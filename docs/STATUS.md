@@ -6,8 +6,8 @@ open under the MIT license. The complete requested VR conversion remains unfinis
 | Area | Implemented and observed | Still required |
 | --- | --- | --- |
 | Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission | Full stereo/culling/temporal acceptance on a physical headset |
-| Head motion | Simulator head translations and rotations modify native camera matrices | Persistent player head anchor, verified world scale and body exclusion |
-| First person | Native iron sights show the game's rifle and arms | Lowering the gun currently restores third person; tracked hands/forearms and gear rig are absent |
+| Head motion | Native player head bone anchors the camera; simulator translations and rotations modify native eye matrices | Verified anatomical eye offset, world scale and all-state acceptance |
+| First person | Player-owned head model and body group excluded; native arms/rifle remain; walking with the gun lowered retained the head camera in the latest capture | Shoulder/sleeve intrusion when looking down; tracked hands/forearms and gear rig |
 | HUD and markers | Native DRAW2D passes and marker update registration identified | Actual UI capture, forearm attachment, interaction and world-anchor projection; current overlays distort during head motion |
 | Weapons | Native AM MRS-4 aim, fire, ammunition decrement and reload observed through OpenXR input | Controller-driven muzzle/ballistics and all-weapon verification |
 | Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
@@ -17,18 +17,19 @@ open under the MIT license. The complete requested VR conversion remains unfinis
 
 ## Build and native runtime evidence
 
-All five local suites passed: 484 core contract checks, 33 D3D11 checks across two
-hardware devices, system DirectInput proxy parity, 100 synthetic camera setter and
-120 getter calls, and process-exit cleanup. These checks do not certify the full mod.
+All five local suites passed: core contracts including tracking suspension/recovery,
+D3D11 checks across two hardware devices, system DirectInput proxy parity, synthetic
+camera setter/getter calls and player visibility ownership/replacement checks, and
+process-exit cleanup. These checks do not certify the full mod.
 GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
 Live simulator build SHA256:
-`8CAAB92ABB4768AE14E189CEE26F4578E9A79459165FF173FF4C41B7606B8F03`.
+`5906E0D2C52C3B95AB220CAFEAC47A897C458C79EE470883D175B8F5F35E3CBF`.
 The tested game is TPP 1.0.15.4, x64/D3D11, executable SHA256
 `085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`.
 
-The current run produced over 78,000 native scene pairs with zero reported scene
+The earlier 8CAAB92A baseline produced over 78,000 native scene pairs with zero reported scene
 capture failures/rejections. A verified duplicate desktop-present append is removed
 for the second eye while preserving the native target setup. A read-only 400-sample
 check found no duplicate entries in that vector. Measured native cadence was 57.75
@@ -42,10 +43,23 @@ only after both lists execute. The consumer submits those source eye poses/FOVs.
 There is no alternate-eye rendering, generated eye, depth reconstruction or mono
 fallback substituted for an active stereo frame.
 
-Two head-camera cancellations were recorded in this run: one stale-tracking event
+Two head-camera cancellations were recorded in that earlier run: one stale-tracking event
 and one deliberate toggle off. This prevents claiming uninterrupted acceptance for
 all earlier footage. Native camera history is provisionally set to the current eye;
 other temporal resources are not yet isolated.
+
+The current camera keeps its activation and origin during tracking stalls, suspends
+eye submission, and resumes on fresh matching tracking. It no longer selects a
+third-person theatre quad because of a tracking timeout. Player visibility resolves
+through the camera's player appearance collection and verifies its ownership backlink;
+it does not hide other actors by scanning the global model list.
+
+The latest test initially suffered black dropouts while the simulator's synthetic
+room helper occupied about 7 GB of dedicated GPU memory plus shared memory. Stopping
+that helper reduced total dedicated usage from roughly 11.7 GB to 5 GB. The following
+59-second recording contained 205 distinct captured frames and no fully black captures.
+This sampled observation does not establish a minimum frame rate or rule out shorter
+dropouts. No head-camera cancellation occurred in that session through this check.
 
 The simulator is Meta XR Simulator v205 with simulated Quest 3. Game UI and gameplay
 were driven through OpenXR actions, with all test launches windowed at 1280x720.
@@ -59,6 +73,11 @@ Private local artifacts retain actual composited left-eye PNGs, action timestamp
 capture metadata and variable-rate MP4s. They are development evidence, not a finished
 mod demo, and are excluded from the public source.
 
+- `fps-head-visibility-movement-left`: 59 seconds, 205 captured frames, 3.47 captures/second.
+  Head translation/rotation, walking, stance changes, firing (29 to 27 rounds), reload
+  (31/169), and walking with the weapon lowered completed. The hair/face obstruction
+  is removed. Shoulder/sleeve geometry still intrudes during some downward views,
+  and HUD/marker distortion is unresolved. This remains failed full-mod acceptance.
 - `native-stereo-six-dof-left`: 90.05 seconds, 441 captured frames, 4.90 captures/second.
   The rotation/fire/reload actions happened after this recording ended; it only
   contains the recorded translation portion of that attempted sequence.

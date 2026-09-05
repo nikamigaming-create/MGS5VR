@@ -1,6 +1,9 @@
 #include "mgs5vr/camera_observer.hpp"
 #include "mgs5vr/camera_consumer.hpp"
 #include "mgs5vr/render_camera.hpp"
+#include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/player_visibility.hpp"
+#include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include <windows.h>
 #include <MinHook.h>
@@ -99,6 +102,23 @@ extern "C" void MgsCameraObserved(void* object,const float* source,uintptr_t cal
     ++totalCalls;
     try {
         std::array<float,8> v;std::memcpy(v.data(),source,sizeof(v));
+        if(ownerContextVerified&&caller==imageBase+0x1118b1a&&context&&mgs5vr::headCamera().available()){
+            // The native camera owner publishes the player root at +0x30 and
+            // bone 4's affine local transform at +0x70. The latter is populated
+            // by the native animation reader, independently of ADS/boom state.
+            std::array<unsigned char,0x388> ownerBytes{};
+            if(readMemory(context[0],ownerBytes)){
+                uintptr_t type{},linked{};std::memcpy(&type,ownerBytes.data(),8);std::memcpy(&linked,ownerBytes.data()+0x380,8);
+                if(type==imageBase+0x23b8218&&linked==reinterpret_cast<uintptr_t>(object)){
+                    std::array<float,16> root{},head{};
+                    std::memcpy(root.data(),ownerBytes.data()+0x30,sizeof(root));
+                    std::memcpy(head.data(),ownerBytes.data()+0x70,sizeof(head));
+                    mgs5vr::headCamera().publishPlayerHead(linked,context[0],{{v[0],v[1],v[2],v[3]},{v[4],v[5],v[6]}},root,head,mgs5vr::steadyMilliseconds());
+                    const auto status=mgs5vr::headCamera().status();
+                    mgs5vr::updatePlayerVisibility(context[0],status.active||status.pending);
+                }
+            }
+        }
         std::lock_guard guard(observationMutex);
         Observation* slot=nullptr;
         for(auto& o:observations)if(o.object==reinterpret_cast<uintptr_t>(object)){slot=&o;break;}
@@ -119,6 +139,7 @@ void installCameraObserver(const std::filesystem::path& evidenceDirectory){
         0x0f,0x28,0x02,0x0f,0x29,0x81,0xf0,0,0,0,0x0f,0x28,0x4a,0x10,
         0x0f,0x29,0x89,0,1,0,0,0xc3};
     imageBase=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+    initializePlayerVisibility(imageBase);
     constexpr std::array<unsigned char,20> callsite{
         0x48,0x8b,0x8e,0x80,0x03,0,0,0x48,0x8d,0x95,0x10,0x03,0,0,
         0x48,0x8b,0x01,0xff,0x50,0x08};

@@ -12,7 +12,7 @@ This repository is **not a complete VR conversion of The Phantom Pain**. It is a
 
 The requested final view is first person: six-axis head tracking, tracked hands and equipped gear, and the complete game HUD on the forearm. Cinematics should use a large screen and native skip actions. Those engine integrations remain outstanding.
 
-The default mode captures the game's desktop image onto a large, world-anchored OpenXR quad. With `-EnableHeadCameraExperiment`, left grip plus left stick click toggles experimental native head tracking and same-frame stereo. Both eye cameras use one tracking snapshot; alternate-eye rendering is not used. The experiment currently needs native iron sights and manual toggling before menus. OpenXR controllers feed the game's own XInput import, without Windows key/mouse injection or window activation. Automatic cinematic switching requires a verified game-state adapter.
+The default mode captures the game's desktop image onto a large, world-anchored OpenXR quad. With `-EnableHeadCameraExperiment`, left grip plus left stick click toggles experimental native head tracking and same-frame stereo. Both eye cameras use one tracking snapshot; alternate-eye rendering is not used. The camera now anchors to the player's head bone and excludes the player's head model and body group while retaining arm groups. Native iron sights are optional; manual toggling before menus is still required. OpenXR controllers feed the game's own XInput import, without Windows key/mouse injection or window activation. Automatic cinematic switching requires a verified game-state adapter.
 
 ## Build
 
@@ -51,13 +51,13 @@ To develop the native stereo experiment, install with all three switches:
 .\tools\install.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP' -EnableTheatrePreview -EnableCameraObserver -EnableHeadCameraExperiment
 ```
 
-In loaded gameplay, enter native iron sights, then hold left grip and click the left stick to toggle the experiment. Toggle it off before opening menus. Lowering the weapon currently restores the game's third-person camera, and the original HUD/markers distort in the eye views. A persistent first-person camera and separated arm HUD are active development work.
+In loaded gameplay, hold left grip and click the left stick to toggle the experiment. Toggle it off before opening menus. The latest simulator capture retained first person while walking with the weapon lowered. Tracking stalls suspend eye submission and resume from the same head origin instead of switching to the third-person theatre screen. Shoulder/sleeve geometry can still intrude when looking down, and the original HUD/markers distort in the eye views. The tracked rig and separated arm HUD remain incomplete.
 
 For the current VR test setup, use native Graphics Settings to set Depth of Field to Disable, Motion Blur to Off, and Post-Processing to Off. Set Camera Shake to Off in Camera Settings. These saved settings were exercised in the simulator; they do not establish that every cinematic or temporal effect is disabled.
 
 The current DLL takes the `dinput8.dll` slot and cannot yet be chained with IHHook or another DirectInput proxy. It activates only in `mgsvtpp.exe`, never `mgsvmgo.exe`. The module remains loaded until process exit. Restart the game to replace it.
 
-With Meta XR Operator loaded, closing the game can take roughly 20 seconds while the runtime and Operator server finish shutting down. The preview requests normal OpenXR session exit and allows up to 30 seconds for cleanup before native process exit; this path was verified in the game.
+With Meta XR Operator loaded, closing the game can take roughly 20 seconds while the runtime and Operator server finish shutting down. The preview requests normal OpenXR session exit and allows up to 30 seconds for cleanup before native process exit. One native exit completed, but later sessions stalled at instance destruction; shutdown reliability remains unresolved.
 
 The current Touch controller mapping passes A/B/X/Y, sticks, triggers, grip buttons and stick clicks to the corresponding Xbox controls. Tap left Menu for Start/iDroid; hold it for at least 0.55 seconds for Back/Pause. Both paths have been exercised in the game through Meta XR Operator. Tracking/focus loss and stale samples release virtual inputs. Other controller profiles have incomplete bindings; D-pad actions and motion aiming are not implemented.
 
@@ -77,4 +77,4 @@ The optional `-EnableCameraObserver` installation switch enables a version-check
 
 Modified files are preserved and require manual review. `mgs5vr.log` is retained for diagnostics.
 
-See [implementation status](docs/STATUS.md), [architecture](docs/ARCHITECTURE.md), and [acceptance matrix](docs/ACCEPTANCE.md) before testing. They distinguish implemented code, verified behavior, and outstanding work.
+See [implementation status](docs/STATUS.md), [architecture](docs/ARCHITECTURE.md), [acceptance matrix](docs/ACCEPTANCE.md), and the [development handoff](docs/HANDOFF.md) before testing. They distinguish implemented code, verified behavior, and outstanding work.

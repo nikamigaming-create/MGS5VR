@@ -40,6 +40,27 @@ This prototype produced complete pairs and full-eye native gameplay in Meta XR S
 
 ## Camera diagnostics
 
+The player-camera publication also supplies the player's world transform and animated
+head-bone transform. The opt-in head camera validates these rigid transforms and joins
+the derived head position to the exact native camera object and source pose before
+applying the HMD delta. It replaces the third-person boom position without holding ADS.
+Tracked poses older than 150 ms suspend writes/submission while preserving the origin
+and activation; fresh tracking resumes. Camera identity or matrix mismatches still cancel.
+
+Player visibility follows the camera's player pointer to its appearance component and
+bounded model collection, checking the ownership backlink and expected runtime types.
+The separate head model is hidden only when it contains the head group and no body or
+arm group. The body group uses verified native visibility functions; arm groups remain.
+Restoration checks the same ownership and expected hidden state, so an appearance
+replacement or native mask change is not overwritten. Shoulder/sleeve intrusion still
+requires a proper first-person rig.
+
+The experimental UI adapter carries the source eye through native UI job enqueue and
+worker execution. Projection changes require an exact camera/view match and a fresh,
+active source generation. Only some observed UI jobs match these checks. This is
+unfinished groundwork: there is no HUD pixel extraction, wrist attachment, or proven
+world-marker correction.
+
 The optional private camera evidence directory enables bounded owner snapshots and getter-consumer records. The caller and instruction signatures are checked against the exact executable baseline; diagnostic getters return the native pointer unchanged. Observations distinguish camera publication from downstream reads, but are sampled summaries without a shared render-frame identifier. They must not be used as the source transaction for a tracked rig or HUD.
 
 Native first-person aiming changes which pose one conditional getter returns. This is not sufficient to classify first-person gameplay, since title cameras can select the same storage. Affine pose conversion, inverse view, viewport publication and perspective builders are now integrated in the experimental scene path under exact executable signatures. Weapon and HUD state still need to join that source transaction.

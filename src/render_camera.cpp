@@ -3,6 +3,7 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/scene_capture.hpp"
+#include "mgs5vr/ui_renderer.hpp"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -100,6 +101,7 @@ void record(Pair& p){
 __declspec(noinline) uintptr_t projection(float* output,float a,float b,float c,float d,float e,float f,float g,float h,float i){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const auto result=originalProjection(output,a,b,c,d,e,f,g,h,i);
+    if(enabled.load()&&caller==base+0x2e68a0)mgs5vr::applyUiEyeProjection(output);
     if(!enabled.load()||!eyeViewport)return result;
     const bool clip=caller==base+0x1b9691&&reinterpret_cast<uintptr_t>(output)==eyeViewport+0x300;
     const bool gpu=caller==base+0x1b9724&&reinterpret_cast<uintptr_t>(output)==eyeViewport+0x280;
@@ -132,7 +134,7 @@ struct NativeRestore {
         std::memcpy(reinterpret_cast<void*>(camera+0x30),cameraMatrices.data(),cameraMatrices.size());
         std::memcpy(reinterpret_cast<void*>(viewport+0x280),viewportMatrices.data(),viewportMatrices.size());
     }
-    ~NativeRestore(){restore();eyeViewport=0;stereoTarget=0;drawingEye={};insideStereo=false;}
+    ~NativeRestore(){restore();mgs5vr::clearUiRenderSource();eyeViewport=0;stereoTarget=0;drawingEye={};insideStereo=false;}
 };
 __declspec(noinline) uintptr_t registerTarget(void* graphics,void* target){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
@@ -193,7 +195,9 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         std::memcpy(reinterpret_cast<void*>(source.viewport+0x3c0),eyeView.data(),sizeof(eyeView));
         std::memcpy(reinterpret_cast<void*>(source.viewport+0x400),reinterpret_cast<void*>(source.viewport+0x280),sizeof(eyeView));
         drawingEye.projected=true;
+        mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView);
         result=originalScene(render,graphics,task,worker);
+        mgs5vr::clearUiRenderSource();
         // Native passes may finish and replace the current deferred context.
         const auto afterOwner=field<uintptr_t>(graphics,0x150);
         auto* afterContext=afterOwner?field<ID3D11DeviceContext*>(reinterpret_cast<void*>(afterOwner),8):nullptr;
@@ -311,6 +315,7 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
         throw std::runtime_error("Cannot enable native scene/matrix hooks");
     }
     enabled.store(true);
+    try{installUiRenderer(base);}catch(const std::exception& ex){log(std::string("Native UI integration unavailable: ")+ex.what());}
     log("Native camera matrix integration installed; head control remains off until explicitly toggled");
 }
 void reportRenderCamera(){
@@ -319,6 +324,7 @@ void reportRenderCamera(){
     PresentTrace presentSnapshot;Pair failureSnapshot;std::array<ViewportSample,8> viewportSnapshot;
     {std::lock_guard lock(latestMutex);snapshot=latest;presentSnapshot=presentTrace;failureSnapshot=lastMatrixFailure;viewportSnapshot=viewports;}
     const auto status=headCamera().status();
+    reportUiRenderer(evidence);
     evidence<<"{\"event\":\"native_scene_pairs\",\"calls\":"<<sceneCalls.load()<<",\"pairs\":"<<scenePairs.load()
         <<",\"copies\":"<<sceneCopies.load()<<",\"rejected\":"<<sceneRejected.load()<<",\"thread\":"<<sceneThread.load()
         <<",\"d3d_context_type\":"<<sceneContextType.load()<<",\"failure\":"<<sceneFailure.load()
@@ -329,7 +335,10 @@ void reportRenderCamera(){
     for(const auto& p:snapshot)if(p.camera){
         evidence<<"{\"tick_ms\":"<<p.tick<<",\"camera\":\"0x"<<std::hex<<p.camera<<std::dec<<"\",\"sequence\":"<<p.sequence
             <<",\"thread\":"<<p.thread<<",\"tracking_sequence\":"<<p.sample.trackingSequence<<",\"applied\":"<<(p.applied?"true":"false")
-            <<",\"inverse_valid\":"<<(p.validInverse?"true":"false")<<",\"pose\":";array(values(p.sample.nativePose));
+            <<",\"inverse_valid\":"<<(p.validInverse?"true":"false")
+            <<",\"player_sequence\":"<<p.sample.playerSequence<<",\"player_owner\":"<<p.sample.playerOwner
+            <<",\"player_head\":";array(std::array<float,3>{p.sample.playerHead.x,p.sample.playerHead.y,p.sample.playerHead.z});
+        evidence<<",\"pose\":";array(values(p.sample.nativePose));
         evidence<<",\"world\":";array(p.world);evidence<<",\"view\":";array(p.view);
         evidence<<",\"inverse_error\":"<<p.inverseError<<",\"active\":"<<(status.active?"true":"false")
             <<",\"stop_reason\":"<<static_cast<unsigned>(status.reason)<<",\"cancellations\":"<<status.cancellations<<"}\n";
@@ -362,5 +371,5 @@ EyeFrame observeRenderPresent(void*) noexcept {
     try{std::unique_lock lock(latestMutex,std::try_to_lock);if(lock.owns_lock())presentTrace=next;}catch(...){}
     return {}; // Scene-capture command-list metadata owns the image/pose join.
 }
-void stopRenderCamera() noexcept {enabled.store(false);headCamera().cancel();try{reportRenderCamera();evidence.close();}catch(...){}}
+void stopRenderCamera() noexcept {enabled.store(false);stopUiRenderer();headCamera().cancel();try{reportRenderCamera();evidence.close();}catch(...){}}
 }

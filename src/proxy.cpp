@@ -99,7 +99,8 @@ DWORD WINAPI initialize(void*){
                 installCameraObserver(evidencePath.data());
                 if(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1){
                     installRenderCamera(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),evidencePath.data());
-                    headCamera().configure(true);
+                    headCamera().configure(true,1,true);
+                    log("Native VR camera requires a matching player head-bone publication; ADS no longer supplies its position");
                 }
             }catch(const std::exception& e){log(std::string("Camera observer unavailable: ")+e.what());}
         }

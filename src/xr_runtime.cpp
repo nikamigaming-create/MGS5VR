@@ -419,8 +419,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         if(eyeEpoch!=consumer.frame().epoch){eyeFrames={};eyeEpoch=consumer.frame().epoch;}
         const auto cameraStatus=headCamera().status();
         if(frame.shouldRender&&consumer.frame().sequence){
-            if(!cameraStatus.active){screen.upload(consumer.texture(),consumer.frame());eyeFrames={};}
-            else {
+            if(!cameraStatus.active&&!cameraStatus.pending){screen.upload(consumer.texture(),consumer.frame());eyeFrames={};}
+            else if(cameraStatus.active&&!cameraStatus.suspended){
                 const auto metadata=consumer.eyes();
                 if(readyEyePair(metadata,cameraStatus.activation,steadyMilliseconds())){
                     for(size_t n=0;n<2;++n){auto& target=*eyeScreens[n];target.upload(consumer.texture(),consumer.frame(),static_cast<uint32_t>(n));
@@ -445,8 +445,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         }
         XrFrameEndInfo end{XR_TYPE_FRAME_END_INFO};end.displayTime=frame.predictedDisplayTime;end.environmentBlendMode=XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
         if(frame.shouldRender&&tracking){
-            if(cameraStatus.active){
-                if(readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds())){
+            if(cameraStatus.active||cameraStatus.pending){
+                if(cameraStatus.active&&!cameraStatus.suspended&&readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds())){
                     layer=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);end.layerCount=1;end.layers=&layer;++projectionFrames;
                 }
             }else if(anchored&&screen.ready){end.layerCount=1;end.layers=&layer;++stats.submittedScreens;}

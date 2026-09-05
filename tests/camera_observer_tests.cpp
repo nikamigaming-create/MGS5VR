@@ -1,5 +1,6 @@
 #include "mgs5vr/core.hpp"
 #include "mgs5vr/camera_consumer.hpp"
+#include "mgs5vr/player_visibility.hpp"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
@@ -15,6 +16,44 @@ extern void* MgsCameraTrampoline;
 void MgsCameraIntercept();
 }
 namespace {
+int visibilityChecks(){
+    constexpr uintptr_t base=0x10000;
+    std::array<unsigned char,0x388> owner{};
+    std::array<unsigned char,0x618> character{};
+    std::array<unsigned char,0x50> parts{};
+    std::array<unsigned char,0x18> list{};
+    std::array<unsigned char,0x48> renderer{};
+    std::array<unsigned char,0x200> model{},replacement{};
+    std::array<uint32_t,3> groups{0xf948d635,0xa9e88501,0xdc3a5d6d};
+    std::array<uintptr_t,1> records{},entry{};
+    const auto address=[](auto& a){return reinterpret_cast<uintptr_t>(a.data());};
+    const auto put=[](auto& a,size_t offset,auto value){std::memcpy(a.data()+offset,&value,sizeof(value));};
+    const auto mask=[](const auto& a){uint32_t value{};std::memcpy(&value,a.data()+0x1a4,4);return value;};
+    put(owner,0,base+0x23b8218);put(owner,0x370,address(character));
+    put(character,0,base+0x2295210);put(character,0x610,address(parts));
+    put(parts,0,base+0x22e56c0);put(parts,0x38,address(character));put(parts,0x48,address(list));
+    put(list,0,base+0x2215c78);put(list,8,address(records));put(list,0x10,uint32_t{1});
+    records[0]=address(entry);entry[0]=address(renderer);
+    put(renderer,0,base+0x20f9460);put(renderer,0x40,address(model));
+    put(model,0,base+0x20f4d90);put(model,0x180,address(groups));put(model,0x1e8,uint16_t{3});put(model,0x1a4,uint32_t{2});
+    const auto original=model;int failures=0;
+    mgs5vr::initializePlayerVisibility(base);
+    const auto update=[&](bool enabled){mgs5vr::updatePlayerVisibility(address(owner),enabled);};
+    update(true);auto expected=original;put(expected,0x1a4,uint32_t{0xffffffff});
+    if(model!=expected)++failures;
+    update(false);if(model!=original)++failures;
+    put(parts,0x38,uintptr_t{});update(true);if(model!=original)++failures;
+    put(parts,0x38,address(character));groups[2]=0x4e74fd8c;
+    update(true);if(model!=original)++failures;groups[2]=0xdc3a5d6d;
+    put(list,0x10,uint32_t{33});update(true);if(model!=original)++failures;
+    put(list,0x10,uint32_t{1});update(true);put(model,0x1a4,uint32_t{4});
+    update(false);if(mask(model)!=4)++failures;model=original;
+    update(true);replacement=original;put(renderer,0x40,address(replacement));
+    update(true);update(false);
+    if(mask(model)!=0xffffffff||replacement!=original)++failures;
+    std::cout<<"Player visibility ownership, mixed arm/head refusal, bounded lists and appearance replacement; "<<failures<<" failures.\n";
+    return failures;
+}
 int consumerChecks(){
     // Synthetic camera storage, including both branches of each native getter.
     // The test checks pointer identity and that observing never mutates storage.
@@ -94,6 +133,6 @@ int main(){
     }
     MH_DisableHook(code);MH_RemoveHook(code);VirtualFree(code,0,MEM_RELEASE);
     std::cout<<"100 synthetic setter calls through camera observer; "<<failures<<" failures. Not in-game camera proof.\n";
-    failures+=consumerChecks();MH_Uninitialize();
+    failures+=consumerChecks();failures+=visibilityChecks();MH_Uninitialize();
     return failures?1:0;
 }

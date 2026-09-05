@@ -40,6 +40,35 @@ int main(){
     expect(near(l.position.x,10.032f)&&near(r.position.x,9.968f),"same-frame eye offsets preserve runtime IPD in FOX camera axes");
     expect(near(l.position.y,r.position.y)&&near(l.position.z,r.position.z),"parallel eye cameras do not introduce toe-in or vertical disparity");
     HeadCamera camera;
+    const std::array<float,16> playerRoot{0,0,-1,0,0,1,0,0,1,0,0,0,500,300,1300,1};
+    auto headBone=std::array<float,16>{1,0,0,0,0,1,0,0,0,0,1,0,0,1.6f,0.1f,1};
+    const auto headPoint=playerHeadPosition(playerRoot,headBone);
+    expect(headPoint&&same(*headPoint,{500.1f,301.6f,1300}),"animated head position uses local-then-world transform order");
+    auto invalidRoot=playerRoot;invalidRoot[0]=std::numeric_limits<float>::quiet_NaN();
+    expect(!playerHeadPosition(invalidRoot,headBone),"nonfinite player root cannot move the VR camera");
+    invalidRoot=playerRoot;invalidRoot[2]=1;
+    expect(!playerHeadPosition(invalidRoot,headBone),"reflected player transform cannot reverse stereo handedness");
+    invalidRoot=playerRoot;invalidRoot[5]=2;
+    expect(!playerHeadPosition(invalidRoot,headBone),"scaled player transform requires a separate world-scale contract");
+    HeadCamera firstPerson;firstPerson.configure(true,1,true);firstPerson.track({},true,100);
+    const Pose thirdPerson{{},{500,303,1305}};
+    expect(firstPerson.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,100),"native player head joins its camera publication");
+    firstPerson.toggle();auto firstView=firstPerson.resolve(11,thirdPerson,100);
+    expect(firstView.applied&&same(firstView.nativePose.position,*headPoint)&&firstView.playerOwner==22&&firstView.playerSequence==1,
+           "VR starts at the player head even when the native camera is behind the player");
+    headBone[13]=0.3f;const Pose lowered{{},{500,301,1303}};
+    firstPerson.track(Pose{{},{0.2f,0.1f,-0.1f}},true,110);
+    firstPerson.publishPlayerHead(11,22,lowered,playerRoot,headBone,110);
+    firstView=firstPerson.resolve(11,lowered,110);
+    expect(firstView.applied&&same(firstView.nativePose.position,{499.9f,300.4f,1300.1f}),
+           "prone head height and six-axis tracking do not inherit the third-person boom");
+    const auto savedHeadView=firstView;
+    auto mismatchedCamera=lowered;mismatchedCamera.position.z+=1;
+    expect(!firstPerson.resolve(11,mismatchedCamera,110).applied&&firstPerson.status().reason==HeadCameraStop::playerHeadUnavailable,
+           "unmatched camera generation cancels instead of attaching an unrelated player pose");
+    expect(same(savedHeadView.nativePose.position,{499.9f,300.4f,1300.1f}),"published player-eye frame remains immutable");
+    firstPerson.track({},true,300);firstPerson.toggle();
+    expect(!firstPerson.resolve(11,lowered,300).applied,"stale player head cannot survive a fresh headset sample");
     const Pose nativeCamera{{},{10,20,30}};
     camera.track({},true,100);camera.toggle();
     expect(!camera.resolve(1,nativeCamera,100).applied,"native head camera is opt-in");
@@ -55,11 +84,15 @@ int main(){
     expect(!camera.resolve(2,nativeCamera,120).applied&&!camera.active(),"camera identity change cancels explicit activation");
     expect(camera.status().reason==HeadCameraStop::cameraChanged,"camera identity cancellation records its reason");
     camera.toggle();camera.resolve(1,nativeCamera,120);
-    expect(!camera.resolve(1,nativeCamera,271).applied&&!camera.active(),"stale tracking cancels native camera writes");
-    expect(camera.status().reason==HeadCameraStop::staleTracking,"stale tracking cancellation remains observable");
-    camera.track({},true,300);camera.toggle();camera.resolve(1,nativeCamera,300);
+    const auto activationBeforeStall=camera.status().activation;
+    expect(!camera.resolve(1,nativeCamera,271).applied&&camera.active()&&camera.status().suspended,"stale tracking suspends camera writes while preserving VR intent");
+    expect(camera.status().reason==HeadCameraStop::staleTracking,"stale tracking suspension remains observable");
+    camera.track(Pose{{},{5,5,-6}},true,300);resolved=camera.resolve(1,nativeCamera,300);
+    expect(resolved.applied&&same(resolved.nativePose.position,{9,20,30})&&!camera.status().suspended
+        &&camera.status().activation==activationBeforeStall,"fresh tracking resumes the same origin and stereo activation without a third-person fallback");
     camera.track({},false,301);
-    expect(!camera.resolve(1,nativeCamera,301).applied,"tracking loss restores the native camera");
+    expect(!camera.resolve(1,nativeCamera,301).applied&&camera.active()&&camera.status().suspended,"tracking loss suspends rendering without submitting a theatre view");
+    camera.toggle();expect(!camera.active()&&!camera.status().suspended,"manual disable still works while tracking is suspended");
     camera.track({},true,400);camera.toggle();camera.resolve(1,nativeCamera,400);
     camera.track(Pose{{0.70710678f,0,0,0.70710678f},{}},true,410);
     resolved=camera.resolve(1,nativeCamera,410);
