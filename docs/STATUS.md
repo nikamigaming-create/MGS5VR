@@ -1,0 +1,80 @@
+# Status: experimental native VR mod
+
+Updated 2026-09-05. The mod source, native adapters, tests and build tooling are
+open under the MIT license. The complete requested VR conversion remains unfinished.
+
+| Area | Implemented and observed | Still required |
+| --- | --- | --- |
+| Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission | Full stereo/culling/temporal acceptance on a physical headset |
+| Head motion | Simulator head translations and rotations modify native camera matrices | Persistent player head anchor, verified world scale and body exclusion |
+| First person | Native iron sights show the game's rifle and arms | Lowering the gun currently restores third person; tracked hands/forearms and gear rig are absent |
+| HUD and markers | Native DRAW2D passes and marker update registration identified | Actual UI capture, forearm attachment, interaction and world-anchor projection; current overlays distort during head motion |
+| Weapons | Native AM MRS-4 aim, fire, ammunition decrement and reload observed through OpenXR input | Controller-driven muzzle/ballistics and all-weapon verification |
+| Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
+| Effects | Native graphics UI saved DOF Disable, motion blur Off and post-processing Off; camera shake Off persisted on reopening settings | Verify remaining cinematic effects and isolate any shared per-eye temporal resources |
+| Save | Continue/Resume loads the existing checkpoint and equipped rifle | Automatic startup state adapter |
+| Cinematics | Default large-screen theatre preview and native game controls | Automatic cinematic classification and complete skip coverage |
+
+## Build and native runtime evidence
+
+All five local suites passed: 484 core contract checks, 33 D3D11 checks across two
+hardware devices, system DirectInput proxy parity, 100 synthetic camera setter and
+120 getter calls, and process-exit cleanup. These checks do not certify the full mod.
+GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
+explicitly excluded on hosted runners. Game/headset tests require a separate local run.
+
+Live simulator build SHA256:
+`8CAAB92ABB4768AE14E189CEE26F4578E9A79459165FF173FF4C41B7606B8F03`.
+The tested game is TPP 1.0.15.4, x64/D3D11, executable SHA256
+`085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`.
+
+The current run produced over 78,000 native scene pairs with zero reported scene
+capture failures/rejections. A verified duplicate desktop-present append is removed
+for the second eye while preserving the native target setup. A read-only 400-sample
+check found no duplicate entries in that vector. Measured native cadence was 57.75
+pairs/second over one eight-second interval without recording, and approximately
+50.7 pairs/second over an 88-second simulator PNG recording interval. These are
+bounded measurements, not a minimum frame-rate guarantee.
+
+Both images and their camera metadata share one native source/tracking/activation
+family. Copies are associated with their actual D3D11 command lists and published
+only after both lists execute. The consumer submits those source eye poses/FOVs.
+There is no alternate-eye rendering, generated eye, depth reconstruction or mono
+fallback substituted for an active stereo frame.
+
+Two head-camera cancellations were recorded in this run: one stale-tracking event
+and one deliberate toggle off. This prevents claiming uninterrupted acceptance for
+all earlier footage. Native camera history is provisionally set to the current eye;
+other temporal resources are not yet isolated.
+
+The simulator is Meta XR Simulator v205 with simulated Quest 3. Game UI and gameplay
+were driven through OpenXR actions, with all test launches windowed at 1280x720.
+The system runtime registry selection is preserved. Elliott's simulator passed a
+bounded headless OpenXR probe; its game-rendering path remains unverified. A physical
+runtime reported no available headset, so physical headset acceptance is outstanding.
+
+## Recordings and failed acceptance
+
+Private local artifacts retain actual composited left-eye PNGs, action timestamps,
+capture metadata and variable-rate MP4s. They are development evidence, not a finished
+mod demo, and are excluded from the public source.
+
+- `native-stereo-six-dof-left`: 90.05 seconds, 441 captured frames, 4.90 captures/second.
+  The rotation/fire/reload actions happened after this recording ended; it only
+  contains the recorded translation portion of that attempted sequence.
+- `native-stereo-complete-sequence-left`: 60.14 seconds, 281 captured frames,
+  4.67 captures/second. The scripted sequence completed; complete visual acceptance
+  and correlation with the tracking cancellation remain outstanding.
+- `native-stereo-movement-effects-off-left`: 75.20 seconds, 238 captured frames,
+  3.16 captures/second. Movement reached the game, but lowering the gun visibly
+  returned to third person and the sequence ended prone. This fails persistent
+  first-person acceptance. HUD warping and body clipping remain visible defects.
+
+Recording cadence is separate from native game cadence. None of these recordings
+is a 60 FPS video, and none contains the requested functioning forearm HUD or tracked
+weapon rig. No qualifying single-eye demonstration exists. The mod is not ready for
+the user's requested trial, and no zero-bug or all-weapons claim is made.
+
+See [acceptance](ACCEPTANCE.md) for the remaining observable gates and
+[architecture](ARCHITECTURE.md) for the rendering contracts. Private logs and raw
+analysis stay outside public source and distributions.

@@ -1,0 +1,12 @@
+{
+  "version": 3,
+  "configurePresets": [{
+    "name": "windows-x64", "generator": "Visual Studio 17 2022", "architecture": "x64",
+    "binaryDir": "${sourceDir}/build", "cacheVariables": {
+      "FETCHCONTENT_SOURCE_DIR_OPENXR": "${sourceDir}/.deps/OpenXR-SDK",
+      "FETCHCONTENT_SOURCE_DIR_MINHOOK": "${sourceDir}/.deps/minhook"
+    }
+  }],
+  "buildPresets": [{"name": "release", "configurePreset": "windows-x64", "configuration": "Release"}],
+  "testPresets": [{"name": "release", "configurePreset": "windows-x64", "configuration": "Release", "output": {"outputOnFailure": true}}]
+}

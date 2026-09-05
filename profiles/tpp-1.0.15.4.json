@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "game": "Metal Gear Solid V: The Phantom Pain",
+  "file_version": "1.0.15.4",
+  "steam_build_id": "24176213",
+  "sha256": "085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45",
+  "engine_hooks_verified": false,
+  "diagnostic_camera_observer": {
+    "setter_rva": "0x44e960",
+    "observed_caller_rva": "0x1118b1a",
+    "live_observed": true,
+    "owner_link_observed": true,
+    "getter_rvas": [
+      "0x44ddd0",
+      "0x44dc70",
+      "0x44dca0"
+    ],
+    "getter_consumers_observed": true,
+    "affine_matrix_builder_candidates": [
+      "0x438ac0",
+      "0x438c20"
+    ],
+    "matrix_builder_runtime_outputs_verified": true,
+    "writes_camera": false,
+    "scene_authority_verified": false,
+    "world_units_per_meter": null,
+    "first_person_anchor": null
+  },
+  "stereo_camera": null,
+  "cinematic_state": null,
+  "cinematic_skip": null,
+  "hud_pixel_source": null,
+  "semantic_input": null,
+  "native_gamepad_input": "Game XINPUT1_3 XInputGetState import; basic Touch bindings exercised through Meta XR Operator",
+  "weapon_transform": null,
+  "muzzle_and_ballistics": null,
+  "native_scene_experiment": {
+    "world_builder_rva": "0x438ac0",
+    "view_builder_rva": "0x438c20",
+    "viewport_publication_rva": "0x1b9490",
+    "perspective_builder_rva": "0x241b00",
+    "render_job_rva": "0x1bd390",
+    "scene_draw_rva": "0x1beec0",
+    "present_target_setup_rva": "0x2496a0",
+    "present_target_scene_return_rva": "0x1bef27",
+    "same_simulation_frame_required": true,
+    "alternate_eye_rendering": false,
+    "live_complete_eye_pairs_observed": true,
+    "live_projection_layer_observed": true,
+    "live_stereo_verified": false,
+    "physical_headset_verified": false
+  }
+}

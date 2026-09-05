@@ -1,0 +1,12 @@
+* text=auto eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.asm text eol=lf
+*.py text eol=lf
+*.ps1 text eol=crlf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.svg text eol=lf
+# Preserve upstream license formatting exactly, including final blank lines.
+licenses/** -whitespace

@@ -1,0 +1,80 @@
+# MGS5VR — native stereo experiment
+
+[![Windows build](https://github.com/nikamigaming-create/MGS5VR/actions/workflows/windows.yml/badge.svg?branch=main)](https://github.com/nikamigaming-create/MGS5VR/actions/workflows/windows.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Platform: Windows x64](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![API: D3D11 + OpenXR](https://img.shields.io/badge/API-D3D11%20%2B%20OpenXR-blue)
+[![Status: experimental](https://img.shields.io/badge/status-experimental-orange)](docs/STATUS.md)
+
+The mod's implementation, native build adapters, tests and build tooling are open source under the [MIT license](LICENSE). Dependencies are pinned open-source projects with [retained notices](docs/THIRD_PARTY_NOTICES.md). Building requires no private mod code. Running requires your own installation of the game and an OpenXR runtime; neither is redistributed here. This is an independent community project.
+
+This repository is **not a complete VR conversion of The Phantom Pain**. It is a native Windows x64/D3D11/OpenXR development experiment. An opt-in native scene hook now draws both eyes within one game render transaction and submits a projection layer. Live simulator gameplay has produced complete eye pairs, but stereo acceptance remains incomplete. The arm HUD, tracked first-person rig, motion-controlled weapons and universal cinematic skipping are not implemented.
+
+The requested final view is first person: six-axis head tracking, tracked hands and equipped gear, and the complete game HUD on the forearm. Cinematics should use a large screen and native skip actions. Those engine integrations remain outstanding.
+
+The default mode captures the game's desktop image onto a large, world-anchored OpenXR quad. With `-EnableHeadCameraExperiment`, left grip plus left stick click toggles experimental native head tracking and same-frame stereo. Both eye cameras use one tracking snapshot; alternate-eye rendering is not used. The experiment currently needs native iron sights and manual toggling before menus. OpenXR controllers feed the game's own XInput import, without Windows key/mouse injection or window activation. Automatic cinematic switching requires a verified game-state adapter.
+
+## Build
+
+Requires Windows x64, Visual Studio 2022 C++ build tools and Windows SDK, Git, CMake 3.24+, and Python 3. Run from this repository:
+
+```powershell
+.\tools\build.ps1
+```
+
+Dependencies are pinned: Khronos OpenXR SDK 1.1.49 (`977f6675...`), MinHook 1.3.4 (`c3fcafdc...`). The OpenXR loader is statically linked. The Visual C++ runtime is required. Build outputs are in `build/Release/`.
+
+The Windows CI badge reports the real build and four tests that do not require a GPU. The fifth suite exercises two hardware D3D11 devices locally. CI does not run MGSV or a headset, and the badge does not certify VR playability. Development build artifacts are experimental. See [contributing](CONTRIBUTING.md) for the evidence requirements.
+
+## Check the selected OpenXR runtime
+
+```powershell
+.\build\Release\mgs5vr_probe.exe
+.\build\Release\mgs5vr_probe.exe --session-seconds 10
+```
+
+The second command creates a bounded session without game pixels. Exit status distinguishes missing headset (2), no progressing session (3), and session failure (4). The probe also prints a structured error. Some runtimes print their own diagnostics alongside the JSON.
+
+For a locally installed simulator, set `XR_RUNTIME_JSON` only in the launching PowerShell process to that simulator's manifest. This project does not change the system OpenXR registry selection. Simulator validation cannot certify a physical headset.
+
+## Install the current preview
+
+Close the game first. The installer supports only the recorded SHA256 of TPP 1.0.15.4, refuses existing proxy/config files, and records hashes for removal. It does not modify the executable, game archives, or saves.
+
+```powershell
+.\tools\install.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP' -EnableTheatrePreview
+```
+
+To develop the native stereo experiment, install with all three switches:
+
+```powershell
+.\tools\install.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP' -EnableTheatrePreview -EnableCameraObserver -EnableHeadCameraExperiment
+```
+
+In loaded gameplay, enter native iron sights, then hold left grip and click the left stick to toggle the experiment. Toggle it off before opening menus. Lowering the weapon currently restores the game's third-person camera, and the original HUD/markers distort in the eye views. A persistent first-person camera and separated arm HUD are active development work.
+
+For the current VR test setup, use native Graphics Settings to set Depth of Field to Disable, Motion Blur to Off, and Post-Processing to Off. Set Camera Shake to Off in Camera Settings. These saved settings were exercised in the simulator; they do not establish that every cinematic or temporal effect is disabled.
+
+The current DLL takes the `dinput8.dll` slot and cannot yet be chained with IHHook or another DirectInput proxy. It activates only in `mgsvtpp.exe`, never `mgsvmgo.exe`. The module remains loaded until process exit. Restart the game to replace it.
+
+With Meta XR Operator loaded, closing the game can take roughly 20 seconds while the runtime and Operator server finish shutting down. The preview requests normal OpenXR session exit and allows up to 30 seconds for cleanup before native process exit; this path was verified in the game.
+
+The current Touch controller mapping passes A/B/X/Y, sticks, triggers, grip buttons and stick clicks to the corresponding Xbox controls. Tap left Menu for Start/iDroid; hold it for at least 0.55 seconds for Back/Pause. Both paths have been exercised in the game through Meta XR Operator. Tracking/focus loss and stale samples release virtual inputs. Other controller profiles have incomplete bindings; D-pad actions and motion aiming are not implemented.
+
+Use Continue and then Resume Game to load the existing checkpoint and its equipped gear. This path was exercised with the saved AM MRS-4. The current save uses the game's Action Type layout: left trigger aims, right trigger fires, right grip changes to iron sights while aiming, and right B reloads. Left X is a quick dive outside aim, not reload. Controls retain the game's selected layout. Automatic startup directly into the save is not implemented.
+
+Edit `mgs5vr.ini` while the game is closed: `width_cm=800`, `distance_cm=600`. Supported range is 100–3000 cm. Hold both grips and click the right stick to recenter the screen. Suggested bindings on other controllers are unverified; simple controllers lack the grip chord. Cinematic skipping uses the game's existing controls; no universal skip hook is present.
+
+For simulator testing, `tools/launch-simulator.ps1` takes `-GameDir`, `-RuntimeManifest`, optional `-OperatorDir`, and `-Headless` for Elliott's headless simulator. It enforces a normal **1280×720 window**, backs up any graphics configuration it changes, and sets runtime variables only for the launched process. It preserves the system OpenXR registry. The chosen runtime and Operator must already be installed. The Meta/Operator launch path has been exercised with actual 1280×720 game capture.
+
+The optional `-EnableCameraObserver` installation switch enables a version-checked diagnostic setter hook. It records retail camera transforms and does not alter the camera. It is development evidence, not a 6DoF mode.
+
+## Remove
+
+```powershell
+.\tools\uninstall.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP'
+```
+
+Modified files are preserved and require manual review. `mgs5vr.log` is retained for diagnostics.
+
+See [implementation status](docs/STATUS.md), [architecture](docs/ARCHITECTURE.md), and [acceptance matrix](docs/ACCEPTANCE.md) before testing. They distinguish implemented code, verified behavior, and outstanding work.
