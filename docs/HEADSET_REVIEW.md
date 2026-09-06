@@ -173,7 +173,14 @@ additional report questions shadow placement and spatial audio.
 The current stereo path shares native temporal resources between eyes, and
 only its scene projection/view publication is explicitly adapted. Wider-FOV
 culling and secondary lighting/shadow camera consumers are not accepted. There
-is no explicit HMD audio-listener adapter in the current source. These are
-investigation leads, not established causes. The desktop mirror recording
+was no explicit HMD audio-listener adapter in the recorded source. These were
+investigation leads. The desktop mirror recording
 cannot prove head-relative sound localization or binocular shadow agreement.
 No renderer or audio fix is claimed by the arm/HUD follow-up.
+
+The subsequent centered-projection SIM check removed the reproduced sky rectangle
+with Volumetric Clouds restored to On. A later guarded listener adapter now feeds
+the same center-head publication to the native audio setters; yaw, pitch, lean and
+theatre restoration were observed. These checks are documented in
+[SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md). They do not establish physical shadow or
+sound-localization accuracy, and the garment/arm gate remains open.

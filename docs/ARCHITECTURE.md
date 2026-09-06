@@ -42,7 +42,7 @@ The default mode is a mono video surface in a stereo environment. Rendered cinem
 ```text
 One native camera publication + one OpenXR tracking snapshot
   -> native scene-draw hook, inside the native render job
-  -> eye 0: native world/view + asymmetric projection, native scene draw, GPU copy
+  -> eye 0: native world/view + centered enclosing projection, native scene draw, GPU copy
   -> eye 1: same transaction, second native camera/draw/copy
   -> restore native matrices; keep one desktop present registration
   -> observe exact FinishCommandList identities for each eye copy
@@ -52,6 +52,29 @@ One native camera publication + one OpenXR tracking snapshot
 ```
 
 Both draws use the same source, tracking and activation identifiers. Different native frames cannot be paired. The scene replay does not advance the game update, and checks that camera publication has not advanced during the pair. No alternate-eye scheduling, mono duplication, generated image or depth reconstruction is used. During active stereo, a present without a new complete pair retains the preceding stereo mailbox instead of replacing it with mono. The XR gate rejects missing, mismatched or stale pairs.
+
+The centered render FOV encloses each runtime view and is carried unchanged with
+its pixels into projection-layer submission. This removed the sampled screen-fixed
+sky rectangle. Native source/culling projection and shared temporal resources still
+need separate acceptance; wider render coverage alone does not prove those passes.
+
+## Native listener publication
+
+The version-gated camera publisher selects its listener at publisher+0x60. Its
+camera getters feed primary setter 0x1d6a490 (return 0x438132) and virtual setter
+0x1d6a550 (return 0x43814e). The primary setter calls the native audio API, then
+copies the accepted pose to listener+0x20/+0x30; the virtual setter copies to
++0x40/+0x50. The adapter passes an aligned copy of the same center-head pose used
+by the source camera. It leaves raw camera storage and observer getters unchanged.
+
+Only the exact primary caller, source camera pointer and unchanged source pose
+qualify. Explicit alternate primary transforms stay native. The virtual call must
+follow a successful primary update on the same listener and camera publication.
+Both require active, fresh, matching stereo tracking. Theatre, pending activation,
+tracking suspension and unmatched callers retain the original setter arguments.
+Diagnostic evidence records the exact submitted and native-consumed poses, not
+just invocation counts. Headset output, HRTF, occlusion and perceived localization
+remain separate physical acceptance gates.
 
 This prototype produced complete pairs and full-eye native gameplay in Meta XR Simulator. It still needs broader visual acceptance. Native temporal resources are shared: previous camera matrices are provisionally set to the current eye, but per-eye temporal effects, wider-FOV culling and scopes are unverified. The default-off [controller rig](CONTROLLER_RIG.md) modifies native skin publication, pins the eye source to that tracking packet, and supplies the ordinary firearm solver with an authored barrel-axis target. The optional weapon/status wrist HUD shares that source. Complete menu, weapon and physical acceptance remain outstanding.
 

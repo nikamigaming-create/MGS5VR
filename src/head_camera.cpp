@@ -5,6 +5,12 @@
 #include <algorithm>
 
 namespace mgs5vr {
+std::optional<Pose> trackedListenerPose(const HeadCameraSample& frame,HeadCameraStatus status,uint64_t now){
+    if(!status.enabled||!status.active||status.pending||status.suspended||!frame.applied||!frame.stereoTracked
+        ||!frame.trackingSequence||frame.activation!=status.activation||now<frame.sampleTime
+        ||now-frame.sampleTime>150||!valid(frame.nativePose))return {};
+    return frame.nativePose;
+}
 std::optional<Vec3> playerHeadPosition(const std::array<float,16>& root,const std::array<float,16>& head){
     const auto rigid=[](const std::array<float,16>& m){
         for(float f:m)if(!std::isfinite(f))return false;

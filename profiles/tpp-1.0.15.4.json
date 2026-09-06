@@ -80,6 +80,18 @@
     "hud_pixel_extraction_implemented": false,
     "world_marker_acceptance_passed": false
   },
+  "audio_listener_experiment": {
+    "enabled_by_default": false,
+    "primary_setter_rva": "0x1d6a490",
+    "primary_return_rva": "0x438132",
+    "virtual_setter_rva": "0x1d6a550",
+    "virtual_return_rva": "0x43814e",
+    "matching_source_camera_and_pose_required": true,
+    "same_center_head_publication_as_eyes": true,
+    "native_setter_consumption_observed": true,
+    "theatre_native_restoration_observed": true,
+    "physical_localization_verified": false
+  },
   "native_scene_experiment": {
     "world_builder_rva": "0x438ac0",
     "view_builder_rva": "0x438c20",
@@ -93,6 +105,8 @@
     "alternate_eye_rendering": false,
     "live_complete_eye_pairs_observed": true,
     "live_projection_layer_observed": true,
+    "centered_render_coverage_encloses_runtime_fov": true,
+    "submitted_fov_matches_rendered_pixels": true,
     "live_stereo_verified": false,
     "physical_headset_verified": false
   }

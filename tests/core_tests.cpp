@@ -164,6 +164,29 @@ int main(){
     const auto renderedRig=rigCamera.resolve(1,thirdPerson,310);
     expect(renderedRig.applied&&renderedRig.rigSequence&&renderedRig.controllers.predictedXrTime==10000
         &&same(renderedRig.nativePose.position,rigFrame.nativePose.position),"eyes use the pose that drove the native rig despite newer tracking");
+    auto audioStatus=rigCamera.status();
+    const auto audioPose=trackedListenerPose(renderedRig,audioStatus,310);
+    expect(audioPose&&same(audioPose->position,rigFrame.nativePose.position)
+        &&same(rotate(audioPose->orientation,{0,0,1}),rotate(rigFrame.nativePose.orientation,{0,0,1})),
+        "listener uses the rendered center-head position and orientation despite newer tracking");
+    expect(!trackedListenerPose(renderedRig,audioStatus,299)&&!trackedListenerPose(renderedRig,audioStatus,451),
+        "future or stale camera publications cannot update the native audio listener");
+    ++audioStatus.activation;
+    expect(!trackedListenerPose(renderedRig,audioStatus,310),"recenter rejects the previous listener publication");
+    audioStatus=rigCamera.status();audioStatus.suspended=true;
+    expect(!trackedListenerPose(renderedRig,audioStatus,310),"tracking suspension releases listener ownership");
+    audioStatus=rigCamera.status();audioStatus.active=false;
+    expect(!trackedListenerPose(renderedRig,audioStatus,310),"theatre mode leaves native audio in control");
+    audioStatus=rigCamera.status();audioStatus.pending=true;
+    expect(!trackedListenerPose(renderedRig,audioStatus,310),"pending VR activation cannot move audio ahead of the image");
+    audioStatus=rigCamera.status();audioStatus.enabled=false;
+    expect(!trackedListenerPose(renderedRig,audioStatus,310),"disabled integration cannot retain listener ownership");
+    auto badAudioFrame=renderedRig;badAudioFrame.nativePose.orientation.w=std::numeric_limits<float>::quiet_NaN();
+    expect(!trackedListenerPose(badAudioFrame,rigCamera.status(),310),"invalid rotation cannot reach the audio engine");
+    badAudioFrame=renderedRig;badAudioFrame.applied=false;
+    expect(!trackedListenerPose(badAudioFrame,rigCamera.status(),310),"unmodified camera cannot receive a tracked listener");
+    badAudioFrame=renderedRig;badAudioFrame.stereoTracked=false;
+    expect(!trackedListenerPose(badAudioFrame,rigCamera.status(),310),"missing stereo tracking leaves the native listener unchanged");
     auto changedNativeCamera=thirdPerson;changedNativeCamera.position.x+=0.1f;
     rigCamera.publishPlayerHead(1,22,changedNativeCamera,playerRoot,headBone,311);
     expect(!rigCamera.resolve(1,changedNativeCamera,311).applied&&rigCamera.status().reason==HeadCameraStop::rigFrameMismatch,

@@ -6,8 +6,10 @@ open under the MIT license. The complete requested VR conversion remains unfinis
 The latest simulator slice implements real weapon/status UI on the **left
 forearm**, removes the flat gameplay reticle and destination labels, stabilizes
 the visible rig, and adds native equipment selection. Zoom is reserved so aiming
-stays in stereo. A 14.883-second, 0.58 MB follow-up SIM clip was reviewed; it has 60
-distinct frames at 3.967 captures/second, not a smoothness or full-mod pass.
+stays in stereo. The latest 14.803-second, 0.69 MB SIM clip includes the centered
+sky projection and has 58 reviewed distinct frames at 3.850 captures/second.
+The native audio listener now follows the rendered head pose; the clip is silent
+and does not establish perceived localization, smoothness or full-mod acceptance.
 Read the [current review](SIM_HUD_REVIEW.md) and [complete controls](CONTROLS.md).
 
 An initial **physical Quest 3 combat run** is now recorded and reviewed. The user
@@ -25,7 +27,7 @@ slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation
 | Weapons | AM MRS-4 and WU pistol ready/fire/reload and equipment categories exercised; ordinary shots use the authored muzzle | Impacts/obstruction, scoped and alternate modes, all-weapon and physical verification |
 | Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
 | Travel | D-Horse mount/walk/gallop/dismount and bounded mounted rifle shots in SIM; native travel input routing with neutral transition gates | Actual vehicle entry/driving/exit, mounted roles and physical riding comfort |
-| Audio | Native game audio remains active; camera-to-listener path identified | HMD-relative listener adaptation and physical localization test |
+| Audio | Native primary and virtual listeners consume the source center-head pose; head rotation/lean and theatre restoration observed in SIM | Physical localization, output/HRTF and occlusion checks |
 | Effects | Native graphics UI saved DOF Disable, motion blur Off and post-processing Off; camera shake Off persisted on reopening settings | Verify remaining cinematic effects and isolate any shared per-eye temporal resources |
 | Save | Continue/Resume loads the existing checkpoint and equipped rifle | Automatic startup state adapter |
 | Cinematics | Default large-screen theatre preview and native game controls | Automatic cinematic classification and complete skip coverage |
@@ -40,9 +42,9 @@ GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
 Current simulator build SHA256:
-`D28A741FEA73152A3E77F7BA5819C4D2463370007CE8241E7B2D781194E216D7`.
-It adds the [centered projection check](SIM_HUD_REVIEW.md#centered-projection-follow-up)
-to the HUD/rig build used for the short recording. The initial physical run used
+`6A1EC3044DFAC1EE473C5ED9C2EEE62BD31D54F3B4548CE543BF997F90E49AA4`.
+It adds the centered projection and native listener updates described in the
+[SIM review](SIM_HUD_REVIEW.md). The initial physical run used
 `4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`,
 with the later physical rollback retained as
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.

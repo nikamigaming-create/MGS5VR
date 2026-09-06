@@ -26,22 +26,35 @@ using ViewportFn=uintptr_t(*)(void*,uint8_t);
 using ProjectionFn=uintptr_t(*)(float*,float,float,float,float,float,float,float,float,float);
 using SceneFn=uintptr_t(*)(void*,void*,void*,uint32_t);
 using RegisterTargetFn=uintptr_t(*)(void*,void*);
+using ListenerFn=void*(*)(void*,void*,const float*);
 ViewportFn originalViewport{};ProjectionFn originalProjection{};SceneFn originalScene{};
 RegisterTargetFn originalRegisterTarget{};
+ListenerFn originalListener{},originalVirtualListener{};
 uintptr_t base{};
 struct Pair {
     uintptr_t camera{};
     uint64_t sequence{},tick{};
     DWORD thread{};
     mgs5vr::HeadCameraSample sample{};
+    std::array<float,8> nativeInput{};
     std::array<float,16> world{},view{};
     bool haveWorld{},applied{},validInverse{};
     float inverseError{};
 };
 thread_local Pair current;
+thread_local uintptr_t primaryListener{};
+thread_local uint64_t primaryListenerSequence{};
 std::array<Pair,8> latest{};
 Pair lastMatrixFailure{};
 std::mutex latestMutex;
+struct ListenerProof {
+    uintptr_t camera{},listener{};
+    uint64_t sequence{},tracking{},activation{},tick{};
+    std::array<float,8> native{},submitted{},consumed{},virtualConsumed{};
+    bool primaryAccepted{},virtualAccepted{};
+};
+ListenerProof listenerProof;
+std::atomic_uint64_t listenerUpdates{},virtualListenerUpdates{},listenerFailures{};
 std::atomic_uint64_t sequence{},pairCount{},missed{};
 std::atomic_bool enabled{},nativePairVerified{};
 std::ofstream evidence;
@@ -97,6 +110,51 @@ void record(Pair& p){
     for(auto& item:latest)if(item.camera==p.camera){slot=&item;break;}
     if(!slot)for(auto& item:latest)if(!item.camera){slot=&item;break;}
     if(slot)*slot=p;else ++missed;
+}
+__declspec(noinline) void* listener(void* object,void* output,const float* input){
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    if(!enabled.load()||caller!=base+0x438132)return originalListener(object,output,input);
+    primaryListener=0;primaryListenerSequence=0;
+    // This exact camera publication selects its listener through publisher+0x60.
+    // An explicitly selected alternate listener transform remains native.
+    if(!current.applied||!current.validInverse||!current.sequence||!object
+        ||reinterpret_cast<uintptr_t>(input)!=current.camera+0xf0
+        ||std::memcmp(input,current.nativeInput.data(),sizeof(current.nativeInput)))return originalListener(object,output,input);
+    const auto tracked=mgs5vr::trackedListenerPose(current.sample,mgs5vr::headCamera().status(),mgs5vr::steadyMilliseconds());
+    if(!tracked)return originalListener(object,output,input);
+    alignas(16) const auto adjusted=values(*tracked);
+    auto* result=originalListener(object,output,adjusted.data());
+    ListenerProof proof;proof.camera=current.camera;proof.listener=reinterpret_cast<uintptr_t>(object);
+    proof.sequence=current.sequence;proof.tracking=current.sample.trackingSequence;proof.activation=current.sample.activation;
+    proof.tick=GetTickCount64();proof.native=current.nativeInput;proof.submitted=adjusted;
+    std::memcpy(proof.consumed.data(),static_cast<unsigned char*>(object)+0x20,sizeof(proof.consumed));
+    proof.primaryAccepted=field<int32_t>(output,0)==0&&proof.consumed==adjusted;
+    ++listenerUpdates;
+    if(proof.primaryAccepted){primaryListener=proof.listener;primaryListenerSequence=current.sequence;}
+    else ++listenerFailures;
+    {std::unique_lock lock(latestMutex,std::try_to_lock);if(lock.owns_lock())listenerProof=proof;}
+    return result;
+}
+__declspec(noinline) void* virtualListener(void* object,void* output,const float* input){
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    const auto source=reinterpret_cast<uintptr_t>(input);
+    if(!enabled.load()||caller!=base+0x43814e||primaryListener!=reinterpret_cast<uintptr_t>(object)
+        ||!primaryListenerSequence||primaryListenerSequence!=current.sequence
+        ||(source!=current.camera+0xf0&&source!=current.camera+0x130))return originalVirtualListener(object,output,input);
+    const auto tracked=mgs5vr::trackedListenerPose(current.sample,mgs5vr::headCamera().status(),mgs5vr::steadyMilliseconds());
+    if(!tracked)return originalVirtualListener(object,output,input);
+    alignas(16) const auto adjusted=values(*tracked);
+    auto* result=originalVirtualListener(object,output,adjusted.data());
+    std::array<float,8> consumed{};std::memcpy(consumed.data(),static_cast<unsigned char*>(object)+0x40,sizeof(consumed));
+    const bool accepted=field<int32_t>(output,0)==0&&consumed==adjusted;
+    ++virtualListenerUpdates;if(!accepted)++listenerFailures;
+    {std::unique_lock lock(latestMutex,std::try_to_lock);
+        if(lock.owns_lock()&&listenerProof.sequence==current.sequence&&listenerProof.listener==primaryListener){
+            listenerProof.virtualConsumed=consumed;listenerProof.virtualAccepted=accepted;
+        }
+    }
+    primaryListener=0;primaryListenerSequence=0;
+    return result;
 }
 __declspec(noinline) uintptr_t projection(float* output,float a,float b,float c,float d,float e,float f,float g,float h,float i){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
@@ -222,7 +280,9 @@ __declspec(noinline) float* world(void* input,float* output){
     const auto source=reinterpret_cast<uintptr_t>(input);
     if(caller==base+0x437c64){
         current={};current.camera=source-0xf0;
+        primaryListener=0;primaryListenerSequence=0;
         std::array<float,8> native{};std::memcpy(native.data(),input,sizeof(native));
+        current.nativeInput=native;
         current.sample={pose(native.data()),{},0,0,false};
         if(nativePairVerified.load())current.sample=mgs5vr::headCamera().resolveCurrent(current.camera,current.sample.nativePose);
         alignas(16) auto adjusted=values(current.sample.nativePose);
@@ -290,9 +350,15 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
     constexpr std::array<unsigned char,10> projectionEntry{0x48,0x8b,0xc4,0x48,0x81,0xec,0x88,0,0,0};
     constexpr std::array<unsigned char,12> sceneEntry{0x40,0x55,0x56,0x57,0x41,0x54,0x41,0x55,0x41,0x56,0x41,0x57};
     constexpr std::array<unsigned char,17> registerEntry{0x40,0x55,0x56,0x57,0x41,0x54,0x41,0x55,0x41,0x56,0x41,0x57,0x48,0x8d,0x6c,0x24,0xd9};
+    constexpr std::array<unsigned char,16> listenerEntry{0x48,0x89,0x5c,0x24,0x10,0x48,0x89,0x6c,0x24,0x18,0x48,0x89,0x74,0x24,0x20,0x57};
+    constexpr std::array<unsigned char,17> virtualListenerEntry{0x41,0x0f,0x28,0,0xc7,0x02,0,0,0,0,0x48,0x8b,0xc2,0x0f,0x29,0x41,0x40};
+    constexpr std::array<unsigned char,15> listenerCaller{0x4c,0x8b,0xc0,0x48,0x8d,0x55,0x07,0x48,0x8b,0xcf,0xe8,0x5e,0x23,0x93,0x01};
+    constexpr std::array<unsigned char,15> virtualListenerCaller{0x4c,0x8b,0xc0,0x48,0x8d,0x55,0x07,0x48,0x8b,0xcf,0xe8,0x02,0x24,0x93,0x01};
     if(!matches(moduleBase+0x438ac0,worldEntry)||!matches(moduleBase+0x438c20,viewEntry)||!matches(moduleBase+0x1c4fa0,extentsEntry)
         ||!matches(moduleBase+0x1b9490,viewportEntry)||!matches(moduleBase+0x241b00,projectionEntry)||!matches(moduleBase+0x1beec0,sceneEntry)
-        ||!matches(moduleBase+0x2496a0,registerEntry))throw std::runtime_error("Native scene/matrix builder signature mismatch");
+        ||!matches(moduleBase+0x2496a0,registerEntry)||!matches(moduleBase+0x1d6a490,listenerEntry)
+        ||!matches(moduleBase+0x1d6a550,virtualListenerEntry)||!matches(moduleBase+0x438123,listenerCaller)
+        ||!matches(moduleBase+0x43813f,virtualListenerCaller))throw std::runtime_error("Native scene/matrix/listener signature mismatch");
     base=moduleBase;
     if(!directory.empty()){
         std::filesystem::create_directories(directory);
@@ -301,14 +367,16 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
         evidence<<std::setprecision(9)<<"{\"schema\":1,\"image_base\":"<<base<<",\"paired_native_publication\":true,\"joined_to_present\":false}\n";
     }
     struct Hook {uintptr_t rva;void* wrapper;void** original;};
-    const std::array<Hook,7> hooks{{
+    const std::array<Hook,9> hooks{{
         {0x438ac0,reinterpret_cast<void*>(&world),reinterpret_cast<void**>(&originalWorld)},
         {0x438c20,reinterpret_cast<void*>(&view),reinterpret_cast<void**>(&originalView)},
         {0x1c4fa0,reinterpret_cast<void*>(&extents),reinterpret_cast<void**>(&originalExtents)},
         {0x1b9490,reinterpret_cast<void*>(&viewport),reinterpret_cast<void**>(&originalViewport)},
         {0x241b00,reinterpret_cast<void*>(&projection),reinterpret_cast<void**>(&originalProjection)},
         {0x1beec0,reinterpret_cast<void*>(&scene),reinterpret_cast<void**>(&originalScene)},
-        {0x2496a0,reinterpret_cast<void*>(&registerTarget),reinterpret_cast<void**>(&originalRegisterTarget)}}};
+        {0x2496a0,reinterpret_cast<void*>(&registerTarget),reinterpret_cast<void**>(&originalRegisterTarget)},
+        {0x1d6a490,reinterpret_cast<void*>(&listener),reinterpret_cast<void**>(&originalListener)},
+        {0x1d6a550,reinterpret_cast<void*>(&virtualListener),reinterpret_cast<void**>(&originalVirtualListener)}}};
     for(const auto& hook:hooks){const auto result=MH_CreateHook(reinterpret_cast<void*>(base+hook.rva),hook.wrapper,hook.original);
         if(result!=MH_OK)throw std::runtime_error(std::string("Native scene hook: ")+MH_StatusToString(result));
     }
@@ -319,12 +387,13 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
     enabled.store(true);
     try{installUiRenderer(base);}catch(const std::exception& ex){log(std::string("Native UI integration unavailable: ")+ex.what());}
     log("Native camera matrix integration installed; head control remains off until explicitly toggled");
+    log("Native listener integration installed; guarded by the active source camera publication");
 }
 void reportRenderCamera(){
     if(!evidence||reports>=1024)return;
     std::array<Pair,8> snapshot;
-    PresentTrace presentSnapshot;Pair failureSnapshot;std::array<ViewportSample,8> viewportSnapshot;
-    {std::lock_guard lock(latestMutex);snapshot=latest;presentSnapshot=presentTrace;failureSnapshot=lastMatrixFailure;viewportSnapshot=viewports;}
+    PresentTrace presentSnapshot;Pair failureSnapshot;std::array<ViewportSample,8> viewportSnapshot;ListenerProof audioSnapshot;
+    {std::lock_guard lock(latestMutex);snapshot=latest;presentSnapshot=presentTrace;failureSnapshot=lastMatrixFailure;viewportSnapshot=viewports;audioSnapshot=listenerProof;}
     const auto status=headCamera().status();
     reportUiRenderer(evidence);
     evidence<<"{\"event\":\"native_scene_pairs\",\"calls\":"<<sceneCalls.load()<<",\"pairs\":"<<scenePairs.load()
@@ -332,6 +401,16 @@ void reportRenderCamera(){
         <<",\"d3d_context_type\":"<<sceneContextType.load()<<",\"failure\":"<<sceneFailure.load()
         <<",\"duplicate_presents_skipped\":"<<duplicatePresentsSkipped.load()<<"}\n";
     const auto array=[&](const auto& data){evidence<<'[';for(size_t n=0;n<data.size();++n){if(n)evidence<<',';if(std::isfinite(data[n]))evidence<<data[n];else evidence<<"null";}evidence<<']';};
+    if(audioSnapshot.sequence){
+        evidence<<"{\"event\":\"native_listener\",\"updates\":"<<listenerUpdates.load()<<",\"virtual_updates\":"<<virtualListenerUpdates.load()
+            <<",\"failures\":"<<listenerFailures.load()<<",\"camera\":"<<audioSnapshot.camera<<",\"listener\":"<<audioSnapshot.listener
+            <<",\"source_sequence\":"<<audioSnapshot.sequence<<",\"tracking_sequence\":"<<audioSnapshot.tracking
+            <<",\"activation\":"<<audioSnapshot.activation<<",\"tick_ms\":"<<audioSnapshot.tick
+            <<",\"primary_accepted\":"<<(audioSnapshot.primaryAccepted?"true":"false")
+            <<",\"virtual_accepted\":"<<(audioSnapshot.virtualAccepted?"true":"false")<<",\"native_pose\":";array(audioSnapshot.native);
+        evidence<<",\"submitted_pose\":";array(audioSnapshot.submitted);evidence<<",\"consumed_pose\":";array(audioSnapshot.consumed);
+        evidence<<",\"virtual_consumed_pose\":";array(audioSnapshot.virtualConsumed);evidence<<"}\n";
+    }
     evidence<<"{\"event\":\"native_command_capture\",\"finish_execute_taggedFinish_taggedExecute_complete_failure_pendingFamilies_pendingLists\":";
     array(sceneCaptureCounters());evidence<<"}\n";
     for(const auto& p:snapshot)if(p.camera){

@@ -5,6 +5,30 @@ headset acceptance. The complete [Touch control list](CONTROLS.md) describes the
 current input path. Optical zoom is reserved: aiming stays in the native stereo
 scene, using the equipped weapon's actual sights. No binocular/scope quad remains.
 
+## Latest lighting and listener check
+
+DLL `6A1EC3044DFAC1EE473C5ED9C2EEE62BD31D54F3B4548CE543BF997F90E49AA4`
+adds a guarded native audio-listener update to the centered-projection build below.
+All five local suites pass. The actual primary and virtual setter outputs were
+checked in SIM process 29748: neutral head, 60-degree yaw with 12/4/8 cm lean,
+45-degree pitch, horse-to-foot transition and rifle/pistol operation. A bounded
+sample reached 21,434 accepted updates for each listener with zero failures.
+Submitted and native-consumed poses match within each recorded publication.
+Toggling to theatre restored the original primary and virtual camera poses;
+reactivation used the new activation's center-head pose. Raw camera storage and
+read-only observers remain unchanged. This is listener data-flow proof, not a
+headset output, HRTF, occlusion or perceived-localization pass.
+
+The latest private `artifacts/lighting-followup-15s/simulator.mp4` starts at
+20:43:57 UTC and is 14.803 seconds, 687,646 bytes, silent H.264 at 688 x 720.
+All 58 decoded frames were reviewed chronologically; each is distinct and none
+is fully black. Measured capture cadence is 3.850 images/second, maximum response
+gap 282 ms, with no capture/action/encoder error. No raw frame sequence was saved.
+It shows sky yaw, left forearm reading, automatic rifle support, fire/reload,
+rifle-to-pistol selection and final head lean. Both-eye live checks supplement the
+single-eye clip. The sky rectangle is absent in these captures; garment/body
+intrusion and full physical/shadow/culling/temporal acceptance remain open.
+
 ## Forearm and support follow-up
 
 Local DLL `102CEF7F7F0F3CCF665D05C8252DA83CFB7CDD484582780CB9324EFE30621C2E` passed all five suites.

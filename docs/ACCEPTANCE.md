@@ -3,7 +3,7 @@
 Use pass, fail, or unproven per claim; do not convert a passing infrastructure test into full-mod readiness.
 
 The latest [HUD/rig simulator review](SIM_HUD_REVIEW.md) documents a bounded
-14.973-second clip and the current [controls](CONTROLS.md). It improves the
+14.803-second clip and the current [controls](CONTROLS.md). It improves the
 weapon/status and arm presentation while leaving the complete rig, every weapon,
 interactive menus and physical acceptance open. It is not the longer full-mod
 demonstration described below.
@@ -29,6 +29,7 @@ Capture the submitted game eye and its attached geometry from the same frame tra
 | Automatic cinematic switching | Authoritative scene state + final composition | Gameplay -> cinematic/video -> gameplay | Same-looking gameplay frame | Not implemented |
 | Every cinematic skippable | Native completion + playable next mission state | Each cinematic class and repeated transitions | Press while loading, hold across transitions | Not implemented |
 | Native game stereo | Distinct game-eye images, correct projection and culling | 60 seconds, fast six-axis head motion | Duplicate or swapped eyes | Live same-transaction eye pairs and projection-layer output observed; full motion, culling and temporal-effect acceptance unproven |
+| Head-relative audio | Native listener input/output joined to the rendered head pose, plus physical listening | Yaw/pitch/lean near stationary sounds, riding/foot and theatre transitions | Stale tracking, recenter, inactive VR and alternate cameras | Primary/virtual native pose consumption and theatre restoration observed in SIM; physical localization/output/HRTF/occlusion unproven |
 | First-person visibility | Hands and held gear visible, body excluded; source-bound player head anchor | Crouch, prone, sprint, ADS, traversal | Camera inside head/body, third-person boom | Head anchor, shoulder policy and player exclusion observed; guarded hip-mount suppression removes the tested stowed stock. Complete stance/rig gate remains unproven |
 | Complete arm HUD | Actual meaningful changing HUD/iDroid pixels in both eyes | Open, browse, select edges, back, close, reopen; 60 seconds | Blank/stale surface, threshold oscillation | Weapon/status forearm UI and native equipment cards implemented and observed; complete interactive iDroid and spatial feedback remain incomplete |
 | Both hands and forearms | Final-eye video of anatomical connection and correct skinning | Neutral, reach limits, opposing head/hand motion | Suppress/detach a limb | Anatomical palm binding, forearm roll, animation restoration and native reload/bolt support observed; full gate unproven with cuff/garment polish and transient motion scrutiny outstanding |

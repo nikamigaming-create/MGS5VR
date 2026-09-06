@@ -36,6 +36,10 @@ struct HeadCameraSample {
     Pose wristPanel{}; // World-space forearm surface from this skin publication.
     bool wristPanelTracked{};
 };
+// Native listener adapters consume the center-head pose from the camera's
+// existing publication, never a newer tracking sample or an individual eye.
+std::optional<Pose> trackedListenerPose(const HeadCameraSample& frame,
+    HeadCameraStatus status,uint64_t milliseconds);
 // Row-vector affine transforms, in native FOX units. The local transform is
 // the character's published head bone; the root places that character in world.
 std::optional<Vec3> playerHeadPosition(const std::array<float,16>& worldFromPlayer,
