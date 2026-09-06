@@ -9,6 +9,7 @@
 #include "mgs5vr/camera_observer.hpp"
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/process_exit.hpp"
 #include <array>
 #include <atomic>
@@ -100,6 +101,8 @@ DWORD WINAPI initialize(void*){
                 if(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1){
                     installRenderCamera(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),evidencePath.data());
                     headCamera().configure(true,1,true);
+                    if(GetPrivateProfileIntW(L"diagnostics",L"controller_rig_experiment",0,ini.c_str())==1)
+                        installControllerRig(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)));
                     log("Native VR camera requires a matching player head-bone publication; ADS no longer supplies its position");
                 }
             }catch(const std::exception& e){log(std::string("Camera observer unavailable: ")+e.what());}

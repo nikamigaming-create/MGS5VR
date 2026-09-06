@@ -167,6 +167,72 @@ def native_camera_demo(proxy, output, started, status, locomotion=False):
         status["finished_seconds"] = time.monotonic() - started
 
 
+def controller_rig_demo(proxy, output, started, status):
+    """Requires the native controller experiment already calibrated and active."""
+    actions = []
+    client = None
+    try:
+        client = Operator(proxy)
+        available = client.request("tools/list", {})["tools"]
+        def tool(suffix):
+            matches = [t["name"] for t in available if t["name"].endswith(suffix)]
+            if len(matches) != 1:
+                raise RuntimeError(suffix)
+            return matches[0]
+        def call(suffix, args, label):
+            row = {"seconds": time.monotonic()-started, "label": label, "args": args}
+            if suffix == "openxr_set_controller_pose":
+                row["before"] = client.call(tool("openxr_get_controller_pose"),
+                    {"hand": args["hand"], "base_space": "local", "pose_type": "grip"})
+            row["head"] = client.call(tool("openxr_get_head_pose"), {"base_space": "local"})
+            actions.append(row)
+            row["result"] = client.call(tool(suffix), args)
+            print(json.dumps({"demo_step": label, "seconds": row["seconds"]}), flush=True)
+        def grip(position, orientation, label):
+            call("openxr_set_controller_pose", {"hand": "right", "base_space": "local",
+                "pose_type": "grip", "position": position, "orientation": orientation,
+                "duration_seconds": 0}, label)
+        def button(component, label):
+            call("openxr_set_controller_input", {"hand": "right", "component": component,
+                "value": 1, "auto_release": True, "hold_duration": .12}, label)
+        call("openxr_set_controller_input", {"hand": "right", "component": "Grip", "value": 1}, "right grip holds weapon ready")
+        call("openxr_set_controller_input", {"hand": "left", "component": "Grip", "value": 1}, "left grip holds support hand")
+        call("openxr_set_controller_input", {"hand": "left", "component": "Trigger", "value": 0}, "release legacy aim trigger")
+        time.sleep(2)
+        grip([.20,-.26,-.34], [0,-.173648,0,.984808], "controller right and yaw right; head fixed")
+        time.sleep(2.5)
+        button("Trigger", "fire along right barrel")
+        time.sleep(2)
+        grip([-.10,-.24,-.32], [0,.258819,0,.965926], "controller left and yaw left; head fixed")
+        time.sleep(2.5)
+        button("Trigger", "fire along left barrel")
+        time.sleep(2)
+        grip([.08,-.16,-.25], [.130526,0,0,.991445], "raise and pitch controller")
+        time.sleep(2.5)
+        grip([.10,-.26,-.30], [0,0,.130526,.991445], "roll controller")
+        time.sleep(2.5)
+        grip([.13,-.24,-.32], [0,0,0,1], "return controller to neutral")
+        time.sleep(2)
+        button("B", "native reload")
+        time.sleep(3)
+        call("openxr_set_head_pose", {"base_space": "local", "position": [.07,.02,0],
+            "orientation": [0,.130526,0,.991445], "duration_seconds": 1}, "lean and turn head with controller fixed")
+        actions[-1]["right_after"] = client.call(tool("openxr_get_controller_pose"),
+            {"hand": "right", "base_space": "local", "pose_type": "grip"})
+        time.sleep(2)
+        call("openxr_set_head_pose", {"base_space": "local", "position": [0,0,0],
+            "orientation": [0,0,0,1], "duration_seconds": 1}, "return head to neutral")
+        time.sleep(2)
+        status["completed"] = True
+    except Exception as error:
+        status["error"] = str(error)
+    finally:
+        if client:
+            client.close()
+        status["finished_seconds"] = time.monotonic()-started
+        (output/"demo-actions.json").write_text(json.dumps({"actions": actions, "status": status}, indent=2), encoding="utf-8")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--proxy", required=True, type=pathlib.Path)
@@ -179,7 +245,11 @@ def main():
                         help="Record scripted head motion, native aiming/fire/reload; requires already active native FPS/stereo")
     parser.add_argument("--demo-locomotion", action="store_true",
                         help="Add native walking, strafe, turn, stance and lowered-weapon camera checks to the demo")
+    parser.add_argument("--demo-controller-rig", action="store_true",
+                        help="Move the calibrated right grip, fire and reload with head fixed; requires active controller experiment")
     args = parser.parse_args()
+    if args.demo_controller_rig and (args.demo_native_camera or args.demo_locomotion):
+        parser.error("controller and camera demos must run separately")
     client = Operator(args.proxy)
     try:
         tools = client.request("tools/list", {})["tools"]
@@ -198,7 +268,11 @@ def main():
         frames = []
         demo_status = {}
         demo_thread = None
-        if args.demo_native_camera or args.demo_locomotion:
+        if args.demo_controller_rig:
+            demo_thread = threading.Thread(target=controller_rig_demo,
+                args=(args.proxy, args.output, started, demo_status), daemon=True)
+            demo_thread.start()
+        elif args.demo_native_camera or args.demo_locomotion:
             demo_thread = threading.Thread(target=native_camera_demo,
                 args=(args.proxy, args.output, started, demo_status, args.demo_locomotion), daemon=True)
             demo_thread.start()

@@ -4,8 +4,20 @@
 #include <mutex>
 
 namespace mgs5vr {
-enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable };
+enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch };
 struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{}; };
+// All poses use the same OpenXR LOCAL space and predicted display time as
+// the eyes. Grip is the attachment frame; aim is a separate pointing frame.
+struct TrackedHand {
+    Pose grip{},aim{};
+    bool gripTracked{},aimTracked{};
+};
+struct ControllerFrame {
+    std::array<TrackedHand,2> hands{};
+    int64_t predictedXrTime{};
+    uint64_t referenceEpoch{};
+    bool supportRequested{};
+};
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};
     uint64_t trackingSequence{}, activation{};
@@ -17,6 +29,8 @@ struct HeadCameraSample {
     uint64_t playerSequence{};
     uintptr_t playerOwner{};
     Vec3 playerHead{};
+    ControllerFrame controllers{};
+    uint64_t rigSequence{};
 };
 // Row-vector affine transforms, in native FOX units. The local transform is
 // the character's published head bone; the root places that character in world.
@@ -30,7 +44,8 @@ public:
                            const std::array<float,16>& worldFromPlayer,
                            const std::array<float,16>& playerFromHead,uint64_t milliseconds);
     void track(Pose head,bool validTracking,uint64_t milliseconds);
-    void trackStereo(Pose head,const std::array<EyeView,2>& views,bool validTracking,uint64_t milliseconds);
+    void trackStereo(Pose head,const std::array<EyeView,2>& views,bool validTracking,uint64_t milliseconds,
+                     ControllerFrame controllers={});
     void toggle();
     void cancel(HeadCameraStop reason=HeadCameraStop::manual);
     HeadCameraSample resolve(uintptr_t camera,Pose nativePose,uint64_t milliseconds);
@@ -38,11 +53,13 @@ public:
     // A pose published between an earlier timestamp and lock acquisition must
     // not be mistaken for a clock reversal.
     HeadCameraSample resolveCurrent(uintptr_t camera,Pose nativePose);
+    HeadCameraSample resolveCurrentForRig(uintptr_t camera,Pose nativePose);
+    bool publishRigFrame(uintptr_t camera,uintptr_t owner,Pose sourceCamera,HeadCameraSample frame);
     bool available() const;
     bool active() const;
     HeadCameraStatus status() const;
 private:
-    HeadCameraSample resolveLocked(uintptr_t camera,Pose nativePose,uint64_t milliseconds);
+    HeadCameraSample resolveLocked(uintptr_t camera,Pose nativePose,uint64_t milliseconds,bool useRig=true);
     void cancelLocked(HeadCameraStop reason);
     void suspendLocked(HeadCameraStop reason);
     mutable std::mutex mutex_;
@@ -54,6 +71,9 @@ private:
     bool stereoTracking_{};
     bool suspended_{};
     std::array<EyeView,2> views_{};
+    ControllerFrame controllers_{};
+    struct RigFrame { uintptr_t camera{},owner{}; Pose sourceCamera{}; HeadCameraSample sample{}; } rig_;
+    uint64_t rigSequence_{};
     HeadCameraStop reason_{};
     uint64_t cancellations_{};
     struct PlayerHead {

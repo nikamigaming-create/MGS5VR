@@ -1,4 +1,5 @@
 #include "mgs5vr/camera_observer.hpp"
+#include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/camera_consumer.hpp"
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/head_camera.hpp"
@@ -115,6 +116,7 @@ extern "C" void MgsCameraObserved(void* object,const float* source,uintptr_t cal
                     std::memcpy(head.data(),ownerBytes.data()+0x70,sizeof(head));
                     mgs5vr::headCamera().publishPlayerHead(linked,context[0],{{v[0],v[1],v[2],v[3]},{v[4],v[5],v[6]}},root,head,mgs5vr::steadyMilliseconds());
                     const auto status=mgs5vr::headCamera().status();
+                    mgs5vr::observeControllerRigOwner(context[0]);
                     mgs5vr::updatePlayerVisibility(context[0],status.active||status.pending);
                 }
             }
@@ -173,6 +175,7 @@ void installCameraObserver(const std::filesystem::path& evidenceDirectory){
     if(!reportThread)log("Camera observer report thread unavailable");
 }
 void stopCameraObserver() noexcept {
+    stopControllerRig();
     if(reportStop)SetEvent(reportStop);
     if(reportThread&&WaitForSingleObject(reportThread,2500)==WAIT_OBJECT_0){
         CloseHandle(reportThread);reportThread=nullptr;

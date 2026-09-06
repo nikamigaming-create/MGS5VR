@@ -36,7 +36,7 @@ One native camera publication + one OpenXR tracking snapshot
 
 Both draws use the same source, tracking and activation identifiers. Different native frames cannot be paired. The scene replay does not advance the game update, and checks that camera publication has not advanced during the pair. No alternate-eye scheduling, mono duplication, generated image or depth reconstruction is used. During active stereo, a present without a new complete pair retains the preceding stereo mailbox instead of replacing it with mono. The XR gate rejects missing, mismatched or stale pairs.
 
-This prototype produced complete pairs and full-eye native gameplay in Meta XR Simulator. It still needs broader visual acceptance. Native temporal resources are shared: previous camera matrices are provisionally set to the current eye, but per-eye temporal effects, wider-FOV culling and scopes are unverified. Native ADS supplies the current rifle and arms; controller-driven rig, ballistics and wrist HUD are not yet attached to this frame transaction.
+This prototype produced complete pairs and full-eye native gameplay in Meta XR Simulator. It still needs broader visual acceptance. Native temporal resources are shared: previous camera matrices are provisionally set to the current eye, but per-eye temporal effects, wider-FOV culling and scopes are unverified. The default-off [controller rig](CONTROLLER_RIG.md) modifies native skin publication, pins the eye source to that tracking packet, and supplies the ordinary firearm solver with an authored barrel-axis target. Wrist HUD and complete weapon/physical acceptance remain outstanding.
 
 ## Camera diagnostics
 

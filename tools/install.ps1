@@ -3,6 +3,7 @@ param(
     [switch]$EnableTheatrePreview,
     [switch]$EnableCameraObserver,
     [switch]$EnableHeadCameraExperiment,
+    [switch]$EnableControllerRigExperiment,
     [string]$CameraEvidenceDir
 )
 $ErrorActionPreference = 'Stop'
@@ -32,6 +33,10 @@ if ($EnableCameraObserver) { $mgsConfig = $mgsConfig.Replace('camera_observer=0'
 if ($EnableHeadCameraExperiment) {
     if (-not $EnableTheatrePreview -or -not $EnableCameraObserver) { throw 'The head-camera experiment requires the OpenXR preview and camera observer.' }
     $mgsConfig = $mgsConfig.Replace('head_camera_experiment=0','head_camera_experiment=1')
+}
+if ($EnableControllerRigExperiment) {
+    if (-not $EnableHeadCameraExperiment) { throw 'The controller rig experiment requires -EnableHeadCameraExperiment.' }
+    $mgsConfig = $mgsConfig.Replace('controller_rig_experiment=0','controller_rig_experiment=1')
 }
 if ($CameraEvidenceDir) {
     if (-not $EnableCameraObserver) { throw '-CameraEvidenceDir requires -EnableCameraObserver.' }

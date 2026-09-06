@@ -33,4 +33,8 @@ bool readyEyePair(const std::array<EyeFrame,2>& eyes,uint64_t activation,uint64_
     }
     return true;
 }
+Pose nativeTrackedPose(Pose nativeHead,Pose sourceHead,Pose trackedPose,float units){
+    auto relative=compose(inverse(sourceHead),trackedPose);relative.position=relative.position*units;
+    return compose(compose(nativeHead,Pose{{0,1,0,0},{}}),relative);
+}
 }

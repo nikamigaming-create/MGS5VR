@@ -337,6 +337,7 @@ void reportRenderCamera(){
             <<",\"thread\":"<<p.thread<<",\"tracking_sequence\":"<<p.sample.trackingSequence<<",\"applied\":"<<(p.applied?"true":"false")
             <<",\"inverse_valid\":"<<(p.validInverse?"true":"false")
             <<",\"player_sequence\":"<<p.sample.playerSequence<<",\"player_owner\":"<<p.sample.playerOwner
+            <<",\"rig_sequence\":"<<p.sample.rigSequence<<",\"predicted_xr_time\":"<<p.sample.controllers.predictedXrTime
             <<",\"player_head\":";array(std::array<float,3>{p.sample.playerHead.x,p.sample.playerHead.y,p.sample.playerHead.z});
         evidence<<",\"pose\":";array(values(p.sample.nativePose));
         evidence<<",\"world\":";array(p.world);evidence<<",\"view\":";array(p.view);

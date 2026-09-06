@@ -34,6 +34,21 @@
   "native_gamepad_input": "Game XINPUT1_3 XInputGetState import; basic Touch bindings exercised through Meta XR Operator",
   "weapon_transform": null,
   "muzzle_and_ballistics": null,
+  "controller_rig_experiment": {
+    "enabled_by_default": false,
+    "skin_publication_rva": "0x1a6caa0",
+    "player_owned_model_required": true,
+    "shot_solver_rva": "0x1044ff0",
+    "rendered_wrist_getter_rva": "0xaf0ea0",
+    "weapon_attachment_getter_rva": "0x1042e40",
+    "right_arm_bones": [10, 11, 12],
+    "left_arm_bones": [6, 7, 8],
+    "same_tracking_packet_as_eye_camera": true,
+    "am_mrs4_controller_motion_observed": true,
+    "controller_directed_projectile_packet_observed": true,
+    "physical_hand_calibration_verified": false,
+    "all_weapon_acceptance_passed": false
+  },
   "player_camera_experiment": {
     "camera_publication_return_rva": "0x1118b1a",
     "owner_type_rva": "0x23b8218",

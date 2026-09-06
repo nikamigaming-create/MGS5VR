@@ -2,6 +2,7 @@
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/controller_rig.hpp"
 #include <Xinput.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
@@ -84,6 +85,8 @@ struct Session {
     bool priorHeadToggle{};
     MenuButton menuButton;
     XrTime pendingLocalChange{};
+    uint64_t referenceEpoch{1};
+    ControllerFrame controllerFrame{};
     explicit Session(Instance& i):instance(i){}
     XrPath path(const char* p) { XrPath v; xrCheck(xrStringToPath(instance.handle,p,&v),"Create OpenXR path"); return v; }
     XrAction action(const char* name,const char* label,XrActionType type,bool withHands=false) {
@@ -229,22 +232,35 @@ struct Session {
         if(!state.isActive||!std::isfinite(state.currentState.x)||!std::isfinite(state.currentState.y))return {};
         return {std::clamp(state.currentState.x,-1.0f,1.0f),std::clamp(state.currentState.y,-1.0f,1.0f)};
     }
-    bool trackedHand(size_t n,XrTime time){
-        XrActionStateGetInfo info{XR_TYPE_ACTION_STATE_GET_INFO};info.action=grip;info.subactionPath=hands[n];
-        XrActionStatePose state{XR_TYPE_ACTION_STATE_POSE};xrCheck(xrGetActionStatePose(handle,&info,&state),"Read grip tracking state");
-        if(!state.isActive)return false;
-        XrSpaceLocation pose{XR_TYPE_SPACE_LOCATION};xrCheck(xrLocateSpace(gripSpaces[n],local,time,&pose),"Locate controller grip");
-        return (pose.locationFlags&validPoseBits)==validPoseBits&&valid(fromXr(pose.pose));
+    TrackedHand trackedHand(size_t n,XrTime time){
+        TrackedHand result;
+        const auto locate=[&](XrAction action,XrSpace space,Pose& output){
+            XrActionStateGetInfo info{XR_TYPE_ACTION_STATE_GET_INFO};info.action=action;info.subactionPath=hands[n];
+            XrActionStatePose state{XR_TYPE_ACTION_STATE_POSE};xrCheck(xrGetActionStatePose(handle,&info,&state),"Read controller tracking state");
+            if(!state.isActive)return false;
+            XrSpaceLocation pose{XR_TYPE_SPACE_LOCATION};xrCheck(xrLocateSpace(space,local,time,&pose),"Locate controller pose");
+            constexpr auto trackedBits=validPoseBits|XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT|XR_SPACE_LOCATION_POSITION_TRACKED_BIT;
+            if((pose.locationFlags&trackedBits)!=trackedBits||!valid(fromXr(pose.pose)))return false;
+            output=fromXr(pose.pose);return true;
+        };
+        result.gripTracked=locate(grip,gripSpaces[n],result.grip);
+        result.aimTracked=locate(aim,aimSpaces[n],result.aim);
+        return result;
     }
     void syncInput(XrTime time){
+        controllerFrame={};
         if(!focused){priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
         if(r==XR_SESSION_NOT_FOCUSED){priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
-        const bool left=trackedHand(0,time),right=trackedHand(1,time);
+        controllerFrame={{trackedHand(0,time),trackedHand(1,time)},time,referenceEpoch};
+        const bool left=controllerFrame.hands[0].gripTracked,right=controllerFrame.hands[1].gripTracked;
         const float ls=left?scalar(squeezes,hands[0]):0,rs=right?scalar(squeezes,hands[1]):0;
+        const float lt=left?scalar(triggers,hands[0]):0,rt=right?scalar(triggers,hands[1]):0;
+        const bool rigInput=controllerRigEnabled()&&headCamera().active();
+        controllerFrame.supportRequested=ls>0.5f||lt>0.5f;
         const bool center=boolean(recenter)&&ls>0.75f&&rs>0.75f;
         const bool headToggle=headCamera().available()&&left&&ls>0.75f&&boolean(thumbClick,hands[0]);
         if(priorFocused&&headToggle&&!priorHeadToggle){headCamera().toggle();log("Native head-camera toggle requested through OpenXR");}
@@ -258,9 +274,12 @@ struct Session {
         pad.buttons|=menuButton.update(boolean(menu),left,steadyMilliseconds());
         bit(left&&boolean(thumbClick,hands[0])&&!headToggle,XINPUT_GAMEPAD_LEFT_THUMB);
         bit(right&&boolean(thumbClick,hands[1])&&!center,XINPUT_GAMEPAD_RIGHT_THUMB);
-        bit(ls>0.5f&&!center&&!headToggle,XINPUT_GAMEPAD_LEFT_SHOULDER);bit(rs>0.5f&&!center,XINPUT_GAMEPAD_RIGHT_SHOULDER);
-        pad.leftTrigger=static_cast<uint8_t>((left?scalar(triggers,hands[0]):0)*255);
-        pad.rightTrigger=static_cast<uint8_t>((right?scalar(triggers,hands[1]):0)*255);
+        bit(!rigInput&&ls>0.5f&&!center&&!headToggle,XINPUT_GAMEPAD_LEFT_SHOULDER);
+        bit(!rigInput&&rs>0.5f&&!center,XINPUT_GAMEPAD_RIGHT_SHOULDER);
+        // In the rig experiment, holding the right grip readies the native gun.
+        // The same grip no longer toggles the game's scope/first-person mode.
+        pad.leftTrigger=static_cast<uint8_t>((rigInput&&rs>0.5f?1.f:lt)*255);
+        pad.rightTrigger=static_cast<uint8_t>((!rigInput||rs>0.5f||lt>0.5f?rt:0)*255);
         const auto l=left?stick(hands[0]):XrVector2f{},rr=right?stick(hands[1]):XrVector2f{};
         pad.leftX=static_cast<int16_t>(l.x*32767);pad.leftY=static_cast<int16_t>(l.y*32767);
         pad.rightX=static_cast<int16_t>(rr.x*32767);pad.rightY=static_cast<int16_t>(rr.y*32767);
@@ -393,6 +412,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         if(closing)continue;
         if(session.pendingLocalChange&&frame.predictedDisplayTime>=session.pendingLocalChange){
             session.pendingLocalChange=0;session.recenterRequested=true;anchored=false;
+            ++session.referenceEpoch;
         }
         session.syncInput(frame.predictedDisplayTime);
         XrSpaceLocation head{XR_TYPE_SPACE_LOCATION};
@@ -407,7 +427,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         const bool stereoTracked=viewCount==2&&(viewState.viewStateFlags&viewValidBits)==viewValidBits;
         std::array<EyeView,2> trackedViews{};
         for(size_t n=0;n<2;++n)trackedViews[n]={fromXr(views[n].pose),{views[n].fov.angleLeft,views[n].fov.angleRight,views[n].fov.angleUp,views[n].fov.angleDown}};
-        headCamera().trackStereo(fromXr(head.pose),trackedViews,tracking&&stereoTracked&&session.focused,steadyMilliseconds());
+        headCamera().trackStereo(fromXr(head.pose),trackedViews,tracking&&stereoTracked&&session.focused,steadyMilliseconds(),session.controllerFrame);
         if(tracking&&(!anchored||session.recenterRequested)){
             screenPose=recenteredScreen(fromXr(head.pose),config.distanceMeters);anchored=true;session.recenterRequested=false;
         }

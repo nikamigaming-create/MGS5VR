@@ -1,4 +1,5 @@
 #include "mgs5vr/core.hpp"
+#include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include <cmath>
@@ -105,6 +106,57 @@ int main(){
     const auto normalized=rigidCamera.resolve(1,Pose{{0,0.60003f,0,0.80004f},{500,300,1300}},500);
     const auto nq=normalized.nativePose.orientation;
     expect(normalized.applied&&std::abs(nq.y*nq.y+nq.w*nq.w-1)<0.0000002f,"kilometer-scale native camera keeps a normalized rigid rotation");
+    HeadCamera handsCamera;handsCamera.configure(true);
+    const std::array<EyeView,2> rigEyes{{{Pose{{},{-0.032f,0,0}},EyeFov{-0.7f,0.7f,0.7f,-0.7f}},
+                                      {Pose{{},{0.032f,0,0}},EyeFov{-0.7f,0.7f,0.7f,-0.7f}}}};
+    ControllerFrame hands;hands.referenceEpoch=1;hands.predictedXrTime=9000;
+    hands.hands[1]={Pose{{},{0.2f,-0.3f,-0.4f}},Pose{{},{0.2f,-0.2f,-0.5f}},true,true};
+    handsCamera.trackStereo({},rigEyes,true,100,hands);handsCamera.toggle();
+    const auto joinedHands=handsCamera.resolve(1,nativeCamera,100);
+    expect(joinedHands.applied&&joinedHands.controllers.hands[1].gripTracked&&joinedHands.controllers.predictedXrTime==9000,
+           "grip, aim and eyes retain one predicted-time snapshot");
+    hands.hands[1].grip.position.x+=0.1f;hands.predictedXrTime=10000;
+    handsCamera.trackStereo({},rigEyes,true,110,hands);
+    expect(near(joinedHands.controllers.hands[1].grip.position.x,0.2f),"a newer controller sample cannot mutate a source frame");
+    expect(!handsCamera.resolve(1,nativeCamera,261).controllers.hands[1].gripTracked,"stale eyes cannot expose a live weapon pose");
+    hands.hands[1].grip.orientation.w=0;
+    handsCamera.trackStereo({},rigEyes,true,270,hands);
+    auto validAimOnly=handsCamera.resolve(1,nativeCamera,270);
+    expect(!validAimOnly.controllers.hands[1].gripTracked&&validAimOnly.controllers.hands[1].aimTracked,"grip and aim validity remain independent");
+    const Pose held{{},{0.2f,-0.3f,-0.4f}},movingHead{{0,0.258819f,0,0.965926f},{0.1f,0.05f,0}};
+    const Pose basis{{0,1,0,0},{}};
+    const auto movedNativeHead=compose(nativeCamera,compose(compose(basis,movingHead),inverse(basis)));
+    expect(same(nativeTrackedPose(movedNativeHead,movingHead,held).position,nativeTrackedPose(nativeCamera,{},held).position),
+           "head motion does not steer a stationary controller");
+    const auto nativeRoot=nativeAffinePose(playerRoot);
+    HeadCamera rigCamera;rigCamera.configure(true,1,true);
+    hands.hands[1].grip.orientation.w=1;hands.predictedXrTime=10000;
+    rigCamera.trackStereo({},rigEyes,true,300,hands);rigCamera.toggle();
+    rigCamera.publishPlayerHead(1,22,thirdPerson,playerRoot,headBone,300);
+    auto rigFrame=rigCamera.resolve(1,thirdPerson,300);rigFrame.nativePose.position.y+=0.1f;
+    expect(rigCamera.publishRigFrame(1,22,thirdPerson,rigFrame),"native skin publication latches its exact tracking input");
+    hands.predictedXrTime=11000;hands.hands[1].grip.position.x+=0.1f;
+    rigCamera.trackStereo({},rigEyes,true,310,hands);
+    const auto renderedRig=rigCamera.resolve(1,thirdPerson,310);
+    expect(renderedRig.applied&&renderedRig.rigSequence&&renderedRig.controllers.predictedXrTime==10000
+        &&same(renderedRig.nativePose.position,rigFrame.nativePose.position),"eyes use the pose that drove the native rig despite newer tracking");
+    auto changedNativeCamera=thirdPerson;changedNativeCamera.position.x+=0.1f;
+    rigCamera.publishPlayerHead(1,22,changedNativeCamera,playerRoot,headBone,311);
+    expect(!rigCamera.resolve(1,changedNativeCamera,311).applied&&rigCamera.status().reason==HeadCameraStop::rigFrameMismatch,
+           "a rig from another native camera publication is withheld");
+    expect(nativeRoot&&same(rotate(nativeRoot->orientation,{1,0,0}),{0,0,-1}),"row affine decoding retains native handedness");
+    const ArmPose arm{{{},{}},{{},{0.2f,-0.15f,0}},{{},{0.4f,0,0}}};
+    for(int i=0;i<100;++i){
+        const float angle=static_cast<float>(i)*0.06283185f;
+        const Pose target{{0,0,std::sin(angle/2),std::cos(angle/2)},{0.4f*std::cos(angle),0.4f*std::sin(angle),0.1f}};
+        const auto solved=solveArm(arm,target,{0,-1,-1});
+        expect(solved&&same(solved->pose.wrist.position,target.position),"reachable wrist follows controller translation");
+        if(solved){const auto upper=solved->pose.elbow.position-solved->pose.shoulder.position,lower=solved->pose.wrist.position-solved->pose.elbow.position;
+            expect(near(dot(upper,upper),0.0625f)&&near(dot(lower,lower),0.0625f),"arm IK preserves both authored segment lengths");}
+    }
+    const auto extended=solveArm(arm,Pose{{},{3,0,0}},{0,-1,0});
+    expect(extended&&extended->reachClamped&&near(extended->pose.wrist.position.x,0.499f),"unreachable grip cannot stretch the native limb");
+    expect(!solveArm(ArmPose{},Pose{},{}),"missing skeleton geometry cannot produce an arm");
     GamepadMailbox gamepad;
     expect(!gamepad.read(100),"unconnected XR gamepad preserves original input path");
     gamepad.publish({0x1000,0,255,100,-100,0,0},true,100);

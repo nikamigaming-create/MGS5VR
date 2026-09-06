@@ -25,6 +25,7 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     if(!std::isfinite(units)||units<=0)throw std::invalid_argument("Camera scale must be finite and positive");
     std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=false;camera_=0;reason_=HeadCameraStop::none;
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=0;suspended_=false;
+    controllers_={};rig_={};
 }
 bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
                                   const std::array<float,16>& root,const std::array<float,16>& head,uint64_t time){
@@ -43,19 +44,30 @@ bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceC
 void HeadCamera::track(Pose head,bool tracked,uint64_t time){
     std::lock_guard lock(mutex_);
     stereoTracking_=false;
+    controllers_={};
     tracking_=tracked&&valid(head)&&(!time_||time>=time_);
     if(tracking_){head_=head;time_=time;++sequence_;}
     else suspendLocked(HeadCameraStop::trackingLost);
 }
-void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool tracked,uint64_t time){
+void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool tracked,uint64_t time,ControllerFrame controllers){
     std::lock_guard lock(mutex_);
     tracking_=tracked&&valid(head)&&(!time_||time>=time_);
     for(const auto& eye:views)tracking_=tracking_&&valid(eye.pose)&&valid(eye.fov);
     const auto separation=views[1].pose.position-views[0].pose.position;
     tracking_=tracking_&&dot(separation,separation)>0.0001f&&dot(separation,separation)<0.04f;
     stereoTracking_=tracking_;
-    if(tracking_){head_=head;views_=views;time_=time;++sequence_;}
-    else suspendLocked(HeadCameraStop::trackingLost);
+    if(tracking_){
+        if(controllers_.referenceEpoch&&controllers.referenceEpoch!=controllers_.referenceEpoch&&(active_||pending_)){
+            active_=false;pending_=true;camera_=0;
+        }
+        for(auto& hand:controllers.hands){
+            hand.gripTracked=controllers.predictedXrTime>0&&controllers.referenceEpoch&&hand.gripTracked&&valid(hand.grip);
+            hand.aimTracked=controllers.predictedXrTime>0&&controllers.referenceEpoch&&hand.aimTracked&&valid(hand.aim);
+            if(!hand.gripTracked)hand.grip={};
+            if(!hand.aimTracked)hand.aim={};
+        }
+        head_=head;views_=views;controllers_=controllers;time_=time;++sequence_;
+    }else {controllers_={};suspendLocked(HeadCameraStop::trackingLost);}
 }
 void HeadCamera::toggle(){
     std::lock_guard lock(mutex_);
@@ -65,7 +77,7 @@ void HeadCamera::toggle(){
 }
 void HeadCamera::cancelLocked(HeadCameraStop reason){
     if(active_||pending_){reason_=reason;++cancellations_;}
-    active_=pending_=suspended_=false;camera_=0;
+    active_=pending_=suspended_=false;camera_=0;rig_={};
 }
 void HeadCamera::suspendLocked(HeadCameraStop reason){
     if(active_||pending_){suspended_=true;reason_=reason;}
@@ -82,7 +94,19 @@ HeadCameraSample HeadCamera::resolveCurrent(uintptr_t camera,Pose nativePose){
     std::lock_guard lock(mutex_);
     return resolveLocked(camera,nativePose,steadyMilliseconds());
 }
-HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint64_t time){
+HeadCameraSample HeadCamera::resolveCurrentForRig(uintptr_t camera,Pose nativePose){
+    std::lock_guard lock(mutex_);
+    return resolveLocked(camera,nativePose,steadyMilliseconds(),false);
+}
+bool HeadCamera::publishRigFrame(uintptr_t camera,uintptr_t owner,Pose sourceCamera,HeadCameraSample frame){
+    if(!owner||!frame.applied||!valid(sourceCamera)||!valid(frame.nativePose)||!frame.controllers.hands[1].gripTracked)return false;
+    std::lock_guard lock(mutex_);
+    if(!active_||camera_!=camera||frame.activation!=activation_||frame.trackingSequence>sequence_
+       ||frame.controllers.referenceEpoch!=controllers_.referenceEpoch)return false;
+    frame.rigSequence=++rigSequence_;rig_={camera,owner,sourceCamera,frame};return true;
+}
+HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint64_t time,bool useRig){
+    const auto sourceCamera=nativePose;
     HeadCameraSample result{nativePose,head_,sequence_,activation_,false};
     result.views=views_;result.sampleTime=time_;result.stereoTracked=stereoTracking_;
     if(!enabled_||!camera||!valid(nativePose))return result;
@@ -105,6 +129,16 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(pending_){camera_=camera;origin_=head_;pending_=false;active_=true;++activation_;}
     if(!active_)return result;
     if(camera_!=camera){cancelLocked(HeadCameraStop::cameraChanged);return result;}
+    if(useRig&&rig_.camera){
+        const auto& s=rig_.sample;const auto& p=rig_.sourceCamera;
+        const bool same=p.position.x==sourceCamera.position.x&&p.position.y==sourceCamera.position.y&&p.position.z==sourceCamera.position.z
+            &&p.orientation.x==sourceCamera.orientation.x&&p.orientation.y==sourceCamera.orientation.y
+            &&p.orientation.z==sourceCamera.orientation.z&&p.orientation.w==sourceCamera.orientation.w;
+        if(rig_.camera!=camera||rig_.owner!=result.playerOwner||s.activation!=activation_||!same
+           ||time<s.sampleTime||time-s.sampleTime>150){suspendLocked(HeadCameraStop::rigFrameMismatch);return result;}
+        const auto playerPublication=result.playerSequence;
+        result=s;result.playerSequence=playerPublication;suspended_=false;reason_=HeadCameraStop::none;return result;
+    }
     suspended_=false;reason_=HeadCameraStop::none;
     // FOX's camera-local forward/right candidates are +Z/-X. The explicit
     // 180-degree basis rotation keeps handedness intact; validate in live motion.
@@ -122,6 +156,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(!std::isfinite(length)||length<0.5)return result;
     q={static_cast<float>(q.x/length),static_cast<float>(q.y/length),static_cast<float>(q.z/length),static_cast<float>(q.w/length)};
     result.activation=activation_;result.applied=valid(result.nativePose);
+    if(result.applied)result.controllers=controllers_;
     return result;
 }
 HeadCamera& headCamera(){static auto* instance=new HeadCamera;return *instance;}

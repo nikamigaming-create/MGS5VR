@@ -16,9 +16,9 @@ FetchContent_Declare(openxr GIT_REPOSITORY https://github.com/KhronosGroup/OpenX
 FetchContent_Declare(minhook GIT_REPOSITORY https://github.com/TsudaKageyu/minhook.git
   GIT_TAG c3fcafdc10146beb5919319d0683e44e3c30d537)
 FetchContent_MakeAvailable(openxr minhook)
-add_library(mgs5vr_core STATIC src/core.cpp src/input_bridge.cpp src/head_camera.cpp src/stereo.cpp)
+add_library(mgs5vr_core STATIC src/core.cpp src/input_bridge.cpp src/head_camera.cpp src/stereo.cpp src/arm_ik.cpp)
 target_include_directories(mgs5vr_core PUBLIC include)
-add_library(mgs5vr_runtime STATIC src/log.cpp src/mailbox.cpp src/xr_runtime.cpp src/scene_capture.cpp src/ui_renderer.cpp src/player_visibility.cpp)
+add_library(mgs5vr_runtime STATIC src/log.cpp src/mailbox.cpp src/xr_runtime.cpp src/scene_capture.cpp src/ui_renderer.cpp src/player_visibility.cpp src/controller_rig.cpp)
 target_include_directories(mgs5vr_runtime PUBLIC include)
 target_compile_definitions(mgs5vr_runtime PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX
   XR_USE_PLATFORM_WIN32 XR_USE_GRAPHICS_API_D3D11)
@@ -48,7 +48,7 @@ foreach(t mgs5vr_core mgs5vr_runtime dinput8 mgs5vr_probe mgs5vr_tests mgs5vr_gp
 endforeach()
 install(TARGETS dinput8 mgs5vr_probe RUNTIME DESTINATION .)
 install(FILES config/mgs5vr.ini README.md LICENSE CONTRIBUTING.md DESTINATION .)
-install(FILES docs/STATUS.md docs/THIRD_PARTY_NOTICES.md docs/ARCHITECTURE.md docs/ACCEPTANCE.md docs/HANDOFF.md DESTINATION docs)
+install(FILES docs/STATUS.md docs/THIRD_PARTY_NOTICES.md docs/ARCHITECTURE.md docs/ACCEPTANCE.md docs/HANDOFF.md docs/CONTROLLER_RIG.md DESTINATION docs)
 install(FILES tools/install.ps1 tools/uninstall.ps1 tools/launch-simulator.ps1 DESTINATION tools)
 install(FILES profiles/tpp-1.0.15.4.json DESTINATION profiles)
 install(FILES "${openxr_SOURCE_DIR}/LICENSE" DESTINATION licenses RENAME OpenXR.txt)

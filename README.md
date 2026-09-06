@@ -8,9 +8,9 @@
 
 The mod's implementation, native build adapters, tests and build tooling are open source under the [MIT license](LICENSE). Dependencies are pinned open-source projects with [retained notices](docs/THIRD_PARTY_NOTICES.md). Building requires no private mod code. Running requires your own installation of the game and an OpenXR runtime; neither is redistributed here. This is an independent community project.
 
-This repository is **not a complete VR conversion of The Phantom Pain**. It is a native Windows x64/D3D11/OpenXR development experiment. An opt-in native scene hook now draws both eyes within one game render transaction and submits a projection layer. Live simulator gameplay has produced complete eye pairs, but stereo acceptance remains incomplete. The arm HUD, tracked first-person rig, motion-controlled weapons and universal cinematic skipping are not implemented.
+This repository is **not a complete VR conversion of The Phantom Pain**. It is a native Windows x64/D3D11/OpenXR development experiment. An opt-in native scene hook draws both eyes within one game render transaction and submits a projection layer. The controller experiment now drives native hands and the rifle, with controller-directed muzzle and projectile output observed for the AM MRS-4. Physical alignment and all-state acceptance remain incomplete. The arm HUD and universal cinematic skipping are not implemented.
 
-The requested final view is first person: six-axis head tracking, tracked hands and equipped gear, and the complete game HUD on the forearm. Cinematics should use a large screen and native skip actions. Those engine integrations remain outstanding.
+The requested final view is first person: six-axis head tracking, tracked hands and equipped gear, and the complete game HUD on the forearm. Cinematics should use a large screen and native skip actions. See the [controller experiment](docs/CONTROLLER_RIG.md) for its observed behavior and remaining limits.
 
 The default mode captures the game's desktop image onto a large, world-anchored OpenXR quad. With `-EnableHeadCameraExperiment`, left grip plus left stick click toggles experimental native head tracking and same-frame stereo. Both eye cameras use one tracking snapshot; alternate-eye rendering is not used. The camera now anchors to the player's head bone and excludes the player's head model and body group while retaining arm groups. Native iron sights are optional; manual toggling before menus is still required. OpenXR controllers feed the game's own XInput import, without Windows key/mouse injection or window activation. Automatic cinematic switching requires a verified game-state adapter.
 
@@ -53,13 +53,22 @@ To develop the native stereo experiment, install with all three switches:
 
 In loaded gameplay, hold left grip and click the left stick to toggle the experiment. Toggle it off before opening menus. The latest simulator capture retained first person while walking with the weapon lowered. Tracking stalls suspend eye submission and resume from the same head origin instead of switching to the third-person theatre screen. Shoulder/sleeve geometry can still intrude when looking down, and the original HUD/markers distort in the eye views. The tracked rig and separated arm HUD remain incomplete.
 
+Add `-EnableControllerRigExperiment` to that installation command to enable the
+default-off tracked arm/weapon adapter. Calibrate in loaded gameplay with the rifle
+ready and the controllers held in a neutral forward pose when toggling native VR.
+While active, right grip holds the gun ready and right trigger fires; left grip
+requests the animated support-hand contact. Right B reloads. Grip no longer invokes
+the native scope/view toggle. Left trigger remains a legacy weapon-ready input.
+Unheld-weapon, scope, other weapon families, anatomical grip and wrist HUD acceptance
+remain outstanding; this is not a recommendation to begin physical headset testing.
+
 For the current VR test setup, use native Graphics Settings to set Depth of Field to Disable, Motion Blur to Off, and Post-Processing to Off. Set Camera Shake to Off in Camera Settings. These saved settings were exercised in the simulator; they do not establish that every cinematic or temporal effect is disabled.
 
 The current DLL takes the `dinput8.dll` slot and cannot yet be chained with IHHook or another DirectInput proxy. It activates only in `mgsvtpp.exe`, never `mgsvmgo.exe`. The module remains loaded until process exit. Restart the game to replace it.
 
 With Meta XR Operator loaded, closing the game can take roughly 20 seconds while the runtime and Operator server finish shutting down. The preview requests normal OpenXR session exit and allows up to 30 seconds for cleanup before native process exit. One native exit completed, but later sessions stalled at instance destruction; shutdown reliability remains unresolved.
 
-The current Touch controller mapping passes A/B/X/Y, sticks, triggers, grip buttons and stick clicks to the corresponding Xbox controls. Tap left Menu for Start/iDroid; hold it for at least 0.55 seconds for Back/Pause. Both paths have been exercised in the game through Meta XR Operator. Tracking/focus loss and stale samples release virtual inputs. Other controller profiles have incomplete bindings; D-pad actions and motion aiming are not implemented.
+The default Touch mapping passes A/B/X/Y, sticks, triggers, grip buttons and stick clicks to the corresponding Xbox controls; the controller experiment changes grip behavior as described above. Tap left Menu for Start/iDroid; hold it for at least 0.55 seconds for Back/Pause. Both paths have been exercised in the game through Meta XR Operator. Tracking/focus loss and stale samples release virtual inputs. Other controller profiles have incomplete bindings; D-pad actions remain unimplemented.
 
 Use Continue and then Resume Game to load the existing checkpoint and its equipped gear. This path was exercised with the saved AM MRS-4. The current save uses the game's Action Type layout: left trigger aims, right trigger fires, right grip changes to iron sights while aiming, and right B reloads. Left X is a quick dive outside aim, not reload. Controls retain the game's selected layout. Automatic startup directly into the save is not implemented.
 

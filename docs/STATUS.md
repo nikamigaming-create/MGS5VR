@@ -1,15 +1,15 @@
 # Status: experimental native VR mod
 
-Updated 2026-09-05. The mod source, native adapters, tests and build tooling are
+Updated 2026-09-06. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
 | Area | Implemented and observed | Still required |
 | --- | --- | --- |
 | Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission | Full stereo/culling/temporal acceptance on a physical headset |
 | Head motion | Native player head bone anchors the camera; simulator translations and rotations modify native eye matrices | Verified anatomical eye offset, world scale and all-state acceptance |
-| First person | Player-owned head model and body group excluded; native arms/rifle remain; walking with the gun lowered retained the head camera in the latest capture | Shoulder/sleeve intrusion when looking down; tracked hands/forearms and gear rig |
+| First person | Player-owned head/body exclusion; controller-driven native arms/rifle; walking retained the head camera | Shoulder/sleeve intrusion, anatomical calibration, reach and stow animation |
 | HUD and markers | Native DRAW2D passes and marker update registration identified | Actual UI capture, forearm attachment, interaction and world-anchor projection; current overlays distort during head motion |
-| Weapons | Native AM MRS-4 aim, fire, ammunition decrement and reload observed through OpenXR input | Controller-driven muzzle/ballistics and all-weapon verification |
+| Weapons | AM MRS-4 follows controller translation/rotation; authored muzzle and controller-directed native projectile packet observed; ammo/reload exercised | Impacts/obstruction, scoped and alternate modes, all-weapon and physical verification |
 | Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
 | Effects | Native graphics UI saved DOF Disable, motion blur Off and post-processing Off; camera shake Off persisted on reopening settings | Verify remaining cinematic effects and isolate any shared per-eye temporal resources |
 | Save | Continue/Resume loads the existing checkpoint and equipped rifle | Automatic startup state adapter |
@@ -24,8 +24,12 @@ process-exit cleanup. These checks do not certify the full mod.
 GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
-Live simulator build SHA256:
-`5906E0D2C52C3B95AB220CAFEAC47A897C458C79EE470883D175B8F5F35E3CBF`.
+Current controller build SHA256:
+`4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`.
+The initial controller/muzzle probe and first recording used
+`B22157DBCF1F00060057E5D3581314476962BA03ADD9C378183604F94AF43830`;
+the current build adds right-grip weapon readiness and bounds shot diagnostics to
+the actual firing caller. See [controller rig](CONTROLLER_RIG.md).
 The tested game is TPP 1.0.15.4, x64/D3D11, executable SHA256
 `085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`.
 
@@ -73,6 +77,17 @@ Private local artifacts retain actual composited left-eye PNGs, action timestamp
 capture metadata and variable-rate MP4s. They are development evidence, not a finished
 mod demo, and are excluded from the public source.
 
+- `controller-aim-left`: 29.25 seconds, 101 distinct captured frames, 3.45 captures/second.
+  Controller translations, yaw/pitch/roll, firing and reload with the head fixed.
+  The rifle/hands move in the native scene. No fully black frame was captured.
+  Sleeve intrusion, unheld weapon animation and face HUD remain defects. A separate
+  projectile-spawn probe confirmed the modified native origin/direction.
+- `controller-grip-aim-left`: 35.234 seconds, 121 distinct captured frames, 3.43 captures/second.
+  Uses the current 4B299FF8 build and right-grip weapon-ready mapping with the legacy
+  left trigger released. Controller movement, shots, reload and independent head
+  lean/yaw completed. Native firing diagnostics matched the rendered barrel; no
+  fully black captures occurred. Mobile encoding is a silent 35-second 720x754
+  H.264 Baseline MP4 with measured variable frame timing.
 - `fps-head-visibility-movement-left`: 59 seconds, 205 captured frames, 3.47 captures/second.
   Head translation/rotation, walking, stance changes, firing (29 to 27 rounds), reload
   (31/169), and walking with the weapon lowered completed. The hair/face obstruction
@@ -90,8 +105,8 @@ mod demo, and are excluded from the public source.
   first-person acceptance. HUD warping and body clipping remain visible defects.
 
 Recording cadence is separate from native game cadence. None of these recordings
-is a 60 FPS video, and none contains the requested functioning forearm HUD or tracked
-weapon rig. No qualifying single-eye demonstration exists. The mod is not ready for
+is a 60 FPS video. The controller recording shows the tracked rifle, but none contains
+the requested functioning forearm HUD. No qualifying full-mod demonstration exists. The mod is not ready for
 the user's requested trial, and no zero-bug or all-weapons claim is made.
 
 See [acceptance](ACCEPTANCE.md) for the remaining observable gates and
