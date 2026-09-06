@@ -14,6 +14,7 @@ import queue
 import subprocess
 import threading
 import time
+import shutil
 
 
 class Operator:
@@ -233,6 +234,75 @@ def controller_rig_demo(proxy, output, started, status):
         (output/"demo-actions.json").write_text(json.dumps({"actions": actions, "status": status}, indent=2), encoding="utf-8")
 
 
+def stream_capture(client, capture, args):
+    """Encode incoming real eye images immediately; retain no raw frame files."""
+    encoder = shutil.which("ffmpeg")
+    if not encoder:
+        raise RuntimeError("ffmpeg is required for bounded MP4 capture")
+    if args.seconds > 30 or args.demo_controller_rig or args.demo_native_camera or args.demo_locomotion:
+        raise ValueError("MP4 capture is limited to 30 seconds; drive OpenXR actions separately")
+    args.output.mkdir(parents=True, exist_ok=False)
+    movie = args.output / "simulator.mp4"
+    # Arrival timestamps preserve the measured capture cadence. No interpolation
+    # or frame-rate conversion is requested. PNGs travel only through the pipe.
+    process = subprocess.Popen([
+        encoder, "-hide_banner", "-loglevel", "error", "-n",
+        "-f", "image2pipe", "-framerate", "1000", "-vcodec", "png",
+        "-use_wallclock_as_timestamps", "1", "-probesize", "32", "-analyzeduration", "0",
+        "-i", "pipe:0", "-an", "-vf", "scale=-2:720", "-fps_mode", "vfr",
+        "-enc_time_base", "1:1000", "-c:v", "libx264", "-preset", "fast",
+        "-crf", "23", "-pix_fmt", "yuv420p", "-t", str(args.seconds),
+        "-fs", str(12 * 1024 * 1024), "-movflags", "+faststart", str(movie),
+    ], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW)
+    started = time.monotonic()
+    started_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    frames, error = [], None
+    try:
+        while time.monotonic() - started < args.seconds:
+            before = time.monotonic()
+            result = client.call(capture, {"eye": args.eye})
+            after = time.monotonic()
+            images = [c for c in result.get("content", []) if c.get("type") == "image"]
+            if len(images) != 1 or images[0].get("mimeType") != "image/png":
+                raise RuntimeError("Capture did not return one real PNG")
+            data = base64.b64decode(images[0]["data"], validate=True)
+            if len(data) > 8 * 1024 * 1024:
+                raise RuntimeError("Eye image exceeds the bounded capture budget")
+            process.stdin.write(data)
+            process.stdin.flush()
+            frames.append({"request_seconds": before - started, "response_seconds": after - started})
+            if movie.exists() and movie.stat().st_size >= 12 * 1024 * 1024:
+                raise RuntimeError("Capture reached its 12 MiB media budget")
+            time.sleep(max(0, min(1 / args.max_fps - (time.monotonic() - before),
+                                  args.seconds - (time.monotonic() - started))))
+    except Exception as exc:
+        error = repr(exc)
+        raise
+    finally:
+        elapsed = time.monotonic() - started
+        process.stdin.close()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.terminate()  # Only the encoder created by this capture.
+            process.wait(timeout=3)
+            error = error or "Encoder did not finalize within ten seconds"
+        encoder_error = process.stderr.read().decode("utf-8", errors="replace")[-4000:]
+        metadata = {"schema": 2, "eye": args.eye, "source": "Meta OpenXR composited eye",
+                    "started_utc": started_utc, "seconds": elapsed, "requested_seconds": args.seconds,
+                    "frames": frames, "measured_capture_fps": len(frames) / max(elapsed, .001),
+                    "raw_frame_files": 0, "media_budget_bytes": 12 * 1024 * 1024,
+                    "timestamp_clock": "PNG arrival at encoder; Python request/response bounds recorded",
+                    "stereo_acceptance": False, "full_mod_acceptance": False,
+                    "error": error, "encoder_exit": process.returncode, "encoder_error": encoder_error}
+        (args.output / "capture.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    if process.returncode or error:
+        raise RuntimeError(error or encoder_error or "Encoder failed")
+    print(json.dumps({"video": str(movie.resolve()), "frames": len(frames),
+                      "seconds": elapsed, "bytes": movie.stat().st_size}), flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--proxy", required=True, type=pathlib.Path)
@@ -241,6 +311,8 @@ def main():
     parser.add_argument("--eye", choices=["left", "right"], default="left")
     parser.add_argument("--output", type=pathlib.Path)
     parser.add_argument("--max-fps", type=float, default=30)
+    parser.add_argument("--mp4", action="store_true",
+                        help="Stream to a 720p MP4 (12 MiB/30 s maximum); no raw frame files")
     parser.add_argument("--demo-native-camera", action="store_true",
                         help="Record scripted head motion, native aiming/fire/reload; requires already active native FPS/stereo")
     parser.add_argument("--demo-locomotion", action="store_true",
@@ -262,6 +334,9 @@ def main():
         capture = [t["name"] for t in tools if "capture_composited_image" in t["name"]]
         if len(capture) != 1:
             raise RuntimeError(f"Expected one composited capture tool, got {capture}")
+        if args.mp4:
+            stream_capture(client, capture[0], args)
+            return
         args.output.mkdir(parents=True, exist_ok=False)
         started = time.monotonic()
         started_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
