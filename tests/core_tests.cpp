@@ -216,6 +216,12 @@ int main(){
     equipmentHeld={0x0040,0,0,1000,-1000,0,0};
     expect(equipment.update(equipmentHeld,true).buttons==0,"deadzone never selects equipment or sprints");
     equipment.reset();expect(equipment.update(equipmentHeld,false)==equipmentHeld,"mode reset restores ordinary native controls");
+    equipment.reset();
+    equipmentHeld={0x8000};
+    expect(equipment.update(equipmentHeld,true,false).buttons==0,"disabled optics cannot open a native scope or binocular view");
+    expect(equipment.update(equipmentHeld,false,false).buttons==0,"releasing the modifier cannot leak the reserved optics button as an action");
+    equipment.update({},false,false);
+    expect(equipment.update(equipmentHeld,false,false).buttons==0x8000,"ordinary Y action resumes after releasing reserved optics input");
     GamepadMailbox gamepad;
     expect(!gamepad.read(100),"unconnected XR gamepad preserves original input path");
     gamepad.publish({0x1000,0,255,100,-100,0,0},true,100);

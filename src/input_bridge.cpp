@@ -2,7 +2,7 @@
 #include <chrono>
 #include <cstdlib>
 namespace mgs5vr {
-GamepadSample RigEquipment::update(GamepadSample sample,bool modifier){
+GamepadSample RigEquipment::update(GamepadSample sample,bool modifier,bool allowOptics){
     constexpr uint16_t x=0x4000,y=0x8000,stickClick=0x0040;
     const int sx=sample.leftX,sy=sample.leftY;
     blockedButtons_&=sample.buttons;
@@ -11,7 +11,7 @@ GamepadSample RigEquipment::update(GamepadSample sample,bool modifier){
         blockedButtons_|=sample.buttons&(x|y|stickClick);
         blockedStick_=true;
         if(sample.buttons&x)sample.buttons|=0x0100;
-        if(sample.buttons&y)sample.buttons|=0x0200;
+        if(allowOptics&&(sample.buttons&y))sample.buttons|=0x0200;
         if(std::abs(sx)>19660||std::abs(sy)>19660){
             if(std::abs(sy)>=std::abs(sx))sample.buttons|=sy>0?0x0001:0x0002;
             else sample.buttons|=sx>0?0x0008:0x0004;

@@ -14,7 +14,7 @@ struct GamepadSample {
 // Release the stick/buttons before returning them to movement and actions.
 class RigEquipment {
 public:
-    GamepadSample update(GamepadSample sample,bool modifier);
+    GamepadSample update(GamepadSample sample,bool modifier,bool allowOptics=true);
     void reset(){blockedButtons_=0;blockedStick_=false;}
 private:
     uint16_t blockedButtons_{};

@@ -84,6 +84,7 @@ struct Session {
     bool priorRecenter{}, priorFocused{};
     bool priorHeadToggle{};
     MenuButton menuButton;
+    RigEquipment equipment;
     XrTime pendingLocalChange{};
     uint64_t referenceEpoch{1};
     ControllerFrame controllerFrame{};
@@ -259,11 +260,14 @@ struct Session {
         const bool left=controllerFrame.hands[0].gripTracked,right=controllerFrame.hands[1].gripTracked;
         const float ls=left?scalar(squeezes,hands[0]):0,rs=right?scalar(squeezes,hands[1]):0;
         const float lt=left?scalar(triggers,hands[0]):0,rt=right?scalar(triggers,hands[1]):0;
-        const bool rigInput=controllerRigEnabled()&&headCamera().active();
-        controllerFrame.supportRequested=ls>0.5f||lt>0.5f;
+        const auto nativeStatus=headCamera().status();
+        const bool rigInput=controllerRigEnabled()&&(nativeStatus.active||nativeStatus.pending);
+        controllerFrame.supportRequested=ls>0.5f;
         const bool center=boolean(recenter)&&ls>0.75f&&rs>0.75f;
         const bool headToggle=headCamera().available()&&left&&ls>0.75f&&boolean(thumbClick,hands[0]);
-        if(priorFocused&&headToggle&&!priorHeadToggle){headCamera().toggle();log("Native head-camera toggle requested through OpenXR");}
+        if(priorFocused&&headToggle&&!priorHeadToggle){
+            headCamera().toggle();log("Native head-camera toggle requested through OpenXR");
+        }
         priorHeadToggle=headToggle;
         if(priorFocused&&center&&!priorRecenter)recenterRequested=true;
         if(priorFocused&&center&&!priorRecenter)log("OpenXR recenter chord accepted");
@@ -278,11 +282,15 @@ struct Session {
         bit(!rigInput&&rs>0.5f&&!center,XINPUT_GAMEPAD_RIGHT_SHOULDER);
         // In the rig experiment, holding the right grip readies the native gun.
         // The same grip no longer toggles the game's scope/first-person mode.
-        pad.leftTrigger=static_cast<uint8_t>((rigInput&&rs>0.5f?1.f:lt)*255);
-        pad.rightTrigger=static_cast<uint8_t>((!rigInput||rs>0.5f||lt>0.5f?rt:0)*255);
+        pad.leftTrigger=static_cast<uint8_t>((rigInput?(rs>0.5f?1.f:0.f):lt)*255);
+        pad.rightTrigger=static_cast<uint8_t>((!rigInput||rs>0.5f?rt:0)*255);
         const auto l=left?stick(hands[0]):XrVector2f{},rr=right?stick(hands[1]):XrVector2f{};
         pad.leftX=static_cast<int16_t>(l.x*32767);pad.leftY=static_cast<int16_t>(l.y*32767);
         pad.rightX=static_cast<int16_t>(rr.x*32767);pad.rightY=static_cast<int16_t>(rr.y*32767);
+        // Keep aiming in stereo. Native binocular/scope input is reserved until
+        // an authored optical mode can preserve the 3D scene and tracked hands.
+        if(rigInput)pad=equipment.update(pad,lt>0.5f,false);
+        else equipment.reset();
         gamepadMailbox().publish(pad,left||right,steadyMilliseconds());
         priorRecenter=center;priorFocused=true;
     }
