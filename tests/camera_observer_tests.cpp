@@ -16,42 +16,87 @@ extern void* MgsCameraTrampoline;
 void MgsCameraIntercept();
 }
 namespace {
+template<class T> T visibilityField(void* object,size_t offset){
+    T value{};std::memcpy(&value,static_cast<unsigned char*>(object)+offset,sizeof(value));return value;
+}
+void fixtureVisible(void* object,uint32_t group,bool show){
+    const auto count=visibilityField<uint16_t>(object,0x1e8);
+    const auto* names=visibilityField<const uint32_t*>(object,0x180);
+    auto* flags=visibilityField<uint8_t*>(object,0x170);
+    for(uint16_t i=0;i<count;++i)if(names[i]==group){
+        if(show)flags[i]|=4;else flags[i]&=static_cast<uint8_t>(~4u);
+        break;
+    }
+}
+void fixtureHideVisible(void* object,uint32_t group){fixtureVisible(object,group,false);}
+void fixtureShowVisible(void* object,uint32_t group){fixtureVisible(object,group,true);}
 int visibilityChecks(){
-    constexpr uintptr_t base=0x10000;
+    // Signature-qualified synthetic helpers change only normal draw membership.
+    // The assertions cover shadow preservation and guarded ownership/restoration.
+    auto* region=static_cast<unsigned char*>(VirtualAlloc(nullptr,0x1d0000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));
+    if(!region)return 1;
+    const uintptr_t base=reinterpret_cast<uintptr_t>(region);
+    constexpr unsigned char hidePrefix[]={0x40,0x53,0x48,0x83,0xec,0x20,0x44,0x0f,0xb7,0x89,0xe8,0x01,0,0,0x33,0xc0,0x48,0x8b,0xd9,0x45,0x85,0xc9};
+    constexpr unsigned char showPrefix[]={0x48,0x83,0xec,0x28,0x44,0x0f,0xb7,0x91,0xe8,0x01,0,0,0x33,0xc0,0x4c,0x8b,0xd9,0x44,0x8b,0xc0,0x45,0x85,0xd2};
+    const auto helper=[&](size_t offset,const auto& prefix,uintptr_t destination,bool hide){
+        auto* out=region+offset;std::memcpy(out,prefix,sizeof(prefix));out+=sizeof(prefix);
+        const unsigned char unwind[]={0x48,0x83,0xc4,static_cast<unsigned char>(hide?0x20:0x28)};
+        std::memcpy(out,unwind,sizeof(unwind));out+=sizeof(unwind);if(hide)*out++=0x5b;
+        *out++=0x48;*out++=0xb8;std::memcpy(out,&destination,8);out+=8;*out++=0xff;*out=0xe0;
+    };
+    helper(0x1ccc30,hidePrefix,reinterpret_cast<uintptr_t>(&fixtureHideVisible),true);
+    helper(0x1cee30,showPrefix,reinterpret_cast<uintptr_t>(&fixtureShowVisible),false);
+    DWORD prior{};if(!VirtualProtect(region,0x1d0000,PAGE_EXECUTE_READ,&prior)){VirtualFree(region,0,MEM_RELEASE);return 1;}
+    FlushInstructionCache(GetCurrentProcess(),region,0x1d0000);
     std::array<unsigned char,0x388> owner{};
     std::array<unsigned char,0x618> character{};
+    std::array<unsigned char,0x18> component{};
+    std::array<unsigned char,0x70> bodyParts{};
     std::array<unsigned char,0x50> parts{};
     std::array<unsigned char,0x18> list{};
     std::array<unsigned char,0x48> renderer{};
-    std::array<unsigned char,0x200> model{},replacement{};
+    std::array<unsigned char,0x200> model{},body{},replacement{};
     std::array<uint32_t,3> groups{0xf948d635,0xa9e88501,0xdc3a5d6d};
+    std::array<uint32_t,3> bodyGroups{0xf948d635,0x1a166b34,0x4e74fd8c};
+    std::array<uint8_t,3> flags{15,15,7},bodyFlags{15,15,15},replacementFlags{15,15,7};
+    const auto nativeFlags=flags,nativeBodyFlags=bodyFlags;
     std::array<uintptr_t,1> records{},entry{};
     const auto address=[](auto& a){return reinterpret_cast<uintptr_t>(a.data());};
     const auto put=[](auto& a,size_t offset,auto value){std::memcpy(a.data()+offset,&value,sizeof(value));};
     const auto mask=[](const auto& a){uint32_t value{};std::memcpy(&value,a.data()+0x1a4,4);return value;};
     put(owner,0,base+0x23b8218);put(owner,0x370,address(character));
-    put(character,0,base+0x2295210);put(character,0x610,address(parts));
+    put(character,0,base+0x2295210);put(character,0x610,address(parts));put(character,0x10,address(component));
+    put(component,0x10,address(bodyParts));put(bodyParts,0x68,address(body));
     put(parts,0,base+0x22e56c0);put(parts,0x38,address(character));put(parts,0x48,address(list));
     put(list,0,base+0x2215c78);put(list,8,address(records));put(list,0x10,uint32_t{1});
     records[0]=address(entry);entry[0]=address(renderer);
     put(renderer,0,base+0x20f9460);put(renderer,0x40,address(model));
-    put(model,0,base+0x20f4d90);put(model,0x180,address(groups));put(model,0x1e8,uint16_t{3});put(model,0x1a4,uint32_t{2});
-    const auto original=model;int failures=0;
+    put(model,0,base+0x20f4d90);put(model,0x180,address(groups));put(model,0x170,address(flags));put(model,0x1e8,uint16_t{3});put(model,0x1a4,uint32_t{2});
+    put(body,0,base+0x20f4d90);put(body,0x180,address(bodyGroups));put(body,0x170,address(bodyFlags));put(body,0x1e8,uint16_t{3});
+    const auto original=model,originalBody=body;int failures=0;
     mgs5vr::initializePlayerVisibility(base);
     const auto update=[&](bool enabled){mgs5vr::updatePlayerVisibility(address(owner),enabled);};
-    update(true);auto expected=original;put(expected,0x1a4,uint32_t{0xffffffff});
-    if(model!=expected)++failures;
-    update(false);if(model!=original)++failures;
-    put(parts,0x38,uintptr_t{});update(true);if(model!=original)++failures;
+    update(true);
+    if(model!=original||body!=originalBody||flags!=std::array<uint8_t,3>{11,11,3}||bodyFlags!=std::array<uint8_t,3>{15,11,15})++failures;
+    update(false);if(flags!=nativeFlags||bodyFlags!=nativeBodyFlags||model!=original)++failures;
+    put(parts,0x38,uintptr_t{});update(true);if(flags!=nativeFlags)++failures;update(false);
     put(parts,0x38,address(character));groups[2]=0x4e74fd8c;
-    update(true);if(model!=original)++failures;groups[2]=0xdc3a5d6d;
-    put(list,0x10,uint32_t{33});update(true);if(model!=original)++failures;
-    put(list,0x10,uint32_t{1});update(true);put(model,0x1a4,uint32_t{4});
-    update(false);if(mask(model)!=4)++failures;model=original;
-    update(true);replacement=original;put(renderer,0x40,address(replacement));
+    update(true);if(flags!=nativeFlags)++failures;update(false);groups[2]=0xdc3a5d6d;
+    put(list,0x10,uint32_t{33});update(true);if(flags!=nativeFlags)++failures;update(false);
+    put(list,0x10,uint32_t{1});update(true);flags[1]=0;put(model,0x1a4,uint32_t{4});
+    update(false);if(flags!=std::array<uint8_t,3>{15,0,7}||mask(model)!=4)++failures;
+    model=original;flags=nativeFlags;
+    update(true);replacement=original;put(replacement,0x170,address(replacementFlags));put(renderer,0x40,address(replacement));
     update(true);update(false);
-    if(mask(model)!=0xffffffff||replacement!=original)++failures;
-    std::cout<<"Player visibility ownership, mixed arm/head refusal, bounded lists and appearance replacement; "<<failures<<" failures.\n";
+    if(flags!=std::array<uint8_t,3>{11,11,3}||replacementFlags!=nativeFlags||mask(model)!=2)++failures;
+    put(renderer,0x40,address(model));flags=nativeFlags;
+    if(VirtualProtect(region,0x1d0000,PAGE_READWRITE,&prior)){
+        region[0x1ccc30]=0x90;FlushInstructionCache(GetCurrentProcess(),region,0x1d0000);
+        mgs5vr::initializePlayerVisibility(base);update(true);
+        if(flags!=nativeFlags||bodyFlags!=nativeBodyFlags)++failures;
+    }else ++failures;
+    update(false);mgs5vr::initializePlayerVisibility(0);VirtualFree(region,0,MEM_RELEASE);
+    std::cout<<"Player-only normal visibility, native shadow preservation, signature refusal and ownership restoration; "<<failures<<" failures.\n";
     return failures;
 }
 int consumerChecks(){

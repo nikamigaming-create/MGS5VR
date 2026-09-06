@@ -45,6 +45,10 @@ right stick to select within the category before releasing.
 The cards use real game data and appear around the forearm HUD. Selection does
 not move the player. Release held stick/button inputs before resuming movement.
 
+For an item card with a **Use** prompt, keep the category open, select the card
+with the right stick and click the **right stick**. Phantom Cigar use was exercised
+in SIM; **B** ended its time passage. This does not certify the other item actions.
+
 **Optical zoom is unavailable in this VR test.** Left trigger + Y is reserved and
 does nothing. It cannot force a 2D scope or binocular screen. The checkpoint's
 AM MRS-4 has iron sights; no magnification is invented for it. Future optical work

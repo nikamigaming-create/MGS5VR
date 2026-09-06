@@ -6,10 +6,12 @@ open under the MIT license. The complete requested VR conversion remains unfinis
 The latest simulator slice implements real weapon/status UI on the **left
 forearm**, removes the flat gameplay reticle and destination labels, stabilizes
 the visible rig, and adds native equipment selection. Zoom is reserved so aiming
-stays in stereo. The latest 14.803-second, 0.69 MB SIM clip includes the centered
-sky projection and has 58 reviewed distinct frames at 3.850 captures/second.
-The native audio listener now follows the rendered head pose; the clip is silent
-and does not establish perceived localization, smoothness or full-mod acceptance.
+stays in stereo. Hidden body/head meshes now retain their native shadow casting;
+the latest 14.811-second, 1.38 MB SIM clip shows the full person silhouette and
+tracked arm movement in 44 reviewed frames at 2.903 captures/second.
+The preceding clip covers centered sky projection and native audio-listener
+tracking. Both clips are silent and do not establish perceived localization,
+smoothness or full-mod acceptance.
 Read the [current review](SIM_HUD_REVIEW.md) and [complete controls](CONTROLS.md).
 
 An initial **physical Quest 3 combat run** is now recorded and reviewed. The user
@@ -22,7 +24,7 @@ slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation
 | --- | --- | --- |
 | Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission; centered render coverage removes the reproduced sky rectangle in SIM | Shadow/culling/temporal and physical stereo acceptance |
 | Head motion | Native player head bone anchors the camera; simulator translations and rotations modify native eye matrices | Verified anatomical eye offset, world scale and all-state acceptance |
-| First person | Player-owned head/body exclusion; anatomical palm binding, shoulder anchors, forearm roll and native reload support; named hip mount hidden in VR | Cuff/garment polish, physical alignment, full reach/motion/stance acceptance |
+| First person | Player-owned head/body hidden from normal rendering while preserving their native shadow; anatomical palm binding, shoulder anchors, forearm roll and native reload support; named hip mount hidden in VR | Cuff/garment deformation, stowed-equipment shadows, physical alignment, full reach/motion/stance acceptance |
 | HUD and markers | Native weapon/ammo UI on left forearm; flat reticle/destination labels suppressed; captured eye projection applied to native scene-camera cues | Spatial damage/subtitle/context feedback, interactive wrist iDroid, full motion acceptance |
 | Weapons | AM MRS-4 and WU pistol ready/fire/reload and equipment categories exercised; ordinary shots use the authored muzzle | Impacts/obstruction, scoped and alternate modes, all-weapon and physical verification |
 | Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
@@ -42,8 +44,8 @@ GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
 Current simulator build SHA256:
-`6A1EC3044DFAC1EE473C5ED9C2EEE62BD31D54F3B4548CE543BF997F90E49AA4`.
-It adds the centered projection and native listener updates described in the
+`02B38141BC4E444D2A73FFCF2ECBFFCFE376C7B3FC1ACEDD8D3EF0178DDC9137`.
+It adds player body/head shadow preservation to the projection/listener updates in the
 [SIM review](SIM_HUD_REVIEW.md). The initial physical run used
 `4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`,
 with the later physical rollback retained as

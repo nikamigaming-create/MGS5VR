@@ -90,9 +90,13 @@ and activation; fresh tracking resumes. Camera identity or matrix mismatches sti
 Player visibility follows the camera's player pointer to its appearance component and
 bounded model collection, checking the ownership backlink and expected runtime types.
 The separate head model is hidden only when it contains the head group and no body or
-arm group. The body group uses verified native visibility functions; arm groups remain.
-Restoration checks the same ownership and expected hidden state, so an appearance
-replacement or native mask change is not overwritten. Anatomical palm frames,
+arm group. Verified normal-only group functions remove the body and head from the
+main draw list while preserving their native shadow list and global visibility mask.
+The normal-only function is independently identified by the engine's SHADOW_ONLY
+draw-mode caller; no shadow geometry is synthesized. Arm groups remain visible.
+Restoration checks the same ownership and expected named-group flags, so an appearance
+replacement or native visibility change is not overwritten. It never enables a
+native-disabled shadow. Anatomical palm frames,
 head-relative shoulder anchors and restored animation inputs now reduce the
 observed sleeve intrusion. Garment polish and full rig acceptance remain open.
 

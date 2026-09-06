@@ -184,3 +184,10 @@ the same center-head publication to the native audio setters; yaw, pitch, lean a
 theatre restoration were observed. These checks are documented in
 [SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md). They do not establish physical shadow or
 sound-localization accuracy, and the garment/arm gate remains open.
+
+The user's later clarification identified missing shadow parts matching the
+first-person-hidden meshes. The normal-only visibility follow-up preserves their
+native shadow membership and restores the head/torso/leg silhouette in both
+daylight SIM eyes, including tracked arm raises and stance changes. The short
+shadow clip and restoration checks are in the SIM review. Stowed-equipment shadows,
+garment deformation and physical shadow accuracy remain open.

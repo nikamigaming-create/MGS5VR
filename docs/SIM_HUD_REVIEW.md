@@ -5,7 +5,42 @@ headset acceptance. The complete [Touch control list](CONTROLS.md) describes the
 current input path. Optical zoom is reserved: aiming stays in the native stereo
 scene, using the equipped weapon's actual sights. No binocular/scope quad remains.
 
-## Latest lighting and listener check
+## Player shadow preservation follow-up
+
+DLL `02B38141BC4E444D2A73FFCF2ECBFFCFE376C7B3FC1ACEDD8D3EF0178DDC9137`
+keeps the first-person-hidden body and head in the native shadow draw list. The
+previous body helper removed both normal and shadow membership, and the head's
+global mask excluded every pass. The replacement uses the exact native normal-only
+hide/show functions, identified independently through the SHADOW_ONLY draw-mode
+caller. It leaves the global mask and native-disabled shadows alone.
+
+All five local suites passed, including named-group shadow preservation, native
+state changes, appearance replacement, ownership refusal and mismatched signatures.
+Read-only SIM observations in process 15052 confirmed unchanged shadow lists across
+VR activation, mounted/dismounted states and theatre restoration. The body/head
+normal flags changed from 15 to 11; disabling VR restored their original flags and
+normal membership. The observations are external snapshots, not coherent frame traces.
+
+Both composited eyes showed head, torso and leg shadows in daylight while those
+meshes remained hidden from the first-person view. Raising a tracked arm changed
+its shadow; crouch and the subsequent confirmed standing state retained the body
+shadow. D-Horse remained visible. Native Phantom Cigar item use supplied daylight;
+no game clock, executable or save was patched.
+
+The private `artifacts/shadow-followup-15s/simulator.mp4` is a 14.811-second,
+1,382,117-byte silent H.264 recording of the actual right eye. All 44 decoded
+frames were reviewed chronologically; all are distinct and none is fully black.
+Capture cadence was 2.903 images/second, maximum response gap 704 ms, with no
+capture/action/encoder error or raw frame files. The clip shows the standing
+silhouette, each arm raised, bounded head lean, rifle ready/stow and a sideways
+step. The preceding tightly framed crouch take was replaced, not retained.
+
+This passes the bounded missing-body/head-shadow check. Sleeve and loose garment
+deformation remain visible, and the existing zeroed hip-mount matrix still removes
+its stowed weapon from all passes. Complete equipment shadows, all outfits,
+shadow-camera/culling accuracy and physical stereo acceptance remain open.
+
+## Lighting and listener check
 
 DLL `6A1EC3044DFAC1EE473C5ED9C2EEE62BD31D54F3B4548CE543BF997F90E49AA4`
 adds a guarded native audio-listener update to the centered-projection build below.

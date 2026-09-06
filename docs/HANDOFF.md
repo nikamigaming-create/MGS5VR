@@ -1,6 +1,7 @@
 # Development handoff - 2026-09-06
 
-The latest installed build adds centered projection and native listener tracking. Read
+The latest installed build preserves the hidden player's native body/head shadow,
+on top of centered projection and native listener tracking. Read
 [SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md) for the evidence and open gates, and
 [CONTROLS.md](CONTROLS.md) for the complete Touch interaction list. The initial
 physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
@@ -12,6 +13,9 @@ physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
   are suppressed; native scene-camera people cues remain.
 - Anatomical palm binding, head-relative shoulders, forearm roll, native animation
   restoration, and native support contact during reload/bolt cycles.
+- Normal-only body/head exclusion preserves native shadow membership. Both-eye
+  daylight silhouettes, tracked arm movement, crouch/stand and theatre restoration
+  were checked. Complete equipment shadows and garment deformation remain open.
 - Verified player hip mount suppression removes the stowed rifle stock in the
   tested pistol/prone views. Held weapons still draw and fire.
 - Right grip readies, right trigger fires, left grip supports, B reloads.
@@ -22,7 +26,7 @@ physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
 - All five local suites passed. CI builds all targets and runs four non-GPU suites.
 
 Local DLL SHA256:
-`6A1EC3044DFAC1EE473C5ED9C2EEE62BD31D54F3B4548CE543BF997F90E49AA4`.
+`02B38141BC4E444D2A73FFCF2ECBFFCFE376C7B3FC1ACEDD8D3EF0178DDC9137`.
 The last physical-test rollback is retained locally with DLL SHA256
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
 No game executable, archives or saves were patched. Installation hashes were
@@ -31,7 +35,17 @@ public default; the local test enables the camera, rig and wrist HUD explicitly.
 
 ## Follow-up evidence and remaining work
 
-The latest `artifacts/lighting-followup-15s/simulator.mp4` is 14.803 seconds,
+The latest `artifacts/shadow-followup-15s/simulator.mp4` is 14.811 seconds,
+1,382,117 bytes, silent H.264 of the right eye, with 44 reviewed distinct frames
+at 2.903 captures/second. No black frames or capture/action/encoder errors; maximum
+response gap 704 ms. It shows a complete standing person shadow, each arm raised,
+head lean, rifle ready/stow and a sideways step. First-person sleeve/garment
+deformation remains visible. The hip-mount matrix suppression still excludes its
+stowed weapon from all passes; that needs a separately owned normal-only binding.
+Read-only shadow-list observations and native restoration are recorded in the SIM
+review. The local published rollback is 6A1EC304; the physical 7077 rollback remains.
+
+The preceding `artifacts/lighting-followup-15s/simulator.mp4` is 14.803 seconds,
 687,646 bytes, silent H.264, with 58 reviewed distinct frames at 3.850 captures
 per second. There were no black frames or capture/action/encoder errors. It shows
 sky yaw, left-arm status, automatic rifle support, fire/reload, pistol selection

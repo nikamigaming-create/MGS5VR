@@ -6,22 +6,20 @@
 
 namespace {
 uintptr_t base{};
-using GroupFn=void(*)(void*,const uint64_t*);
-GroupFn hideGroup{},showGroup{};
+using GroupFn=void(*)(void*,uint32_t);
+GroupFn hideVisibleGroup{},showVisibleGroup{};
 constexpr uint32_t headName=0xa9e88501,bodyName=0x1a166b34,armName=0x4e74fd8c;
-constexpr uint64_t bodyHash=0xff131a166b34;
 template<class T> bool read(uintptr_t address,T& value){
     SIZE_T copied{};
     return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&value,sizeof(value),&copied)&&copied==sizeof(value);
 }
 template<class T> T get(uintptr_t address){T value{};read(address,value);return value;}
-bool mask(uintptr_t model,uint32_t value){
-    SIZE_T copied{};return WriteProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(model+0x1a4),&value,sizeof(value),&copied)&&copied==sizeof(value);
-}
+struct GroupChange {uint32_t name{};uint8_t previousFlags{};};
 struct Binding {
     uintptr_t owner{},character{},parts{},record{},renderer{},model{};
-    uint32_t previousMask{};
     bool body{};
+    std::array<GroupChange,128> groups{};
+    uint16_t changed{};
 };
 std::array<Binding,32> hidden{};
 bool names(uintptr_t model,std::array<uint32_t,128>& result,uint16_t& count){
@@ -54,48 +52,58 @@ int groupIndex(const Binding& b,uint32_t name){
     const auto end=groups.begin()+count,found=std::find(groups.begin(),end,name);
     return found==end?-1:static_cast<int>(found-groups.begin());
 }
-uint8_t bodyFlags(const Binding& b){
-    const auto index=groupIndex(b,bodyName);const auto data=get<uintptr_t>(b.model+0x170);
+uint8_t groupFlags(const Binding& b,uint32_t name){
+    const auto index=groupIndex(b,name);const auto data=get<uintptr_t>(b.model+0x170);
     return index>=0&&data?get<uint8_t>(data+static_cast<uintptr_t>(index)):0;
 }
 void restore(Binding& b){
-    if(b.model&&owned(b)){
-        if(b.body){
-            if(showGroup&&bodyFlags(b)==3)showGroup(reinterpret_cast<void*>(b.model),&bodyHash);
-        }else if(get<uintptr_t>(b.model)==base+0x20f4d90&&get<uint32_t>(b.model+0x1a4)==0xffffffff){
-            mask(b.model,b.previousMask);
+    if(b.model&&owned(b)&&showVisibleGroup){
+        for(uint16_t i=0;i<b.changed;++i){const auto& group=b.groups[i];
+            // Restore only our normal-draw bit while the rest of the named
+            // group's state still matches. Never enable shadows here.
+            if(groupFlags(b,group.name)==static_cast<uint8_t>(group.previousFlags&~4u))
+                showVisibleGroup(reinterpret_cast<void*>(b.model),group.name);
         }
     }
     b={};
 }
 void conceal(Binding candidate){
-    if(!owned(candidate))return;
+    if(!hideVisibleGroup||!owned(candidate))return;
     auto slot=std::find_if(hidden.begin(),hidden.end(),[&](const auto& b){return b.model==candidate.model&&b.owner==candidate.owner;});
     if(slot==hidden.end()){
         slot=std::find_if(hidden.begin(),hidden.end(),[](const auto& b){return !b.model;});
         if(slot==hidden.end())return;
-        if(candidate.body){if(!hideGroup||bodyFlags(candidate)!=15)return;}
-        else if(!read(candidate.model+0x1a4,candidate.previousMask))return;
         *slot=candidate;
-        mgs5vr::log(candidate.body?"First-person player body group hidden; arm groups retained":"First-person player head model hidden");
+        mgs5vr::log(candidate.body?"First-person player body hidden from main view; native shadow retained":"First-person player head hidden from main view; native shadow retained");
     }
-    if(candidate.body){
-        if(bodyFlags(candidate)==15)hideGroup(reinterpret_cast<void*>(candidate.model),&bodyHash);
-    }else{
-        uint32_t current{};if(!read(candidate.model+0x1a4,current))return;
-        if(current!=0xffffffff)slot->previousMask=current;
-        mask(candidate.model,0xffffffff);
+    std::array<uint32_t,128> groups{};uint16_t count{};
+    if(!names(candidate.model,groups,count))return;
+    const auto flags=get<uintptr_t>(candidate.model+0x170);if(!flags)return;
+    for(uint16_t i=0;i<count;++i){
+        if(candidate.body&&groups[i]!=bodyName)continue;
+        uint8_t previous{};if(!read(flags+i,previous)||!(previous&4))continue;
+        auto change=std::find_if(slot->groups.begin(),slot->groups.begin()+slot->changed,
+            [&](const auto& g){return g.name==groups[i];});
+        if(change==slot->groups.begin()+slot->changed){
+            if(slot->changed==slot->groups.size())continue;
+            change=slot->groups.begin()+slot->changed++;
+        }
+        *change={groups[i],previous};
+        hideVisibleGroup(reinterpret_cast<void*>(candidate.model),groups[i]);
     }
 }
 }
 namespace mgs5vr {
 void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
-    base=moduleBase;
-    constexpr std::array<unsigned char,22> hideSignature{0x40,0x53,0x48,0x83,0xec,0x20,0x4c,0x8b,0x02,0x48,0x8b,0xd9,0x0f,0xb7,0x89,0xe8,0x01,0,0,0x33,0xc0,0x85};
-    constexpr std::array<unsigned char,22> showSignature{0x48,0x83,0xec,0x28,0x4c,0x8b,0x0a,0x33,0xd2,0x4c,0x8b,0xd1,0x0f,0xb7,0x89,0xe8,0x01,0,0,0x8b,0xc2,0x85};
-    std::array<unsigned char,22> bytes{};
-    if(read(base+0x1cca90,bytes)&&bytes==hideSignature&&read(base+0x1ceb80,bytes)&&bytes==showSignature){
-        hideGroup=reinterpret_cast<GroupFn>(base+0x1cca90);showGroup=reinterpret_cast<GroupFn>(base+0x1ceb80);
+    base=moduleBase;hideVisibleGroup=showVisibleGroup=nullptr;
+    // StaticModel SHADOW_ONLY=1 calls the first-list hide helper. Its separate
+    // DISABLE_SHADOW=2 branch hides the second list. Both callers and helper
+    // bytes were verified in this exact profile; no guessed visibility masks.
+    constexpr std::array<unsigned char,22> hideSignature{0x40,0x53,0x48,0x83,0xec,0x20,0x44,0x0f,0xb7,0x89,0xe8,0x01,0,0,0x33,0xc0,0x48,0x8b,0xd9,0x45,0x85,0xc9};
+    constexpr std::array<unsigned char,23> showSignature{0x48,0x83,0xec,0x28,0x44,0x0f,0xb7,0x91,0xe8,0x01,0,0,0x33,0xc0,0x4c,0x8b,0xd9,0x44,0x8b,0xc0,0x45,0x85,0xd2};
+    std::array<unsigned char,22> hideBytes{};std::array<unsigned char,23> showBytes{};
+    if(read(base+0x1ccc30,hideBytes)&&hideBytes==hideSignature&&read(base+0x1cee30,showBytes)&&showBytes==showSignature){
+        hideVisibleGroup=reinterpret_cast<GroupFn>(base+0x1ccc30);showVisibleGroup=reinterpret_cast<GroupFn>(base+0x1cee30);
     }
 }
 void updatePlayerVisibility(uintptr_t owner,bool firstPerson) noexcept {
@@ -106,7 +114,7 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson) noexcept {
     if(!character||get<uintptr_t>(character)!=base+0x2295210)return;
     const auto component=get<uintptr_t>(character+0x10),bodyParts=get<uintptr_t>(component+0x10);
     const auto bodyModel=get<uintptr_t>(bodyParts+0x68);
-    Binding body{owner,character,bodyParts,0,0,bodyModel,0,true};
+    Binding body{owner,character,bodyParts,0,0,bodyModel,true};
     if(bodyModel&&groupIndex(body,bodyName)>=0&&groupIndex(body,armName)>=0)conceal(body);
     const auto parts=get<uintptr_t>(character+0x610);
     if(!parts||get<uintptr_t>(parts)!=base+0x22e56c0||get<uintptr_t>(parts+0x38)!=character)return;
