@@ -1,6 +1,27 @@
 #include "mgs5vr/input_bridge.hpp"
 #include <chrono>
+#include <cstdlib>
 namespace mgs5vr {
+GamepadSample RigEquipment::update(GamepadSample sample,bool modifier){
+    constexpr uint16_t x=0x4000,y=0x8000,stickClick=0x0040;
+    const int sx=sample.leftX,sy=sample.leftY;
+    blockedButtons_&=sample.buttons;
+    if(std::abs(sx)<12000&&std::abs(sy)<12000)blockedStick_=false;
+    if(modifier){
+        blockedButtons_|=sample.buttons&(x|y|stickClick);
+        blockedStick_=true;
+        if(sample.buttons&x)sample.buttons|=0x0100;
+        if(sample.buttons&y)sample.buttons|=0x0200;
+        if(std::abs(sx)>19660||std::abs(sy)>19660){
+            if(std::abs(sy)>=std::abs(sx))sample.buttons|=sy>0?0x0001:0x0002;
+            else sample.buttons|=sx>0?0x0008:0x0004;
+        }
+        sample.buttons&=~(x|y|stickClick);
+    }
+    sample.buttons&=~blockedButtons_;
+    if(modifier||blockedStick_)sample.leftX=sample.leftY=0;
+    return sample;
+}
 uint16_t MenuButton::update(bool pressed,bool active,uint64_t time){
     if(!active||time<lastTime_){
         held_=false;longSent_=false;pulse_=0;releaseRequired_=pressed;lastTime_=time;return 0;

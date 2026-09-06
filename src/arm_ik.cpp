@@ -15,7 +15,7 @@ Quat swing(Vec3 a,Vec3 b){
 }
 Quat turn(Quat delta,Quat q){return normalize(compose(Pose{delta,{}},Pose{q,{}}).orientation);}
 }
-std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint){
+std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,bool followWristTwist){
     if(!valid(a.shoulder)||!valid(a.elbow)||!valid(a.wrist)||!valid(target)||!valid(Pose{{},hint}))return {};
     const auto upper=a.elbow.position-a.shoulder.position,lower=a.wrist.position-a.elbow.position;
     const float u=length(upper),l=length(lower);
@@ -34,7 +34,15 @@ std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint){
     const auto wrist=a.shoulder.position+forward*reach;
     ArmSolution out{a,std::abs(requested-reach)>0.0001f};
     out.pose.shoulder.orientation=turn(swing(upper,elbow-a.shoulder.position),a.shoulder.orientation);
-    out.pose.elbow={turn(swing(lower,wrist-elbow),a.elbow.orientation),elbow};
+    auto forearmRotation=turn(swing(lower,wrist-elbow),a.elbow.orientation);
+    if(followWristTwist){
+        // Transport the native forearm with the hand, then swing its long axis
+        // back onto the solved segment. This preserves hand-driven roll instead
+        // of leaving the sleeve twisted against a stationary animated forearm.
+        const auto handDelta=compose(Pose{target.orientation,{}},inverse(Pose{a.wrist.orientation,{}})).orientation;
+        forearmRotation=turn(swing(rotate(handDelta,lower),wrist-elbow),turn(handDelta,a.elbow.orientation));
+    }
+    out.pose.elbow={forearmRotation,elbow};
     out.pose.wrist={normalize(target.orientation),wrist};
     return out;
 }

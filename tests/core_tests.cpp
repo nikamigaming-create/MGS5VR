@@ -165,11 +165,18 @@ int main(){
     for(int i=0;i<100;++i){
         const float angle=static_cast<float>(i)*0.06283185f;
         const Pose target{{0,0,std::sin(angle/2),std::cos(angle/2)},{0.4f*std::cos(angle),0.4f*std::sin(angle),0.1f}};
-        const auto solved=solveArm(arm,target,{0,-1,-1});
+        const auto solved=solveArm(arm,target,{0,-1,-1},true);
         expect(solved&&same(solved->pose.wrist.position,target.position),"reachable wrist follows controller translation");
         if(solved){const auto upper=solved->pose.elbow.position-solved->pose.shoulder.position,lower=solved->pose.wrist.position-solved->pose.elbow.position;
-            expect(near(dot(upper,upper),0.0625f)&&near(dot(lower,lower),0.0625f),"arm IK preserves both authored segment lengths");}
+            expect(near(dot(upper,upper),0.0625f)&&near(dot(lower,lower),0.0625f),"arm IK preserves both authored segment lengths");
+            expect(same(rotate(compose(Pose{solved->pose.elbow.orientation,{}},inverse(Pose{arm.elbow.orientation,{}})).orientation,
+                               arm.wrist.position-arm.elbow.position),lower),"forearm twist retains the solved bone axis");}
     }
+    const ArmPose alignedArm{{{},{}},{{},{0,-.3f,0}},{{},{0,-.3f,-.25f}}};
+    const Quat wristRoll{0,0,.70710678f,.70710678f};
+    const auto twisted=solveArm(alignedArm,Pose{wristRoll,alignedArm.wrist.position},{0,-1,0},true);
+    expect(twisted&&same(rotate(twisted->pose.elbow.orientation,{1,0,0}),{0,1,0}),
+           "wrist roll propagates into the forearm instead of twisting the cuff against it");
     const auto extended=solveArm(arm,Pose{{},{3,0,0}},{0,-1,0});
     expect(extended&&extended->reachClamped&&near(extended->pose.wrist.position.x,0.499f),"unreachable grip cannot stretch the native limb");
     expect(!solveArm(ArmPose{},Pose{},{}),"missing skeleton geometry cannot produce an arm");
@@ -189,6 +196,26 @@ int main(){
     }
     expect(!anatomicalGrip({},indexKnuckle,indexKnuckle)&&!anatomicalGrip({},Vec3{0,0,2},Vec3{0,1,2}),
            "degenerate or non-hand landmark geometry cannot steer the rig");
+    RigEquipment equipment;
+    GamepadSample equipmentHeld{0x8000,255,128,0,30000,22000,-12000};
+    auto mapped=equipment.update(equipmentHeld,true);
+    expect(mapped.buttons==0x0201&&mapped.leftX==0&&mapped.leftY==0,"equipment modifier selects primary and binocular action without movement/context action");
+    expect(mapped.leftTrigger==255&&mapped.rightTrigger==128&&mapped.rightX==22000,"equipment selection retains native aim/fire and selection stick");
+    mapped=equipment.update(equipmentHeld,false);
+    expect(mapped.buttons==0&&mapped.leftY==0,"releasing modifier first cannot leak held action or start walking");
+    equipment.update({},false);
+    mapped=equipment.update(equipmentHeld,false);
+    expect(mapped==equipmentHeld,"fresh native actions resume after neutral input");
+    equipmentHeld={0x4000,0,0,-30000,22000,0,0};
+    mapped=equipment.update(equipmentHeld,true);
+    expect(mapped.buttons==0x0104,"dominant left axis selects items and X maps native call");
+    equipmentHeld={0,0,0,10000,-30000,0,0};
+    expect(equipment.update(equipmentHeld,true).buttons==0x0002,"down selects the secondary weapon");
+    equipmentHeld={0,0,0,30000,10000,0,0};
+    expect(equipment.update(equipmentHeld,true).buttons==0x0008,"right selects support equipment");
+    equipmentHeld={0x0040,0,0,1000,-1000,0,0};
+    expect(equipment.update(equipmentHeld,true).buttons==0,"deadzone never selects equipment or sprints");
+    equipment.reset();expect(equipment.update(equipmentHeld,false)==equipmentHeld,"mode reset restores ordinary native controls");
     GamepadMailbox gamepad;
     expect(!gamepad.read(100),"unconnected XR gamepad preserves original input path");
     gamepad.publish({0x1000,0,255,100,-100,0,0},true,100);

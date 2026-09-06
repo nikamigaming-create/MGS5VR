@@ -10,6 +10,13 @@ view and projection. Tests cover rigid-transform invariance, palm placement,
 panel extent/depth, and eye disparity. These primitives alone do not establish
 an accepted hand fit or a working in-game wrist HUD.
 
+The arm solver can explicitly transport wrist roll into the forearm while
+preserving its solved long axis. Existing callers retain the earlier swing-only
+behavior unless they opt in. The independent equipment modifier maps native
+equipment directions and shoulder actions, suppressing movement and held button
+leakage until release. Contract tests cover both primitives; their runtime
+integration and the visual rig still require simulator acceptance.
+
 The installed executable baseline is SHA256 `085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`, file version 1.0.15.4, Steam build 24176213. Engine offsets from 1.0.15.3 must not be applied to it. `profiles/tpp-1.0.15.4.json` deliberately records unverified hooks as null.
 
 ## Default theatre pixel path

@@ -4,7 +4,19 @@ The first physical headset run establishes that the current native VR path can
 support real movement and rifle combat. The user reported that it worked well,
 but rejected the intrusive HUD and asked for better arms and clearer weapon use.
 The next slice is a clear main view with a coherent AM MRS-4 rig and live forearm
-status. Enemy and location markers should remain available, per the user's request.
+status on the **left forearm**.
+
+The user's follow-up makes HUD work the immediate priority: remove the screen
+crosshair and other flat overlays; put only native weapon/ammo/status information
+on the left forearm, with larger menus on spatial panels. Remove destination
+letters (E/D/F), distances and flat enemy icons from both the main view and the
+wrist HUD. Retain actual 3D marks/silhouettes on people, checked in both eyes.
+The later request also requires equip/lower/reload, available weapon categories,
+binoculars and zoom to be exercised through real controller input. The supplied
+still visibly fails arm geometry and weapon orientation acceptance.
+An expanded map should be accessible from the
+wrist/menu path. Preserve the native game data and interactions behind these
+surfaces; do not replace them with a decorative status mockup.
 
 ## Evidence and limits
 
@@ -82,13 +94,14 @@ game HUD and must not be used to diagnose the game's UI path.
    the same source pose as the world and arm. Remove the duplicate from the eye
    image once its replacement is usable. Put contextual prompts near their
    relevant object or on a small readable panel; keep blocking menus escapable.
-   Preserve enemy/location markers and validate their world projection in both
-   eyes. Handle subtitles and damage feedback separately from ammo/status.
+   Preserve 3D people cues and validate their world projection in both eyes;
+   suppress flat destination labels and reticles. Handle subtitles and damage
+   feedback separately from ammo/status.
 4. **Make the controls explicit.** Retain the current hold-to-ready/fire/reload
    mapping for this slice, with a compact in-game guide away from the aiming
    area. Clarify support-hand attach/release and consistent lowering/stowing.
-   Validate the ordinary rifle before extending scopes, other weapon families,
-   throws, CQC and mounted weapons.
+   Exercise the ordinary rifle, available weapon categories, binoculars and zoom.
+   Throws, CQC and mounted weapons require their own ownership policies.
 5. **Validate in the simulator before another physical test.** Use the sequence
    below on the same saved checkpoint. Investigate edge coverage with paired-eye
    captures and measured head motion. The user requested simulator development,
