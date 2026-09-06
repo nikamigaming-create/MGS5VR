@@ -18,7 +18,7 @@ slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation
 
 | Area | Implemented and observed | Still required |
 | --- | --- | --- |
-| Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission | Fix the reproduced sky-lighting rectangle; shadow/culling/temporal and physical stereo acceptance |
+| Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission; centered render coverage removes the reproduced sky rectangle in SIM | Shadow/culling/temporal and physical stereo acceptance |
 | Head motion | Native player head bone anchors the camera; simulator translations and rotations modify native eye matrices | Verified anatomical eye offset, world scale and all-state acceptance |
 | First person | Player-owned head/body exclusion; anatomical palm binding, shoulder anchors, forearm roll and native reload support; named hip mount hidden in VR | Cuff/garment polish, physical alignment, full reach/motion/stance acceptance |
 | HUD and markers | Native weapon/ammo UI on left forearm; flat reticle/destination labels suppressed; captured eye projection applied to native scene-camera cues | Spatial damage/subtitle/context feedback, interactive wrist iDroid, full motion acceptance |
@@ -39,11 +39,13 @@ process-exit cleanup. These checks do not certify the full mod.
 GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
-Current controller build SHA256:
-`102CEF7F7F0F3CCF665D05C8252DA83CFB7CDD484582780CB9324EFE30621C2E`.
-It is the simulator HUD/rig build described above. The initial physical run used
+Current simulator build SHA256:
+`D28A741FEA73152A3E77F7BA5819C4D2463370007CE8241E7B2D781194E216D7`.
+It adds the [centered projection check](SIM_HUD_REVIEW.md#centered-projection-follow-up)
+to the HUD/rig build used for the short recording. The initial physical run used
 `4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`,
-which remains the local rollback.
+with the later physical rollback retained as
+`70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
 The initial controller/muzzle probe and first recording used
 `B22157DBCF1F00060057E5D3581314476962BA03ADD9C378183604F94AF43830`;
 later builds added right-grip readiness and bounded shot diagnostics to the

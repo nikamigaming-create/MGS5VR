@@ -26,7 +26,8 @@ wrist/head movement. Two rifle shots logged authored barrel alignment of 1.
 
 Support and HUD placement improved, but full rig acceptance remains open:
 body/garment geometry still intrudes beside the left arm in the pistol support
-pose. A separately reproduced rectangular sky-lighting discontinuity also remains.
+pose. The sky-lighting rectangle is visible in this older recording; see the
+subsequent projection check below.
 The clip is not a physical comfort, smoothness, lighting or audio pass.
 
 D-Horse mount, walk, gallop and dismount were exercised through native input;
@@ -37,6 +38,31 @@ and brake triggers, with neutral-input gates across mode/focus transitions. Its
 input contracts pass; **no vehicle has yet been entered or driven in SIM**.
 A sprint toward the village ended in native player death and Mission Failed;
 checkpoint recovery worked. The cause of that death was not established.
+
+## Centered projection follow-up
+
+DLL `D28A741FEA73152A3E77F7BA5819C4D2463370007CE8241E7B2D781194E216D7`
+passed all five local suites. The native eye render now encloses the runtime's
+requested FOV in a centered frustum. That exact rendered FOV travels beside its
+pixels through the existing command-list/mailbox join and is submitted to OpenXR.
+This preserves the ray geometry; it does not add zoom. Enlarging coverage at the
+same texture resolution costs some pixel density. OpenXR explicitly supports
+mapping a submitted FOV different from the located view to the display
+([projection-view contract](https://registry.khronos.org/OpenXR/specs/1.0/man/html/XrCompositionLayerProjectionView.html)).
+
+In SIM process 17444, the screen-fixed sky rectangle disappeared in both eyes.
+Volumetric Clouds off did not remove it in the preceding build; the centered
+candidate was checked with clouds off and then restored to On. Reopening graphics
+settings confirmed On. Sampled head yaw +40/-50 degrees, pitch 25/30/45/65 degrees,
+and a 12 cm sideways lean retained continuous sky coverage. Both-eye left forearm
+reading, automatic rifle support, two ordinary shots (barrel alignment 1), reload,
+and horse-to-foot transition still worked. At the bounded diagnostic sample there
+were 3,912 native eye pairs, zero capture rejections and no scene failure.
+
+The 15-second forearm recording above is from the preceding DLL, not this build.
+This removes the reproduced rectangle in the checked states; it does not certify
+all shadows, distant-object culling, temporal effects or physical headset optics.
+The native source/culling projection and shared temporal resources are unchanged.
 
 ## Earlier HUD build and scope
 

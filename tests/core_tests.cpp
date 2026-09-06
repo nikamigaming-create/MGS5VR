@@ -16,6 +16,14 @@ int main(){
     const EyeFov asymmetric{-0.8f,0.9f,0.75f,-0.7f};
     std::array<float,16> projection{1,0,0,0,0,1,0,0,0,0,-0.0002f,1,0,0,0.1f,0};
     expect(setEyeProjection(projection,asymmetric),"native perspective accepts runtime asymmetric field of view");
+    const auto centered=centeredEyeFov(asymmetric);
+    expect(centered&&centered->left<=asymmetric.left&&centered->right>=asymmetric.right
+        &&centered->up>=asymmetric.up&&centered->down<=asymmetric.down,
+        "centered native render coverage contains every requested runtime edge");
+    auto centeredProjection=projection;
+    expect(centered&&setEyeProjection(centeredProjection,*centered)&&near(centeredProjection[8],0)&&near(centeredProjection[9],0),
+        "centered native effects and the submitted image share a zero-offset projection");
+    expect(!centeredEyeFov({0,.8f,.8f,-.8f}),"invalid runtime field of view cannot be enlarged into valid-looking metadata");
     const auto ndc=[&](float x,float y,float z){return Vec3{(x*projection[0]+z*projection[8])/z,(y*projection[5]+z*projection[9])/z,(z*projection[10]+projection[14])/z};};
     expect(near(ndc(-std::tan(asymmetric.left)*3,0,3).x,-1),"left eye frustum boundary projects to left edge");
     expect(near(ndc(-std::tan(asymmetric.right)*3,0,3).x,1),"right eye frustum boundary projects to right edge");

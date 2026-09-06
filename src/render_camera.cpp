@@ -178,6 +178,8 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     for(uint32_t eye=0;eye<2;++eye){
         saved.restore();eyeViewport=source.viewport;clipProjection=gpuProjection=false;
         drawingEye={source.pair.sample.views[eye],id,source.pair.sample.trackingSequence,status.activation,source.pair.sample.sampleTime,eye,false,false};
+        if(const auto fov=mgs5vr::centeredEyeFov(drawingEye.view.fov))drawingEye.view.fov=*fov;
+        else {complete=false;sceneFailure=4;break;}
         const auto native=mgs5vr::nativeEyePose(source.pair.sample.nativePose,source.pair.sample.headPose,drawingEye.view.pose);
         alignas(16) auto nativeValues=values(native);
         alignas(16) std::array<float,16> eyeWorld{},eyeView{};

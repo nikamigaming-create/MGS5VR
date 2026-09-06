@@ -1,4 +1,5 @@
 #include "mgs5vr/stereo.hpp"
+#include <algorithm>
 #include <cmath>
 
 namespace mgs5vr {
@@ -31,6 +32,11 @@ bool setEyeProjection(std::array<float,16>& m,EyeFov f){
     const float l=std::tan(f.left),r=std::tan(f.right),u=std::tan(f.up),d=std::tan(f.down);
     m[0]=-2/(r-l);m[5]=2/(u-d);m[8]=-(r+l)/(r-l);m[9]=-(u+d)/(u-d);
     return true;
+}
+std::optional<EyeFov> centeredEyeFov(EyeFov f){
+    if(!valid(f))return {};
+    const float x=std::max(-f.left,f.right),y=std::max(f.up,-f.down);
+    return EyeFov{-x,x,y,-y};
 }
 Pose nativeEyePose(Pose nativeHead,Pose sourceHead,Pose sourceEye,float units){
     const Pose basis{{0,1,0,0},{}};

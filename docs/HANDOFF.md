@@ -1,6 +1,6 @@
 # Development handoff - 2026-09-06
 
-The latest installed build is the simulator forearm-corrective/support follow-up. Read
+The latest installed build adds centered projection to the forearm/support follow-up. Read
 [SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md) for the evidence and open gates, and
 [CONTROLS.md](CONTROLS.md) for the complete Touch interaction list. The initial
 physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
@@ -22,7 +22,7 @@ physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
 - All five local suites passed. CI builds all targets and runs four non-GPU suites.
 
 Local DLL SHA256:
-`102CEF7F7F0F3CCF665D05C8252DA83CFB7CDD484582780CB9324EFE30621C2E`.
+`D28A741FEA73152A3E77F7BA5819C4D2463370007CE8241E7B2D781194E216D7`.
 The last physical-test rollback is retained locally with DLL SHA256
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
 No game executable, archives or saves were patched. Installation hashes were
@@ -36,8 +36,14 @@ The current `artifacts/forearm-followup-15s/simulator.mp4` is 14.883 seconds,
 reviewed; no raw frame sequence was written. It shows automatic support across
 the rifle/pistol swap, left forearm reading, reload and wrist/head movement.
 Both-eye live checks supplement the single-eye clip. Garment/body intrusion near
-the pistol support pose remains open. The new physical recording reproduces a
-sky-lighting rectangle that is still visible in SIM. No lighting/audio fix yet.
+the pistol support pose remains open. This clip predates the projection fix.
+The supplied physical recording's sky rectangle was reproduced with asymmetric
+render projection, including with Volumetric Clouds off. Centering the render
+coverage and carrying that same FOV with the submitted pixels removes the rectangle
+in both sampled SIM eyes. Clouds were restored to On and verified by reopening
+settings; head yaw/pitch/lean, left HUD reading, rifle support/fire/reload and horse
+dismount were checked. Shadow/culling/temporal and physical acceptance remain open.
+There is no audio fix in this build.
 
 D-Horse mount/walk/gallop/dismount and bounded mounted rifle shots have SIM
 observations. Vehicle input routing is implemented and contract-tested, but no
