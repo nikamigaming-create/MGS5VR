@@ -40,8 +40,10 @@ std::atomic_uintptr_t playerOwner{};
 std::atomic_bool enabled{};
 std::mutex rigMutex;
 uintptr_t boundOwner{};
+uintptr_t boundModel{};
 uint64_t activation{},updates{};
 std::array<Vec3,2> bendHistory{};
+SupportContact supportContact;
 float supportBlend{};
 uint64_t supportAt{};
 struct ShotRig {
@@ -81,6 +83,13 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     if(parent[6]!=5||parent[7]!=6||parent[8]!=7||parent[10]!=9||parent[11]!=10||parent[12]!=11)return false;
     if(parent[24]!=8||parent[30]!=8||parent[34]!=30||parent[40]!=12||parent[46]!=12||parent[50]!=46)return false;
+    const auto bindOffset=[&](size_t i){return get<Vec3>(parents+i*0x20+0x10);};
+    const std::array<ArmBasis,2> armBasis{{{bindOffset(7),bindOffset(8)},{bindOffset(11),bindOffset(12)}}};
+    // This profile's bind axes are +X on the left and -X on the right. Native
+    // flexion is about Y; +Y is the dorsal side of both authored wrist frames.
+    for(size_t side=0;side<2;++side)for(const auto axis:{armBasis[side].upperAxis,armBasis[side].forearmAxis})
+        if(!valid(Pose{{},axis})||std::abs(axis.y)+std::abs(axis.z)>0.001f
+           ||(side?-axis.x:axis.x)<0.2f||(side?-axis.x:axis.x)>0.35f)return false;
     std::array<float,16> matrix{};std::array<float,8> cameraValues{};
     if(!read(reinterpret_cast<uintptr_t>(binding),matrix)||!read(camera+0xf0,cameraValues))return false;
     const auto root=nativeAffinePose(matrix);if(!root)return false;
@@ -104,11 +113,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         if(!palm)return false;
         gripFromWrist[i]=compose(inverse(*palm),wrist);
     }
-    if(boundOwner!=owner||activation!=frame.activation){
+    if(boundOwner!=owner||boundModel!=model||activation!=frame.activation){
         for(size_t i=0;i<2;++i){
             bendHistory[i]=bone(q,p,wrists[i]-1).position-bone(q,p,shoulders[i]).position;
         }
-        boundOwner=owner;activation=frame.activation;
+        boundOwner=owner;boundModel=model;activation=frame.activation;
+        supportContact.reset();
         supportBlend=0;supportAt=now;
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
@@ -134,13 +144,13 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
     }
     const Pose rightTarget=compose(grips[1],gripFromWrist[1]);
-    const auto right=solveArm({bone(q,p,10),bone(q,p,11),bone(q,p,12)},rightTarget,bendHistory[1],true);
+    const auto right=solveArm({bone(q,p,10),bone(q,p,11),bone(q,p,12)},rightTarget,bendHistory[1],&armBasis[1]);
     if(!right)return false;
     replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
     bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
-    bool nativeManipulation=false;
+    bool nativeManipulation=false,firearmActive=false;
     const auto weaponComponent=get<uintptr_t>(character+0x80);
-    if(get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
+    if(!frame.controllers.vehicleControls&&get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
         const auto instances=get<uintptr_t>(weaponComponent+0x38);
         const auto first=get<uint32_t>(instances+0x24),index=get<uint32_t>(owner+0x3a0);
         if(index>=first&&index-first<=15){
@@ -148,15 +158,26 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             // Observed throughout rifle reload and WU pistol bolt cycling; the
             // native animation owns the support hand during these operations.
             nativeManipulation=(get<uint32_t>(state+0x27c)&0x1c0)==0x40&&(get<uint32_t>(state+0x3c0)&0x04000000)!=0;
+            firearmActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x40;
         }
     }
-    const bool support=frame.controllers.supportRequested||nativeManipulation;
+    const auto attached=compose(right->pose.wrist,compose(inverse(rightAnimated),leftAnimated));
+    const auto attachedGrip=compose(attached,inverse(gripFromWrist[0]));
+    const auto separation=grips[0].position-attachedGrip.position;
+    const auto handSeparation=grips[0].position-grips[1].position;
+    const auto towardHead=frame.headPose.position-frame.controllers.hands[0].grip.position;
+    const auto dorsal=rotate(frame.controllers.hands[0].grip.orientation,{-1,0,0});
+    const bool inspecting=dot(towardHead,towardHead)<0.49f
+        &&dot(dorsal,towardHead)>0.5f*std::sqrt(dot(towardHead,towardHead));
+    // Turning the watch toward the eyes must free the hand even beside a pistol.
+    const bool nearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&!inspecting,
+        frame.controllers.hands[0].gripTracked,std::sqrt(dot(handSeparation,handSeparation)));
+    const bool support=frame.controllers.supportRequested||nativeManipulation||nearSupport;
     const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/120.f:1.f,1.f);supportAt=now;
     supportBlend=std::clamp(supportBlend+(support?step:-step),0.f,1.f);
     if(frame.controllers.hands[0].gripTracked||support){
         // Preserve the game's animated support-hand contact while the native
         // support is requested or a native reload/bolt cycle is running.
-        const auto attached=compose(right->pose.wrist,compose(inverse(rightAnimated),leftAnimated));
         auto target=attached;
         if(frame.controllers.hands[0].gripTracked&&supportBlend<1){
             const auto tracked=compose(grips[0],gripFromWrist[0]);
@@ -167,7 +188,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const float n=std::sqrt(blended.x*blended.x+blended.y*blended.y+blended.z*blended.z+blended.w*blended.w);
             target.orientation={blended.x/n,blended.y/n,blended.z/n,blended.w/n};
         }
-        const auto left=solveArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],true);
+        const auto left=solveArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],&armBasis[0]);
         if(!left)return false;
         replace(q,p,6,left->pose.shoulder);replace(q,p,7,left->pose.elbow);replace(q,p,8,left->pose.wrist);
         bendHistory[0]=left->pose.elbow.position-left->pose.shoulder.position;
@@ -180,17 +201,37 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         while(ancestor>=0&&!controlled[static_cast<size_t>(ancestor)])ancestor=parent[static_cast<size_t>(ancestor)];
         if(ancestor>=0)replace(q,p,i,compose(delta[static_cast<size_t>(ancestor)],bone(originalQ,originalP,i)));
     }
+    // These named corrective joints belong to the verified native arm mesh.
+    // Recompute their native local corrections from the solved joints. Neither
+    // stale animation corrections nor rigid parent copies match this skin.
+    constexpr std::array<uint32_t,14> helperNames{0x8cb42ff9,0x17c46537,0x668bcff7,0xf8ae9203,0x9ccbd1fd,0xc7a9a0c4,0x6cae37b1,
+        0x82901b42,0x4b89fc94,0x18f26b1e,0x24ce95fb,0x0831f646,0x9bed7bf0,0xa4b3e85d};
+    constexpr std::array<int32_t,14> helperParents{5,6,6,7,7,7,8,9,10,10,11,11,11,12};
+    const auto names=get<uintptr_t>(model+0xe8);
+    bool helpersMatch=count>110;
+    for(size_t j=0;helpersMatch&&j<helperNames.size();++j)
+        helpersMatch=parent[97+j]==helperParents[j]&&get<uint32_t>(names+(97+j)*4)==helperNames[j];
+    if(helpersMatch)for(size_t side=0;side<2;++side){
+        const size_t clavicle=side?9:5;
+        const auto local=[&](size_t i){return compose(inverse(bone(q,p,parent[i])),bone(q,p,i)).orientation;};
+        const auto corrections=armCorrectiveRotations(local(clavicle),local(clavicle+1),local(clavicle+2),local(clavicle+3),side!=0);
+        for(size_t j=0;j<7;++j){
+            const auto i=97+side*7+j,anchor=static_cast<size_t>(helperParents[side*7+j]);
+            const auto offset=bindOffset(i);
+            if(!valid(Pose{{},offset})||dot(offset,offset)>0.16f)return false;
+            replace(q,p,i,compose(bone(q,p,anchor),Pose{corrections[j],offset}));
+        }
+    }
     // Full render pose, before native matrix and attachment publication. Finger
     // poses follow their solved wrist. Native position.w metadata is retained.
     frame.playerHead=renderedHead;
     if(frame.controllers.hands[0].gripTracked){
         const auto wrist=compose(*root,bone(q,p,8));
         const auto elbow=compose(*root,bone(q,p,7));
-        const auto palm=compose(wrist,inverse(gripFromWrist[0]));
-        frame.wristPanel=compose(palm,Pose{{0,-0.70710678f,0,0.70710678f},{}});
-        frame.wristPanel.position=wrist.position+(elbow.position-wrist.position)*0.35f
-            +rotate(frame.wristPanel.orientation,{0,0,0.025f});
-        frame.wristPanelTracked=true;
+        const auto surface=helpersMatch?compose(*root,bone(q,p,102)):wrist;
+        if(const auto panel=forearmPanel(elbow,wrist,rotate(surface.orientation,{0,1,0}))){
+            frame.wristPanel=*panel;frame.wristPanelTracked=true;
+        }
     }
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
     // The engine may reuse animated helper/finger channels next frame. Only the
@@ -200,7 +241,6 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // SKL_300_ASRROOT is the authored hip holster, independent of the held
     // weapon's wrist socket. Suppress only its published render scale in VR.
     // The native animation channels and held-weapon transform remain intact.
-    const auto names=get<uintptr_t>(model+0xe8);
     if(count>53&&parent[53]==0&&get<uint32_t>(names+53*4)==0xec70c442)
         restore.stowedMount=get<uintptr_t>(reinterpret_cast<uintptr_t>(binding)+0x40)+53*64;
     std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
@@ -210,7 +250,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         std::ostringstream s;s<<"Controller rig updates="<<updates<<" tracking="<<frame.trackingSequence
             <<" predicted="<<frame.controllers.predictedXrTime<<" player="<<frame.playerSequence
             <<" right_wrist="<<right->pose.wrist.position.x<<','<<right->pose.wrist.position.y<<','<<right->pose.wrist.position.z
-            <<" reach_clamped="<<right->reachClamped;log(s.str());
+            <<" reach_clamped="<<right->reachClamped<<" support="<<supportBlend
+            <<" support_near="<<nearSupport<<" support_distance="<<std::sqrt(dot(separation,separation))
+            <<" hand_distance="<<std::sqrt(dot(handSeparation,handSeparation))
+            <<" inspecting="<<inspecting<<" arm_helpers="<<helpersMatch;log(s.str());
     }
     return true;
 }
@@ -310,4 +353,36 @@ void installControllerRig(uintptr_t imageBase){
 void observeControllerRigOwner(uintptr_t owner) noexcept{playerOwner.store(owner);}
 void stopControllerRig() noexcept{enabled.store(false);playerOwner.store(0);}
 bool controllerRigEnabled() noexcept{return enabled.load();}
+TravelMode nativeTravelMode() noexcept{
+    // PlayerStatus's own Lua readers select this double-buffered local player
+    // table (0x53c990 / 0x53ca40). Registration at 0x5547cc assigns ON_HORSE
+    // bit 25 and ON_VEHICLE bit 26. No game status is written here.
+    static std::mutex mutex;
+    static TravelMode cached{TravelMode::unknown};
+    static uint64_t sampledAt{};
+    std::lock_guard lock(mutex);
+    const auto now=steadyMilliseconds();
+    if(!enabled.load())return TravelMode::unknown;
+    const auto owner=playerOwner.load();
+    if(get<uintptr_t>(owner)==base+0x23b8218){
+        const auto index=get<uint32_t>(base+0x2bd3fd4);
+        if(index<16&&get<uint32_t>(owner+0x3a0)==index)for(int attempt=0;attempt<2;++attempt){
+            const auto phase=get<uint32_t>(base+0x2bd3fd0);
+            if(phase>1)break;
+            const auto state=base+0x2bd3ff0+(phase*16ull+index)*0xe0;
+            std::array<uint32_t,5> flags{};Vec3 stateRoot{},ownerRoot{};
+            if(get<uintptr_t>(state)!=base+0x2190b28||!read(state+0xc0,flags)
+                ||!read(state+0x40,stateRoot)||!read(owner+0x60,ownerRoot))break;
+            if(phase!=get<uint32_t>(base+0x2bd3fd0))continue;
+            const auto difference=stateRoot-ownerRoot;
+            if(!valid(Pose{{},difference})||dot(difference,difference)>4)break;
+            const auto mode=(flags[1]&(1u<<5))?TravelMode::unknown:
+                (flags[0]&(1u<<26))?TravelMode::vehicle:(flags[0]&(1u<<25))?TravelMode::horse:TravelMode::onFoot;
+            if(mode!=cached){std::ostringstream s;s<<"Native travel mode="<<static_cast<int>(mode)
+                <<" player="<<index<<" flags="<<std::hex<<flags[0]<<','<<flags[1];log(s.str());}
+            cached=mode;sampledAt=now;return mode;
+        }
+    }
+    return now>=sampledAt&&now-sampledAt<=150?cached:TravelMode::unknown;
+}
 }

@@ -162,10 +162,11 @@ int main(){
            "a rig from another native camera publication is withheld");
     expect(nativeRoot&&same(rotate(nativeRoot->orientation,{1,0,0}),{0,0,-1}),"row affine decoding retains native handedness");
     const ArmPose arm{{{},{}},{{},{0.2f,-0.15f,0}},{{},{0.4f,0,0}}};
+    const ArmBasis armBasis{arm.elbow.position-arm.shoulder.position,arm.wrist.position-arm.elbow.position};
     for(int i=0;i<100;++i){
         const float angle=static_cast<float>(i)*0.06283185f;
         const Pose target{{0,0,std::sin(angle/2),std::cos(angle/2)},{0.4f*std::cos(angle),0.4f*std::sin(angle),0.1f}};
-        const auto solved=solveArm(arm,target,{0,-1,-1},true);
+        const auto solved=solveArm(arm,target,{0,-1,-1},&armBasis);
         expect(solved&&same(solved->pose.wrist.position,target.position),"reachable wrist follows controller translation");
         if(solved){const auto upper=solved->pose.elbow.position-solved->pose.shoulder.position,lower=solved->pose.wrist.position-solved->pose.elbow.position;
             expect(near(dot(upper,upper),0.0625f)&&near(dot(lower,lower),0.0625f),"arm IK preserves both authored segment lengths");
@@ -173,10 +174,90 @@ int main(){
                                arm.wrist.position-arm.elbow.position),lower),"forearm twist retains the solved bone axis");}
     }
     const ArmPose alignedArm{{{},{}},{{},{0,-.3f,0}},{{},{0,-.3f,-.25f}}};
+    const ArmBasis alignedBasis{{0,-.3f,0},{0,0,-.25f},{0,0,-1},{1,0,0}};
     const Quat wristRoll{0,0,.70710678f,.70710678f};
-    const auto twisted=solveArm(alignedArm,Pose{wristRoll,alignedArm.wrist.position},{0,-1,0},true);
-    expect(twisted&&same(rotate(twisted->pose.elbow.orientation,{1,0,0}),{0,1,0}),
-           "wrist roll propagates into the forearm instead of twisting the cuff against it");
+    const auto twisted=solveArm(alignedArm,Pose{wristRoll,alignedArm.wrist.position},{0,-1,0},&alignedBasis);
+    expect(twisted&&same(rotate(twisted->pose.elbow.orientation,{1,0,0}),{1,0,0}),
+           "tracked wrist roll leaves the native elbow hinge untwisted");
+    for(int i=0;i<=720;++i){
+        const float angle=static_cast<float>(i)*0.034906585f;
+        const Quat roll{0,0,std::sin(angle/2),std::cos(angle/2)};
+        auto animated=alignedArm;
+        animated.elbow.orientation={0,std::sin(angle*.73f),0,std::cos(angle*.73f)};
+        animated.wrist.orientation={std::sin(angle*.21f),0,0,std::cos(angle*.21f)};
+        const auto solved=solveArm(animated,Pose{roll,alignedArm.wrist.position},{0,-1,0},&alignedBasis);
+        expect(solved&&same(rotate(solved->pose.elbow.orientation,{1,0,0}),{1,0,0})
+            &&same(rotate(solved->pose.wrist.orientation,{1,0,0}),rotate(roll,{1,0,0})),
+               "repeated wrist turns cannot accumulate twist at the elbow or lose the tracked hand");
+    }
+    const auto axisRotation=[](unsigned axis,float degrees){
+        const float angle=degrees*.00872664626f,s=std::sin(angle);
+        return Quat{axis==0?s:0,axis==1?s:0,axis==2?s:0,std::cos(angle)};
+    };
+    for(const bool right:{false,true}){
+        const auto corrections=armCorrectiveRotations(axisRotation(2,20),axisRotation(0,80),
+            axisRotation(1,-60),axisRotation(0,100),right);
+        expect(same(rotate(corrections[1],{0,1,0}),rotate(axisRotation(0,right?-60.f:-56.f),{0,1,0})),
+               "shoulder correctives preserve the native left/right twist weights");
+        expect(same(rotate(corrections[3],{1,0,0}),rotate(axisRotation(1,33),{1,0,0})),
+               "elbow corrective counter-rotates flexion instead of folding the sleeve");
+        expect(same(rotate(corrections[4],{0,1,0}),rotate(axisRotation(0,35),{0,1,0}))
+            &&same(rotate(corrections[5],{0,1,0}),rotate(axisRotation(0,75),{0,1,0})),
+               "forearm helper joints distribute 100 degrees of wrist twist at 35 and 75 percent");
+    }
+    const Pose watchElbow{{},{-.3f,-.3f,-.4f}},watchWrist{{},{0,-.3f,-.4f}};
+    const auto watch=forearmPanel(watchElbow,watchWrist,{0,1,0});
+    expect(watch&&same(rotate(watch->orientation,{1,0,0}),{1,0,0})
+        &&same(rotate(watch->orientation,{0,0,1}),{0,1,0})
+        &&same(rotate(watch->orientation,{0,1,0}),{0,0,-1}),
+        "left watch reads left to right along the forearm with its top away from the wearer");
+    const Pose watchMove{{0,.70710678f,0,.70710678f},{3,1,2}};
+    const auto movedWatch=forearmPanel(compose(watchMove,watchElbow),compose(watchMove,watchWrist),rotate(watchMove.orientation,{0,1,0}));
+    expect(watch&&movedWatch&&same(movedWatch->position,compose(watchMove,*watch).position),
+           "forearm HUD remains attached through character translation and turning");
+    expect(!forearmPanel(watchElbow,watchWrist,{1,0,0}),"undefined forearm normal cannot produce a face HUD");
+    SupportContact support;
+    expect(!support.update(true,true,.4f)&&support.update(true,true,.25f),"bringing the tracked hands together acquires support");
+    expect(support.update(true,true,.4f),"support survives contact movement through a weapon swap");
+    expect(!support.update(true,true,.46f)&&!support.update(true,true,.4f),"pulling away releases support without edge chatter");
+    expect(support.update(true,true,.1f)&&!support.update(true,false,.1f),"lost hand tracking releases automatic support");
+    expect(support.update(true,true,.1f)&&!support.update(false,true,.1f),"lowering the gun releases automatic support");
+    expect(support.update(true,true,.4f),"readying a different nearby weapon restores the prior support contact");
+    support.update(false,true,.5f);
+    expect(!support.update(true,true,.5f),"selection cannot reattach a hand that has moved away");
+    RigInput travelInput;
+    GamepadSample triggerOnly{};triggerOnly.rightTrigger=255;
+    expect(travelInput.update(triggerOnly,false,false,TravelMode::onFoot).gamepad.rightTrigger==0,
+           "on-foot trigger requires a readied weapon");
+    const auto readyGun=travelInput.update(triggerOnly,true,true,TravelMode::onFoot);
+    expect(readyGun.gamepad.leftTrigger==255&&readyGun.gamepad.rightTrigger==255&&readyGun.supportRequested,
+           "on-foot grip still readies and supports the firearm");
+    expect(travelInput.update(triggerOnly,true,true,TravelMode::vehicle).gamepad==GamepadSample{},
+           "entering a vehicle cannot carry firing input into accelerator or mounted attack");
+    travelInput.update({},false,false,TravelMode::vehicle);
+    const auto accelerator=travelInput.update(triggerOnly,false,false,TravelMode::vehicle);
+    expect(accelerator.gamepad.rightTrigger==255&&accelerator.gamepad.leftTrigger==0&&!accelerator.weaponReady,
+           "vehicle accelerator works independently of the weapon-ready grip and brake");
+    GamepadSample brakeOnly{};brakeOnly.leftTrigger=255;
+    const auto brake=travelInput.update(brakeOnly,false,false,TravelMode::vehicle);
+    expect(brake.gamepad.leftTrigger==255&&brake.gamepad.rightTrigger==0&&brake.gamepad.buttons==0,
+           "vehicle braking/reversing is not consumed by the equipment modifier");
+    expect(travelInput.update({},true,false,TravelMode::vehicle).gamepad.buttons==0x0100,
+           "vehicle left grip retains the native mounted attack/call action");
+    expect(travelInput.update(brakeOnly,false,true,TravelMode::onFoot).gamepad==GamepadSample{},
+           "exiting a vehicle releases brake and grip inputs before restoring foot controls");
+    travelInput.update({},false,false,TravelMode::onFoot);
+    expect(travelInput.update(triggerOnly,false,true,TravelMode::onFoot).weaponReady,
+           "on-foot weapon controls resume after neutral input following exit");
+    expect(travelInput.update(triggerOnly,false,true,TravelMode::unknown).gamepad==GamepadSample{},
+           "unavailable native travel state cannot guess accelerator versus firearm input");
+    travelInput.update({},false,false,TravelMode::vehicle);
+    travelInput.suspend();
+    expect(travelInput.update(triggerOnly,false,false,TravelMode::vehicle).gamepad==GamepadSample{},
+           "regaining XR focus cannot resume a held accelerator");
+    travelInput.update({},false,false,TravelMode::vehicle);
+    expect(travelInput.update(triggerOnly,false,false,TravelMode::vehicle).gamepad.rightTrigger==255,
+           "vehicle input resumes after neutral input following focus loss");
     const auto extended=solveArm(arm,Pose{{},{3,0,0}},{0,-1,0});
     expect(extended&&extended->reachClamped&&near(extended->pose.wrist.position.x,0.499f),"unreachable grip cannot stretch the native limb");
     expect(!solveArm(ArmPose{},Pose{},{}),"missing skeleton geometry cannot produce an arm");

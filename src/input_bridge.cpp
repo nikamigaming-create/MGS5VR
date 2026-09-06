@@ -22,6 +22,27 @@ GamepadSample RigEquipment::update(GamepadSample sample,bool modifier,bool allow
     if(modifier||blockedStick_)sample.leftX=sample.leftY=0;
     return sample;
 }
+RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,TravelMode mode){
+    if(mode==TravelMode::unknown){releaseRequired_=true;equipment_.reset();return {};}
+    if(mode!=mode_){
+        if(mode_!=TravelMode::unknown)releaseRequired_=true;
+        mode_=mode;equipment_.reset();
+    }
+    if(releaseRequired_){
+        if(raw.buttons||raw.leftTrigger>24||raw.rightTrigger>24||leftGrip||rightGrip
+           ||std::abs(static_cast<int>(raw.leftX))>6000||std::abs(static_cast<int>(raw.leftY))>6000
+           ||std::abs(static_cast<int>(raw.rightX))>6000||std::abs(static_cast<int>(raw.rightY))>6000)return {};
+        releaseRequired_=false;
+    }
+    if(mode==TravelMode::vehicle){
+        if(leftGrip)raw.buttons|=0x0100;
+        return {equipment_.update(raw,rightGrip,false),false,false};
+    }
+    const bool modifier=raw.leftTrigger>127;
+    raw.leftTrigger=rightGrip?255:0;
+    if(!rightGrip)raw.rightTrigger=0;
+    return {equipment_.update(raw,modifier,false),rightGrip,leftGrip};
+}
 uint16_t MenuButton::update(bool pressed,bool active,uint64_t time){
     if(!active||time<lastTime_){
         held_=false;longSent_=false;pulse_=0;releaseRequired_=pressed;lastTime_=time;return 0;

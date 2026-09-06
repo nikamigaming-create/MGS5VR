@@ -75,6 +75,14 @@ game HUD and must not be used to diagnose the game's UI path.
 
 ## Follow-up on September 6
 
+The user completed a second physical Quest 3 session on DLL `70779290` (game
+PID 34656). Native stereo, tracked controller input and movement were logged;
+the runtime and process shut down with cleanup. The user reported good overall
+gameplay, but rejected the forearm display orientation, sleeve twisting, and
+support-hand behavior after weapon changes. No recording was supplied for this
+second session. This is direct physical feedback, not visual acceptance of the
+subsequent arm/HUD changes.
+
 The [simulator follow-up](SIM_HUD_REVIEW.md) now records the implemented left-arm
 weapon HUD, native equipment controls, arm/stow changes and requested 15-second
 clip. The current [control guide](CONTROLS.md) supersedes the historical table
@@ -152,3 +160,20 @@ states, the forearm display stays attached and shows actual changing game data,
 the main view has no duplicate personal HUD, useful world markers remain, and
 the muzzle/impact/ammo behavior agrees. Tracking loss and menu transitions must
 remain recoverable. This initial recording does not pass those gates.
+
+## Additional color, shadow and audio report
+
+The second supplied recording is 472.512 seconds, 1570 x 1400, H.264 at an
+encoded 30 FPS with AAC audio. It starts with logos; gameplay begins around
+00:37. Inspection of the early gameplay turns at 00:40-00:48 shows a rectangular
+lighting/color discontinuity in the sky, alongside the already reported cuff
+deformation. This is a visible failure, not accepted lighting. The user's
+additional report questions shadow placement and spatial audio.
+
+The current stereo path shares native temporal resources between eyes, and
+only its scene projection/view publication is explicitly adapted. Wider-FOV
+culling and secondary lighting/shadow camera consumers are not accepted. There
+is no explicit HMD audio-listener adapter in the current source. These are
+investigation leads, not established causes. The desktop mirror recording
+cannot prove head-relative sound localization or binocular shadow agreement.
+No renderer or audio fix is claimed by the arm/HUD follow-up.

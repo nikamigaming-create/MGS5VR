@@ -14,8 +14,20 @@ Quat swing(Vec3 a,Vec3 b){
     const auto axis=cross(a,b);return normalize({axis.x,axis.y,axis.z,1+d});
 }
 Quat turn(Quat delta,Quat q){return normalize(compose(Pose{delta,{}},Pose{q,{}}).orientation);}
+std::optional<Quat> basisRotation(Vec3 localAxis,Vec3 localUp,Vec3 axis,Vec3 up){
+    const auto frame=[](Vec3 x,Vec3 y)->std::optional<Pose>{
+        if(length(x)<0.001f)return {};
+        x=unit(x);y=y-x*dot(x,y);
+        if(length(y)<0.001f)return {};
+        y=unit(y);const auto z=cross(x,y);
+        return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,0,0,0,1});
+    };
+    const auto local=frame(localAxis,localUp),world=frame(axis,up);
+    if(!local||!world)return {};
+    return compose(*world,inverse(*local)).orientation;
 }
-std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,bool followWristTwist){
+}
+std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const ArmBasis* basis){
     if(!valid(a.shoulder)||!valid(a.elbow)||!valid(a.wrist)||!valid(target)||!valid(Pose{{},hint}))return {};
     const auto upper=a.elbow.position-a.shoulder.position,lower=a.wrist.position-a.elbow.position;
     const float u=length(upper),l=length(lower);
@@ -35,16 +47,52 @@ std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,bool 
     ArmSolution out{a,std::abs(requested-reach)>0.0001f};
     out.pose.shoulder.orientation=turn(swing(upper,elbow-a.shoulder.position),a.shoulder.orientation);
     auto forearmRotation=turn(swing(lower,wrist-elbow),a.elbow.orientation);
-    if(followWristTwist){
-        // Transport the native forearm with the hand, then swing its long axis
-        // back onto the solved segment. This preserves hand-driven roll instead
-        // of leaving the sleeve twisted against a stationary animated forearm.
-        const auto handDelta=compose(Pose{target.orientation,{}},inverse(Pose{a.wrist.orientation,{}})).orientation;
-        forearmRotation=turn(swing(rotate(handDelta,lower),wrist-elbow),turn(handDelta,a.elbow.orientation));
+    if(basis){
+        // The native elbow is a hinge. Pronation belongs to its downstream
+        // twist helpers; rotating the elbow itself knots the upper sleeve.
+        const auto upperRotation=basisRotation(basis->upperAxis,basis->elbowBend,elbow-a.shoulder.position,wrist-elbow);
+        if(!upperRotation)return {};
+        out.pose.shoulder.orientation=*upperRotation;
+        const auto axis=unit(wrist-elbow);
+        const auto up=rotate(*upperRotation,basis->wristUp);
+        const auto lowerRotation=basisRotation(basis->forearmAxis,basis->wristUp,axis,up);
+        if(!lowerRotation)return {};
+        forearmRotation=*lowerRotation;
     }
     out.pose.elbow={forearmRotation,elbow};
     out.pose.wrist={normalize(target.orientation),wrist};
     return out;
+}
+std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Quat wrist,bool right){
+    const auto twist=[](Quat q,unsigned axis,float weight){
+        if(q.w<0)q={-q.x,-q.y,-q.z,-q.w};
+        const float component=axis==0?q.x:axis==1?q.y:q.z;
+        const float angle=std::atan2(component,q.w)*weight;
+        const float s=std::sin(angle);
+        return Quat{axis==0?s:0,axis==1?s:0,axis==2?s:0,std::cos(angle)};
+    };
+    // These coefficients reproduce native corrective channels, including
+    // different shoulder twist weights on the prosthetic and ordinary arms.
+    return {twist(clavicle,2,-1),twist(upper,0,right?-.75f:-.70f),twist(upper,0,-.45f),
+        twist(elbow,1,-.55f),twist(wrist,0,.35f),twist(wrist,0,.75f),twist(wrist,1,-.55f)};
+}
+std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal){
+    if(!valid(elbow)||!valid(wrist)||!valid(Pose{{},dorsal}))return {};
+    const auto segment=wrist.position-elbow.position;
+    if(length(segment)<0.05f||length(segment)>0.7f)return {};
+    const auto x=unit(segment);
+    auto z=dorsal-x*dot(dorsal,x);
+    if(length(z)<0.1f)return {};
+    z=unit(z);const auto y=cross(z,x);
+    const auto p=wrist.position-segment*0.35f+z*0.025f;
+    return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,p.x,p.y,p.z,1});
+}
+bool SupportContact::update(bool ready,bool tracked,float distance){
+    if(!tracked||!std::isfinite(distance)||distance<0)attached_=false;
+    else if(ready)attached_=distance<(attached_?0.45f:0.30f);
+    // Lowering for selection releases the rendered hand but retains contact
+    // intent. The newly readied weapon still has to be within release range.
+    return ready&&attached_;
 }
 std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuckle){
     if(!valid(wrist)||!valid(Pose{{},indexKnuckle})||!valid(Pose{{},littleKnuckle}))return {};

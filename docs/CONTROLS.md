@@ -13,7 +13,8 @@ reticle or destination-letter overlay in gameplay. Native 3D people cues remain.
 | Fire | **Right trigger**, while holding right grip |
 | Lower the gun while keeping it in hand | Keep right grip held and lower your hand |
 | Put the weapon away | Release right grip; the game performs its native stow animation |
-| Add the support hand | Hold **left grip**; release it to move that hand freely |
+| Add the support hand | Bring the left hand near the weapon, or hold **left grip** |
+| Free the left hand | Release left grip and move the hand away, or turn the wrist HUD toward your eyes |
 | Reload | **Right B**; the native reload moves the support hand, then releases it |
 | Read the HUD | Raise and turn your **left forearm** toward your eyes |
 
@@ -21,6 +22,11 @@ One-handed aim works. Two-handed use currently means the left hand follows the
 weapon's native support pose; the right hand still controls its direction. It is
 not a two-controller leverage solve. Reloads use a button, not manual magazine
 grabbing. Native finger and bolt animations remain in use.
+
+Automatic support acquires when the tracked hands are within 30 cm and releases
+beyond 45 cm. It retains contact intent while changing weapons, then checks the
+tracked hand distance again. Turning the left wrist toward the eyes frees automatic
+support for reading; holding left grip still explicitly requests support.
 
 ## Equipment selection
 
@@ -68,7 +74,24 @@ step and Y switches MAP/NAV. Close with B, then use left grip + left-stick click
 to return to tracked VR. This deliberate menu transition does not change aiming
 into a screen view.
 
+## Vehicle mapping under simulator development
+
+Native vehicle state changes the controls to **right trigger: accelerator**,
+**left trigger: brake/reverse**, **left stick: steering**, and **Y: enter/exit**.
+**Left grip** retains the native mounted attack/call action. **Right grip** becomes
+the equipment modifier while seated, freeing both triggers for driving. Release
+held controls after entry/exit or regained focus before resuming input. These
+mappings have contract tests; actual vehicle entry/driving/exit remains unproven.
+They are not a claim of physical steering-wheel or mounted-gun hand interaction.
+
 ## Test scope
+
+D-Horse mounting, walking, galloping and dismounting have now been exercised in
+the simulator. **Y** mounts/dismounts, **left stick** rides, and **X** increases
+speed. Release right grip and let the native stow animation finish before dismounting. The native horse and gallop flags changed with those actions and cleared
+after dismount. Bounded ordinary rifle shots were also observed while mounted. Hiding, all mounted
+weapons, vehicles and physical riding comfort remain separate acceptance gates.
+Driving is not ready for headset testing.
 
 Rifle and WU pistol ready/fire/reload, support attach/release, equipment cards,
 left-arm ammo updates and basic iDroid/pause navigation have simulator observations.

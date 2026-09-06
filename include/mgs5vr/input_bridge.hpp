@@ -20,6 +20,20 @@ private:
     uint16_t blockedButtons_{};
     bool blockedStick_{};
 };
+enum class TravelMode { unknown,onFoot,horse,vehicle };
+struct RigInputSample { GamepadSample gamepad; bool weaponReady{},supportRequested{}; };
+// Mounted vehicle triggers retain the game's accelerator/brake meanings.
+// A travel-mode transition consumes held controls until they are released.
+class RigInput {
+public:
+    RigInputSample update(GamepadSample raw,bool leftGrip,bool rightGrip,TravelMode mode);
+    void suspend(){releaseRequired_=true;equipment_.reset();}
+    void reset(){mode_=TravelMode::unknown;releaseRequired_=false;equipment_.reset();}
+private:
+    TravelMode mode_{TravelMode::unknown};
+    bool releaseRequired_{};
+    RigEquipment equipment_;
+};
 // MGSV assigns Start to iDroid and Back to Pause. A short menu press emits
 // Start on release; holding for 550 ms emits Back once, without opening iDroid.
 class MenuButton {

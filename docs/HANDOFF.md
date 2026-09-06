@@ -1,6 +1,6 @@
 # Development handoff - 2026-09-06
 
-The latest installed build is the simulator left-arm HUD/rig slice. Read
+The latest installed build is the simulator forearm-corrective/support follow-up. Read
 [SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md) for the evidence and open gates, and
 [CONTROLS.md](CONTROLS.md) for the complete Touch interaction list. The initial
 physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
@@ -22,14 +22,31 @@ physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
 - All five local suites passed. CI builds all targets and runs four non-GPU suites.
 
 Local DLL SHA256:
+`102CEF7F7F0F3CCF665D05C8252DA83CFB7CDD484582780CB9324EFE30621C2E`.
+The last physical-test rollback is retained locally with DLL SHA256
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
-The initial physical-test rollback is retained locally with DLL SHA256
-`4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`.
 No game executable, archives or saves were patched. Installation hashes were
 updated to the actual installed DLL/config. All experiment flags remain off by
 public default; the local test enables the camera, rig and wrist HUD explicitly.
 
-## Private short clip
+## Follow-up evidence and remaining work
+
+The current `artifacts/forearm-followup-15s/simulator.mp4` is 14.883 seconds,
+580,622 bytes, with 60 distinct frames at 3.967 captures/second. All frames were
+reviewed; no raw frame sequence was written. It shows automatic support across
+the rifle/pistol swap, left forearm reading, reload and wrist/head movement.
+Both-eye live checks supplement the single-eye clip. Garment/body intrusion near
+the pistol support pose remains open. The new physical recording reproduces a
+sky-lighting rectangle that is still visible in SIM. No lighting/audio fix yet.
+
+D-Horse mount/walk/gallop/dismount and bounded mounted rifle shots have SIM
+observations. Vehicle input routing is implemented and contract-tested, but no
+vehicle has been driven. Native player death interrupted a village approach;
+checkpoint recovery succeeded. Use the road for the next approach and establish
+the cause before claiming travel acceptance. Audio listener camera readers were
+identified at native caller RVAs 0x438123 and 0x43813f; they are still unmodified.
+
+## Earlier private short clip
 
 `artifacts/sim-polish-15s/simulator.mp4`: 14.973 seconds, silent H.264, 688 x 720,
 561,573 bytes. The encoder streamed actual composited-eye PNGs in memory and wrote

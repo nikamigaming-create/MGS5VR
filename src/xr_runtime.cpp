@@ -84,7 +84,7 @@ struct Session {
     bool priorRecenter{}, priorFocused{};
     bool priorHeadToggle{};
     MenuButton menuButton;
-    RigEquipment equipment;
+    RigInput rigControls;
     XrTime pendingLocalChange{};
     uint64_t referenceEpoch{1};
     ControllerFrame controllerFrame{};
@@ -250,11 +250,11 @@ struct Session {
     }
     void syncInput(XrTime time){
         controllerFrame={};
-        if(!focused){priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){rigControls.suspend();priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){rigControls.suspend();priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
         controllerFrame={{trackedHand(0,time),trackedHand(1,time)},time,referenceEpoch};
         const bool left=controllerFrame.hands[0].gripTracked,right=controllerFrame.hands[1].gripTracked;
@@ -262,7 +262,6 @@ struct Session {
         const float lt=left?scalar(triggers,hands[0]):0,rt=right?scalar(triggers,hands[1]):0;
         const auto nativeStatus=headCamera().status();
         const bool rigInput=controllerRigEnabled()&&(nativeStatus.active||nativeStatus.pending);
-        controllerFrame.supportRequested=ls>0.5f;
         const bool center=boolean(recenter)&&ls>0.75f&&rs>0.75f;
         const bool headToggle=headCamera().available()&&left&&ls>0.75f&&boolean(thumbClick,hands[0]);
         if(priorFocused&&headToggle&&!priorHeadToggle){
@@ -280,17 +279,20 @@ struct Session {
         bit(right&&boolean(thumbClick,hands[1])&&!center,XINPUT_GAMEPAD_RIGHT_THUMB);
         bit(!rigInput&&ls>0.5f&&!center&&!headToggle,XINPUT_GAMEPAD_LEFT_SHOULDER);
         bit(!rigInput&&rs>0.5f&&!center,XINPUT_GAMEPAD_RIGHT_SHOULDER);
-        // In the rig experiment, holding the right grip readies the native gun.
-        // The same grip no longer toggles the game's scope/first-person mode.
-        pad.leftTrigger=static_cast<uint8_t>((rigInput?(rs>0.5f?1.f:0.f):lt)*255);
-        pad.rightTrigger=static_cast<uint8_t>((!rigInput||rs>0.5f?rt:0)*255);
+        pad.leftTrigger=static_cast<uint8_t>(lt*255);
+        pad.rightTrigger=static_cast<uint8_t>(rt*255);
         const auto l=left?stick(hands[0]):XrVector2f{},rr=right?stick(hands[1]):XrVector2f{};
         pad.leftX=static_cast<int16_t>(l.x*32767);pad.leftY=static_cast<int16_t>(l.y*32767);
         pad.rightX=static_cast<int16_t>(rr.x*32767);pad.rightY=static_cast<int16_t>(rr.y*32767);
         // Keep aiming in stereo. Native binocular/scope input is reserved until
         // an authored optical mode can preserve the 3D scene and tracked hands.
-        if(rigInput)pad=equipment.update(pad,lt>0.5f,false);
-        else equipment.reset();
+        if(rigInput){
+            const auto mode=nativeTravelMode();
+            const auto mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode);
+            pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
+            controllerFrame.supportRequested=mapped.supportRequested;
+            controllerFrame.vehicleControls=mode==TravelMode::vehicle;
+        }else rigControls.reset();
         gamepadMailbox().publish(pad,left||right,steadyMilliseconds());
         priorRecenter=center;priorFocused=true;
     }

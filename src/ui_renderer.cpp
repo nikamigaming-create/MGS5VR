@@ -112,6 +112,8 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                     std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
                     return result;
                 }
+                // A failed wrist projection must not reintroduce a face HUD.
+                ++suppressedDraws;return 0;
             }
         }
     }

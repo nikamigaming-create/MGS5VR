@@ -19,8 +19,14 @@ preserve segment lengths and clamp unreachable targets. Descendants retain their
 animated relation to the wrist, including fingers. Native wrist and metacarpal
 landmarks define the anatomical grip frame, following the OpenXR palm axes.
 Activation no longer calibrates from an arbitrary weapon animation. Shoulder
-anchors follow the head and native torso yaw; forearm roll follows the wrist.
-Clavicle and arm descendants move with the solved chain. Native animation input
+anchors follow the head and native torso yaw. Authored joint axes define the
+elbow hinge; the elbow itself does not inherit wrist roll. Verified arm corrective
+joints 97-110 use their bind offsets and recomputed native local corrections.
+The two forearm twist helpers carry 35% and 75% of wrist twist. Elbow and wrist
+flexion helpers counter-rotate by 55%; shoulder weights retain the native
+left/right difference. Other descendants retain their native animation.
+The forearm HUD's long edge follows elbow-to-wrist, with its front on the dorsal
+side of the forearm. Native animation input
 is restored after matrix publication, avoiding feedback into the next pose.
 Physical controller fit has not been accepted.
 
@@ -52,7 +58,9 @@ shot path and do not establish controller aiming. Do not treat that fallback as
 tracked aiming. Collision near walls and all weapon families require further work.
 
 Right grip holds the native gun ready; right trigger fires. Left grip requests
-support-hand contact; left trigger is now the equipment modifier. Native reload
+support-hand contact. Tracked hand proximity also acquires contact within 30 cm, releases beyond
+45 cm, and gives way to wrist inspection. Selection retains support intent while
+the gun is stowed, then checks the tracked hand distance again. Left trigger is the equipment modifier. Native reload
 and bolt-cycle state temporarily own support contact, with a 120 ms attach/release
 blend. The right hand remains the weapon's primary controller.
 

@@ -17,6 +17,8 @@ struct ControllerFrame {
     int64_t predictedXrTime{};
     uint64_t referenceEpoch{};
     bool supportRequested{};
+    bool weaponReady{};
+    bool vehicleControls{};
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};

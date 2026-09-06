@@ -5,7 +5,40 @@ headset acceptance. The complete [Touch control list](CONTROLS.md) describes the
 current input path. Optical zoom is reserved: aiming stays in the native stereo
 scene, using the equipped weapon's actual sights. No binocular/scope quad remains.
 
-## Build and scope
+## Forearm and support follow-up
+
+Local DLL `102CEF7F7F0F3CCF665D05C8252DA83CFB7CDD484582780CB9324EFE30621C2E` passed all five suites.
+The arm solver now retains an authored elbow hinge and recomputes the native
+corrective channels, including partial forearm twist. The HUD's long edge follows
+the left forearm and its normal follows the distal forearm helper. Automatic
+support uses tracked hand distance, keeps its intent through selection, and
+releases for deliberate wrist inspection.
+
+SIM observations include both-eye wrist reading, automatic rifle-to-pistol
+support, inspection release, pistol fire/reload, and sampled right-wrist rotations
+at 0/90/180/270/360 degrees. The new compact recording is 14.883 seconds, 580,622
+bytes, silent H.264, 688 x 720. Its 60 decoded frames were reviewed in chronological
+sheets, with enlarged inspection of the selection and pistol poses. All frames
+are distinct; none is fully black. Measured capture cadence is 3.967 images per
+second, maximum response gap 282 ms. No raw frame sequence was written. The clip
+shows rifle fire/reload, automatic support across selection, forearm reading and
+wrist/head movement. Two rifle shots logged authored barrel alignment of 1.
+
+Support and HUD placement improved, but full rig acceptance remains open:
+body/garment geometry still intrudes beside the left arm in the pistol support
+pose. A separately reproduced rectangular sky-lighting discontinuity also remains.
+The clip is not a physical comfort, smoothness, lighting or audio pass.
+
+D-Horse mount, walk, gallop and dismount were exercised through native input;
+native horse/gallop flags corroborated those actions. Two ordinary rifle shots
+were also observed while mounted. Riding comfort, hiding and all mounted weapons
+remain unproven. Native travel-state routing now preserves vehicle accelerator
+and brake triggers, with neutral-input gates across mode/focus transitions. Its
+input contracts pass; **no vehicle has yet been entered or driven in SIM**.
+A sprint toward the village ended in native player death and Mission Failed;
+checkpoint recovery worked. The cause of that death was not established.
+
+## Earlier HUD build and scope
 
 Tested local DLL SHA256:
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.

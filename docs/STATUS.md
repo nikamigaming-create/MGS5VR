@@ -6,8 +6,8 @@ open under the MIT license. The complete requested VR conversion remains unfinis
 The latest simulator slice implements real weapon/status UI on the **left
 forearm**, removes the flat gameplay reticle and destination labels, stabilizes
 the visible rig, and adds native equipment selection. Zoom is reserved so aiming
-stays in stereo. A 14.973-second, 0.56 MB actual SIM clip was reviewed; it has 56
-distinct frames at 3.676 captures/second, not a smoothness or full-mod pass.
+stays in stereo. A 14.883-second, 0.58 MB follow-up SIM clip was reviewed; it has 60
+distinct frames at 3.967 captures/second, not a smoothness or full-mod pass.
 Read the [current review](SIM_HUD_REVIEW.md) and [complete controls](CONTROLS.md).
 
 An initial **physical Quest 3 combat run** is now recorded and reviewed. The user
@@ -18,12 +18,14 @@ slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation
 
 | Area | Implemented and observed | Still required |
 | --- | --- | --- |
-| Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission | Full stereo/culling/temporal acceptance on a physical headset |
+| Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission | Fix the reproduced sky-lighting rectangle; shadow/culling/temporal and physical stereo acceptance |
 | Head motion | Native player head bone anchors the camera; simulator translations and rotations modify native eye matrices | Verified anatomical eye offset, world scale and all-state acceptance |
 | First person | Player-owned head/body exclusion; anatomical palm binding, shoulder anchors, forearm roll and native reload support; named hip mount hidden in VR | Cuff/garment polish, physical alignment, full reach/motion/stance acceptance |
 | HUD and markers | Native weapon/ammo UI on left forearm; flat reticle/destination labels suppressed; captured eye projection applied to native scene-camera cues | Spatial damage/subtitle/context feedback, interactive wrist iDroid, full motion acceptance |
 | Weapons | AM MRS-4 and WU pistol ready/fire/reload and equipment categories exercised; ordinary shots use the authored muzzle | Impacts/obstruction, scoped and alternate modes, all-weapon and physical verification |
 | Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
+| Travel | D-Horse mount/walk/gallop/dismount and bounded mounted rifle shots in SIM; native travel input routing with neutral transition gates | Actual vehicle entry/driving/exit, mounted roles and physical riding comfort |
+| Audio | Native game audio remains active; camera-to-listener path identified | HMD-relative listener adaptation and physical localization test |
 | Effects | Native graphics UI saved DOF Disable, motion blur Off and post-processing Off; camera shake Off persisted on reopening settings | Verify remaining cinematic effects and isolate any shared per-eye temporal resources |
 | Save | Continue/Resume loads the existing checkpoint and equipped rifle | Automatic startup state adapter |
 | Cinematics | Default large-screen theatre preview and native game controls | Automatic cinematic classification and complete skip coverage |
@@ -38,7 +40,7 @@ GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
 Current controller build SHA256:
-`70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
+`102CEF7F7F0F3CCF665D05C8252DA83CFB7CDD484582780CB9324EFE30621C2E`.
 It is the simulator HUD/rig build described above. The initial physical run used
 `4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`,
 which remains the local rollback.
