@@ -38,6 +38,20 @@ std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint){
     out.pose.wrist={normalize(target.orientation),wrist};
     return out;
 }
+std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuckle){
+    if(!valid(wrist)||!valid(Pose{{},indexKnuckle})||!valid(Pose{{},littleKnuckle}))return {};
+    const auto across=littleKnuckle-indexKnuckle;
+    const auto along=(indexKnuckle+littleKnuckle)*0.5f-wrist.position;
+    const float width=length(across),palmLength=length(along);
+    if(width<0.02f||width>0.13f||palmLength<0.035f||palmLength>0.16f)return {};
+    // -Z runs from little finger to index finger. The winding of the native
+    // mirrored hands gives +X into the right palm and away from the left palm.
+    const auto z=unit(across),normal=cross(z,along);
+    if(length(normal)<0.01f)return {};
+    const auto x=unit(normal),y=cross(z,x);
+    const auto center=wrist.position+along*0.55f;
+    return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,center.x,center.y,center.z,1});
+}
 std::optional<Pose> nativeAffinePose(const std::array<float,16>& m){
     for(float f:m)if(!std::isfinite(f))return {};
     if(std::abs(m[3])+std::abs(m[7])+std::abs(m[11])+std::abs(m[15]-1)>0.001f)return {};

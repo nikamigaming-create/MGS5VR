@@ -22,6 +22,22 @@ int main(){
     expect(near(ndc(0,std::tan(asymmetric.up)*3,3).y,1),"upper eye frustum boundary projects to upper edge");
     expect(near(ndc(0,std::tan(asymmetric.down)*3,3).y,-1),"lower eye frustum boundary projects to lower edge");
     expect(near(projection[10],-0.0002f)&&near(projection[14],0.1f),"eye optics preserve native depth convention");
+    const std::array<float,16> identityMatrix{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+    const EyeFov squareEye{-0.785398163f,0.785398163f,0.785398163f,-0.785398163f};
+    const auto panelClip=[](const std::array<float,16>& m,float x,float y){
+        const float w=x*m[3]+y*m[7]+m[15];
+        return Vec3{(x*m[0]+y*m[4]+m[12])/w,(x*m[1]+y*m[5]+m[13])/w,(x*m[2]+y*m[6]+m[14])/w};};
+    const Pose spatialPanel{{0,1,0,0},{0,0,2}};
+    const auto uiProjection=uiPanelProjection(identityMatrix,identityMatrix,squareEye,spatialPanel,0.8f,0.4f);
+    expect(uiProjection&&same(panelClip(*uiProjection,1,1),{0.2f,0.1f,0.015f}),
+           "native UI corners project at the physical panel size and distance");
+    auto leftView=identityMatrix,rightView=identityMatrix;leftView[12]=-0.032f;rightView[12]=0.032f;
+    const auto leftPanel=uiPanelProjection(identityMatrix,leftView,squareEye,spatialPanel,0.8f,0.4f);
+    const auto rightPanel=uiPanelProjection(identityMatrix,rightView,squareEye,spatialPanel,0.8f,0.4f);
+    expect(leftPanel&&rightPanel&&near(panelClip(*leftPanel,0,0).x-panelClip(*rightPanel,0,0).x,0.032f),
+           "forearm UI has real per-eye disparity rather than a shared flat overlay");
+    expect(!uiPanelProjection(identityMatrix,identityMatrix,squareEye,spatialPanel,0,0.4f),
+           "invalid physical UI extent cannot replace native projection");
     auto ortho=projection;ortho[11]=0;ortho[15]=1;
     expect(!setEyeProjection(ortho,asymmetric),"orthographic pass cannot be mistaken for scene projection");
     std::array<EyeFrame,2> pair{};
@@ -157,6 +173,22 @@ int main(){
     const auto extended=solveArm(arm,Pose{{},{3,0,0}},{0,-1,0});
     expect(extended&&extended->reachClamped&&near(extended->pose.wrist.position.x,0.499f),"unreachable grip cannot stretch the native limb");
     expect(!solveArm(ArmPose{},Pose{},{}),"missing skeleton geometry cannot produce an arm");
+    const Vec3 indexKnuckle{0,0.03f,-0.085f},littleKnuckle{0,-0.03f,-0.075f};
+    const auto palm=anatomicalGrip({},indexKnuckle,littleKnuckle);
+    expect(palm&&near(palm->position.z,-0.044f),"grip origin is inside the palm rather than at the wrist");
+    if(palm){
+        const Pose moved{{0,0.70710678f,0,0.70710678f},{3,2,1}};
+        const auto movedPalm=anatomicalGrip(moved,compose(moved,Pose{{},indexKnuckle}).position,compose(moved,Pose{{},littleKnuckle}).position);
+        const auto expectedPalm=compose(moved,*palm);
+        expect(movedPalm&&same(movedPalm->position,expectedPalm.position)
+            &&same(rotate(movedPalm->orientation,{0,0,-1}),rotate(expectedPalm.orientation,{0,0,-1})),
+            "anatomical grip is invariant under native character or animation rotation");
+        const Pose tracked{{0.258819f,0,0,0.9659258f},{0.2f,-0.2f,-0.4f}};
+        const auto target=compose(tracked,inverse(*palm));
+        expect(same(compose(target,*palm).position,tracked.position),"tracked grip places the palm at the controller, including the wrist offset");
+    }
+    expect(!anatomicalGrip({},indexKnuckle,indexKnuckle)&&!anatomicalGrip({},Vec3{0,0,2},Vec3{0,1,2}),
+           "degenerate or non-hand landmark geometry cannot steer the rig");
     GamepadMailbox gamepad;
     expect(!gamepad.read(100),"unconnected XR gamepad preserves original input path");
     gamepad.publish({0x1000,0,255,100,-100,0,0},true,100);

@@ -1,5 +1,15 @@
 # Runtime and game integration
 
+The core includes independent transforms for a native hand's palm frame and for
+placing native UI clip coordinates on a world-space panel. The palm frame uses
+the wrist and index/little knuckles, with a provisional center 55% of the way
+from wrist to knuckle midpoint. It follows the [OpenXR grip-axis convention](https://registry.khronos.org/OpenXR/specs/1.0-khr/html/xrspec.html#semantic-paths-standard-pose-identifiers).
+It does not calibrate from the camera or an activation pose. Panel math retains
+the native UI's homogeneous layout coordinates while giving each eye its own
+view and projection. Tests cover rigid-transform invariance, palm placement,
+panel extent/depth, and eye disparity. These primitives alone do not establish
+an accepted hand fit or a working in-game wrist HUD.
+
 The installed executable baseline is SHA256 `085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`, file version 1.0.15.4, Steam build 24176213. Engine offsets from 1.0.15.3 must not be applied to it. `profiles/tpp-1.0.15.4.json` deliberately records unverified hooks as null.
 
 ## Default theatre pixel path

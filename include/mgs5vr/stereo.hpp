@@ -3,6 +3,9 @@
 
 namespace mgs5vr {
 struct EyeFov { float left{},right{},up{},down{}; };
+std::optional<std::array<float,16>> uiPanelProjection(const std::array<float,16>& uiProjection,
+    const std::array<float,16>& eyeView,EyeFov fov,Pose panel,float width,float height,
+    float centerX=0,float centerY=0);
 struct EyeView { Pose pose{}; EyeFov fov{}; };
 // Carried beside the pixels under the GPU mailbox mutex. Never reconstructed
 // from the newest tracking sample at presentation time.

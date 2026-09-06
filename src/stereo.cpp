@@ -2,6 +2,25 @@
 #include <cmath>
 
 namespace mgs5vr {
+std::optional<std::array<float,16>> uiPanelProjection(const std::array<float,16>& uiProjection,
+    const std::array<float,16>& eyeView,EyeFov fov,Pose panel,float width,float height,float centerX,float centerY){
+    if(!valid(panel)||!valid(fov)||!std::isfinite(width)||!std::isfinite(height)||width<=0||height<=0
+        ||width>4||height>4||!std::isfinite(centerX)||!std::isfinite(centerY))return {};
+    for(float f:uiProjection)if(!std::isfinite(f))return {};
+    for(float f:eyeView)if(!std::isfinite(f))return {};
+    const auto x=rotate(panel.orientation,{width/2,0,0}),y=rotate(panel.orientation,{0,height/2,0});
+    const auto p=panel.position-x*centerX-y*centerY;
+    // Flatten the native UI's clip coordinates onto an actual world plane.
+    // Its original homogeneous W retains perspective within native UI layouts.
+    std::array<float,16> plane{x.x,x.y,x.z,0,y.x,y.y,y.z,0,0,0,0,0,p.x,p.y,p.z,1};
+    const auto multiply=[](const auto& a,const auto& b){std::array<float,16> out{};
+        for(size_t r=0;r<4;++r)for(size_t c=0;c<4;++c){double sum=0;
+            for(size_t k=0;k<4;++k)sum+=static_cast<double>(a[r*4+k])*b[k*4+c];out[r*4+c]=static_cast<float>(sum);}
+        return out;};
+    std::array<float,16> projection{};projection[11]=1;projection[14]=0.03f;
+    if(!setEyeProjection(projection,fov))return {};
+    return multiply(uiProjection,multiply(multiply(plane,eyeView),projection));
+}
 bool valid(EyeFov f){
     return std::isfinite(f.left)&&std::isfinite(f.right)&&std::isfinite(f.up)&&std::isfinite(f.down)
         &&f.left<0&&f.right>0&&f.down<0&&f.up>0&&f.left>-1.56f&&f.right<1.56f&&f.down>-1.56f&&f.up<1.56f;
