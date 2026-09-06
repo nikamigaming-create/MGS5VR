@@ -1,6 +1,18 @@
 # Development handoff — 2026-09-06
 
-This is an experimental checkpoint, not a finished VR mod or an invitation to user testing.
+This is an experimental checkpoint. A first physical Quest 3 combat run is now
+recorded; arm geometry and HUD placement still block full acceptance.
+
+## Physical test follow-up
+
+Read [HEADSET_REVIEW.md](HEADSET_REVIEW.md) first when resuming. The user supplied a
+153-second Oculus Mirror recording and reported that gameplay worked well, while
+asking for coherent arms and personal HUD moved out of the main view. Keep the
+enemy/location markers they find useful. The next slice is explicit rifle
+hold/lower/reload states, corrected sleeves and hand contact, and real live
+forearm status. The physical run used the installed 4B299FF8 build and exited
+cleanly through Oculus. The preflight rebuild 6729001B passed five suites but was
+not installed for that run. No runtime source change was made during the review.
 
 ## Saved implementation
 

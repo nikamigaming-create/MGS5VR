@@ -3,6 +3,12 @@
 Updated 2026-09-06. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
+An initial **physical Quest 3 combat run** is now recorded and reviewed. The user
+reported good overall playability and requested better arms and a less intrusive
+HUD. Movement, rifle fire/reload and manual theatre/native transitions are visible;
+the rig and HUD still fail complete acceptance. See [headset review and next
+slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation order.
+
 | Area | Implemented and observed | Still required |
 | --- | --- | --- |
 | Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission | Full stereo/culling/temporal acceptance on a physical headset |
@@ -69,7 +75,9 @@ The simulator is Meta XR Simulator v205 with simulated Quest 3. Game UI and game
 were driven through OpenXR actions, with all test launches windowed at 1280x720.
 The system runtime registry selection is preserved. Elliott's simulator passed a
 bounded headless OpenXR probe; its game-rendering path remains unverified. A physical
-runtime reported no available headset, so physical headset acceptance is outstanding.
+runtime initially reported no available headset. On September 6, the Quest 3
+connected and the installed controller build completed an initial physical combat
+run with a clean Oculus shutdown. Full physical headset acceptance is outstanding.
 
 ## Recordings and failed acceptance
 
@@ -106,8 +114,10 @@ mod demo, and are excluded from the public source.
 
 Recording cadence is separate from native game cadence. None of these recordings
 is a 60 FPS video. The controller recording shows the tracked rifle, but none contains
-the requested functioning forearm HUD. No qualifying full-mod demonstration exists. The mod is not ready for
-the user's requested trial, and no zero-bug or all-weapons claim is made.
+the requested functioning forearm HUD. The required full-mod demonstration and
+acceptance remain incomplete. The user subsequently chose to test the
+experimental build on a Quest 3; that initial run is documented in
+[HEADSET_REVIEW.md](HEADSET_REVIEW.md). No zero-bug or all-weapons claim is made.
 
 See [acceptance](ACCEPTANCE.md) for the remaining observable gates and
 [architecture](ARCHITECTURE.md) for the rendering contracts. Private logs and raw
