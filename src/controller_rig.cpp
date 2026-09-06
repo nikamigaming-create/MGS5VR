@@ -7,6 +7,7 @@
 #include <intrin.h>
 #include <MinHook.h>
 #include <array>
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <cmath>
@@ -19,16 +20,30 @@ using namespace mgs5vr;
 using Update=void(*)(void*,void*);
 Update original{};
 struct Vector4{float x{},y{},z{},w{};};
+struct PoseRestore {
+    uintptr_t rotations{},positions{};
+    uintptr_t stowedMount{};
+    uint16_t count{};
+    std::array<Quat,512> q{};
+    std::array<Vector4,512> p{};
+    ~PoseRestore(){
+        if(count){
+            std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
+            std::memcpy(reinterpret_cast<void*>(positions),p.data(),count*16u);
+        }
+    }
+};
 using Shot=void(*)(void*,Vector4*,Vector4*,void*,uint32_t);
 Shot originalShot{};
 uintptr_t base{};
 std::atomic_uintptr_t playerOwner{};
 std::atomic_bool enabled{};
 std::mutex rigMutex;
-uintptr_t calibratedOwner{};
+uintptr_t boundOwner{};
 uint64_t activation{},updates{};
-std::array<Quat,2> gripFromWrist{};
 std::array<Vec3,2> bendHistory{};
+float supportBlend{};
+uint64_t supportAt{};
 struct ShotRig {
     uintptr_t owner{},character{},camera{},model{};
     Pose sourceCamera{},wristWorld{};
@@ -42,7 +57,8 @@ Pose bone(const std::array<Quat,512>& q,const std::array<Vector4,512>& p,size_t 
 void replace(std::array<Quat,512>& q,std::array<Vector4,512>& p,size_t i,Pose value){
     q[i]=value.orientation;p[i].x=value.position.x;p[i].y=value.position.y;p[i].z=value.position.z;
 }
-bool apply(void* context,void* binding){
+bool apply(void* context,void* binding,PoseRestore& restore){
+    const auto now=steadyMilliseconds();
     const auto owner=playerOwner.load();
     if(!owner||get<uintptr_t>(owner)!=base+0x23b8218)return false;
     const auto character=get<uintptr_t>(owner+0x370),camera=get<uintptr_t>(owner+0x380);
@@ -52,7 +68,7 @@ bool apply(void* context,void* binding){
     const auto driver=reinterpret_cast<uintptr_t>(context),skeleton=get<uintptr_t>(driver+0x10);
     if(get<uintptr_t>(driver)!=base+0x24c1988||!skeleton)return false;
     const auto count=get<uint16_t>(skeleton+0x48);
-    if(count<21||count>512||get<int16_t>(skeleton+0x4a)!=0||get<uint32_t>(skeleton+0x60)!=0)return false;
+    if(count<53||count>512||get<int16_t>(skeleton+0x4a)!=0||get<uint32_t>(skeleton+0x60)!=0)return false;
     const auto qo=get<uint32_t>(skeleton+0x58),po=get<uint32_t>(skeleton+0x5c);
     if(qo<0x90||po<qo+count*16u||po>0x10000)return false;
     const auto rotations=skeleton+qo,positions=skeleton+po,parents=get<uintptr_t>(model+0xf0);
@@ -64,6 +80,7 @@ bool apply(void* context,void* binding){
         if(!read(parents+i*0x20,parent[i])||parent[i]>=static_cast<int32_t>(i)||parent[i]<-1||!valid(bone(q,p,i)))return false;
     }
     if(parent[6]!=5||parent[7]!=6||parent[8]!=7||parent[10]!=9||parent[11]!=10||parent[12]!=11)return false;
+    if(parent[24]!=8||parent[30]!=8||parent[34]!=30||parent[40]!=12||parent[46]!=12||parent[50]!=46)return false;
     std::array<float,16> matrix{};std::array<float,8> cameraValues{};
     if(!read(reinterpret_cast<uintptr_t>(binding),matrix)||!read(camera+0xf0,cameraValues))return false;
     const auto root=nativeAffinePose(matrix);if(!root)return false;
@@ -79,35 +96,83 @@ bool apply(void* context,void* binding){
         grips[i]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.hands[i].grip));
     std::lock_guard lock(rigMutex);
     constexpr std::array<size_t,2> wrists{8,12},shoulders{6,10};
-    if(calibratedOwner!=owner||activation!=frame.activation){
-        if(!frame.controllers.hands[0].gripTracked)return false;
+    constexpr std::array<size_t,2> indexKnuckles{24,40},littleKnuckles{34,50};
+    std::array<Pose,2> gripFromWrist{};
+    for(size_t i=0;i<2;++i){
+        const auto wrist=bone(q,p,wrists[i]);
+        const auto palm=anatomicalGrip(wrist,bone(q,p,indexKnuckles[i]).position,bone(q,p,littleKnuckles[i]).position);
+        if(!palm)return false;
+        gripFromWrist[i]=compose(inverse(*palm),wrist);
+    }
+    if(boundOwner!=owner||activation!=frame.activation){
         for(size_t i=0;i<2;++i){
-            // Experimental neutral-pose orientation calibration. Translation
-            // stays at the tracked grip; there is no remembered world offset.
-            gripFromWrist[i]=compose(inverse(grips[i]),bone(q,p,wrists[i])).orientation;
             bendHistory[i]=bone(q,p,wrists[i]-1).position-bone(q,p,shoulders[i]).position;
         }
-        calibratedOwner=owner;activation=frame.activation;
-        log("Controller rig neutral wrist orientation calibrated; weapon/muzzle acceptance pending");
+        boundOwner=owner;activation=frame.activation;
+        supportBlend=0;supportAt=now;
+        log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
     const auto rightAnimated=bone(q,p,12),leftAnimated=bone(q,p,8);
-    const Pose rightTarget=compose(grips[1],Pose{gripFromWrist[1],{}});
-    const auto right=solveArm({bone(q,p,10),bone(q,p,11),rightAnimated},rightTarget,bendHistory[1]);
+    {
+        // The retail prone animation puts shoulders above/around the eye. Use
+        // a standing upper-body frame at the tracked head for the visible VR
+        // arms, retaining native limb lengths and moving clavicle helpers too.
+        const auto forward=rotate(nativeCamera.orientation,{0,0,1});
+        const float yaw=std::atan2(forward.x,forward.z);
+        const Quat torso{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
+        const auto span=bone(q,p,6).position-bone(q,p,10).position;
+        const float halfWidth=std::clamp(std::sqrt(dot(span,span))*.5f,.15f,.23f);
+        for(size_t side=0;side<2;++side){
+            const auto shoulder=shoulders[side];
+            const auto anchorWorld=frame.nativePose.position+rotate(torso,{side? -halfWidth:halfWidth,-.22f,-.06f});
+            const auto anchor=compose(inverse(*root),Pose{{},anchorWorld}).position;
+            const auto shift=anchor-bone(q,p,shoulder).position;
+            for(size_t i=shoulder-1;i<=shoulder+2;++i){auto b=bone(q,p,i);b.position=b.position+shift;replace(q,p,i,b);}
+            // Stable down/out bias; a transient native crouch/reload bend must
+            // not leave the elbow trapped above the head in later frames.
+            bendHistory[side]=rotate(inverse(*root).orientation,rotate(torso,{side?-.25f:.25f,-1.f,-.15f}));
+        }
+    }
+    const Pose rightTarget=compose(grips[1],gripFromWrist[1]);
+    const auto right=solveArm({bone(q,p,10),bone(q,p,11),bone(q,p,12)},rightTarget,bendHistory[1],true);
     if(!right)return false;
     replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
     bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
-    const bool support=frame.controllers.supportRequested;
+    bool nativeManipulation=false;
+    const auto weaponComponent=get<uintptr_t>(character+0x80);
+    if(get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
+        const auto instances=get<uintptr_t>(weaponComponent+0x38);
+        const auto first=get<uint32_t>(instances+0x24),index=get<uint32_t>(owner+0x3a0);
+        if(index>=first&&index-first<=15){
+            const auto state=get<uintptr_t>(weaponComponent+0x58)+(index-first)*0x610ull;
+            // Observed throughout rifle reload and WU pistol bolt cycling; the
+            // native animation owns the support hand during these operations.
+            nativeManipulation=(get<uint32_t>(state+0x27c)&0x1c0)==0x40&&(get<uint32_t>(state+0x3c0)&0x04000000)!=0;
+        }
+    }
+    const bool support=frame.controllers.supportRequested||nativeManipulation;
+    const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/120.f:1.f,1.f);supportAt=now;
+    supportBlend=std::clamp(supportBlend+(support?step:-step),0.f,1.f);
     if(frame.controllers.hands[0].gripTracked||support){
         // Preserve the game's animated support-hand contact while the native
-        // weapon-ready action is held, including relative reload animation.
-        const auto target=support?compose(right->pose.wrist,compose(inverse(rightAnimated),leftAnimated))
-                                 :compose(grips[0],Pose{gripFromWrist[0],{}});
-        const auto left=solveArm({bone(q,p,6),bone(q,p,7),leftAnimated},target,bendHistory[0]);
+        // support is requested or a native reload/bolt cycle is running.
+        const auto attached=compose(right->pose.wrist,compose(inverse(rightAnimated),leftAnimated));
+        auto target=attached;
+        if(frame.controllers.hands[0].gripTracked&&supportBlend<1){
+            const auto tracked=compose(grips[0],gripFromWrist[0]);
+            target.position=tracked.position+(attached.position-tracked.position)*supportBlend;
+            auto a=tracked.orientation,b=attached.orientation;
+            if(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w<0)b={-b.x,-b.y,-b.z,-b.w};
+            Quat blended{a.x+(b.x-a.x)*supportBlend,a.y+(b.y-a.y)*supportBlend,a.z+(b.z-a.z)*supportBlend,a.w+(b.w-a.w)*supportBlend};
+            const float n=std::sqrt(blended.x*blended.x+blended.y*blended.y+blended.z*blended.z+blended.w*blended.w);
+            target.orientation={blended.x/n,blended.y/n,blended.z/n,blended.w/n};
+        }
+        const auto left=solveArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],true);
         if(!left)return false;
         replace(q,p,6,left->pose.shoulder);replace(q,p,7,left->pose.elbow);replace(q,p,8,left->pose.wrist);
         bendHistory[0]=left->pose.elbow.position-left->pose.shoulder.position;
     }
-    constexpr std::array<size_t,6> changed{6,7,8,10,11,12};
+    constexpr std::array<size_t,8> changed{5,6,7,8,9,10,11,12};
     std::array<Pose,512> delta{};std::array<bool,512> controlled{};
     for(const auto i:changed){controlled[i]=true;delta[i]=compose(bone(q,p,i),inverse(bone(originalQ,originalP,i)));}
     for(size_t i=0;i<count;++i)if(!controlled[i]){
@@ -118,7 +183,26 @@ bool apply(void* context,void* binding){
     // Full render pose, before native matrix and attachment publication. Finger
     // poses follow their solved wrist. Native position.w metadata is retained.
     frame.playerHead=renderedHead;
+    if(frame.controllers.hands[0].gripTracked){
+        const auto wrist=compose(*root,bone(q,p,8));
+        const auto elbow=compose(*root,bone(q,p,7));
+        const auto palm=compose(wrist,inverse(gripFromWrist[0]));
+        frame.wristPanel=compose(palm,Pose{{0,-0.70710678f,0,0.70710678f},{}});
+        frame.wristPanel.position=wrist.position+(elbow.position-wrist.position)*0.35f
+            +rotate(frame.wristPanel.orientation,{0,0,0.025f});
+        frame.wristPanelTracked=true;
+    }
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
+    // The engine may reuse animated helper/finger channels next frame. Only the
+    // native publication consumes our solved pose; never feed it back into the
+    // animation cache and compound garment transforms on subsequent updates.
+    restore.rotations=rotations;restore.positions=positions;restore.q=originalQ;restore.p=originalP;restore.count=count;
+    // SKL_300_ASRROOT is the authored hip holster, independent of the held
+    // weapon's wrist socket. Suppress only its published render scale in VR.
+    // The native animation channels and held-weapon transform remain intact.
+    const auto names=get<uintptr_t>(model+0xe8);
+    if(count>53&&parent[53]==0&&get<uint32_t>(names+53*4)==0xec70c442)
+        restore.stowedMount=get<uintptr_t>(reinterpret_cast<uintptr_t>(binding)+0x40)+53*64;
     std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
     std::memcpy(reinterpret_cast<void*>(positions),p.data(),count*16u);
     shotRig={owner,character,camera,model,nativeCamera,compose(*root,right->pose.wrist),frame.trackingSequence};
@@ -131,8 +215,16 @@ bool apply(void* context,void* binding){
     return true;
 }
 void update(void* context,void* binding){
-    if(enabled.load()&&headCamera().active())try{apply(context,binding);}catch(...){}
+    PoseRestore restore;
+    if(enabled.load()&&headCamera().active())try{apply(context,binding,restore);}catch(...){}
     original(context,binding);
+    if(restore.stowedMount){
+        auto matrix=get<std::array<float,16>>(restore.stowedMount);
+        if(nativeAffinePose(matrix)){
+            std::fill_n(matrix.begin(),12,0.f);
+            std::memcpy(reinterpret_cast<void*>(restore.stowedMount),matrix.data(),sizeof(matrix));
+        }
+    }
 }
 // The native shot solver reads the rendered wrist, then converges the shot onto
 // a camera target. Supply a private copy of that target on the rendered barrel

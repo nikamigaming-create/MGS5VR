@@ -2,6 +2,12 @@
 
 Use pass, fail, or unproven per claim; do not convert a passing infrastructure test into full-mod readiness.
 
+The latest [HUD/rig simulator review](SIM_HUD_REVIEW.md) documents a bounded
+14.973-second clip and the current [controls](CONTROLS.md). It improves the
+weapon/status and arm presentation while leaving the complete rig, every weapon,
+interactive menus and physical acceptance open. It is not the longer full-mod
+demonstration described below.
+
 ## Required full-mod demonstration
 
 The requested full-mod demonstration is one continuous single-eye recording from actual native 3D gameplay. Deliver a normal single-eye video, not a side-by-side presentation. Demonstrate all six axes of head motion and report actual capture cadence separately from game/runtime frame rates. The current recordings do not provide 60 FPS video evidence. The user chose to try the experimental build on a physical Quest 3 on September 6 while this gate remained incomplete; [the review](HEADSET_REVIEW.md) records observed gameplay and remaining arm/HUD failures.
@@ -23,10 +29,10 @@ Capture the submitted game eye and its attached geometry from the same frame tra
 | Automatic cinematic switching | Authoritative scene state + final composition | Gameplay -> cinematic/video -> gameplay | Same-looking gameplay frame | Not implemented |
 | Every cinematic skippable | Native completion + playable next mission state | Each cinematic class and repeated transitions | Press while loading, hold across transitions | Not implemented |
 | Native game stereo | Distinct game-eye images, correct projection and culling | 60 seconds, fast six-axis head motion | Duplicate or swapped eyes | Live same-transaction eye pairs and projection-layer output observed; full motion, culling and temporal-effect acceptance unproven |
-| First-person visibility | Hands and held gear visible, body excluded; source-bound player head anchor | Crouch, prone, sprint, ADS, traversal | Camera inside head/body, third-person boom | Head-bone anchor and player head/body exclusion observed; walking with gun lowered stayed first person. Fail full gate: shoulder/sleeve intrusion and incomplete stance/rig coverage |
-| Complete arm HUD | Actual meaningful changing HUD/iDroid pixels in both eyes | Open, browse, select edges, back, close, reopen; 60 seconds | Blank/stale surface, threshold oscillation | Not implemented |
-| Both hands and forearms | Final-eye video of anatomical connection and correct skinning | Neutral, reach limits, opposing head/hand motion | Suppress/detach a limb | Native arm IK and controller movement observed; fail full gate: sleeve intrusion, calibration and animation limits |
-| All weapons | Grip, muzzle and actual impacts agree in final-eye video | Every family, reload/ADS/scope/swap/throw/melee/mounted | Wrong socket, stale pose, failed tracking | AM MRS-4 controller pose and native projectile origin/direction observed; other modes and impact/obstruction acceptance unproven |
+| First-person visibility | Hands and held gear visible, body excluded; source-bound player head anchor | Crouch, prone, sprint, ADS, traversal | Camera inside head/body, third-person boom | Head anchor, shoulder policy and player exclusion observed; guarded hip-mount suppression removes the tested stowed stock. Complete stance/rig gate remains unproven |
+| Complete arm HUD | Actual meaningful changing HUD/iDroid pixels in both eyes | Open, browse, select edges, back, close, reopen; 60 seconds | Blank/stale surface, threshold oscillation | Weapon/status forearm UI and native equipment cards implemented and observed; complete interactive iDroid and spatial feedback remain incomplete |
+| Both hands and forearms | Final-eye video of anatomical connection and correct skinning | Neutral, reach limits, opposing head/hand motion | Suppress/detach a limb | Anatomical palm binding, forearm roll, animation restoration and native reload/bolt support observed; full gate unproven with cuff/garment polish and transient motion scrutiny outstanding |
+| All weapons | Grip, muzzle and actual impacts agree in final-eye video | Every family, reload/ADS/scope/swap/throw/melee/mounted | Wrong socket, stale pose, failed tracking | AM MRS-4 and WU pistol ready/fire/reload and selection observed; optical input reserved; other modes and impact/obstruction acceptance unproven |
 | Physical readiness | Actual headset/controller observation | Full mission session and comfort assessment | Simulator-only or single-eye evidence | Initial Quest 3 combat recording and favorable user report; arm/HUD failures remain, full mission/comfort/stereo acceptance unproven |
 
 Save final composited images for both eyes, then inspect the full time sequence. Record capture cadence, dropped frames, source transaction, audio coverage and runtime state. A black theatre environment is expected for the preview; a black background during promised native gameplay/wrist interaction is a failure.

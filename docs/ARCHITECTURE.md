@@ -53,7 +53,7 @@ One native camera publication + one OpenXR tracking snapshot
 
 Both draws use the same source, tracking and activation identifiers. Different native frames cannot be paired. The scene replay does not advance the game update, and checks that camera publication has not advanced during the pair. No alternate-eye scheduling, mono duplication, generated image or depth reconstruction is used. During active stereo, a present without a new complete pair retains the preceding stereo mailbox instead of replacing it with mono. The XR gate rejects missing, mismatched or stale pairs.
 
-This prototype produced complete pairs and full-eye native gameplay in Meta XR Simulator. It still needs broader visual acceptance. Native temporal resources are shared: previous camera matrices are provisionally set to the current eye, but per-eye temporal effects, wider-FOV culling and scopes are unverified. The default-off [controller rig](CONTROLLER_RIG.md) modifies native skin publication, pins the eye source to that tracking packet, and supplies the ordinary firearm solver with an authored barrel-axis target. Wrist HUD and complete weapon/physical acceptance remain outstanding.
+This prototype produced complete pairs and full-eye native gameplay in Meta XR Simulator. It still needs broader visual acceptance. Native temporal resources are shared: previous camera matrices are provisionally set to the current eye, but per-eye temporal effects, wider-FOV culling and scopes are unverified. The default-off [controller rig](CONTROLLER_RIG.md) modifies native skin publication, pins the eye source to that tracking packet, and supplies the ordinary firearm solver with an authored barrel-axis target. The optional weapon/status wrist HUD shares that source. Complete menu, weapon and physical acceptance remain outstanding.
 
 ## Camera diagnostics
 
@@ -69,18 +69,23 @@ bounded model collection, checking the ownership backlink and expected runtime t
 The separate head model is hidden only when it contains the head group and no body or
 arm group. The body group uses verified native visibility functions; arm groups remain.
 Restoration checks the same ownership and expected hidden state, so an appearance
-replacement or native mask change is not overwritten. Shoulder/sleeve intrusion still
-requires a proper first-person rig.
+replacement or native mask change is not overwritten. Anatomical palm frames,
+head-relative shoulder anchors and restored animation inputs now reduce the
+observed sleeve intrusion. Garment polish and full rig acceptance remain open.
 
-The experimental UI adapter carries the source eye through native UI job enqueue and
-worker execution. Projection changes require an exact camera/view match and a fresh,
-active source generation. Only some observed UI jobs match these checks. This is
-unfinished groundwork: there is no HUD pixel extraction, wrist attachment, or proven
-world-marker correction.
+The experimental UI adapter carries the source eye, view and solved forearm panel
+through native UI job enqueue and worker execution. It requires an exact camera
+identity and fresh active generation. Scene-camera UI uses the captured view even
+if the shared native camera has since been restored. Under `wrist_hud_experiment`,
+verified artificial layout-camera orders 146-148 draw actual weapon/status pixels
+through a projection onto the left forearm; other flat gameplay UI is suppressed.
+The back of the panel is culled. No duplicate HUD texture, fabricated values or
+new overlay pose is substituted. Full menus use the large-screen mode; pointer
+interaction and spatial damage/subtitle/context feedback are still incomplete.
 
 The optional private camera evidence directory enables bounded owner snapshots and getter-consumer records. The caller and instruction signatures are checked against the exact executable baseline; diagnostic getters return the native pointer unchanged. Observations distinguish camera publication from downstream reads, but are sampled summaries without a shared render-frame identifier. They must not be used as the source transaction for a tracked rig or HUD.
 
-Native first-person aiming changes which pose one conditional getter returns. This is not sufficient to classify first-person gameplay, since title cameras can select the same storage. Affine pose conversion, inverse view, viewport publication and perspective builders are now integrated in the experimental scene path under exact executable signatures. Weapon and HUD state still need to join that source transaction.
+Native first-person aiming changes which pose one conditional getter returns. This is not sufficient to classify first-person gameplay, since title cameras can select the same storage. Affine pose conversion, inverse view, viewport publication and perspective builders are integrated under exact executable signatures. The current rig and weapon HUD join that source transaction; unsupported gameplay states remain unverified.
 
 ## Contracts prepared for the engine adapter
 
@@ -94,7 +99,7 @@ Native first-person aiming changes which pose one conditional getter returns. Th
 
 1. Complete visual and timing acceptance of same-transaction native eye draws. Verify world scale, culling, temporal resources, scoped views, and fast six-axis motion.
 2. Recover authoritative cinematic/video state and native skip completion. Test each cinematic class, including scripted mission gates and unskippable sequences, for progression integrity.
-3. Identify the complete HUD/iDroid pixel source and semantic action dispatcher. Route that source onto an actual wrist display, provide cursor interaction and preserve world/background rendering during pause.
+3. Extend the existing weapon/status forearm interface to interactive iDroid, spatial contextual feedback and cursor interaction. Preserve world/background rendering during wrist use.
 4. Bind controller aim to weapon presentation **and** gameplay muzzle/ballistics. Calibrate authored sockets and compatible hand/arm animations for every weapon family. Cover recoil, reload, ADS, scopes, throwing, melee/CQC, vehicle/mounted weapons and tracking loss.
 5. Exercise the complete acceptance matrix in the simulator and then in a physical headset. A correct screenshot or advancing frame count does not establish motion stability or interaction correctness.
 

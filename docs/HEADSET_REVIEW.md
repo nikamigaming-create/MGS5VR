@@ -73,7 +73,15 @@ are retained in `artifacts/physical-headset-review-20260906.json`.
 The desktop notification around 00:48–00:57 is capture content. It is not the
 game HUD and must not be used to diagnose the game's UI path.
 
-## Implementation order
+## Follow-up on September 6
+
+The [simulator follow-up](SIM_HUD_REVIEW.md) now records the implemented left-arm
+weapon HUD, native equipment controls, arm/stow changes and requested 15-second
+clip. The current [control guide](CONTROLS.md) supersedes the historical table
+below: left trigger is the equipment modifier, and optical zoom is reserved.
+The physical footage in this document remains the earlier-build reference.
+
+## Original implementation order
 
 1. **Repair the rifle/arm presentation.** Reproduce neutral, ready, lowered and
    reload poses with the same owned outfit and AM MRS-4. Replace calibration from
@@ -113,7 +121,7 @@ Stable arm attachment is a prerequisite for a stable forearm display. UI-source
 discovery can proceed independently, but the integrated next-build target is
 both a correct rifle rig and a clear main view.
 
-## Current controls, while native VR is active
+## Controls in the reviewed physical build
 
 | Control | Current behavior |
 | --- | --- |

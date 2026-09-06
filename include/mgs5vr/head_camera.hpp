@@ -31,6 +31,8 @@ struct HeadCameraSample {
     Vec3 playerHead{};
     ControllerFrame controllers{};
     uint64_t rigSequence{};
+    Pose wristPanel{}; // World-space forearm surface from this skin publication.
+    bool wristPanelTracked{};
 };
 // Row-vector affine transforms, in native FOX units. The local transform is
 // the character's published head bone; the root places that character in world.

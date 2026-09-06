@@ -4,6 +4,7 @@ param(
     [switch]$EnableCameraObserver,
     [switch]$EnableHeadCameraExperiment,
     [switch]$EnableControllerRigExperiment,
+    [switch]$EnableWristHudExperiment,
     [string]$CameraEvidenceDir
 )
 $ErrorActionPreference = 'Stop'
@@ -37,6 +38,10 @@ if ($EnableHeadCameraExperiment) {
 if ($EnableControllerRigExperiment) {
     if (-not $EnableHeadCameraExperiment) { throw 'The controller rig experiment requires -EnableHeadCameraExperiment.' }
     $mgsConfig = $mgsConfig.Replace('controller_rig_experiment=0','controller_rig_experiment=1')
+}
+if ($EnableWristHudExperiment) {
+    if (-not $EnableControllerRigExperiment) { throw 'The left-arm HUD requires -EnableControllerRigExperiment.' }
+    $mgsConfig = $mgsConfig.Replace('wrist_hud_experiment=0','wrist_hud_experiment=1')
 }
 if ($CameraEvidenceDir) {
     if (-not $EnableCameraObserver) { throw '-CameraEvidenceDir requires -EnableCameraObserver.' }

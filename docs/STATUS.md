@@ -3,6 +3,13 @@
 Updated 2026-09-06. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
+The latest simulator slice implements real weapon/status UI on the **left
+forearm**, removes the flat gameplay reticle and destination labels, stabilizes
+the visible rig, and adds native equipment selection. Zoom is reserved so aiming
+stays in stereo. A 14.973-second, 0.56 MB actual SIM clip was reviewed; it has 56
+distinct frames at 3.676 captures/second, not a smoothness or full-mod pass.
+Read the [current review](SIM_HUD_REVIEW.md) and [complete controls](CONTROLS.md).
+
 An initial **physical Quest 3 combat run** is now recorded and reviewed. The user
 reported good overall playability and requested better arms and a less intrusive
 HUD. Movement, rifle fire/reload and manual theatre/native transitions are visible;
@@ -13,9 +20,9 @@ slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation
 | --- | --- | --- |
 | Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission | Full stereo/culling/temporal acceptance on a physical headset |
 | Head motion | Native player head bone anchors the camera; simulator translations and rotations modify native eye matrices | Verified anatomical eye offset, world scale and all-state acceptance |
-| First person | Player-owned head/body exclusion; controller-driven native arms/rifle; walking retained the head camera | Shoulder/sleeve intrusion, anatomical calibration, reach and stow animation |
-| HUD and markers | Native DRAW2D passes and marker update registration identified | Actual UI capture, forearm attachment, interaction and world-anchor projection; current overlays distort during head motion |
-| Weapons | AM MRS-4 follows controller translation/rotation; authored muzzle and controller-directed native projectile packet observed; ammo/reload exercised | Impacts/obstruction, scoped and alternate modes, all-weapon and physical verification |
+| First person | Player-owned head/body exclusion; anatomical palm binding, shoulder anchors, forearm roll and native reload support; named hip mount hidden in VR | Cuff/garment polish, physical alignment, full reach/motion/stance acceptance |
+| HUD and markers | Native weapon/ammo UI on left forearm; flat reticle/destination labels suppressed; captured eye projection applied to native scene-camera cues | Spatial damage/subtitle/context feedback, interactive wrist iDroid, full motion acceptance |
+| Weapons | AM MRS-4 and WU pistol ready/fire/reload and equipment categories exercised; ordinary shots use the authored muzzle | Impacts/obstruction, scoped and alternate modes, all-weapon and physical verification |
 | Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
 | Effects | Native graphics UI saved DOF Disable, motion blur Off and post-processing Off; camera shake Off persisted on reopening settings | Verify remaining cinematic effects and isolate any shared per-eye temporal resources |
 | Save | Continue/Resume loads the existing checkpoint and equipped rifle | Automatic startup state adapter |
@@ -31,11 +38,14 @@ GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
 Current controller build SHA256:
-`4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`.
+`70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
+It is the simulator HUD/rig build described above. The initial physical run used
+`4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`,
+which remains the local rollback.
 The initial controller/muzzle probe and first recording used
 `B22157DBCF1F00060057E5D3581314476962BA03ADD9C378183604F94AF43830`;
-the current build adds right-grip weapon readiness and bounds shot diagnostics to
-the actual firing caller. See [controller rig](CONTROLLER_RIG.md).
+later builds added right-grip readiness and bounded shot diagnostics to the
+actual firing caller. See [controller rig](CONTROLLER_RIG.md).
 The tested game is TPP 1.0.15.4, x64/D3D11, executable SHA256
 `085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`.
 
@@ -64,7 +74,7 @@ third-person theatre quad because of a tracking timeout. Player visibility resol
 through the camera's player appearance collection and verifies its ownership backlink;
 it does not hide other actors by scanning the global model list.
 
-The latest test initially suffered black dropouts while the simulator's synthetic
+An earlier test initially suffered black dropouts while the simulator's synthetic
 room helper occupied about 7 GB of dedicated GPU memory plus shared memory. Stopping
 that helper reduced total dedicated usage from roughly 11.7 GB to 5 GB. The following
 59-second recording contained 205 distinct captured frames and no fully black captures.
@@ -79,7 +89,7 @@ runtime initially reported no available headset. On September 6, the Quest 3
 connected and the installed controller build completed an initial physical combat
 run with a clean Oculus shutdown. Full physical headset acceptance is outstanding.
 
-## Recordings and failed acceptance
+## Earlier recordings and failed acceptance
 
 Private local artifacts retain actual composited left-eye PNGs, action timestamps,
 capture metadata and variable-rate MP4s. They are development evidence, not a finished
@@ -91,7 +101,7 @@ mod demo, and are excluded from the public source.
   Sleeve intrusion, unheld weapon animation and face HUD remain defects. A separate
   projectile-spawn probe confirmed the modified native origin/direction.
 - `controller-grip-aim-left`: 35.234 seconds, 121 distinct captured frames, 3.43 captures/second.
-  Uses the current 4B299FF8 build and right-grip weapon-ready mapping with the legacy
+  Uses the earlier 4B299FF8 build and right-grip weapon-ready mapping with the legacy
   left trigger released. Controller movement, shots, reload and independent head
   lean/yaw completed. Native firing diagnostics matched the rendered barrel; no
   fully black captures occurred. Mobile encoding is a silent 35-second 720x754
@@ -113,8 +123,9 @@ mod demo, and are excluded from the public source.
   first-person acceptance. HUD warping and body clipping remain visible defects.
 
 Recording cadence is separate from native game cadence. None of these recordings
-is a 60 FPS video. The controller recording shows the tracked rifle, but none contains
-the requested functioning forearm HUD. The required full-mod demonstration and
+is a 60 FPS video. The earlier controller recordings show the tracked rifle, but
+none of these older clips contains the functioning forearm HUD shown in the
+new [SIM review](SIM_HUD_REVIEW.md). The required full-mod demonstration and
 acceptance remain incomplete. The user subsequently chose to test the
 experimental build on a Quest 3; that initial run is documented in
 [HEADSET_REVIEW.md](HEADSET_REVIEW.md). No zero-bug or all-weapons claim is made.

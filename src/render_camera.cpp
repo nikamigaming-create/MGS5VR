@@ -195,7 +195,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         std::memcpy(reinterpret_cast<void*>(source.viewport+0x3c0),eyeView.data(),sizeof(eyeView));
         std::memcpy(reinterpret_cast<void*>(source.viewport+0x400),reinterpret_cast<void*>(source.viewport+0x280),sizeof(eyeView));
         drawingEye.projected=true;
-        mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView);
+        mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,source.pair.sample);
         result=originalScene(render,graphics,task,worker);
         mgs5vr::clearUiRenderSource();
         // Native passes may finish and replace the current deferred context.

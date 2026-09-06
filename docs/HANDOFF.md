@@ -1,73 +1,67 @@
-# Development handoff — 2026-09-06
+# Development handoff - 2026-09-06
 
-This is an experimental checkpoint. A first physical Quest 3 combat run is now
-recorded; arm geometry and HUD placement still block full acceptance.
+The latest installed build is the simulator left-arm HUD/rig slice. Read
+[SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md) for the evidence and open gates, and
+[CONTROLS.md](CONTROLS.md) for the complete Touch interaction list. The initial
+physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
 
-## Physical test follow-up
+## Installed and observed
 
-Read [HEADSET_REVIEW.md](HEADSET_REVIEW.md) first when resuming. The user supplied a
-153-second Oculus Mirror recording and reported that gameplay worked well, while
-asking for coherent arms and personal HUD moved out of the main view. Keep the
-enemy/location markers they find useful. The next slice is explicit rifle
-hold/lower/reload states, corrected sleeves and hand contact, and real live
-forearm status. The physical run used the installed 4B299FF8 build and exited
-cleanly through Oculus. The preflight rebuild 6729001B passed five suites but was
-not installed for that run. No runtime source change was made during the review.
+- Real native weapon/ammo/status on the left forearm, joined to the same skin/eye
+  publication. Back-facing text is hidden. Flat reticles and destination labels
+  are suppressed; native scene-camera people cues remain.
+- Anatomical palm binding, head-relative shoulders, forearm roll, native animation
+  restoration, and native support contact during reload/bolt cycles.
+- Verified player hip mount suppression removes the stowed rifle stock in the
+  tested pistol/prone views. Held weapons still draw and fire.
+- Right grip readies, right trigger fires, left grip supports, B reloads.
+  Left trigger plus left-stick direction selects equipment. Zoom is reserved;
+  there is no native scope/binocular screen transition in tracked VR.
+- Full menus use the manual large-screen toggle and native controls. Map zoom,
+  tab navigation, close, pause and return to VR were exercised.
+- All five local suites passed. CI builds all targets and runs four non-GPU suites.
 
-## Saved implementation
-
-- Native same-game-frame stereo and a player head-bone camera that remains first person with the weapon lowered.
-- Player-owned head-model and body-group exclusion, retaining native arm groups; checked restoration when visibility or appearance changes.
-- Tracking suspension and recovery without switching to a theatre quad or resetting the established head origin.
-- Experimental UI worker/source matching and guarded projection changes. HUD pixel extraction and wrist display are not implemented.
-- Default-off native controller rig: full render-pose arm IK and matching source pose for eyes. The rifle follows the right grip; native authored muzzle and projectile output were checked for AM MRS-4. Right grip readies, trigger fires, left grip supports, B reloads.
-- All five local test suites passed, including GPU transfers, camera contracts, player ownership/replacement, and proxy/exit fixtures.
-
-The last locally installed and live-tested DLL SHA256 is
+Local DLL SHA256:
+`70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
+The initial physical-test rollback is retained locally with DLL SHA256
 `4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`.
-It targets only the executable baseline in the game profile. A CI build may have a
-different DLL hash; this hash identifies the local observation, not a reproducible-build guarantee.
+No game executable, archives or saves were patched. Installation hashes were
+updated to the actual installed DLL/config. All experiment flags remain off by
+public default; the local test enables the camera, rig and wrist HUD explicitly.
 
-## Latest observation
+## Private short clip
 
-Latest footage: `controller-grip-aim-left`, 35.234 seconds, 121 distinct captured
-frames at 3.43 captures/second, on the current 4B299FF8 build. Right-grip readiness,
-left-grip support, controller translation/rotation, native shots, reload and an
-independent head lean/yaw completed. No fully black capture occurred. The silent
-mobile file is `artifacts/MGS5VR-controller-grip-mobile.mp4` (35 seconds, 720x754).
+`artifacts/sim-polish-15s/simulator.mp4`: 14.973 seconds, silent H.264, 688 x 720,
+561,573 bytes. The encoder streamed actual composited-eye PNGs in memory and wrote
+no raw frame sequence. Capture/action timestamps and verification metadata sit
+beside the clip. All 56 decoded frames were reviewed; they are distinct, with no
+fully black frame. Capture cadence was 3.676 images/second, largest packet gap
+0.304 seconds. This does not demonstrate headset smoothness or 60 FPS capture.
 
-The controller experiment and its limits are documented in [CONTROLLER_RIG.md](CONTROLLER_RIG.md).
-The first 29.25-second left-eye controller capture has 101 distinct frames at 3.45
-captures/second, no fully black captures, and completed translation/yaw/pitch/roll,
-fire and reload actions. A private probe at native projectile creation confirmed
-the controller-directed muzzle origin and shot direction. A separate head yaw and
-6 cm translation left the controller poses and gun's world direction steady.
-Walking retained first person. Releasing weapon-ready input exposes a stow/hand
-animation defect; shoulder/sleeve intrusion and face HUD remain. This is failed
-full-mod acceptance, not a finished hands/HUD demonstration.
+The clip shows support, rifle fire/reload, changing arm ammo, stow, pistol
+selection/fire/bolt cycle, and independent head movement. Main-view flat markers
+are absent. Angular cuff shapes remain visible around stow/selection; a transient
+free-hand view in the wider checks needs higher-cadence scrutiny. Full rig
+acceptance is therefore open. Do not claim that every weapon or interaction works.
 
-The 59-second continuous left-eye capture `fps-head-visibility-movement-left`
-contains 205 distinct frames at 3.47 captures/second. It includes head translations
-and rotations, walking, stance changes, firing (29 to 27 rounds), reload (31/169),
-and walking with the weapon lowered. No fully black frame was captured. It is not
-a 60 FPS recording and does not qualify as the requested full-mod demonstration.
-The footage and raw runtime evidence remain local and excluded from source.
+## Resume
 
-Black dropouts initially coincided with the simulator's unused synthetic-room helper
-occupying about 7 GB of dedicated GPU memory plus shared memory. Stopping that helper
-reduced dedicated usage to roughly 5 GB and the subsequent capture showed no black
-frames. This was a local session intervention, not an automatic launcher fix.
+Use the existing Continue/Resume checkpoint and equipped gear, with the native
+Action Type controller layout. Use OpenXR semantic input; no Windows key/mouse or
+focus automation. The per-process simulator selection preserves the system Oculus
+runtime. The final simulator session was left paused. Do not silently start a
+physical session while the user requested simulator work.
 
-## Next work
+The known forward rifle grip for simulator inspection is local position
+`[0.16,-0.25,-0.30]`, quaternion xyzw
+`[0.61595203,-0.00760909,0.07982154,0.78369236]`. Left HUD inspection is
+`[-0.10,-0.10,-0.42]`, `[0,0.70710678,0,0.70710678]`. The earlier negative
+90-degree right-grip pitch points the weapon backward and must not be reused.
+The simulator head setter also moves controllers: reapply explicit local hand
+poses when testing independent head motion. Keep private probes and game-derived
+media outside the public source; retain one rollback and avoid raw frame folders.
 
-1. Fix shoulder/sleeve intrusion, camera eye offset and rig attachment across stance and animation changes.
-2. Finish HUD extraction and wrist attachment; correct world-marker projection and verify both eyes during motion.
-3. Extend the ordinary-rifle muzzle binding to scoped/alternate modes; verify impacts, obstruction, weapon families, stow and tracking failures.
-4. Diagnose remaining simulator frame stalls and runtime shutdown reliability. Verify cold startup without synthetic-room memory pressure.
-5. Implement cinematic classification/skip coverage, then complete the continuous single-eye acceptance sequence and physical-headset checks.
-
-Resume through the existing Continue/Resume save and equipped gear, using the windowed
-1280x720 launcher. Use OpenXR actions for UI/gameplay, with no Windows key/mouse/focus
-automation. Keep DOF, motion blur, post-processing and camera shake disabled. The
-left-grip/left-stick-click chord toggles native VR; lower the weapon during verification
-to ensure first person persists. Work stays in one task unless the user requests otherwise.
+Next work is cuff/garment polish, physical anatomical fit, higher-cadence rapid
+motion and live tracking-loss checks, weapon impacts/obstruction and remaining
+weapon families. Spatial damage/subtitle/context feedback, interactive wrist
+menus, authored stereo optics and automatic cinematic handling remain unfinished.
