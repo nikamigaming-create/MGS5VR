@@ -56,6 +56,30 @@ uint8_t groupFlags(const Binding& b,uint32_t name){
     const auto index=groupIndex(b,name);const auto data=get<uintptr_t>(b.model+0x170);
     return index>=0&&data?get<uint8_t>(data+static_cast<uintptr_t>(index)):0;
 }
+bool bodyBranches(uintptr_t model,const std::array<uint32_t,128>& groups,uint16_t count,std::array<bool,128>& conceal){
+    // The native group inheritance walk (1ce980) reads signed parents at +4
+    // in eight-byte records. Preserve the arm subtree and its ancestry; other
+    // branches contain body/garment attachments that must keep casting shadows.
+    const auto asset=get<uintptr_t>(model+0x188),records=get<uintptr_t>(asset+8);
+    if(!asset||!records)return false;
+    std::array<int16_t,128> parents{};std::array<bool,128> keep{};
+    int arm=-1;
+    for(uint16_t i=0;i<count;++i){
+        if(!read(records+i*8+4,parents[i])||parents[i]<-1||parents[i]>=i)return false;
+        if(groups[i]==armName){if(arm>=0)return false;arm=i;}
+    }
+    if(arm<0||parents[arm]<0)return false;
+    // Reject a body/arm overlap instead of hiding an ancestor of visible arms.
+    for(int i=arm;i>=0;i=parents[i]){if(groups[i]==bodyName)return false;keep[i]=true;}
+    for(uint16_t i=0;i<count;++i){
+        auto ancestor=parents[i];
+        while(ancestor>=0&&ancestor!=arm)ancestor=parents[ancestor];
+        if(ancestor==arm)keep[i]=true;
+    }
+    for(uint16_t i=0;i<count;++i)
+        conceal[i]=!keep[i]&&(parents[i]<0||keep[parents[i]]);
+    return true;
+}
 void restore(Binding& b){
     if(b.model&&owned(b)&&showVisibleGroup){
         for(uint16_t i=0;i<b.changed;++i){const auto& group=b.groups[i];
@@ -78,9 +102,11 @@ void conceal(Binding candidate){
     }
     std::array<uint32_t,128> groups{};uint16_t count{};
     if(!names(candidate.model,groups,count))return;
+    std::array<bool,128> bodyConceal{};
+    if(candidate.body&&!bodyBranches(candidate.model,groups,count,bodyConceal))return;
     const auto flags=get<uintptr_t>(candidate.model+0x170);if(!flags)return;
     for(uint16_t i=0;i<count;++i){
-        if(candidate.body&&groups[i]!=bodyName)continue;
+        if(candidate.body&&!bodyConceal[i])continue;
         uint8_t previous{};if(!read(flags+i,previous)||!(previous&4))continue;
         auto change=std::find_if(slot->groups.begin(),slot->groups.begin()+slot->changed,
             [&](const auto& g){return g.name==groups[i];});

@@ -27,6 +27,13 @@ std::optional<Quat> basisRotation(Vec3 localAxis,Vec3 localUp,Vec3 axis,Vec3 up)
     return compose(*world,inverse(*local)).orientation;
 }
 }
+std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprightHead){
+    if(!valid(chest)||!valid(uprightHead)||!valid(Pose{{},shoulderCenter}))return {};
+    // Place the shoulder line behind the eyes. The former 6 cm setback exposed
+    // the open shoulder ends of the native shirt when the elbows were bent.
+    const auto target=compose(uprightHead,Pose{{},{0,-.18f,-.16f}});
+    return compose(target,inverse(Pose{chest.orientation,shoulderCenter}));
+}
 std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const ArmBasis* basis){
     if(!valid(a.shoulder)||!valid(a.elbow)||!valid(a.wrist)||!valid(target)||!valid(Pose{{},hint}))return {};
     const auto upper=a.elbow.position-a.shoulder.position,lower=a.wrist.position-a.elbow.position;

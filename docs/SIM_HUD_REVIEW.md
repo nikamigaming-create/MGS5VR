@@ -5,6 +5,50 @@ headset acceptance. The complete [Touch control list](CONTROLS.md) describes the
 current input path. Optical zoom is reserved: aiming stays in the native stereo
 scene, using the equipped weapon's actual sights. No binocular/scope quad remains.
 
+## Shoulder and sleeve placement follow-up
+
+DLL `5090EA1879FAACBE74D283370484C4573E7371B55BDE2554813B1A66039D3E9B`
+addresses the large open sleeve edges in the latest supplied standing screenshot.
+A private native-animation comparison reproduced those edges with the arm solve
+bypassed. The accepted candidate places the shoulder line 18 cm below and 16 cm
+behind the head anchor, and moves spine/clavicle weights through the same rigid
+transform. It also preserves the native corrective joints' animated translations.
+Temporary diagnostic modes are absent from the final candidate.
+
+The owned body's group hierarchy now keeps the arm subtree and its ancestors,
+and excludes other body/garment branches from the normal pass. It uses the existing
+normal-only helpers, retaining shadow membership. In process 39256, the changed
+body, garment and head flags were 11 in VR and restored to 15 in theatre. Their
+shadow membership remained present; another native group changed with weapon
+stow, so these snapshots do not assert whole-list identity across that transition.
+The standing person silhouette remained visible in a right-eye check. These are
+bounded external observations, not coherent per-frame shadow traces.
+
+All five local suites passed, including shared shoulder placement, native yaw and
+chest-pitch removal, invalid poses, group ancestry, invalid hierarchy refusal and
+normal/shadow restoration. Both-eye SIM checks covered the reported standing
+pose, forearm reading, close wrist reach, automatic rifle/pistol support and return
+from theatre. Sampled right-controller turns at 90/180/270/360 degrees changed the
+actual pose and returned without accumulated arm knots. Rifle and pistol firing
+logged authored barrel alignment of 1; target impacts were not established.
+
+The private `artifacts/arm-placement-15s/simulator.mp4`, starting at 23:44:51 UTC,
+is 14.722 seconds and 736,726 bytes, silent H.264 of the actual right eye. All 51
+decoded frames were reviewed chronologically; each is distinct and none is fully
+black. Measured capture cadence was 3.389 images/second, maximum response gap
+329 ms, with no capture/action/encoder errors and no raw frame sequence. It shows
+forearm reading, automatic support, rifle fire/reload, stow, pistol selection and
+support recovery, a full wrist turn and head lean. The large sleeve spikes did
+not recur in this sequence. This capture rate cannot establish headset smoothness.
+
+This is a bounded standing-arm improvement. The full rig gate remains open:
+extreme inverted rifle poses can intersect the forearm; prone controllers below
+the terrain hide the hands while the wrist UI remains visible. Raising the hands
+above ground restores visible arms, but close-up sleeve clipping remains. Hand/
+weapon ground collision, all poses/outfits and physical anatomical fit still need
+work. The user's existing checkpoint was retained. No executable, clock or save
+patch supplied the daylight; the native Phantom Cigar item was used.
+
 ## Player shadow preservation follow-up
 
 DLL `02B38141BC4E444D2A73FFCF2ECBFFCFE376C7B3FC1ACEDD8D3EF0178DDC9137`

@@ -124,20 +124,19 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     const auto rightAnimated=bone(q,p,12),leftAnimated=bone(q,p,8);
     {
-        // The retail prone animation puts shoulders above/around the eye. Use
-        // a standing upper-body frame at the tracked head for the visible VR
-        // arms, retaining native limb lengths and moving clavicle helpers too.
+        // The arm meshes also carry spine and clavicle weights. Reposition
+        // the whole upper body with one rigid transform: independent shoulder
+        // offsets leave those shared sleeve vertices in different body frames.
         const auto forward=rotate(nativeCamera.orientation,{0,0,1});
         const float yaw=std::atan2(forward.x,forward.z);
         const Quat torso{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
-        const auto span=bone(q,p,6).position-bone(q,p,10).position;
-        const float halfWidth=std::clamp(std::sqrt(dot(span,span))*.5f,.15f,.23f);
+        const auto chest=bone(q,p,2);
+        const auto shoulderCenter=(bone(q,p,6).position+bone(q,p,10).position)*.5f;
+        const auto uprightHead=compose(inverse(*root),Pose{torso,frame.nativePose.position});
+        const auto torsoDelta=upperBodyPlacement(chest,shoulderCenter,uprightHead);
+        if(!torsoDelta)return false;
+        for(const size_t i:{1,2,5,6,7,8,9,10,11,12})replace(q,p,i,compose(*torsoDelta,bone(q,p,i)));
         for(size_t side=0;side<2;++side){
-            const auto shoulder=shoulders[side];
-            const auto anchorWorld=frame.nativePose.position+rotate(torso,{side? -halfWidth:halfWidth,-.22f,-.06f});
-            const auto anchor=compose(inverse(*root),Pose{{},anchorWorld}).position;
-            const auto shift=anchor-bone(q,p,shoulder).position;
-            for(size_t i=shoulder-1;i<=shoulder+2;++i){auto b=bone(q,p,i);b.position=b.position+shift;replace(q,p,i,b);}
             // Stable down/out bias; a transient native crouch/reload bend must
             // not leave the elbow trapped above the head in later frames.
             bendHistory[side]=rotate(inverse(*root).orientation,rotate(torso,{side?-.25f:.25f,-1.f,-.15f}));
@@ -193,7 +192,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         replace(q,p,6,left->pose.shoulder);replace(q,p,7,left->pose.elbow);replace(q,p,8,left->pose.wrist);
         bendHistory[0]=left->pose.elbow.position-left->pose.shoulder.position;
     }
-    constexpr std::array<size_t,8> changed{5,6,7,8,9,10,11,12};
+    constexpr std::array<size_t,10> changed{1,2,5,6,7,8,9,10,11,12};
     std::array<Pose,512> delta{};std::array<bool,512> controlled{};
     for(const auto i:changed){controlled[i]=true;delta[i]=compose(bone(q,p,i),inverse(bone(originalQ,originalP,i)));}
     for(size_t i=0;i<count;++i)if(!controlled[i]){
@@ -217,7 +216,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const auto corrections=armCorrectiveRotations(local(clavicle),local(clavicle+1),local(clavicle+2),local(clavicle+3),side!=0);
         for(size_t j=0;j<7;++j){
             const auto i=97+side*7+j,anchor=static_cast<size_t>(helperParents[side*7+j]);
-            const auto offset=bindOffset(i);
+            // Retain the native shoulder-slide and wrist-bulge translations;
+            // these channels are animated, not constant asset bind offsets.
+            const auto offset=compose(inverse(bone(originalQ,originalP,anchor)),bone(originalQ,originalP,i)).position;
             if(!valid(Pose{{},offset})||dot(offset,offset)>0.16f)return false;
             replace(q,p,i,compose(bone(q,p,anchor),Pose{corrections[j],offset}));
         }

@@ -57,9 +57,14 @@ int visibilityChecks(){
     std::array<unsigned char,0x48> renderer{};
     std::array<unsigned char,0x200> model{},body{},replacement{};
     std::array<uint32_t,3> groups{0xf948d635,0xa9e88501,0xdc3a5d6d};
-    std::array<uint32_t,3> bodyGroups{0xf948d635,0x1a166b34,0x4e74fd8c};
-    std::array<uint8_t,3> flags{15,15,7},bodyFlags{15,15,15},replacementFlags{15,15,7};
-    const auto nativeFlags=flags,nativeBodyFlags=bodyFlags;
+    std::array<uint32_t,6> bodyGroups{0xf948d635,0x1a166b34,0x4e74fd8c,0x026b417c,0x8f957fed,0xe503b8a1};
+    std::array<uint8_t,3> flags{15,15,7},replacementFlags{15,15,7};
+    std::array<uint8_t,6> bodyFlags{15,15,15,15,15,15};
+    const auto nativeFlags=flags;const auto nativeBodyFlags=bodyFlags;
+    struct GroupRecord {uint32_t index;int16_t parent;uint16_t unused;};
+    static_assert(sizeof(GroupRecord)==8);
+    std::array<GroupRecord,6> hierarchy{{{0,-1,0},{1,0,0},{2,0,0},{3,0,0},{4,3,0},{5,2,0}}};
+    std::array<uintptr_t,2> groupAsset{};
     std::array<uintptr_t,1> records{},entry{};
     const auto address=[](auto& a){return reinterpret_cast<uintptr_t>(a.data());};
     const auto put=[](auto& a,size_t offset,auto value){std::memcpy(a.data()+offset,&value,sizeof(value));};
@@ -72,13 +77,18 @@ int visibilityChecks(){
     records[0]=address(entry);entry[0]=address(renderer);
     put(renderer,0,base+0x20f9460);put(renderer,0x40,address(model));
     put(model,0,base+0x20f4d90);put(model,0x180,address(groups));put(model,0x170,address(flags));put(model,0x1e8,uint16_t{3});put(model,0x1a4,uint32_t{2});
-    put(body,0,base+0x20f4d90);put(body,0x180,address(bodyGroups));put(body,0x170,address(bodyFlags));put(body,0x1e8,uint16_t{3});
+    groupAsset[1]=address(hierarchy);
+    put(body,0,base+0x20f4d90);put(body,0x180,address(bodyGroups));put(body,0x170,address(bodyFlags));put(body,0x1e8,uint16_t{6});put(body,0x188,address(groupAsset));
     const auto original=model,originalBody=body;int failures=0;
     mgs5vr::initializePlayerVisibility(base);
     const auto update=[&](bool enabled){mgs5vr::updatePlayerVisibility(address(owner),enabled);};
     update(true);
-    if(model!=original||body!=originalBody||flags!=std::array<uint8_t,3>{11,11,3}||bodyFlags!=std::array<uint8_t,3>{15,11,15})++failures;
+    if(model!=original||body!=originalBody||flags!=std::array<uint8_t,3>{11,11,3}||bodyFlags!=std::array<uint8_t,6>{15,11,15,11,15,15})++failures;
     update(false);if(flags!=nativeFlags||bodyFlags!=nativeBodyFlags||model!=original)++failures;
+    // A cyclic hierarchy or a body ancestor of arms must not hide anything.
+    hierarchy[3].parent=4;update(true);if(bodyFlags!=nativeBodyFlags)++failures;update(false);hierarchy[3].parent=0;
+    hierarchy[2].parent=1;update(true);if(bodyFlags!=nativeBodyFlags)++failures;update(false);hierarchy[2].parent=0;
+    groupAsset[1]=0;update(true);if(bodyFlags!=nativeBodyFlags)++failures;update(false);groupAsset[1]=address(hierarchy);
     put(parts,0x38,uintptr_t{});update(true);if(flags!=nativeFlags)++failures;update(false);
     put(parts,0x38,address(character));groups[2]=0x4e74fd8c;
     update(true);if(flags!=nativeFlags)++failures;update(false);groups[2]=0xdc3a5d6d;

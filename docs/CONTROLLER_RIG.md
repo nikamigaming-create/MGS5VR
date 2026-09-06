@@ -19,9 +19,13 @@ preserve segment lengths and clamp unreachable targets. Descendants retain their
 animated relation to the wrist, including fingers. Native wrist and metacarpal
 landmarks define the anatomical grip frame, following the OpenXR palm axes.
 Activation no longer calibrates from an arbitrary weapon animation. Shoulder
-anchors follow the head and native torso yaw. Authored joint axes define the
+anchors follow the head and native torso yaw. Spine, clavicles and arms share one
+rigid placement, preserving their shared sleeve weights. The shoulder line sits
+18 cm below and 16 cm behind the head anchor; the former 6 cm setback exposed the
+native shirt's open shoulder ends in ordinary bent-arm poses. Authored joint axes define the
 elbow hinge; the elbow itself does not inherit wrist roll. Verified arm corrective
-joints 97-110 use their bind offsets and recomputed native local corrections.
+joints 97-110 retain their native animated local translations and use recomputed
+native local rotations. This preserves shoulder slide and wrist bulge channels.
 The two forearm twist helpers carry 35% and 75% of wrist twist. Elbow and wrist
 flexion helpers counter-rotate by 55%; shoulder weights retain the native
 left/right difference. Other descendants retain their native animation.
@@ -82,7 +86,8 @@ optics remain future work.
 The [September 6 HUD/rig review](SIM_HUD_REVIEW.md) records the current build,
 15-second clip, controls exercised, and unresolved gates. It shows real changing
 forearm ammo, support/reload contact, rifle-to-pistol selection and head movement.
-Sleeve/cuff shaping and physical controller alignment still need acceptance.
+The standing sleeve failure improved in the latest bounded check. Prone ground
+contact, extreme close-up clipping and physical controller alignment remain open.
 
 Historically, the first 29.25-second continuous left-eye recording contains 101 distinct captured
 frames (3.45 captures/second), right-hand translation, yaw, pitch and roll, native

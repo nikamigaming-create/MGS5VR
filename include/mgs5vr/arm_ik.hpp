@@ -6,6 +6,9 @@ struct ArmPose { Pose shoulder,elbow,wrist; };
 struct ArmSolution { ArmPose pose; bool reachClamped{}; };
 // Axes in the authored joint frames, independent of the current weapon animation.
 struct ArmBasis { Vec3 upperAxis,forearmAxis; Vec3 elbowBend{0,0,1},wristUp{0,1,0}; };
+// A shared model-space transform for the spine, clavicles and arm roots.
+// uprightHead carries the camera's yaw, without tracked look pitch or roll.
+std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprightHead);
 std::optional<ArmSolution> solveArm(const ArmPose& animated,Pose wristTarget,Vec3 bendHint,
                                   const ArmBasis* basis=nullptr);
 // Local corrective rotations observed on this profile's seven arm helpers.

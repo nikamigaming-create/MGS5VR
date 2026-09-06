@@ -192,6 +192,24 @@ int main(){
     expect(!rigCamera.resolve(1,changedNativeCamera,311).applied&&rigCamera.status().reason==HeadCameraStop::rigFrameMismatch,
            "a rig from another native camera publication is withheld");
     expect(nativeRoot&&same(rotate(nativeRoot->orientation,{1,0,0}),{0,0,-1}),"row affine decoding retains native handedness");
+    const Pose chestPose{{.38268343f,0,0,.92387953f},{0,1.2f,0}};
+    const Vec3 shoulderCenter{0,1.4f,.03f};
+    const Pose uprightHead{{0,.70710678f,0,.70710678f},{2,1.7f,3}};
+    const auto torsoPlacement=upperBodyPlacement(chestPose,shoulderCenter,uprightHead);
+    expect(torsoPlacement&&same(compose(*torsoPlacement,Pose{{},shoulderCenter}).position,{1.84f,1.52f,3}),
+           "shoulders stay behind and below the eyes after native yaw");
+    if(torsoPlacement){
+        const auto placedChest=compose(*torsoPlacement,chestPose);
+        expect(same(rotate(placedChest.orientation,{0,1,0}),{0,1,0}),"native crouch pitch does not tilt the VR shoulder frame");
+        const Vec3 a{-.2f,1.4f,.03f},b{.2f,1.4f,.03f};
+        const auto movedA=compose(*torsoPlacement,Pose{{},a}).position,movedB=compose(*torsoPlacement,Pose{{},b}).position;
+        expect(near(dot(movedA-movedB,movedA-movedB),.16f),"shared upper-body placement preserves shoulder width");
+        const auto skinBefore=a*.35f+b*.65f;
+        expect(same(movedA*.35f+movedB*.65f,compose(*torsoPlacement,Pose{{},skinBefore}).position),
+               "sleeve vertices shared by chest and clavicle keep one rigid placement");
+    }
+    auto invalidChest=chestPose;invalidChest.orientation.w=std::numeric_limits<float>::quiet_NaN();
+    expect(!upperBodyPlacement(invalidChest,shoulderCenter,uprightHead),"invalid torso pose cannot reach skin publication");
     const ArmPose arm{{{},{}},{{},{0.2f,-0.15f,0}},{{},{0.4f,0,0}}};
     const ArmBasis armBasis{arm.elbow.position-arm.shoulder.position,arm.wrist.position-arm.elbow.position};
     for(int i=0;i<100;++i){

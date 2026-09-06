@@ -3,18 +3,19 @@
 Use pass, fail, or unproven per claim; do not convert a passing infrastructure test into full-mod readiness.
 
 The latest [HUD/rig simulator review](SIM_HUD_REVIEW.md) documents a bounded
-14.811-second shadow clip and the current [controls](CONTROLS.md). It improves the
+14.722-second arm clip and the current [controls](CONTROLS.md). It improves the
 weapon/status and arm presentation while leaving the complete rig, every weapon,
-interactive menus and physical acceptance open. It is not the longer full-mod
-demonstration described below.
+interactive menus and physical acceptance open. The user requested compact
+15-second clips per slice; the latest one does not satisfy the full evidence set
+described below.
 
 ## Required full-mod demonstration
 
-The requested full-mod demonstration is one continuous single-eye recording from actual native 3D gameplay. Deliver a normal single-eye video, not a side-by-side presentation. Demonstrate all six axes of head motion and report actual capture cadence separately from game/runtime frame rates. The current recordings do not provide 60 FPS video evidence. The user chose to try the experimental build on a physical Quest 3 on September 6 while this gate remained incomplete; [the review](HEADSET_REVIEW.md) records observed gameplay and remaining arm/HUD failures.
+Full-mod evidence must come from continuous single-eye recordings of actual native 3D gameplay. Keep each requested slice around 15 seconds and use a normal single eye, not a side-by-side presentation. Across those checks, demonstrate all six axes of head motion and report actual capture cadence separately from game/runtime frame rates. The current recordings do not provide 60 FPS video evidence. The user chose to try the experimental build on a physical Quest 3 on September 6 while this gate remained incomplete; [the review](HEADSET_REVIEW.md) records observed gameplay and remaining arm/HUD failures.
 
 Start at the existing saved checkpoint with its equipped gear. Demonstrate translation along all three axes as well as yaw, pitch and roll, with visible world parallax. Look down at the forearm-mounted live HUD; move the arm while the head remains still, then move the head while the arm remains still. Raise the held gun, align its sights, aim away from the head direction, fire at a visible surface or target, and show the resulting impact and native ammunition change. Reload and return to the arm HUD, showing that its values updated. Hands, forearms, gear and the world must remain correctly attached and visible throughout.
 
-Capture the submitted game eye and its attached geometry from the same frame transaction. Keep timestamps, pose/source-frame identifiers, capture rate and dropped-frame counts alongside the video. Do not interpolate missing frames or replace live HUD/game imagery with a mockup. Inspect both eyes internally for correct projection and stereo separation; deliver the user's requested single eye. A single-eye video can demonstrate parallax and interaction but cannot alone certify binocular stereo or physical-headset comfort. The current theatre preview does not meet this gate, and no qualifying video exists yet.
+Capture the submitted game eye and its attached geometry from the same frame transaction. Keep timestamps, pose/source-frame identifiers, capture rate and dropped-frame counts alongside the video. Do not interpolate missing frames or replace live HUD/game imagery with a mockup. Inspect both eyes internally for correct projection and stereo separation; deliver the user's requested single eye. A single-eye video can demonstrate parallax and interaction but cannot alone certify binocular stereo or physical-headset comfort. The current clips do not satisfy this complete evidence set.
 
 | Claim | Required evidence | Minimum motion/observation | Negative fixture | Current result |
 |---|---|---|---|---|
@@ -33,7 +34,7 @@ Capture the submitted game eye and its attached geometry from the same frame tra
 | Hidden player shadow | Body/head excluded from normal view while retaining native shadow membership | Both-eye daylight silhouette, arm raises, stance changes and VR off/on | Native-disabled shadow, replaced model and unrelated owner | Bounded body/head coverage passes in SIM; all equipment/outfits, shadow-camera/culling and physical accuracy unproven |
 | First-person visibility | Hands and held gear visible, body excluded; source-bound player head anchor | Crouch, prone, sprint, ADS, traversal | Camera inside head/body, third-person boom | Head anchor, shoulder policy and player exclusion observed; guarded hip-mount suppression removes the tested stowed stock. Complete stance/rig gate remains unproven |
 | Complete arm HUD | Actual meaningful changing HUD/iDroid pixels in both eyes | Open, browse, select edges, back, close, reopen; 60 seconds | Blank/stale surface, threshold oscillation | Weapon/status forearm UI and native equipment cards implemented and observed; complete interactive iDroid and spatial feedback remain incomplete |
-| Both hands and forearms | Final-eye video of anatomical connection and correct skinning | Neutral, reach limits, opposing head/hand motion | Suppress/detach a limb | Anatomical palm binding, forearm roll, animation restoration and native reload/bolt support observed; full gate unproven with cuff/garment polish and transient motion scrutiny outstanding |
+| Both hands and forearms | Final-eye video of anatomical connection and correct skinning | Neutral, reach limits, opposing head/hand motion | Suppress/detach a limb | Shared torso/shoulder placement removes the reproduced large sleeve edges in the bounded standing rifle/pistol sequence; prone ground contact, close-up clipping, all poses and physical fit remain open |
 | All weapons | Grip, muzzle and actual impacts agree in final-eye video | Every family, reload/ADS/scope/swap/throw/melee/mounted | Wrong socket, stale pose, failed tracking | AM MRS-4 and WU pistol ready/fire/reload and selection observed; optical input reserved; other modes and impact/obstruction acceptance unproven |
 | Physical readiness | Actual headset/controller observation | Full mission session and comfort assessment | Simulator-only or single-eye evidence | Initial Quest 3 combat recording and favorable user report; arm/HUD failures remain, full mission/comfort/stereo acceptance unproven |
 

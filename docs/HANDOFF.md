@@ -1,7 +1,8 @@
 # Development handoff - 2026-09-06
 
-The latest installed build preserves the hidden player's native body/head shadow,
-on top of centered projection and native listener tracking. Read
+The latest installed build improves the exposed sleeve edges by repositioning the
+shoulders and their shared torso weights. It retains the body/head shadow,
+centered projection and native listener tracking fixes. Read
 [SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md) for the evidence and open gates, and
 [CONTROLS.md](CONTROLS.md) for the complete Touch interaction list. The initial
 physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
@@ -11,11 +12,12 @@ physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
 - Real native weapon/ammo/status on the left forearm, joined to the same skin/eye
   publication. Back-facing text is hidden. Flat reticles and destination labels
   are suppressed; native scene-camera people cues remain.
-- Anatomical palm binding, head-relative shoulders, forearm roll, native animation
-  restoration, and native support contact during reload/bolt cycles.
+- Anatomical palm binding, shared torso/shoulder placement, forearm roll, native
+  animated corrective translations, animation restoration, and native support
+  contact during reload/bolt cycles. The reported standing sleeve failure improved.
 - Normal-only body/head exclusion preserves native shadow membership. Both-eye
   daylight silhouettes, tracked arm movement, crouch/stand and theatre restoration
-  were checked. Complete equipment shadows and garment deformation remain open.
+  were checked. Complete equipment shadows, prone and close-up clipping remain open.
 - Verified player hip mount suppression removes the stowed rifle stock in the
   tested pistol/prone views. Held weapons still draw and fire.
 - Right grip readies, right trigger fires, left grip supports, B reloads.
@@ -26,7 +28,7 @@ physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
 - All five local suites passed. CI builds all targets and runs four non-GPU suites.
 
 Local DLL SHA256:
-`02B38141BC4E444D2A73FFCF2ECBFFCFE376C7B3FC1ACEDD8D3EF0178DDC9137`.
+`5090EA1879FAACBE74D283370484C4573E7371B55BDE2554813B1A66039D3E9B`.
 The last physical-test rollback is retained locally with DLL SHA256
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
 No game executable, archives or saves were patched. Installation hashes were
@@ -35,7 +37,18 @@ public default; the local test enables the camera, rig and wrist HUD explicitly.
 
 ## Follow-up evidence and remaining work
 
-The latest `artifacts/shadow-followup-15s/simulator.mp4` is 14.811 seconds,
+The latest `artifacts/arm-placement-15s/simulator.mp4` is 14.722 seconds,
+736,726 bytes, silent H.264 of the right eye, with 51 reviewed distinct frames
+at 3.389 captures/second. No black frames or capture/action/encoder errors; maximum
+response gap 329 ms. It shows wrist reading, support, rifle fire/reload, pistol
+selection/support, a full wrist turn and independent head lean. Both-eye live
+checks covered standing, wrist reading, close reach and rifle/pistol support.
+The large sleeve spikes did not recur in this sequence. Prone hands below the
+terrain remain occluded while the HUD is visible, and extreme close-up/inverted
+poses can clip. These are open gates, along with physical controller fit and
+rapid-motion smoothness. Temporary diagnostic modes were removed before building.
+
+The previous `artifacts/shadow-followup-15s/simulator.mp4` is 14.811 seconds,
 1,382,117 bytes, silent H.264 of the right eye, with 44 reviewed distinct frames
 at 2.903 captures/second. No black frames or capture/action/encoder errors; maximum
 response gap 704 ms. It shows a complete standing person shadow, each arm raised,
@@ -43,7 +56,7 @@ head lean, rifle ready/stow and a sideways step. First-person sleeve/garment
 deformation remains visible. The hip-mount matrix suppression still excludes its
 stowed weapon from all passes; that needs a separately owned normal-only binding.
 Read-only shadow-list observations and native restoration are recorded in the SIM
-review. The local published rollback is 6A1EC304; the physical 7077 rollback remains.
+review. The local published rollback is 02B38141; the physical 7077 rollback remains.
 
 The preceding `artifacts/lighting-followup-15s/simulator.mp4` is 14.803 seconds,
 687,646 bytes, silent H.264, with 58 reviewed distinct frames at 3.850 captures
@@ -101,13 +114,17 @@ physical session while the user requested simulator work.
 The known forward rifle grip for simulator inspection is local position
 `[0.16,-0.25,-0.30]`, quaternion xyzw
 `[0.61595203,-0.00760909,0.07982154,0.78369236]`. Left HUD inspection is
-`[-0.10,-0.10,-0.42]`, `[0,0.70710678,0,0.70710678]`. The earlier negative
+`[-0.02,-0.30,-0.38]`, `[-0.70710678,0.70710678,0,0]`. The earlier negative
 90-degree right-grip pitch points the weapon backward and must not be reused.
 The simulator head setter also moves controllers: reapply explicit local hand
 poses when testing independent head motion. Keep private probes and game-derived
 media outside the public source; retain one rollback and avoid raw frame folders.
 
-Next work is cuff/garment polish, physical anatomical fit, higher-cadence rapid
+Continue the user's [all-gameplay worklist](POLISH_CHECKLIST.md) on the existing
+checkpoint. The native lowered-weapon trigger now reaches attack/CQC/body-throw
+input, with passing contracts; target interactions remain unproven.
+
+Next work is prone ground contact, close-up garment clipping, physical anatomical fit, higher-cadence rapid
 motion and live tracking-loss checks, weapon impacts/obstruction and remaining
 weapon families. Spatial damage/subtitle/context feedback, interactive wrist
 menus, authored stereo optics and automatic cinematic handling remain unfinished.
