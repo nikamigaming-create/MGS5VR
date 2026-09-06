@@ -10,7 +10,7 @@ struct GamepadSample {
     bool operator==(const GamepadSample&) const = default;
 };
 // In tracked-rig mode, left trigger is a modifier: left stick selects the
-// native equipment category, X calls/radios, and Y uses binoculars/scopes.
+// native equipment category, X calls/radios, and Y is reserved for optics.
 // Release the stick/buttons before returning them to movement and actions.
 class RigEquipment {
 public:

@@ -40,7 +40,8 @@ RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,T
     }
     const bool modifier=raw.leftTrigger>127;
     raw.leftTrigger=rightGrip?255:0;
-    if(!rightGrip)raw.rightTrigger=0;
+    // The Action Type trigger also performs CQC and throws carried bodies
+    // while the weapon is lowered. Let the native action state choose it.
     return {equipment_.update(raw,modifier,false),rightGrip,leftGrip};
 }
 uint16_t MenuButton::update(bool pressed,bool active,uint64_t time){

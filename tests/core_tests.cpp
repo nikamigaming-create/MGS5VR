@@ -258,8 +258,9 @@ int main(){
     expect(!support.update(true,true,.5f),"selection cannot reattach a hand that has moved away");
     RigInput travelInput;
     GamepadSample triggerOnly{};triggerOnly.rightTrigger=255;
-    expect(travelInput.update(triggerOnly,false,false,TravelMode::onFoot).gamepad.rightTrigger==0,
-           "on-foot trigger requires a readied weapon");
+    const auto cqc=travelInput.update(triggerOnly,false,false,TravelMode::onFoot);
+    expect(cqc.gamepad.rightTrigger==255&&cqc.gamepad.leftTrigger==0&&!cqc.weaponReady,
+           "lowered weapon retains the native attack/CQC trigger without aiming");
     const auto readyGun=travelInput.update(triggerOnly,true,true,TravelMode::onFoot);
     expect(readyGun.gamepad.leftTrigger==255&&readyGun.gamepad.rightTrigger==255&&readyGun.supportRequested,
            "on-foot grip still readies and supports the firearm");

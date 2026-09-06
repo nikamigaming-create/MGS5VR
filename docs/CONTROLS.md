@@ -65,6 +65,7 @@ bionic arm or item does not establish tracked throwing, CQC or item-use support.
 | Crouch / change stance | Right A; hold A for prone; release weapon-ready grip first |
 | Quick dive | Left X without the equipment modifier |
 | Context action / pickup | Left Y without the equipment modifier; follow the native action when available |
+| Native attack / CQC / carried-body throw | Right trigger with right grip released; the native game state chooses the action |
 | Native call/radio | Left trigger + X |
 | Toggle native VR / large game screen | Left grip + left-stick click |
 | Open iDroid map | Tap left Menu |
@@ -101,6 +102,8 @@ Rifle and WU pistol ready/fire/reload, support attach/release, equipment cards,
 left-arm ammo updates and basic iDroid/pause navigation have simulator observations.
 Physical controller fit still needs a headset check. Throws, CQC, mounted weapons,
 all inventory items, contextual targets, every menu branch and every weapon are
-not certified. Flat damage, subtitle and context prompts currently have no spatial
+not certified. The lowered-weapon trigger now reaches the native action path;
+its input contract passes, but a target interaction has not been accepted.
+Flat damage, subtitle and context prompts currently have no spatial
 replacement. Sleeve/cuff polish remains open. This guide describes the controls
 without claiming those gates pass; see the [current SIM review](SIM_HUD_REVIEW.md).
