@@ -47,14 +47,17 @@ then **release left trigger** to confirm and close. Gameplay does not pause.
 | Right stick with left trigger held | Action |
 | --- | --- |
 | First flick up / down / right / left | Primary / secondary / support / items |
-| After centering the stick | Point toward the displayed card: up is up, left is left |
+| After the cards appear and the stick is centered | Flick toward a card, including diagonals; center between choices |
 | Right B, while keeping left trigger held | Return to category choice |
-| Click, on an item with a Use prompt | Use the selected item |
+| Right A, on an item with a Use prompt | Use the selected item once; right-stick click also works |
 
-The first flick selects a category and is consumed. Center the stick once, then
-browse its cards in their displayed directions. B lets you choose another
-category without releasing left trigger. Native equip/stow transitions can
-delay opening; let the picker appear before browsing.
+Holding left trigger alone does not equip or toggle anything. The first flick
+opens one category. Once its cards appear, center the stick and flick toward a
+card. Up is up, left is left, and diagonal cards accept diagonal flicks. Keep a
+flick steady briefly; center between choices. Holding or wobbling one flick
+cannot skip into a second selection. B returns to category choice while left
+trigger stays held. Native equip/stow transitions can delay opening; navigation
+is blocked until the expanded menu has rendered.
 
 The cards and descriptions use real game data and unfold above the **left wrist**,
 facing you; the small status display stays flat along the forearm. Raise that
@@ -63,14 +66,30 @@ the picker is open and until the stick returns to neutral after closing. A held
 fire trigger must be released before it can fire after selection.
 
 For an item card with a **Use** prompt, keep the category open, select the card
-with the right stick and click the **right stick**. Phantom Cigar use was exercised
+with the right stick and press **A** (or click the right stick). A held Use button
+produces one press, and cannot become crouch when the picker closes. Phantom Cigar use was exercised
 in SIM; **B** ended its time passage. This does not certify the other item actions.
+
+On the current checkpoint, **NVG is the upward item slot**. Hold left trigger,
+flick left for Items, wait for the cards and center, then flick up to NVG and
+release left trigger. To turn it off, select **None** in the item picker and
+release. This is night vision, separate from optical binocular zoom. Its native
+upward slot has a small NVG label rather than a large rectangular card.
+
+For a grenade, choose **Support** with a first flick right and finish selection.
+Hold **right grip** to ready it. Move and tilt the **right hand** to position and
+direct the trajectory; **right trigger** throws. Hand elevation controls the arc,
+while right-stick left/right still turns your body. Right-stick up/down is
+suppressed while a tracked grenade is readied. Throw strength remains the native
+equipment strength; this is point-and-trigger throwing, not a velocity gesture.
+The latest SIM observations and remaining stance limits are in the
+[interaction and visibility review](INTERACTION_VISIBILITY_REVIEW.md).
 
 **Optical zoom is unavailable in this VR test.** Left trigger + Y is reserved and
 does nothing. It cannot force a 2D scope or binocular screen. The checkpoint's
 AM MRS-4 has iron sights; no magnification is invented for it. Future optical work
-must identify the equipped optic and retain a stereo view. Selecting a grenade,
-bionic arm or item does not establish tracked throwing, CQC or item-use support.
+must identify the equipped optic and retain a stereo view. The grenade adapter
+does not establish bionic-arm, CQC or every item action.
 
 ## Movement, actions and menus
 

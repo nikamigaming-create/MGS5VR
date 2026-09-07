@@ -55,6 +55,29 @@ bool setEyeProjection(std::array<float,16>& m,EyeFov f){
     m[0]=-2/(r-l);m[5]=2/(u-d);m[8]=-(r+l)/(r-l);m[9]=-(u+d)/(u-d);
     return true;
 }
+bool widenVisibilityProjection(std::array<float,16>& matrix,Pose head,const std::array<EyeView,2>& views){
+    if(!valid(head)||std::abs(matrix[0])<.01f||std::abs(matrix[5])<.01f)return false;
+    for(float v:matrix)if(!std::isfinite(v))return false;
+    float x=0,y=0;
+    for(const auto& eye:views){
+        if(!valid(eye.pose)||!valid(eye.fov))return false;
+        const auto relative=compose(inverse(head),eye.pose);
+        for(float horizontal:{eye.fov.left,eye.fov.right})for(float vertical:{eye.fov.down,eye.fov.up}){
+            const auto ray=rotate(relative.orientation,{std::tan(horizontal),std::tan(vertical),-1});
+            if(ray.z>=-.01f)return false;
+            x=std::max(x,std::atan2(std::abs(ray.x),-ray.z));
+            y=std::max(y,std::atan2(std::abs(ray.y),-ray.z));
+        }
+    }
+    // Angular coverage only; object bounds still supply native near-field
+    // visibility. Do not increase the render FOV, resolution, or LOD distances.
+    constexpr float margin=.12f;
+    x=std::max(x+margin,std::atan((1+std::abs(matrix[8]))/std::abs(matrix[0])));
+    y=std::max(y+margin,std::atan((1+std::abs(matrix[9]))/std::abs(matrix[5])));
+    auto widened=matrix;
+    if(x>=1.5f||y>=1.5f||!setEyeProjection(widened,{-x,x,y,-y}))return false;
+    matrix=widened;return true;
+}
 Pose nativeEyePose(Pose nativeHead,Pose sourceHead,Pose sourceEye,float units){
     const Pose basis{{0,1,0,0},{}};
     auto relative=compose(inverse(sourceHead),sourceEye);relative.position=relative.position*units;

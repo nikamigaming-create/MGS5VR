@@ -1,5 +1,12 @@
 # Development handoff - 2026-09-07
 
+Latest handoff: the deliberate wrist/grenade/visibility candidate is installed,
+the owned SIM is stopped, and the accepted 2560×1440/native-AA physical graphics
+are restored. No headset session has been relaunched. See
+[current results and exact build](INTERACTION_VISIBILITY_REVIEW.md). Physical
+menu/grenade acceptance and the user's left-turn tree pop-in remain the next
+checks. The notes below preserve earlier stages rather than current launch state.
+
 The current Quest 3 run of `7BF543BE` received positive user feedback for the
 basic VR experience; low resolution and jagged edges remain. The working 1080p
 DLL/configuration is preserved privately, and the same DLL is now under physical

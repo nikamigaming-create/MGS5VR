@@ -77,6 +77,8 @@ struct SceneSource {uintptr_t viewport{},grCamera{};Pair pair;};
 SceneSource sceneSource;
 std::mutex sceneMutex;
 thread_local uintptr_t eyeViewport{};
+thread_local uintptr_t visibilityViewport{};
+std::atomic_uint64_t visibilityUpdates{};
 thread_local uintptr_t stereoTarget{};
 thread_local mgs5vr::EyeFrame drawingEye{};
 thread_local bool clipProjection{},gpuProjection{},insideStereo{};
@@ -161,6 +163,14 @@ __declspec(noinline) uintptr_t projection(float* output,float a,float b,float c,
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const auto result=originalProjection(output,a,b,c,d,e,f,g,h,i);
     if(enabled.load()&&caller==base+0x2e68a0)mgs5vr::applyUiEyeProjection(output);
+    if(enabled.load()&&visibilityViewport&&caller==base+0x1b9691
+        &&reinterpret_cast<uintptr_t>(output)==visibilityViewport+0x300){
+        std::array<float,16> matrix{};std::memcpy(matrix.data(),output,sizeof(matrix));
+        if(mgs5vr::widenVisibilityProjection(matrix,current.sample.headPose,current.sample.views)){
+            std::memcpy(output,matrix.data(),sizeof(matrix));
+            if(++visibilityUpdates==1)mgs5vr::log("Native visibility projection covers both tracked eyes with a symmetric turn margin");
+        }
+    }
     if(!enabled.load()||!eyeViewport)return result;
     const bool clip=caller==base+0x1b9691&&reinterpret_cast<uintptr_t>(output)==eyeViewport+0x300;
     const bool gpu=caller==base+0x1b9724&&reinterpret_cast<uintptr_t>(output)==eyeViewport+0x280;
@@ -172,7 +182,19 @@ __declspec(noinline) uintptr_t projection(float* output,float a,float b,float c,
 }
 __declspec(noinline) uintptr_t viewport(void* input,uint8_t history){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    // Native visibility is prepared before scene replay. Widen its clip matrix
+    // while the native builder derives the frustum planes, using this same
+    // center-head publication. Neither eye's image projection is widened here.
+    const auto priorVisibility=visibilityViewport;
+    const auto now=mgs5vr::steadyMilliseconds();
+    if(enabled.load()&&!insideStereo&&caller==base+0x4380b9&&current.applied&&current.validInverse
+        &&current.sample.stereoTracked&&now>=current.sample.sampleTime&&now-current.sample.sampleTime<=150){
+        const auto camera=field<uintptr_t>(input,0x570);
+        if(camera&&std::memcmp(reinterpret_cast<void*>(camera+0x70),current.view.data(),sizeof(current.view))==0)
+            visibilityViewport=reinterpret_cast<uintptr_t>(input);
+    }
     const auto result=originalViewport(input,history);
+    visibilityViewport=priorVisibility;
     if(enabled.load()&&!insideStereo&&caller==base+0x4380b9&&current.applied&&current.validInverse&&current.sample.stereoTracked){
         const auto camera=field<uintptr_t>(input,0x570);
         if(camera&&std::memcmp(reinterpret_cast<void*>(camera+0x70),current.view.data(),sizeof(current.view))==0){

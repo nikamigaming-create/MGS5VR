@@ -3,6 +3,7 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/ui_renderer.hpp"
 #include <Xinput.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
@@ -324,9 +325,14 @@ struct Session {
         // an authored optical mode can preserve the 3D scene and tracked hands.
         if(rigInput){
             const auto mode=nativeTravelMode();
-            const auto mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode);
+            const auto beforePhase=rigControls.equipmentPhase();
+            const auto mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode,
+                steadyMilliseconds(),nativeEquipmentPickerDrawTime(),controllerThrowReady());
+            if(beforePhase!=rigControls.equipmentPhase())log("Wrist picker phase="+std::to_string(rigControls.equipmentPhase())
+                +" category="+std::to_string(rigControls.equipmentCategory()));
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
+            controllerFrame.equipmentCategory=rigControls.equipmentPhase()>=2?rigControls.equipmentCategory()+1:0;
         }else if(nativeStatus.awaitingPlayer)rigControls.suspend();
         else rigControls.reset();
         gamepadMailbox().publish(pad,left||right,steadyMilliseconds());

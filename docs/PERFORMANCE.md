@@ -4,6 +4,16 @@ The target is 90 fresh stereo frames per second, with room below the 11.11 ms
 display interval. A 90 Hz headset alone does not establish that the game renders
 90 new frames. Settings and in-game acceptance are still being measured.
 
+The latest physical Quest 3 test retained native **2560×1440**, Post Processing
+**High** for native AA, and received positive user feedback. The user accepts
+roughly 86 fresh FPS as a useful fidelity compromise; this is not a locked-90
+claim. Keep DOF and motion blur disabled, SSAO and volumetric clouds off, effects,
+lighting and shadows High, and textures/filtering/model detail Extra High.
+Interaction checks use a separate 1280×720 SIM run and restore the physical
+profile afterward. Its performance numbers must not be substituted for 1440p
+headset results. No upscaler, generated frames or third-party clarity plugin is
+included.
+
 The VR graphics adapter selects the engine's variable frame-rate option and
 removes desktop V-sync from the game mirror. Its producer is capped at 120 FPS
 to feed the asynchronous 90 Hz OpenXR consumer with a small margin. The cap also

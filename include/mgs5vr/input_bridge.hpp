@@ -3,6 +3,7 @@
 #include <mutex>
 #include <optional>
 namespace mgs5vr {
+uint64_t steadyMilliseconds();
 struct GamepadSample {
     uint16_t buttons{};
     uint8_t leftTrigger{},rightTrigger{};
@@ -13,14 +14,21 @@ struct GamepadSample {
 // locomotion. The first right-stick direction chooses the corresponding native
 // D-pad category; after centering, the stick browses without rotating its axes.
 // B returns to category selection while the modifier remains held.
+// Trigger alone sends no native category. Expanded UI readiness gates browsing;
+// one settled eight-way flick selects one card until the stick is centered again.
 // Release closes selection. A held navigation stick cannot leak into turning.
 class RigEquipment {
 public:
-    GamepadSample update(GamepadSample sample,bool modifier,bool allowOptics=true);
-    void reset(){blockedButtons_=0;blockedStick_=false;active_=false;categoryChosen_=false;waitBrowseNeutral_=false;useHeld_=false;category_=0;}
+    GamepadSample update(GamepadSample sample,bool modifier,bool allowOptics,uint64_t time,uint64_t pickerDrawTime);
+    void reset(){*this=RigEquipment{};}
+    unsigned phase() const {return !active_?0:!categoryChosen_?1:waitBrowseNeutral_?2:3;}
+    unsigned category() const {return category_;}
 private:
     uint16_t blockedButtons_{};
-    bool blockedStick_{},active_{},categoryChosen_{},waitBrowseNeutral_{},useHeld_{};
+    bool blockedStick_{},active_{},categoryChosen_{},waitBrowseNeutral_{},wasNeutral_{},browseLatched_{};
+    uint64_t neutralSince_{},openedAt_{},directionSince_{},useUntil_{},lastTime_{};
+    int candidateDirection_{-1};
+    int16_t browseX_{},browseY_{};
     unsigned category_{};
 };
 enum class TravelMode { unknown,onFoot,horse,vehicle };
@@ -29,7 +37,10 @@ struct RigInputSample { GamepadSample gamepad; bool weaponReady{}; };
 // A travel-mode transition consumes held controls until they are released.
 class RigInput {
 public:
-    RigInputSample update(GamepadSample raw,bool leftGrip,bool rightGrip,TravelMode mode);
+    RigInputSample update(GamepadSample raw,bool leftGrip,bool rightGrip,TravelMode mode,
+                         uint64_t time=steadyMilliseconds(),uint64_t pickerDrawTime=0,bool throwing=false);
+    unsigned equipmentPhase() const {return equipment_.phase();}
+    unsigned equipmentCategory() const {return equipment_.category();}
     void suspend(){releaseRequired_=true;equipment_.reset();}
     void reset(){mode_=TravelMode::unknown;releaseRequired_=false;fireReleaseRequired_=false;wristMode_=false;equipment_.reset();}
 private:

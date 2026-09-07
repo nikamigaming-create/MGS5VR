@@ -4,7 +4,8 @@ Play **Metal Gear Solid V: The Phantom Pain** in first-person VR, with tracked
 hands and a weapon HUD on your **left forearm**.
 
 **Experimental:** the current Quest 3 build received positive basic gameplay
-feedback. Sharpness, arm polish and complete interaction testing remain unfinished.
+feedback, including a later 1440p/native-AA session. Arm polish, vegetation pop-in
+and complete interaction testing remain unfinished.
 See [what has been tested](docs/STATUS.md).
 
 **Setup in one line:** connect your headset → download and extract → run the
@@ -54,7 +55,8 @@ predates the latest finger and wrist-menu corrections; those are not yet package
 | Support the weapon | Bring the left palm to its support grip; pull away to release |
 | Reload | Right B |
 | Read ammo and status | Raise your left forearm |
-| Select equipment while moving | Hold left trigger; flick right stick toward a category, center, then point toward its cards; release trigger to finish |
+| Select equipment while moving | Hold left trigger; flick right stick toward a category, wait for its cards, center, then flick toward a card; release trigger to finish |
+| Back / use selected item | Right B / right A while the wrist picker is open |
 | Interact / pick up | Left Y when the game offers the action |
 | iDroid / pause | Tap left Menu / hold left Menu |
 
@@ -71,10 +73,11 @@ for native anti-aliasing, **Depth of Field: Disable**, **Motion Blur: Off**, and
 and volumetric clouds. Keep textures, filtering and model detail at **Extra High**.
 The installer leaves the game's graphics preferences under your control.
 
-The current performance target is a 90 Hz headset with fresh stereo frames.
-SIM tests are mostly in the high 80s to 90, with occasional lower stretches;
-headset timing and a whole-game guarantee are unproven. The 1440p test cost too
-much performance, so 1080p is the current compromise. See
+The latest physical test uses **2560×1440 with native AA** and received positive
+feedback; that profile is retained for the tester. Start at 1080p on other hardware
+and increase resolution if performance allows. The target remains a 90 Hz headset
+with fresh stereo frames; high-80s samples do not establish locked 90 FPS or a
+whole-game guarantee. See
 [performance and AA](docs/PERFORMANCE.md) and [resolution setup](docs/ADVANCED_SETUP.md#runtime-and-resolution).
 
 ## Current limits

@@ -28,6 +28,17 @@ private:
     bool attached_{},candidate_{};
     uint64_t since_{},lastTime_{};
 };
+// Keep contact in the acquired weapon frame. During release, retain the last
+// presented offset so an unrelated stow animation cannot drag the free hand.
+class SupportPose {
+public:
+    std::optional<Pose> update(Pose nativeOffset,bool attached,bool manipulating);
+    void reset(){attached_=false;acquired_={};presented_.reset();}
+private:
+    bool attached_{};
+    Pose acquired_{};
+    std::optional<Pose> presented_;
+};
 // OpenXR grip frame from the native wrist and the index/little metacarpal heads.
 // Unlike activation-pose calibration this is independent of the camera and of
 // where the user happened to hold the controller when enabling VR.
@@ -35,6 +46,10 @@ std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuck
 // Swing the authored barrel direction toward the other controller while
 // keeping the primary palm fixed. Roll stays owned by the primary controller.
 std::optional<Pose> twoHandGrip(Pose primary,Pose support,Vec3 forwardInPrimary,float influence);
+struct PointThrow { Vec3 origin,velocity; };
+// Start at the rendered palm; point along OpenXR aim -Z. The native solver
+// supplies speed at neutral camera angles, so looking/turning cannot steer it.
+std::optional<PointThrow> pointThrow(Pose renderedPalm,Pose gripFromAim,Vec3 nativeVelocity);
 // Local rotations for the authored straight finger chains (thumb through pinky).
 // Native weapon/contact animation remains authoritative while a hand is attached.
 std::optional<Quat> fingerJointRotation(bool right,unsigned finger,unsigned joint,float curl);

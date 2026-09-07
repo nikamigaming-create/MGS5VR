@@ -1,5 +1,9 @@
 # Wrist directions and grenade pointing — 2026-09-07
 
+This records the earlier failed B631 candidate and A719 rollback. See the
+[later interaction and visibility review](INTERACTION_VISIBILITY_REVIEW.md)
+for the deliberate menu and hand-directed grenade follow-up.
+
 The wrist direction correction is retained. The grenade pointing candidate is
 held after its final recording showed missing arms during part of grenade use.
 No passing grenade release or full-mod acceptance is claimed.

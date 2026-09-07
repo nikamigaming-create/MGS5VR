@@ -20,6 +20,7 @@ struct ControllerFrame {
     uint64_t referenceEpoch{};
     bool weaponReady{};
     bool vehicleControls{};
+    unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};

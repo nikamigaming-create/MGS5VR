@@ -25,6 +25,9 @@ std::optional<EyeImageRegion> eyeImageRegion(EyeFov rendered,EyeFov requested,ui
 // FOX row-vector projection: camera +Z forward, -X screen-right. Retains the
 // engine's depth mapping while replacing the angular field and optical center.
 bool setEyeProjection(std::array<float,16>& matrix,EyeFov fov);
+// Conservative angular visibility coverage before either eye is drawn. Keeps
+// native coverage if it is wider and adds a small symmetric head-turn margin.
+bool widenVisibilityProjection(std::array<float,16>& matrix,Pose head,const std::array<EyeView,2>& views);
 Pose nativeEyePose(Pose nativeHead,Pose sourceHead,Pose sourceEye,float units=1);
 // The resulting controller axes retain the OpenXR grip/aim convention. Unlike
 // a FOX camera, a controller is not conjugated back into FOX camera-local axes.

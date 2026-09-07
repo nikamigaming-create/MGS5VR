@@ -157,6 +157,15 @@ bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time
     if(time-since_>=150){attached_=true;candidate_=false;}
     return attached_;
 }
+std::optional<Pose> SupportPose::update(Pose nativeOffset,bool attached,bool manipulating){
+    if(!valid(nativeOffset)){reset();return {};}
+    if(attached){
+        if(!attached_)acquired_=nativeOffset;
+        presented_=manipulating?nativeOffset:acquired_;
+    }
+    attached_=attached;
+    return presented_;
+}
 std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuckle){
     if(!valid(wrist)||!valid(Pose{{},indexKnuckle})||!valid(Pose{{},littleKnuckle}))return {};
     const auto across=littleKnuckle-indexKnuckle;
@@ -170,6 +179,15 @@ std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuck
     const auto x=unit(normal),y=cross(z,x);
     const auto center=wrist.position+along*0.55f;
     return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,center.x,center.y,center.z,1});
+}
+std::optional<PointThrow> pointThrow(Pose renderedPalm,Pose gripFromAim,Vec3 nativeVelocity){
+    if(!valid(renderedPalm)||!valid(gripFromAim)||!valid(Pose{{},nativeVelocity}))return {};
+    const float speed=std::sqrt(dot(nativeVelocity,nativeVelocity));
+    if(speed<.1f||speed>100.f)return {};
+    auto direction=rotate(compose(renderedPalm,gripFromAim).orientation,{0,0,-1});
+    const float length=std::sqrt(dot(direction,direction));
+    if(!std::isfinite(length)||length<.9f||length>1.1f)return {};
+    return PointThrow{renderedPalm.position,direction*(speed/length)};
 }
 std::optional<Pose> nativeAffinePose(const std::array<float,16>& m){
     for(float f:m)if(!std::isfinite(f))return {};

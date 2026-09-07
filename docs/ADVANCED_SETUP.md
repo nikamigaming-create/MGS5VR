@@ -49,9 +49,10 @@ software and select it as the active OpenXR runtime. The physical baseline uses
 Quest 3, Touch controllers and the Meta PC runtime. Other hardware remains
 unverified; the controls assume the game's **Action Type** layout.
 
-The positively reviewed baseline used native 1920x1080 rendering. The current
-2560x1440 test keeps the same DLL; its visual improvement and sustained performance
-await physical feedback. Close the game before requesting that mode:
+The latest physical 2560x1440/native-AA session received positive feedback, and
+that resolution is retained for the tester. Start at 1920x1080 on other hardware;
+the higher setting is not a universal performance recommendation. Close the game
+before requesting that mode:
 
 ```powershell
 $mgsRuntime = (Get-ItemProperty 'HKLM:\SOFTWARE\Khronos\OpenXR\1').ActiveRuntime
@@ -68,7 +69,8 @@ supply `-GraphicsConfig` with the chosen account's absolute
 Check `Game Present ... size=2560x1440` in the game's `mgs5vr.log`: the game may
 substitute unsupported display modes. Enlarging an XR image alone cannot recover
 detail missing from the native render. The [sharpness review](HEADSET_SHARPNESS_REVIEW.md)
-records the observed dimensions, performance and remaining anti-aliasing test.
+records the earlier dimensional checks; [performance notes](PERFORMANCE.md)
+describe the current profile and measurement limits.
 
 ## Large screen, menus and transitions
 
