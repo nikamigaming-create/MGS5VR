@@ -44,7 +44,9 @@ right stick to select within the category before releasing.
 | Right | Support equipment, such as grenades |
 | Left | Items |
 
-The cards use real game data and appear around the forearm HUD. Selection does
+The cards and descriptions use real game data and unfold above the **left wrist**,
+facing you; the small status display stays flat along the forearm. Raise that
+wrist into view to read the selection. Selection does
 not move the player. Release held stick/button inputs before resuming movement.
 
 For an item card with a **Use** prompt, keep the category open, select the card

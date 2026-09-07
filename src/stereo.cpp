@@ -57,4 +57,15 @@ Pose nativeTrackedPose(Pose nativeHead,Pose sourceHead,Pose trackedPose,float un
     auto relative=compose(inverse(sourceHead),trackedPose);relative.position=relative.position*units;
     return compose(compose(nativeHead,Pose{{0,1,0,0},{}}),relative);
 }
+bool panelFacesBothEyes(Pose panel,const std::array<Pose,2>& eyes){
+    if(!valid(panel))return false;
+    const auto normal=rotate(panel.orientation,{0,0,1});
+    for(const auto& eye:eyes){
+        if(!valid(eye))return false;
+        const auto toward=eye.position-panel.position;
+        const float distance=std::sqrt(dot(toward,toward));
+        if(distance<.05f||dot(normal,toward)<.15f*distance)return false;
+    }
+    return true;
+}
 }

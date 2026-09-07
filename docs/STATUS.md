@@ -7,7 +7,10 @@ The latest physical Quest 3 test of `C367CC6F` **failed stereo acceptance**:
 the user reported incompatible left/right views across the whole landscape.
 The game was stopped. The centered-FOV lighting change has been rolled back to
 the earlier runtime-provided eye projections. Physical validation of that
-replacement is pending. Earlier SIM menu/arm results do not override the failure.
+replacement is pending. The attempted `70779290` physical rollback also failed:
+the user reported garbled limbs, low resolution and flat or inconsistent UI depth.
+There is no accepted physical recovery build. Earlier SIM menu/arm results do
+not override these failures.
 
 The latest simulator slice implements real weapon/status UI on the **left
 forearm**, removes the flat gameplay reticle and destination labels, stabilizes

@@ -7,11 +7,12 @@ runtime eye FOVs. The earlier sky rectangle may return. Do not call stereo fixed
 until the user confirms the replacement in the physical headset. Escaping blue
 triangles from marked people also remain a reported failure.
 
-For immediate headset recovery, install the retained exact `70779290` physical
-baseline. `DA0CAED9` is the separate runtime-FOV rollback candidate, with five
-local suites and six both-eye SIM endpoint poses checked. Its sky rectangle
-remains visible, and its physical stereo check is unproven. Keep these build
-identities distinct; the newer arm/menu behavior is not in the recovery DLL.
+The attempted `70779290` physical rollback also FAILED: the user reported garbled
+arms/legs, low resolution and flat or inconsistent UI depth. Do not reinstall it
+as an accepted recovery. `DA0CAED9` is the separate runtime-FOV rollback candidate,
+with five local suites and six both-eye SIM endpoint poses checked. Its sky
+rectangle remains visible and its physical stereo check is unproven. No retained
+build currently has passing physical acceptance for the requested experience.
 
 The build retains automatic iDroid/pause screen transitions and
 same-player return to VR. Map zoom/tab navigation, both final eyes, held-trigger

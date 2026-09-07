@@ -38,6 +38,13 @@ int main(){
            "forearm UI has real per-eye disparity rather than a shared flat overlay");
     expect(!uiPanelProjection(identityMatrix,identityMatrix,squareEye,spatialPanel,0,0.4f),
            "invalid physical UI extent cannot replace native projection");
+    const std::array<Pose,2> panelEyes{Pose{{},{-.032f,0,0}},Pose{{},{.032f,0,0}}};
+    expect(panelFacesBothEyes(Pose{{},{0,0,-.4f}},panelEyes),"front-facing wrist display is visible to the stereo pair");
+    expect(!panelFacesBothEyes(Pose{{0,1,0,0},{0,0,-.4f}},panelEyes),"back-facing wrist display is hidden in both eyes");
+    const Pose edgePanel{{0,.70710678f,0,.70710678f},{0,0,-.4f}};
+    expect(!panelFacesBothEyes(edgePanel,panelEyes),"plane separating the eyes cannot become a monocular wrist display");
+    auto invalidEyes=panelEyes;invalidEyes[1].position.x=std::numeric_limits<float>::quiet_NaN();
+    expect(!panelFacesBothEyes(Pose{{},{0,0,-.4f}},invalidEyes),"invalid eye pose cannot expose half of the wrist display");
     auto ortho=projection;ortho[11]=0;ortho[15]=1;
     expect(!setEyeProjection(ortho,asymmetric),"orthographic pass cannot be mistaken for scene projection");
     std::array<EyeFrame,2> pair{};

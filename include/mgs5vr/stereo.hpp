@@ -24,4 +24,7 @@ Pose nativeEyePose(Pose nativeHead,Pose sourceHead,Pose sourceEye,float units=1)
 // a FOX camera, a controller is not conjugated back into FOX camera-local axes.
 Pose nativeTrackedPose(Pose nativeHead,Pose sourceHead,Pose trackedPose,float units=1);
 bool readyEyePair(const std::array<EyeFrame,2>& eyes,uint64_t activation,uint64_t now);
+// One visibility decision for the entire stereo family. A wrist plane near
+// edge-on must never be accepted by one eye and rejected by the other.
+bool panelFacesBothEyes(Pose panel,const std::array<Pose,2>& eyes);
 }

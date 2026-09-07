@@ -265,7 +265,12 @@ struct Session {
         const bool center=boolean(recenter)&&ls>0.75f&&rs>0.75f;
         const bool headToggle=headCamera().available()&&left&&ls>0.75f&&boolean(thumbClick,hands[0]);
         if(priorFocused&&headToggle&&!priorHeadToggle){
-            headCamera().toggle();log("Native head-camera toggle requested through OpenXR");
+            // The title scene also owns a Snake camera/skeleton. It is not a
+            // playable character, and rig controls would consume its menu input.
+            if(!controllerRigEnabled()||nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer
+                ||nativeTravelMode()!=TravelMode::unknown){
+                headCamera().toggle();log("Native head-camera toggle requested through OpenXR");
+            }else log("Native VR activation waits for a playable local character");
         }
         priorHeadToggle=headToggle;
         if(priorFocused&&center&&!priorRecenter)recenterRequested=true;

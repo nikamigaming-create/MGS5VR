@@ -4,6 +4,7 @@
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/scene_capture.hpp"
 #include "mgs5vr/ui_renderer.hpp"
+#include "mgs5vr/controller_rig.hpp"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -225,6 +226,9 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     bool contains=false;auto candidate=field<uintptr_t>(render,0xa0);
     for(unsigned n=0;candidate&&n<16;++n){if(candidate==source.viewport){contains=true;break;}candidate=field<uintptr_t>(reinterpret_cast<void*>(candidate),0x30);}
     const auto now=mgs5vr::steadyMilliseconds();
+    // The first camera update can precede tracked skin publication. Do not
+    // submit that exposed third-person arm pose as the first VR eye pair.
+    if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence){++sceneRejected;return originalScene(render,graphics,task,worker);}
     if(!contains||source.pair.sample.activation!=status.activation||now<source.pair.sample.sampleTime||now-source.pair.sample.sampleTime>150
         ||std::memcmp(reinterpret_cast<void*>(source.grCamera+0x30),source.pair.world.data(),sizeof(source.pair.world))){++sceneRejected;return originalScene(render,graphics,task,worker);}
     const auto contextOwner=field<uintptr_t>(graphics,0x150);

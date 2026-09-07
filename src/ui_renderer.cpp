@@ -23,7 +23,7 @@ using NodeFn=uintptr_t(*)(void*,void*);
 QueueFn originalQueue{};ExecuteFn originalExecute{};NodeFn originalNode{};
 uintptr_t base{};
 std::atomic_bool enabled{};
-struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{};bool panelTracked{};Vec3 eyePosition{};};
+struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{};};
 thread_local Source producing,executing;
 std::mutex mutex;
 std::unordered_map<uintptr_t,Source> pending;
@@ -37,6 +37,7 @@ std::vector<NodeSample> nodes;
 std::atomic_uint64_t queued{},executions{},joined{},patched{},cameraMismatch{},viewMismatch{},expired{},overflow{},nodeCalls{};
 std::atomic_uint64_t spatialDraws{};
 std::atomic_uint64_t suppressedDraws{};
+std::array<std::atomic_uint64_t,2> spatialByEye{},hiddenPanelByEye{};
 std::filesystem::path settings;
 bool spatialEnabled{};
 bool menuReaderVerified{};
@@ -101,22 +102,32 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             if(camera!=executing.camera&&read(camera,&cameraType,sizeof(cameraType))&&cameraType==base+0x20f08c8
                 &&read(camera+0x30,world.data(),sizeof(world))&&world[0]==-1&&world[5]==1&&world[10]==-1&&world[15]==1
                 &&world[1]==0&&world[2]==0&&world[3]==0&&world[4]==0&&world[6]==0&&world[7]==0&&world[8]==0&&world[9]==0&&world[11]==0
-                &&world[12]==0&&world[13]==0&&(world[14]==100||world[14]==135)){
+                &&world[12]==0&&world[13]==0&&(world[14]==100||world[14]==135||world[14]==150)){
                 const auto order=field<uint32_t>(item,0x28);
                 // Native contextual button/action icons are layer 52. Layer 50
                 // contains destination letters and distances and stays hidden.
                 const bool contextAction=order==52;
-                const bool front=dot(rotate(executing.panel.orientation,{0,0,1}),executing.eyePosition-executing.panel.position)>0.005f;
-                if((!contextAction&&(order<146||order>148))||!executing.panelTracked||!front){++suppressedDraws;return 0;}
+                // The native equipment carousel has its own layout camera at
+                // Z=150. Its cards, tabs and description are orders 133..136;
+                // the similarly numbered Z=100 layers are unrelated overlays.
+                const bool equipmentPicker=world[14]==150&&order>=133&&order<=136;
+                if((!contextAction&&!equipmentPicker&&(order<146||order>148))||!executing.panelTracked||(!equipmentPicker&&!executing.panelVisible)){
+                    ++suppressedDraws;
+                    if((contextAction||equipmentPicker||(order>=146&&order<=148))&&executing.eye.eye<2)++hiddenPanelByEye[executing.eye.eye];
+                    return 0;
+                }
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
-                const auto panel=contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
-                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,1.2f,0.675f,
-                    contextAction?.04f:.72f,contextAction?-.52f:-.70f);
+                const auto panel=equipmentPicker?executing.picker:
+                    contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
+                const float layoutWidth=equipmentPicker?.7f:1.2f;
+                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
+                    equipmentPicker?0.f:contextAction?.04f:.72f,equipmentPicker?0.f:contextAction?-.52f:-.70f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));
                     const auto result=originalNode(state,item);
                     std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
+                    if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
                     return result;
                 }
                 // A failed wrist projection must not reintroduce a face HUD.
@@ -174,7 +185,14 @@ std::optional<bool> nativeMenuOpen() noexcept {
     return next!=0;
 }
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const HeadCameraSample& rig){
-    producing={eye,camera,view,rig.wristPanel,rig.wristPanelTracked,nativeEyePose(rig.nativePose,rig.headPose,eye.view.pose).position};
+    const std::array<Pose,2> eyes{nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),
+                                nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose)};
+    // Keep status flat along the forearm, but unfold the larger native picker
+    // above that wrist, facing the source head. Both eyes use this same pose.
+    const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
+    const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,{0,.16f,-.03f})};
+    producing={eye,camera,view,rig.wristPanel,picker,rig.wristPanelTracked,
+               rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes)};
 }
 void clearUiRenderSource() noexcept {producing={};}
 bool applyUiEyeProjection(float* output) noexcept {
@@ -204,6 +222,8 @@ void reportUiRenderer(std::ostream& out){
        <<",\"joined\":"<<joined.load()<<",\"projection_patched\":"<<patched.load()<<",\"camera_mismatch\":"<<cameraMismatch.load()
        <<",\"view_restored\":"<<viewMismatch.load()<<",\"spatial_draws\":"<<spatialDraws.load()<<",\"suppressed_draws\":"<<suppressedDraws.load()
        <<",\"expired\":"<<expired.load()<<",\"overflow\":"<<overflow.load()
+       <<",\"spatial_by_eye\":["<<spatialByEye[0].load()<<','<<spatialByEye[1].load()<<']'
+       <<",\"hidden_panel_by_eye\":["<<hiddenPanelByEye[0].load()<<','<<hiddenPanelByEye[1].load()<<']'
        <<",\"pending\":"<<pending.size()<<",\"node_calls\":"<<nodeCalls.load()<<",\"nodes\":[";
     for(size_t i=0;i<nodes.size();++i){const auto& n=nodes[i];if(i)out<<',';
         out<<"{\"name\":"<<std::quoted(n.name)<<",\"node\":"<<n.node<<",\"camera\":"<<n.camera<<",\"color\":"<<n.color
