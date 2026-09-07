@@ -90,7 +90,34 @@ int main(){
     const auto savedHeadView=firstView;
     auto mismatchedCamera=lowered;mismatchedCamera.position.z+=1;
     expect(!firstPerson.resolve(11,mismatchedCamera,110).applied&&firstPerson.status().reason==HeadCameraStop::playerHeadUnavailable,
-           "unmatched camera generation cancels instead of attaching an unrelated player pose");
+           "unmatched camera generation stops instead of attaching an unrelated player pose");
+    const auto menuActivation=firstPerson.status().activation;
+    expect(!firstPerson.active()&&!firstPerson.status().pending&&firstPerson.status().awaitingPlayer,
+           "missing player publication exposes native menu pixels and controls while retaining VR intent");
+    firstPerson.track(Pose{{},{0.3f,0.1f,-0.1f}},true,120);
+    firstPerson.publishPlayerHead(12,23,lowered,playerRoot,headBone,120);
+    expect(!firstPerson.resolve(12,lowered,120).applied&&firstPerson.status().awaitingPlayer,
+           "an unrelated camera and actor cannot resume VR after a menu");
+    firstPerson.publishPlayerHead(11,23,lowered,playerRoot,headBone,120);
+    expect(!firstPerson.resolve(11,lowered,120).applied&&firstPerson.status().awaitingPlayer,
+           "recycled camera address cannot attach VR to a different player owner");
+    firstPerson.publishPlayerHead(11,22,lowered,playerRoot,headBone,120);
+    const auto resumedPlayer=firstPerson.resolve(11,lowered,120);
+    expect(resumedPlayer.applied&&!firstPerson.status().awaitingPlayer
+        &&firstPerson.status().activation==menuActivation+1
+        &&same(resumedPlayer.nativePose.position,{499.8f,300.4f,1300.1f}),
+           "the same live player resumes automatically with original head origin and a fresh eye generation");
+    firstPerson.resolve(11,mismatchedCamera,120);firstPerson.toggle();
+    expect(!firstPerson.status().awaitingPlayer&&!firstPerson.active(),"manual disable cancels automatic menu return");
+    expect(!firstPerson.resolve(11,lowered,120).applied,"fresh gameplay cannot undo a manual VR disable");
+    firstPerson.toggle();firstPerson.resolve(11,lowered,120);
+    firstPerson.setNativeMenuOpen(true);
+    expect(!firstPerson.resolve(11,lowered,120).applied&&firstPerson.status().awaitingPlayer,
+           "iDroid keeps native menu pixels even while the same player head continues to publish");
+    firstPerson.setNativeMenuOpen(false);
+    expect(firstPerson.resolve(11,lowered,120).applied,"closing the native iDroid state restores the same tracked player");
+    firstPerson.setNativeMenuOpen(true);firstPerson.toggle();firstPerson.setNativeMenuOpen(false);
+    expect(!firstPerson.resolve(11,lowered,120).applied,"manual disable inside iDroid prevents automatic return");
     expect(same(savedHeadView.nativePose.position,{499.9f,300.4f,1300.1f}),"published player-eye frame remains immutable");
     firstPerson.track({},true,300);firstPerson.toggle();
     expect(!firstPerson.resolve(11,lowered,300).applied,"stale player head cannot survive a fresh headset sample");
@@ -135,6 +162,18 @@ int main(){
                                       {Pose{{},{0.032f,0,0}},EyeFov{-0.7f,0.7f,0.7f,-0.7f}}}};
     ControllerFrame hands;hands.referenceEpoch=1;hands.predictedXrTime=9000;
     hands.hands[1]={Pose{{},{0.2f,-0.3f,-0.4f}},Pose{{},{0.2f,-0.2f,-0.5f}},true,true};
+    HeadCamera menuEpoch;menuEpoch.configure(true,1,true);
+    auto menuHands=hands;
+    menuEpoch.trackStereo({},rigEyes,true,100,menuHands);
+    menuEpoch.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,100);
+    menuEpoch.toggle();menuEpoch.resolve(11,thirdPerson,100);menuEpoch.setNativeMenuOpen(true);
+    menuHands.referenceEpoch=2;menuHands.predictedXrTime=10000;
+    menuEpoch.trackStereo({},rigEyes,true,110,menuHands);
+    expect(menuEpoch.status().awaitingPlayer&&!menuEpoch.status().pending&&!menuEpoch.active(),
+           "a reference-space change inside iDroid keeps native menu pixels available");
+    menuEpoch.setNativeMenuOpen(false);
+    menuEpoch.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,110);
+    expect(menuEpoch.resolve(11,thirdPerson,110).applied,"iDroid can return after a reference-space change");
     handsCamera.trackStereo({},rigEyes,true,100,hands);handsCamera.toggle();
     const auto joinedHands=handsCamera.resolve(1,nativeCamera,100);
     expect(joinedHands.applied&&joinedHands.controllers.hands[1].gripTracked&&joinedHands.controllers.predictedXrTime==9000,

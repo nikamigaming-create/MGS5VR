@@ -39,6 +39,8 @@ std::atomic_uint64_t spatialDraws{};
 std::atomic_uint64_t suppressedDraws{};
 std::filesystem::path settings;
 bool spatialEnabled{};
+bool menuReaderVerified{};
+std::atomic_int menuState{-1};
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
 std::string nodeName(uintptr_t node){
@@ -138,6 +140,11 @@ void installUiRenderer(uintptr_t moduleBase){
         if(!read(moduleBase+hook.rva,bytes.data(),hook.size)||std::memcmp(bytes.data(),hook.signature,hook.size))throw std::runtime_error("Native UI renderer signature mismatch");
     }
     base=moduleBase;
+    constexpr std::array<unsigned char,8> menuGetter{0x48,0x8b,0x05,0x11,0x18,0x39,0x02,0xc3};
+    constexpr std::array<unsigned char,8> menuOpen{0x80,0x79,0x20,0,0x0f,0x95,0xc0,0xc3};
+    std::array<unsigned char,8> getterBytes{},openBytes{};
+    menuReaderVerified=read(base+0x85fd00,getterBytes.data(),getterBytes.size())&&getterBytes==menuGetter
+        &&read(base+0x934110,openBytes.data(),openBytes.size())&&openBytes==menuOpen;
     std::array<wchar_t,32768> executable{};
     if(GetModuleFileNameW(nullptr,executable.data(),static_cast<DWORD>(executable.size()))){
         settings=std::filesystem::path(executable.data()).parent_path()/L"mgs5vr.ini";
@@ -151,6 +158,20 @@ void installUiRenderer(uintptr_t moduleBase){
         throw std::runtime_error("Cannot enable native UI hooks");
     }
     enabled.store(true);log("Native UI worker lineage installed; experimental left-forearm weapon HUD="+std::to_string(spatialEnabled));
+}
+std::optional<bool> nativeMenuOpen() noexcept {
+    if(!enabled.load()||!menuReaderVerified)return {};
+    uintptr_t system{},type{},terminal{};uint8_t open{};
+    if(!read(base+0x2bf1518,&system,sizeof(system)))return {};
+    if(system){
+        if(!read(system,&type,sizeof(type))||type!=base+0x2242d78
+            ||!read(system+0x7c0,&terminal,sizeof(terminal)))return {};
+        if(terminal&&(!read(terminal,&type,sizeof(type))||type!=base+0x22705a8
+            ||!read(terminal+0x20,&open,sizeof(open))))return {};
+    }
+    const int next=open!=0;
+    if(menuState.exchange(next)!=next)try{log("Native iDroid menu open="+std::to_string(next));}catch(...){}
+    return next!=0;
 }
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const HeadCameraSample& rig){
     producing={eye,camera,view,rig.wristPanel,rig.wristPanelTracked,nativeEyePose(rig.nativePose,rig.headPose,eye.view.pose).position};

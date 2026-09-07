@@ -7,6 +7,8 @@
 
 namespace mgs5vr {
 void installUiRenderer(uintptr_t moduleBase);
+// Exact native IsMbDvcTerminalOpened reader; no UI state is written.
+std::optional<bool> nativeMenuOpen() noexcept;
 // Producer scope is the native scene invocation; the UI may execute on a worker.
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,
                        const HeadCameraSample& rig);

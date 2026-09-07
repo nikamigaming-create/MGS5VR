@@ -292,7 +292,8 @@ struct Session {
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
             controllerFrame.supportRequested=mapped.supportRequested;
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
-        }else rigControls.reset();
+        }else if(nativeStatus.awaitingPlayer)rigControls.suspend();
+        else rigControls.reset();
         gamepadMailbox().publish(pad,left||right,steadyMilliseconds());
         priorRecenter=center;priorFocused=true;
     }
@@ -395,7 +396,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
     const std::array<Screen*,2> eyeScreens{&leftEye,&rightEye};
     std::array<EyeFrame,2> eyeFrames{};
     uint64_t eyeEpoch{},projectionFrames{};
-    Pose screenPose{};bool anchored=false;
+    Pose screenPose{};bool anchored=false,menuReturnPending=false;
     const auto start=std::chrono::steady_clock::now();
     bool closing=false;
     std::chrono::steady_clock::time_point closeDeadline{};
@@ -448,6 +449,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         if(fresh)++stats.sourceFrames;
         if(eyeEpoch!=consumer.frame().epoch){eyeFrames={};eyeEpoch=consumer.frame().epoch;}
         const auto cameraStatus=headCamera().status();
+        if(cameraStatus.awaitingPlayer)menuReturnPending=true;
+        else if(!cameraStatus.active&&!cameraStatus.pending)menuReturnPending=false;
         if(frame.shouldRender&&consumer.frame().sequence){
             if(!cameraStatus.active&&!cameraStatus.pending){screen.upload(consumer.texture(),consumer.frame());eyeFrames={};}
             else if(cameraStatus.active&&!cameraStatus.suspended){
@@ -478,6 +481,12 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             if(cameraStatus.active||cameraStatus.pending){
                 if(cameraStatus.active&&!cameraStatus.suspended&&readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds())){
                     layer=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);end.layerCount=1;end.layers=&layer;++projectionFrames;
+                    menuReturnPending=false;
+                }else if(menuReturnPending&&cameraStatus.active&&!cameraStatus.suspended&&anchored&&screen.ready){
+                    // Keep the last native menu quad until this return has a
+                    // complete new stereo pair. Never use old gameplay eyes or
+                    // fall back to a screen after gameplay tracking is lost.
+                    end.layerCount=1;end.layers=&layer;++stats.submittedScreens;
                 }
             }else if(anchored&&screen.ready){end.layerCount=1;end.layers=&layer;++stats.submittedScreens;}
         }

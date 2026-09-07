@@ -5,6 +5,40 @@ headset acceptance. The complete [Touch control list](CONTROLS.md) describes the
 current input path. Optical zoom is reserved: aiming stays in the native stereo
 scene, using the equipped weapon's actual sights. No binocular/scope quad remains.
 
+## Automatic native menu return
+
+DLL `C367CC6FABCCA6254353D8B5F1571A9630A08ADC841F6CFE1BC8CC3CA60C6EC1`
+remembers the user's VR request while the native player camera stops publishing
+during pause. iDroid continues publishing that camera, so it additionally uses
+the native terminal's open state, identified through `IsMbDvcTerminalOpened`.
+The reader checks the getter/open-function signatures and both object types;
+it only reads native state. It does not infer map state from the player's
+first-person/subject flag.
+
+Returning requires the previously accepted camera and player owner, preserves
+the HMD origin, and starts a new eye-image activation. The last native menu image
+remains on the screen until a fresh complete stereo pair is available. Tracking
+loss during active gameplay still suspends submission instead of switching to a
+screen. Manual VR-off cancels automatic return. Menu controls remain native;
+gameplay controls require a neutral release after return.
+
+Both final eyes showed pause/resume and iDroid close returning to tracked VR
+without another toggle. Trigger map zoom and grip tab switching worked. Closing
+the map with a zoom trigger still held returned without a visible attack in the
+mounted check. Manual VR-off inside iDroid stayed in theatre after closing it.
+A subsequent explicit toggle and horse dismount worked. All five local suites
+passed, including same-owner return, wrong-owner refusal, manual cancellation,
+iDroid with fresh head publications, and reference-space changes inside a menu.
+
+Private `artifacts/menu-return-15s/simulator.mp4` is 14.879 seconds and 1,204,950
+bytes, silent H.264 of the left final composited eye. All 54 distinct decoded
+frames were reviewed. It shows VR -> pause -> VR -> iDroid -> VR. No fully black
+frame or capture/action error was found. Capture cadence was 3.556 images/second,
+maximum response gap 468 ms. No raw frame sequence was archived. These samples
+do not prove physical comfort or rule out shorter transition gaps. Native horse/
+arm dithering, blue scene-cue streaks, close garment presentation, interactive
+wrist menus and all cinematic/loading/player-replacement transitions remain open.
+
 ## Prone ground-contact follow-up
 
 The native ground-IK collision query reproduced the hillside surface at the
@@ -293,7 +327,7 @@ locally; private media and game data are excluded from the public source.
 - Every weapon/item, tracked throws, CQC, scoped modes and mounted weapons.
 - Damage feedback, subtitles and contextual prompts: flat gameplay UI is
   suppressed, and these do not yet have a spatial replacement.
-- Interactive wrist iDroid, pointers and automatic menu/cinematic transitions.
+- Interactive wrist iDroid, pointers and complete cinematic/loading transitions.
 - Full stereo/culling/temporal acceptance and reliable native runtime shutdown.
 
 The new HUD/control path is ready for a bounded experimental headset comparison;

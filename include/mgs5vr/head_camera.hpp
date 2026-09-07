@@ -5,7 +5,7 @@
 
 namespace mgs5vr {
 enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch };
-struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{}; };
+struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{}; };
 // All poses use the same OpenXR LOCAL space and predicted display time as
 // the eyes. Grip is the attachment frame; aim is a separate pointing frame.
 struct TrackedHand {
@@ -55,6 +55,7 @@ public:
     void trackStereo(Pose head,const std::array<EyeView,2>& views,bool validTracking,uint64_t milliseconds,
                      ControllerFrame controllers={});
     void toggle();
+    void setNativeMenuOpen(bool open);
     void cancel(HeadCameraStop reason=HeadCameraStop::manual);
     HeadCameraSample resolve(uintptr_t camera,Pose nativePose,uint64_t milliseconds);
     // Samples the steady clock while holding the same lock as the tracked pose.
@@ -70,14 +71,17 @@ private:
     HeadCameraSample resolveLocked(uintptr_t camera,Pose nativePose,uint64_t milliseconds,bool useRig=true);
     void cancelLocked(HeadCameraStop reason);
     void suspendLocked(HeadCameraStop reason);
+    void awaitPlayerLocked();
     mutable std::mutex mutex_;
     Pose head_{}, origin_{};
-    uintptr_t camera_{};
+    uintptr_t camera_{},playerOwner_{};
     uint64_t time_{},sequence_{},activation_{};
     float units_{1};
     bool enabled_{},tracking_{},pending_{},active_{};
     bool stereoTracking_{};
     bool suspended_{};
+    bool awaitingPlayer_{};
+    bool nativeMenuOpen_{};
     std::array<EyeView,2> views_{};
     ControllerFrame controllers_{};
     struct RigFrame { uintptr_t camera{},owner{}; Pose sourceCamera{}; HeadCameraSample sample{}; } rig_;

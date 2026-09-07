@@ -1,6 +1,9 @@
 # Development handoff - 2026-09-06
 
-The latest installed build adds native collision contact for the arms, fixing
+The latest installed build adds automatic iDroid/pause screen transitions and
+same-player return to VR. Map zoom/tab navigation, both final eyes, held-trigger
+return and the manual override were checked. A 14.879-second menu clip contains
+54 reviewed frames and no black captures. This slice retains native collision contact for the arms, fixing
 the reproduced prone hands going below the hillside. Both final eyes and a
 compact 14.785-second clip were inspected. The full arm/garment gate stays open.
 It retains context-action icons beside the left forearm, checked through horse
@@ -26,12 +29,13 @@ physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
 - Right grip readies, right trigger fires, left grip supports, B reloads.
   Left trigger plus left-stick direction selects equipment. Zoom is reserved;
   there is no native scope/binocular screen transition in tracked VR.
-- Full menus use the manual large-screen toggle and native controls. Map zoom,
-  tab navigation, close, pause and return to VR were exercised.
+- iDroid and pause automatically use the large screen and native controls. Map
+  zoom, tab navigation, close, pause and automatic return to VR were exercised.
+  Manual VR-off remains respected; held gameplay inputs require a neutral release.
 - All five local suites passed. CI builds all targets and runs four non-GPU suites.
 
 Local DLL SHA256:
-`F3A1D9E0336938360C05EE5789A053F48433CD0F61D54EB851ECC7B4EA5989AA`.
+`C367CC6FABCCA6254353D8B5F1571A9630A08ADC841F6CFE1BC8CC3CA60C6EC1`.
 The last physical-test rollback is retained locally with DLL SHA256
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
 No game executable, archives or saves were patched. Installation hashes were

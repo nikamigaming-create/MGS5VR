@@ -74,12 +74,14 @@ bionic arm or item does not establish tracked throwing, CQC or item-use support.
 | Pause | Hold left Menu for at least 0.55 seconds |
 | Recenter the large screen | Both grips + right-stick click |
 
-For the complete native menu controls, release right grip and toggle to the large
-screen before opening the menu. Then A confirms, B goes back, sticks navigate, grips act as LB/RB, and
-triggers retain LT/RT. On the map, triggers zoom, right-stick click changes zoom
-step and Y switches MAP/NAV. Close with B, then use left grip + left-stick click
-to return to tracked VR. This deliberate menu transition does not change aiming
-into a screen view.
+iDroid and pause automatically use the large screen. **A** confirms, **B** goes
+back, sticks navigate, grips act as LB/RB, and triggers retain LT/RT. On the map,
+triggers zoom, right-stick click changes zoom step and Y switches MAP/NAV.
+Close iDroid with **B**, or hold **Menu** again to unpause. Tracked VR returns
+automatically when the same player camera resumes. Release held controls once
+after returning before moving or firing. The manual VR toggle remains available;
+switching VR off inside a menu also disables automatic return. Other cinematic,
+loading and player-replacement transitions still need acceptance.
 
 ## Vehicle mapping under simulator development
 

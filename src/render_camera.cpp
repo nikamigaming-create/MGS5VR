@@ -279,6 +279,7 @@ __declspec(noinline) float* world(void* input,float* output){
     if(!enabled.load())return originalWorld(input,output);
     const auto source=reinterpret_cast<uintptr_t>(input);
     if(caller==base+0x437c64){
+        if(const auto menu=mgs5vr::nativeMenuOpen())mgs5vr::headCamera().setNativeMenuOpen(*menu);
         current={};current.camera=source-0xf0;
         primaryListener=0;primaryListenerSequence=0;
         std::array<float,8> native{};std::memcpy(native.data(),input,sizeof(native));
@@ -423,7 +424,8 @@ void reportRenderCamera(){
         evidence<<",\"pose\":";array(values(p.sample.nativePose));
         evidence<<",\"world\":";array(p.world);evidence<<",\"view\":";array(p.view);
         evidence<<",\"inverse_error\":"<<p.inverseError<<",\"active\":"<<(status.active?"true":"false")
-            <<",\"stop_reason\":"<<static_cast<unsigned>(status.reason)<<",\"cancellations\":"<<status.cancellations<<"}\n";
+            <<",\"stop_reason\":"<<static_cast<unsigned>(status.reason)<<",\"cancellations\":"<<status.cancellations
+            <<",\"awaiting_player\":"<<(status.awaitingPlayer?"true":"false")<<"}\n";
     }
     if(failureSnapshot.sequence){
         evidence<<"{\"event\":\"matrix_failure\",\"sequence\":"<<failureSnapshot.sequence<<",\"inverse_error\":"<<failureSnapshot.inverseError

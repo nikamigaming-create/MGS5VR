@@ -19,6 +19,11 @@ the hands above the slope in the reproduced prone failure. Its 14.785-second
 SIM clip is 1.42 MB, with 51 reviewed frames at 3.386 captures/second. Other
 terrain, close garment/hand presentation and physical fit remain open.
 
+iDroid and pause now open on the native menu screen and return automatically to
+tracked VR. Map zoom, tab switching, both-eye return and the manual override were
+checked in SIM. The 14.879-second, 1.20 MB menu clip has 54 reviewed frames and no
+black captures. This does not establish all cinematic/loading transitions.
+
 An initial **physical Quest 3 combat run** is now recorded and reviewed. The user
 reported good overall playability and requested better arms and a less intrusive
 HUD. Movement, rifle fire/reload and manual theatre/native transitions are visible;
@@ -37,6 +42,7 @@ slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation
 | Audio | Native primary and virtual listeners consume the source center-head pose; head rotation/lean and theatre restoration observed in SIM | Physical localization, output/HRTF and occlusion checks |
 | Effects | Native graphics UI saved DOF Disable, motion blur Off and post-processing Off; camera shake Off persisted on reopening settings | Verify remaining cinematic effects and isolate any shared per-eye temporal resources |
 | Save | Continue/Resume loads the existing checkpoint and equipped rifle | Automatic startup state adapter |
+| Menus | iDroid/pause switch to the native screen; same-player return restores VR, with held-input release protection | Every menu branch, interactive wrist iDroid and player-replacement transitions |
 | Cinematics | Default large-screen theatre preview and native game controls | Automatic cinematic classification and complete skip coverage |
 
 ## Build and native runtime evidence
@@ -49,8 +55,8 @@ GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
 Current simulator build SHA256:
-`02B38141BC4E444D2A73FFCF2ECBFFCFE376C7B3FC1ACEDD8D3EF0178DDC9137`.
-It adds player body/head shadow preservation to the projection/listener updates in the
+`C367CC6FABCCA6254353D8B5F1571A9630A08ADC841F6CFE1BC8CC3CA60C6EC1`.
+It adds automatic native menu return to the arm, shadow and projection/listener updates in the
 [SIM review](SIM_HUD_REVIEW.md). The initial physical run used
 `4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`,
 with the later physical rollback retained as

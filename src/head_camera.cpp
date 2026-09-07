@@ -29,9 +29,9 @@ std::optional<Vec3> playerHeadPosition(const std::array<float,16>& root,const st
 }
 void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     if(!std::isfinite(units)||units<=0)throw std::invalid_argument("Camera scale must be finite and positive");
-    std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=false;camera_=0;reason_=HeadCameraStop::none;
+    std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=awaitingPlayer_=false;camera_=playerOwner_=0;reason_=HeadCameraStop::none;
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=0;suspended_=false;
-    controllers_={};rig_={};
+    controllers_={};rig_={};nativeMenuOpen_=false;
 }
 bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
                                   const std::array<float,16>& root,const std::array<float,16>& head,uint64_t time){
@@ -63,8 +63,9 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
     tracking_=tracking_&&dot(separation,separation)>0.0001f&&dot(separation,separation)<0.04f;
     stereoTracking_=tracking_;
     if(tracking_){
-        if(controllers_.referenceEpoch&&controllers.referenceEpoch!=controllers_.referenceEpoch&&(active_||pending_)){
-            active_=false;pending_=true;camera_=0;
+        if(controllers_.referenceEpoch&&controllers.referenceEpoch!=controllers_.referenceEpoch&&(active_||pending_||awaitingPlayer_)){
+            if(!awaitingPlayer_){active_=false;pending_=true;}
+            camera_=playerOwner_=0;
         }
         for(auto& hand:controllers.hands){
             hand.gripTracked=controllers.predictedXrTime>0&&controllers.referenceEpoch&&hand.gripTracked&&valid(hand.grip);
@@ -78,12 +79,25 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
 void HeadCamera::toggle(){
     std::lock_guard lock(mutex_);
     if(!enabled_)return;
-    if(active_||pending_)cancelLocked(HeadCameraStop::manual);
+    if(active_||pending_||awaitingPlayer_)cancelLocked(HeadCameraStop::manual);
     else {pending_=true;reason_=HeadCameraStop::none;}
 }
+void HeadCamera::setNativeMenuOpen(bool open){
+    std::lock_guard lock(mutex_);nativeMenuOpen_=open;
+    if(open)awaitPlayerLocked();
+}
 void HeadCamera::cancelLocked(HeadCameraStop reason){
-    if(active_||pending_){reason_=reason;++cancellations_;}
-    active_=pending_=suspended_=false;camera_=0;rig_={};
+    if(active_||pending_||awaitingPlayer_){reason_=reason;++cancellations_;}
+    active_=pending_=suspended_=awaitingPlayer_=false;camera_=playerOwner_=0;rig_={};
+}
+void HeadCamera::awaitPlayerLocked(){
+    // A native menu/cinematic has no matching player-head publication. Keep
+    // native pixels and normal menu input available, but remember the user's
+    // VR request. Resume only the exact camera/owner previously accepted.
+    if(active_||pending_||awaitingPlayer_){
+        awaitingPlayer_=true;active_=pending_=suspended_=false;rig_={};
+        reason_=HeadCameraStop::playerHeadUnavailable;
+    }
 }
 void HeadCamera::suspendLocked(HeadCameraStop reason){
     if(active_||pending_){suspended_=true;reason_=reason;}
@@ -91,7 +105,7 @@ void HeadCamera::suspendLocked(HeadCameraStop reason){
 void HeadCamera::cancel(HeadCameraStop reason){std::lock_guard lock(mutex_);cancelLocked(reason);}
 bool HeadCamera::available() const {std::lock_guard lock(mutex_);return enabled_;}
 bool HeadCamera::active() const {std::lock_guard lock(mutex_);return active_;}
-HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_,pending_,reason_,cancellations_,activation_,suspended_};}
+HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_,pending_,reason_,cancellations_,activation_,suspended_,awaitingPlayer_};}
 HeadCameraSample HeadCamera::resolve(uintptr_t camera,Pose nativePose,uint64_t time){
     std::lock_guard lock(mutex_);
     return resolveLocked(camera,nativePose,time);
@@ -119,7 +133,8 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(!tracking_){suspendLocked(HeadCameraStop::trackingLost);return result;}
     if(time<time_){cancelLocked(HeadCameraStop::clockMismatch);return result;}
     if(time-time_>150){suspendLocked(HeadCameraStop::staleTracking);return result;}
-    if(requirePlayerHead_&&(pending_||active_)){
+    if(nativeMenuOpen_){awaitPlayerLocked();return result;}
+    if(requirePlayerHead_&&(pending_||active_||awaitingPlayer_)){
         const auto same=[](Pose a,Pose b){
             return a.position.x==b.position.x&&a.position.y==b.position.y&&a.position.z==b.position.z
                 &&a.orientation.x==b.orientation.x&&a.orientation.y==b.orientation.y
@@ -128,11 +143,17 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         const auto found=std::find_if(playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){
             return p.camera==camera&&p.sequence&&time>=p.time&&time-p.time<=150&&same(p.sourceCamera,nativePose);
         });
-        if(found==playerHeads_.end()){cancelLocked(HeadCameraStop::playerHeadUnavailable);return result;}
+        if(found==playerHeads_.end()){awaitPlayerLocked();return result;}
+        if(awaitingPlayer_){
+            if((camera_&&camera_!=camera)||(playerOwner_&&playerOwner_!=found->owner))return result;
+            if(!camera_)origin_=head_;
+            camera_=camera;playerOwner_=found->owner;awaitingPlayer_=false;active_=true;
+            ++activation_; // No eye image from before the menu may be reused.
+        }
         nativePose.position=found->position;
         result.playerSequence=found->sequence;result.playerOwner=found->owner;result.playerHead=found->position;
     }
-    if(pending_){camera_=camera;origin_=head_;pending_=false;active_=true;++activation_;}
+    if(pending_){camera_=camera;playerOwner_=result.playerOwner;origin_=head_;pending_=false;active_=true;++activation_;}
     if(!active_)return result;
     if(camera_!=camera){cancelLocked(HeadCameraStop::cameraChanged);return result;}
     if(useRig&&rig_.camera){
