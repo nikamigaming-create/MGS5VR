@@ -22,6 +22,31 @@ int main(){
     expect(near(ndc(0,std::tan(asymmetric.up)*3,3).y,1),"upper eye frustum boundary projects to upper edge");
     expect(near(ndc(0,std::tan(asymmetric.down)*3,3).y,-1),"lower eye frustum boundary projects to lower edge");
     expect(near(projection[10],-0.0002f)&&near(projection[14],0.1f),"eye optics preserve native depth convention");
+    const EyeFov opticalLeft{-.9424778f,.6981317f,.8726646f,-.8552113f};
+    const EyeFov opticalRight{-opticalLeft.right,-opticalLeft.left,opticalLeft.up,opticalLeft.down};
+    const auto completeFov=enclosingEyeFov(opticalLeft);
+    expect(completeFov&&near(completeFov->left,-completeFov->right)&&near(completeFov->up,-completeFov->down),
+        "lighting coverage has a centered enclosing render field");
+    const auto cropLeft=eyeImageRegion(*completeFov,opticalLeft,1280,720);
+    const auto cropRight=eyeImageRegion(*completeFov,opticalRight,1280,720);
+    expect(cropLeft&&cropRight&&cropLeft->x==0&&cropRight->x>0&&cropLeft->width==cropRight->width,
+        "left and right runtime optical centers select opposite texture regions");
+    const auto rayFromPixel=[](EyeFov f,double x,double y,double w,double h){
+        return Vec3{float(std::tan(f.left)+(std::tan(f.right)-std::tan(f.left))*x/w),
+            float(std::tan(f.up)-(std::tan(f.up)-std::tan(f.down))*y/h),-1};};
+    for(const auto& region:{*cropLeft,*cropRight})for(float u:{0.f,.13f,.5f,1.f})for(float v:{0.f,.37f,1.f}){
+        const auto sourceRay=rayFromPixel(*completeFov,region.x+u*region.width,region.y+v*region.height,1280,720);
+        const auto displayedRay=rayFromPixel(region.fov,u,v,1,1);
+        expect(same(sourceRay,displayedRay),"cropped pixels retain their exact original angular ray");
+    }
+    expect(cropLeft->fov.left<=opticalLeft.left&&cropLeft->fov.right>=opticalLeft.right
+        &&cropLeft->fov.up>=opticalLeft.up&&cropLeft->fov.down<=opticalLeft.down,
+        "integer rounding covers every requested eye ray");
+    expect(!eyeImageRegion(opticalLeft,*completeFov,1280,720),"missing rendered coverage is rejected rather than stretched");
+    expect(!eyeImageRegion(*completeFov,opticalLeft,0,720),"zero-size eye cannot produce a projection region");
+    const auto sameSize=eyeImageRegion(opticalLeft,opticalLeft,1280,720);
+    expect(sameSize&&sameSize->x==0&&sameSize->y==0&&sameSize->width==1280&&sameSize->height==720,
+        "unchanged optics retain the full texture");
     const std::array<float,16> identityMatrix{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
     const EyeFov squareEye{-0.785398163f,0.785398163f,0.785398163f,-0.785398163f};
     const auto panelClip=[](const std::array<float,16>& m,float x,float y){
@@ -48,7 +73,7 @@ int main(){
     auto ortho=projection;ortho[11]=0;ortho[15]=1;
     expect(!setEyeProjection(ortho,asymmetric),"orthographic pass cannot be mistaken for scene projection");
     std::array<EyeFrame,2> pair{};
-    for(uint32_t n=0;n<2;++n)pair[n]={EyeView{Pose{{},{n?0.032f:-0.032f,0,0}},asymmetric},9,31,4,100,n,true,true};
+    for(uint32_t n=0;n<2;++n)pair[n]={EyeView{Pose{{},{n?0.032f:-0.032f,0,0}},asymmetric},9,31,4,100,n,true,true,asymmetric};
     expect(readyEyePair(pair,4,110),"both native eyes from one simulation and tracking transaction are eligible");
     pair[1].sourceSequence=10;
     expect(!readyEyePair(pair,4,110),"alternate-eye consecutive simulation frames are rejected");
@@ -59,6 +84,10 @@ int main(){
     pair[0].joined=true;
     expect(!readyEyePair(pair,5,110),"old activation cannot survive recenter");
     expect(!readyEyePair(pair,4,251),"stale eye images stop submission");
+    expect(readyEyePair(pair,4,400,500),"an already accepted pair can cover a bounded runtime stall with its original poses");
+    expect(!readyEyePair(pair,4,601,500),"presentation recovery never retains eyes beyond half a second");
+    expect(!readyEyePair(pair,5,400,500),"presentation recovery cannot cross activation generations");
+    expect(!readyEyePair(pair,4,400,501),"unbounded presentation retention is rejected");
     const auto l=nativeEyePose(Pose{{},{10,20,30}},Pose{},Pose{{},{-0.032f,0,0}});
     const auto r=nativeEyePose(Pose{{},{10,20,30}},Pose{},Pose{{},{0.032f,0,0}});
     expect(near(l.position.x,10.032f)&&near(r.position.x,9.968f),"same-frame eye offsets preserve runtime IPD in FOX camera axes");

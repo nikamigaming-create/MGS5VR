@@ -35,7 +35,7 @@ Game D3D11 Present, before real Present
 
 The producer never waits for the compositor. If the mailbox is occupied, it drops the new capture. The consumer retains valid pixels when the producer stops; XR event polling, tracking and frame submission run independently. Game immediate-context pipeline bindings are untouched. Resize/reset creates a new texture epoch; no backbuffer reference is retained across Present. Both devices must have the same adapter LUID. RGBA8/BGRA8 desktop output and a matching sRGB runtime format are required; HDR/color conversion and cross-GPU capture are unsupported.
 
-The default mode is a mono video surface in a stereo environment. Rendered cinematics and videos appear on that surface. The opt-in native scene mode uses the separate path below; automatic game-state switching is not implemented.
+The default mode is a mono video surface in a stereo environment. Rendered cinematics and videos appear on that surface. The opt-in native scene mode uses the separate path below. Native iDroid/pause can switch to the screen and return to the same player camera; complete cinematic/loading classification remains unfinished.
 
 ## Experimental native stereo pixel path
 
@@ -47,16 +47,28 @@ One native camera publication + one OpenXR tracking snapshot
   -> restore native matrices; keep one desktop present registration
   -> observe exact FinishCommandList identities for each eye copy
   -> observe native ExecuteCommandList for both copies
-  -> atomic shared texture array + immutable source eye poses/FOVs
-  -> XR consumer cache -> two eye swapchains -> projection layer
+  -> atomic shared texture array + immutable source eye poses/render FOVs/requested FOVs
+  -> XR consumer cache -> prepare both eye swapchains -> publish both
+  -> crop each eye to its requested optics -> projection layer
 ```
 
 Both draws use the same source, tracking and activation identifiers. Different native frames cannot be paired. The scene replay does not advance the game update, and checks that camera publication has not advanced during the pair. No alternate-eye scheduling, mono duplication, generated image or depth reconstruction is used. During active stereo, a present without a new complete pair retains the preceding stereo mailbox instead of replacing it with mono. The XR gate rejects missing, mismatched or stale pairs.
 
-The centered render FOV encloses each runtime view and is carried unchanged with
-its pixels into projection-layer submission. This removed the sampled screen-fixed
-sky rectangle. Native source/culling projection and shared temporal resources still
-need separate acceptance; wider render coverage alone does not prove those passes.
+The centered render FOV encloses each runtime view. The source metadata retains
+both this render FOV and the requested runtime FOV. Submission selects the latter's
+pixel region through `XrSwapchainSubImage.imageRect`; the submitted FOV describes
+that integer-rounded region exactly. The wider centered FOV is not submitted over
+the full image. Tests compare source pixel rays against projection rays across
+both crops. This removed the sampled sky rectangle in SIM; physical stereo,
+native source/culling projection and shared temporal resources remain unaccepted.
+
+New source pairs must be complete, from the current activation and no older than
+150 ms. Swapchain waits are nonblocking and both eyes must be ready before either
+new image is released. During runtime stalls only, an already accepted pair may
+be presented for up to 500 ms with its original poses/FOVs, while current head
+tracking is valid and the camera is active. This bounded presentation allowance
+does not admit stale new sources or relabel old pixels with current tracking.
+Empty and retained submissions and slow runtime stages are observable in the log.
 
 ## Native listener publication
 

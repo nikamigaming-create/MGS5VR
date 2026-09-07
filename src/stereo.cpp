@@ -26,6 +26,28 @@ bool valid(EyeFov f){
     return std::isfinite(f.left)&&std::isfinite(f.right)&&std::isfinite(f.up)&&std::isfinite(f.down)
         &&f.left<0&&f.right>0&&f.down<0&&f.up>0&&f.left>-1.56f&&f.right<1.56f&&f.down>-1.56f&&f.up<1.56f;
 }
+std::optional<EyeFov> enclosingEyeFov(EyeFov f){
+    if(!valid(f))return {};
+    const float x=std::max(-f.left,f.right),y=std::max(f.up,-f.down);
+    return EyeFov{-x,x,y,-y};
+}
+std::optional<EyeImageRegion> eyeImageRegion(EyeFov rendered,EyeFov requested,uint32_t width,uint32_t height){
+    if(!valid(rendered)||!valid(requested)||!width||!height||width>16384||height>16384
+        ||requested.left<rendered.left||requested.right>rendered.right
+        ||requested.down<rendered.down||requested.up>rendered.up)return {};
+    const double l=std::tan(double(rendered.left)),r=std::tan(double(rendered.right));
+    const double u=std::tan(double(rendered.up)),d=std::tan(double(rendered.down));
+    const auto pixelX=[&](float angle){return (std::tan(double(angle))-l)/(r-l)*width;};
+    const auto pixelY=[&](float angle){return (u-std::tan(double(angle)))/(u-d)*height;};
+    const int32_t x0=std::clamp(int32_t(std::floor(pixelX(requested.left))),0,int32_t(width));
+    const int32_t x1=std::clamp(int32_t(std::ceil(pixelX(requested.right))),0,int32_t(width));
+    const int32_t y0=std::clamp(int32_t(std::floor(pixelY(requested.up))),0,int32_t(height));
+    const int32_t y1=std::clamp(int32_t(std::ceil(pixelY(requested.down))),0,int32_t(height));
+    if(x1<=x0||y1<=y0)return {};
+    return EyeImageRegion{x0,y0,x1-x0,y1-y0,
+        {float(std::atan(l+(r-l)*x0/width)),float(std::atan(l+(r-l)*x1/width)),
+         float(std::atan(u-(u-d)*y0/height)),float(std::atan(u-(u-d)*y1/height))}};
+}
 bool setEyeProjection(std::array<float,16>& m,EyeFov f){
     if(!valid(f)||std::abs(m[11]-1)>0.00001f||std::abs(m[15])>0.00001f)return false;
     for(float v:m)if(!std::isfinite(v))return false;
@@ -42,14 +64,14 @@ Pose nativeEyePose(Pose nativeHead,Pose sourceHead,Pose sourceEye,float units){
     if(norm>0.5){q={static_cast<float>(q.x/norm),static_cast<float>(q.y/norm),static_cast<float>(q.z/norm),static_cast<float>(q.w/norm)};}
     return result;
 }
-bool readyEyePair(const std::array<EyeFrame,2>& eyes,uint64_t activation,uint64_t now){
+bool readyEyePair(const std::array<EyeFrame,2>& eyes,uint64_t activation,uint64_t now,uint64_t maximumAgeMs){
     // Both images must be drawn from one native scene/tracking transaction.
     // Consecutive game frames, including alternating-eye rendering, are rejected.
-    if(!activation||eyes[0].sourceSequence!=eyes[1].sourceSequence
+    if(!activation||!maximumAgeMs||maximumAgeMs>500||eyes[0].sourceSequence!=eyes[1].sourceSequence
         ||eyes[0].trackingSequence!=eyes[1].trackingSequence)return false;
     for(size_t n=0;n<eyes.size();++n){const auto& e=eyes[n];
         if(!e.projected||!e.joined||e.eye!=n||!e.sourceSequence||e.activation!=activation
-            ||!valid(e.view.pose)||!valid(e.view.fov)||now<e.sampleTime||now-e.sampleTime>150)return false;
+            ||!valid(e.view.pose)||!valid(e.view.fov)||!valid(e.displayFov)||now<e.sampleTime||now-e.sampleTime>maximumAgeMs)return false;
     }
     return true;
 }

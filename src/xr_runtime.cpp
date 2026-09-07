@@ -324,11 +324,11 @@ struct Screen {
     std::vector<XrSwapchainImageD3D11KHR> images;
     uint32_t width{},height{},pendingIndex{};
     DXGI_FORMAT sourceFormat{DXGI_FORMAT_UNKNOWN};
-    bool pending{},ready{};
+    bool pending{},waited{},ready{};
     FrameId copied{};
     explicit Screen(Session& s):session(s){}
     ~Screen(){reset();}
-    void reset(){if(handle)xrDestroySwapchain(handle);handle=XR_NULL_HANDLE;images.clear();pending=ready=false;copied={};}
+    void reset(){if(handle)xrDestroySwapchain(handle);handle=XR_NULL_HANDLE;images.clear();pending=waited=ready=false;copied={};}
     void create(D3D11_TEXTURE2D_DESC desc){
         reset();
         if(desc.Width>session.instance.properties.graphicsProperties.maxSwapchainImageWidth
@@ -352,26 +352,38 @@ struct Screen {
         xrCheck(xrEnumerateSwapchainImages(handle,count,&count,reinterpret_cast<XrSwapchainImageBaseHeader*>(images.data())),"Get XR D3D11 textures");
         log("Theatre swapchain "+std::to_string(width)+"x"+std::to_string(height));
     }
-    void upload(ID3D11Texture2D* source,FrameId id,uint32_t sourceSlice=0){
-        if(!source||!id.sequence)return;
+    bool prepare(ID3D11Texture2D* source,FrameId id,uint32_t sourceSlice=0){
+        if(!source||!id.sequence)return false;
         D3D11_TEXTURE2D_DESC desc{};source->GetDesc(&desc);
         if(sourceSlice>=desc.ArraySize)throw std::invalid_argument("Missing native eye texture slice");
         if(!handle||desc.Width!=width||desc.Height!=height||desc.Format!=sourceFormat||(copied.epoch!=id.epoch&&ready))create(desc);
-        if(ready&&copied==id)return;
+        if(ready&&copied==id)return true;
         if(!pending){
             XrSwapchainImageAcquireInfo ai{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-            xrCheck(xrAcquireSwapchainImage(handle,&ai,&pendingIndex),"Acquire XR image");pending=true;
+            xrCheck(xrAcquireSwapchainImage(handle,&ai,&pendingIndex),"Acquire XR image");pending=true;waited=false;
         }
-        XrSwapchainImageWaitInfo wait{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};wait.timeout=50'000'000;
+        if(waited)return true;
+        // A busy swapchain must not block controller/head sampling for two
+        // consecutive 50 ms eye waits. Keep the acquisition and retry next frame.
+        XrSwapchainImageWaitInfo wait{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};wait.timeout=0;
         const auto r=xrWaitSwapchainImage(handle,&wait);
-        if(r==XR_TIMEOUT_EXPIRED)return; // Retain acquisition and wait again on the next XR frame.
+        if(r==XR_TIMEOUT_EXPIRED)return false; // Retain acquisition for the next XR frame.
         xrCheck(r,"Wait XR image");
+        waited=true;
+        return true;
+    }
+    void publishPrepared(ID3D11Texture2D* source,FrameId id,uint32_t sourceSlice=0){
+        if(ready&&copied==id)return;
+        if(!pending||!waited)throw std::logic_error("XR image publication requires a waited acquisition");
         session.context->CopySubresourceRegion(images.at(pendingIndex).texture,0,0,0,0,source,sourceSlice,nullptr);
         session.context->Flush();
         checkHr(session.device->GetDeviceRemovedReason(),"XR device health");
         XrSwapchainImageReleaseInfo release{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
         xrCheck(xrReleaseSwapchainImage(handle,&release),"Release XR image");
-        pending=false;ready=true;copied=id;
+        pending=waited=false;ready=true;copied=id;
+    }
+    void upload(ID3D11Texture2D* source,FrameId id,uint32_t sourceSlice=0){
+        if(prepare(source,id,sourceSlice))publishPrepared(source,id,sourceSlice);
     }
 };
 struct EndFrameGuard {
@@ -400,12 +412,14 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
     TextureConsumer consumer(session.device.Get());Screen screen(session),leftEye(session),rightEye(session);RuntimeStats stats;
     const std::array<Screen*,2> eyeScreens{&leftEye,&rightEye};
     std::array<EyeFrame,2> eyeFrames{};
-    uint64_t eyeEpoch{},projectionFrames{};
+    uint64_t eyeEpoch{},projectionFrames{},emptyStereoFrames{},retainedStereoFrames{};
+    bool priorEmptyStereo{},layoutLogged{};
     Pose screenPose{};bool anchored=false,menuReturnPending=false;
     const auto start=std::chrono::steady_clock::now();
     bool closing=false;
     std::chrono::steady_clock::time_point closeDeadline{};
     while(!session.exiting){
+        const auto cycleStart=steadyMilliseconds();
         const auto now=std::chrono::steady_clock::now();
         if(!closing&&(stop.load()||(duration.count()>0&&now-start>=duration))){
             closing=true;closeDeadline=now+std::chrono::seconds(2);
@@ -422,6 +436,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         if(!session.running){std::this_thread::sleep_for(std::chrono::milliseconds(10));continue;}
         XrFrameWaitInfo wi{XR_TYPE_FRAME_WAIT_INFO};XrFrameState frame{XR_TYPE_FRAME_STATE};
         xrCheck(xrWaitFrame(session.handle,&wi,&frame),"Wait XR frame");
+        const auto waitDone=steadyMilliseconds();
         XrFrameBeginInfo bi{XR_TYPE_FRAME_BEGIN_INFO};xrCheck(xrBeginFrame(session.handle,&bi),"Begin XR frame");
         EndFrameGuard guard{session.handle,frame.predictedDisplayTime};++stats.frames;
         // Keep paired empty frames until STOPPING; do not publish more native input during exit.
@@ -447,6 +462,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             stats.firstHead=fromXr(head.pose);stats.firstViews=trackedViews;stats.haveViews=true;
         }
         headCamera().trackStereo(fromXr(head.pose),trackedViews,tracking&&stereoTracked&&session.focused,steadyMilliseconds(),session.controllerFrame);
+        const auto trackingDone=steadyMilliseconds();
         if(tracking&&(!anchored||session.recenterRequested)){
             screenPose=recenteredScreen(fromXr(head.pose),config.distanceMeters);anchored=true;session.recenterRequested=false;
         }
@@ -454,8 +470,9 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         auto channel=source.latest();
         if(channel&&!sameLuid(channel->adapterLuid,session.luid))throw std::runtime_error("Game and headset use different GPUs; shared capture is unavailable");
         const bool fresh=consumer.consume(channel);
+        const auto consumeDone=steadyMilliseconds();
         if(fresh)++stats.sourceFrames;
-        if(eyeEpoch!=consumer.frame().epoch){eyeFrames={};eyeEpoch=consumer.frame().epoch;}
+        if(eyeEpoch!=consumer.frame().epoch){eyeFrames={};eyeEpoch=consumer.frame().epoch;layoutLogged=false;}
         const auto cameraStatus=headCamera().status();
         if(cameraStatus.awaitingPlayer)menuReturnPending=true;
         else if(!cameraStatus.active&&!cameraStatus.pending)menuReturnPending=false;
@@ -464,12 +481,19 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             else if(cameraStatus.active&&!cameraStatus.suspended){
                 const auto metadata=consumer.eyes();
                 if(readyEyePair(metadata,cameraStatus.activation,steadyMilliseconds())){
-                    for(size_t n=0;n<2;++n){auto& target=*eyeScreens[n];target.upload(consumer.texture(),consumer.frame(),static_cast<uint32_t>(n));
-                        if(target.ready&&target.copied==consumer.frame())eyeFrames[n]=metadata[n];
+                    // Acquire/wait BOTH eyes before releasing either new image.
+                    // Backpressure retains the preceding complete pair instead
+                    // of advancing one swapchain and invalidating that pair.
+                    const bool leftReady=leftEye.prepare(consumer.texture(),consumer.frame(),0);
+                    const bool rightReady=rightEye.prepare(consumer.texture(),consumer.frame(),1);
+                    if(leftReady&&rightReady){
+                        for(size_t n=0;n<2;++n)eyeScreens[n]->publishPrepared(consumer.texture(),consumer.frame(),static_cast<uint32_t>(n));
+                        eyeFrames=metadata;
                     }
                 }
             }
         }
+        const auto uploadDone=steadyMilliseconds();
         XrCompositionLayerQuad quad{XR_TYPE_COMPOSITION_LAYER_QUAD};
         quad.space=session.local;quad.eyeVisibility=XR_EYE_VISIBILITY_BOTH;quad.pose=toXr(screenPose);
         quad.subImage.swapchain=screen.handle;
@@ -479,16 +503,33 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         std::array<XrCompositionLayerProjectionView,2> projectionViews{{{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW},{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW}}};
         XrCompositionLayerProjection projection{XR_TYPE_COMPOSITION_LAYER_PROJECTION};projection.space=session.local;
         projection.viewCount=2;projection.views=projectionViews.data();
+        bool regionsValid=true;
         for(size_t n=0;n<2;++n){auto& v=projectionViews[n];const auto& sourceEye=eyeFrames[n];
-            v.pose=toXr(sourceEye.view.pose);v.fov={sourceEye.view.fov.left,sourceEye.view.fov.right,sourceEye.view.fov.up,sourceEye.view.fov.down};
+            const auto region=eyeImageRegion(sourceEye.view.fov,sourceEye.displayFov,eyeScreens[n]->width,eyeScreens[n]->height);
+            if(!region){regionsValid=false;continue;}
+            v.pose=toXr(sourceEye.view.pose);v.fov={region->fov.left,region->fov.right,region->fov.up,region->fov.down};
             v.subImage.swapchain=eyeScreens[n]->handle;
-            v.subImage.imageRect.extent={static_cast<int32_t>(eyeScreens[n]->width),static_cast<int32_t>(eyeScreens[n]->height)};
+            v.subImage.imageRect.offset={region->x,region->y};
+            v.subImage.imageRect.extent={region->width,region->height};
+            if(!layoutLogged)log("XR eye "+std::to_string(n)+" region="+std::to_string(region->x)+","+std::to_string(region->y)
+                +","+std::to_string(region->width)+","+std::to_string(region->height)
+                +" fov="+std::to_string(region->fov.left)+","+std::to_string(region->fov.right)
+                +","+std::to_string(region->fov.up)+","+std::to_string(region->fov.down));
         }
+        if(regionsValid)layoutLogged=true;
         XrFrameEndInfo end{XR_TYPE_FRAME_END_INFO};end.displayTime=frame.predictedDisplayTime;end.environmentBlendMode=XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
         if(frame.shouldRender&&tracking){
             if(cameraStatus.active||cameraStatus.pending){
-                if(cameraStatus.active&&!cameraStatus.suspended&&readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds())){
+                // Runtime wait/end calls can stall beyond the native tracking
+                // freshness window. Reproject the last ACCEPTED complete pair
+                // for at most 500 ms while current headset tracking is valid.
+                // Keep its original poses/FOVs; never relabel old pixels with
+                // current tracking or use this allowance to accept new sources.
+                const bool recoverable=!cameraStatus.suspended||cameraStatus.reason==HeadCameraStop::staleTracking;
+                const bool freshEyes=readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds());
+                if(cameraStatus.active&&recoverable&&regionsValid&&readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds(),500)){
                     layer=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);end.layerCount=1;end.layers=&layer;++projectionFrames;
+                    if(!freshEyes||cameraStatus.suspended)++retainedStereoFrames;
                     menuReturnPending=false;
                 }else if(menuReturnPending&&cameraStatus.active&&!cameraStatus.suspended&&anchored&&screen.ready){
                     // Keep the last native menu quad until this return has a
@@ -499,8 +540,25 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             }else if(anchored&&screen.ready){end.layerCount=1;end.layers=&layer;++stats.submittedScreens;}
         }
         xrCheck(xrEndFrame(session.handle,&end),"Submit XR frame");guard.ended=true;
+        const auto cycleEnd=steadyMilliseconds();
+        if(cycleEnd-cycleStart>100)log("XR slow frame ms: wait="+std::to_string(waitDone-cycleStart)
+            +" tracking="+std::to_string(trackingDone-waitDone)+" consume="+std::to_string(consumeDone-trackingDone)
+            +" upload="+std::to_string(uploadDone-consumeDone)+" submit="+std::to_string(cycleEnd-uploadDone));
+        const bool emptyStereo=frame.shouldRender&&tracking&&cameraStatus.active&&!end.layerCount;
+        if(emptyStereo){
+            ++emptyStereoFrames;
+            if(!priorEmptyStereo){
+                const auto tick=steadyMilliseconds();
+                log("XR stereo waiting: suspended="+std::to_string(cameraStatus.suspended)+" regions="+std::to_string(regionsValid)
+                    +" source="+std::to_string(eyeFrames[0].sourceSequence)+","+std::to_string(eyeFrames[1].sourceSequence)
+                    +" age_ms="+std::to_string(tick>=eyeFrames[0].sampleTime?tick-eyeFrames[0].sampleTime:0)
+                    +" activation="+std::to_string(cameraStatus.activation));
+            }
+        }
+        priorEmptyStereo=emptyStereo;
         if(stats.frames%300==0)log("XR frames="+std::to_string(stats.frames)+" theatre submissions="+std::to_string(stats.submittedScreens)
-            +" projection submissions="+std::to_string(projectionFrames)+" captured frames="+std::to_string(stats.sourceFrames));
+            +" projection submissions="+std::to_string(projectionFrames)+" captured frames="+std::to_string(stats.sourceFrames)
+            +" empty stereo="+std::to_string(emptyStereoFrames)+" retained stereo="+std::to_string(retainedStereoFrames));
     }
     log("OpenXR frame loop stopped; releasing graphics resources");
     return stats;

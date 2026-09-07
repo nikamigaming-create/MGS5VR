@@ -240,9 +240,13 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     for(uint32_t eye=0;eye<2;++eye){
         saved.restore();eyeViewport=source.viewport;clipProjection=gpuProjection=false;
         drawingEye={source.pair.sample.views[eye],id,source.pair.sample.trackingSequence,status.activation,source.pair.sample.sampleTime,eye,false,false};
-        // Preserve the runtime's optical centers. Enlarging and recentering
-        // these fields passed static SIM checks but failed the physical
-        // Quest headset test. Use the earlier headset-tested projection path.
+        // Centered native rendering avoids the observed lighting coverage gap.
+        // Preserve the requested optical centers separately, then submit only
+        // their exact pixel region with its matching angular bounds.
+        drawingEye.displayFov=drawingEye.view.fov;
+        const auto renderFov=mgs5vr::enclosingEyeFov(drawingEye.displayFov);
+        if(!renderFov){complete=false;sceneFailure=4;break;}
+        drawingEye.view.fov=*renderFov;
         const auto native=mgs5vr::nativeEyePose(source.pair.sample.nativePose,source.pair.sample.headPose,drawingEye.view.pose);
         alignas(16) auto nativeValues=values(native);
         alignas(16) std::array<float,16> eyeWorld{},eyeView{};

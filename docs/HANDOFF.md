@@ -1,18 +1,26 @@
-# Development handoff - 2026-09-06
+# Development handoff - 2026-09-07
 
 Physical C367 headset acceptance failed: the user reported incompatible views
-across the entire landscape. The game was stopped. The centered-FOV change from
-dbd361a is rolled back; native draws and XR submission again use the unmodified
-runtime eye FOVs. The earlier sky rectangle may return. Do not call stereo fixed
-until the user confirms the replacement in the physical headset. Escaping blue
-triangles from marked people also remain a reported failure.
+across the entire landscape. The earlier full-image centered-FOV submission from
+dbd361a was rolled back. The current candidate renders centered coverage but crops
+it to each runtime eye's optics, submitting the exact FOV of the rounded crop.
+The large rectangle is absent in current SIM captures. Do not call physical
+stereo fixed until the user confirms the replacement in the headset. Escaping
+blue triangles from marked people remain visible.
 
 The attempted `70779290` physical rollback also FAILED: the user reported garbled
 arms/legs, low resolution and flat or inconsistent UI depth. Do not reinstall it
-as an accepted recovery. `DA0CAED9` is the separate runtime-FOV rollback candidate,
-with five local suites and six both-eye SIM endpoint poses checked. Its sky
-rectangle remains visible and its physical stereo check is unproven. No retained
-build currently has passing physical acceptance for the requested experience.
+as an accepted recovery. `DA0CAED9` was the separate runtime-FOV rollback candidate
+with a visible sky rectangle. The current installed `7BF543BE` candidate has five
+passing local suites and a reviewed 14.714-second wrist/sky clip. No retained build
+has passing physical acceptance for the requested experience. Read
+[SKY_CROP_REVIEW.md](SKY_CROP_REVIEW.md) before another headset test.
+
+The current SIM run uses native 1920x1080 rendering with clouds On and the existing
+1% checkpoint. An unused Meta Bedroom environment was consuming about 7.2 GB of
+dedicated GPU memory; stopping only that helper restored steady frame delivery.
+Leave unrelated applications alone. Use a per-process Meta runtime override and
+preserve the global physical OpenXR runtime. No physical test was launched here.
 
 The build retains automatic iDroid/pause screen transitions and
 same-player return to VR. Map zoom/tab navigation, both final eyes, held-trigger
@@ -49,7 +57,7 @@ physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
 - All five local suites passed. CI builds all targets and runs four non-GPU suites.
 
 Local DLL SHA256:
-`C367CC6FABCCA6254353D8B5F1571A9630A08ADC841F6CFE1BC8CC3CA60C6EC1`.
+`7BF543BE8E4EC882295AD8491DA6CCEB88B98BB878120DDBC54C0D6C371B170A`.
 The last physical-test rollback is retained locally with DLL SHA256
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
 No game executable, archives or saves were patched. Installation hashes were
@@ -135,7 +143,8 @@ acceptance is therefore open. Do not claim that every weapon or interaction work
 Use the existing Continue/Resume checkpoint and equipped gear, with the native
 Action Type controller layout. Use OpenXR semantic input; no Windows key/mouse or
 focus automation. The per-process simulator selection preserves the system Oculus
-runtime. The final simulator session was left paused. Do not silently start a
+runtime. The current simulator session remains in native gameplay with inputs
+released. Do not silently start a
 physical session while the user requested simulator work.
 
 The known forward rifle grip for simulator inspection is local position
@@ -151,7 +160,8 @@ Continue the user's [all-gameplay worklist](POLISH_CHECKLIST.md) on the existing
 checkpoint. The native lowered-weapon trigger now reaches attack/CQC/body-throw
 input, with passing contracts; target interactions remain unproven.
 
-Next work is prone ground contact, close-up garment clipping, physical anatomical fit, higher-cadence rapid
+Next work is the remaining blue marker/dither artifacts, close-up garment clipping,
+physical anatomical fit, broader prone ground contact, higher-cadence rapid
 motion and live tracking-loss checks, weapon impacts/obstruction and remaining
 weapon families. Spatial damage/subtitle/context feedback, interactive wrist
 menus, authored stereo optics and automatic cinematic handling remain unfinished.

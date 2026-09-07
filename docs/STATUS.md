@@ -1,29 +1,38 @@
 # Status: experimental native VR mod
 
-Updated 2026-09-06. The mod source, native adapters, tests and build tooling are
+Updated 2026-09-07. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
 The latest physical Quest 3 test of `C367CC6F` **failed stereo acceptance**:
 the user reported incompatible left/right views across the whole landscape.
-The game was stopped. The centered-FOV lighting change has been rolled back to
-the earlier runtime-provided eye projections. Physical validation of that
-replacement is pending. The attempted `70779290` physical rollback also failed:
+The earlier centered-FOV submission was rolled back. The latest candidate instead
+crops a centered native render to each eye's requested optics, with matching
+projection rays. Its physical validation is pending. The attempted `70779290`
+physical rollback also failed:
 the user reported garbled limbs, low resolution and flat or inconsistent UI depth.
 There is no accepted physical recovery build. Earlier SIM menu/arm results do
 not override these failures.
 
-The latest simulator slice implements real weapon/status UI on the **left
+The current SIM review covers equipment cards above the left wrist, all four
+equipment categories, wrist movement, closing, and a head turn/lean without the
+large sky rectangle. The silent 14.714-second clip is 670,771 bytes and contains
+54 reviewed frames at 3.6 captures/second, with no blank frames. Both final eyes
+were also inspected. Blue marker streaks, a dotted patch, arm/garment extremes,
+physical stereo and a paused world behind the menu remain open. See
+[sky/capture review](SKY_CROP_REVIEW.md) and [wrist picker](WRIST_PICKER_REVIEW.md).
+
+Earlier simulator slices implemented real weapon/status UI on the **left
 forearm**, removes the flat gameplay reticle and destination labels, stabilizes
 the visible rig, and adds native equipment selection. Zoom is reserved so aiming
 stays in stereo. Hidden body/head meshes now retain their native shadow casting;
-the latest 14.811-second, 1.38 MB SIM clip shows the full person silhouette and
+an earlier 14.811-second, 1.38 MB SIM clip shows the full person silhouette and
 tracked arm movement in 44 reviewed frames at 2.903 captures/second.
 The preceding clip covered centered sky projection (since rolled back) and native audio-listener
 tracking. Both clips are silent and do not establish perceived localization,
 smoothness or full-mod acceptance.
 Read the [current review](SIM_HUD_REVIEW.md) and [complete controls](CONTROLS.md).
 
-The latest arm follow-up adds guarded native ground contacts. Both eyes now show
+The arm follow-up added guarded native ground contacts. Both sampled eyes showed
 the hands above the slope in the reproduced prone failure. Its 14.785-second
 SIM clip is 1.42 MB, with 51 reviewed frames at 3.386 captures/second. Other
 terrain, close garment/hand presentation and physical fit remain open.
@@ -41,10 +50,10 @@ slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation
 
 | Area | Implemented and observed | Still required |
 | --- | --- | --- |
-| Rendering | Native D3D11 scene drawn twice inside one game render transaction; atomic two-eye OpenXR projection submission with runtime-provided optical centers | Physical stereo regression check; sky rectangle, shadow/culling/temporal acceptance |
+| Rendering | Native scene drawn twice in one transaction; centered coverage cropped to the runtime eye optics; sampled sky rectangle absent in current SIM views | Physical stereo regression check; dotted patch, shadow/culling/temporal acceptance |
 | Head motion | Native player head bone anchors the camera; simulator translations and rotations modify native eye matrices | Verified anatomical eye offset, world scale and all-state acceptance |
 | First person | Player-owned head/body hidden from normal rendering while preserving their native shadow; anatomical palm binding, shoulder anchors, forearm roll and native reload support; named hip mount hidden in VR | Cuff/garment deformation, stowed-equipment shadows, physical alignment, full reach/motion/stance acceptance |
-| HUD and markers | Native weapon/ammo UI on left forearm; flat reticle/destination labels suppressed; captured eye projection applied to native scene-camera cues | Spatial damage/subtitle/context feedback, interactive wrist iDroid, full motion acceptance |
+| HUD and markers | Native weapon/ammo UI on left forearm, equipment cards above it; flat reticle/destination labels suppressed | Escaping blue marker streaks, spatial damage/subtitle/context feedback, interactive wrist iDroid, full motion acceptance |
 | Weapons | AM MRS-4 and WU pistol ready/fire/reload and equipment categories exercised; ordinary shots use the authored muzzle | Impacts/obstruction, scoped and alternate modes, all-weapon and physical verification |
 | Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
 | Travel | D-Horse mount/walk/gallop/dismount and bounded mounted rifle shots in SIM; native travel input routing with neutral transition gates | Actual vehicle entry/driving/exit, mounted roles and physical riding comfort |
@@ -64,9 +73,10 @@ GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
 Current simulator build SHA256:
-`DA0CAED97097036128DA10393E53C667E94509801B626EDEE1DDFEB8C211230A`.
-It rolls back centered projection while retaining automatic native menu return and the arm, shadow and listener updates in the
-[SIM review](SIM_HUD_REVIEW.md). The initial physical run used
+`7BF543BE8E4EC882295AD8491DA6CCEB88B98BB878120DDBC54C0D6C371B170A`.
+It includes the wrist picker, sky crop and bounded swapchain recovery described in
+the [current review](SKY_CROP_REVIEW.md), retaining native menu return and the arm,
+shadow and listener changes. The initial physical run used
 `4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`,
 with the later physical rollback retained as
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
