@@ -1,7 +1,8 @@
 # Development handoff - 2026-09-06
 
-The latest installed build improves the exposed sleeve edges by repositioning the
-shoulders and their shared torso weights. It retains the body/head shadow,
+The latest installed build restores native context-action icons beside the left
+forearm status display. The horse/Y prompt was checked through mount and
+dismount. It retains the shoulder-placement improvement, body/head shadow,
 centered projection and native listener tracking fixes. Read
 [SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md) for the evidence and open gates, and
 [CONTROLS.md](CONTROLS.md) for the complete Touch interaction list. The initial
@@ -28,7 +29,7 @@ physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).
 - All five local suites passed. CI builds all targets and runs four non-GPU suites.
 
 Local DLL SHA256:
-`5090EA1879FAACBE74D283370484C4573E7371B55BDE2554813B1A66039D3E9B`.
+`F3A1D9E0336938360C05EE5789A053F48433CD0F61D54EB851ECC7B4EA5989AA`.
 The last physical-test rollback is retained locally with DLL SHA256
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
 No game executable, archives or saves were patched. Installation hashes were
@@ -37,7 +38,13 @@ public default; the local test enables the camera, rig and wrist HUD explicitly.
 
 ## Follow-up evidence and remaining work
 
-The latest `artifacts/arm-placement-15s/simulator.mp4` is 14.722 seconds,
+The context-action follow-up is `artifacts/context-actions-15s/simulator.mp4`: a
+14.846-second, 3,214,127-byte silent left-eye clip with 43 reviewed distinct frames.
+It shows forearm reading, back-facing suppression, mounting, a short ride and
+dismounting. Capture cadence is 2.817 images/second with a 422 ms maximum gap;
+no capture/action errors or black frames. Broader contexts remain unproven.
+
+The preceding `artifacts/arm-placement-15s/simulator.mp4` is 14.722 seconds,
 736,726 bytes, silent H.264 of the right eye, with 51 reviewed distinct frames
 at 3.389 captures/second. No black frames or capture/action/encoder errors; maximum
 response gap 329 ms. It shows wrist reading, support, rifle fire/reload, pistol

@@ -1,7 +1,9 @@
 # Touch controls for the tracked VR experiment
 
 These bindings target the game's **Action Type** controller layout. The left-arm
-HUD shows the native weapon name, ammunition and status. There is no flat aiming
+HUD shows the native weapon name, ammunition and status. Native context-action
+icons appear beside that display when the game offers an action; the horse/Y
+mount prompt has been checked through mount and dismount. There is no flat aiming
 reticle or destination-letter overlay in gameplay. Native 3D people cues remain.
 
 ## Weapons and hands
@@ -104,6 +106,7 @@ Physical controller fit still needs a headset check. Throws, CQC, mounted weapon
 all inventory items, contextual targets, every menu branch and every weapon are
 not certified. The lowered-weapon trigger now reaches the native action path;
 its input contract passes, but a target interaction has not been accepted.
-Flat damage, subtitle and context prompts currently have no spatial
-replacement. Sleeve/cuff polish remains open. This guide describes the controls
+The native context-action icon layer now follows the left forearm; pickup, carry
+and other target-specific prompts still need individual checks. Flat damage and
+subtitles currently have no spatial replacement. Sleeve/cuff polish remains open. This guide describes the controls
 without claiming those gates pass; see the [current SIM review](SIM_HUD_REVIEW.md).

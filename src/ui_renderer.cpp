@@ -101,10 +101,15 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 &&world[1]==0&&world[2]==0&&world[3]==0&&world[4]==0&&world[6]==0&&world[7]==0&&world[8]==0&&world[9]==0&&world[11]==0
                 &&world[12]==0&&world[13]==0&&(world[14]==100||world[14]==135)){
                 const auto order=field<uint32_t>(item,0x28);
+                // Native contextual button/action icons are layer 52. Layer 50
+                // contains destination letters and distances and stays hidden.
+                const bool contextAction=order==52;
                 const bool front=dot(rotate(executing.panel.orientation,{0,0,1}),executing.eyePosition-executing.panel.position)>0.005f;
-                if(order<146||order>148||!executing.panelTracked||!front){++suppressedDraws;return 0;}
+                if((!contextAction&&(order<146||order>148))||!executing.panelTracked||!front){++suppressedDraws;return 0;}
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
-                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,executing.panel,1.2f,0.675f,0.72f,-0.70f);
+                const auto panel=contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
+                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,1.2f,0.675f,
+                    contextAction?.04f:.72f,contextAction?-.52f:-.70f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));

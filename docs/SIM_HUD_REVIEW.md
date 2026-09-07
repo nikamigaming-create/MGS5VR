@@ -5,6 +5,33 @@ headset acceptance. The complete [Touch control list](CONTROLS.md) describes the
 current input path. Optical zoom is reserved: aiming stays in the native stereo
 scene, using the equipped weapon's actual sights. No binocular/scope quad remains.
 
+## Context-action forearm follow-up
+
+The flat UI filter also removed useful context-action icons. The exact native
+build draws those icons in artificial-camera layer 52; destination letters and
+distances occupy layer 50. The action layer now uses a separate area beside the
+left forearm's weapon/status display, with the same captured rig/eye transaction
+and front-facing/tracking guards. Destination markers and reticles remain hidden.
+
+Local DLL SHA256:
+`F3A1D9E0336938360C05EE5789A053F48433CD0F61D54EB851ECC7B4EA5989AA`.
+All five local suites passed. Private isolation probes and machine-specific
+probe paths were removed before this build.
+
+Both-eye SIM inspection covered the native horse/Y icon beside the ammo display,
+close wrist movement, and hiding both displays when the forearm turned away.
+The icon disappeared during mounting and returned after dismounting; native
+travel flags independently changed on foot -> horse -> on foot. A short ride
+also completed. This establishes the mount-context path, not every loot or CQC
+target and not physical headset acceptance.
+
+Private `artifacts/context-actions-15s/simulator.mp4` is 14.846 seconds and
+3,214,127 bytes. All 43 distinct decoded left-eye frames were reviewed; capture
+cadence was 2.817 images/second, maximum response gap 422 ms. The silent H.264
+clip has no black frames, capture error or action errors. Native horse fading,
+reins and close garment behavior remain visible development issues. Other
+context layers, subtitles, damage feedback and ground contact remain open.
+
 ## Shoulder and sleeve placement follow-up
 
 DLL `5090EA1879FAACBE74D283370484C4573E7371B55BDE2554813B1A66039D3E9B`

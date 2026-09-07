@@ -105,7 +105,9 @@ through native UI job enqueue and worker execution. It requires an exact camera
 identity and fresh active generation. Scene-camera UI uses the captured view even
 if the shared native camera has since been restored. Under `wrist_hud_experiment`,
 verified artificial layout-camera orders 146-148 draw actual weapon/status pixels
-through a projection onto the left forearm; other flat gameplay UI is suppressed.
+through a projection onto the left forearm. The native context-action icon layer
+uses a separate area beside it. Both retain the captured rig/eye transaction and
+front-facing tracking guards; other flat gameplay UI is suppressed.
 The back of the panel is culled. No duplicate HUD texture, fabricated values or
 new overlay pose is substituted. Full menus use the large-screen mode; pointer
 interaction and spatial damage/subtitle/context feedback are still incomplete.
