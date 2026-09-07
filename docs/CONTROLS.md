@@ -20,10 +20,16 @@ reticle or destination-letter overlay in gameplay. Native 3D people cues remain.
 | Reload | **Right B**; the native reload moves the support hand, then releases it |
 | Read the HUD | Raise and turn your **left forearm** toward your eyes |
 
-One-handed aim works. Two-handed use currently means the left hand follows the
-weapon's native support pose; the right hand still controls its direction. It is
-not a two-controller leverage solve. Reloads use a button, not manual magazine
-grabbing. Native finger and bolt animations remain in use.
+The right hand owns the weapon grip. With support engaged, the line from the
+right controller to the left guides the authored barrel direction. The left
+hand retains the native support contact; reload animations temporarily own it.
+Reloads use a button rather than manual magazine grabbing.
+
+Free fingers articulate on both hands: grip curls the lower fingers and thumb,
+and trigger curls the index finger. Supported controller touch sensors also pose
+the index and thumb. These are controller-driven poses, not individual finger
+tracking. Hands in contact with a weapon retain its native grip animation.
+Grip and trigger keep their gameplay actions while also animating the fingers.
 
 Automatic support acquires when the tracked hands are within 30 cm and releases
 beyond 45 cm. It retains contact intent while changing weapons, then checks the
@@ -32,22 +38,24 @@ support for reading; holding left grip still explicitly requests support.
 
 ## Equipment selection
 
-Release right grip before switching equipment. Hold **left trigger**, push the
-**left stick** in a category direction, then release the stick and trigger.
-Keep the direction held to open that category's native selection cards; use the
-right stick to select within the category before releasing.
+Hold **left trigger** to open the left-wrist picker. The **left stick still
+moves you**, so you can select while walking. Use the **right stick** to browse,
+then **release left trigger** to confirm and close. Gameplay does not pause.
 
-| Left-stick direction with left trigger held | Category |
+| Right stick with left trigger held | Action |
 | --- | --- |
-| Up | Primary weapon |
-| Down | Secondary weapon / bionic arm |
-| Right | Support equipment, such as grenades |
-| Left | Items |
+| Up / down | Browse cards in the current category |
+| Left / right flick | Previous / next category |
+| Click, on an item with a Use prompt | Use the selected item |
+
+Categories cycle through primary, secondary/bionic arm, support equipment, and
+items. Return the stick to neutral between category flicks.
 
 The cards and descriptions use real game data and unfold above the **left wrist**,
 facing you; the small status display stays flat along the forearm. Raise that
-wrist into view to read the selection. Selection does
-not move the player. Release held stick/button inputs before resuming movement.
+wrist into view to read the selection. Right-stick turning is consumed while
+the picker is open and until the stick returns to neutral after closing. A held
+fire trigger must be released before it can fire after selection.
 
 For an item card with a **Use** prompt, keep the category open, select the card
 with the right stick and click the **right stick**. Phantom Cigar use was exercised
@@ -63,7 +71,7 @@ bionic arm or item does not establish tracked throwing, CQC or item-use support.
 
 | Action | Control |
 | --- | --- |
-| Move | Left stick without left trigger |
+| Move, including during wrist selection | Left stick |
 | Turn / native camera look | Right stick; currently smooth native turning |
 | Sprint | Left-stick click without left grip |
 | Crouch / change stance | Right A; hold A for prone; release weapon-ready grip first |

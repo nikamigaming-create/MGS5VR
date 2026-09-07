@@ -11,6 +11,8 @@ struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reas
 struct TrackedHand {
     Pose grip{},aim{};
     bool gripTracked{},aimTracked{};
+    float trigger{},squeeze{};
+    bool triggerTouched{},thumbTouched{};
 };
 struct ControllerFrame {
     std::array<TrackedHand,2> hands{};

@@ -9,6 +9,7 @@
 #include "mgs5vr/camera_observer.hpp"
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/process_exit.hpp"
 #include <array>
@@ -30,6 +31,7 @@ void cleanupBeforeExit() noexcept {
     using namespace mgs5vr;
     log("MGS5VR process exit requested; stopping OpenXR worker");
     stopRequested.store(true);
+    stopNativePerformance();
     if(wakeWorker)SetEvent(wakeWorker);
     try{gamepadMailbox().publish({},false,steadyMilliseconds());}catch(...){}
     bool finished=true;
@@ -91,6 +93,10 @@ DWORD WINAPI initialize(void*){
         if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
             reinterpret_cast<LPCWSTR>(&initialize),&pinned))throw std::runtime_error("Cannot pin capture module");
         auto& mailbox=*new TextureMailbox;
+        if(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1)
+            log(enableNativeFrameRate(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))
+                ?"Native variable frame rate enabled; producer capped at 120 FPS for the 90 Hz target"
+                :"Native frame-rate signatures differ; original limiter retained");
         installCaptureHook(mailbox);
         installProcessExitHook(&cleanupBeforeExit);
         if(GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1){

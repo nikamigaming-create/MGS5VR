@@ -3,30 +3,50 @@
 #include <cstdlib>
 namespace mgs5vr {
 GamepadSample RigEquipment::update(GamepadSample sample,bool modifier,bool allowOptics){
-    constexpr uint16_t x=0x4000,y=0x8000,stickClick=0x0040;
-    const int sx=sample.leftX,sy=sample.leftY;
+    constexpr uint16_t x=0x4000,y=0x8000,rightClick=0x0080;
+    constexpr uint16_t categories[]{0x0001,0x0002,0x0008,0x0004};
+    const int sx=sample.rightX,sy=sample.rightY;
+    const bool neutral=std::abs(sx)<12000&&std::abs(sy)<12000;
     blockedButtons_&=sample.buttons;
-    if(std::abs(sx)<12000&&std::abs(sy)<12000)blockedStick_=false;
+    const bool freshUse=(sample.buttons&rightClick)&&!(blockedButtons_&rightClick);
+    if(!(sample.buttons&rightClick)||!modifier||!active_)useHeld_=false;
+    if(neutral)blockedStick_=false;
+    if(std::abs(sx)<12000)categoryLatched_=false;
+    if(modifier&&!active_)blockedStick_=!neutral;
     if(modifier){
-        blockedButtons_|=sample.buttons&(x|y|stickClick);
-        blockedStick_=true;
+        blockedButtons_|=sample.buttons&(x|y|rightClick);
         if(sample.buttons&x)sample.buttons|=0x0100;
         if(allowOptics&&(sample.buttons&y))sample.buttons|=0x0200;
-        if(std::abs(sx)>19660||std::abs(sy)>19660){
-            if(std::abs(sy)>=std::abs(sx))sample.buttons|=sy>0?0x0001:0x0002;
-            else sample.buttons|=sx>0?0x0008:0x0004;
+        sample.buttons&=~(x|y|rightClick|0x000f);
+        sample.rightX=sample.rightY=0;
+        if(!blockedStick_){
+            if(std::abs(sx)>19660&&std::abs(sx)>std::abs(sy)){
+                if(!categoryLatched_){category_=(category_+(sx>0?1:3))%4;useHeld_=false;}
+                categoryLatched_=true;
+            }else if(std::abs(sy)>19660&&std::abs(sy)>=std::abs(sx)){
+                // The native cards use horizontal stick browsing. Reserve
+                // horizontal controller motion for categories in the VR mode.
+                sample.rightX=static_cast<int16_t>(sy);
+            }
         }
-        sample.buttons&=~(x|y|stickClick);
+        sample.buttons|=categories[category_];
+        // The native item-card Use action is a right-stick click. Consume the
+        // same held click on close so it cannot become an unrelated action.
+        if(category_==3&&active_&&freshUse&&!categoryLatched_)useHeld_=true;
+        if(useHeld_)sample.buttons|=rightClick;
+    }else{
+        if(active_&&!neutral)blockedStick_=true;
+        if(blockedStick_)sample.rightX=sample.rightY=0;
     }
-    sample.buttons&=~blockedButtons_;
-    if(modifier||blockedStick_)sample.leftX=sample.leftY=0;
+    sample.buttons&=~(blockedButtons_&~(useHeld_?rightClick:0));
+    active_=modifier;
     return sample;
 }
 RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,TravelMode mode){
-    if(mode==TravelMode::unknown){releaseRequired_=true;equipment_.reset();return {};}
+    if(mode==TravelMode::unknown){releaseRequired_=true;wristMode_=false;equipment_.reset();return {};}
     if(mode!=mode_){
         if(mode_!=TravelMode::unknown)releaseRequired_=true;
-        mode_=mode;equipment_.reset();
+        mode_=mode;wristMode_=false;equipment_.reset();
     }
     if(releaseRequired_){
         if(raw.buttons||raw.leftTrigger>24||raw.rightTrigger>24||leftGrip||rightGrip
@@ -38,11 +58,16 @@ RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,T
         if(leftGrip)raw.buttons|=0x0100;
         return {equipment_.update(raw,rightGrip,false),false,false};
     }
-    const bool modifier=raw.leftTrigger>127;
-    raw.leftTrigger=rightGrip?255:0;
+    const bool modifier=raw.leftTrigger>(wristMode_?64:127);
+    wristMode_=modifier;
+    if(raw.rightTrigger<=24)fireReleaseRequired_=false;
+    if(modifier&&raw.rightTrigger>24)fireReleaseRequired_=true;
+    const bool ready=rightGrip&&!modifier;
+    raw.leftTrigger=ready?255:0;
+    if(modifier||fireReleaseRequired_)raw.rightTrigger=0;
     // The Action Type trigger also performs CQC and throws carried bodies
     // while the weapon is lowered. Let the native action state choose it.
-    return {equipment_.update(raw,modifier,false),rightGrip,leftGrip};
+    return {equipment_.update(raw,modifier,false),ready,leftGrip&&!modifier};
 }
 uint16_t MenuButton::update(bool pressed,bool active,uint64_t time){
     if(!active||time<lastTime_){

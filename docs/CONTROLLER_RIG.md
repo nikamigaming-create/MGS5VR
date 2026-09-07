@@ -72,7 +72,15 @@ support-hand contact. Tracked hand proximity also acquires contact within 30 cm,
 45 cm, and gives way to wrist inspection. Selection retains support intent while
 the gun is stowed, then checks the tracked hand distance again. Left trigger is the equipment modifier. Native reload
 and bolt-cycle state temporarily own support contact, with a 120 ms attach/release
-blend. The right hand remains the weapon's primary controller.
+blend. The right hand remains the weapon's primary grip. During two-handed aim,
+the authored muzzle axis swings toward the line between the controllers. Using
+the animated palm-to-palm vector instead can point the gun sideways during a
+support animation; the muzzle and firing path share the same socket chain.
+
+Free hands animate verified native finger chains from grip/trigger values and
+optional controller touch sensors. Mirrored joint rotations curl toward each
+palm. The saved native pose supplies contact animation, without feeding modified
+finger joints back into the engine's animation cache.
 
 The optional wrist HUD relocates native UI orders 146-148 from verified artificial
 layout cameras onto the left forearm. Other flat gameplay UI from those cameras

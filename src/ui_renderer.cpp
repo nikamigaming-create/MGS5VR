@@ -119,7 +119,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto panel=equipmentPicker?executing.picker:
                     contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
-                const float layoutWidth=equipmentPicker?.7f:1.2f;
+                const float layoutWidth=equipmentPicker?.42f:1.2f;
                 const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
                     equipmentPicker?0.f:contextAction?.04f:.72f,equipmentPicker?0.f:contextAction?-.52f:-.70f);
                 if(mapped){
@@ -190,7 +190,7 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     // Keep status flat along the forearm, but unfold the larger native picker
     // above that wrist, facing the source head. Both eyes use this same pose.
     const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
-    const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,{0,.16f,-.03f})};
+    const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,{0,.09f,-.03f})};
     producing={eye,camera,view,rig.wristPanel,picker,rig.wristPanelTracked,
                rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes)};
 }

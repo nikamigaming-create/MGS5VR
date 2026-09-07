@@ -423,31 +423,85 @@ int main(){
     expect(!anatomicalGrip({},indexKnuckle,indexKnuckle)&&!anatomicalGrip({},Vec3{0,0,2},Vec3{0,1,2}),
            "degenerate or non-hand landmark geometry cannot steer the rig");
     RigEquipment equipment;
-    GamepadSample equipmentHeld{0x8000,255,128,0,30000,22000,-12000};
+    GamepadSample equipmentHeld{0x8000,255,128,17000,30000,0,0};
     auto mapped=equipment.update(equipmentHeld,true);
-    expect(mapped.buttons==0x0201&&mapped.leftX==0&&mapped.leftY==0,"equipment modifier selects primary and binocular action without movement/context action");
-    expect(mapped.leftTrigger==255&&mapped.rightTrigger==128&&mapped.rightX==22000,"equipment selection retains native aim/fire and selection stick");
+    expect(mapped.buttons==0x0201&&mapped.leftX==17000&&mapped.leftY==30000,"trigger opens primary equipment while left-stick movement continues");
+    equipmentHeld.rightY=30000;
+    mapped=equipment.update(equipmentHeld,true);
+    expect(mapped.rightX==30000&&mapped.rightY==0&&mapped.leftY==30000,"right-stick vertical browsing retains simultaneous locomotion");
     mapped=equipment.update(equipmentHeld,false);
-    expect(mapped.buttons==0&&mapped.leftY==0,"releasing modifier first cannot leak held action or start walking");
+    expect(mapped.buttons==0&&mapped.rightX==0&&mapped.rightY==0&&mapped.leftY==30000,"closing consumes held menu controls without interrupting movement or causing a turn");
     equipment.update({},false);
     mapped=equipment.update(equipmentHeld,false);
     expect(mapped==equipmentHeld,"fresh native actions resume after neutral input");
-    equipmentHeld={0x4000,0,0,-30000,22000,0,0};
+    equipment.reset();equipment.update({},true);
+    equipmentHeld={0,0,0,-30000,22000,30000,0};
     mapped=equipment.update(equipmentHeld,true);
-    expect(mapped.buttons==0x0104,"dominant left axis selects items and X maps native call");
-    equipmentHeld={0,0,0,10000,-30000,0,0};
-    expect(equipment.update(equipmentHeld,true).buttons==0x0002,"down selects the secondary weapon");
-    equipmentHeld={0,0,0,30000,10000,0,0};
-    expect(equipment.update(equipmentHeld,true).buttons==0x0008,"right selects support equipment");
-    equipmentHeld={0x0040,0,0,1000,-1000,0,0};
-    expect(equipment.update(equipmentHeld,true).buttons==0,"deadzone never selects equipment or sprints");
+    expect(mapped.buttons==0x0002&&mapped.rightX==0&&mapped.leftX==-30000,"right flick changes to secondary without consuming strafe input");
+    expect(equipment.update(equipmentHeld,true).buttons==0x0002,"holding a category direction cannot repeatedly cycle categories");
+    equipment.update({},true);
+    expect(equipment.update(equipmentHeld,true).buttons==0x0008,"second right flick selects support equipment");
+    equipment.update({},true);
+    expect(equipment.update(equipmentHeld,true).buttons==0x0004,"third right flick selects items");
+    equipment.update({},true);
+    equipmentHeld={0x0080};
+    expect(equipment.update(equipmentHeld,true).buttons==0x0084,"fresh right-stick click uses a native item card");
+    expect(equipment.update(equipmentHeld,true).buttons==0x0084,"item-use press survives native polling while held");
+    expect(equipment.update(equipmentHeld,false).buttons==0,"held item-use click is consumed when selection closes");
+    equipment.update({},false);equipment.update({},true);
+    equipmentHeld={0,0,0,0,0,-30000,0};
+    expect(equipment.update(equipmentHeld,true).buttons==0x0008,"left flick returns to the preceding category");
+    equipment.reset();equipmentHeld={0x0040,0,0,1000,-1000,0,0};
+    expect(equipment.update(equipmentHeld,true).buttons==0x0041,"wrist mode opens without a direction and retains the movement stick click");
     equipment.reset();expect(equipment.update(equipmentHeld,false)==equipmentHeld,"mode reset restores ordinary native controls");
     equipment.reset();
     equipmentHeld={0x8000};
-    expect(equipment.update(equipmentHeld,true,false).buttons==0,"disabled optics cannot open a native scope or binocular view");
+    expect(equipment.update(equipmentHeld,true,false).buttons==0x0001,"disabled optics cannot open a native scope or binocular view");
     expect(equipment.update(equipmentHeld,false,false).buttons==0,"releasing the modifier cannot leak the reserved optics button as an action");
     equipment.update({},false,false);
     expect(equipment.update(equipmentHeld,false,false).buttons==0x8000,"ordinary Y action resumes after releasing reserved optics input");
+    equipment.reset();equipmentHeld={0,0,0,30000,0,30000,0};
+    expect(equipment.update(equipmentHeld,true,false).buttons==1,"opening during a turn consumes the prior turning stick until neutral");
+    expect(equipment.update(equipmentHeld,true,false).buttons==1,"held pre-menu turning cannot choose another category");
+    equipment.update({},true,false);
+    expect(equipment.update(equipmentHeld,true,false).buttons==2,"fresh navigation resumes after centering the right stick");
+    RigInput wristInput;
+    GamepadSample walkingSelection{0,255,255,15000,28000,0,0};
+    auto selectionInput=wristInput.update(walkingSelection,true,true,TravelMode::onFoot);
+    expect(selectionInput.gamepad.leftX==15000&&selectionInput.gamepad.leftY==28000&&selectionInput.gamepad.buttons==1
+        &&selectionInput.gamepad.leftTrigger==0&&selectionInput.gamepad.rightTrigger==0&&!selectionInput.weaponReady&&!selectionInput.supportRequested,
+        "selection frees the wrist, lowers the weapon and consumes fire while movement continues");
+    walkingSelection.leftTrigger=100;
+    expect(wristInput.update(walkingSelection,false,true,TravelMode::onFoot).gamepad.buttons==1,"trigger hysteresis keeps the picker open through a partial release");
+    walkingSelection.leftTrigger=0;
+    selectionInput=wristInput.update(walkingSelection,false,true,TravelMode::onFoot);
+    expect(selectionInput.gamepad.buttons==0&&selectionInput.gamepad.rightTrigger==0&&selectionInput.weaponReady&&selectionInput.gamepad.leftY==28000,
+        "release closes selection and restores the ready grip without firing a held trigger");
+    walkingSelection.rightTrigger=0;wristInput.update(walkingSelection,false,true,TravelMode::onFoot);
+    walkingSelection.rightTrigger=255;
+    expect(wristInput.update(walkingSelection,false,true,TravelMode::onFoot).gamepad.rightTrigger==255,"a fresh trigger pull fires after the picker closes");
+    const Pose primaryGrip{{},{.2f,1.2f,-.3f}},supportGrip{{},{.5f,1.2f,-.6f}};
+    const auto guidedGrip=twoHandGrip(primaryGrip,supportGrip,{0,0,-.3f},1);
+    expect(guidedGrip&&same(guidedGrip->position,primaryGrip.position)
+        &&same(rotate(guidedGrip->orientation,{0,0,-1}),{.70710678f,0,-.70710678f}),
+        "support controller guides aim while the primary palm stays fixed");
+    const auto unguidedGrip=twoHandGrip(primaryGrip,supportGrip,{0,0,-.3f},0);
+    expect(unguidedGrip&&same(rotate(unguidedGrip->orientation,{0,0,-1}),{0,0,-1}),"zero support influence preserves one-handed aim");
+    const auto sidewaysBarrel=twoHandGrip(primaryGrip,supportGrip,{1,0,0},1);
+    expect(sidewaysBarrel&&same(sidewaysBarrel->position,primaryGrip.position)
+        &&same(rotate(sidewaysBarrel->orientation,{1,0,0}),{.70710678f,0,-.70710678f}),
+        "a barrel offset from the palm axes follows the support controller without moving the firing grip");
+    expect(!twoHandGrip(primaryGrip,primaryGrip,{0,0,-.3f},1)
+        &&!twoHandGrip(primaryGrip,Pose{{},{.2f,1.2f,.1f}},{0,0,-.3f},1),"coincident or crossed hands cannot flip the weapon");
+    for(unsigned finger=0;finger<5;++finger)for(unsigned joint=0;joint<3;++joint){
+        const auto leftOpen=fingerJointRotation(false,finger,joint,0),rightOpen=fingerJointRotation(true,finger,joint,0);
+        expect(leftOpen&&rightOpen&&same(rotate(*leftOpen,{1,0,0}),{1,0,0})&&same(rotate(*rightOpen,{-1,0,0}),{-1,0,0}),
+            "released controller fingers retain the authored straight bind pose");
+        const auto leftCurl=fingerJointRotation(false,finger,joint,1),rightCurl=fingerJointRotation(true,finger,joint,1);
+        expect(leftCurl&&rightCurl&&rotate(*leftCurl,{1,0,0}).y<0&&rotate(*rightCurl,{-1,0,0}).y<0,
+            "both hands curl toward the palm rather than bending backward");
+    }
+    expect(!fingerJointRotation(false,5,0,1)&&!fingerJointRotation(false,0,3,1)&&!fingerJointRotation(false,0,0,-1),"invalid finger channels are rejected");
     GamepadMailbox gamepad;
     expect(!gamepad.read(100),"unconnected XR gamepad preserves original input path");
     gamepad.publish({0x1000,0,255,100,-100,0,0},true,100);

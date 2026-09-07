@@ -3,15 +3,22 @@
 Updated 2026-09-07. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
-The current physical Quest 3 run of `7BF543BE` received positive user feedback:
+The latest candidate adds articulated free fingers, support-controller barrel
+aiming, a smaller wrist picker and right-stick selection while the left stick
+keeps moving. Its release build and six test suites pass. A small 15-second SIM
+clip and both-eye observations are recorded in the [hands/wrist review](HANDS_WRIST_REVIEW.md).
+Shoulder removal and physical acceptance of these changes remain open.
+
+The earlier physical Quest 3 run of `7BF543BE` received positive user feedback:
 the basic experience works well, with low resolution and jagged edges remaining.
-The same binary is now under a 2560x1440 native-resolution test. Read the
+The 2560x1440 trial has been replaced by 1920x1080 with native AA for frame-rate
+headroom. Read the [performance notes](PERFORMANCE.md) and the
 [physical sharpness review](HEADSET_SHARPNESS_REVIEW.md) for the baseline and limits.
 Earlier builds `C367CC6F` and `70779290` failed stereo or limb/UI presentation;
 they remain failed references. The current positive report is not acceptance of
 every interaction, material, arm pose or transition.
 
-The current SIM review covers equipment cards above the left wrist, all four
+The preceding SIM review covers equipment cards above the left wrist, all four
 equipment categories, wrist movement, closing, and a head turn/lean without the
 large sky rectangle. The silent 14.714-second clip is 670,771 bytes and contains
 54 reviewed frames at 3.6 captures/second, with no blank frames. Both final eyes

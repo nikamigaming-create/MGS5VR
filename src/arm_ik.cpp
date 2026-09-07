@@ -33,6 +33,31 @@ std::optional<Vec3> outsideArmSurface(Vec3 point,const ArmSurface& surface){
        ||!std::isfinite(surface.clearance)||surface.clearance<0||surface.clearance>.15f)return {};
     return point+surface.normal*std::max(0.f,surface.clearance-dot(point-surface.point,surface.normal));
 }
+std::optional<Pose> twoHandGrip(Pose primary,Pose support,Vec3 forwardInPrimary,float influence){
+    if(!valid(primary)||!valid(support)||!valid(Pose{{},forwardInPrimary})
+       ||!std::isfinite(influence)||influence<0||influence>1)return {};
+    const auto requested=support.position-primary.position;
+    const float distance=length(requested),axisLength=length(forwardInPrimary);
+    // Coincident/crossed controllers must not flip the sights or produce a
+    // singular solve. The caller retains one-handed aim in these cases.
+    if(distance<.12f||distance>1.1f||axisLength<.001f||axisLength>2.f)return {};
+    const auto current=rotate(primary.orientation,forwardInPrimary);
+    if(dot(unit(current),unit(requested))<-.8f)return {};
+    auto delta=swing(current,requested);
+    if(delta.w<0)delta={-delta.x,-delta.y,-delta.z,-delta.w};
+    delta=normalize({delta.x*influence,delta.y*influence,delta.z*influence,1+(delta.w-1)*influence});
+    return Pose{turn(delta,primary.orientation),primary.position};
+}
+std::optional<Quat> fingerJointRotation(bool right,unsigned finger,unsigned joint,float curl){
+    if(finger>=5||joint>=3||!std::isfinite(curl)||curl<0||curl>1)return {};
+    constexpr float flexion[5][3]={{35,55,60},{70,85,50},{80,95,60},{80,95,60},{85,95,60}};
+    const float side=right?1.f:-1.f;
+    const float angle=side*flexion[finger][joint]*curl*.00872664626f;
+    const Quat flex{0,0,std::sin(angle),std::cos(angle)};
+    if(finger||joint)return flex;
+    const float opposition=-side*30.f*curl*.00872664626f;
+    return turn(Quat{0,std::sin(opposition),0,std::cos(opposition)},flex);
+}
 std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprightHead){
     if(!valid(chest)||!valid(uprightHead)||!valid(Pose{{},shoulderCenter}))return {};
     // Place the shoulder line behind the eyes. The former 6 cm setback exposed

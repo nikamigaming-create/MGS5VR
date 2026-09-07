@@ -9,16 +9,17 @@ struct GamepadSample {
     int16_t leftX{},leftY{},rightX{},rightY{};
     bool operator==(const GamepadSample&) const = default;
 };
-// In tracked-rig mode, left trigger is a modifier: left stick selects the
-// native equipment category, X calls/radios, and Y is reserved for optics.
-// Release the stick/buttons before returning them to movement and actions.
+// Hold the modifier to open equipment at the wrist. The left stick remains
+// locomotion; right-stick left/right changes category and up/down browses it.
+// Release closes selection. A held navigation stick cannot leak into turning.
 class RigEquipment {
 public:
     GamepadSample update(GamepadSample sample,bool modifier,bool allowOptics=true);
-    void reset(){blockedButtons_=0;blockedStick_=false;}
+    void reset(){blockedButtons_=0;blockedStick_=false;active_=false;categoryLatched_=false;useHeld_=false;category_=0;}
 private:
     uint16_t blockedButtons_{};
-    bool blockedStick_{};
+    bool blockedStick_{},active_{},categoryLatched_{},useHeld_{};
+    unsigned category_{};
 };
 enum class TravelMode { unknown,onFoot,horse,vehicle };
 struct RigInputSample { GamepadSample gamepad; bool weaponReady{},supportRequested{}; };
@@ -28,10 +29,12 @@ class RigInput {
 public:
     RigInputSample update(GamepadSample raw,bool leftGrip,bool rightGrip,TravelMode mode);
     void suspend(){releaseRequired_=true;equipment_.reset();}
-    void reset(){mode_=TravelMode::unknown;releaseRequired_=false;equipment_.reset();}
+    void reset(){mode_=TravelMode::unknown;releaseRequired_=false;fireReleaseRequired_=false;wristMode_=false;equipment_.reset();}
 private:
     TravelMode mode_{TravelMode::unknown};
     bool releaseRequired_{};
+    bool fireReleaseRequired_{};
+    bool wristMode_{};
     RigEquipment equipment_;
 };
 // MGSV assigns Start to iDroid and Back to Pause. A short menu press emits

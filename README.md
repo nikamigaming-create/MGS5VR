@@ -21,7 +21,7 @@ You do not need Visual Studio, a simulator, or to compile anything.
 
 ## Install once
 
-1. Download **MGS5VR-experimental-2026-09-07.1.zip** from the [experimental release](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-07.1). Extract the whole ZIP, keeping its folders together. Use the ZIP named MGS5VR, rather than GitHub's Source code download.
+1. Download **MGS5VR-experimental-2026-09-07.2.zip** from the [experimental release](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-07.2). Extract the whole ZIP, keeping its folders together. Use the ZIP named MGS5VR, rather than GitHub's Source code download.
 2. Find your game's folder using Steam's **Browse local files** option. It must contain `mgsvtpp.exe`.
 3. Open the extracted **MGS5VR** folder containing this README, `dinput8.dll` and `tools`. In File Explorer's address bar, type `powershell` and press Enter. Run this command, replacing the quoted path with your game's folder:
 
@@ -51,23 +51,28 @@ your save. Installation is only needed once.
 | Support the weapon | Bring the left hand near it, or hold left grip |
 | Reload | Right B |
 | Read ammo and status | Raise your left forearm |
-| Select a primary weapon | Release right grip; hold left trigger + left stick up, browse with the right stick, then release |
+| Select equipment while moving | Hold left trigger; right stick up/down browses, left/right changes category; release trigger to finish |
 | Interact / pick up | Left Y when the game offers the action |
 | iDroid / pause | Tap left Menu / hold left Menu |
 
+Free fingers respond to grip and trigger input on both hands. The left hand
+guides two-handed weapon aim while the right hand owns the grip.
 Weapon selection cards open above the left wrist. Full iDroid and pause menus
 use the large screen. [All controls, equipment categories and test limits →](docs/CONTROLS.md)
 
 ## Picture settings
 
-The current test setup uses **Windowed**, **Depth of Field: Disable**,
-**Motion Blur: Off**, **Post Processing: Off**, and **Camera Shake: Off**.
-Post Processing Off also removes the game's anti-aliasing, so jagged edges remain
-a known limitation; see the [sharpness review](docs/HEADSET_SHARPNESS_REVIEW.md).
+Start with **1920×1080 Windowed**, **V-sync: Disable**, **Post Processing: High**
+for native anti-aliasing, **Depth of Field: Disable**, **Motion Blur: Off**, and
+**Camera Shake: Off**. Use **High** effects, lighting and shadows; disable SSAO
+and volumetric clouds. Keep textures, filtering and model detail at **Extra High**.
+The installer leaves the game's graphics preferences under your control.
 
-The positively reviewed baseline used **1920×1080**. **2560×1440** is the current
-sharpness test with the same mod binary; its visual improvement and sustained
-performance still need confirmation. [Resolution setup →](docs/ADVANCED_SETUP.md#runtime-and-resolution)
+The current performance target is a 90 Hz headset with fresh stereo frames.
+SIM tests are mostly in the high 80s to 90, with occasional lower stretches;
+headset timing and a whole-game guarantee are unproven. The 1440p test cost too
+much performance, so 1080p is the current compromise. See
+[performance and AA](docs/PERFORMANCE.md) and [resolution setup](docs/ADVANCED_SETUP.md#runtime-and-resolution).
 
 ## Current limits
 

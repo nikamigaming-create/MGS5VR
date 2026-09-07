@@ -1,4 +1,5 @@
 #include "mgs5vr/mailbox.hpp"
+#include "mgs5vr/gpu_timing.hpp"
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -37,6 +38,31 @@ static bool consumeEventually(TextureConsumer& consumer,TextureMailbox& mailbox)
 }
 int main(){try{
     Device producer,reader;TextureMailbox mailbox;TextureConsumer consumer(reader.device.Get());
+    GpuTiming timing;
+    ComPtr<ID3D11DeviceContext> deferred;
+    checkHr(producer.device->CreateDeferredContext(0,&deferred),"Create timing refusal fixture");
+    require(!timing.poll(deferred.Get()),"GPU timing refuses deferred-context readback");
+    require(timing.begin(producer.context.Get()),"GPU timing starts on the immediate context");
+    require(!timing.begin(producer.context.Get()),"nested timing cannot overwrite an active query");
+    timing.end(producer.context.Get());producer.context->Flush();
+    require(!timing.poll(reader.context.Get()),"timing results cannot be read from another device");
+    std::optional<double> measured;
+    for(unsigned i=0;i<100&&!measured;++i){measured=timing.poll(producer.context.Get());if(!measured)std::this_thread::sleep_for(std::chrono::milliseconds(1));}
+    require(measured&&*measured>=0&&*measured<100,"real GPU timestamp interval arrives without a blocking query");
+    GpuTiming splitTiming;
+    ComPtr<ID3D11DeviceContext> secondDeferred;
+    checkHr(producer.device->CreateDeferredContext(0,&secondDeferred),"Create split timing fixture");
+    require(splitTiming.begin(deferred.Get()),"timestamp start records in the native deferred context");
+    splitTiming.end(secondDeferred.Get());
+    ComPtr<ID3D11CommandList> firstList,secondList;
+    checkHr(deferred->FinishCommandList(FALSE,&firstList),"Finish timestamp start list");
+    checkHr(secondDeferred->FinishCommandList(FALSE,&secondList),"Finish timestamp end list");
+    splitTiming.beginExecution(producer.context.Get());
+    producer.context->ExecuteCommandList(firstList.Get(),FALSE);producer.context->ExecuteCommandList(secondList.Get(),FALSE);
+    splitTiming.endExecution(producer.context.Get());
+    producer.context->Flush();measured.reset();
+    for(unsigned i=0;i<100&&!measured;++i){measured=splitTiming.poll(producer.context.Get());if(!measured)std::this_thread::sleep_for(std::chrono::milliseconds(1));}
+    require(measured&&*measured>=0&&*measured<100&&!splitTiming.pending(),"GPU time spans split native command lists and drains after playback");
     auto source=texture(producer,64,32);const float red[]{1,0,0,1},green[]{0,1,0,1};clear(producer,source.Get(),red);
     ComPtr<ID3D11RenderTargetView> target;checkHr(producer.device->CreateRenderTargetView(source.Get(),nullptr,&target),"Create state fixture");
     auto* bound=target.Get();producer.context->OMSetRenderTargets(1,&bound,nullptr);

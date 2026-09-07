@@ -29,5 +29,11 @@ private:
 // Unlike activation-pose calibration this is independent of the camera and of
 // where the user happened to hold the controller when enabling VR.
 std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuckle);
+// Swing the authored barrel direction toward the other controller while
+// keeping the primary palm fixed. Roll stays owned by the primary controller.
+std::optional<Pose> twoHandGrip(Pose primary,Pose support,Vec3 forwardInPrimary,float influence);
+// Local rotations for the authored straight finger chains (thumb through pinky).
+// Native weapon/contact animation remains authoritative while a hand is attached.
+std::optional<Quat> fingerJointRotation(bool right,unsigned finger,unsigned joint,float curl);
 std::optional<Pose> nativeAffinePose(const std::array<float,16>& rowMatrix);
 }

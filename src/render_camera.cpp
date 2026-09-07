@@ -237,6 +237,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     sceneContextType.store(context->GetType());
     NativeRestore saved(source.grCamera,source.viewport);insideStereo=true;stereoTarget=field<uintptr_t>(render,0x98);
     const auto cameraCount=pairCount.load();uintptr_t result{};bool complete=true;
+    mgs5vr::beginSceneTiming(context,id);
     for(uint32_t eye=0;eye<2;++eye){
         saved.restore();eyeViewport=source.viewport;clipProjection=gpuProjection=false;
         drawingEye={source.pair.sample.views[eye],id,source.pair.sample.trackingSequence,status.activation,source.pair.sample.sampleTime,eye,false,false};
@@ -274,6 +275,8 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         catch(const std::exception& ex){complete=false;sceneFailure=7;mgs5vr::log(std::string("Native eye capture: ")+ex.what());}
     }
     if(pairCount.load()!=cameraCount){complete=false;sceneFailure=6;}
+    const auto timingOwner=field<uintptr_t>(graphics,0x150);
+    mgs5vr::endSceneTiming(timingOwner?field<ID3D11DeviceContext*>(reinterpret_cast<void*>(timingOwner),8):context,id,complete);
     if(complete){++scenePairs;}
     else {
         ++sceneRejected;mgs5vr::cancelSceneEyes(id);mgs5vr::headCamera().cancel(mgs5vr::HeadCameraStop::matrixMismatch);
