@@ -2,12 +2,13 @@
 
 Use pass, fail, or unproven per claim; do not convert a passing infrastructure test into full-mod readiness.
 
-The latest [HUD/rig simulator review](SIM_HUD_REVIEW.md) documents a bounded
-14.722-second arm clip and the current [controls](CONTROLS.md). It improves the
-weapon/status and arm presentation while leaving the complete rig, every weapon,
-interactive menus and physical acceptance open. The user requested compact
-15-second clips per slice; the latest one does not satisfy the full evidence set
-described below.
+The [wrist/sky SIM review](SKY_CROP_REVIEW.md) documents a 14.714-second clip and
+both-eye endpoints. The subsequent [Quest 3 report](HEADSET_SHARPNESS_REVIEW.md)
+is positive for the basic experience while retaining a low-resolution/jaggies
+complaint. A higher-resolution run uses the same DLL; visual improvement and
+sustained performance remain unconfirmed. The complete rig, every weapon,
+interactive menus and full-mission acceptance remain open. The requested compact
+15-second clips per slice do not individually satisfy the full evidence set below.
 
 ## Required full-mod demonstration
 
@@ -36,7 +37,7 @@ Capture the submitted game eye and its attached geometry from the same frame tra
 | Complete arm HUD | Actual meaningful changing HUD/iDroid pixels in both eyes | Open, browse, select edges, back, close, reopen; 60 seconds | Blank/stale surface, threshold oscillation | Weapon/status forearm UI and native equipment cards implemented and observed; complete interactive iDroid and spatial feedback remain incomplete |
 | Both hands and forearms | Final-eye video of anatomical connection and correct skinning | Neutral, reach limits, opposing head/hand motion | Suppress/detach a limb | Shared torso/shoulder placement removes the reproduced large sleeve edges in the bounded standing rifle/pistol sequence; prone ground contact, close-up clipping, all poses and physical fit remain open |
 | All weapons | Grip, muzzle and actual impacts agree in final-eye video | Every family, reload/ADS/scope/swap/throw/melee/mounted | Wrong socket, stale pose, failed tracking | AM MRS-4 and WU pistol ready/fire/reload and selection observed; optical input reserved; other modes and impact/obstruction acceptance unproven |
-| Physical readiness | Actual headset/controller observation | Full mission session and comfort assessment | Simulator-only or single-eye evidence | Initial Quest 3 combat recording and favorable user report; arm/HUD failures remain, full mission/comfort/stereo acceptance unproven |
+| Physical readiness | Actual headset/controller observation | Full mission session and comfort assessment | Simulator-only or single-eye evidence | Current 7BF543BE Quest 3 report is positive for the basic experience; sharpness, all-state stereo, full mission and sustained comfort remain unaccepted |
 
 Save final composited images for both eyes, then inspect the full time sequence. Record capture cadence, dropped frames, source transaction, audio coverage and runtime state. A black theatre environment is expected for the preview; a black background during promised native gameplay/wrist interaction is a failure.
 

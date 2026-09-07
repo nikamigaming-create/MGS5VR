@@ -10,8 +10,8 @@ It does not certify every interaction, material, arm pose or loading transition.
 The earlier failed builds remain failed; their results must not be substituted
 for this specific build's evidence.
 
-The live game renders each native eye at 1920x1080. The requested physical eye
-optics select a 1546x906 region from each source image. This is a substantial
+The positively reviewed baseline rendered each native eye at 1920x1080. Its
+physical eye optics selected a 1546x906 region from each source image. This was a substantial
 pixel-density limitation before headset presentation. Increasing only the size
 of a copied image cannot recover missing scene detail. The game already has
 ExtraHigh textures, texture filtering and model detail.
@@ -19,7 +19,8 @@ ExtraHigh textures, texture filtering and model detail.
 The preserved baseline includes the exact DLL, INI, installation record and
 graphics configuration. After the user requested an immediate restart, the same
 DLL launched on the Oculus runtime at native 2560x1440, confirmed by the game
-present and swapchain logs. Quality settings are unchanged: 33% more pixels in
+present and swapchain logs, with a 2061x1207 submitted region for each eye.
+Quality settings are unchanged: 33% more pixels in
 each dimension and about 78% more total rendered pixels. Native stereo resumed,
 with roughly 60 complete pairs/second in the sampled interval. Visual improvement
 and sustained performance still require the user's report; runtime counters alone
