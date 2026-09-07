@@ -13,6 +13,23 @@ static void expect(bool ok,const char* name){++checks;if(!ok){++failures;std::ce
 static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
+    {
+        const Pose palm{{},{2,3,4}};
+        const auto straight=pointThrow(palm,{},Vec3{3,4,0});
+        expect(straight&&same(straight->origin,palm.position)&&same(straight->velocity,{0,0,-5}),
+            "grenade starts at rendered palm and uses aim -Z with native speed");
+        const Pose aimPitch{{.70710678f,0,0,.70710678f},{.1f,0,-.1f}};
+        const auto upward=pointThrow(palm,aimPitch,Vec3{0,0,5});
+        expect(upward&&same(upward->origin,palm.position)&&same(upward->velocity,{0,5,0}),
+            "controller aim pitch raises grenade arc without moving its palm origin");
+        const Pose turned{{0,.70710678f,0,.70710678f},{-2,8,1}};
+        const auto side=pointThrow(turned,{},Vec3{0,5,0});
+        expect(side&&same(side->origin,turned.position)&&same(side->velocity,{-5,0,0}),
+            "translated and rotated rendered hand controls grenade launch in world space");
+        expect(!pointThrow(palm,{},{}),"zero native grenade speed cannot create a bogus arc");
+        expect(!pointThrow(palm,{},Vec3{0,std::numeric_limits<float>::quiet_NaN(),0}),"invalid grenade velocity is rejected");
+        expect(!pointThrow(Pose{{0,0,0,0},{}},{},Vec3{1,0,0}),"invalid hand transform is rejected for throwing");
+    }
     const EyeFov asymmetric{-0.8f,0.9f,0.75f,-0.7f};
     std::array<float,16> projection{1,0,0,0,0,1,0,0,0,0,-0.0002f,1,0,0,0.1f,0};
     expect(setEyeProjection(projection,asymmetric),"native perspective accepts runtime asymmetric field of view");

@@ -171,6 +171,15 @@ std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuck
     const auto center=wrist.position+along*0.55f;
     return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,center.x,center.y,center.z,1});
 }
+std::optional<PointThrow> pointThrow(Pose renderedPalm,Pose gripFromAim,Vec3 nativeVelocity){
+    if(!valid(renderedPalm)||!valid(gripFromAim)||!valid(Pose{{},nativeVelocity}))return {};
+    const float speed=std::sqrt(dot(nativeVelocity,nativeVelocity));
+    if(speed<.1f||speed>100.f)return {};
+    auto direction=rotate(compose(renderedPalm,gripFromAim).orientation,{0,0,-1});
+    const float length=std::sqrt(dot(direction,direction));
+    if(!std::isfinite(length)||length<.9f||length>1.1f)return {};
+    return PointThrow{renderedPalm.position,direction*(speed/length)};
+}
 std::optional<Pose> nativeAffinePose(const std::array<float,16>& m){
     for(float f:m)if(!std::isfinite(f))return {};
     if(std::abs(m[3])+std::abs(m[7])+std::abs(m[11])+std::abs(m[15]-1)>0.001f)return {};

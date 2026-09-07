@@ -35,6 +35,10 @@ struct PoseRestore {
 };
 using Shot=void(*)(void*,Vector4*,Vector4*,void*,uint32_t);
 Shot originalShot{};
+using ThrowOrigin=void(*)(void*,void*,uint32_t,Vector4*,Vector4*);
+using ThrowVelocity=void(*)(void*,void*,uint32_t,Vector4*);
+ThrowOrigin originalThrowOrigin{};
+ThrowVelocity originalThrowVelocity{};
 uintptr_t base{};
 std::atomic_uintptr_t playerOwner{};
 std::atomic_bool enabled{};
@@ -54,6 +58,8 @@ struct ShotRig {
     uintptr_t owner{},character{},camera{},model{};
     Pose sourceCamera{},wristWorld{};
     uint64_t trackingSequence{};
+    Pose palmWorld{},gripFromAim{};
+    bool throwTracked{};
 } shotRig;
 template<class T> bool read(uintptr_t address,T& out){
     SIZE_T count{};return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&out,sizeof(out),&count)&&count==sizeof(out);
@@ -226,7 +232,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(!right)return false;
     replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
     bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
-    bool nativeManipulation=false,firearmActive=false;
+    bool nativeManipulation=false,firearmActive=false,throwableActive=false;
     std::optional<Vec3> barrelInGrip;
     const auto weaponComponent=get<uintptr_t>(character+0x80);
     if(!frame.controllers.vehicleControls&&get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
@@ -238,6 +244,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             // native animation owns the support hand during these operations.
             nativeManipulation=(get<uint32_t>(state+0x27c)&0x1c0)==0x40&&(get<uint32_t>(state+0x3c0)&0x04000000)!=0;
             firearmActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x40;
+            throwableActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x80;
             const auto flags=get<uint32_t>(state+0x27c),mode=get<uint32_t>(state+0x3c0);
             if(frame.controllers.weaponReady&&firearmActive&&!nativeManipulation&&!(flags&0x400000)&&!(mode&0x2000)){
                 // Use the same authored barrel frame as the native shot path.
@@ -368,7 +375,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     unsigned articulatedHands{};
     for(size_t side=0;side<2;++side){
         const auto& hand=frame.controllers.hands[side];
-        const float contact=side?((frame.controllers.weaponReady&&firearmActive)?1.f:0.f):supportBlend;
+        const float contact=side?((frame.controllers.weaponReady&&(firearmActive||throwableActive))?1.f:0.f):supportBlend;
         if(!hand.gripTracked||frame.controllers.vehicleControls||contact>=1)continue;
         for(size_t finger=0;finger<5;++finger)for(size_t joint=0;joint<3;++joint){
             const auto i=fingers[side][finger]+joint;
@@ -410,6 +417,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
     std::memcpy(reinterpret_cast<void*>(positions),p.data(),count*16u);
     shotRig={owner,character,camera,model,nativeCamera,compose(*root,right->pose.wrist),frame.trackingSequence};
+    const auto& throwingHand=frame.controllers.hands[1];
+    if(throwableActive&&frame.controllers.weaponReady&&!frame.controllers.vehicleControls&&throwingHand.aimTracked){
+        shotRig.palmWorld=compose(shotRig.wristWorld,inverse(gripFromWrist[1]));
+        shotRig.gripFromAim=compose(inverse(throwingHand.grip),throwingHand.aim);
+        shotRig.throwTracked=true;
+    }
     if(++updates%120==1){
         std::ostringstream s;s<<"Controller rig updates="<<updates<<" tracking="<<frame.trackingSequence
             <<" predicted="<<frame.controllers.predictedXrTime<<" player="<<frame.playerSequence
@@ -493,6 +506,81 @@ void shot(void* context,Vector4* origin,Vector4* direction,void* state,uint32_t 
             <<" direction="<<direction->x<<','<<direction->y<<','<<direction->z;log(s.str());}
     }
 }
+struct PendingThrow {
+    void* context{};void* state{};uint32_t index{};
+    uintptr_t velocityCaller{};
+    uint64_t time{},tracking{},rig{};
+    PointThrow solution{};float velocityW{};
+};
+thread_local PendingThrow pendingThrow;
+std::optional<PendingThrow> controllerThrow(void* context,void* state,uint32_t index,uintptr_t velocityCaller){
+    if(!enabled.load()||!headCamera().active())return {};
+    ShotRig rig;{std::lock_guard lock(rigMutex);rig=shotRig;}
+    if(!rig.throwTracked||!rig.owner||rig.owner!=playerOwner.load())return {};
+    const auto component=reinterpret_cast<uintptr_t>(context),weapon=reinterpret_cast<uintptr_t>(state);
+    if(get<uintptr_t>(component)!=base+0x23b3e80||get<uintptr_t>(component+8)!=rig.character
+       ||get<uintptr_t>(rig.character+0x80)!=component||get<uintptr_t>(rig.owner+0x370)!=rig.character)return {};
+    const auto first=get<uint32_t>(get<uintptr_t>(component+0x38)+0x24);
+    if(index!=get<uint32_t>(rig.owner+0x3a0)||index<first||index-first>15
+       ||weapon!=get<uintptr_t>(component+0x58)+(index-first)*0x610ull
+       ||(get<uint32_t>(weapon+0x27c)&0x1c0)!=0x80)return {};
+    const auto frame=headCamera().resolveCurrent(rig.camera,rig.sourceCamera);
+    if(!frame.applied||frame.playerOwner!=rig.owner||frame.trackingSequence!=rig.trackingSequence
+       ||!frame.controllers.weaponReady||frame.controllers.vehicleControls
+       ||!frame.controllers.hands[1].gripTracked||!frame.controllers.hands[1].aimTracked)return {};
+    // This verified velocity helper reads only context+8/+60, character+78,
+    // and render+8/+290 before consulting the unchanged equipment database.
+    // Give it caller-owned copies with neutral pitch/yaw. Never patch the live
+    // camera or shared player angles just to change grenade throw strength.
+    alignas(16) std::array<std::byte,0x68> privateContext{};
+    alignas(16) std::array<std::byte,0x80> privateCharacter{};
+    alignas(16) std::array<std::byte,0x298> privateRender{};
+    std::array<float,2> angles{};
+    if(!read(component,privateContext)||!read(rig.character,privateCharacter))return {};
+    const auto characterAddress=reinterpret_cast<uintptr_t>(privateCharacter.data());
+    const auto renderAddress=reinterpret_cast<uintptr_t>(privateRender.data());
+    const auto anglesAddress=reinterpret_cast<uintptr_t>(angles.data());
+    std::memcpy(privateContext.data()+8,&characterAddress,8);
+    std::memcpy(privateCharacter.data()+0x78,&renderAddress,8);
+    std::memcpy(privateRender.data()+8,&index,4);
+    std::memcpy(privateRender.data()+0x290,&anglesAddress,8);
+    alignas(16) Vector4 velocity{};
+    originalThrowVelocity(privateContext.data(),state,index,&velocity);
+    const auto solution=pointThrow(rig.palmWorld,rig.gripFromAim,{velocity.x,velocity.y,velocity.z});
+    if(!solution)return {};
+    return PendingThrow{context,state,index,velocityCaller,steadyMilliseconds(),frame.trackingSequence,
+        frame.rigSequence,*solution,velocity.w};
+}
+void throwOrigin(void* context,void* state,uint32_t index,Vector4* origin,Vector4* rotation){
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    originalThrowOrigin(context,state,index,origin,rotation);
+    pendingThrow={};
+    // The two native request paths both consume origin immediately followed
+    // by velocity. Keep that pair on one published rig generation and thread.
+    const auto velocityCaller=caller==base+0x1061eac?base+0x1061ebe:
+        caller==base+0x1087b16?base+0x1087b28:0;
+    if(!velocityCaller)return;
+    if(const auto request=controllerThrow(context,state,index,velocityCaller)){
+        pendingThrow=*request;
+        origin->x=request->solution.origin.x;origin->y=request->solution.origin.y;origin->z=request->solution.origin.z;
+    }
+}
+void throwVelocity(void* context,void* state,uint32_t index,Vector4* velocity){
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    const auto request=pendingThrow;pendingThrow={};
+    const auto now=steadyMilliseconds();
+    if(request.context!=context||request.state!=state||request.index!=index||request.velocityCaller!=caller
+       ||now<request.time||now-request.time>50){originalThrowVelocity(context,state,index,velocity);return;}
+    *velocity={request.solution.velocity.x,request.solution.velocity.y,request.solution.velocity.z,request.velocityW};
+    static std::atomic_uint64_t requests{};
+    const auto count=++requests;
+    if(count%120==1||caller==base+0x1087b28){
+        std::ostringstream s;s<<"Controller throw requests="<<count<<" caller="<<std::hex<<caller-base<<std::dec
+            <<" tracking="<<request.tracking<<" rig="<<request.rig
+            <<" origin="<<request.solution.origin.x<<','<<request.solution.origin.y<<','<<request.solution.origin.z
+            <<" velocity="<<velocity->x<<','<<velocity->y<<','<<velocity->z;log(s.str());
+    }
+}
 }
 namespace mgs5vr {
 void installControllerRig(uintptr_t imageBase){
@@ -520,6 +608,19 @@ void installControllerRig(uintptr_t imageBase){
     if(status!=MH_OK)throw std::runtime_error(std::string("Controller shot create: ")+MH_StatusToString(status));
     status=MH_EnableHook(shotAddress);
     if(status!=MH_OK)throw std::runtime_error(std::string("Controller shot enable: ")+MH_StatusToString(status));
+    if(!matches(0x1037ba0,std::array<unsigned char,13>{0x48,0x8b,0xc4,0x55,0x53,0x56,0x57,0x41,0x54,0x41,0x56,0x41,0x57})
+       ||!matches(0x1039020,std::array<unsigned char,9>{0x48,0x8b,0xc4,0x55,0x53,0x56,0x57,0x41,0x56}))
+        throw std::runtime_error("Controller throw helper signatures differ");
+    const auto originAddress=reinterpret_cast<void*>(base+0x1037ba0),velocityAddress=reinterpret_cast<void*>(base+0x1039020);
+    status=MH_CreateHook(originAddress,reinterpret_cast<void*>(&throwOrigin),reinterpret_cast<void**>(&originalThrowOrigin));
+    if(status!=MH_OK)throw std::runtime_error(std::string("Controller throw origin create: ")+MH_StatusToString(status));
+    status=MH_CreateHook(velocityAddress,reinterpret_cast<void*>(&throwVelocity),reinterpret_cast<void**>(&originalThrowVelocity));
+    if(status!=MH_OK){MH_RemoveHook(originAddress);throw std::runtime_error(std::string("Controller throw velocity create: ")+MH_StatusToString(status));}
+    status=MH_QueueEnableHook(originAddress);
+    if(status==MH_OK)status=MH_QueueEnableHook(velocityAddress);
+    if(status==MH_OK)status=MH_ApplyQueued();
+    if(status!=MH_OK){MH_RemoveHook(originAddress);MH_RemoveHook(velocityAddress);throw std::runtime_error(std::string("Controller throw enable: ")+MH_StatusToString(status));}
+    log("Controller throw origin and velocity adapters installed");
     enabled.store(true);log("Experimental controller rig installed at verified skin publication RVA 0x1a6caa0 and shot solver 0x1044ff0");
 }
 void observeControllerRigOwner(uintptr_t owner) noexcept{playerOwner.store(owner);}
