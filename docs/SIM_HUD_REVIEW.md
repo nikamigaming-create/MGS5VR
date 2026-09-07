@@ -5,6 +5,31 @@ headset acceptance. The complete [Touch control list](CONTROLS.md) describes the
 current input path. Optical zoom is reserved: aiming stays in the native stereo
 scene, using the equipped weapon's actual sights. No binocular/scope quad remains.
 
+## Prone ground-contact follow-up
+
+The native ground-IK collision query reproduced the hillside surface at the
+existing checkpoint. Before the change, the tracked prone hands went beneath
+that surface. The [guarded native adapter](GROUND_CONTACT.md) now supplies wrist
+and elbow contacts during the same skin/eye publication. Both final composited
+eyes showed the hands above ground; rifle support stayed attached. Crouch and
+90/180/270/360-degree controller turns were inspected separately, including the
+return to the neutral grip. The ground-free crouch pose reported zero contacts.
+
+Local DLL SHA256:
+`D9A4F63A771673AF4C64B71054E72E6D49FEB633E77F9F70E94C592DD906F30A`.
+All five local suites passed, including nine rotated-slope arm regressions.
+Temporary native collision/input probes were removed from the candidate.
+
+Private `artifacts/ground-contact-15s/simulator.mp4` is 14.785 seconds and
+1,418,871 bytes. All 51 distinct left-eye frames were reviewed. Measured capture
+cadence is 3.386 images/second, with maximum response gap 344 ms, no black frame,
+and no capture/action error. No raw frames were archived. The clip shows prone
+hands, wrist inspection, rifle readiness, trigger/reload inputs and stowing.
+The attempted final stance tap did not visibly establish a completed transition;
+it is not counted as a pass. This silent clip does not establish physical fit,
+impact accuracy, smooth display cadence, every stance/terrain, or complete arm
+polish. Close garment edges and hand presentation still require work.
+
 ## Context-action forearm follow-up
 
 The flat UI filter also removed useful context-action icons. The exact native

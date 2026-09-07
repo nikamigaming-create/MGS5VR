@@ -1,8 +1,10 @@
 # Development handoff - 2026-09-06
 
-The latest installed build restores native context-action icons beside the left
-forearm status display. The horse/Y prompt was checked through mount and
-dismount. It retains the shoulder-placement improvement, body/head shadow,
+The latest installed build adds native collision contact for the arms, fixing
+the reproduced prone hands going below the hillside. Both final eyes and a
+compact 14.785-second clip were inspected. The full arm/garment gate stays open.
+It retains context-action icons beside the left forearm, checked through horse
+mount/dismount, along with the shoulder-placement improvement, body/head shadow,
 centered projection and native listener tracking fixes. Read
 [SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md) for the evidence and open gates, and
 [CONTROLS.md](CONTROLS.md) for the complete Touch interaction list. The initial

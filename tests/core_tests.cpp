@@ -223,6 +223,34 @@ int main(){
                                arm.wrist.position-arm.elbow.position),lower),"forearm twist retains the solved bone axis");}
     }
     const ArmPose alignedArm{{{},{}},{{},{0,-.3f,0}},{{},{0,-.3f,-.25f}}};
+    // A prone wrist can remain above the floor while the unconstrained elbow
+    // bends through it. Exercise contact on rotated slopes, not just flat Y=0.
+    for(int i=-4;i<=4;++i){
+        const float angle=static_cast<float>(i)*.1f;
+        const Pose slope{{0,0,std::sin(angle/2),std::cos(angle/2)},{12,3,-7}};
+        const auto transform=[&](Vec3 point){return compose(slope,Pose{{},point}).position;};
+        const ArmSurface surface{transform({}),rotate(slope.orientation,{0,1,0}),.06f};
+        ArmPose grounded{compose(slope,Pose{{},{0,.10f,0}}),
+            compose(slope,Pose{{},{.20f,-.05f,0}}),compose(slope,Pose{{},{.40f,.10f,0}})};
+        const Pose target{slope.orientation,transform({.40f,.10f,0})};
+        const auto free=solveArm(grounded,target,rotate(slope.orientation,{0,-1,0}));
+        const auto constrained=solveArm(grounded,target,rotate(slope.orientation,{0,-1,0}),nullptr,&surface);
+        expect(free&&dot(free->pose.elbow.position-surface.point,surface.normal)<0,
+               "prone regression fixture actually places the free elbow below ground");
+        expect(constrained&&dot(constrained->pose.elbow.position-surface.point,surface.normal)>=.0599f,
+               "native contact keeps the elbow above a sloped surface");
+        if(constrained){
+            const auto u=constrained->pose.elbow.position-grounded.shoulder.position;
+            const auto lowerSegment=constrained->pose.wrist.position-constrained->pose.elbow.position;
+            expect(near(dot(u,u),.0625f)&&near(dot(lowerSegment,lowerSegment),.0625f)&&same(constrained->pose.wrist.position,target.position),
+                   "contact preserves arm lengths and an unobstructed tracked wrist");
+        }
+        const auto hand=outsideArmSurface(transform({.4f,-.2f,0}),surface);
+        expect(hand&&near(dot(*hand-surface.point,surface.normal),.06f),"penetrating wrist stops at native surface clearance");
+        const auto clearHand=outsideArmSurface(target.position,surface);
+        expect(clearHand&&same(*clearHand,target.position),"contact does not move an unobstructed wrist");
+    }
+    expect(!outsideArmSurface({},ArmSurface{{},{},.05f}),"missing collision normal cannot invent a floor");
     const ArmBasis alignedBasis{{0,-.3f,0},{0,0,-.25f},{0,0,-1},{1,0,0}};
     const Quat wristRoll{0,0,.70710678f,.70710678f};
     const auto twisted=solveArm(alignedArm,Pose{wristRoll,alignedArm.wrist.position},{0,-1,0},&alignedBasis);

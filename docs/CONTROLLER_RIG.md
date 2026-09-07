@@ -34,6 +34,12 @@ side of the forearm. Native animation input
 is restored after matrix publication, avoiding feedback into the next pose.
 Physical controller fit has not been accepted.
 
+[Native ground contacts](GROUND_CONTACT.md) now keep the reproduced prone arms
+above the game's sloped collision surface. Wrist clearance and a constrained
+elbow circle preserve segment lengths; shared shoulder placement and attached
+weapon support move together. Misses and unverified native query signatures
+supply no contact. This is ground support, not hand/weapon wall collision.
+
 The primary body's verified bone 53 (`SKL_300_ASRROOT`, hash `ec70c442`,
 parent 0) is the hip holster. Its published render matrix has zero scale during
 an accepted VR rig update. Native animation channels and the held wrist socket
@@ -86,8 +92,9 @@ optics remain future work.
 The [September 6 HUD/rig review](SIM_HUD_REVIEW.md) records the current build,
 15-second clip, controls exercised, and unresolved gates. It shows real changing
 forearm ammo, support/reload contact, rifle-to-pistol selection and head movement.
-The standing sleeve failure improved in the latest bounded check. Prone ground
-contact, extreme close-up clipping and physical controller alignment remain open.
+The standing sleeve failure and reproduced prone ground penetration improved in
+bounded checks. Other terrain, extreme close-up clipping and physical controller
+alignment remain open.
 
 Historically, the first 29.25-second continuous left-eye recording contains 101 distinct captured
 frames (3.45 captures/second), right-hand translation, yaw, pitch and roll, native

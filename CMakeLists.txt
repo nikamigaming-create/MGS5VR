@@ -48,7 +48,7 @@ foreach(t mgs5vr_core mgs5vr_runtime dinput8 mgs5vr_probe mgs5vr_tests mgs5vr_gp
 endforeach()
 install(TARGETS dinput8 mgs5vr_probe RUNTIME DESTINATION .)
 install(FILES config/mgs5vr.ini README.md LICENSE CONTRIBUTING.md DESTINATION .)
-install(FILES docs/STATUS.md docs/THIRD_PARTY_NOTICES.md docs/ARCHITECTURE.md docs/ACCEPTANCE.md docs/HANDOFF.md docs/CONTROLLER_RIG.md DESTINATION docs)
+install(FILES docs/STATUS.md docs/THIRD_PARTY_NOTICES.md docs/ARCHITECTURE.md docs/ACCEPTANCE.md docs/HANDOFF.md docs/CONTROLLER_RIG.md docs/GROUND_CONTACT.md docs/CONTROLS.md DESTINATION docs)
 install(FILES tools/install.ps1 tools/uninstall.ps1 tools/launch-simulator.ps1 DESTINATION tools)
 install(FILES profiles/tpp-1.0.15.4.json DESTINATION profiles)
 install(FILES "${openxr_SOURCE_DIR}/LICENSE" DESTINATION licenses RENAME OpenXR.txt)

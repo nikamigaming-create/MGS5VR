@@ -27,6 +27,12 @@ std::optional<Quat> basisRotation(Vec3 localAxis,Vec3 localUp,Vec3 axis,Vec3 up)
     return compose(*world,inverse(*local)).orientation;
 }
 }
+std::optional<Vec3> outsideArmSurface(Vec3 point,const ArmSurface& surface){
+    if(!valid(Pose{{},point})||!valid(Pose{{},surface.point})||!valid(Pose{{},surface.normal})
+       ||std::abs(dot(surface.normal,surface.normal)-1.f)>.003f
+       ||!std::isfinite(surface.clearance)||surface.clearance<0||surface.clearance>.15f)return {};
+    return point+surface.normal*std::max(0.f,surface.clearance-dot(point-surface.point,surface.normal));
+}
 std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprightHead){
     if(!valid(chest)||!valid(uprightHead)||!valid(Pose{{},shoulderCenter}))return {};
     // Place the shoulder line behind the eyes. The former 6 cm setback exposed
@@ -34,7 +40,7 @@ std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprig
     const auto target=compose(uprightHead,Pose{{},{0,-.18f,-.16f}});
     return compose(target,inverse(Pose{chest.orientation,shoulderCenter}));
 }
-std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const ArmBasis* basis){
+std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const ArmBasis* basis,const ArmSurface* surface){
     if(!valid(a.shoulder)||!valid(a.elbow)||!valid(a.wrist)||!valid(target)||!valid(Pose{{},hint}))return {};
     const auto upper=a.elbow.position-a.shoulder.position,lower=a.wrist.position-a.elbow.position;
     const float u=length(upper),l=length(lower);
@@ -49,7 +55,25 @@ std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const
     auto bend=hint-forward*dot(hint,forward);
     if(length(bend)<0.001f)bend=upper-forward*dot(upper,forward);
     if(length(bend)<0.001f)bend=cross(forward,std::abs(forward.y)<0.8f?Vec3{0,1,0}:Vec3{1,0,0});
-    const auto elbow=a.shoulder.position+forward*along+unit(bend)*away;
+    const auto center=a.shoulder.position+forward*along;
+    bend=unit(bend);
+    if(surface){
+        if(!outsideArmSurface(center,*surface))return {};
+        // Keep both bone lengths by choosing a feasible point on the elbow
+        // circle. Translating a solved elbow would stretch the arm instead.
+        const auto inCircle=surface->normal-forward*dot(surface->normal,forward);
+        const float span=length(inCircle)*away;
+        const float required=surface->clearance-dot(center-surface->point,surface->normal);
+        if(required>span+.0001f)return {};
+        if(span>.0001f&&required>dot(bend,surface->normal)*away){
+            const auto towardSurface=unit(inCircle);
+            const float cosine=std::clamp(required/span,-1.f,1.f);
+            auto tangent=bend-towardSurface*dot(bend,towardSurface);
+            if(length(tangent)<.0001f)tangent=cross(forward,towardSurface);
+            bend=towardSurface*cosine+unit(tangent)*std::sqrt(std::max(0.f,1.f-cosine*cosine));
+        }
+    }
+    const auto elbow=center+bend*away;
     const auto wrist=a.shoulder.position+forward*reach;
     ArmSolution out{a,std::abs(requested-reach)>0.0001f};
     out.pose.shoulder.orientation=turn(swing(upper,elbow-a.shoulder.position),a.shoulder.orientation);

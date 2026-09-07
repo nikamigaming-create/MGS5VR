@@ -14,6 +14,11 @@ tracking. Both clips are silent and do not establish perceived localization,
 smoothness or full-mod acceptance.
 Read the [current review](SIM_HUD_REVIEW.md) and [complete controls](CONTROLS.md).
 
+The latest arm follow-up adds guarded native ground contacts. Both eyes now show
+the hands above the slope in the reproduced prone failure. Its 14.785-second
+SIM clip is 1.42 MB, with 51 reviewed frames at 3.386 captures/second. Other
+terrain, close garment/hand presentation and physical fit remain open.
+
 An initial **physical Quest 3 combat run** is now recorded and reviewed. The user
 reported good overall playability and requested better arms and a less intrusive
 HUD. Movement, rifle fire/reload and manual theatre/native transitions are visible;

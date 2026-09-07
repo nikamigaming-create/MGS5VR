@@ -38,6 +38,7 @@ Shot originalShot{};
 uintptr_t base{};
 std::atomic_uintptr_t playerOwner{};
 std::atomic_bool enabled{};
+bool groundQueryVerified{};
 std::mutex rigMutex;
 uintptr_t boundOwner{};
 uintptr_t boundModel{};
@@ -55,6 +56,36 @@ template<class T> bool read(uintptr_t address,T& out){
     SIZE_T count{};return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&out,sizeof(out),&count)&&count==sizeof(out);
 }
 template<class T> T get(uintptr_t address){T out{};read(address,out);return out;}
+std::optional<ArmSurface> groundSurface(Vec3 point,float ceiling,float clearance){
+    // TPP 1.0.15.4 HumanGroundIk uses this synchronous, internally read-locked
+    // query. The 0x800 inclusion layer is set by the player IK factory. Query
+    // storage and hit records are caller-owned; no native state is modified.
+    if(!groundQueryVerified||!valid(Pose{{},point})||!std::isfinite(ceiling)
+       ||point.y>ceiling||ceiling-point.y>3.f||!get<uintptr_t>(base+0x2c79710))return {};
+    alignas(16) std::array<std::byte,0x250> query{};
+    using Init=void*(*)(void*,uint32_t);
+    using Ray=uint32_t(*)(void*,uint32_t,const Vector4*,const Vector4*,float);
+    using HitValue=void*(*)(const void*,Vector4*);
+    reinterpret_cast<Init>(base+0xa0fb50)(query.data(),0);
+    const uint64_t groundLayers=0x800;
+    std::memcpy(query.data(),&groundLayers,sizeof(groundLayers));
+    const uint64_t filter=0x80000006;
+    std::memcpy(query.data()+0x18,&filter,sizeof(filter));
+    alignas(16) Vector4 start{point.x,ceiling,point.z,0},end{point.x,point.y-.75f,point.z,0};
+    const auto result=reinterpret_cast<Ray>(base+0x1b9b130)(query.data(),0x04000700,&start,&end,0.f);
+    const auto address=reinterpret_cast<uintptr_t>(query.data());
+    const auto count=get<uint32_t>(address+0x60);const auto index=get<int32_t>(address+0x64);
+    if(!result||!count||count>5||index<0||static_cast<uint32_t>(index)>=count)return {};
+    alignas(16) Vector4 hit{},normal{};const void* record=query.data()+0x70+index*0x60;
+    // These getters also handle shape-local hit records and their transforms.
+    reinterpret_cast<HitValue>(base+0x1b9a5d0)(record,&hit);
+    reinterpret_cast<HitValue>(base+0x1b99910)(record,&normal);
+    const ArmSurface surface{{hit.x,hit.y,hit.z},{normal.x,normal.y,normal.z},clearance};
+    if(!outsideArmSurface(point,surface)||surface.normal.y<.35f
+       ||hit.y>start.y+.01f||hit.y<end.y-.01f
+       ||std::abs(hit.x-point.x)+std::abs(hit.z-point.z)>.02f)return {};
+    return surface;
+}
 Pose bone(const std::array<Quat,512>& q,const std::array<Vector4,512>& p,size_t i){return {q[i],{p[i].x,p[i].y,p[i].z}};}
 void replace(std::array<Quat,512>& q,std::array<Vector4,512>& p,size_t i,Pose value){
     q[i]=value.orientation;p[i].x=value.position.x;p[i].y=value.position.y;p[i].z=value.position.z;
@@ -104,6 +135,35 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     for(size_t i=0;i<2;++i)if(frame.controllers.hands[i].gripTracked)
         grips[i]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.hands[i].grip));
     std::lock_guard lock(rigMutex);
+    const auto rootInverse=inverse(*root);
+    const float groundCeiling=frame.nativePose.position.y+.05f;
+    unsigned groundContacts{};
+    const auto modelSurface=[&](Vec3 point,float clearance)->std::optional<ArmSurface>{
+        const auto world=compose(*root,Pose{{},point}).position;
+        const auto surface=groundSurface(world,groundCeiling,clearance);
+        if(!surface)return {};
+        return ArmSurface{compose(rootInverse,Pose{{},surface->point}).position,
+            rotate(rootInverse.orientation,surface->normal),clearance};
+    };
+    const auto clearWrist=[&](Pose target){
+        if(const auto surface=modelSurface(target.position,.055f))
+            if(const auto point=outsideArmSurface(target.position,*surface)){
+                if(dot(*point-target.position,*point-target.position)>1e-8f)++groundContacts;
+                target.position=*point;
+            }
+        return target;
+    };
+    const auto groundedArm=[&](const ArmPose& animated,Pose target,Vec3 hint,const ArmBasis& basis){
+        auto solution=solveArm(animated,target,hint,&basis);
+        if(solution)if(const auto surface=modelSurface(solution->pose.elbow.position,.06f)){
+            if(dot(solution->pose.elbow.position-surface->point,surface->normal)<surface->clearance){
+                if(const auto contact=solveArm(animated,target,hint,&basis,&*surface)){
+                    solution=contact;++groundContacts;
+                }
+            }
+        }
+        return solution;
+    };
     constexpr std::array<size_t,2> wrists{8,12},shoulders{6,10};
     constexpr std::array<size_t,2> indexKnuckles{24,40},littleKnuckles{34,50};
     std::array<Pose,2> gripFromWrist{};
@@ -133,8 +193,17 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const auto chest=bone(q,p,2);
         const auto shoulderCenter=(bone(q,p,6).position+bone(q,p,10).position)*.5f;
         const auto uprightHead=compose(inverse(*root),Pose{torso,frame.nativePose.position});
-        const auto torsoDelta=upperBodyPlacement(chest,shoulderCenter,uprightHead);
+        auto torsoDelta=upperBodyPlacement(chest,shoulderCenter,uprightHead);
         if(!torsoDelta)return false;
+        // Keep the shared sleeve roots together when the native prone head is
+        // close to a slope. Moving an individual shoulder tears shared weights.
+        float lift{};
+        for(const auto i:shoulders){
+            const auto world=compose(*root,compose(*torsoDelta,bone(q,p,i))).position;
+            if(const auto surface=groundSurface(world,groundCeiling,.09f))
+                lift=std::max(lift,(surface->clearance-dot(world-surface->point,surface->normal))/surface->normal.y);
+        }
+        if(lift>0){torsoDelta->position=torsoDelta->position+rotate(rootInverse.orientation,{0,lift,0});++groundContacts;}
         for(const size_t i:{1,2,5,6,7,8,9,10,11,12})replace(q,p,i,compose(*torsoDelta,bone(q,p,i)));
         for(size_t side=0;side<2;++side){
             // Stable down/out bias; a transient native crouch/reload bend must
@@ -142,8 +211,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             bendHistory[side]=rotate(inverse(*root).orientation,rotate(torso,{side?-.25f:.25f,-1.f,-.15f}));
         }
     }
-    const Pose rightTarget=compose(grips[1],gripFromWrist[1]);
-    const auto right=solveArm({bone(q,p,10),bone(q,p,11),bone(q,p,12)},rightTarget,bendHistory[1],&armBasis[1]);
+    auto rightTarget=clearWrist(compose(grips[1],gripFromWrist[1]));
+    const ArmPose rightAnimatedArm{bone(q,p,10),bone(q,p,11),bone(q,p,12)};
+    auto right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
     if(!right)return false;
     replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
     bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
@@ -160,7 +230,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             firearmActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x40;
         }
     }
-    const auto attached=compose(right->pose.wrist,compose(inverse(rightAnimated),leftAnimated));
+    const auto supportOffset=compose(inverse(rightAnimated),leftAnimated);
+    auto attached=compose(right->pose.wrist,supportOffset);
     const auto attachedGrip=compose(attached,inverse(gripFromWrist[0]));
     const auto separation=grips[0].position-attachedGrip.position;
     const auto handSeparation=grips[0].position-grips[1].position;
@@ -174,6 +245,21 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const bool support=frame.controllers.supportRequested||nativeManipulation||nearSupport;
     const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/120.f:1.f,1.f);supportAt=now;
     supportBlend=std::clamp(supportBlend+(support?step:-step),0.f,1.f);
+    if(supportBlend>=1){
+        // Lift the held weapon and its support contact together; do not slide
+        // the fully attached left palm away from the authored weapon grip.
+        const auto contact=clearWrist(attached);
+        const auto shift=contact.position-attached.position;
+        if(dot(shift,shift)>1e-8f){
+            rightTarget.position=rightTarget.position+shift;
+            if(const auto raised=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1])){
+                right=raised;
+                replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
+                bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
+                attached=compose(right->pose.wrist,supportOffset);
+            }
+        }
+    }
     if(frame.controllers.hands[0].gripTracked||support){
         // Preserve the game's animated support-hand contact while the native
         // support is requested or a native reload/bolt cycle is running.
@@ -187,7 +273,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const float n=std::sqrt(blended.x*blended.x+blended.y*blended.y+blended.z*blended.z+blended.w*blended.w);
             target.orientation={blended.x/n,blended.y/n,blended.z/n,blended.w/n};
         }
-        const auto left=solveArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],&armBasis[0]);
+        if(supportBlend<1)target=clearWrist(target);
+        const auto left=groundedArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],armBasis[0]);
         if(!left)return false;
         replace(q,p,6,left->pose.shoulder);replace(q,p,7,left->pose.elbow);replace(q,p,8,left->pose.wrist);
         bendHistory[0]=left->pose.elbow.position-left->pose.shoulder.position;
@@ -254,7 +341,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             <<" reach_clamped="<<right->reachClamped<<" support="<<supportBlend
             <<" support_near="<<nearSupport<<" support_distance="<<std::sqrt(dot(separation,separation))
             <<" hand_distance="<<std::sqrt(dot(handSeparation,handSeparation))
-            <<" inspecting="<<inspecting<<" arm_helpers="<<helpersMatch;log(s.str());
+            <<" inspecting="<<inspecting<<" arm_helpers="<<helpersMatch<<" ground_contacts="<<groundContacts;log(s.str());
     }
     return true;
 }
@@ -334,6 +421,14 @@ void shot(void* context,Vector4* origin,Vector4* direction,void* state,uint32_t 
 namespace mgs5vr {
 void installControllerRig(uintptr_t imageBase){
     base=imageBase;
+    const auto matches=[&]<size_t N>(uintptr_t rva,const std::array<unsigned char,N>& bytes){
+        std::array<unsigned char,N> actual{};return read(base+rva,actual)&&actual==bytes;
+    };
+    groundQueryVerified=matches(0xa0fb50,std::array<unsigned char,9>{0x48,0x89,0x4c,0x24,0x08,0x48,0x83,0xec,0x18})
+        &&matches(0x1b9b130,std::array<unsigned char,10>{0x48,0x83,0xec,0x38,0xf3,0x0f,0x10,0x44,0x24,0x60})
+        &&matches(0x1b9a5d0,std::array<unsigned char,10>{0x4c,0x8b,0xdc,0x48,0x81,0xec,0x98,0,0,0})
+        &&matches(0x1b99910,std::array<unsigned char,7>{0x48,0x81,0xec,0x88,0,0,0});
+    log(groundQueryVerified?"Controller rig native ground-query signatures verified":"Controller rig ground contacts disabled: native query signature differs");
     constexpr std::array<unsigned char,13> expected{0x48,0x89,0x5c,0x24,0x18,0x57,0x48,0x81,0xec,0xc0,0,0,0};
     std::array<unsigned char,expected.size()> actual{};auto address=reinterpret_cast<void*>(base+0x1a6caa0);
     if(!read(base+0x1a6caa0,actual)||actual!=expected)throw std::runtime_error("Controller rig skin publication signature differs");

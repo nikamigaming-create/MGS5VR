@@ -8,7 +8,7 @@ zoom remains reserved at the user's request.
 
 | Area | Work and required playable check | Current gate |
 | --- | --- | --- |
-| Arms and visible gear | Correct skinning, wrist roll, support, reach, cuffs; preserve complete shadows | Standing sleeve edges improved in both-eye SIM and 14.722-second clip; prone ground contact, close-up clipping, all poses/outfits and physical fit remain open |
+| Arms and visible gear | Correct skinning, wrist roll, support, reach, cuffs; preserve complete shadows | Standing sleeves and reproduced prone ground penetration improved in both-eye SIM and compact clips; other terrain, close garment/hand presentation, all poses/outfits and physical fit remain open |
 | Weapons | Draw/stow, category swap, aim, fire, impact/obstruction, reload; each family and alternate action | Rifle/pistol partial; remaining families unproven |
 | Loot and recovery | Automatic ammo pickup, held weapon swap, plants, materials, containers, pick up/set down/throw bodies, Fulton; distinguish taps from holds and show contextual feedback | Unproven in tracked VR |
 | Items and combat | Throwables, placement, binocular marking, bionic arm, CQC, grab/interrogate/carry, Fulton, healing and consumables | Item selection and Phantom Cigar observed; broader interactions unproven |
