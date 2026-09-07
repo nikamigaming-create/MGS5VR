@@ -1,5 +1,10 @@
 # Sky crop and wrist SIM review — 2026-09-07
 
+This records the SIM review before physical launch. A subsequent Quest 3 run
+received positive basic-experience feedback with low resolution/jaggies remaining;
+see [HEADSET_SHARPNESS_REVIEW.md](HEADSET_SHARPNESS_REVIEW.md). Unproven physical
+claims below describe the state at the time of this SIM review.
+
 The user's capture showed a large rectangular lighting boundary in the sky.
 Rendering a centered enclosing field removed that sampled boundary. Submitting
 the whole enlarged field had previously failed physical stereo acceptance, so

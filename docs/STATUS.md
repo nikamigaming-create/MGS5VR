@@ -3,27 +3,25 @@
 Updated 2026-09-07. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
-The latest physical Quest 3 test of `C367CC6F` **failed stereo acceptance**:
-the user reported incompatible left/right views across the whole landscape.
-The earlier centered-FOV submission was rolled back. The latest candidate instead
-crops a centered native render to each eye's requested optics, with matching
-projection rays. Its physical validation is pending. The attempted `70779290`
-physical rollback also failed:
-the user reported garbled limbs, low resolution and flat or inconsistent UI depth.
-There is no accepted physical recovery build. Earlier SIM menu/arm results do
-not override these failures.
+The current physical Quest 3 run of `7BF543BE` received positive user feedback:
+the basic experience works well, with low resolution and jagged edges remaining.
+The same binary is now under a 2560x1440 native-resolution test. Read the
+[physical sharpness review](HEADSET_SHARPNESS_REVIEW.md) for the baseline and limits.
+Earlier builds `C367CC6F` and `70779290` failed stereo or limb/UI presentation;
+they remain failed references. The current positive report is not acceptance of
+every interaction, material, arm pose or transition.
 
 The current SIM review covers equipment cards above the left wrist, all four
 equipment categories, wrist movement, closing, and a head turn/lean without the
 large sky rectangle. The silent 14.714-second clip is 670,771 bytes and contains
 54 reviewed frames at 3.6 captures/second, with no blank frames. Both final eyes
 were also inspected. Blue marker streaks, a dotted patch, arm/garment extremes,
-physical stereo and a paused world behind the menu remain open. See
+broader physical acceptance and a paused world behind the menu remain open. See
 [sky/capture review](SKY_CROP_REVIEW.md) and [wrist picker](WRIST_PICKER_REVIEW.md).
 
 Earlier simulator slices implemented real weapon/status UI on the **left
-forearm**, removes the flat gameplay reticle and destination labels, stabilizes
-the visible rig, and adds native equipment selection. Zoom is reserved so aiming
+forearm**, removed the flat gameplay reticle and destination labels, adjusted
+the visible rig, and added native equipment selection. Zoom is reserved so aiming
 stays in stereo. Hidden body/head meshes now retain their native shadow casting;
 an earlier 14.811-second, 1.38 MB SIM clip shows the full person silhouette and
 tracked arm movement in 44 reviewed frames at 2.903 captures/second.

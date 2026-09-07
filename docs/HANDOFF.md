@@ -1,26 +1,28 @@
 # Development handoff - 2026-09-07
 
-Physical C367 headset acceptance failed: the user reported incompatible views
-across the entire landscape. The earlier full-image centered-FOV submission from
-dbd361a was rolled back. The current candidate renders centered coverage but crops
-it to each runtime eye's optics, submitting the exact FOV of the rounded crop.
-The large rectangle is absent in current SIM captures. Do not call physical
-stereo fixed until the user confirms the replacement in the headset. Escaping
-blue triangles from marked people remain visible.
+The current Quest 3 run of `7BF543BE` received positive user feedback for the
+basic VR experience; low resolution and jagged edges remain. The working 1080p
+DLL/configuration is preserved privately, and the same DLL is now under physical
+test at native 2560x1440. Read
+[HEADSET_SHARPNESS_REVIEW.md](HEADSET_SHARPNESS_REVIEW.md). This report does not
+close the complete gameplay, material or arm-pose gates. The earlier physical
+C367 stereo failure remains historical evidence. Centered native coverage is
+cropped to each runtime eye's optics, with exact angular bounds for the crop.
 
 The attempted `70779290` physical rollback also FAILED: the user reported garbled
 arms/legs, low resolution and flat or inconsistent UI depth. Do not reinstall it
 as an accepted recovery. `DA0CAED9` was the separate runtime-FOV rollback candidate
 with a visible sky rectangle. The current installed `7BF543BE` candidate has five
-passing local suites and a reviewed 14.714-second wrist/sky clip. No retained build
-has passing physical acceptance for the requested experience. Read
-[SKY_CROP_REVIEW.md](SKY_CROP_REVIEW.md) before another headset test.
+passing local suites and a reviewed 14.714-second wrist/sky clip. Its new positive
+physical report is distinct from the earlier failed builds. Full-mod acceptance
+remains open; [SKY_CROP_REVIEW.md](SKY_CROP_REVIEW.md) records the preceding SIM work.
 
-The current SIM run uses native 1920x1080 rendering with clouds On and the existing
+The last SIM run used native 1920x1080 rendering with clouds On and the existing
 1% checkpoint. An unused Meta Bedroom environment was consuming about 7.2 GB of
 dedicated GPU memory; stopping only that helper restored steady frame delivery.
 Leave unrelated applications alone. Use a per-process Meta runtime override and
-preserve the global physical OpenXR runtime. No physical test was launched here.
+preserve the global physical OpenXR runtime. The subsequent physical run uses the
+Oculus runtime and actual user inputs, with no simulator input layer.
 
 The build retains automatic iDroid/pause screen transitions and
 same-player return to VR. Map zoom/tab navigation, both final eyes, held-trigger
@@ -143,9 +145,9 @@ acceptance is therefore open. Do not claim that every weapon or interaction work
 Use the existing Continue/Resume checkpoint and equipped gear, with the native
 Action Type controller layout. Use OpenXR semantic input; no Windows key/mouse or
 focus automation. The per-process simulator selection preserves the system Oculus
-runtime. The current simulator session remains in native gameplay with inputs
-released. Do not silently start a
-physical session while the user requested simulator work.
+runtime. The user is now testing the physical headset at native 2560x1440.
+Do not replace that active session with SIM or change the working rig/stereo
+binary while evaluating sharpness.
 
 The known forward rifle grip for simulator inspection is local position
 `[0.16,-0.25,-0.30]`, quaternion xyzw
