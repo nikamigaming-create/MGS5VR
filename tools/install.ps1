@@ -1,5 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$GameDir,
+    [switch]$EnableVR,
     [switch]$EnableTheatrePreview,
     [switch]$EnableCameraObserver,
     [switch]$EnableHeadCameraExperiment,
@@ -8,6 +9,13 @@ param(
     [string]$CameraEvidenceDir
 )
 $ErrorActionPreference = 'Stop'
+if ($EnableVR) {
+    $EnableTheatrePreview = $true
+    $EnableCameraObserver = $true
+    $EnableHeadCameraExperiment = $true
+    $EnableControllerRigExperiment = $true
+    $EnableWristHudExperiment = $true
+}
 $mgsRoot = Split-Path -Parent $PSScriptRoot
 $mgsTarget = (Resolve-Path -LiteralPath $GameDir).Path
 $mgsExe = Join-Path $mgsTarget 'mgsvtpp.exe'
@@ -62,4 +70,8 @@ try {
     foreach ($mgsName in $mgsCreated) { Remove-Item -LiteralPath (Join-Path $mgsTarget $mgsName) }
     throw
 }
-Write-Output "Installed theatre preview into $mgsTarget (enabled=$($EnableTheatrePreview.IsPresent)). Game executable and archives were not modified."
+$mgsMode = if ($EnableHeadCameraExperiment) { 'tracked VR' } elseif ($EnableTheatrePreview) { 'large-screen preview' } else { 'disabled preview' }
+Write-Output "Installed MGS5VR ($mgsMode) into $mgsTarget. Game executable, archives and saves were not modified."
+if ($EnableHeadCameraExperiment) {
+    Write-Output 'Launch the game, load Continue/Resume Game, then hold left grip and click the left stick to enter VR.'
+}
