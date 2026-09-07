@@ -28,6 +28,17 @@ private:
     bool attached_{},candidate_{};
     uint64_t since_{},lastTime_{};
 };
+// Keep contact in the acquired weapon frame. During release, retain the last
+// presented offset so an unrelated stow animation cannot drag the free hand.
+class SupportPose {
+public:
+    std::optional<Pose> update(Pose nativeOffset,bool attached,bool manipulating);
+    void reset(){attached_=false;acquired_={};presented_.reset();}
+private:
+    bool attached_{};
+    Pose acquired_{};
+    std::optional<Pose> presented_;
+};
 // OpenXR grip frame from the native wrist and the index/little metacarpal heads.
 // Unlike activation-pose calibration this is independent of the camera and of
 // where the user happened to hold the controller when enabling VR.

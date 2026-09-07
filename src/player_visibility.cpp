@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <array>
 #include <algorithm>
+#include <sstream>
 
 namespace {
 uintptr_t base{};
@@ -105,6 +106,16 @@ void conceal(Binding candidate){
     std::array<bool,128> bodyConceal{};
     if(candidate.body&&!bodyBranches(candidate.model,groups,count,bodyConceal))return;
     const auto flags=get<uintptr_t>(candidate.model+0x170);if(!flags)return;
+    if(candidate.body){
+        static uintptr_t observedModel{};
+        static std::array<uint32_t,3> observed{};
+        const std::array<uint32_t,3> current{groupFlags(candidate,armName),get<uint8_t>(flags),get<uint32_t>(candidate.model+0x1a4)};
+        if(observedModel!=candidate.model||observed!=current){
+            observedModel=candidate.model;observed=current;
+            std::ostringstream s;s<<"Player arm visibility arm="<<current[0]<<" root="<<current[1]<<" model="<<current[2];
+            mgs5vr::log(s.str());
+        }
+    }
     for(uint16_t i=0;i<count;++i){
         if(candidate.body&&!bodyConceal[i])continue;
         uint8_t previous{};if(!read(flags+i,previous)||!(previous&4))continue;

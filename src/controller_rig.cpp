@@ -49,6 +49,7 @@ uintptr_t boundModel{};
 uint64_t activation{},updates{};
 std::array<Vec3,2> bendHistory{};
 SupportContact supportContact;
+SupportPose supportPose;
 float supportBlend{};
 float aimBlend{};
 Quat guidedOffset{};
@@ -193,7 +194,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             bendHistory[i]=bone(q,p,wrists[i]-1).position-bone(q,p,shoulders[i]).position;
         }
         boundOwner=owner;boundModel=model;activation=frame.activation;
-        supportContact.reset();
+        supportContact.reset();supportPose.reset();
         supportBlend=0;aimBlend=0;guidedOffset={};heldSupportOffset={};supportAt=now;
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
@@ -287,6 +288,13 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const bool support=nearSupport;
     const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/180.f:1.f,1.f);supportAt=now;
     supportBlend=std::clamp(supportBlend+(support?step:-step),0.f,1.f);
+    // A menu, stow, non-firearm or lost controller releases ownership now.
+    // Distance release can blend out, but never toward a new native stow pose.
+    if(!frame.controllers.weaponReady||!firearmActive||inspecting||!frame.controllers.hands[0].gripTracked){
+        supportBlend=0;aimBlend=0;supportPose.reset();
+    }
+    const auto presentedSupport=supportPose.update(supportOffset,nearSupport,nativeManipulation).value_or(supportOffset);
+    attached=compose(right->pose.wrist,presentedSupport);
     bool guiding=nearSupport&&nativeManipulation&&aimBlend>0;
     if(barrelInGrip&&frame.controllers.hands[0].gripTracked&&nearSupport){
         if(const auto guided=twoHandGrip(grips[1],grips[0],*barrelInGrip,1.f)){
@@ -304,7 +312,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         if(!right)return false;
         replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
         bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
-        attached=compose(right->pose.wrist,supportOffset);
+        attached=compose(right->pose.wrist,presentedSupport);
     }
     if(supportBlend>=1){
         // Lift the held weapon and its support contact together; do not slide
@@ -317,7 +325,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 right=raised;
                 replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
                 bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
-                attached=compose(right->pose.wrist,supportOffset);
+                attached=compose(right->pose.wrist,presentedSupport);
             }
         }
     }
@@ -424,13 +432,18 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         shotRig.throwTracked=true;
     }
     if(++updates%120==1){
+        const auto headFromModel=compose(inverse(frame.nativePose),*root);
+        const auto leftView=compose(headFromModel,bone(q,p,8)).position;
+        const auto rightView=compose(headFromModel,bone(q,p,12)).position;
         std::ostringstream s;s<<"Controller rig updates="<<updates<<" tracking="<<frame.trackingSequence
             <<" predicted="<<frame.controllers.predictedXrTime<<" player="<<frame.playerSequence
             <<" right_wrist="<<right->pose.wrist.position.x<<','<<right->pose.wrist.position.y<<','<<right->pose.wrist.position.z
             <<" reach_clamped="<<right->reachClamped<<" support="<<supportBlend<<" support_aim="<<aimBlend<<" articulated_hands="<<articulatedHands
             <<" support_near="<<nearSupport<<" support_distance="<<std::sqrt(dot(separation,separation))
             <<" hand_distance="<<std::sqrt(dot(handSeparation,handSeparation))
-            <<" inspecting="<<inspecting<<" arm_helpers="<<helpersMatch<<" ground_contacts="<<groundContacts;log(s.str());
+            <<" inspecting="<<inspecting<<" arm_helpers="<<helpersMatch<<" ground_contacts="<<groundContacts
+            <<" left_head="<<leftView.x<<','<<leftView.y<<','<<leftView.z
+            <<" right_head="<<rightView.x<<','<<rightView.y<<','<<rightView.z;log(s.str());
     }
     return true;
 }
@@ -511,6 +524,7 @@ struct PendingThrow {
     uintptr_t velocityCaller{};
     uint64_t time{},tracking{},rig{};
     PointThrow solution{};float velocityW{};
+    Vector4* origin{};
 };
 thread_local PendingThrow pendingThrow;
 std::optional<PendingThrow> controllerThrow(void* context,void* state,uint32_t index,uintptr_t velocityCaller){
@@ -562,15 +576,18 @@ void throwOrigin(void* context,void* state,uint32_t index,Vector4* origin,Vector
     if(!velocityCaller)return;
     if(const auto request=controllerThrow(context,state,index,velocityCaller)){
         pendingThrow=*request;
-        origin->x=request->solution.origin.x;origin->y=request->solution.origin.y;origin->z=request->solution.origin.z;
+        pendingThrow.origin=origin;
     }
 }
 void throwVelocity(void* context,void* state,uint32_t index,Vector4* velocity){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const auto request=pendingThrow;pendingThrow={};
-    const auto now=steadyMilliseconds();
     if(request.context!=context||request.state!=state||request.index!=index||request.velocityCaller!=caller
-       ||now<request.time||now-request.time>50){originalThrowVelocity(context,state,index,velocity);return;}
+       ||!request.origin){originalThrowVelocity(context,state,index,velocity);return;}
+    // Both verified callers retain the origin in their own request storage and
+    // call velocity immediately next. Publish the pair here: an unmatched call
+    // leaves the original origin intact, including after a scheduling delay.
+    request.origin->x=request.solution.origin.x;request.origin->y=request.solution.origin.y;request.origin->z=request.solution.origin.z;
     *velocity={request.solution.velocity.x,request.solution.velocity.y,request.solution.velocity.z,request.velocityW};
     static std::atomic_uint64_t requests{};
     const auto count=++requests;

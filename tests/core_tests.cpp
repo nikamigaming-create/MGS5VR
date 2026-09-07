@@ -378,6 +378,21 @@ int main(){
            "forearm HUD remains attached through character translation and turning");
     expect(!forearmPanel(watchElbow,watchWrist,{1,0,0}),"undefined forearm normal cannot produce a face HUD");
     SupportContact support;
+    SupportPose supportPose;
+    const Pose acquiredSupport{{},{.25f,0,.12f}},animatedReload{{},{.15f,.2f,.05f}},stowingSupport{{},{-.4f,2.f,-.3f}};
+    expect(!supportPose.update(acquiredSupport,false,false),"a free hand has no acquired support pose");
+    auto presentedSupport=supportPose.update(acquiredSupport,true,false);
+    expect(presentedSupport&&same(presentedSupport->position,acquiredSupport.position),"support acquires the current weapon contact");
+    presentedSupport=supportPose.update(stowingSupport,true,false);
+    expect(presentedSupport&&same(presentedSupport->position,acquiredSupport.position),"ordinary animation changes cannot move acquired support into the sky");
+    presentedSupport=supportPose.update(animatedReload,true,true);
+    expect(presentedSupport&&same(presentedSupport->position,animatedReload.position),"an attached native reload can animate contact");
+    presentedSupport=supportPose.update(stowingSupport,false,false);
+    expect(presentedSupport&&same(presentedSupport->position,animatedReload.position),"release blends from the last presented contact instead of chasing stow animation");
+    presentedSupport=supportPose.update(acquiredSupport,true,false);
+    expect(presentedSupport&&same(presentedSupport->position,acquiredSupport.position),"new contact reacquires its own weapon pose");
+    supportPose.reset();
+    expect(!supportPose.update(stowingSupport,false,false),"menu or tracking reset cannot retain a support presentation");
     expect(!support.update(true,true,.25f,1000)&&!support.update(true,true,.25f,1200),"a free palm away from the weapon support grip stays one-handed");
     expect(!support.update(true,true,.09f,1300)&&!support.update(true,true,.09f,1400)
         &&support.update(true,true,.09f,1450),"support engages only after dwelling at the actual weapon grip");

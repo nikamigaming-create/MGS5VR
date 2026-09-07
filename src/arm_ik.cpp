@@ -157,6 +157,15 @@ bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time
     if(time-since_>=150){attached_=true;candidate_=false;}
     return attached_;
 }
+std::optional<Pose> SupportPose::update(Pose nativeOffset,bool attached,bool manipulating){
+    if(!valid(nativeOffset)){reset();return {};}
+    if(attached){
+        if(!attached_)acquired_=nativeOffset;
+        presented_=manipulating?nativeOffset:acquired_;
+    }
+    attached_=attached;
+    return presented_;
+}
 std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuckle){
     if(!valid(wrist)||!valid(Pose{{},indexKnuckle})||!valid(Pose{{},littleKnuckle}))return {};
     const auto across=littleKnuckle-indexKnuckle;
