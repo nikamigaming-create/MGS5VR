@@ -67,12 +67,13 @@ scope/alternate weapon modes and stale or unmatched rig publications use the nat
 shot path and do not establish controller aiming. Do not treat that fallback as
 tracked aiming. Collision near walls and all weapon families require further work.
 
-Right grip holds the native gun ready; right trigger fires. Left grip requests
-support-hand contact. Tracked hand proximity also acquires contact within 30 cm, releases beyond
-45 cm, and gives way to wrist inspection. Selection retains support intent while
-the gun is stowed, then checks the tracked hand distance again. Left trigger is the equipment modifier. Native reload
-and bolt-cycle state temporarily own support contact, with a 120 ms attach/release
-blend. The right hand remains the weapon's primary grip. During two-handed aim,
+Right grip holds the native gun ready; right trigger fires. Corrective source
+requires the tracked palm to dwell within 10 cm of the actual weapon support
+grip for 150 ms, releasing beyond 20 cm. The former hand-to-hand distance test
+and left-grip override were rejected in the headset. Wrist inspection and
+equipment selection clear contact. Native reload and bolt-cycle animation own
+an already acquired support hand; they do not acquire a free hand. Attachment
+blends over 180 ms. The right hand remains the weapon's primary grip. During two-handed aim,
 the authored muzzle axis swings toward the line between the controllers. Using
 the animated palm-to-palm vector instead can point the gun sideways during a
 support animation; the muzzle and firing path share the same socket chain.

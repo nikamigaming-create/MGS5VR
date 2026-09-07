@@ -20,10 +20,13 @@ std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Qu
 std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal);
 class SupportContact {
 public:
-    bool update(bool ready,bool tracked,float distance);
-    void reset(){attached_=false;}
+    // Distance is from the tracked palm to the weapon's support grip.
+    bool update(bool ready,bool tracked,float distance,uint64_t time);
+    bool attached() const {return attached_;}
+    void reset(){attached_=false;candidate_=false;since_=lastTime_=0;}
 private:
-    bool attached_{};
+    bool attached_{},candidate_{};
+    uint64_t since_{},lastTime_{};
 };
 // OpenXR grip frame from the native wrist and the index/little metacarpal heads.
 // Unlike activation-pose calibration this is independent of the camera and of

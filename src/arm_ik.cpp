@@ -50,13 +50,18 @@ std::optional<Pose> twoHandGrip(Pose primary,Pose support,Vec3 forwardInPrimary,
 }
 std::optional<Quat> fingerJointRotation(bool right,unsigned finger,unsigned joint,float curl){
     if(finger>=5||joint>=3||!std::isfinite(curl)||curl<0||curl>1)return {};
-    constexpr float flexion[5][3]={{35,55,60},{70,85,50},{80,95,60},{80,95,60},{85,95,60}};
     const float side=right?1.f:-1.f;
+    if(finger==0){
+        // The thumb's authored chain already slopes toward the palm. Its
+        // hinge closes across the palm about Y, unlike the fingers' Z curl.
+        // Applying finger flexion here folds the thumb backward at the wrist.
+        constexpr float across[3]{35,30,35};
+        const float angle=-side*across[joint]*curl*.00872664626f;
+        return Quat{0,std::sin(angle),0,std::cos(angle)};
+    }
+    constexpr float flexion[5][3]={{35,55,60},{70,85,50},{80,95,60},{80,95,60},{85,95,60}};
     const float angle=side*flexion[finger][joint]*curl*.00872664626f;
-    const Quat flex{0,0,std::sin(angle),std::cos(angle)};
-    if(finger||joint)return flex;
-    const float opposition=-side*30.f*curl*.00872664626f;
-    return turn(Quat{0,std::sin(opposition),0,std::cos(opposition)},flex);
+    return Quat{0,0,std::sin(angle),std::cos(angle)};
 }
 std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprightHead){
     if(!valid(chest)||!valid(uprightHead)||!valid(Pose{{},shoulderCenter}))return {};
@@ -143,12 +148,14 @@ std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal){
     const auto p=wrist.position-segment*0.35f+z*0.025f;
     return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,p.x,p.y,p.z,1});
 }
-bool SupportContact::update(bool ready,bool tracked,float distance){
-    if(!tracked||!std::isfinite(distance)||distance<0)attached_=false;
-    else if(ready)attached_=distance<(attached_?0.45f:0.30f);
-    // Lowering for selection releases the rendered hand but retains contact
-    // intent. The newly readied weapon still has to be within release range.
-    return ready&&attached_;
+bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time){
+    if(!ready||!tracked||!std::isfinite(distance)||distance<0||time<lastTime_){reset();return false;}
+    lastTime_=time;
+    if(attached_){if(distance<.20f)return true;reset();return false;}
+    if(distance>=.10f){candidate_=false;return false;}
+    if(!candidate_){candidate_=true;since_=time;}
+    if(time-since_>=150){attached_=true;candidate_=false;}
+    return attached_;
 }
 std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuckle){
     if(!valid(wrist)||!valid(Pose{{},indexKnuckle})||!valid(Pose{{},littleKnuckle}))return {};

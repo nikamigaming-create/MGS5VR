@@ -18,7 +18,6 @@ struct ControllerFrame {
     std::array<TrackedHand,2> hands{};
     int64_t predictedXrTime{};
     uint64_t referenceEpoch{};
-    bool supportRequested{};
     bool weaponReady{};
     bool vehicleControls{};
 };

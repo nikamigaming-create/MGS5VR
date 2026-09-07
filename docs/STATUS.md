@@ -3,11 +3,16 @@
 Updated 2026-09-07. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
-The latest candidate adds articulated free fingers, support-controller barrel
+The latest physical test rejected backward thumb motion and unwanted automatic
+support-hand attachment. The corrective source changes the thumb hinge and
+requires deliberate proximity to the actual weapon grip; physical acceptance
+is pending. PR publication remains a draft and the release is held.
+
+The candidate adds articulated free fingers, support-controller barrel
 aiming, a smaller wrist picker and right-stick selection while the left stick
 keeps moving. Its release build and six test suites pass. A small 15-second SIM
 clip and both-eye observations are recorded in the [hands/wrist review](HANDS_WRIST_REVIEW.md).
-Shoulder removal and physical acceptance of these changes remain open.
+Shoulder removal and physical acceptance of the corrections remain open.
 
 The earlier physical Quest 3 run of `7BF543BE` received positive user feedback:
 the basic experience works well, with low resolution and jagged edges remaining.

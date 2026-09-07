@@ -326,7 +326,6 @@ struct Session {
             const auto mode=nativeTravelMode();
             const auto mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode);
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
-            controllerFrame.supportRequested=mapped.supportRequested;
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
         }else if(nativeStatus.awaitingPlayer)rigControls.suspend();
         else rigControls.reset();

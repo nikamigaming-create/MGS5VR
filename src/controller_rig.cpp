@@ -48,6 +48,7 @@ SupportContact supportContact;
 float supportBlend{};
 float aimBlend{};
 Quat guidedOffset{};
+Pose heldSupportOffset{};
 uint64_t supportAt{};
 struct ShotRig {
     uintptr_t owner{},character{},camera{},model{};
@@ -187,7 +188,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
         boundOwner=owner;boundModel=model;activation=frame.activation;
         supportContact.reset();
-        supportBlend=0;aimBlend=0;guidedOffset={};supportAt=now;
+        supportBlend=0;aimBlend=0;guidedOffset={};heldSupportOffset={};supportAt=now;
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
     const auto rightAnimated=bone(q,p,12),leftAnimated=bone(q,p,8);
@@ -254,22 +255,33 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     const auto supportOffset=compose(inverse(rightAnimated),leftAnimated);
     auto attached=compose(right->pose.wrist,supportOffset);
-    const auto attachedGrip=compose(attached,inverse(gripFromWrist[0]));
+    // Test the actual support grip, never controller-to-controller distance.
+    // While attached, retain the acquired contact frame through native reload
+    // animation and evaluate it in the currently guided weapon frame.
+    const bool wasAttached=supportContact.attached();
+    const auto contactPrimary=compose(grips[1],Pose{blendRotation({},guidedOffset,aimBlend),{}});
+    auto contactWrist=right->pose.wrist;
+    if(aimBlend>0)if(const auto solved=groundedArm(rightAnimatedArm,clearWrist(compose(contactPrimary,gripFromWrist[1])),bendHistory[1],armBasis[1]))
+        contactWrist=solved->pose.wrist;
+    const auto contactPose=compose(contactWrist,wasAttached?heldSupportOffset:supportOffset);
+    const auto attachedGrip=compose(contactPose,inverse(gripFromWrist[0]));
     const auto separation=grips[0].position-attachedGrip.position;
     const auto handSeparation=grips[0].position-grips[1].position;
     const auto towardHead=frame.headPose.position-frame.controllers.hands[0].grip.position;
     const auto dorsal=rotate(frame.controllers.hands[0].grip.orientation,{-1,0,0});
     const bool inspecting=dot(towardHead,towardHead)<0.49f
         &&dot(dorsal,towardHead)>0.5f*std::sqrt(dot(towardHead,towardHead));
-    // Turning the watch toward the eyes must free the hand even beside a pistol.
-    const bool nearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&!inspecting,
-        frame.controllers.hands[0].gripTracked,std::sqrt(dot(handSeparation,handSeparation)));
-    const bool support=(frame.controllers.weaponReady&&firearmActive&&frame.controllers.supportRequested)||nativeManipulation||nearSupport;
-    const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/120.f:1.f,1.f);supportAt=now;
+    // Clenching the left controller only articulates its fingers. Contact must
+    // dwell at the weapon; inspection, lowering, tracking loss and pulling away
+    // release it. A one-handed reload does not grab a distant tracked hand.
+    const bool nearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&!inspecting&&(!nativeManipulation||wasAttached),
+        frame.controllers.hands[0].gripTracked,std::sqrt(dot(separation,separation)),now);
+    if(nearSupport&&!wasAttached)heldSupportOffset=supportOffset;
+    const bool support=nearSupport;
+    const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/180.f:1.f,1.f);supportAt=now;
     supportBlend=std::clamp(supportBlend+(support?step:-step),0.f,1.f);
-    bool guiding=false;
-    if(barrelInGrip&&frame.controllers.hands[0].gripTracked
-       &&(frame.controllers.supportRequested||nearSupport)){
+    bool guiding=nearSupport&&nativeManipulation&&aimBlend>0;
+    if(barrelInGrip&&frame.controllers.hands[0].gripTracked&&nearSupport){
         if(const auto guided=twoHandGrip(grips[1],grips[0],*barrelInGrip,1.f)){
             guidedOffset=compose(inverse(grips[1]),*guided).orientation;guiding=true;
         }

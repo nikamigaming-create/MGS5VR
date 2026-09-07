@@ -361,22 +361,26 @@ int main(){
            "forearm HUD remains attached through character translation and turning");
     expect(!forearmPanel(watchElbow,watchWrist,{1,0,0}),"undefined forearm normal cannot produce a face HUD");
     SupportContact support;
-    expect(!support.update(true,true,.4f)&&support.update(true,true,.25f),"bringing the tracked hands together acquires support");
-    expect(support.update(true,true,.4f),"support survives contact movement through a weapon swap");
-    expect(!support.update(true,true,.46f)&&!support.update(true,true,.4f),"pulling away releases support without edge chatter");
-    expect(support.update(true,true,.1f)&&!support.update(true,false,.1f),"lost hand tracking releases automatic support");
-    expect(support.update(true,true,.1f)&&!support.update(false,true,.1f),"lowering the gun releases automatic support");
-    expect(support.update(true,true,.4f),"readying a different nearby weapon restores the prior support contact");
-    support.update(false,true,.5f);
-    expect(!support.update(true,true,.5f),"selection cannot reattach a hand that has moved away");
+    expect(!support.update(true,true,.25f,1000)&&!support.update(true,true,.25f,1200),"a free palm away from the weapon support grip stays one-handed");
+    expect(!support.update(true,true,.09f,1300)&&!support.update(true,true,.09f,1400)
+        &&support.update(true,true,.09f,1450),"support engages only after dwelling at the actual weapon grip");
+    expect(support.update(true,true,.19f,1500),"a small movement at the acquired grip retains support");
+    expect(!support.update(true,true,.21f,1600)&&!support.update(true,true,.19f,1800),"pulling away releases support without edge chatter");
+    support.update(true,true,.05f,2000);
+    expect(support.update(true,true,.05f,2150)&&!support.update(true,false,.05f,2160),"lost hand tracking releases support");
+    support.update(true,true,.05f,2300);
+    expect(support.update(true,true,.05f,2450)&&!support.update(false,true,.05f,2460),"lowering or inspecting releases support");
+    expect(!support.update(true,true,.15f,2600),"selection does not preserve a sticky two-hand latch");
+    support.update(true,true,.05f,2700);
+    expect(!support.update(true,true,.05f,2800)&&!support.update(true,true,.05f,2750),"a regressed contact clock resets the dwell");
     RigInput travelInput;
     GamepadSample triggerOnly{};triggerOnly.rightTrigger=255;
     const auto cqc=travelInput.update(triggerOnly,false,false,TravelMode::onFoot);
     expect(cqc.gamepad.rightTrigger==255&&cqc.gamepad.leftTrigger==0&&!cqc.weaponReady,
            "lowered weapon retains the native attack/CQC trigger without aiming");
     const auto readyGun=travelInput.update(triggerOnly,true,true,TravelMode::onFoot);
-    expect(readyGun.gamepad.leftTrigger==255&&readyGun.gamepad.rightTrigger==255&&readyGun.supportRequested,
-           "on-foot grip still readies and supports the firearm");
+    expect(readyGun.gamepad.leftTrigger==255&&readyGun.gamepad.rightTrigger==255&&readyGun.weaponReady,
+           "right grip readies the firearm; left grip no longer forces support");
     expect(travelInput.update(triggerOnly,true,true,TravelMode::vehicle).gamepad==GamepadSample{},
            "entering a vehicle cannot carry firing input into accelerator or mounted attack");
     travelInput.update({},false,false,TravelMode::vehicle);
@@ -469,7 +473,7 @@ int main(){
     GamepadSample walkingSelection{0,255,255,15000,28000,0,0};
     auto selectionInput=wristInput.update(walkingSelection,true,true,TravelMode::onFoot);
     expect(selectionInput.gamepad.leftX==15000&&selectionInput.gamepad.leftY==28000&&selectionInput.gamepad.buttons==1
-        &&selectionInput.gamepad.leftTrigger==0&&selectionInput.gamepad.rightTrigger==0&&!selectionInput.weaponReady&&!selectionInput.supportRequested,
+        &&selectionInput.gamepad.leftTrigger==0&&selectionInput.gamepad.rightTrigger==0&&!selectionInput.weaponReady,
         "selection frees the wrist, lowers the weapon and consumes fire while movement continues");
     walkingSelection.leftTrigger=100;
     expect(wristInput.update(walkingSelection,false,true,TravelMode::onFoot).gamepad.buttons==1,"trigger hysteresis keeps the picker open through a partial release");
@@ -498,8 +502,21 @@ int main(){
         expect(leftOpen&&rightOpen&&same(rotate(*leftOpen,{1,0,0}),{1,0,0})&&same(rotate(*rightOpen,{-1,0,0}),{-1,0,0}),
             "released controller fingers retain the authored straight bind pose");
         const auto leftCurl=fingerJointRotation(false,finger,joint,1),rightCurl=fingerJointRotation(true,finger,joint,1);
-        expect(leftCurl&&rightCurl&&rotate(*leftCurl,{1,0,0}).y<0&&rotate(*rightCurl,{-1,0,0}).y<0,
-            "both hands curl toward the palm rather than bending backward");
+        expect(leftCurl&&rightCurl&&(finger
+            ?rotate(*leftCurl,{1,0,0}).y<0&&rotate(*rightCurl,{-1,0,0}).y<0
+            :rotate(*leftCurl,{1,0,0}).z<0&&rotate(*rightCurl,{-1,0,0}).z<0),
+            "fingers curl into the palm while mirrored thumbs close across it");
+    }
+    for(const bool rightHand:{false,true}){
+        const float side=rightHand?-1.f:1.f;
+        Pose thumb{{},{0,0,.03f}};
+        const Vec3 segments[]{{side*.04f,-.01f,.008f},{side*.03f,-.01f,0},{side*.02f,0,0}};
+        for(unsigned joint=0;joint<3;++joint){
+            thumb=compose(thumb,Pose{*fingerJointRotation(rightHand,0,joint,1),{}});
+            thumb.position=thumb.position+rotate(thumb.orientation,segments[joint]);
+        }
+        expect(side*thumb.position.x>.02f&&thumb.position.z<0&&thumb.position.z>-.06f&&near(thumb.position.y,-.02f),
+            "closed thumb stays in front of the wrist and crosses the palm without folding backward");
     }
     expect(!fingerJointRotation(false,5,0,1)&&!fingerJointRotation(false,0,3,1)&&!fingerJointRotation(false,0,0,-1),"invalid finger channels are rejected");
     GamepadMailbox gamepad;

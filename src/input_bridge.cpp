@@ -56,7 +56,7 @@ RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,T
     }
     if(mode==TravelMode::vehicle){
         if(leftGrip)raw.buttons|=0x0100;
-        return {equipment_.update(raw,rightGrip,false),false,false};
+        return {equipment_.update(raw,rightGrip,false),false};
     }
     const bool modifier=raw.leftTrigger>(wristMode_?64:127);
     wristMode_=modifier;
@@ -67,7 +67,7 @@ RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,T
     if(modifier||fireReleaseRequired_)raw.rightTrigger=0;
     // The Action Type trigger also performs CQC and throws carried bodies
     // while the weapon is lowered. Let the native action state choose it.
-    return {equipment_.update(raw,modifier,false),ready,leftGrip&&!modifier};
+    return {equipment_.update(raw,modifier,false),ready};
 }
 uint16_t MenuButton::update(bool pressed,bool active,uint64_t time){
     if(!active||time<lastTime_){

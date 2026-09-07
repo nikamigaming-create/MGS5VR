@@ -15,8 +15,8 @@ reticle or destination-letter overlay in gameplay. Native 3D people cues remain.
 | Fire | **Right trigger**, while holding right grip |
 | Lower the gun while keeping it in hand | Keep right grip held and lower your hand |
 | Put the weapon away | Release right grip; the game performs its native stow animation |
-| Add the support hand | Bring the left hand near the weapon, or hold **left grip** |
-| Free the left hand | Release left grip and move the hand away, or turn the wrist HUD toward your eyes |
+| Add the support hand | Bring the left palm to the weapon's support grip and hold it there briefly |
+| Free the left hand | Pull the hand away, or turn the wrist HUD toward your eyes |
 | Reload | **Right B**; the native reload moves the support hand, then releases it |
 | Read the HUD | Raise and turn your **left forearm** toward your eyes |
 
@@ -31,10 +31,12 @@ the index and thumb. These are controller-driven poses, not individual finger
 tracking. Hands in contact with a weapon retain its native grip animation.
 Grip and trigger keep their gameplay actions while also animating the fingers.
 
-Automatic support acquires when the tracked hands are within 30 cm and releases
-beyond 45 cm. It retains contact intent while changing weapons, then checks the
-tracked hand distance again. Turning the left wrist toward the eyes frees automatic
-support for reading; holding left grip still explicitly requests support.
+Support requires the left palm to stay within 10 cm of the weapon's support grip
+for 150 ms, then blends into contact. Pulling more than 20 cm away releases it.
+Clenching left grip only animates the free fingers; it cannot force two-handed
+mode. Lowering the weapon or inspecting the wrist clears contact, so selection
+does not leave a sticky support latch. These corrected thresholds still need
+physical acceptance after the first build attached too readily.
 
 ## Equipment selection
 

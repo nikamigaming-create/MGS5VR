@@ -1,6 +1,23 @@
 # Finger articulation and wrist selection review
 
-2026-09-07 candidate DLL SHA-256:
+**Physical test failed thumb and support-hand acceptance. Release is held.**
+The user reported backward thumb motion and unwanted two-hand attachment that
+obscured the firing hand. The SIM observations below did not catch those defects.
+
+The corrective source separates thumb flexion from finger flexion, removes the
+left-grip support override, and requires the palm to dwell within 10 cm of the
+weapon's support grip for 150 ms. Pulling more than 20 cm away releases contact.
+The acquired contact survives native reload motion, but a one-handed reload does
+not grab a free hand. Attachment blends over 180 ms. This correction still needs
+final-eye/headset acceptance; there is no new passing video for it yet.
+
+Corrective DLL SHA-256:
+`4DC82F49C7CB6644D27F5D7B205866766C68ED6EE359B97EBF6FA4DCC6A23123`.
+It is installed with the game closed; its Release build and all six local CTest
+suites pass, including contact dwell/release and a complete mirrored thumb-chain
+fixture that rejects folding behind the wrist.
+
+Rejected 2026-09-07 candidate DLL SHA-256:
 `9028782E9291BE7DE50B52B2D6C5C5138688D003249BEBC35B68266E9429EE7A`.
 
 The current change adds controller-driven finger articulation, two-controller
@@ -34,8 +51,10 @@ remove the earlier approximately 60 FPS producer limit. Isolated SIM motion
 tests were mostly in the high 80s to 90 fresh stereo FPS, with brief 80–84 FPS
 stretches. The 900p trial lowered GPU time without eliminating those dips, so
 1080p was retained. Later live windows on this candidate reported about 89.5–89.6
-fresh FPS with other GPU work running. These are samples, not a whole-game or
-physical-headset guarantee. See [performance measurement](PERFORMANCE.md).
+fresh FPS with other GPU work running. Complete windows from the subsequent
+physical Quest 3 gameplay run reported roughly 86.6–89.2 fresh FPS; transition
+and session-recovery windows were lower. These are samples, not a whole-game
+guarantee. See [performance measurement](PERFORMANCE.md).
 
 ## Verification and unfinished work
 

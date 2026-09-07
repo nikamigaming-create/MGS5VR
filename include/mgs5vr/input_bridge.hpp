@@ -22,7 +22,7 @@ private:
     unsigned category_{};
 };
 enum class TravelMode { unknown,onFoot,horse,vehicle };
-struct RigInputSample { GamepadSample gamepad; bool weaponReady{},supportRequested{}; };
+struct RigInputSample { GamepadSample gamepad; bool weaponReady{}; };
 // Mounted vehicle triggers retain the game's accelerator/brake meanings.
 // A travel-mode transition consumes held controls until they are released.
 class RigInput {

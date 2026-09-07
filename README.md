@@ -48,7 +48,7 @@ your save. Installation is only needed once.
 | --- | --- |
 | Move / turn | Left stick / right stick |
 | Ready / fire | Hold right grip, then right trigger |
-| Support the weapon | Bring the left hand near it, or hold left grip |
+| Support the weapon | Bring the left palm to its support grip; pull away to release |
 | Reload | Right B |
 | Read ammo and status | Raise your left forearm |
 | Select equipment while moving | Hold left trigger; right stick up/down browses, left/right changes category; release trigger to finish |
