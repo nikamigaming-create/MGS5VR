@@ -2,6 +2,7 @@
 #include "mgs5vr/log.hpp"
 #include <iostream>
 #include <string>
+#include <iomanip>
 
 static std::string json(const std::string& s){
     std::string out="\"";
@@ -31,7 +32,18 @@ int main(int argc,char** argv){
     if(seconds)try{
         TextureMailbox mailbox;std::atomic_bool stop{false};
         const auto stats=runTheatre(mailbox,{},stop,std::chrono::seconds(seconds));
-        std::cout<<"{\"xr_frames\":"<<stats.frames<<",\"screen_submissions\":"<<stats.submittedScreens<<",\"note\":\"Session-only probe, no game pixels\"}\n";
+        std::cout<<std::setprecision(9)<<"{\"xr_frames\":"<<stats.frames<<",\"screen_submissions\":"<<stats.submittedScreens
+            <<",\"note\":\"Session-only probe, no game pixels\",\"have_views\":"<<(stats.haveViews?"true":"false");
+        const auto pose=[](Pose p){std::cout<<'['<<p.orientation.x<<','<<p.orientation.y<<','<<p.orientation.z<<','<<p.orientation.w
+            <<','<<p.position.x<<','<<p.position.y<<','<<p.position.z<<']';};
+        if(stats.haveViews){
+            std::cout<<",\"head\":";pose(stats.firstHead);std::cout<<",\"views\":[";
+            for(size_t n=0;n<2;++n){const auto& v=stats.firstViews[n];if(n)std::cout<<',';
+                std::cout<<"{\"pose\":";pose(v.pose);std::cout<<",\"fov\":["<<v.fov.left<<','<<v.fov.right<<','<<v.fov.up<<','<<v.fov.down<<"]}";
+            }
+            std::cout<<']';
+        }
+        std::cout<<"}\n";
         return stats.frames?0:3;
     }catch(const std::exception& e){std::cout<<"{\"session_error\":"<<json(e.what())<<"}\n";return 4;}
     return 0;

@@ -12,6 +12,8 @@ This repository is **not a complete VR conversion of The Phantom Pain**. It is a
 
 The requested gameplay view is first person: six-axis head tracking, tracked hands and equipped gear, and weapon/status UI on the left forearm. Complete native menus use a large spatial screen. See the [latest simulator review](docs/SIM_HUD_REVIEW.md) and [complete controls](docs/CONTROLS.md) for the tested slice and its limits.
 
+The latest physical headset test reported a cross-eyed landscape. The centered-FOV lighting change has been rolled back to the earlier runtime-provided eye projections. The replacement still requires a physical stereo check; this is not a polished release.
+
 The default mode captures the game's desktop image onto a large, world-anchored OpenXR quad. With `-EnableHeadCameraExperiment`, left grip plus left stick click toggles experimental native head tracking and same-frame stereo. Both eye cameras use one tracking snapshot; alternate-eye rendering is not used. The camera now anchors to the player's head bone and excludes the player's head model and body group while retaining arm groups. Aiming stays in stereo with the weapon's actual sights; optical zoom is reserved. iDroid and pause automatically use the large screen and restore tracked VR when the same player camera resumes. OpenXR controllers feed the game's own XInput import, without Windows key/mouse injection or window activation. Complete cinematic/loading transitions remain unverified.
 
 ## Build

@@ -5,6 +5,37 @@ headset acceptance. The complete [Touch control list](CONTROLS.md) describes the
 current input path. Optical zoom is reserved: aiming stays in the native stereo
 scene, using the equipped weapon's actual sights. No binocular/scope quad remains.
 
+## Physical stereo regression and projection rollback
+
+The physical Quest 3 run of C367CC6F failed: the user reported different,
+incompatible views of the whole landscape. The process was stopped. Earlier
+static SIM eye reviews did not reproduce or rule out that physical failure.
+The user also reports blue triangles escaping from the marked people into the sky.
+
+DLL `DA0CAED97097036128DA10393E53C667E94509801B626EDEE1DDFEB8C211230A`
+removes the centered-FOV adjustment introduced by dbd361a. The native eye
+projection and submitted image metadata again preserve the runtime's asymmetric
+optical centers, as in the earlier physically playable path. This is a rollback
+for diagnosis, not a confirmed root cause or a physical acceptance claim. The
+sky rectangle/lighting issue that motivated centering remains open.
+
+All five local test suites pass. The session-only probe now reports the first
+valid head/view poses and FOVs without submitting game pixels. The physical
+Quest 3 probe returned parallel eye orientations, 54/40-degree horizontal FOVs
+with mirrored left/right asymmetry, and 44/55-degree up/down extents.
+
+Six endpoint poses (forward, both yaw directions, roll, pitch/lean and return)
+were captured in both simulator eyes and visually reviewed. After correcting
+for the optical-center offset, median horizontal world disparity was 0.013–0.046
+degrees; 95th-percentile vertical disagreement was below 0.60 pixels. These are
+sequential-eye endpoint captures with correspondence outliers, not simultaneous
+motion or physical comfort proof. The sky rectangle returned and remains a
+visual failure. No complete stereo-fix claim is made.
+
+Because that SIM result cannot identify the physical failure, the exact earlier
+physically playable `70779290` DLL is the headset recovery baseline. The newer
+DA0C rollback candidate is retained separately for development.
+
 ## Automatic native menu return
 
 DLL `C367CC6FABCCA6254353D8B5F1571A9630A08ADC841F6CFE1BC8CC3CA60C6EC1`

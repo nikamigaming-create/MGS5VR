@@ -1,6 +1,19 @@
 # Development handoff - 2026-09-06
 
-The latest installed build adds automatic iDroid/pause screen transitions and
+Physical C367 headset acceptance failed: the user reported incompatible views
+across the entire landscape. The game was stopped. The centered-FOV change from
+dbd361a is rolled back; native draws and XR submission again use the unmodified
+runtime eye FOVs. The earlier sky rectangle may return. Do not call stereo fixed
+until the user confirms the replacement in the physical headset. Escaping blue
+triangles from marked people also remain a reported failure.
+
+For immediate headset recovery, install the retained exact `70779290` physical
+baseline. `DA0CAED9` is the separate runtime-FOV rollback candidate, with five
+local suites and six both-eye SIM endpoint poses checked. Its sky rectangle
+remains visible, and its physical stereo check is unproven. Keep these build
+identities distinct; the newer arm/menu behavior is not in the recovery DLL.
+
+The build retains automatic iDroid/pause screen transitions and
 same-player return to VR. Map zoom/tab navigation, both final eyes, held-trigger
 return and the manual override were checked. A 14.879-second menu clip contains
 54 reviewed frames and no black captures. This slice retains native collision contact for the arms, fixing
@@ -8,7 +21,7 @@ the reproduced prone hands going below the hillside. Both final eyes and a
 compact 14.785-second clip were inspected. The full arm/garment gate stays open.
 It retains context-action icons beside the left forearm, checked through horse
 mount/dismount, along with the shoulder-placement improvement, body/head shadow,
-centered projection and native listener tracking fixes. Read
+native listener tracking fixes. Read
 [SIM_HUD_REVIEW.md](SIM_HUD_REVIEW.md) for the evidence and open gates, and
 [CONTROLS.md](CONTROLS.md) for the complete Touch interaction list. The initial
 physical Quest 3 reference remains in [HEADSET_REVIEW.md](HEADSET_REVIEW.md).

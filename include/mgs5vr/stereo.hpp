@@ -16,9 +16,6 @@ struct EyeFrame {
     bool projected{},joined{};
 };
 bool valid(EyeFov fov);
-// FOX screen-space effects assume a centered frustum. Enclose the runtime FOV
-// and submit this same enlarged FOV with the image, preserving visible geometry.
-std::optional<EyeFov> centeredEyeFov(EyeFov fov);
 // FOX row-vector projection: camera +Z forward, -X screen-right. Retains the
 // engine's depth mapping while replacing the angular field and optical center.
 bool setEyeProjection(std::array<float,16>& matrix,EyeFov fov);

@@ -438,6 +438,9 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         const bool stereoTracked=viewCount==2&&(viewState.viewStateFlags&viewValidBits)==viewValidBits;
         std::array<EyeView,2> trackedViews{};
         for(size_t n=0;n<2;++n)trackedViews[n]={fromXr(views[n].pose),{views[n].fov.angleLeft,views[n].fov.angleRight,views[n].fov.angleUp,views[n].fov.angleDown}};
+        if(!stats.haveViews&&tracking&&stereoTracked){
+            stats.firstHead=fromXr(head.pose);stats.firstViews=trackedViews;stats.haveViews=true;
+        }
         headCamera().trackStereo(fromXr(head.pose),trackedViews,tracking&&stereoTracked&&session.focused,steadyMilliseconds(),session.controllerFrame);
         if(tracking&&(!anchored||session.recenterRequested)){
             screenPose=recenteredScreen(fromXr(head.pose),config.distanceMeters);anchored=true;session.recenterRequested=false;
