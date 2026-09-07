@@ -36,7 +36,7 @@ jobs:
       - name: Check Python tooling
         run: python -m compileall -q tools
       - name: Assemble development install tree
-        run: cmake --install build --config Release --prefix dist/MGS5VR-development
+        run: cmake --install build --config Release --component MGS5VR --prefix dist/MGS5VR-development
       - name: Preserve build and test evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

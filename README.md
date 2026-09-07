@@ -41,23 +41,24 @@ For a locally installed simulator, set `XR_RUNTIME_JSON` only in the launching P
 
 ## Install the current preview
 
+Extract the complete archive from the [experimental downloads](https://github.com/nikamigaming-create/MGS5VR/releases), including its tools, documentation, profile and licenses. Windows x64, the supported game build, an installed OpenXR runtime and the [Microsoft Visual C++ v14 x64 Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) are required. A source checkout must be built first.
+
 Close the game first. The installer supports only the recorded SHA256 of TPP 1.0.15.4, refuses existing proxy/config files, and records hashes for removal. It does not modify the executable, game archives, or saves.
 
 ```powershell
 .\tools\install.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP' -EnableTheatrePreview
 ```
 
-To develop the native stereo experiment, install with all three switches:
+For the tracked VR test with hands and the left-wrist HUD, install with all five switches:
 
 ```powershell
-.\tools\install.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP' -EnableTheatrePreview -EnableCameraObserver -EnableHeadCameraExperiment
+.\tools\install.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP' -EnableTheatrePreview -EnableCameraObserver -EnableHeadCameraExperiment -EnableControllerRigExperiment -EnableWristHudExperiment
 ```
 
 In loaded gameplay, hold left grip and click the left stick to toggle native VR.
 Tracking stalls suspend eye submission and resume from the same head origin.
-Add `-EnableControllerRigExperiment -EnableWristHudExperiment` to the installation
-command above to enable tracked hands/arms and the native weapon/status display
-on the **left forearm**. These options remain disabled by default.
+This enables tracked hands/arms and the native weapon/status display on the
+**left forearm**. These options remain disabled by default.
 
 Right grip readies the weapon; right trigger fires; left grip requests support;
 right B reloads. Left trigger plus left-stick direction selects equipment.
@@ -68,6 +69,15 @@ See the [complete Touch interaction list](docs/CONTROLS.md) for one/two-handed u
 weapon selection, menus, movement and the exact test limits.
 
 For the current VR test setup, use native Graphics Settings to set Depth of Field to Disable, Motion Blur to Off, and Post-Processing to Off. Set Camera Shake to Off in Camera Settings. These saved settings were exercised in the simulator; they do not establish that every cinematic or temporal effect is disabled.
+
+The positively reviewed Quest 3 baseline used native 1920x1080 rendering. A 2560x1440 sharpness test is running with the same DLL; its visual improvement and sustained performance remain unconfirmed. To request that mode after closing the game, use the selected physical runtime:
+
+```powershell
+$mgsRuntime = (Get-ItemProperty 'HKLM:\SOFTWARE\Khronos\OpenXR\1').ActiveRuntime
+.\tools\launch-simulator.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP' -RuntimeManifest $mgsRuntime -RenderWidth 2560 -RenderHeight 1440
+```
+
+Despite its name, this launcher uses the supplied runtime; a physical run omits `-Headless` and `-OperatorDir`. It backs up changed graphics settings and preserves the global runtime selection. Confirm `Game Present ... size=2560x1440` in `mgs5vr.log`, because unsupported modes can be substituted by the game. The [sharpness review](docs/HEADSET_SHARPNESS_REVIEW.md) separates the working baseline from the higher-resolution test.
 
 The current DLL takes the `dinput8.dll` slot and cannot yet be chained with IHHook or another DirectInput proxy. It activates only in `mgsvtpp.exe`, never `mgsvmgo.exe`. The module remains loaded until process exit. Restart the game to replace it.
 
