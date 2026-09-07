@@ -35,8 +35,8 @@ Support requires the left palm to stay within 10 cm of the weapon's support grip
 for 150 ms, then blends into contact. Pulling more than 20 cm away releases it.
 Clenching left grip only animates the free fingers; it cannot force two-handed
 mode. Lowering the weapon or inspecting the wrist clears contact, so selection
-does not leave a sticky support latch. These corrected thresholds still need
-physical acceptance after the first build attached too readily.
+does not leave a sticky support latch. The corrective headset run received
+positive feedback; complete reach and pose coverage remains open.
 
 ## Equipment selection
 
@@ -46,12 +46,15 @@ then **release left trigger** to confirm and close. Gameplay does not pause.
 
 | Right stick with left trigger held | Action |
 | --- | --- |
-| Up / down | Browse cards in the current category |
-| Left / right flick | Previous / next category |
+| First flick up / down / right / left | Primary / secondary / support / items |
+| After centering the stick | Point toward the displayed card: up is up, left is left |
+| Right B, while keeping left trigger held | Return to category choice |
 | Click, on an item with a Use prompt | Use the selected item |
 
-Categories cycle through primary, secondary/bionic arm, support equipment, and
-items. Return the stick to neutral between category flicks.
+The first flick selects a category and is consumed. Center the stick once, then
+browse its cards in their displayed directions. B lets you choose another
+category without releasing left trigger. Native equip/stow transitions can
+delay opening; let the picker appear before browsing.
 
 The cards and descriptions use real game data and unfold above the **left wrist**,
 facing you; the small status display stays flat along the forearm. Raise that

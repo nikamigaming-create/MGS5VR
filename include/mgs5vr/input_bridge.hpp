@@ -10,15 +10,17 @@ struct GamepadSample {
     bool operator==(const GamepadSample&) const = default;
 };
 // Hold the modifier to open equipment at the wrist. The left stick remains
-// locomotion; right-stick left/right changes category and up/down browses it.
+// locomotion. The first right-stick direction chooses the corresponding native
+// D-pad category; after centering, the stick browses without rotating its axes.
+// B returns to category selection while the modifier remains held.
 // Release closes selection. A held navigation stick cannot leak into turning.
 class RigEquipment {
 public:
     GamepadSample update(GamepadSample sample,bool modifier,bool allowOptics=true);
-    void reset(){blockedButtons_=0;blockedStick_=false;active_=false;categoryLatched_=false;useHeld_=false;category_=0;}
+    void reset(){blockedButtons_=0;blockedStick_=false;active_=false;categoryChosen_=false;waitBrowseNeutral_=false;useHeld_=false;category_=0;}
 private:
     uint16_t blockedButtons_{};
-    bool blockedStick_{},active_{},categoryLatched_{},useHeld_{};
+    bool blockedStick_{},active_{},categoryChosen_{},waitBrowseNeutral_{},useHeld_{};
     unsigned category_{};
 };
 enum class TravelMode { unknown,onFoot,horse,vehicle };

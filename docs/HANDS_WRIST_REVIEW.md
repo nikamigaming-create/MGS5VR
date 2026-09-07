@@ -1,8 +1,13 @@
 # Finger articulation and wrist selection review
 
-**Physical test failed thumb and support-hand acceptance. Release is held.**
+**The first physical test failed thumb and support-hand acceptance. Release is held.**
 The user reported backward thumb motion and unwanted two-hand attachment that
 obscured the firing hand. The SIM observations below did not catch those defects.
+
+The later corrective headset run received positive feedback, with rotated picker
+directions and grenade aiming identified next. The menu direction correction is
+retained; the grenade candidate failed its final arm-visibility review and is
+withheld. See [the latest results and limits](MENU_GRENADE_REVIEW.md).
 
 The corrective source separates thumb flexion from finger flexion, removes the
 left-grip support override, and requires the palm to dwell within 10 cm of the

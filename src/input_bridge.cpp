@@ -1,38 +1,45 @@
 #include "mgs5vr/input_bridge.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 namespace mgs5vr {
 GamepadSample RigEquipment::update(GamepadSample sample,bool modifier,bool allowOptics){
-    constexpr uint16_t x=0x4000,y=0x8000,rightClick=0x0080;
+    constexpr uint16_t b=0x2000,x=0x4000,y=0x8000,rightClick=0x0080;
     constexpr uint16_t categories[]{0x0001,0x0002,0x0008,0x0004};
     const int sx=sample.rightX,sy=sample.rightY;
     const bool neutral=std::abs(sx)<12000&&std::abs(sy)<12000;
     blockedButtons_&=sample.buttons;
     const bool freshUse=(sample.buttons&rightClick)&&!(blockedButtons_&rightClick);
+    const bool freshBack=(sample.buttons&b)&&!(blockedButtons_&b);
     if(!(sample.buttons&rightClick)||!modifier||!active_)useHeld_=false;
     if(neutral)blockedStick_=false;
-    if(std::abs(sx)<12000)categoryLatched_=false;
-    if(modifier&&!active_)blockedStick_=!neutral;
+    if(neutral)waitBrowseNeutral_=false;
+    if(modifier&&!active_){blockedStick_=!neutral;categoryChosen_=false;waitBrowseNeutral_=false;}
     if(modifier){
-        blockedButtons_|=sample.buttons&(x|y|rightClick);
+        blockedButtons_|=sample.buttons&(b|x|y|rightClick);
         if(sample.buttons&x)sample.buttons|=0x0100;
         if(allowOptics&&(sample.buttons&y))sample.buttons|=0x0200;
-        sample.buttons&=~(x|y|rightClick|0x000f);
+        sample.buttons&=~(b|x|y|rightClick|0x000f);
         sample.rightX=sample.rightY=0;
+        if(active_&&freshBack){categoryChosen_=false;blockedStick_=!neutral;waitBrowseNeutral_=false;useHeld_=false;}
         if(!blockedStick_){
-            if(std::abs(sx)>19660&&std::abs(sx)>std::abs(sy)){
-                if(!categoryLatched_){category_=(category_+(sx>0?1:3))%4;useHeld_=false;}
-                categoryLatched_=true;
-            }else if(std::abs(sy)>19660&&std::abs(sy)>=std::abs(sx)){
-                // The native cards use horizontal stick browsing. Reserve
-                // horizontal controller motion for categories in the VR mode.
-                sample.rightX=static_cast<int16_t>(sy);
+            if(!categoryChosen_){
+                if(std::max(std::abs(sx),std::abs(sy))>19660){
+                    category_=std::abs(sx)>std::abs(sy)?(sx>0?2u:3u):(sy>0?0u:1u);
+                    categoryChosen_=true;waitBrowseNeutral_=true;useHeld_=false;
+                }
+            }else if(!waitBrowseNeutral_){
+                // Match the displayed native menu. Up must never become
+                // horizontal browsing, and choosing a category must not also
+                // skip a card before the controller has returned to neutral.
+                sample.rightX=static_cast<int16_t>(sx);
+                sample.rightY=static_cast<int16_t>(sy);
             }
         }
         sample.buttons|=categories[category_];
         // The native item-card Use action is a right-stick click. Consume the
         // same held click on close so it cannot become an unrelated action.
-        if(category_==3&&active_&&freshUse&&!categoryLatched_)useHeld_=true;
+        if(category_==3&&categoryChosen_&&!waitBrowseNeutral_&&active_&&freshUse)useHeld_=true;
         if(useHeld_)sample.buttons|=rightClick;
     }else{
         if(active_&&!neutral)blockedStick_=true;

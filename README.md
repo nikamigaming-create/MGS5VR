@@ -21,7 +21,7 @@ You do not need Visual Studio, a simulator, or to compile anything.
 
 ## Install once
 
-1. Download **MGS5VR-experimental-2026-09-07.2.zip** from the [experimental release](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-07.2). Extract the whole ZIP, keeping its folders together. Use the ZIP named MGS5VR, rather than GitHub's Source code download.
+1. Download **MGS5VR-experimental-2026-09-07.1.zip** from the [experimental release](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-07.1). Extract the whole ZIP, keeping its folders together. Use the ZIP named MGS5VR, rather than GitHub's Source code download.
 2. Find your game's folder using Steam's **Browse local files** option. It must contain `mgsvtpp.exe`.
 3. Open the extracted **MGS5VR** folder containing this README, `dinput8.dll` and `tools`. In File Explorer's address bar, type `powershell` and press Enter. Run this command, replacing the quoted path with your game's folder:
 
@@ -44,6 +44,9 @@ your save. Installation is only needed once.
 
 ## Essential Touch controls
 
+These controls describe the development branch. The downloadable `.1` release
+predates the latest finger and wrist-menu corrections; those are not yet packaged.
+
 | Action | Control |
 | --- | --- |
 | Move / turn | Left stick / right stick |
@@ -51,7 +54,7 @@ your save. Installation is only needed once.
 | Support the weapon | Bring the left palm to its support grip; pull away to release |
 | Reload | Right B |
 | Read ammo and status | Raise your left forearm |
-| Select equipment while moving | Hold left trigger; right stick up/down browses, left/right changes category; release trigger to finish |
+| Select equipment while moving | Hold left trigger; flick right stick toward a category, center, then point toward its cards; release trigger to finish |
 | Interact / pick up | Left Y when the game offers the action |
 | iDroid / pause | Tap left Menu / hold left Menu |
 

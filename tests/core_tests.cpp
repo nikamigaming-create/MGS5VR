@@ -432,29 +432,44 @@ int main(){
     expect(mapped.buttons==0x0201&&mapped.leftX==17000&&mapped.leftY==30000,"trigger opens primary equipment while left-stick movement continues");
     equipmentHeld.rightY=30000;
     mapped=equipment.update(equipmentHeld,true);
-    expect(mapped.rightX==30000&&mapped.rightY==0&&mapped.leftY==30000,"right-stick vertical browsing retains simultaneous locomotion");
+    expect(mapped.buttons==0x0201&&mapped.rightX==0&&mapped.rightY==0&&mapped.leftY==30000,"up chooses primary and consumes the category gesture while walking");
+    equipment.update({},true);
+    mapped=equipment.update(equipmentHeld,true);
+    expect(mapped.rightX==0&&mapped.rightY==30000,"up remains up in native card navigation; it never becomes left or right");
     mapped=equipment.update(equipmentHeld,false);
     expect(mapped.buttons==0&&mapped.rightX==0&&mapped.rightY==0&&mapped.leftY==30000,"closing consumes held menu controls without interrupting movement or causing a turn");
     equipment.update({},false);
     mapped=equipment.update(equipmentHeld,false);
     expect(mapped==equipmentHeld,"fresh native actions resume after neutral input");
-    equipment.reset();equipment.update({},true);
-    equipmentHeld={0,0,0,-30000,22000,30000,0};
-    mapped=equipment.update(equipmentHeld,true);
-    expect(mapped.buttons==0x0002&&mapped.rightX==0&&mapped.leftX==-30000,"right flick changes to secondary without consuming strafe input");
-    expect(equipment.update(equipmentHeld,true).buttons==0x0002,"holding a category direction cannot repeatedly cycle categories");
-    equipment.update({},true);
-    expect(equipment.update(equipmentHeld,true).buttons==0x0008,"second right flick selects support equipment");
-    equipment.update({},true);
-    expect(equipment.update(equipmentHeld,true).buttons==0x0004,"third right flick selects items");
+    for(const auto direction:std::array<GamepadSample,4>{{{0,0,0,-30000,22000,0,30000},{0,0,0,-30000,22000,0,-30000},
+            {0,0,0,-30000,22000,30000,0},{0,0,0,-30000,22000,-30000,0}}}){
+        equipment.reset();equipment.update({},true);
+        const uint16_t category=direction.rightY>0?1:direction.rightY<0?2:direction.rightX>0?8:4;
+        mapped=equipment.update(direction,true);
+        expect(mapped.buttons==category&&mapped.rightX==0&&mapped.rightY==0&&mapped.leftX==-30000,
+            "all four category directions match the native D-pad and preserve movement");
+        expect(equipment.update(direction,true)==mapped,"holding the category gesture cannot also browse or cycle categories");
+        equipment.update({},true);
+        for(const auto browse:std::array<GamepadSample,4>{{{0,0,0,0,0,25000,0},{0,0,0,0,0,-25000,0},
+                {0,0,0,0,0,0,25000},{0,0,0,0,0,0,-25000}}}){
+            mapped=equipment.update(browse,true);
+            expect(mapped.buttons==category&&mapped.rightX==browse.rightX&&mapped.rightY==browse.rightY,
+                "native card navigation preserves both axes and signs in every category");
+        }
+    }
     equipment.update({},true);
     equipmentHeld={0x0080};
     expect(equipment.update(equipmentHeld,true).buttons==0x0084,"fresh right-stick click uses a native item card");
     expect(equipment.update(equipmentHeld,true).buttons==0x0084,"item-use press survives native polling while held");
     expect(equipment.update(equipmentHeld,false).buttons==0,"held item-use click is consumed when selection closes");
     equipment.update({},false);equipment.update({},true);
-    equipmentHeld={0,0,0,0,0,-30000,0};
-    expect(equipment.update(equipmentHeld,true).buttons==0x0008,"left flick returns to the preceding category");
+    equipmentHeld={0,0,0,0,0,30000,0};
+    expect(equipment.update(equipmentHeld,true).buttons==0x0008,"a new hold can directly choose another category");
+    equipment.update({},true);
+    expect(equipment.update({0x2000},true).buttons==0x0008,"B returns to categories without reloading or leaving wrist mode");
+    equipmentHeld={0x2000,0,0,0,0,0,-30000};
+    expect(equipment.update(equipmentHeld,true).buttons==0x0002,"after back, down selects secondary while the trigger stays held");
+    expect(equipment.update(equipmentHeld,false).buttons==0,"back and navigation remain consumed through menu close");
     equipment.reset();equipmentHeld={0x0040,0,0,1000,-1000,0,0};
     expect(equipment.update(equipmentHeld,true).buttons==0x0041,"wrist mode opens without a direction and retains the movement stick click");
     equipment.reset();expect(equipment.update(equipmentHeld,false)==equipmentHeld,"mode reset restores ordinary native controls");
@@ -468,7 +483,7 @@ int main(){
     expect(equipment.update(equipmentHeld,true,false).buttons==1,"opening during a turn consumes the prior turning stick until neutral");
     expect(equipment.update(equipmentHeld,true,false).buttons==1,"held pre-menu turning cannot choose another category");
     equipment.update({},true,false);
-    expect(equipment.update(equipmentHeld,true,false).buttons==2,"fresh navigation resumes after centering the right stick");
+    expect(equipment.update(equipmentHeld,true,false).buttons==8,"fresh right navigation chooses the right category after centering");
     RigInput wristInput;
     GamepadSample walkingSelection{0,255,255,15000,28000,0,0};
     auto selectionInput=wristInput.update(walkingSelection,true,true,TravelMode::onFoot);
