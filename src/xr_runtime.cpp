@@ -3,6 +3,7 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/ui_renderer.hpp"
 #include <Xinput.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
@@ -31,6 +32,7 @@ struct Instance {
     XrSystemId system{XR_NULL_SYSTEM_ID};
     XrSystemProperties properties{XR_TYPE_SYSTEM_PROPERTIES};
     std::string runtime;
+    bool refreshControl{};
     Instance() {
         uint32_t count=0;
         xrCheck(xrEnumerateInstanceExtensionProperties(nullptr,0,&count,nullptr),"Enumerate OpenXR extensions");
@@ -38,13 +40,15 @@ struct Instance {
         xrCheck(xrEnumerateInstanceExtensionProperties(nullptr,count,&count,extensions.data()),"Read OpenXR extensions");
         const bool d3d=std::any_of(extensions.begin(),extensions.end(),[](const auto& x){return std::strcmp(x.extensionName,XR_KHR_D3D11_ENABLE_EXTENSION_NAME)==0;});
         if(!d3d) throw std::runtime_error("OpenXR runtime does not expose XR_KHR_D3D11_enable");
-        const char* enabled=XR_KHR_D3D11_ENABLE_EXTENSION_NAME;
+        std::vector<const char*> enabled{XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
+        refreshControl=std::any_of(extensions.begin(),extensions.end(),[](const auto& x){return std::strcmp(x.extensionName,XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME)==0;});
+        if(refreshControl)enabled.push_back(XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
         XrInstanceCreateInfo info{XR_TYPE_INSTANCE_CREATE_INFO};
         strcpy_s(info.applicationInfo.applicationName,"MGS5VR native stereo experiment");
         strcpy_s(info.applicationInfo.engineName,"MGS5VR");
         info.applicationInfo.applicationVersion=1;
         info.applicationInfo.apiVersion=XR_MAKE_VERSION(1,0,0);
-        info.enabledExtensionCount=1; info.enabledExtensionNames=&enabled;
+        info.enabledExtensionCount=static_cast<uint32_t>(enabled.size());info.enabledExtensionNames=enabled.data();
         xrCheck(xrCreateInstance(&info,&handle),"Create OpenXR instance");
         XrInstanceProperties props{XR_TYPE_INSTANCE_PROPERTIES};
         const auto result=xrGetInstanceProperties(handle,&props);
@@ -73,7 +77,7 @@ struct Session {
     XrSpace local{XR_NULL_HANDLE}, view{XR_NULL_HANDLE};
     XrActionSet actions{XR_NULL_HANDLE};
     XrAction grip{XR_NULL_HANDLE},aim{XR_NULL_HANDLE},recenter{XR_NULL_HANDLE};
-    XrAction sticks{},triggers{},squeezes{},thumbClick{},menu{};
+    XrAction sticks{},triggers{},squeezes{},thumbClick{},triggerTouch{},thumbTouch{},menu{};
     std::array<XrAction,4> face{}; // Native Xbox A, B, X, Y.
     std::array<XrSpace,2> gripSpaces{},aimSpaces{};
     std::array<XrPath,2> hands{};
@@ -89,6 +93,17 @@ struct Session {
     uint64_t referenceEpoch{1};
     ControllerFrame controllerFrame{};
     explicit Session(Instance& i):instance(i){}
+    void requestRefreshRate(){
+        if(!instance.refreshControl){log("OpenXR refresh rate is controlled by the headset runtime; 90 Hz target must be set there");return;}
+        PFN_xrEnumerateDisplayRefreshRatesFB enumerate{};PFN_xrRequestDisplayRefreshRateFB request{};
+        if(XR_FAILED(xrGetInstanceProcAddr(instance.handle,"xrEnumerateDisplayRefreshRatesFB",reinterpret_cast<PFN_xrVoidFunction*>(&enumerate)))
+           ||XR_FAILED(xrGetInstanceProcAddr(instance.handle,"xrRequestDisplayRefreshRateFB",reinterpret_cast<PFN_xrVoidFunction*>(&request)))||!enumerate||!request)return;
+        uint32_t count{};if(XR_FAILED(enumerate(handle,0,&count,nullptr))||!count||count>32)return;
+        std::vector<float> rates(count);if(XR_FAILED(enumerate(handle,count,&count,rates.data())))return;
+        if(std::any_of(rates.begin(),rates.end(),[](float hz){return std::abs(hz-90.f)<.01f;}))
+            log("OpenXR requested 90 Hz; result="+std::to_string(request(handle,90.f)));
+        else log("OpenXR runtime does not offer 90 Hz; retaining its supported refresh rate");
+    }
     XrPath path(const char* p) { XrPath v; xrCheck(xrStringToPath(instance.handle,p,&v),"Create OpenXR path"); return v; }
     XrAction action(const char* name,const char* label,XrActionType type,bool withHands=false) {
         XrActionCreateInfo info{XR_TYPE_ACTION_CREATE_INFO};
@@ -144,6 +159,8 @@ struct Session {
         triggers=action("triggers","Native gamepad triggers",XR_ACTION_TYPE_FLOAT_INPUT,true);
         squeezes=action("squeezes","Native gamepad shoulders",XR_ACTION_TYPE_FLOAT_INPUT,true);
         thumbClick=action("thumb_click","Native gamepad stick clicks",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
+        triggerTouch=action("trigger_touch","Index finger contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
+        thumbTouch=action("thumb_touch","Thumb contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         menu=action("menu","Tap iDroid; hold Pause",XR_ACTION_TYPE_BOOLEAN_INPUT);
         face={action("a","Native gamepad A",XR_ACTION_TYPE_BOOLEAN_INPUT),action("b","Native gamepad B",XR_ACTION_TYPE_BOOLEAN_INPUT),
             action("x","Native gamepad X",XR_ACTION_TYPE_BOOLEAN_INPUT),action("y","Native gamepad Y",XR_ACTION_TYPE_BOOLEAN_INPUT)};
@@ -167,6 +184,14 @@ struct Session {
                     bind(thumbClick,h+(p.layout==2?"trackpad/click":"thumbstick/click"));
                     bind(triggers,h+"trigger/value");
                     bind(squeezes,h+((p.layout==2||p.layout==3)?"squeeze/click":"squeeze/value"));
+                }
+                if(p.layout<=1){
+                    bind(triggerTouch,h+"trigger/touch");
+                    bind(thumbTouch,h+"thumbstick/touch");
+                    if(p.layout==0)bind(thumbTouch,h+"thumbrest/touch");
+                    const bool leftHand=h=="/user/hand/left/input/";
+                    bind(thumbTouch,h+(p.layout==0&&leftHand?"x/touch":"a/touch"));
+                    bind(thumbTouch,h+(p.layout==0&&leftHand?"y/touch":"b/touch"));
                 }
             }
             if(p.layout<=1){
@@ -209,7 +234,7 @@ struct Session {
             focused=e.state==XR_SESSION_STATE_FOCUSED;
             if(e.state==XR_SESSION_STATE_READY&&!running){
                 XrSessionBeginInfo begin{XR_TYPE_SESSION_BEGIN_INFO};begin.primaryViewConfigurationType=XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-                xrCheck(xrBeginSession(handle,&begin),"Begin XR session");running=true;recenterRequested=true;
+                xrCheck(xrBeginSession(handle,&begin),"Begin XR session");running=true;recenterRequested=true;requestRefreshRate();
             }else if(e.state==XR_SESSION_STATE_STOPPING&&running){xrCheck(xrEndSession(handle),"End XR session");running=false;}
             else if(e.state==XR_SESSION_STATE_EXITING||e.state==XR_SESSION_STATE_LOSS_PENDING)exiting=true;
         }
@@ -260,6 +285,13 @@ struct Session {
         const bool left=controllerFrame.hands[0].gripTracked,right=controllerFrame.hands[1].gripTracked;
         const float ls=left?scalar(squeezes,hands[0]):0,rs=right?scalar(squeezes,hands[1]):0;
         const float lt=left?scalar(triggers,hands[0]):0,rt=right?scalar(triggers,hands[1]):0;
+        for(size_t n=0;n<2;++n){
+            auto& hand=controllerFrame.hands[n];
+            if(!hand.gripTracked)continue;
+            hand.trigger=n?rt:lt;hand.squeeze=n?rs:ls;
+            hand.triggerTouched=boolean(triggerTouch,hands[n]);
+            hand.thumbTouched=boolean(thumbTouch,hands[n]);
+        }
         const auto nativeStatus=headCamera().status();
         const bool rigInput=controllerRigEnabled()&&(nativeStatus.active||nativeStatus.pending);
         const bool center=boolean(recenter)&&ls>0.75f&&rs>0.75f;
@@ -293,10 +325,14 @@ struct Session {
         // an authored optical mode can preserve the 3D scene and tracked hands.
         if(rigInput){
             const auto mode=nativeTravelMode();
-            const auto mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode);
+            const auto beforePhase=rigControls.equipmentPhase();
+            const auto mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode,
+                steadyMilliseconds(),nativeEquipmentPickerDrawTime(),controllerThrowReady());
+            if(beforePhase!=rigControls.equipmentPhase())log("Wrist picker phase="+std::to_string(rigControls.equipmentPhase())
+                +" category="+std::to_string(rigControls.equipmentCategory()));
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
-            controllerFrame.supportRequested=mapped.supportRequested;
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
+            controllerFrame.equipmentCategory=rigControls.equipmentPhase()>=2?rigControls.equipmentCategory()+1:0;
         }else if(nativeStatus.awaitingPlayer)rigControls.suspend();
         else rigControls.reset();
         gamepadMailbox().publish(pad,left||right,steadyMilliseconds());
@@ -413,6 +449,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
     const std::array<Screen*,2> eyeScreens{&leftEye,&rightEye};
     std::array<EyeFrame,2> eyeFrames{};
     uint64_t eyeEpoch{},projectionFrames{},emptyStereoFrames{},retainedStereoFrames{};
+    uint64_t performanceAt{},windowSubmissions{},windowNewPairs{},windowEmpty{},lastProjectionSource{};
     bool priorEmptyStereo{},layoutLogged{};
     Pose screenPose{};bool anchored=false,menuReturnPending=false;
     const auto start=std::chrono::steady_clock::now();
@@ -545,6 +582,21 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             +" tracking="+std::to_string(trackingDone-waitDone)+" consume="+std::to_string(consumeDone-trackingDone)
             +" upload="+std::to_string(uploadDone-consumeDone)+" submit="+std::to_string(cycleEnd-uploadDone));
         const bool emptyStereo=frame.shouldRender&&tracking&&cameraStatus.active&&!end.layerCount;
+        if(!performanceAt)performanceAt=cycleEnd;
+        if(cameraStatus.active&&frame.shouldRender){
+            ++windowSubmissions;
+            if(emptyStereo)++windowEmpty;
+            if(end.layerCount&&layer==reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection)
+               &&eyeFrames[0].sourceSequence!=lastProjectionSource){++windowNewPairs;lastProjectionSource=eyeFrames[0].sourceSequence;}
+        }
+        if(cycleEnd-performanceAt>=5000){
+            const double seconds=static_cast<double>(cycleEnd-performanceAt)/1000.0;
+            if(windowSubmissions)log("XR performance runtime_hz="+std::to_string(frame.predictedDisplayPeriod>0?1e9/static_cast<double>(frame.predictedDisplayPeriod):0)
+                +" submissions_fps="+std::to_string(static_cast<double>(windowSubmissions)/seconds)
+                +" new_pairs_fps="+std::to_string(static_cast<double>(windowNewPairs)/seconds)
+                +" repeated_or_empty="+std::to_string(windowSubmissions-windowNewPairs)+" empty="+std::to_string(windowEmpty));
+            performanceAt=cycleEnd;windowSubmissions=windowNewPairs=windowEmpty=0;
+        }
         if(emptyStereo){
             ++emptyStereoFrames;
             if(!priorEmptyStereo){

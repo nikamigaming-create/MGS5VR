@@ -35,6 +35,10 @@ struct PoseRestore {
 };
 using Shot=void(*)(void*,Vector4*,Vector4*,void*,uint32_t);
 Shot originalShot{};
+using ThrowOrigin=void(*)(void*,void*,uint32_t,Vector4*,Vector4*);
+using ThrowVelocity=void(*)(void*,void*,uint32_t,Vector4*);
+ThrowOrigin originalThrowOrigin{};
+ThrowVelocity originalThrowVelocity{};
 uintptr_t base{};
 std::atomic_uintptr_t playerOwner{};
 std::atomic_bool enabled{};
@@ -45,12 +49,18 @@ uintptr_t boundModel{};
 uint64_t activation{},updates{};
 std::array<Vec3,2> bendHistory{};
 SupportContact supportContact;
+SupportPose supportPose;
 float supportBlend{};
+float aimBlend{};
+Quat guidedOffset{};
+Pose heldSupportOffset{};
 uint64_t supportAt{};
 struct ShotRig {
     uintptr_t owner{},character{},camera{},model{};
     Pose sourceCamera{},wristWorld{};
     uint64_t trackingSequence{};
+    Pose palmWorld{},gripFromAim{};
+    bool throwTracked{};
 } shotRig;
 template<class T> bool read(uintptr_t address,T& out){
     SIZE_T count{};return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&out,sizeof(out),&count)&&count==sizeof(out);
@@ -89,6 +99,12 @@ std::optional<ArmSurface> groundSurface(Vec3 point,float ceiling,float clearance
 Pose bone(const std::array<Quat,512>& q,const std::array<Vector4,512>& p,size_t i){return {q[i],{p[i].x,p[i].y,p[i].z}};}
 void replace(std::array<Quat,512>& q,std::array<Vector4,512>& p,size_t i,Pose value){
     q[i]=value.orientation;p[i].x=value.position.x;p[i].y=value.position.y;p[i].z=value.position.z;
+}
+Quat blendRotation(Quat a,Quat b,float weight){
+    if(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w<0)b={-b.x,-b.y,-b.z,-b.w};
+    Quat q{a.x+(b.x-a.x)*weight,a.y+(b.y-a.y)*weight,a.z+(b.z-a.z)*weight,a.w+(b.w-a.w)*weight};
+    const float length=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
+    return {q.x/length,q.y/length,q.z/length,q.w/length};
 }
 bool apply(void* context,void* binding,PoseRestore& restore){
     const auto now=steadyMilliseconds();
@@ -178,8 +194,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             bendHistory[i]=bone(q,p,wrists[i]-1).position-bone(q,p,shoulders[i]).position;
         }
         boundOwner=owner;boundModel=model;activation=frame.activation;
-        supportContact.reset();
-        supportBlend=0;supportAt=now;
+        supportContact.reset();supportPose.reset();
+        supportBlend=0;aimBlend=0;guidedOffset={};heldSupportOffset={};supportAt=now;
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
     const auto rightAnimated=bone(q,p,12),leftAnimated=bone(q,p,8);
@@ -217,7 +233,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(!right)return false;
     replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
     bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
-    bool nativeManipulation=false,firearmActive=false;
+    bool nativeManipulation=false,firearmActive=false,throwableActive=false;
+    std::optional<Vec3> barrelInGrip;
     const auto weaponComponent=get<uintptr_t>(character+0x80);
     if(!frame.controllers.vehicleControls&&get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
         const auto instances=get<uintptr_t>(weaponComponent+0x38);
@@ -228,23 +245,75 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             // native animation owns the support hand during these operations.
             nativeManipulation=(get<uint32_t>(state+0x27c)&0x1c0)==0x40&&(get<uint32_t>(state+0x3c0)&0x04000000)!=0;
             firearmActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x40;
+            throwableActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x80;
+            const auto flags=get<uint32_t>(state+0x27c),mode=get<uint32_t>(state+0x3c0);
+            if(frame.controllers.weaponReady&&firearmActive&&!nativeManipulation&&!(flags&0x400000)&&!(mode&0x2000)){
+                // Use the same authored barrel frame as the native shot path.
+                // The vector between animated palms is not the barrel axis,
+                // especially while the game changes its support-hand pose.
+                alignas(16) std::array<float,16> attachmentMatrix{},muzzleMatrix{};
+                using AttachmentGetter=uint32_t(*)(void*,void*,uint32_t);
+                reinterpret_cast<AttachmentGetter>(base+0x1042e40)(reinterpret_cast<void*>(weaponComponent),attachmentMatrix.data(),index);
+                if(read(state+((flags&0x200)?0x80:0x40),muzzleMatrix)){
+                    const auto attachment=nativeAffinePose(attachmentMatrix),socket=nativeAffinePose(muzzleMatrix);
+                    if(attachment&&socket)barrelInGrip=rotate(compose(gripFromWrist[1],compose(*attachment,*socket)).orientation,{0,0,1});
+                }
+            }
         }
     }
     const auto supportOffset=compose(inverse(rightAnimated),leftAnimated);
     auto attached=compose(right->pose.wrist,supportOffset);
-    const auto attachedGrip=compose(attached,inverse(gripFromWrist[0]));
+    // Test the actual support grip, never controller-to-controller distance.
+    // While attached, retain the acquired contact frame through native reload
+    // animation and evaluate it in the currently guided weapon frame.
+    const bool wasAttached=supportContact.attached();
+    const auto contactPrimary=compose(grips[1],Pose{blendRotation({},guidedOffset,aimBlend),{}});
+    auto contactWrist=right->pose.wrist;
+    if(aimBlend>0)if(const auto solved=groundedArm(rightAnimatedArm,clearWrist(compose(contactPrimary,gripFromWrist[1])),bendHistory[1],armBasis[1]))
+        contactWrist=solved->pose.wrist;
+    const auto contactPose=compose(contactWrist,wasAttached?heldSupportOffset:supportOffset);
+    const auto attachedGrip=compose(contactPose,inverse(gripFromWrist[0]));
     const auto separation=grips[0].position-attachedGrip.position;
     const auto handSeparation=grips[0].position-grips[1].position;
     const auto towardHead=frame.headPose.position-frame.controllers.hands[0].grip.position;
     const auto dorsal=rotate(frame.controllers.hands[0].grip.orientation,{-1,0,0});
     const bool inspecting=dot(towardHead,towardHead)<0.49f
         &&dot(dorsal,towardHead)>0.5f*std::sqrt(dot(towardHead,towardHead));
-    // Turning the watch toward the eyes must free the hand even beside a pistol.
-    const bool nearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&!inspecting,
-        frame.controllers.hands[0].gripTracked,std::sqrt(dot(handSeparation,handSeparation)));
-    const bool support=frame.controllers.supportRequested||nativeManipulation||nearSupport;
-    const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/120.f:1.f,1.f);supportAt=now;
+    // Clenching the left controller only articulates its fingers. Contact must
+    // dwell at the weapon; inspection, lowering, tracking loss and pulling away
+    // release it. A one-handed reload does not grab a distant tracked hand.
+    const bool nearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&!inspecting&&(!nativeManipulation||wasAttached),
+        frame.controllers.hands[0].gripTracked,std::sqrt(dot(separation,separation)),now);
+    if(nearSupport&&!wasAttached)heldSupportOffset=supportOffset;
+    const bool support=nearSupport;
+    const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/180.f:1.f,1.f);supportAt=now;
     supportBlend=std::clamp(supportBlend+(support?step:-step),0.f,1.f);
+    // A menu, stow, non-firearm or lost controller releases ownership now.
+    // Distance release can blend out, but never toward a new native stow pose.
+    if(!frame.controllers.weaponReady||!firearmActive||inspecting||!frame.controllers.hands[0].gripTracked){
+        supportBlend=0;aimBlend=0;supportPose.reset();
+    }
+    const auto presentedSupport=supportPose.update(supportOffset,nearSupport,nativeManipulation).value_or(supportOffset);
+    attached=compose(right->pose.wrist,presentedSupport);
+    bool guiding=nearSupport&&nativeManipulation&&aimBlend>0;
+    if(barrelInGrip&&frame.controllers.hands[0].gripTracked&&nearSupport){
+        if(const auto guided=twoHandGrip(grips[1],grips[0],*barrelInGrip,1.f)){
+            guidedOffset=compose(inverse(grips[1]),*guided).orientation;guiding=true;
+        }
+    }
+    // The firing wrist is the common owner of the visible weapon and muzzle.
+    // Swing it toward the support controller while keeping its grip pivot and
+    // roll. Native reload contact remains authoritative during manipulation.
+    aimBlend=std::clamp(aimBlend+(guiding?step:-step),0.f,1.f);
+    if(aimBlend>0){
+        const auto guided=compose(grips[1],Pose{blendRotation({},guidedOffset,aimBlend),{}});
+        rightTarget=clearWrist(compose(guided,gripFromWrist[1]));
+        right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
+        if(!right)return false;
+        replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
+        bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
+        attached=compose(right->pose.wrist,presentedSupport);
+    }
     if(supportBlend>=1){
         // Lift the held weapon and its support contact together; do not slide
         // the fully attached left palm away from the authored weapon grip.
@@ -256,7 +325,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 right=raised;
                 replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
                 bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
-                attached=compose(right->pose.wrist,supportOffset);
+                attached=compose(right->pose.wrist,presentedSupport);
             }
         }
     }
@@ -267,11 +336,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         if(frame.controllers.hands[0].gripTracked&&supportBlend<1){
             const auto tracked=compose(grips[0],gripFromWrist[0]);
             target.position=tracked.position+(attached.position-tracked.position)*supportBlend;
-            auto a=tracked.orientation,b=attached.orientation;
-            if(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w<0)b={-b.x,-b.y,-b.z,-b.w};
-            Quat blended{a.x+(b.x-a.x)*supportBlend,a.y+(b.y-a.y)*supportBlend,a.z+(b.z-a.z)*supportBlend,a.w+(b.w-a.w)*supportBlend};
-            const float n=std::sqrt(blended.x*blended.x+blended.y*blended.y+blended.z*blended.z+blended.w*blended.w);
-            target.orientation={blended.x/n,blended.y/n,blended.z/n,blended.w/n};
+            target.orientation=blendRotation(tracked.orientation,attached.orientation,supportBlend);
         }
         if(supportBlend<1)target=clearWrist(target);
         const auto left=groundedArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],armBasis[0]);
@@ -310,8 +375,34 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             replace(q,p,i,compose(bone(q,p,anchor),Pose{corrections[j],offset}));
         }
     }
-    // Full render pose, before native matrix and attachment publication. Finger
-    // poses follow their solved wrist. Native position.w metadata is retained.
+    // Free fingers follow controller curls. Preserve authored contact around a
+    // weapon and during reloads, including when the support hand is blending.
+    // Read native locals from the saved pose so updating one joint cannot alter
+    // the native reference for its children.
+    constexpr std::array<std::array<size_t,5>,2> fingers{{{21,24,27,31,34},{37,40,43,47,50}}};
+    unsigned articulatedHands{};
+    for(size_t side=0;side<2;++side){
+        const auto& hand=frame.controllers.hands[side];
+        const float contact=side?((frame.controllers.weaponReady&&(firearmActive||throwableActive))?1.f:0.f):supportBlend;
+        if(!hand.gripTracked||frame.controllers.vehicleControls||contact>=1)continue;
+        for(size_t finger=0;finger<5;++finger)for(size_t joint=0;joint<3;++joint){
+            const auto i=fingers[side][finger]+joint;
+            const auto anchor=joint?i-1:(finger>=3?(side?46u:30u):wrists[side]);
+            if(parent[i]!=static_cast<int32_t>(anchor))return false;
+            const auto offset=bindOffset(i);
+            if(!valid(Pose{{},offset})||dot(offset,offset)<.000025f||dot(offset,offset)>.015f)return false;
+            const auto native=compose(inverse(bone(originalQ,originalP,anchor)),bone(originalQ,originalP,i));
+            const float curl=finger==0?std::max(hand.squeeze,hand.thumbTouched?.65f:0.f)
+                :finger==1?std::max(hand.trigger,hand.triggerTouched?.12f:0.f):hand.squeeze;
+            const auto rotation=fingerJointRotation(side!=0,static_cast<unsigned>(finger),static_cast<unsigned>(joint),curl);
+            if(!rotation)return false;
+            const Pose local{blendRotation(*rotation,native.orientation,contact),offset+(native.position-offset)*contact};
+            replace(q,p,i,compose(bone(q,p,anchor),local));
+        }
+        ++articulatedHands;
+    }
+    // Full render pose, before native matrix and attachment publication.
+    // Native position.w metadata is retained.
     frame.playerHead=renderedHead;
     if(frame.controllers.hands[0].gripTracked){
         const auto wrist=compose(*root,bone(q,p,8));
@@ -334,14 +425,25 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
     std::memcpy(reinterpret_cast<void*>(positions),p.data(),count*16u);
     shotRig={owner,character,camera,model,nativeCamera,compose(*root,right->pose.wrist),frame.trackingSequence};
+    const auto& throwingHand=frame.controllers.hands[1];
+    if(throwableActive&&frame.controllers.weaponReady&&!frame.controllers.vehicleControls&&throwingHand.aimTracked){
+        shotRig.palmWorld=compose(shotRig.wristWorld,inverse(gripFromWrist[1]));
+        shotRig.gripFromAim=compose(inverse(throwingHand.grip),throwingHand.aim);
+        shotRig.throwTracked=true;
+    }
     if(++updates%120==1){
+        const auto headFromModel=compose(inverse(frame.nativePose),*root);
+        const auto leftView=compose(headFromModel,bone(q,p,8)).position;
+        const auto rightView=compose(headFromModel,bone(q,p,12)).position;
         std::ostringstream s;s<<"Controller rig updates="<<updates<<" tracking="<<frame.trackingSequence
             <<" predicted="<<frame.controllers.predictedXrTime<<" player="<<frame.playerSequence
             <<" right_wrist="<<right->pose.wrist.position.x<<','<<right->pose.wrist.position.y<<','<<right->pose.wrist.position.z
-            <<" reach_clamped="<<right->reachClamped<<" support="<<supportBlend
+            <<" reach_clamped="<<right->reachClamped<<" support="<<supportBlend<<" support_aim="<<aimBlend<<" articulated_hands="<<articulatedHands
             <<" support_near="<<nearSupport<<" support_distance="<<std::sqrt(dot(separation,separation))
             <<" hand_distance="<<std::sqrt(dot(handSeparation,handSeparation))
-            <<" inspecting="<<inspecting<<" arm_helpers="<<helpersMatch<<" ground_contacts="<<groundContacts;log(s.str());
+            <<" inspecting="<<inspecting<<" arm_helpers="<<helpersMatch<<" ground_contacts="<<groundContacts
+            <<" left_head="<<leftView.x<<','<<leftView.y<<','<<leftView.z
+            <<" right_head="<<rightView.x<<','<<rightView.y<<','<<rightView.z;log(s.str());
     }
     return true;
 }
@@ -417,8 +519,92 @@ void shot(void* context,Vector4* origin,Vector4* direction,void* state,uint32_t 
             <<" direction="<<direction->x<<','<<direction->y<<','<<direction->z;log(s.str());}
     }
 }
+struct PendingThrow {
+    void* context{};void* state{};uint32_t index{};
+    uintptr_t velocityCaller{};
+    uint64_t time{},tracking{},rig{};
+    PointThrow solution{};float velocityW{};
+    Vector4* origin{};
+};
+thread_local PendingThrow pendingThrow;
+std::optional<PendingThrow> controllerThrow(void* context,void* state,uint32_t index,uintptr_t velocityCaller){
+    if(!enabled.load()||!headCamera().active())return {};
+    ShotRig rig;{std::lock_guard lock(rigMutex);rig=shotRig;}
+    if(!rig.throwTracked||!rig.owner||rig.owner!=playerOwner.load())return {};
+    const auto component=reinterpret_cast<uintptr_t>(context),weapon=reinterpret_cast<uintptr_t>(state);
+    if(get<uintptr_t>(component)!=base+0x23b3e80||get<uintptr_t>(component+8)!=rig.character
+       ||get<uintptr_t>(rig.character+0x80)!=component||get<uintptr_t>(rig.owner+0x370)!=rig.character)return {};
+    const auto first=get<uint32_t>(get<uintptr_t>(component+0x38)+0x24);
+    if(index!=get<uint32_t>(rig.owner+0x3a0)||index<first||index-first>15
+       ||weapon!=get<uintptr_t>(component+0x58)+(index-first)*0x610ull
+       ||(get<uint32_t>(weapon+0x27c)&0x1c0)!=0x80)return {};
+    const auto frame=headCamera().resolveCurrent(rig.camera,rig.sourceCamera);
+    if(!frame.applied||frame.playerOwner!=rig.owner||frame.trackingSequence!=rig.trackingSequence
+       ||!frame.controllers.weaponReady||frame.controllers.vehicleControls
+       ||!frame.controllers.hands[1].gripTracked||!frame.controllers.hands[1].aimTracked)return {};
+    // This verified velocity helper reads only context+8/+60, character+78,
+    // and render+8/+290 before consulting the unchanged equipment database.
+    // Give it caller-owned copies with neutral pitch/yaw. Never patch the live
+    // camera or shared player angles just to change grenade throw strength.
+    alignas(16) std::array<std::byte,0x68> privateContext{};
+    alignas(16) std::array<std::byte,0x80> privateCharacter{};
+    alignas(16) std::array<std::byte,0x298> privateRender{};
+    std::array<float,2> angles{};
+    if(!read(component,privateContext)||!read(rig.character,privateCharacter))return {};
+    const auto characterAddress=reinterpret_cast<uintptr_t>(privateCharacter.data());
+    const auto renderAddress=reinterpret_cast<uintptr_t>(privateRender.data());
+    const auto anglesAddress=reinterpret_cast<uintptr_t>(angles.data());
+    std::memcpy(privateContext.data()+8,&characterAddress,8);
+    std::memcpy(privateCharacter.data()+0x78,&renderAddress,8);
+    std::memcpy(privateRender.data()+8,&index,4);
+    std::memcpy(privateRender.data()+0x290,&anglesAddress,8);
+    alignas(16) Vector4 velocity{};
+    originalThrowVelocity(privateContext.data(),state,index,&velocity);
+    const auto solution=pointThrow(rig.palmWorld,rig.gripFromAim,{velocity.x,velocity.y,velocity.z});
+    if(!solution)return {};
+    return PendingThrow{context,state,index,velocityCaller,steadyMilliseconds(),frame.trackingSequence,
+        frame.rigSequence,*solution,velocity.w};
+}
+void throwOrigin(void* context,void* state,uint32_t index,Vector4* origin,Vector4* rotation){
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    originalThrowOrigin(context,state,index,origin,rotation);
+    pendingThrow={};
+    // The two native request paths both consume origin immediately followed
+    // by velocity. Keep that pair on one published rig generation and thread.
+    const auto velocityCaller=caller==base+0x1061eac?base+0x1061ebe:
+        caller==base+0x1087b16?base+0x1087b28:0;
+    if(!velocityCaller)return;
+    if(const auto request=controllerThrow(context,state,index,velocityCaller)){
+        pendingThrow=*request;
+        pendingThrow.origin=origin;
+    }
+}
+void throwVelocity(void* context,void* state,uint32_t index,Vector4* velocity){
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    const auto request=pendingThrow;pendingThrow={};
+    if(request.context!=context||request.state!=state||request.index!=index||request.velocityCaller!=caller
+       ||!request.origin){originalThrowVelocity(context,state,index,velocity);return;}
+    // Both verified callers retain the origin in their own request storage and
+    // call velocity immediately next. Publish the pair here: an unmatched call
+    // leaves the original origin intact, including after a scheduling delay.
+    request.origin->x=request.solution.origin.x;request.origin->y=request.solution.origin.y;request.origin->z=request.solution.origin.z;
+    *velocity={request.solution.velocity.x,request.solution.velocity.y,request.solution.velocity.z,request.velocityW};
+    static std::atomic_uint64_t requests{};
+    const auto count=++requests;
+    if(count%120==1||caller==base+0x1087b28){
+        std::ostringstream s;s<<"Controller throw requests="<<count<<" caller="<<std::hex<<caller-base<<std::dec
+            <<" tracking="<<request.tracking<<" rig="<<request.rig
+            <<" origin="<<request.solution.origin.x<<','<<request.solution.origin.y<<','<<request.solution.origin.z
+            <<" velocity="<<velocity->x<<','<<velocity->y<<','<<velocity->z;log(s.str());
+    }
+}
 }
 namespace mgs5vr {
+bool controllerThrowReady() noexcept {
+    if(!enabled.load()||!headCamera().active())return false;
+    std::lock_guard lock(rigMutex);
+    return shotRig.throwTracked&&shotRig.owner==playerOwner.load();
+}
 void installControllerRig(uintptr_t imageBase){
     base=imageBase;
     const auto matches=[&]<size_t N>(uintptr_t rva,const std::array<unsigned char,N>& bytes){
@@ -444,6 +630,19 @@ void installControllerRig(uintptr_t imageBase){
     if(status!=MH_OK)throw std::runtime_error(std::string("Controller shot create: ")+MH_StatusToString(status));
     status=MH_EnableHook(shotAddress);
     if(status!=MH_OK)throw std::runtime_error(std::string("Controller shot enable: ")+MH_StatusToString(status));
+    if(!matches(0x1037ba0,std::array<unsigned char,13>{0x48,0x8b,0xc4,0x55,0x53,0x56,0x57,0x41,0x54,0x41,0x56,0x41,0x57})
+       ||!matches(0x1039020,std::array<unsigned char,9>{0x48,0x8b,0xc4,0x55,0x53,0x56,0x57,0x41,0x56}))
+        throw std::runtime_error("Controller throw helper signatures differ");
+    const auto originAddress=reinterpret_cast<void*>(base+0x1037ba0),velocityAddress=reinterpret_cast<void*>(base+0x1039020);
+    status=MH_CreateHook(originAddress,reinterpret_cast<void*>(&throwOrigin),reinterpret_cast<void**>(&originalThrowOrigin));
+    if(status!=MH_OK)throw std::runtime_error(std::string("Controller throw origin create: ")+MH_StatusToString(status));
+    status=MH_CreateHook(velocityAddress,reinterpret_cast<void*>(&throwVelocity),reinterpret_cast<void**>(&originalThrowVelocity));
+    if(status!=MH_OK){MH_RemoveHook(originAddress);throw std::runtime_error(std::string("Controller throw velocity create: ")+MH_StatusToString(status));}
+    status=MH_QueueEnableHook(originAddress);
+    if(status==MH_OK)status=MH_QueueEnableHook(velocityAddress);
+    if(status==MH_OK)status=MH_ApplyQueued();
+    if(status!=MH_OK){MH_RemoveHook(originAddress);MH_RemoveHook(velocityAddress);throw std::runtime_error(std::string("Controller throw enable: ")+MH_StatusToString(status));}
+    log("Controller throw origin and velocity adapters installed");
     enabled.store(true);log("Experimental controller rig installed at verified skin publication RVA 0x1a6caa0 and shot solver 0x1044ff0");
 }
 void observeControllerRigOwner(uintptr_t owner) noexcept{playerOwner.store(owner);}

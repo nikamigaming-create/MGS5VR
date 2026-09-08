@@ -33,6 +33,36 @@ std::optional<Vec3> outsideArmSurface(Vec3 point,const ArmSurface& surface){
        ||!std::isfinite(surface.clearance)||surface.clearance<0||surface.clearance>.15f)return {};
     return point+surface.normal*std::max(0.f,surface.clearance-dot(point-surface.point,surface.normal));
 }
+std::optional<Pose> twoHandGrip(Pose primary,Pose support,Vec3 forwardInPrimary,float influence){
+    if(!valid(primary)||!valid(support)||!valid(Pose{{},forwardInPrimary})
+       ||!std::isfinite(influence)||influence<0||influence>1)return {};
+    const auto requested=support.position-primary.position;
+    const float distance=length(requested),axisLength=length(forwardInPrimary);
+    // Coincident/crossed controllers must not flip the sights or produce a
+    // singular solve. The caller retains one-handed aim in these cases.
+    if(distance<.12f||distance>1.1f||axisLength<.001f||axisLength>2.f)return {};
+    const auto current=rotate(primary.orientation,forwardInPrimary);
+    if(dot(unit(current),unit(requested))<-.8f)return {};
+    auto delta=swing(current,requested);
+    if(delta.w<0)delta={-delta.x,-delta.y,-delta.z,-delta.w};
+    delta=normalize({delta.x*influence,delta.y*influence,delta.z*influence,1+(delta.w-1)*influence});
+    return Pose{turn(delta,primary.orientation),primary.position};
+}
+std::optional<Quat> fingerJointRotation(bool right,unsigned finger,unsigned joint,float curl){
+    if(finger>=5||joint>=3||!std::isfinite(curl)||curl<0||curl>1)return {};
+    const float side=right?1.f:-1.f;
+    if(finger==0){
+        // The thumb's authored chain already slopes toward the palm. Its
+        // hinge closes across the palm about Y, unlike the fingers' Z curl.
+        // Applying finger flexion here folds the thumb backward at the wrist.
+        constexpr float across[3]{35,30,35};
+        const float angle=-side*across[joint]*curl*.00872664626f;
+        return Quat{0,std::sin(angle),0,std::cos(angle)};
+    }
+    constexpr float flexion[5][3]={{35,55,60},{70,85,50},{80,95,60},{80,95,60},{85,95,60}};
+    const float angle=side*flexion[finger][joint]*curl*.00872664626f;
+    return Quat{0,0,std::sin(angle),std::cos(angle)};
+}
 std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprightHead){
     if(!valid(chest)||!valid(uprightHead)||!valid(Pose{{},shoulderCenter}))return {};
     // Place the shoulder line behind the eyes. The former 6 cm setback exposed
@@ -118,12 +148,23 @@ std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal){
     const auto p=wrist.position-segment*0.35f+z*0.025f;
     return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,p.x,p.y,p.z,1});
 }
-bool SupportContact::update(bool ready,bool tracked,float distance){
-    if(!tracked||!std::isfinite(distance)||distance<0)attached_=false;
-    else if(ready)attached_=distance<(attached_?0.45f:0.30f);
-    // Lowering for selection releases the rendered hand but retains contact
-    // intent. The newly readied weapon still has to be within release range.
-    return ready&&attached_;
+bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time){
+    if(!ready||!tracked||!std::isfinite(distance)||distance<0||time<lastTime_){reset();return false;}
+    lastTime_=time;
+    if(attached_){if(distance<.20f)return true;reset();return false;}
+    if(distance>=.10f){candidate_=false;return false;}
+    if(!candidate_){candidate_=true;since_=time;}
+    if(time-since_>=150){attached_=true;candidate_=false;}
+    return attached_;
+}
+std::optional<Pose> SupportPose::update(Pose nativeOffset,bool attached,bool manipulating){
+    if(!valid(nativeOffset)){reset();return {};}
+    if(attached){
+        if(!attached_)acquired_=nativeOffset;
+        presented_=manipulating?nativeOffset:acquired_;
+    }
+    attached_=attached;
+    return presented_;
 }
 std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuckle){
     if(!valid(wrist)||!valid(Pose{{},indexKnuckle})||!valid(Pose{{},littleKnuckle}))return {};
@@ -138,6 +179,15 @@ std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuck
     const auto x=unit(normal),y=cross(z,x);
     const auto center=wrist.position+along*0.55f;
     return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,center.x,center.y,center.z,1});
+}
+std::optional<PointThrow> pointThrow(Pose renderedPalm,Pose gripFromAim,Vec3 nativeVelocity){
+    if(!valid(renderedPalm)||!valid(gripFromAim)||!valid(Pose{{},nativeVelocity}))return {};
+    const float speed=std::sqrt(dot(nativeVelocity,nativeVelocity));
+    if(speed<.1f||speed>100.f)return {};
+    auto direction=rotate(compose(renderedPalm,gripFromAim).orientation,{0,0,-1});
+    const float length=std::sqrt(dot(direction,direction));
+    if(!std::isfinite(length)||length<.9f||length>1.1f)return {};
+    return PointThrow{renderedPalm.position,direction*(speed/length)};
 }
 std::optional<Pose> nativeAffinePose(const std::array<float,16>& m){
     for(float f:m)if(!std::isfinite(f))return {};

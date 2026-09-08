@@ -1,22 +1,38 @@
 #include "mgs5vr/mailbox.hpp"
 #include <stdexcept>
 #include <sstream>
+#include <chrono>
+#include "mgs5vr/log.hpp"
 
 namespace mgs5vr {
 void checkHr(HRESULT r,const char* operation) {
     if(FAILED(r)) { std::ostringstream s; s<<operation<<" HRESULT=0x"<<std::hex<<static_cast<unsigned long>(r); throw std::runtime_error(s.str()); }
 }
 namespace {
+using CaptureClock=std::chrono::steady_clock;
+double elapsed(CaptureClock::time_point a,CaptureClock::time_point b){return std::chrono::duration<double,std::milli>(b-a).count();}
+void reportTransfer(bool producer,const std::array<double,4>& sample) noexcept {try{
+    struct Stats {CaptureClock::time_point since=CaptureClock::now();std::array<double,4> total{},maximum{};uint64_t count{};};
+    thread_local std::array<Stats,2> stats;auto& s=stats[producer?0:1];++s.count;
+    for(size_t i=0;i<sample.size();++i){s.total[i]+=sample[i];s.maximum[i]=std::max(s.maximum[i],sample[i]);}
+    const auto now=CaptureClock::now();if(now-s.since<std::chrono::seconds(5))return;
+    std::ostringstream line;line<<"Mailbox "<<(producer?"producer":"consumer")<<" ms acquire_queue_flush_release=";
+    for(size_t i=0;i<sample.size();++i){if(i)line<<';';line<<s.total[i]/static_cast<double>(s.count)<<','<<s.maximum[i];}
+    log(line.str());s={};
+}catch(...){} }
 class KeyRelease {
 public:
-    KeyRelease(IDXGIKeyedMutex* m,UINT64 key,ID3D11DeviceContext* c):mutex(m),releaseKey(key),context(c){}
-    ~KeyRelease() { context->Flush(); mutex->ReleaseSync(releaseKey); }
+    KeyRelease(IDXGIKeyedMutex* m,UINT64 key,ID3D11DeviceContext* c,double acquireMs):mutex(m),releaseKey(key),context(c),acquireTime(acquireMs){}
+    ~KeyRelease() {const auto copied=CaptureClock::now();context->Flush();const auto flushed=CaptureClock::now();mutex->ReleaseSync(releaseKey);
+        reportTransfer(releaseKey==1,{acquireTime,elapsed(start,copied),elapsed(copied,flushed),elapsed(flushed,CaptureClock::now())});}
     KeyRelease(const KeyRelease&)=delete;
     KeyRelease& operator=(const KeyRelease&)=delete;
 private:
     IDXGIKeyedMutex* mutex;
     UINT64 releaseKey;
     ID3D11DeviceContext* context;
+    double acquireTime{};
+    CaptureClock::time_point start=CaptureClock::now();
 };
 bool acquire(IDXGIKeyedMutex* m,UINT64 key) {
     const auto r=m->AcquireSync(key,0);
@@ -85,8 +101,8 @@ bool TextureMailbox::publishImages(const std::array<ID3D11Texture2D*,2>& sources
         channel->epoch=++epoch_;
         std::lock_guard pointer(pointerMutex_); channel_=channel;
     }
-    if(!acquire(channel->mutex.Get(),0)) return false;
-    KeyRelease release(channel->mutex.Get(),1,context);
+    const auto acquiring=CaptureClock::now();if(!acquire(channel->mutex.Get(),0)) return false;
+    KeyRelease release(channel->mutex.Get(),1,context,elapsed(acquiring,CaptureClock::now()));
     for(uint32_t n=0;n<count;++n){
         if(desc.SampleDesc.Count>1)context->ResolveSubresource(channel->texture.Get(),n,sources[n],0,desc.Format);
         else context->CopySubresourceRegion(channel->texture.Get(),n,0,0,0,sources[n],0,nullptr);
@@ -111,8 +127,8 @@ bool TextureConsumer::consume(const std::shared_ptr<TextureChannel>& channel) {
         checkHr(device_->CreateTexture2D(&desc,nullptr,&cached_),"Create consumer cache");
         channel_=channel;
     }
-    if(!acquire(mutex_.Get(),1)) return false;
-    KeyRelease release(mutex_.Get(),0,context_.Get());
+    const auto acquiring=CaptureClock::now();if(!acquire(mutex_.Get(),1)) return false;
+    KeyRelease release(mutex_.Get(),0,context_.Get(),elapsed(acquiring,CaptureClock::now()));
     context_->CopyResource(cached_.Get(),shared_.Get());
     checkHr(device_->GetDeviceRemovedReason(),"Consumer device health");
     frame_=channel->published;

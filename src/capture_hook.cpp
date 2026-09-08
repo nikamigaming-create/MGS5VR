@@ -3,10 +3,12 @@
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/scene_capture.hpp"
+#include "mgs5vr/native_performance.hpp"
 #include <MinHook.h>
 #include <atomic>
 #include <stdexcept>
 #include <mutex>
+#include <chrono>
 
 namespace mgs5vr {
 namespace {
@@ -21,6 +23,8 @@ HWND selectedWindow{};
 bool failed{};
 uint64_t presented{},copied{};
 HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
+    using Clock=std::chrono::steady_clock;const auto entered=Clock::now();
+    bool pace=false;
     if(!(flags&DXGI_PRESENT_TEST)) {
         std::lock_guard lock(captureMutex);
         if(!failed)try {
@@ -29,6 +33,7 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
             if(owner==GetCurrentProcessId()&&desc.BufferDesc.Width>=640&&desc.BufferDesc.Height>=360
                 &&(!selectedWindow||!IsWindow(selectedWindow)||selectedWindow==desc.OutputWindow)) {
                 selected=swap;selectedWindow=desc.OutputWindow;
+                pace=nativeFrameRateEnabled();
                 observeSceneSwapchain(swap);
                 ComPtr<ID3D11Texture2D> source;
                 checkHr(swap->GetBuffer(0,IID_PPV_ARGS(&source)),"Get game backbuffer");
@@ -43,12 +48,15 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
                     : destination->publish(source.Get(),context.Get(),eye);
                 if(published)++copied;
                 if(++presented%600==1)log("Game Present="+std::to_string(presented)+" published="+std::to_string(copied)
-                    +" size="+std::to_string(desc.BufferDesc.Width)+"x"+std::to_string(desc.BufferDesc.Height));
+                    +" size="+std::to_string(desc.BufferDesc.Width)+"x"+std::to_string(desc.BufferDesc.Height)+" interval="+std::to_string(interval));
             }
         }catch(const std::exception& e){failed=true;log(std::string("Capture suspended: ")+e.what());}
         catch(...){failed=true;log("Capture suspended: unexpected exception");}
     }
-    const auto result=originalPresent(swap,interval,flags);
+    const auto captured=Clock::now();if(pace)paceNativePresent();const auto paced=Clock::now();
+    const auto result=originalPresent(swap,pace?0:interval,flags);
+    if(pace){const auto elapsed=[](auto begin,auto end){return std::chrono::duration<double,std::milli>(end-begin).count();};
+        recordNativePresent(elapsed(entered,captured),elapsed(captured,paced),elapsed(paced,Clock::now()));}
     if(result==DXGI_ERROR_DEVICE_REMOVED||result==DXGI_ERROR_DEVICE_RESET){
         std::lock_guard lock(captureMutex);selected=nullptr;selectedWindow=nullptr;failed=false;destination->invalidate();
         log("Game device lost; waiting for replacement swapchain");

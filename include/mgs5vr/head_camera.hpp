@@ -11,14 +11,16 @@ struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reas
 struct TrackedHand {
     Pose grip{},aim{};
     bool gripTracked{},aimTracked{};
+    float trigger{},squeeze{};
+    bool triggerTouched{},thumbTouched{};
 };
 struct ControllerFrame {
     std::array<TrackedHand,2> hands{};
     int64_t predictedXrTime{};
     uint64_t referenceEpoch{};
-    bool supportRequested{};
     bool weaponReady{};
     bool vehicleControls{};
+    unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};

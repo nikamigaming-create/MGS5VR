@@ -1,17 +1,43 @@
 # Status: experimental native VR mod
 
-Updated 2026-09-07. The mod source, native adapters, tests and build tooling are
+Updated 2026-09-08. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
-The current physical Quest 3 run of `7BF543BE` received positive user feedback:
+The physical EB89CE69 follow-up received positive general gameplay feedback.
+The user identified access to horse/buddy commands, binoculars/zoom and physical
+fist/bionic-arm melee as the next gaps. Their current bindings and implementation
+requirements are recorded in [system access](SYSTEMS_ACCESS.md); those actions
+are not certified by the successful basic play session.
+
+The latest physical 1440p/native-AA run received positive user feedback. The current
+release fixes double wrist selections, gates browsing on actual
+expanded-menu readiness, exposes the small native NVG label, and directs grenade
+preview/throwing from the tracked hand. A camera-visibility correction targets
+tree pop-in while turning left; that physical symptom remains unverified. See the
+[interaction and visibility results](INTERACTION_VISIBILITY_REVIEW.md).
+The [2026-09-08 experimental package](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-08)
+contains this tested DLL and adds double-click install/removal with a file picker.
+Its source is merged into main. Publication does not close the remaining gameplay
+or physical acceptance gaps.
+
+The candidate adds articulated free fingers, support-controller barrel
+aiming, a smaller wrist picker and right-stick selection while the left stick
+keeps moving. Its release build and six test suites pass. A small 15-second SIM
+clip and both-eye observations are recorded in the [hands/wrist review](HANDS_WRIST_REVIEW.md).
+The later 14.729-second interaction clip contains 40 reviewed frames with both
+hands visible through the sampled grenade throw. Earlier prone/slope occlusion,
+shoulder removal and physical acceptance of the new menu mapping remain open.
+
+The earlier physical Quest 3 run of `7BF543BE` received positive user feedback:
 the basic experience works well, with low resolution and jagged edges remaining.
-The same binary is now under a 2560x1440 native-resolution test. Read the
+The retained physical profile is now 2560x1440 with native AA; the earlier 1080p
+compromise remains a starting point for other hardware. Read the [performance notes](PERFORMANCE.md) and the
 [physical sharpness review](HEADSET_SHARPNESS_REVIEW.md) for the baseline and limits.
 Earlier builds `C367CC6F` and `70779290` failed stereo or limb/UI presentation;
 they remain failed references. The current positive report is not acceptance of
 every interaction, material, arm pose or transition.
 
-The current SIM review covers equipment cards above the left wrist, all four
+The preceding SIM review covers equipment cards above the left wrist, all four
 equipment categories, wrist movement, closing, and a head turn/lean without the
 large sky rectangle. The silent 14.714-second clip is 670,771 bytes and contains
 54 reviewed frames at 3.6 captures/second, with no blank frames. Both final eyes
@@ -56,25 +82,27 @@ slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation
 | Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
 | Travel | D-Horse mount/walk/gallop/dismount and bounded mounted rifle shots in SIM; native travel input routing with neutral transition gates | Actual vehicle entry/driving/exit, mounted roles and physical riding comfort |
 | Audio | Native primary and virtual listeners consume the source center-head pose; head rotation/lean and theatre restoration observed in SIM | Physical localization, output/HRTF and occlusion checks |
-| Effects | Native graphics UI saved DOF Disable, motion blur Off and post-processing Off; camera shake Off persisted on reopening settings | Verify remaining cinematic effects and isolate any shared per-eye temporal resources |
+| Effects | Native AA through Post Processing High, DOF Disable, motion blur Off and camera shake Off | NVG presentation/performance, remaining cinematic effects and shared per-eye temporal resources |
 | Save | Continue/Resume loads the existing checkpoint and equipped rifle | Automatic startup state adapter |
 | Menus | iDroid/pause switch to the native screen; same-player return restores VR, with held-input release protection | Every menu branch, interactive wrist iDroid and player-replacement transitions |
 | Cinematics | Default large-screen theatre preview and native game controls | Automatic cinematic classification and complete skip coverage |
 
 ## Build and native runtime evidence
 
-All five local suites passed: core contracts including tracking suspension/recovery,
+All six local suites passed: core contracts including tracking suspension/recovery,
 D3D11 checks across two hardware devices, system DirectInput proxy parity, synthetic
 camera setter/getter calls and player visibility ownership/replacement checks, and
-process-exit cleanup. These checks do not certify the full mod.
-GitHub CI builds every target and runs four suites; the hardware D3D11 suite is
+process-exit cleanup, and the native frame-rate adapter. These checks do not certify the full mod.
+GitHub CI builds every target and runs five suites; the hardware D3D11 suite is
 explicitly excluded on hosted runners. Game/headset tests require a separate local run.
 
 Current simulator build SHA256:
+`EB89CE699E8700FE70F330DAE4FB449591E2601FD9AC3DFA998E9C3EFF412958`.
+It includes the interaction and visibility follow-up described in the
+[current review](INTERACTION_VISIBILITY_REVIEW.md), retaining native menu return,
+shadow and listener changes. The earlier positive physical sharpness baseline was
 `7BF543BE8E4EC882295AD8491DA6CCEB88B98BB878120DDBC54C0D6C371B170A`.
-It includes the wrist picker, sky crop and bounded swapchain recovery described in
-the [current review](SKY_CROP_REVIEW.md), retaining native menu return and the arm,
-shadow and listener changes. The initial physical run used
+The initial physical run used
 `4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`,
 with the later physical rollback retained as
 `70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.

@@ -1,5 +1,10 @@
 # Physical recovery and sharpness — 2026-09-07
 
+Historical dimensional baseline below. Later native-AA and scheduling changes
+were followed by positive physical feedback at 2560×1440. That is now the
+retained physical profile; the earlier Off/1080p notes below describe the initial
+comparison. See [current performance settings](PERFORMANCE.md).
+
 The user tested DLL
 `7BF543BE8E4EC882295AD8491DA6CCEB88B98BB878120DDBC54C0D6C371B170A`
 on the Quest 3 and reported that the experience was working well, with everything

@@ -3,6 +3,42 @@
 For normal play, start with the [README quick start](../README.md). This guide
 covers individual options, diagnostics and building from source.
 
+## Quick setup help
+
+`Install.cmd` opens a file picker for `mgsvtpp.exe` and runs the existing installer
+with `-EnableVR`. `Uninstall.cmd` opens the same picker and removes the recorded,
+unchanged mod files. Both keep the result window open so errors can be read.
+They use Windows PowerShell with an execution-policy override for that process
+only; they do not change your system policy. Cancel the picker to leave everything
+unchanged. No administrator access is requested.
+
+- **Cannot find the game:** in Steam, right-click MGSV → Manage → Browse local files.
+  Copy that folder path into the installer's file picker, then select `mgsvtpp.exe`.
+- **Existing mod files:** close the game and use `Uninstall.cmd` from the previous
+  MGS5VR package first. Another mod's `dinput8.dll` needs that mod's own removal
+  process. Modified files are preserved and identified in the error message.
+- **Script blocked:** extract the entire ZIP, keeping `tools` beside `Install.cmd`.
+  See [PowerShell setup](#powershell-blocks-the-installer) if Windows or an
+  organization policy blocks scripts.
+- **Missing DLL/runtime:** install the
+  [Microsoft Visual C++ x64 runtime](https://aka.ms/vc14/vc_redist.x64.exe).
+- **Only a large screen:** load the save, use the game's Action Type controller
+  layout, then hold left grip and click the left stick. The title screen uses the
+  large screen. Make sure your headset is connected to PC VR with its software
+  selected as the active OpenXR runtime.
+
+For manual installation, open PowerShell in the extracted MGS5VR folder and run:
+
+```powershell
+.\tools\install.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP' -EnableVR
+```
+
+To remove it manually, with the game closed:
+
+```powershell
+.\tools\uninstall.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP'
+```
+
 ## Installer options
 
 `-EnableVR` enables the existing tracked VR configuration: OpenXR presentation,
@@ -49,9 +85,10 @@ software and select it as the active OpenXR runtime. The physical baseline uses
 Quest 3, Touch controllers and the Meta PC runtime. Other hardware remains
 unverified; the controls assume the game's **Action Type** layout.
 
-The positively reviewed baseline used native 1920x1080 rendering. The current
-2560x1440 test keeps the same DLL; its visual improvement and sustained performance
-await physical feedback. Close the game before requesting that mode:
+The latest physical 2560x1440/native-AA session received positive feedback, and
+that resolution is retained for the tester. Start at 1920x1080 on other hardware;
+the higher setting is not a universal performance recommendation. Close the game
+before requesting that mode:
 
 ```powershell
 $mgsRuntime = (Get-ItemProperty 'HKLM:\SOFTWARE\Khronos\OpenXR\1').ActiveRuntime
@@ -68,7 +105,8 @@ supply `-GraphicsConfig` with the chosen account's absolute
 Check `Game Present ... size=2560x1440` in the game's `mgs5vr.log`: the game may
 substitute unsupported display modes. Enlarging an XR image alone cannot recover
 detail missing from the native render. The [sharpness review](HEADSET_SHARPNESS_REVIEW.md)
-records the observed dimensions, performance and remaining anti-aliasing test.
+records the earlier dimensional checks; [performance notes](PERFORMANCE.md)
+describe the current profile and measurement limits.
 
 ## Large screen, menus and transitions
 
@@ -115,8 +153,8 @@ CMake 3.24+, and Python 3. Run from the repository:
 
 Dependencies are pinned: Khronos OpenXR SDK 1.1.49 (`977f6675...`) and MinHook
 1.3.4 (`c3fcafdc...`). The OpenXR loader is statically linked. The Visual C++
-runtime is required. Outputs are in `build/Release/`. CI runs four suites that do
-not need a GPU; the fifth suite exercises two hardware D3D11 devices locally.
+runtime is required. Outputs are in `build/Release/`. CI runs five native suites
+that do not need a GPU; the sixth exercises two hardware D3D11 devices locally.
 CI does not run the game or certify headset playability.
 
 Stage a player package without dependency SDK headers and libraries:

@@ -4,7 +4,9 @@ Requested scope: all gameplay and interactions, September 6, 2026. A checked
 implementation still needs final-eye and physical evidence where applicable.
 Use native game behavior and the player's owned assets; retain the left forearm
 HUD, suppress flat world markers/reticles, and keep aiming in stereo. Optical
-zoom remains reserved at the user's request.
+zoom remains disabled until a stereo implementation replaces the old optical
+screen. The user now explicitly requests binoculars/zoom and direct fist melee;
+see [system access and implementation order](SYSTEMS_ACCESS.md).
 
 | Area | Work and required playable check | Current gate |
 | --- | --- | --- |

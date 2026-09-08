@@ -23,7 +23,7 @@ using NodeFn=uintptr_t(*)(void*,void*);
 QueueFn originalQueue{};ExecuteFn originalExecute{};NodeFn originalNode{};
 uintptr_t base{};
 std::atomic_bool enabled{};
-struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{};};
+struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},itemsOpen{};};
 thread_local Source producing,executing;
 std::mutex mutex;
 std::unordered_map<uintptr_t,Source> pending;
@@ -42,6 +42,7 @@ std::filesystem::path settings;
 bool spatialEnabled{};
 bool menuReaderVerified{};
 std::atomic_int menuState{-1};
+std::atomic_uint64_t pickerDrawTime{};
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
 std::string nodeName(uintptr_t node){
@@ -110,7 +111,8 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 // The native equipment carousel has its own layout camera at
                 // Z=150. Its cards, tabs and description are orders 133..136;
                 // the similarly numbered Z=100 layers are unrelated overlays.
-                const bool equipmentPicker=world[14]==150&&order>=133&&order<=136;
+                const bool equipmentPicker=(world[14]==150&&order>=133&&order<=136)
+                    ||(executing.itemsOpen&&world[14]==100&&order==133);
                 if((!contextAction&&!equipmentPicker&&(order<146||order>148))||!executing.panelTracked||(!equipmentPicker&&!executing.panelVisible)){
                     ++suppressedDraws;
                     if((contextAction||equipmentPicker||(order>=146&&order<=148))&&executing.eye.eye<2)++hiddenPanelByEye[executing.eye.eye];
@@ -119,13 +121,17 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto panel=equipmentPicker?executing.picker:
                     contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
-                const float layoutWidth=equipmentPicker?.7f:1.2f;
+                const float layoutWidth=equipmentPicker?.42f:1.2f;
                 const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
                     equipmentPicker?0.f:contextAction?.04f:.72f,equipmentPicker?0.f:contextAction?-.52f:-.70f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));
                     const auto result=originalNode(state,item);
+                    if(equipmentPicker&&order==135){
+                        auto previous=pickerDrawTime.load();
+                        while(previous<executing.eye.sampleTime&&!pickerDrawTime.compare_exchange_weak(previous,executing.eye.sampleTime)){}
+                    }
                     std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
                     if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
                     return result;
@@ -184,15 +190,16 @@ std::optional<bool> nativeMenuOpen() noexcept {
     if(menuState.exchange(next)!=next)try{log("Native iDroid menu open="+std::to_string(next));}catch(...){}
     return next!=0;
 }
+uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const HeadCameraSample& rig){
     const std::array<Pose,2> eyes{nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),
                                 nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose)};
     // Keep status flat along the forearm, but unfold the larger native picker
     // above that wrist, facing the source head. Both eyes use this same pose.
     const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
-    const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,{0,.16f,-.03f})};
+    const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,{0,.09f,-.03f})};
     producing={eye,camera,view,rig.wristPanel,picker,rig.wristPanelTracked,
-               rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes)};
+               rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),rig.controllers.equipmentCategory==4};
 }
 void clearUiRenderSource() noexcept {producing={};}
 bool applyUiEyeProjection(float* output) noexcept {

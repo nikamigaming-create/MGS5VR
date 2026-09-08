@@ -11,6 +11,12 @@ trees. No game binaries, assets or private reverse-engineering dumps are include
 | [JsonCpp](https://github.com/KhronosGroup/OpenXR-SDK/tree/977f6675bc0057d5a54ed290cb5c71c699b1c0ab/src/external/jsoncpp) | Included in the pinned OpenXR SDK | [MIT / public-domain dedication](../licenses/JsonCpp.txt) |
 | [MinHook](https://github.com/TsudaKageyu/minhook) | `c3fcafdc10146beb5919319d0683e44e3c30d537` (1.3.4) | [BSD 2-Clause, including HDE notices](../licenses/MinHook.txt) |
 
+The native variable-frame-rate and critical-worker scheduling adapter follows
+[MGSVFix by Lyall](https://codeberg.org/Lyall/MGSVFix), with instruction sites
+independently verified against the supported executable. The corresponding
+[MIT notice](../licenses/MGSVFix.txt) is included. See [performance](PERFORMANCE.md)
+for the adapted behavior; no MGSVFix binary is bundled or required.
+
 The Windows SDK, Visual C++ runtime, installed OpenXR runtime and legally owned
 game are external platform/runtime requirements. The optional simulator recorder
 calls a separately installed Meta XR Operator; its binaries are not bundled and
