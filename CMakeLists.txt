@@ -51,7 +51,7 @@ foreach(t mgs5vr_core mgs5vr_runtime dinput8 mgs5vr_probe mgs5vr_tests mgs5vr_gp
 endforeach()
 install(TARGETS dinput8 mgs5vr_probe RUNTIME DESTINATION . COMPONENT MGS5VR)
 install(FILES config/mgs5vr.ini README.md LICENSE CONTRIBUTING.md Install.cmd Uninstall.cmd DESTINATION . COMPONENT MGS5VR)
-install(DIRECTORY docs/ DESTINATION docs COMPONENT MGS5VR FILES_MATCHING PATTERN "*.md" PATTERN "*.svg")
+install(DIRECTORY docs/ DESTINATION docs COMPONENT MGS5VR FILES_MATCHING PATTERN "*.md" PATTERN "*.png")
 install(FILES tools/install.ps1 tools/uninstall.ps1 tools/setup.ps1 tools/launch-simulator.ps1 DESTINATION tools COMPONENT MGS5VR)
 install(FILES profiles/tpp-1.0.15.4.json DESTINATION profiles COMPONENT MGS5VR)
 install(FILES "${openxr_SOURCE_DIR}/LICENSE" DESTINATION licenses RENAME OpenXR.txt COMPONENT MGS5VR)

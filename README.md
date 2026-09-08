@@ -25,7 +25,7 @@ No simulator or compiling needed. Install once; launch normally afterward.
 
 ## Controls
 
-![Quest Touch controls and wrist equipment selection](docs/images/controls.svg)
+![Quest Touch controls and wrist equipment selection](docs/images/controls.png)
 
 **[Full controls, grenades and night vision →](docs/CONTROLS.md)**
 

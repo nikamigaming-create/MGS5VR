@@ -1,6 +1,6 @@
 # Touch controls for the tracked VR experiment
 
-[Quick controller infographic](images/controls.svg) · [Install and play](../README.md)
+[Quick controller infographic](images/controls.png) · [Install and play](../README.md)
 
 These bindings target the game's **Action Type** controller layout. The left-arm
 HUD shows the native weapon name, ammunition and status. Native context-action
