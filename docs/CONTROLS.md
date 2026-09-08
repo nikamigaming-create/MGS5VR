@@ -102,7 +102,7 @@ does not establish bionic-arm, CQC or every item action.
 | Quick dive | Left X without the equipment modifier |
 | Context action / pickup | Left Y without the equipment modifier; follow the native action when available |
 | Native attack / CQC / carried-body throw | Right trigger with right grip released; the native game state chooses the action |
-| Native call/radio | Left trigger + X |
+| Native call/radio input | Left trigger + X; held buddy-command navigation remains incomplete |
 | Toggle native VR / large game screen | Left grip + left-stick click |
 | Open iDroid map | Tap left Menu |
 | Pause | Hold left Menu for at least 0.55 seconds |
@@ -116,6 +116,12 @@ automatically when the same player camera resumes. Release held controls once
 after returning before moving or firing. The manual VR toggle remains available;
 switching VR off inside a menu also disables automatic return. Other cinematic,
 loading and player-replacement transitions still need acceptance.
+
+There is no hidden grip mode for the missing systems. The current wrist modifier
+consumes the right stick/click needed by the held Call Menu; horse summoning and
+buddy commands need a dedicated input/page owner. Physical punches also need
+native strike/contact integration: tracked fist movement currently does not
+cause melee damage. See [system access and the physical-melee contract](SYSTEMS_ACCESS.md).
 
 ## Vehicle mapping under simulator development
 

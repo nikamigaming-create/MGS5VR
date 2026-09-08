@@ -3,6 +3,12 @@
 Updated 2026-09-07. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
+The physical EB89CE69 follow-up received positive general gameplay feedback.
+The user identified access to horse/buddy commands, binoculars/zoom and physical
+fist/bionic-arm melee as the next gaps. Their current bindings and implementation
+requirements are recorded in [system access](SYSTEMS_ACCESS.md); those actions
+are not certified by the successful basic play session.
+
 The latest physical 1440p/native-AA run received positive user feedback. The next
 development candidate fixes double wrist selections, gates browsing on actual
 expanded-menu readiness, exposes the small native NVG label, and directs grenade
