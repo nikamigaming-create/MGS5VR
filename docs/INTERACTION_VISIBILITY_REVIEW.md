@@ -3,7 +3,8 @@
 The development candidate fixes repeated wrist selections and adds hand-directed
 grenade preview/throwing. A conservative camera-visibility correction is included
 for tree pop-in during leftward head turns. That specific physical symptom remains
-unverified. This is a draft candidate, not a new release or complete-mod acceptance.
+unverified. This tested DLL is included in the 2026-09-08 experimental release;
+publication does not establish complete-mod acceptance.
 
 Tested and installed Release DLL SHA-256:
 `EB89CE699E8700FE70F330DAE4FB449591E2601FD9AC3DFA998E9C3EFF412958`.
@@ -65,7 +66,12 @@ interaction run. This was not a clean 1440p headset benchmark and establishes
 neither a performance improvement nor locked 90 FPS. See [performance settings
 and measurement limits](PERFORMANCE.md).
 
-## Next physical check
+## Physical follow-up and remaining checks
+
+The same EB89CE69 DLL subsequently ran on the physical Quest 3 at 2560×1440 with
+native AA. The user reported that basic gameplay was working well, then requested
+horse/buddy commands, binoculars/zoom and physical fist attacks. That general
+positive report did not individually confirm the tree-pop or grenade checks.
 
 Check one deliberate category/card choice, NVG on/off, the grenade arc with the
 stick centered, and trees while turning left/right in the same location. Retain

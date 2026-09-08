@@ -1,6 +1,6 @@
 # Status: experimental native VR mod
 
-Updated 2026-09-07. The mod source, native adapters, tests and build tooling are
+Updated 2026-09-08. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
 The physical EB89CE69 follow-up received positive general gameplay feedback.
@@ -9,13 +9,16 @@ fist/bionic-arm melee as the next gaps. Their current bindings and implementatio
 requirements are recorded in [system access](SYSTEMS_ACCESS.md); those actions
 are not certified by the successful basic play session.
 
-The latest physical 1440p/native-AA run received positive user feedback. The next
-development candidate fixes double wrist selections, gates browsing on actual
+The latest physical 1440p/native-AA run received positive user feedback. The current
+release fixes double wrist selections, gates browsing on actual
 expanded-menu readiness, exposes the small native NVG label, and directs grenade
 preview/throwing from the tracked hand. A camera-visibility correction targets
 tree pop-in while turning left; that physical symptom remains unverified. See the
 [interaction and visibility results](INTERACTION_VISIBILITY_REVIEW.md).
-Publication remains a draft; no new packaged release is published.
+The [2026-09-08 experimental package](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-08)
+contains this tested DLL and adds double-click install/removal with a file picker.
+Its source is merged into main. Publication does not close the remaining gameplay
+or physical acceptance gaps.
 
 The candidate adds articulated free fingers, support-controller barrel
 aiming, a smaller wrist picker and right-stick selection while the left stick
