@@ -148,6 +148,13 @@ std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal){
     const auto p=wrist.position-segment*0.35f+z*0.025f;
     return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,p.x,p.y,p.z,1});
 }
+bool withinSupportCone(Vec3 separation,Vec3 forward){
+    const float distance2=dot(separation,separation),forward2=dot(forward,forward);
+    if(!std::isfinite(distance2)||!std::isfinite(forward2)||distance2<.0001f||forward2<.0001f)return false;
+    // Allow 60 degrees of two-hand guidance. Moving alongside or behind the
+    // firing hand is a release, even if the guided weapon follows that motion.
+    return dot(separation,forward)>=.5f*std::sqrt(distance2*forward2);
+}
 bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time){
     if(!ready||!tracked||!std::isfinite(distance)||distance<0||time<lastTime_){reset();return false;}
     lastTime_=time;

@@ -35,6 +35,9 @@ Grip and trigger keep their gameplay actions while also animating the fingers.
 
 Support requires the left palm to stay within 10 cm of the weapon's support grip
 for 150 ms, then blends into contact. Pulling more than 20 cm away releases it.
+Moving the left hand beside or behind the firing hand also releases support;
+guidance stays within 60 degrees of the right controller's pointing direction.
+This prevents the weapon from following a withdrawn hand and keeping it latched.
 Clenching left grip only animates the free fingers; it cannot force two-handed
 mode. Lowering the weapon or inspecting the wrist clears contact, so selection
 does not leave a sticky support latch. The corrective headset run received

@@ -526,6 +526,18 @@ int main(){
            "forearm HUD remains attached through character translation and turning");
     expect(!forearmPanel(watchElbow,watchWrist,{1,0,0}),"undefined forearm normal cannot produce a face HUD");
     SupportContact support;
+    const Vec3 heldSeparation{-.08f,0,-.24f},withdrawnSeparation{-.34f,-.06f,.04f},primaryForward{0,0,-1};
+    expect(withinSupportCone(heldSeparation,primaryForward),"a hand at the forward rifle grip can guide the barrel");
+    expect(!withinSupportCone(withdrawnSeparation,primaryForward),"withdrawing alongside the firing hand releases even when the gun follows it");
+    const Quat supportTurn{0,.70710678f,0,.70710678f};
+    expect(withinSupportCone(rotate(supportTurn,heldSeparation),rotate(supportTurn,primaryForward))
+        &&!withinSupportCone(rotate(supportTurn,withdrawnSeparation),rotate(supportTurn,primaryForward)),
+        "support release follows controller aim through body turns");
+    expect(!withinSupportCone({},primaryForward)&&!withinSupportCone(heldSeparation,{}),"invalid support directions cannot acquire a hand");
+    expect(!support.update(true,true,.07f,100)&&support.update(true,true,.07f,250)
+        &&!support.update(withinSupportCone(withdrawnSeparation,primaryForward),true,.07f,300),
+        "a close guided contact cannot retain a sideways withdrawn hand");
+    support.reset();
     SupportPose supportPose;
     const Pose acquiredSupport{{},{.25f,0,.12f}},animatedReload{{},{.15f,.2f,.05f}},stowingSupport{{},{-.4f,2.f,-.3f}};
     expect(!supportPose.update(acquiredSupport,false,false),"a free hand has no acquired support pose");

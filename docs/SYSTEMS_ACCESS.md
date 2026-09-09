@@ -133,9 +133,10 @@ were not accepted. That experiment was also rolled back. The candidate's origina
 2x/4x viewing zoom remains separate from native marking. The model-marker switch
 probe did not establish a fix for the reported blue streaks; it was restored and
 no marker-effect patch is enabled. These features are a development candidate,
-separate from the public headset-tested baseline. A downloaded 100% campaign has
-now loaded in SIM for the remaining gadget tests; the original checkpoint is
-backed up separately. Save files are private test data and are not distributed.
+separate from the public headset-tested baseline. A downloaded 100% campaign
+loaded in SIM, but its FOB onboarding interrupted gadget testing. The original
+checkpoint was restored and used for the current showcase. Save files are
+private test data and are not distributed.
 
 Native references: [marking and action icons](https://mgstpp-app.konamionline.com/manual/pc/na/en/pc_02.html),
 [prosthetic arm capabilities](https://www.konami.com/games/eu/en/topics/13601/),

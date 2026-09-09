@@ -296,10 +296,14 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const auto dorsal=rotate(frame.controllers.hands[0].grip.orientation,{-1,0,0});
     const bool inspecting=dot(towardHead,towardHead)<0.49f
         &&dot(dorsal,towardHead)>0.5f*std::sqrt(dot(towardHead,towardHead));
+    const auto& primaryHand=frame.controllers.hands[1];
+    const bool forwardSupport=primaryHand.aimTracked&&withinSupportCone(
+        frame.controllers.hands[0].grip.position-primaryHand.grip.position,
+        rotate(primaryHand.aim.orientation,{0,0,-1}));
     // Clenching the left controller only articulates its fingers. Contact must
     // dwell at the weapon; inspection, lowering, tracking loss and pulling away
     // release it. A one-handed reload does not grab a distant tracked hand.
-    const bool nearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&!inspecting&&(!nativeManipulation||wasAttached),
+    const bool nearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&forwardSupport&&!inspecting&&(!nativeManipulation||wasAttached),
         frame.controllers.hands[0].gripTracked,std::sqrt(dot(separation,separation)),now);
     if(nearSupport&&!wasAttached)heldSupportOffset=supportOffset;
     const bool support=nearSupport;
