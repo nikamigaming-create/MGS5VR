@@ -100,6 +100,38 @@ head turns and a newly acquired mark in both eyes.
 | Special equipment | Placement/detonation, decoys, cardboard-box actions and item-specific alternate controls need coverage beyond merely selecting the item. NVG on/off already has bounded SIM evidence. |
 | Support and progression | iDroid is accessible in the headset, but helicopter requests, support drops/strikes, Mother Base development and deployment transitions are not fully tested. |
 | Transport | Vehicles, Walker Gear and mounted weapons need their own state/control coverage. Driving and shooting a carried gun remains a custom feature, not an available binding. |
+| UAVs and remote weapons | FOB UAVs are defence equipment, not a general scout drone piloted from Snake's wrist. Rocket Arm has guided Missile Cam behavior; its controls and camera transition need VR integration after the arm is unlocked. Walker Gear/D-Walker is a separate piloted platform. None of these later systems has passed this checkpoint's VR tests. |
+
+For the intended VR controls, ordinary punches stay motion-driven. Deliberately
+equip a powered arm to use its special attack; do not bind a normal punch to a
+remote launch. Keep available buddy orders in wrist Commands and support/development
+in iDroid. A guided projectile needs its own stereo camera and explicit return
+to Snake before it can be called supported.
+
+Native references: Konami's [FOB UAV update](https://www.konami.com/mg/mgs5/tpp/jp/news/update201605.php),
+[Rocket Arm / Missile Cam demonstration](https://www.konami.com/games/eu/fr/topics/308/),
+and [Walker Gear controls](https://mgstpp-app.konamionline.com/manual/pc/na/en/pc_06.html).
+
+### September 9 reconnaissance check
+
+The SIM exposed a cross-hand input problem: pressing left X produced both native
+X and B, immediately cancelling a proposed Commands mode. Reading face actions
+through their owning hand removed that extra B. The simple-controller profile
+retains its intentional left-hand Cancel binding. This correction is in the
+development candidate; physical controller-profile coverage remains open.
+
+The Commands mode then received its intended input, but the actual Call menu did
+not appear. A direct native Call check outside the rig also did not produce the
+menu on this checkpoint. The cause remains unresolved. The unfinished Commands
+renderer/input changes were rolled back rather than publishing an empty panel.
+
+Temporarily holding native binocular input beneath the stereo camera entered and
+exited binocular state, but head-directed acquisition and usable per-eye viewing
+were not accepted. That experiment was also rolled back. The candidate's original
+2x/4x viewing zoom remains separate from native marking. The model-marker switch
+probe did not establish a fix for the reported blue streaks; it was restored and
+no marker-effect patch is enabled. The installed play build remains the public
+headset-tested baseline.
 
 Native references: [marking and action icons](https://mgstpp-app.konamionline.com/manual/pc/na/en/pc_02.html),
 [prosthetic arm capabilities](https://www.konami.com/games/eu/en/topics/13601/),

@@ -91,6 +91,7 @@ struct Session {
     MenuButton menuButton;
     RigInput rigControls;
     RigOptics opticsControls;
+    bool simpleControllerProfile{};
     float reportedMagnification{1};
     uint64_t hapticAt{};
     bool wheelHeld{};
@@ -168,8 +169,11 @@ struct Session {
         thumbTouch=action("thumb_touch","Thumb contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         vibration=action("vibration","Native feedback and wheel contact",XR_ACTION_TYPE_VIBRATION_OUTPUT,true);
         menu=action("menu","Tap iDroid; hold Pause",XR_ACTION_TYPE_BOOLEAN_INPUT);
-        face={action("a","Native gamepad A",XR_ACTION_TYPE_BOOLEAN_INPUT),action("b","Native gamepad B",XR_ACTION_TYPE_BOOLEAN_INPUT),
-            action("x","Native gamepad X",XR_ACTION_TYPE_BOOLEAN_INPUT),action("y","Native gamepad Y",XR_ACTION_TYPE_BOOLEAN_INPUT)};
+        // Read each face button through its owning hand. An unscoped read can
+        // aggregate left-select from the simple profile into Touch's right B
+        // in an operator override, making left X also press Cancel.
+        face={action("a","Native gamepad A",XR_ACTION_TYPE_BOOLEAN_INPUT,true),action("b","Native gamepad B",XR_ACTION_TYPE_BOOLEAN_INPUT,true),
+            action("x","Native gamepad X",XR_ACTION_TYPE_BOOLEAN_INPUT,true),action("y","Native gamepad Y",XR_ACTION_TYPE_BOOLEAN_INPUT,true)};
         struct Profile { const char* name; const char* center; const char* menuButton; int layout; };
         const Profile profiles[]={
             {"/interaction_profiles/oculus/touch_controller","/user/hand/right/input/thumbstick/click","/user/hand/left/input/menu/click",0},
@@ -229,6 +233,7 @@ struct Session {
             if(r==XR_EVENT_UNAVAILABLE)break;
             xrCheck(r,"Poll OpenXR events");
             if(buffer.type==XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING){exiting=true;break;}
+            if(buffer.type==XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED)priorFocused=false;
             if(buffer.type==XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING){
                 const auto& change=*reinterpret_cast<const XrEventDataReferenceSpaceChangePending*>(&buffer);
                 if(change.session==handle&&change.referenceSpaceType==XR_REFERENCE_SPACE_TYPE_LOCAL)
@@ -288,6 +293,11 @@ struct Session {
         const auto r=xrSyncActions(handle,&sync);
         if(r==XR_SESSION_NOT_FOCUSED){rigControls.suspend();opticsControls.reset();priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
+        if(!priorFocused){
+            XrInteractionProfileState profile{XR_TYPE_INTERACTION_PROFILE_STATE};
+            if(XR_SUCCEEDED(xrGetCurrentInteractionProfile(handle,hands[0],&profile)))
+                simpleControllerProfile=profile.interactionProfile==path("/interaction_profiles/khr/simple_controller");
+        }
         controllerFrame={{trackedHand(0,time),trackedHand(1,time)},time,referenceEpoch};
         const bool left=controllerFrame.hands[0].gripTracked,right=controllerFrame.hands[1].gripTracked;
         const float ls=left?scalar(squeezes,hands[0]):0,rs=right?scalar(squeezes,hands[1]):0;
@@ -316,8 +326,9 @@ struct Session {
         if(priorFocused&&center&&!priorRecenter)log("OpenXR recenter chord accepted");
         GamepadSample pad{};
         const auto bit=[&](bool enabled,WORD mask){if(enabled)pad.buttons|=mask;};
-        bit(right&&boolean(face[0]),XINPUT_GAMEPAD_A);bit(right&&boolean(face[1]),XINPUT_GAMEPAD_B);
-        bit(left&&boolean(face[2]),XINPUT_GAMEPAD_X);bit(left&&boolean(face[3]),XINPUT_GAMEPAD_Y);
+        bit(right&&boolean(face[0],hands[1]),XINPUT_GAMEPAD_A);
+        bit((simpleControllerProfile?left:right)&&boolean(face[1],hands[simpleControllerProfile?0:1]),XINPUT_GAMEPAD_B);
+        bit(left&&boolean(face[2],hands[0]),XINPUT_GAMEPAD_X);bit(left&&boolean(face[3],hands[0]),XINPUT_GAMEPAD_Y);
         pad.buttons|=menuButton.update(boolean(menu),left,steadyMilliseconds());
         bit(left&&boolean(thumbClick,hands[0])&&!headToggle,XINPUT_GAMEPAD_LEFT_THUMB);
         bit(right&&boolean(thumbClick,hands[1])&&!center,XINPUT_GAMEPAD_RIGHT_THUMB);
