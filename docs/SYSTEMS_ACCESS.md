@@ -3,15 +3,15 @@
 The public September 8 package remains the headset-tested baseline. A development
 candidate adds stereo viewing zoom, motion strikes and left-hand wheel control.
 Native strike contacts have been observed against a truck; this is not yet an
-enemy reaction or health-delta check. Later powered arm abilities, buddy commands
-and native binocular marking still need work.
+enemy reaction or health-delta check. Wrist Commands now supports native call
+selection; later powered arm abilities and native binocular marking still need work.
 
 ## What is available now
 
 | System | Current control and limit |
 | --- | --- |
 | Nearby D-Horse | Release right grip, approach the horse, press left Y at the native mount prompt. Left stick rides, left X increases speed, Y dismounts after lowering the weapon. These basics have SIM evidence. |
-| Call/radio | Left trigger + X sends native Call/LB. A quick radio call has an input route, but the held buddy-command menu is incomplete: wrist selection consumes its right-stick navigation and click. Do not describe horse summoning or commands as verified. |
+| Wrist Commands | Hold left trigger and tap X. After the commands appear, center the right stick, point toward an available command, and confirm with right trigger or right-stick click. Release left trigger to close. Native D-Horse call/Stay back and distraction knock were exercised in SIM. Contextual interrogation and other buddies still need target interactions. |
 | Equipment and NVG | Left trigger opens wrist selection; first right-stick flick chooses a category. NVG is the upward item slot; selecting None turns it off. NVG is separate from binoculars. |
 | iDroid/map | Tap left Menu. Native full menus appear on the large in-headset screen; triggers zoom the map and grips switch tabs. Close with B to return to tracked VR. |
 | Ordinary CQC | Right trigger with right grip released reaches native attack/CQC. The game chooses the contextual action. This is a button route, not physical fist hit detection. |
@@ -49,11 +49,11 @@ its own owned presentation, deliberate draw/stow and contact validation.
 
 ## Commands and optics
 
-Add a visible Commands page to the left-wrist interface. Route the right stick
-and confirm/back actions to exactly one active page, so equipment selection
-cannot consume a buddy order. Preserve walking. Exercise the real Call Menu's
-horse call, available buddy orders, arm commands and contextual interrogation,
-including opening, selection, cancellation and returning to equipment.
+The native Call Menu now unfolds at the left wrist, with a dedicated input owner.
+Equipment selection cannot consume its right stick or confirmation. Walking
+remains available. The candidate exercises horse calling, Stay back and the
+distraction knock. Other buddy orders, powered-arm commands and contextual
+interrogation still need complete target interactions.
 
 Add an explicit Binoculars action with a visible close control and discrete zoom
 steps. Preserve binocular stereo and head tracking while magnified. Marking/intel
@@ -63,8 +63,8 @@ different states. An iron-sight weapon must not silently become a scoped weapon.
 Do not re-enable the old mono optical-screen prototype as a completed VR optic.
 
 The next priority is usable reconnaissance: repair marked-person rendering,
-connect stereo viewing to native marking/intel, and expose a left-wrist Commands
-page. Enemy reaction/damage for motion strikes, vehicle movement/braking and
+connect stereo viewing to native marking/intel, and extend wrist Commands coverage.
+Enemy reaction/damage for motion strikes, vehicle movement/braking and
 physical wheel feedback remain open. The requested
 drive-and-shoot mode would keep left-hand wheel steering, move the pedals to the
 left stick and give right grip/trigger to the carried gun. Native driver controls
@@ -94,7 +94,7 @@ head turns and a newly acquired mark in both eyes.
 
 | Important system | Remaining access or verification |
 | --- | --- |
-| Buddy and arm Commands | Horse calling and buddy orders, distraction knocks and available arm commands need an input owner separate from wrist equipment browsing. |
+| Buddy and arm Commands | Dedicated wrist input/display implemented. D-Horse calling, Stay back and distraction knock exercised; other buddies, abilities and interrogation remain to be exercised. |
 | Powered arms | Native stun, sonar and rocket capabilities depend on developed/equipped gear. Ordinary motion punches must not activate them. Their activation and any guided-camera behavior need individual VR integration. |
 | Stealth and recovery | Hold-up, grab, interrogation, carry/set down, weapon pickup and Fulton need complete target interactions. A native button route is not an end-to-end pass. |
 | Special equipment | Placement/detonation, decoys, cardboard-box actions and item-specific alternate controls need coverage beyond merely selecting the item. NVG on/off already has bounded SIM evidence. |
@@ -120,18 +120,22 @@ through their owning hand removed that extra B. The simple-controller profile
 retains its intentional left-hand Cancel binding. This correction is in the
 development candidate; physical controller-profile coverage remains open.
 
-The Commands mode then received its intended input, but the actual Call menu did
-not appear. A direct native Call check outside the rig also did not produce the
-menu on this checkpoint. The cause remains unresolved. The unfinished Commands
-renderer/input changes were rolled back rather than publishing an empty panel.
+The original checkpoint was prone, where the native Call menu was unavailable.
+After changing stance, the native menu appeared. Its choices and descriptions
+now render on a larger left-wrist panel. Selection retains the chosen direction
+through the native confirmation pulse, then consumes a held stick so it cannot
+turn the camera after the menu disappears. The native horse arrived when called;
+Stay back and the distraction knock were also exercised.
 
 Temporarily holding native binocular input beneath the stereo camera entered and
 exited binocular state, but head-directed acquisition and usable per-eye viewing
 were not accepted. That experiment was also rolled back. The candidate's original
 2x/4x viewing zoom remains separate from native marking. The model-marker switch
 probe did not establish a fix for the reported blue streaks; it was restored and
-no marker-effect patch is enabled. The installed play build remains the public
-headset-tested baseline.
+no marker-effect patch is enabled. These features are a development candidate,
+separate from the public headset-tested baseline. A downloaded 100% campaign has
+now loaded in SIM for the remaining gadget tests; the original checkpoint is
+backed up separately. Save files are private test data and are not distributed.
 
 Native references: [marking and action icons](https://mgstpp-app.konamionline.com/manual/pc/na/en/pc_02.html),
 [prosthetic arm capabilities](https://www.konami.com/games/eu/en/topics/13601/),

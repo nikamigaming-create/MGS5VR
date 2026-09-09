@@ -119,7 +119,7 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Quick dive | Left X without the equipment modifier |
 | Context action / pickup | Left Y without the equipment modifier; follow the native action when available |
 | Native attack / CQC / carried-body throw | Right trigger with right grip released; the native game state chooses the action |
-| Native call/radio input | Left trigger + X; held buddy-command navigation remains incomplete |
+| Wrist Commands / buddy orders | Hold left trigger, tap X; point the right stick toward an available command and press right trigger or right-stick click; release left trigger to close |
 | Toggle native VR / large game screen | Left grip + left-stick click |
 | Open iDroid map | Tap left Menu |
 | Pause | Hold left Menu for at least 0.55 seconds |
@@ -134,9 +134,14 @@ after returning before moving or firing. The manual VR toggle remains available;
 switching VR off inside a menu also disables automatic return. Other cinematic,
 loading and player-replacement transitions still need acceptance.
 
-There is no hidden grip mode for the missing systems. The current wrist modifier
-consumes the right stick/click needed by the held Call Menu; horse summoning and
-buddy commands need a dedicated input/page owner. The motion-melee candidate now
+Wrist Commands has its own input mode, separate from equipment selection.
+Keep left trigger held, center the right stick after the commands appear, then
+point toward a command and confirm. Left-stick walking remains available.
+Right trigger confirms once and cannot fire the gun. B cancels; release left
+trigger and center the stick before returning to gameplay. The native game
+chooses which commands are available; stand or crouch to call D-Horse. Calling
+D-Horse, Stay back and the arm's distraction knock were exercised in SIM.
+The motion-melee candidate now
 reaches native contacts; enemy reaction and damage remain separate acceptance
 steps. See [system access and the physical-melee contract](SYSTEMS_ACCESS.md).
 

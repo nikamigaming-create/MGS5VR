@@ -58,6 +58,41 @@ OpticsInput RigOptics::update(GamepadSample raw,bool available){
     }
     return {raw};
 }
+CommandsInput RigCommands::update(GamepadSample raw,bool available,uint64_t time,uint64_t drawTime){
+    if(time<lastTime_){reset();releaseRequired_=true;}
+    lastTime_=time;
+    const bool chord=raw.leftTrigger>127&&(raw.buttons&0x4000);
+    const bool freshChord=chord&&!priorChord_;
+    priorChord_=chord;
+    const bool confirm=raw.rightTrigger>127||(raw.buttons&0x0080);
+    const bool neutral=std::abs(int(raw.rightX))<6000&&std::abs(int(raw.rightY))<6000;
+    if(!available&&active_){active_=false;releaseRequired_=true;}
+    if(releaseRequired_){
+        if(!raw.buttons&&raw.leftTrigger<=24&&raw.rightTrigger<=24&&neutral)releaseRequired_=false;
+        return {GamepadSample{0,0,0,raw.leftX,raw.leftY},false,true};
+    }
+    if(!available)return {raw};
+    if(freshChord&&!active_){
+        active_=true;openedAt_=time;confirmHeld_=confirm;stickBlocked_=true;confirmUntil_=0;confirmed_=false;
+    }
+    if(!active_)return {raw};
+    const auto menus=static_cast<uint16_t>(raw.buttons&0x0030);
+    if(raw.leftTrigger<64||(raw.buttons&0x2000)||menus){
+        active_=false;releaseRequired_=true;confirmUntil_=0;
+        return {GamepadSample{menus,0,0,raw.leftX,raw.leftY},false,true};
+    }
+    const bool ready=drawTime>openedAt_&&time>=drawTime&&time-drawTime<=150;
+    if(!ready)stickBlocked_=true;
+    else if(neutral)stickBlocked_=false;
+    if(ready&&!stickBlocked_&&confirm&&!confirmHeld_&&!confirmed_){confirmUntil_=time+100;confirmed_=true;}
+    confirmHeld_=confirm;
+    GamepadSample result{static_cast<uint16_t>(0x0100|((ready&&time<confirmUntil_)?0x0080:0)),0,0,raw.leftX,raw.leftY};
+    // Native Call resolves direction and R3 in the same input packet. Keep
+    // the selection through its bounded confirm pulse, then consume it even
+    // if the user keeps holding the stick after the native menu disappears.
+    if(ready&&!stickBlocked_&&(!confirmed_||time<confirmUntil_)){result.rightX=raw.rightX;result.rightY=raw.rightY;}
+    return {result,true,true};
+}
 MotionStrike MotionMelee::update(Pose head,Pose hand,bool available,uint64_t time,uint64_t epoch,bool weapon){
     MotionStrike result;
     if(!available||!valid(head)||!valid(hand)||!epoch){reset();return result;}

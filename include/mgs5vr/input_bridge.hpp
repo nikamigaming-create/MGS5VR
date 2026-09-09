@@ -76,6 +76,19 @@ private:
     bool active_{},releaseRequired_{},priorChord_{},priorClick_{},priorBack_{};
     unsigned power_{};
 };
+struct CommandsInput { GamepadSample gamepad{};bool active{},exclusive{}; };
+// Tap X while holding LT to enter Commands. Release LT to close; walking stays
+// independent. Native call selection owns the right stick and confirm button.
+class RigCommands {
+public:
+    CommandsInput update(GamepadSample raw,bool available,uint64_t time,uint64_t drawTime);
+    void reset(){*this=RigCommands{};}
+    void suspend(){reset();releaseRequired_=true;}
+    bool active() const {return active_;}
+private:
+    uint64_t openedAt_{},lastTime_{},confirmUntil_{};
+    bool active_{},releaseRequired_{},confirmHeld_{},stickBlocked_{},priorChord_{},confirmed_{};
+};
 struct MotionStrike { bool strike{},started{};float curl{};Vec3 start{},end{}; };
 // No buttons arm a punch. Detect a deliberate, outward hand stroke relative to
 // the tracked head, rejecting walking, tracking jumps and a returning hand.

@@ -23,7 +23,7 @@ using NodeFn=uintptr_t(*)(void*,void*);
 QueueFn originalQueue{};ExecuteFn originalExecute{};NodeFn originalNode{};
 uintptr_t base{};
 std::atomic_bool enabled{};
-struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},itemsOpen{};};
+struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},itemsOpen{},commandsOpen{};};
 thread_local Source producing,executing;
 std::mutex mutex;
 std::unordered_map<uintptr_t,Source> pending;
@@ -43,6 +43,7 @@ bool spatialEnabled{};
 bool menuReaderVerified{};
 std::atomic_int menuState{-1};
 std::atomic_uint64_t pickerDrawTime{};
+std::atomic_uint64_t commandsDrawTime{};
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
 std::string nodeName(uintptr_t node){
@@ -113,21 +114,29 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 // the similarly numbered Z=100 layers are unrelated overlays.
                 const bool equipmentPicker=(world[14]==150&&order>=133&&order<=136)
                     ||(executing.itemsOpen&&world[14]==100&&order==133);
-                if((!contextAction&&!equipmentPicker&&(order<146||order>148))||!executing.panelTracked||(!equipmentPicker&&!executing.panelVisible)){
+                // Call uses the Z=100 layout: choices 135..137, selected action
+                // and its help 138..139. Destination marks and status stay separate.
+                const bool commandsPicker=executing.commandsOpen&&world[14]==100&&order>=135&&order<=139;
+                const bool expanded=equipmentPicker||commandsPicker;
+                if((!contextAction&&!expanded&&(order<146||order>148))||!executing.panelTracked||(!expanded&&!executing.panelVisible)){
                     ++suppressedDraws;
                     if((contextAction||equipmentPicker||(order>=146&&order<=148))&&executing.eye.eye<2)++hiddenPanelByEye[executing.eye.eye];
                     return 0;
                 }
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
-                const auto panel=equipmentPicker?executing.picker:
+                const auto panel=expanded?executing.picker:
                     contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
-                const float layoutWidth=equipmentPicker?.42f:1.2f;
+                const float layoutWidth=commandsPicker?.6f:equipmentPicker?.42f:1.2f;
                 const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
-                    equipmentPicker?0.f:contextAction?.04f:.72f,equipmentPicker?0.f:contextAction?-.52f:-.70f);
+                    expanded?0.f:contextAction?.04f:.72f,expanded?0.f:contextAction?-.52f:-.70f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));
                     const auto result=originalNode(state,item);
+                    if(commandsPicker&&order==137){
+                        auto previous=commandsDrawTime.load();
+                        while(previous<executing.eye.sampleTime&&!commandsDrawTime.compare_exchange_weak(previous,executing.eye.sampleTime)){}
+                    }
                     if(equipmentPicker&&order==135){
                         auto previous=pickerDrawTime.load();
                         while(previous<executing.eye.sampleTime&&!pickerDrawTime.compare_exchange_weak(previous,executing.eye.sampleTime)){}
@@ -191,6 +200,7 @@ std::optional<bool> nativeMenuOpen() noexcept {
     return next!=0;
 }
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
+uint64_t nativeCommandsDrawTime() noexcept {return enabled.load()?commandsDrawTime.load():0;}
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const HeadCameraSample& rig){
     const std::array<Pose,2> eyes{nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),
                                 nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose)};
@@ -199,7 +209,7 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
     const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,{0,.09f,-.03f})};
     producing={eye,camera,view,rig.wristPanel,picker,rig.wristPanelTracked,
-               rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),rig.controllers.equipmentCategory==4};
+               rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),rig.controllers.equipmentCategory==4,rig.controllers.commandControls};
 }
 void clearUiRenderSource() noexcept {producing={};}
 bool applyUiEyeProjection(float* output) noexcept {

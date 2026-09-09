@@ -57,6 +57,28 @@ int main(){
         expect(optics.update({},false).magnification==1&&optics.update({},true).magnification==1,"tracking or travel loss cancels zoom");
     }
     {
+        RigCommands commands;
+        GamepadSample input{0x4000,220,0,0,20000,25000,0};
+        auto result=commands.update(input,true,1000,990);
+        expect(result.active&&result.gamepad.buttons==0x100&&result.gamepad.leftY==20000&&result.gamepad.rightX==0,
+            "Commands preserves walking but consumes navigation held during opening");
+        input.buttons=0;input.rightX=0;commands.update(input,true,1020,1010);
+        input.rightY=25000;result=commands.update(input,true,1030,1020);
+        expect(result.active&&result.gamepad.rightY==25000&&result.gamepad.rightX==0,
+            "X can be released and upward command navigation stays upward");
+        input.rightTrigger=255;result=commands.update(input,true,1040,1030);
+        expect(result.gamepad.buttons==0x180&&result.gamepad.rightTrigger==0,"command confirm cannot fire the weapon");
+        expect(result.gamepad.rightY==25000,"native command confirmation includes its selected direction");
+        result=commands.update(input,true,1150,1140);
+        expect(result.gamepad.buttons==0x100,"holding command confirm cannot repeat it");
+        expect(result.gamepad.rightX==0&&result.gamepad.rightY==0,"held selection cannot turn the camera after command confirmation");
+        input.leftTrigger=0;result=commands.update(input,true,1160,1150);
+        expect(!result.active&&result.exclusive&&result.gamepad.rightTrigger==0&&result.gamepad.rightY==0&&result.gamepad.leftY==20000,
+            "release closes commands without leaking held fire or turning");
+        commands.update({},true,1170,1160);input={0x4000,220};commands.update(input,true,1180,1170);
+        commands.suspend();expect(!commands.update(input,true,1190,1180).active,"tracking or focus loss requires a fresh commands chord");
+    }
+    {
         MotionMelee melee;const Pose head{{},{0,1.6f,0}};
         Pose fist{{},{-.22f,1.25f,-.2f}};
         melee.update(head,fist,true,1000,1);

@@ -397,7 +397,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(meleeTracking!=frame.trackingSequence){
         meleeTracking=frame.trackingSequence;
         const bool available=nativeTravelMode()==TravelMode::onFoot&&!nativeManipulation
-            &&frame.controllers.magnification==1&&frame.controllers.hands[0].trigger<.25f;
+            &&frame.controllers.magnification==1&&!frame.controllers.commandControls&&frame.controllers.hands[0].trigger<.25f;
         meleeCurl={};
         for(size_t point=0;point<3;++point){
             const size_t side=point==0?0:1;

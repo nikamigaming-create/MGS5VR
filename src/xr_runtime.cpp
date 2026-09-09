@@ -91,6 +91,7 @@ struct Session {
     MenuButton menuButton;
     RigInput rigControls;
     RigOptics opticsControls;
+    RigCommands commandsControls;
     bool simpleControllerProfile{};
     float reportedMagnification{1};
     uint64_t hapticAt{};
@@ -287,11 +288,11 @@ struct Session {
     }
     void syncInput(XrTime time){
         controllerFrame={};
-        if(!focused){rigControls.suspend();opticsControls.reset();priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){rigControls.suspend();opticsControls.reset();commandsControls.suspend();priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){rigControls.suspend();opticsControls.reset();priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){rigControls.suspend();opticsControls.reset();commandsControls.suspend();priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
         if(!priorFocused){
             XrInteractionProfileState profile{XR_TYPE_INTERACTION_PROFILE_STATE};
@@ -343,22 +344,30 @@ struct Session {
         // scene; it never asks the game to enter its flat binocular camera.
         if(rigInput){
             const auto mode=nativeTravelMode();
-            const auto optical=opticsControls.update(pad,mode==TravelMode::onFoot&&left&&right&&!center&&!headToggle);
-            pad=optical.gamepad;
+            const auto now=steadyMilliseconds();
+            const auto optical=opticsControls.update(pad,mode==TravelMode::onFoot&&left&&right&&!commandsControls.active()&&!center&&!headToggle);
+            const auto wasCommands=commandsControls.active();
+            const auto commands=commandsControls.update(pad,(mode==TravelMode::onFoot||mode==TravelMode::horse)
+                &&left&&right&&!optical.exclusive&&!center&&!headToggle,now,nativeCommandsDrawTime());
+            if(wasCommands!=commands.active)log("Wrist Commands open="+std::to_string(commands.active));
+            controllerFrame.commandControls=commands.active;
             controllerFrame.magnification=optical.magnification;
             if(reportedMagnification!=optical.magnification){
                 reportedMagnification=optical.magnification;log("Stereo magnification="+std::to_string(optical.magnification));
             }
             const auto beforePhase=rigControls.equipmentPhase();
-            const auto mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f&&!optical.exclusive,mode,
-                steadyMilliseconds(),nativeEquipmentPickerDrawTime(),controllerThrowReady());
+            RigInputSample mapped{};
+            if(optical.exclusive||commands.exclusive){
+                rigControls.reset();mapped.gamepad=optical.exclusive?optical.gamepad:commands.gamepad;
+            }else mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode,
+                now,nativeEquipmentPickerDrawTime(),controllerThrowReady());
             if(beforePhase!=rigControls.equipmentPhase())log("Wrist picker phase="+std::to_string(rigControls.equipmentPhase())
                 +" category="+std::to_string(rigControls.equipmentCategory()));
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
             controllerFrame.equipmentCategory=rigControls.equipmentPhase()>=2?rigControls.equipmentCategory()+1:0;
-        }else if(nativeStatus.awaitingPlayer){rigControls.suspend();opticsControls.reset();}
-        else {rigControls.reset();opticsControls.reset();}
+        }else if(nativeStatus.awaitingPlayer){rigControls.suspend();opticsControls.reset();commandsControls.suspend();}
+        else {rigControls.reset();opticsControls.reset();commandsControls.suspend();}
         gamepadMailbox().publish(pad,left||right,steadyMilliseconds());
         const auto hapticNow=steadyMilliseconds();
         const auto wheel=wheelMailbox().read(hapticNow);
