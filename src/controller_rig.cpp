@@ -3,6 +3,7 @@
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
+#include "mgs5vr/motion_melee.hpp"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -47,6 +48,10 @@ std::mutex rigMutex;
 uintptr_t boundOwner{};
 uintptr_t boundModel{};
 uint64_t activation{},updates{};
+std::array<MotionMelee,3> meleeMotion;
+uint64_t meleeTracking{};
+std::array<float,2> meleeCurl{};
+WheelSteering wheelSteering;
 std::array<Vec3,2> bendHistory{};
 SupportContact supportContact;
 SupportPose supportPose;
@@ -196,9 +201,17 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         boundOwner=owner;boundModel=model;activation=frame.activation;
         supportContact.reset();supportPose.reset();
         supportBlend=0;aimBlend=0;guidedOffset={};heldSupportOffset={};supportAt=now;
+        for(auto& motion:meleeMotion)motion.reset();
+        meleeTracking=0;meleeCurl={};
+        wheelSteering.reset();wheelMailbox().publish({});
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
     const auto rightAnimated=bone(q,p,12),leftAnimated=bone(q,p,8);
+    const auto nativeWheelContact=compose(*root,compose(leftAnimated,inverse(gripFromWrist[0])));
+    const auto localWheelContact=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},compose(inverse(frame.nativePose),nativeWheelContact)));
+    const auto wheel=wheelSteering.update(frame.controllers.hands[0].grip,localWheelContact,
+        frame.controllers.vehicleControls&&frame.controllers.hands[0].gripTracked,
+        frame.controllers.hands[0].squeeze>.5f,frame.sampleTime,frame.activation,rotate(frame.headPose.orientation,{0,0,-1}));
     {
         // The arm meshes also carry spine and clavicle weights. Reposition
         // the whole upper body with one rigid transform: independent shoulder
@@ -235,6 +248,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
     bool nativeManipulation=false,firearmActive=false,throwableActive=false;
     std::optional<Vec3> barrelInGrip;
+    std::optional<Pose> muzzleInGrip;
     const auto weaponComponent=get<uintptr_t>(character+0x80);
     if(!frame.controllers.vehicleControls&&get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
         const auto instances=get<uintptr_t>(weaponComponent+0x38);
@@ -256,7 +270,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 reinterpret_cast<AttachmentGetter>(base+0x1042e40)(reinterpret_cast<void*>(weaponComponent),attachmentMatrix.data(),index);
                 if(read(state+((flags&0x200)?0x80:0x40),muzzleMatrix)){
                     const auto attachment=nativeAffinePose(attachmentMatrix),socket=nativeAffinePose(muzzleMatrix);
-                    if(attachment&&socket)barrelInGrip=rotate(compose(gripFromWrist[1],compose(*attachment,*socket)).orientation,{0,0,1});
+                    if(attachment&&socket){
+                        muzzleInGrip=compose(gripFromWrist[1],compose(*attachment,*socket));
+                        barrelInGrip=rotate(muzzleInGrip->orientation,{0,0,1});
+                    }
                 }
             }
         }
@@ -338,7 +355,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             target.position=tracked.position+(attached.position-tracked.position)*supportBlend;
             target.orientation=blendRotation(tracked.orientation,attached.orientation,supportBlend);
         }
-        if(supportBlend<1)target=clearWrist(target);
+        if(wheel.gripped)target=leftAnimated;
+        else if(supportBlend<1)target=clearWrist(target);
         const auto left=groundedArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],armBasis[0]);
         if(!left)return false;
         replace(q,p,6,left->pose.shoulder);replace(q,p,7,left->pose.elbow);replace(q,p,8,left->pose.wrist);
@@ -375,6 +393,34 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             replace(q,p,i,compose(bone(q,p,anchor),Pose{corrections[j],offset}));
         }
     }
+    std::array<std::optional<MeleeSweep>,3> strikes{};
+    if(meleeTracking!=frame.trackingSequence){
+        meleeTracking=frame.trackingSequence;
+        const bool available=nativeTravelMode()==TravelMode::onFoot&&!nativeManipulation
+            &&frame.controllers.magnification==1&&frame.controllers.hands[0].trigger<.25f;
+        meleeCurl={};
+        for(size_t point=0;point<3;++point){
+            const size_t side=point==0?0:1;
+            const auto& hand=frame.controllers.hands[side];
+            auto contact=hand.grip;
+            auto rendered=compose(*root,compose(bone(q,p,wrists[side]),inverse(gripFromWrist[side])));
+            bool allowed=available&&hand.gripTracked&&(side||supportBlend==0);
+            if(point==2){
+                allowed=allowed&&frame.controllers.weaponReady&&firearmActive&&muzzleInGrip.has_value();
+                if(muzzleInGrip){contact=compose(contact,*muzzleInGrip);rendered=compose(rendered,*muzzleInGrip);}
+            }else if(side&&frame.controllers.weaponReady
+                &&(throwableActive||(firearmActive&&muzzleInGrip)))allowed=false;
+            const auto motion=meleeMotion[point].update(frame.headPose,contact,allowed,
+                frame.sampleTime,frame.controllers.referenceEpoch,point==2);
+            if(point<2)meleeCurl[side]=motion.curl;
+            if(!motion.strike)continue;
+            const auto toWorld=[&](Vec3 p){return nativeTrackedPose(frame.nativePose,frame.headPose,Pose{{},p}).position;};
+            const auto correction=rendered.position-toWorld(motion.end);
+            strikes[point]=MeleeSweep{owner,character,toWorld(motion.start)+correction,rendered.position,
+                frame.sampleTime,frame.activation,static_cast<unsigned>(point),motion.started};
+        }
+    }
+    frame.controllers.strikeCurl=meleeCurl;
     // Free fingers follow controller curls. Preserve authored contact around a
     // weapon and during reloads, including when the support hand is blending.
     // Read native locals from the saved pose so updating one joint cannot alter
@@ -392,8 +438,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const auto offset=bindOffset(i);
             if(!valid(Pose{{},offset})||dot(offset,offset)<.000025f||dot(offset,offset)>.015f)return false;
             const auto native=compose(inverse(bone(originalQ,originalP,anchor)),bone(originalQ,originalP,i));
-            const float curl=finger==0?std::max(hand.squeeze,hand.thumbTouched?.65f:0.f)
+            const float controllerCurl=finger==0?std::max(hand.squeeze,hand.thumbTouched?.65f:0.f)
                 :finger==1?std::max(hand.trigger,hand.triggerTouched?.12f:0.f):hand.squeeze;
+            const float curl=std::max(controllerCurl,frame.controllers.strikeCurl[side]);
             const auto rotation=fingerJointRotation(side!=0,static_cast<unsigned>(finger),static_cast<unsigned>(joint),curl);
             if(!rotation)return false;
             const Pose local{blendRotation(*rotation,native.orientation,contact),offset+(native.position-offset)*contact};
@@ -413,6 +460,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
     }
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
+    wheelMailbox().publish(wheel);
+    if(wheel.engaged)log("Driver left hand gripped authored wheel contact");
+    for(const auto& strike:strikes)if(strike)publishMeleeSweep(*strike);
     // The engine may reuse animated helper/finger channels next frame. Only the
     // native publication consumes our solved pose; never feed it back into the
     // animation cache and compound garment transforms on subsequent updates.
@@ -444,6 +494,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             <<" inspecting="<<inspecting<<" arm_helpers="<<helpersMatch<<" ground_contacts="<<groundContacts
             <<" left_head="<<leftView.x<<','<<leftView.y<<','<<leftView.z
             <<" right_head="<<rightView.x<<','<<rightView.y<<','<<rightView.z;log(s.str());
+        if(frame.controllers.vehicleControls){
+            const auto nativePalm=compose(*root,compose(leftAnimated,inverse(gripFromWrist[0])));
+            const auto target=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},compose(inverse(frame.nativePose),nativePalm)));
+            std::ostringstream w;w<<"Driver wheel grip="<<wheel.gripped<<" axis="<<wheel.axis
+                <<" local_contact="<<target.position.x<<','<<target.position.y<<','<<target.position.z;log(w.str());
+        }
     }
     return true;
 }
@@ -643,10 +699,11 @@ void installControllerRig(uintptr_t imageBase){
     if(status==MH_OK)status=MH_ApplyQueued();
     if(status!=MH_OK){MH_RemoveHook(originAddress);MH_RemoveHook(velocityAddress);throw std::runtime_error(std::string("Controller throw enable: ")+MH_StatusToString(status));}
     log("Controller throw origin and velocity adapters installed");
+    installMotionMelee(base);
     enabled.store(true);log("Experimental controller rig installed at verified skin publication RVA 0x1a6caa0 and shot solver 0x1044ff0");
 }
 void observeControllerRigOwner(uintptr_t owner) noexcept{playerOwner.store(owner);}
-void stopControllerRig() noexcept{enabled.store(false);playerOwner.store(0);}
+void stopControllerRig() noexcept{stopMotionMelee();enabled.store(false);playerOwner.store(0);}
 bool controllerRigEnabled() noexcept{return enabled.load();}
 TravelMode nativeTravelMode() noexcept{
     // PlayerStatus's own Lua readers select this double-buffered local player

@@ -1,10 +1,10 @@
 # Remaining gameplay access and physical melee
 
-The September 7 physical run of EB89CE69 received positive general gameplay
-feedback. It does not establish acceptance of every interaction. The next
-requested work is direct fist/bionic-arm melee, buddy commands, binoculars and
-zoom. These are implementation gaps; no additional grip mode unlocks them in the
-installed build.
+The public September 8 package remains the headset-tested baseline. A development
+candidate adds stereo viewing zoom, motion strikes and left-hand wheel control.
+Native strike contacts have been observed against a truck; this is not yet an
+enemy reaction or health-delta check. Later powered arm abilities, buddy commands
+and native binocular marking still need work.
 
 ## What is available now
 
@@ -15,14 +15,15 @@ installed build.
 | Equipment and NVG | Left trigger opens wrist selection; first right-stick flick chooses a category. NVG is the upward item slot; selecting None turns it off. NVG is separate from binoculars. |
 | iDroid/map | Tap left Menu. Native full menus appear on the large in-headset screen; triggers zoom the map and grips switch tabs. Close with B to return to tracked VR. |
 | Ordinary CQC | Right trigger with right grip released reaches native attack/CQC. The game chooses the contextual action. This is a button route, not physical fist hit detection. |
-| Physical fists | Finger articulation and tracked fists exist. Hand motion does not yet generate an accepted melee strike or contact damage. |
-| Binoculars/scopes | Optical input is explicitly disabled in tracked VR. Left trigger + Y is reserved. No grip chord enables stereo magnification. |
-| Vehicles and other actions | Vehicle input routing exists, but driving is unverified. Loot, carry, Fulton, interrogation, powered arm abilities and all weapon families need individual end-to-end checks; selection alone does not prove the action. |
+| Physical fists | Candidate: motion alone submits native kick contacts from palms or the held firearm tip. No trigger pulse or native kick animation. Target damage/reaction acceptance remains open. |
+| Binoculars/scopes | Candidate: left trigger + Y opens stereo 2× viewing; right-stick click switches 2×/4×, B exits. Native marking/intel and per-weapon scopes remain unfinished. |
+| Vehicles | Candidate: left grip acquires the native wheel contact, controller rotation steers, release lets go. Truck entry, both steering directions and exit have SIM evidence. Sustained driving/braking, physical haptic feel and personal-gun fire from the driver seat remain unverified or unimplemented. |
+| Other actions | Loot, carry, Fulton, interrogation, powered arm abilities and all weapon families need individual end-to-end checks; selection alone does not prove the action. |
 
 ## Physical melee contract
 
-Basic fists should require no equipment selection. Squeezing a free controller
-closes the fist; a deliberate punch supplies the attack intent. The left bionic
+Basic fists require no equipment selection or squeeze. A deliberate motion
+stroke supplies attack intent and closes the free fingers. The left bionic
 fist remains available while another item is selected. The right fist is available
 when that hand is free. A left punch must release weapon-support ownership cleanly
 and must never be interpreted as firearm discharge.
@@ -60,11 +61,14 @@ NVG, map zoom, binocular magnification and an equipped weapon's authored scope a
 different states. An iron-sight weapon must not silently become a scoped weapon.
 Do not re-enable the old mono optical-screen prototype as a completed VR optic.
 
-Implementation order: ordinary physical punches and their native target/contact
-gate; wrist Commands and horse calling; binocular marking and stereo zoom; then
-remaining powered arm, loot/carry/Fulton and vehicle interactions. Retain the
-accepted 1440p/native-AA profile throughout interaction work. Keep the installed
-candidate unchanged until each replacement has bounded SIM evidence.
+The next acceptance steps are enemy reaction and damage for motion strikes,
+vehicle movement/braking and wheel control/feedback in a physical headset, then
+wrist Commands, horse calling and native binocular marking. The requested
+drive-and-shoot mode would keep left-hand wheel steering, move the pedals to the
+left stick and give right grip/trigger to the carried gun. Native driver controls
+do not expose that weapon path; remapping triggers alone does not implement it.
+Retain the accepted 1440p/native-AA profile for
+headset play. SIM runtime overrides are process-local and use the existing save.
 
 Native reference: Konami's [Call Menu](https://eu-support.konami.com/hc/en-gb/articles/9667024720151-Metal-Gear-Solid-V-Call-Menu)
 describes buddy orders and prosthetic-arm abilities; its [tactics manual](https://mgstpp-app.konamionline.com/manual/pc/na/en/pc_12.html)

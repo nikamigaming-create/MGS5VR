@@ -3,6 +3,16 @@
 Updated 2026-09-08. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
+The development branch adds independent-eye 2×/4× viewing, motion-only palm and
+firearm-tip strikes using native kick contacts, and left-hand wheel control with
+haptic output. These additions are separate from the September 8 public DLL.
+Native truck-contact acceptance has been observed; enemy reactions/damage,
+powered arm abilities and physical wheel/haptic comfort are not certified.
+Truck entry, wheel acquisition, signed steering and exit were exercised. The
+small clip ends with a carried pistol on foot; it does not demonstrate shooting
+that gun while driving or sustained vehicle movement. See the
+[candidate review](OPTICS_MELEE_WHEEL_REVIEW.md) for the exact scope.
+
 The physical EB89CE69 follow-up received positive general gameplay feedback.
 The user identified access to horse/buddy commands, binoculars/zoom and physical
 fist/bionic-arm melee as the next gaps. Their current bindings and implementation

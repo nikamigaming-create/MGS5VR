@@ -18,7 +18,7 @@ FetchContent_Declare(minhook GIT_REPOSITORY https://github.com/TsudaKageyu/minho
 FetchContent_MakeAvailable(openxr minhook)
 add_library(mgs5vr_core STATIC src/core.cpp src/input_bridge.cpp src/head_camera.cpp src/stereo.cpp src/arm_ik.cpp)
 target_include_directories(mgs5vr_core PUBLIC include)
-add_library(mgs5vr_runtime STATIC src/log.cpp src/mailbox.cpp src/gpu_timing.cpp src/native_performance.cpp src/performance_bridge.asm src/xr_runtime.cpp src/scene_capture.cpp src/ui_renderer.cpp src/player_visibility.cpp src/controller_rig.cpp)
+add_library(mgs5vr_runtime STATIC src/log.cpp src/mailbox.cpp src/gpu_timing.cpp src/native_performance.cpp src/performance_bridge.asm src/xr_runtime.cpp src/scene_capture.cpp src/ui_renderer.cpp src/player_visibility.cpp src/controller_rig.cpp src/motion_melee.cpp)
 target_include_directories(mgs5vr_runtime PUBLIC include)
 target_compile_definitions(mgs5vr_runtime PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX
   XR_USE_PLATFORM_WIN32 XR_USE_GRAPHICS_API_D3D11)

@@ -267,7 +267,9 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         // Preserve the requested optical centers separately, then submit only
         // their exact pixel region with its matching angular bounds.
         drawingEye.displayFov=drawingEye.view.fov;
-        const auto renderFov=mgs5vr::enclosingEyeFov(drawingEye.displayFov);
+        drawingEye.magnification=source.pair.sample.controllers.magnification;
+        const auto optical=mgs5vr::opticalFov(drawingEye.displayFov,drawingEye.magnification);
+        const auto renderFov=optical?mgs5vr::enclosingEyeFov(*optical):std::nullopt;
         if(!renderFov){complete=false;sceneFailure=4;break;}
         drawingEye.view.fov=*renderFov;
         const auto native=mgs5vr::nativeEyePose(source.pair.sample.nativePose,source.pair.sample.headPose,drawingEye.view.pose);

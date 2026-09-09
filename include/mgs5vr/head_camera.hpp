@@ -21,6 +21,8 @@ struct ControllerFrame {
     bool weaponReady{};
     bool vehicleControls{};
     unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
+    float magnification{1};
+    std::array<float,2> strikeCurl{};
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};

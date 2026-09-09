@@ -87,11 +87,26 @@ equipment strength; this is point-and-trigger throwing, not a velocity gesture.
 The latest SIM observations and remaining stance limits are in the
 [interaction and visibility review](INTERACTION_VISIBILITY_REVIEW.md).
 
-**Optical zoom is unavailable in this VR test.** Left trigger + Y is reserved and
-does nothing. It cannot force a 2D scope or binocular screen. The checkpoint's
-AM MRS-4 has iron sights; no magnification is invented for it. Future optical work
-must identify the equipped optic and retain a stereo view. The grenade adapter
-does not establish bionic-arm, CQC or every item action.
+**Stereo zoom (development candidate):** hold **left trigger + tap Y** for 2×.
+**Click the right stick** for 4×/2×; **B** closes it. The world remains stereo with
+live head tracking. Walking and horizontal turning remain available. This is a
+separate viewing mode, not an added scope on an iron-sight gun. Native binocular
+marking/intel and authored scope integration remain unfinished.
+
+**Motion melee (development candidate):** swing either free hand, or bash with a
+readied firearm. No button arms a punch. Deliberate movement closes the free
+fingers and submits contact at the visible palm or authored weapon tip using the
+native kick attack entry. Slow movement, tracking jumps, wrist selection, optics,
+reloads and seated movement cannot generate punches. One accepted target ends a
+stroke; pull back before another strike. Native eligibility and damage rules
+apply; not every object becomes destructible. Enemy reaction/damage testing is
+still required; a collision log alone does not prove damage.
+
+Basic left-arm melee needs no special arm selected. Powered prosthetic abilities
+retain campaign unlocks and equipment selection. After selecting an available
+ability, use **right grip to ready + right trigger to activate**, following its
+native charge/release behavior. Ordinary punches cannot select or discharge an
+ability. Later powered arms are not verified on the 1% checkpoint.
 
 ## Movement, actions and menus
 
@@ -121,19 +136,32 @@ loading and player-replacement transitions still need acceptance.
 
 There is no hidden grip mode for the missing systems. The current wrist modifier
 consumes the right stick/click needed by the held Call Menu; horse summoning and
-buddy commands need a dedicated input/page owner. Physical punches also need
-native strike/contact integration: tracked fist movement currently does not
-cause melee damage. See [system access and the physical-melee contract](SYSTEMS_ACCESS.md).
+buddy commands need a dedicated input/page owner. The motion-melee candidate now
+reaches native contacts; enemy reaction and damage remain separate acceptance
+steps. See [system access and the physical-melee contract](SYSTEMS_ACCESS.md).
 
 ## Vehicle mapping under simulator development
 
 Native vehicle state changes the controls to **right trigger: accelerator**,
 **left trigger: brake/reverse**, **left stick: steering**, and **Y: enter/exit**.
-**Left grip** retains the native mounted attack/call action. **Right grip** becomes
-the equipment modifier while seated, freeing both triggers for driving. Release
-held controls after entry/exit or regained focus before resuming input. These
-mappings have contract tests; actual vehicle entry/driving/exit remains unproven.
-They are not a claim of physical steering-wheel or mounted-gun hand interaction.
+In the development candidate, bring the **left hand to the wheel and squeeze
+left grip**. Turn the controller clockwise/right or counterclockwise/left;
+release grip to let go. The native driver's hand keeps its authored contact.
+The left stick remains available when the wheel is released. **Left X** invokes
+the native vehicle weapon/call action; grabbing the wheel cannot fire it.
+**Right grip** is the equipment modifier while seated. Release
+held controls after entry/exit or regained focus before resuming input. Truck
+entry, left-hand wheel acquisition, both steering directions and exit have SIM
+evidence. The short recording does not establish sustained driving or braking.
+Wheel acquisition gives a short haptic pulse. Native game rumble also reaches the
+controllers; actual feel needs a headset check. This mapping does not implement
+a personal gun through a driver's window. Vehicle weapons retain their native
+availability. Mounted-gun hand aiming remains unfinished.
+
+The requested next behavior is left-hand steering with the carried rifle or
+pistol aimed and fired by the right hand. It needs a native driver weapon path,
+plus left-stick forward/back for the pedals while gripping the wheel so the
+right trigger can fire. This is a design target, not a current control mode.
 
 ## Test scope
 
