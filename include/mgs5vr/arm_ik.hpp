@@ -18,6 +18,9 @@ std::optional<ArmSolution> solveArm(const ArmPose& animated,Pose wristTarget,Vec
 std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Quat wrist,bool right);
 // Landscape display: +X runs elbow to wrist; +Z is the back of the forearm.
 std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal);
+// Support remains in front of the primary controller's unmodified aim. The
+// guided weapon cannot keep a withdrawn hand attached by rotating after it.
+bool withinSupportCone(Vec3 handSeparation,Vec3 primaryForward);
 class SupportContact {
 public:
     // Distance is from the tracked palm to the weapon's support grip.

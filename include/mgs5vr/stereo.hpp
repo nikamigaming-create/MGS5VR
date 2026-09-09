@@ -15,8 +15,10 @@ struct EyeFrame {
     uint32_t eye{};
     bool projected{},joined{};
     EyeFov displayFov{}; // Requested optics; view.fov describes the rendered pixels.
+    float magnification{1}; // Scene angles are optically magnified into displayFov.
 };
 bool valid(EyeFov fov);
+std::optional<EyeFov> opticalFov(EyeFov fov,float magnification);
 std::optional<EyeFov> enclosingEyeFov(EyeFov requested);
 struct EyeImageRegion { int32_t x{},y{},width{},height{}; EyeFov fov{}; };
 // D3D top-left pixel rectangle. The returned FOV describes the rounded rectangle

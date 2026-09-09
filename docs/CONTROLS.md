@@ -1,6 +1,6 @@
 # Touch controls for the tracked VR experiment
 
-[Quick controller infographic](images/controls.png) · [Install and play](../README.md)
+[Quick controller infographic](images/controls.png) · [All control modes](images/control-modes.svg) · [Install and play](../README.md)
 
 These bindings target the game's **Action Type** controller layout. The left-arm
 HUD shows the native weapon name, ammunition and status. Native context-action
@@ -35,6 +35,9 @@ Grip and trigger keep their gameplay actions while also animating the fingers.
 
 Support requires the left palm to stay within 10 cm of the weapon's support grip
 for 150 ms, then blends into contact. Pulling more than 20 cm away releases it.
+Moving the left hand beside or behind the firing hand also releases support;
+guidance stays within 60 degrees of the right controller's pointing direction.
+This prevents the weapon from following a withdrawn hand and keeping it latched.
 Clenching left grip only animates the free fingers; it cannot force two-handed
 mode. Lowering the weapon or inspecting the wrist clears contact, so selection
 does not leave a sticky support latch. The corrective headset run received
@@ -87,11 +90,26 @@ equipment strength; this is point-and-trigger throwing, not a velocity gesture.
 The latest SIM observations and remaining stance limits are in the
 [interaction and visibility review](INTERACTION_VISIBILITY_REVIEW.md).
 
-**Optical zoom is unavailable in this VR test.** Left trigger + Y is reserved and
-does nothing. It cannot force a 2D scope or binocular screen. The checkpoint's
-AM MRS-4 has iron sights; no magnification is invented for it. Future optical work
-must identify the equipped optic and retain a stereo view. The grenade adapter
-does not establish bionic-arm, CQC or every item action.
+**Stereo zoom (development candidate):** hold **left trigger + tap Y** for 2×.
+**Click the right stick** for 4×/2×; **B** closes it. The world remains stereo with
+live head tracking. Walking and horizontal turning remain available. This is a
+separate viewing mode, not an added scope on an iron-sight gun. Native binocular
+marking/intel and authored scope integration remain unfinished.
+
+**Motion melee (development candidate):** swing either free hand, or bash with a
+readied firearm. No button arms a punch. Deliberate movement closes the free
+fingers and submits contact at the visible palm or authored weapon tip using the
+native kick attack entry. Slow movement, tracking jumps, wrist selection, optics,
+reloads and seated movement cannot generate punches. One accepted target ends a
+stroke; pull back before another strike. Native eligibility and damage rules
+apply; not every object becomes destructible. Enemy reaction/damage testing is
+still required; a collision log alone does not prove damage.
+
+Basic left-arm melee needs no special arm selected. Powered prosthetic abilities
+retain campaign unlocks and equipment selection. After selecting an available
+ability, use **right grip to ready + right trigger to activate**, following its
+native charge/release behavior. Ordinary punches cannot select or discharge an
+ability. Later powered arms are not verified on the 1% checkpoint.
 
 ## Movement, actions and menus
 
@@ -104,36 +122,65 @@ does not establish bionic-arm, CQC or every item action.
 | Quick dive | Left X without the equipment modifier |
 | Context action / pickup | Left Y without the equipment modifier; follow the native action when available |
 | Native attack / CQC / carried-body throw | Right trigger with right grip released; the native game state chooses the action |
-| Native call/radio input | Left trigger + X; held buddy-command navigation remains incomplete |
+| Wrist Commands / buddy orders | Hold left trigger, tap X; point the right stick toward an available command and press right trigger or right-stick click; release left trigger to close |
 | Toggle native VR / large game screen | Left grip + left-stick click |
 | Open iDroid map | Tap left Menu |
 | Pause | Hold left Menu for at least 0.55 seconds |
+| Main menu / options | Hold left Menu on foot; choose Return to Title Menu or Options with the left stick and A |
+| Cutscene skip | Hold left Menu; choose Skip and press A when the native game offers it |
 | Recenter the large screen | Both grips + right-stick click |
 
-iDroid and pause automatically use the large screen. **A** confirms, **B** goes
-back, sticks navigate, grips act as LB/RB, and triggers retain LT/RT. On the map,
-triggers zoom, right-stick click changes zoom step and Y switches MAP/NAV.
-Close iDroid with **B**, or hold **Menu** again to unpause. Tracked VR returns
-automatically when the same player camera resumes. Release held controls once
-after returning before moving or firing. The manual VR toggle remains available;
-switching VR off inside a menu also disables automatic return. Other cinematic,
-loading and player-replacement transitions still need acceptance.
+In the development build, opening iDroid or Pause during tracked gameplay puts
+the native menu on a floating panel in the stereo world. Head movement keeps
+working during Pause. The iDroid handset remains attached to the right hand while
+iDroid is open; closing iDroid stows it. Equipment and Commands remain on the left wrist.
 
-There is no hidden grip mode for the missing systems. The current wrist modifier
-consumes the right stick/click needed by the held Call Menu; horse summoning and
-buddy commands need a dedicated input/page owner. Physical punches also need
-native strike/contact integration: tracked fist movement currently does not
-cause melee damage. See [system access and the physical-melee contract](SYSTEMS_ACCESS.md).
+**A** confirms, **B** goes back, the left stick navigates, grips act as **LB/RB**,
+and triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
+zoom step and **Y** switches MAP/NAV. **B** closes iDroid; hold **Menu** again to
+unpause. Holding Menu *inside iDroid* opens its native Help, so close iDroid before
+opening Pause. Release held controls once after returning before moving or firing.
+
+For the main menu, open Pause, select **RETURN TO TITLE MENU**, press **A**, then
+answer the native confirmation. **OPTIONS** and **CONTROLS & MANUAL** are also in
+Pause. The title screen uses the large in-headset screen and native controls.
+Cutscene Skip is available only when the native game offers it. Loading,
+cutscenes and player-replacement transitions still need broader VR integration;
+the floating gameplay menus do not establish support for every transition.
+
+Wrist Commands has its own input mode, separate from equipment selection.
+Keep left trigger held, center the right stick after the commands appear, then
+point toward a command and confirm. Left-stick walking remains available.
+Right trigger confirms once and cannot fire the gun. B cancels; release left
+trigger and center the stick before returning to gameplay. The native game
+chooses which commands are available; stand or crouch to call D-Horse. Calling
+D-Horse, Stay back and the arm's distraction knock were exercised in SIM.
+The motion-melee candidate now
+reaches native contacts; enemy reaction and damage remain separate acceptance
+steps. See [system access and the physical-melee contract](SYSTEMS_ACCESS.md).
 
 ## Vehicle mapping under simulator development
 
 Native vehicle state changes the controls to **right trigger: accelerator**,
 **left trigger: brake/reverse**, **left stick: steering**, and **Y: enter/exit**.
-**Left grip** retains the native mounted attack/call action. **Right grip** becomes
-the equipment modifier while seated, freeing both triggers for driving. Release
-held controls after entry/exit or regained focus before resuming input. These
-mappings have contract tests; actual vehicle entry/driving/exit remains unproven.
-They are not a claim of physical steering-wheel or mounted-gun hand interaction.
+In the development candidate, bring the **left hand to the wheel and squeeze
+left grip**. Turn the controller clockwise/right or counterclockwise/left;
+release grip to let go. The native driver's hand keeps its authored contact.
+The left stick remains available when the wheel is released. **Left X** invokes
+the native vehicle weapon/call action; grabbing the wheel cannot fire it.
+**Right grip** is the equipment modifier while seated. Release
+held controls after entry/exit or regained focus before resuming input. Truck
+entry, left-hand wheel acquisition, both steering directions and exit have SIM
+evidence. The short recording does not establish sustained driving or braking.
+Wheel acquisition gives a short haptic pulse. Native game rumble also reaches the
+controllers; actual feel needs a headset check. This mapping does not implement
+a personal gun through a driver's window. Vehicle weapons retain their native
+availability. Mounted-gun hand aiming remains unfinished.
+
+The requested next behavior is left-hand steering with the carried rifle or
+pistol aimed and fired by the right hand. It needs a native driver weapon path,
+plus left-stick forward/back for the pedals while gripping the wheel so the
+right trigger can fire. This is a design target, not a current control mode.
 
 ## Test scope
 

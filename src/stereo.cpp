@@ -31,6 +31,14 @@ std::optional<EyeFov> enclosingEyeFov(EyeFov f){
     const float x=std::max(-f.left,f.right),y=std::max(f.up,-f.down);
     return EyeFov{-x,x,y,-y};
 }
+std::optional<EyeFov> opticalFov(EyeFov f,float magnification){
+    if(!valid(f)||!std::isfinite(magnification)||magnification<.25f||magnification>4.f)return {};
+    if(magnification==1)return f;
+    const auto angle=[&](float a){return std::atan(std::tan(a)/magnification);};
+    const EyeFov result{angle(f.left),angle(f.right),angle(f.up),angle(f.down)};
+    if(!valid(result))return {};
+    return result;
+}
 std::optional<EyeImageRegion> eyeImageRegion(EyeFov rendered,EyeFov requested,uint32_t width,uint32_t height){
     if(!valid(rendered)||!valid(requested)||!width||!height||width>16384||height>16384
         ||requested.left<rendered.left||requested.right>rendered.right
@@ -91,10 +99,11 @@ bool readyEyePair(const std::array<EyeFrame,2>& eyes,uint64_t activation,uint64_
     // Both images must be drawn from one native scene/tracking transaction.
     // Consecutive game frames, including alternating-eye rendering, are rejected.
     if(!activation||!maximumAgeMs||maximumAgeMs>500||eyes[0].sourceSequence!=eyes[1].sourceSequence
-        ||eyes[0].trackingSequence!=eyes[1].trackingSequence)return false;
+        ||eyes[0].trackingSequence!=eyes[1].trackingSequence||eyes[0].magnification!=eyes[1].magnification)return false;
     for(size_t n=0;n<eyes.size();++n){const auto& e=eyes[n];
         if(!e.projected||!e.joined||e.eye!=n||!e.sourceSequence||e.activation!=activation
-            ||!valid(e.view.pose)||!valid(e.view.fov)||!valid(e.displayFov)||now<e.sampleTime||now-e.sampleTime>maximumAgeMs)return false;
+            ||!valid(e.view.pose)||!valid(e.view.fov)||!valid(e.displayFov)||!std::isfinite(e.magnification)
+            ||e.magnification<1||e.magnification>4||now<e.sampleTime||now-e.sampleTime>maximumAgeMs)return false;
     }
     return true;
 }

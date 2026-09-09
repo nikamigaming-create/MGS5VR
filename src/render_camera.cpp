@@ -250,7 +250,12 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const auto now=mgs5vr::steadyMilliseconds();
     // The first camera update can precede tracked skin publication. Do not
     // submit that exposed third-person arm pose as the first VR eye pair.
-    if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence){++sceneRejected;return originalScene(render,graphics,task,worker);}
+    // Native Pause stops animation publication. Its existing world geometry
+    // remains drawable from fresh tracked eye cameras; requiring another skin
+    // update would black out the menu. A spatial menu can only be anchored
+    // after an accepted gameplay view, and all camera/transaction checks below
+    // still apply. Gameplay continues to require its current tracked skin.
+    if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence&&!source.pair.sample.menuOpen){++sceneRejected;return originalScene(render,graphics,task,worker);}
     if(!contains||source.pair.sample.activation!=status.activation||now<source.pair.sample.sampleTime||now-source.pair.sample.sampleTime>150
         ||std::memcmp(reinterpret_cast<void*>(source.grCamera+0x30),source.pair.world.data(),sizeof(source.pair.world))){++sceneRejected;return originalScene(render,graphics,task,worker);}
     const auto contextOwner=field<uintptr_t>(graphics,0x150);
@@ -267,7 +272,9 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         // Preserve the requested optical centers separately, then submit only
         // their exact pixel region with its matching angular bounds.
         drawingEye.displayFov=drawingEye.view.fov;
-        const auto renderFov=mgs5vr::enclosingEyeFov(drawingEye.displayFov);
+        drawingEye.magnification=source.pair.sample.controllers.magnification;
+        const auto optical=mgs5vr::opticalFov(drawingEye.displayFov,drawingEye.magnification);
+        const auto renderFov=optical?mgs5vr::enclosingEyeFov(*optical):std::nullopt;
         if(!renderFov){complete=false;sceneFailure=4;break;}
         drawingEye.view.fov=*renderFov;
         const auto native=mgs5vr::nativeEyePose(source.pair.sample.nativePose,source.pair.sample.headPose,drawingEye.view.pose);

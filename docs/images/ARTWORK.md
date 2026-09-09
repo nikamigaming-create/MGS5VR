@@ -17,3 +17,10 @@ the pale inner side button, separate from the black outer TRIGGER button.
 
 The card shows the intended bindings. It does not certify all physical controller
 gestures or close the gameplay gaps listed in the guide.
+
+The development companion [control-modes.svg](control-modes.svg) includes the
+additional menu, Commands, zoom, melee and vehicle mappings. Its editable source
+is [CONTROL_SCHEMA.json](../CONTROL_SCHEMA.json); run
+`python tools/render-control-schema.py` to regenerate it. The September 8
+illustration remains the public-release quick card. The attempted bitmap update
+did not return a usable image; the companion uses code-native type and rules.

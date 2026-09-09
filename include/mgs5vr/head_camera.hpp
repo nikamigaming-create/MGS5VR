@@ -5,7 +5,7 @@
 
 namespace mgs5vr {
 enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch };
-struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{}; };
+struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{}; };
 // All poses use the same OpenXR LOCAL space and predicted display time as
 // the eyes. Grip is the attachment frame; aim is a separate pointing frame.
 struct TrackedHand {
@@ -21,6 +21,9 @@ struct ControllerFrame {
     bool weaponReady{};
     bool vehicleControls{};
     unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
+    float magnification{1};
+    std::array<float,2> strikeCurl{};
+    bool commandControls{};
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};
@@ -37,6 +40,8 @@ struct HeadCameraSample {
     uint64_t rigSequence{};
     Pose wristPanel{}; // World-space forearm surface from this skin publication.
     bool wristPanelTracked{};
+    bool menuOpen{};
+    Pose menuPanel{};
 };
 // Native listener adapters consume the center-head pose from the camera's
 // existing publication, never a newer tracking sample or an individual eye.
@@ -84,6 +89,9 @@ private:
     bool suspended_{};
     bool awaitingPlayer_{};
     bool nativeMenuOpen_{};
+    HeadCameraSample lastView_{};
+    Pose menuNative_{},menuHead_{},menuPanel_{};
+    bool menuAnchored_{};
     std::array<EyeView,2> views_{};
     ControllerFrame controllers_{};
     struct RigFrame { uintptr_t camera{},owner{}; Pose sourceCamera{}; HeadCameraSample sample{}; } rig_;

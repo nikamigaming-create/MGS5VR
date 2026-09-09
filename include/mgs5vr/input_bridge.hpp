@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <mutex>
 #include <optional>
+#include "core.hpp"
 namespace mgs5vr {
 uint64_t steadyMilliseconds();
 struct GamepadSample {
@@ -32,6 +33,74 @@ private:
     unsigned category_{};
 };
 enum class TravelMode { unknown,onFoot,horse,vehicle };
+struct WheelSample { float axis{};bool gripped{},engaged{};uint64_t time{}; };
+// Authored driver hand contact and tracked grip are in the same LOCAL frame.
+// A fresh squeeze near that contact takes the wheel; release always lets go.
+class WheelSteering {
+public:
+    WheelSample update(Pose tracked,Pose contact,bool available,bool squeeze,uint64_t time,uint64_t epoch,Vec3 forward={0,0,-1});
+    void reset(){*this=WheelSteering{};}
+private:
+    Pose start_{};
+    Vec3 axis_{0,0,-1};
+    uint64_t time_{},epoch_{};
+    bool gripped_{},held_{};
+};
+class WheelMailbox {
+public:
+    void publish(WheelSample sample);
+    WheelSample read(uint64_t time) const;
+private:
+    mutable std::mutex mutex_;
+    WheelSample sample_{};
+};
+WheelMailbox& wheelMailbox();
+struct RumbleSample { float low{},high{};uint64_t time{}; };
+class RumbleMailbox {
+public:
+    void publish(RumbleSample sample);
+    RumbleSample read(uint64_t time) const;
+private:
+    mutable std::mutex mutex_;
+    RumbleSample sample_{};
+};
+RumbleMailbox& rumbleMailbox();
+struct OpticsInput { GamepadSample gamepad{};float magnification{1};bool exclusive{}; };
+// The reserved wrist+Y chord opens stereo magnification. R-click changes power;
+// B closes it. Controls are released before returning to ordinary gameplay.
+class RigOptics {
+public:
+    OpticsInput update(GamepadSample raw,bool available);
+    void reset(){*this=RigOptics{};}
+private:
+    bool active_{},releaseRequired_{},priorChord_{},priorClick_{},priorBack_{};
+    unsigned power_{};
+};
+struct CommandsInput { GamepadSample gamepad{};bool active{},exclusive{}; };
+// Tap X while holding LT to enter Commands. Release LT to close; walking stays
+// independent. Native call selection owns the right stick and confirm button.
+class RigCommands {
+public:
+    CommandsInput update(GamepadSample raw,bool available,uint64_t time,uint64_t drawTime);
+    void reset(){*this=RigCommands{};}
+    void suspend(){reset();releaseRequired_=true;}
+    bool active() const {return active_;}
+private:
+    uint64_t openedAt_{},lastTime_{},confirmUntil_{};
+    bool active_{},releaseRequired_{},confirmHeld_{},stickBlocked_{},priorChord_{},confirmed_{};
+};
+struct MotionStrike { bool strike{},started{};float curl{};Vec3 start{},end{}; };
+// No buttons arm a punch. Detect a deliberate, outward hand stroke relative to
+// the tracked head, rejecting walking, tracking jumps and a returning hand.
+class MotionMelee {
+public:
+    MotionStrike update(Pose head,Pose contact,bool available,uint64_t time,uint64_t epoch,bool weapon=false);
+    void reset(){*this=MotionMelee{};}
+private:
+    Vec3 previous_{},previousContact_{},start_{};
+    uint64_t previousTime_{},startedAt_{},cooldownUntil_{},epoch_{};
+    bool primed_{},moving_{},striking_{},latched_{};
+};
 struct RigInputSample { GamepadSample gamepad; bool weaponReady{}; };
 // Mounted vehicle triggers retain the game's accelerator/brake meanings.
 // A travel-mode transition consumes held controls until they are released.

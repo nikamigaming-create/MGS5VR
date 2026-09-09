@@ -1,25 +1,40 @@
 #include <windows.h>
 #include <Xinput.h>
+#include <MinHook.h>
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/mailbox.hpp"
+#include "mgs5vr/motion_melee.hpp"
 #include <cstring>
 #include <stdexcept>
 #include <mutex>
 namespace mgs5vr {
 namespace {
 using GetState=DWORD(WINAPI*)(DWORD,XINPUT_STATE*);
+using SetState=DWORD(WINAPI*)(DWORD,XINPUT_VIBRATION*);
 GetState original{};
+SetState originalSet{};
 std::mutex stateMutex;
 GamepadSample previous{};
 DWORD packet{};
 bool reported{};
+DWORD WINAPI setState(DWORD index,XINPUT_VIBRATION* vibration){
+    if(!vibration)return ERROR_BAD_ARGUMENTS;
+    bool active{};
+    gamepadMailbox().read(steadyMilliseconds(),&active);
+    if(index==0&&active){
+        rumbleMailbox().publish({vibration->wLeftMotorSpeed/65535.f,vibration->wRightMotorSpeed/65535.f,steadyMilliseconds()});
+        return ERROR_SUCCESS;
+    }
+    return originalSet(index,vibration);
+}
 DWORD WINAPI getState(DWORD index,XINPUT_STATE* state){
     if(!state)return ERROR_BAD_ARGUMENTS;
     if(index==0){
         bool freshActive{};
         const auto sample=gamepadMailbox().read(steadyMilliseconds(),&freshActive);
         if(sample){
+            if(freshActive)consumeMeleeSweep();
             // Give an attached physical pad back when XR is inactive. If none is
             // attached, synthesize neutral success to release the previous XR state.
             if(!freshActive&&original(index,state)==ERROR_SUCCESS)return ERROR_SUCCESS;
@@ -56,16 +71,35 @@ void installGamepadHook(){
         if(!fn)throw std::runtime_error("Native XInputGetState export unavailable");
         auto* thunk=reinterpret_cast<IMAGE_THUNK_DATA64*>(base+entries[n].FirstThunk);
         const auto end=reinterpret_cast<uintptr_t>(base)+nt->OptionalHeader.SizeOfImage;
+        const auto setFn=GetProcAddress(module,"XInputSetState");
+        original=reinterpret_cast<GetState>(fn);originalSet=reinterpret_cast<SetState>(setFn);
+        bool installed{},rumbleInstalled{};
         for(;reinterpret_cast<uintptr_t>(thunk)+sizeof(*thunk)<=end&&thunk->u1.Function;++thunk){
-            if(thunk->u1.Function!=reinterpret_cast<ULONGLONG>(fn))continue;
-            original=reinterpret_cast<GetState>(fn);
+            const bool input=thunk->u1.Function==reinterpret_cast<ULONGLONG>(fn);
+            const bool rumble=setFn&&thunk->u1.Function==reinterpret_cast<ULONGLONG>(setFn);
+            if(!input&&!rumble)continue;
+            const auto expected=input?fn:setFn;
+            const auto replacement=input?reinterpret_cast<void*>(&getState):reinterpret_cast<void*>(&setState);
             DWORD old{};
             if(!VirtualProtect(&thunk->u1.Function,sizeof(void*),PAGE_READWRITE,&old))throw std::runtime_error("Cannot update game XInput import");
             const auto prior=InterlockedCompareExchangePointer(reinterpret_cast<void* volatile*>(&thunk->u1.Function),
-                reinterpret_cast<void*>(&getState),reinterpret_cast<void*>(fn));
+                replacement,reinterpret_cast<void*>(expected));
             DWORD unused{};VirtualProtect(&thunk->u1.Function,sizeof(void*),old,&unused);
-            if(prior!=reinterpret_cast<void*>(fn))throw std::runtime_error("Game input import changed concurrently");
-            log("Verified XInputGetState import routed to OpenXR gamepad; no OS input injection");return;
+            if(prior!=reinterpret_cast<void*>(expected))throw std::runtime_error("Game input import changed concurrently");
+            if(input)installed=true;
+            if(rumble)rumbleInstalled=true;
+            log(input?"Verified XInputGetState import routed to OpenXR gamepad; no OS input injection":"Native XInput rumble routed to tracked-controller haptics");
+        }
+        if(installed){
+            // Some engine builds resolve vibration dynamically instead of
+            // importing it. Hook that same process-local XInput export too.
+            if(!rumbleInstalled&&setFn){
+                const auto target=reinterpret_cast<void*>(setFn);
+                if(MH_CreateHook(target,reinterpret_cast<void*>(&setState),reinterpret_cast<void**>(&originalSet))==MH_OK
+                    &&MH_EnableHook(target)==MH_OK)log("Native dynamic XInput rumble routed to tracked-controller haptics");
+                else log("Native XInput rumble adapter unavailable; wheel contact haptics remain active");
+            }
+            return;
         }
         throw std::runtime_error("XInput import does not resolve to XInputGetState; input bridge disabled");
     }

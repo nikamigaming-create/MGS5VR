@@ -14,6 +14,108 @@ static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
     {
+        WheelSteering steering;const Pose contact{{},{-.2f,-.3f,.5f}};
+        steering.update(contact,contact,true,false,100,1);
+        auto wheel=steering.update(contact,contact,true,true,111,1);
+        expect(wheel.gripped&&wheel.engaged&&wheel.axis==0,"fresh near-wheel grip acquires without steering jump");
+        auto turn=contact;turn.orientation={0,0,-.258819f,.965926f};
+        wheel=steering.update(turn,contact,true,true,122,1);
+        expect(wheel.gripped&&!wheel.engaged&&std::abs(wheel.axis-.5f)<.001f,"clockwise hand roll turns the wheel right");
+        const auto lookAway=steering.update(turn,contact,true,true,127,1,Vec3{1,0,0});
+        expect(near(lookAway.axis,wheel.axis),"head turns while holding cannot change the steering basis");
+        turn.orientation={0,0,.258819f,.965926f};
+        expect(std::abs(steering.update(turn,contact,true,true,129,1).axis+.5f)<.001f,"counterclockwise hand roll turns left");
+        expect(!steering.update(turn,contact,true,false,133,1).gripped,"releasing the grip releases the wheel");
+        turn.position.x+=1;
+        expect(!steering.update(turn,contact,true,true,144,1).gripped,"distant squeezing cannot snap to the wheel");
+        steering.update(contact,contact,true,false,155,1);
+        steering.update(contact,contact,true,true,166,1);
+        expect(!steering.update(contact,contact,false,true,177,1).gripped,"tracking or vehicle loss releases the wheel");
+        expect(!steering.update(contact,contact,true,true,188,1).gripped,"held grip cannot reattach after tracking loss");
+        RumbleMailbox rumble;rumble.publish({.4f,.2f,100});
+        expect(rumble.read(110).low==.4f&&rumble.read(351).low==0,"native rumble expires without a new game sample");
+    }
+    {
+        RigOptics optics;
+        GamepadSample chord{};chord.leftTrigger=220;chord.buttons=0x8000;
+        auto view=optics.update(chord,true);
+        expect(view.magnification==2&&view.exclusive&&view.gamepad==GamepadSample{},"wrist plus Y opens stereo optics without native binocular or weapon input");
+        expect(optics.update(chord,true).magnification==2,"holding the optics chord does not toggle repeatedly");
+        GamepadSample browse{};browse.leftY=24000;browse.rightX=12000;browse.rightTrigger=255;browse.buttons=0x80;
+        view=optics.update(browse,true);
+        expect(view.magnification==4&&view.gamepad.leftY==24000&&view.gamepad.rightX==12000
+            &&view.gamepad.rightTrigger==0&&view.gamepad.buttons==0,"optics changes power once and preserves walking while consuming fire");
+        expect(optics.update(browse,true).magnification==4,"held right click cannot cycle zoom twice");
+        optics.update({},true);view=optics.update(GamepadSample{0x2000},true);
+        expect(view.magnification==1&&view.exclusive&&view.gamepad.buttons==0,"B exits optics without changing stance");
+        expect(optics.update(browse,true).gamepad==GamepadSample{},"held fire cannot escape optics on exit");
+        optics.update({},true);
+        expect(!optics.update({},true).exclusive,"neutral controls return ownership to gameplay");
+        optics.update(chord,true);view=optics.update(GamepadSample{0x20},true);
+        expect(view.magnification==1&&view.gamepad.buttons==0x20,"pause remains available inside optics");
+        optics.reset();optics.update(chord,true);
+        expect(optics.update({},false).magnification==1&&optics.update({},true).magnification==1,"tracking or travel loss cancels zoom");
+    }
+    {
+        RigCommands commands;
+        GamepadSample input{0x4000,220,0,0,20000,25000,0};
+        auto result=commands.update(input,true,1000,990);
+        expect(result.active&&result.gamepad.buttons==0x100&&result.gamepad.leftY==20000&&result.gamepad.rightX==0,
+            "Commands preserves walking but consumes navigation held during opening");
+        input.buttons=0;input.rightX=0;commands.update(input,true,1020,1010);
+        input.rightY=25000;result=commands.update(input,true,1030,1020);
+        expect(result.active&&result.gamepad.rightY==25000&&result.gamepad.rightX==0,
+            "X can be released and upward command navigation stays upward");
+        input.rightTrigger=255;result=commands.update(input,true,1040,1030);
+        expect(result.gamepad.buttons==0x180&&result.gamepad.rightTrigger==0,"command confirm cannot fire the weapon");
+        expect(result.gamepad.rightY==25000,"native command confirmation includes its selected direction");
+        result=commands.update(input,true,1150,1140);
+        expect(result.gamepad.buttons==0x100,"holding command confirm cannot repeat it");
+        expect(result.gamepad.rightX==0&&result.gamepad.rightY==0,"held selection cannot turn the camera after command confirmation");
+        input.leftTrigger=0;result=commands.update(input,true,1160,1150);
+        expect(!result.active&&result.exclusive&&result.gamepad.rightTrigger==0&&result.gamepad.rightY==0&&result.gamepad.leftY==20000,
+            "release closes commands without leaking held fire or turning");
+        commands.update({},true,1170,1160);input={0x4000,220};commands.update(input,true,1180,1170);
+        commands.suspend();expect(!commands.update(input,true,1190,1180).active,"tracking or focus loss requires a fresh commands chord");
+    }
+    {
+        MotionMelee melee;const Pose head{{},{0,1.6f,0}};
+        Pose fist{{},{-.22f,1.25f,-.2f}};
+        melee.update(head,fist,true,1000,1);
+        unsigned starts{},sweeps{};
+        for(unsigned n=1;n<=18;++n){
+            fist.position.z=-.2f-.018f*n;
+            const auto hit=melee.update(head,fist,true,1000+11*n,1);
+            starts+=hit.started;sweeps+=hit.strike;
+            if(hit.strike)expect(hit.curl==1&&same(hit.end,fist.position),"motion strike closes the fist at its actual contact point");
+        }
+        expect(starts==1&&sweeps>1,"one button-free punch keeps a contact window without repeating its stroke");
+        fist.position.z+=.04f;
+        expect(!melee.update(head,fist,true,1209,1).strike,"returning a fist does not strike again");
+        expect(!melee.update(head,fist,true,1800,1).strike,"tracking gaps rebaseline rather than inventing velocity");
+        fist.position.z-=.5f;
+        expect(!melee.update(head,fist,true,1811,1).strike,"tracking teleport cannot punch");
+        expect(!melee.update(head,fist,true,1822,2).strike,"recenter starts a new motion baseline");
+        melee.reset();Pose walkingHead=head;fist.position={-.22f,1.25f,-.2f};
+        for(unsigned n=0;n<25;++n){
+            walkingHead.position.z=-.03f*n;fist.position.z=walkingHead.position.z-.2f;
+            expect(!melee.update(walkingHead,fist,true,2000+11*n,1).strike,"walking moves head and fist together without a punch");
+        }
+        melee.reset();fist.position={-.22f,1.25f,-.2f};
+        for(unsigned n=0;n<18;++n){
+            auto duck=head;duck.position.y+=.02f*n;
+            expect(!melee.update(duck,fist,true,3000+11*n,1).strike,"head motion alone cannot turn a stationary hand into a strike");
+        }
+        melee.reset();unsigned weaponStarts{};
+        for(unsigned n=0;n<22;++n){
+            const float angle=1.2f-.045f*n;
+            const Pose tip{{},{0,1.6f-std::sin(angle)*.6f,-.2f-std::cos(angle)*.6f}};
+            weaponStarts+=melee.update(head,tip,true,4000+11*n,1,true).started;
+        }
+        expect(weaponStarts==1,"swinging an authored weapon tip can strike while its grip pivot stays still");
+        expect(!melee.update(head,fist,false,4300,1).strike,"menu and native manipulation disable motion strikes");
+    }
+    {
         const Pose palm{{},{2,3,4}};
         const auto straight=pointThrow(palm,{},Vec3{3,4,0});
         expect(straight&&same(straight->origin,palm.position)&&same(straight->velocity,{0,0,-5}),
@@ -57,6 +159,14 @@ int main(){
     expect(near(projection[10],-0.0002f)&&near(projection[14],0.1f),"eye optics preserve native depth convention");
     const EyeFov opticalLeft{-.9424778f,.6981317f,.8726646f,-.8552113f};
     const EyeFov opticalRight{-opticalLeft.right,-opticalLeft.left,opticalLeft.up,opticalLeft.down};
+    for(const auto eye:{opticalLeft,opticalRight})for(float power:{1.f,2.f,4.f}){
+        const auto narrow=opticalFov(eye,power),restored=narrow?opticalFov(*narrow,1/power):std::nullopt;
+        expect(narrow&&restored&&near(std::tan(narrow->right)*power,std::tan(eye.right))
+            &&near(restored->left,eye.left)&&near(restored->right,eye.right)
+            &&near(restored->up,eye.up)&&near(restored->down,eye.down),"stereo magnification scales rays and preserves each eye's asymmetric optical center");
+    }
+    expect(!opticalFov(opticalLeft,0)&&!opticalFov(opticalLeft,5)
+        &&!opticalFov(opticalLeft,std::numeric_limits<float>::quiet_NaN()),"invalid magnification cannot enter scene projection");
     const auto completeFov=enclosingEyeFov(opticalLeft);
     expect(completeFov&&near(completeFov->left,-completeFov->right)&&near(completeFov->up,-completeFov->down),
         "lighting coverage has a centered enclosing render field");
@@ -108,6 +218,11 @@ int main(){
     std::array<EyeFrame,2> pair{};
     for(uint32_t n=0;n<2;++n)pair[n]={EyeView{Pose{{},{n?0.032f:-0.032f,0,0}},asymmetric},9,31,4,100,n,true,true,asymmetric};
     expect(readyEyePair(pair,4,110),"both native eyes from one simulation and tracking transaction are eligible");
+    pair[0].magnification=2;
+    expect(!readyEyePair(pair,4,110),"different zoom powers cannot be submitted as one stereo pair");
+    pair[1].magnification=2;
+    expect(readyEyePair(pair,4,110),"matching zoom powers retain independent stereo eye poses");
+    pair[0].magnification=pair[1].magnification=1;
     pair[1].sourceSequence=10;
     expect(!readyEyePair(pair,4,110),"alternate-eye consecutive simulation frames are rejected");
     pair[1].sourceSequence=9;pair[1].trackingSequence=32;
@@ -173,12 +288,20 @@ int main(){
     expect(!firstPerson.resolve(11,lowered,120).applied,"fresh gameplay cannot undo a manual VR disable");
     firstPerson.toggle();firstPerson.resolve(11,lowered,120);
     firstPerson.setNativeMenuOpen(true);
-    expect(!firstPerson.resolve(11,lowered,120).applied&&firstPerson.status().awaitingPlayer,
-           "iDroid keeps native menu pixels even while the same player head continues to publish");
+    const auto menuView=firstPerson.resolve(11,lowered,120);
+    expect(menuView.applied&&menuView.menuOpen&&firstPerson.active()&&!firstPerson.status().awaitingPlayer,
+           "iDroid retains the native stereo viewpoint with a world-space menu panel");
+    firstPerson.track(Pose{{},{0.4f,0.1f,-0.1f}},true,125);
+    const auto movedMenu=firstPerson.resolve(11,mismatchedCamera,125);
+    expect(movedMenu.applied&&same(movedMenu.menuPanel.position,menuView.menuPanel.position)
+        &&near(std::abs(movedMenu.nativePose.position.x-menuView.nativePose.position.x),.1f),
+           "leaning moves the menu world camera while the panel stays anchored and native iDroid camera animation is ignored");
+    expect(!firstPerson.resolve(12,lowered,125).applied&&firstPerson.active(),
+           "an unrelated native camera cannot borrow the menu viewpoint");
     firstPerson.setNativeMenuOpen(false);
-    expect(firstPerson.resolve(11,lowered,120).applied,"closing the native iDroid state restores the same tracked player");
+    expect(firstPerson.resolve(11,lowered,125).applied,"closing the native iDroid state restores the same tracked player");
     firstPerson.setNativeMenuOpen(true);firstPerson.toggle();firstPerson.setNativeMenuOpen(false);
-    expect(!firstPerson.resolve(11,lowered,120).applied,"manual disable inside iDroid prevents automatic return");
+    expect(!firstPerson.resolve(11,lowered,125).applied,"manual disable inside iDroid prevents automatic return");
     expect(same(savedHeadView.nativePose.position,{499.9f,300.4f,1300.1f}),"published player-eye frame remains immutable");
     firstPerson.track({},true,300);firstPerson.toggle();
     expect(!firstPerson.resolve(11,lowered,300).applied,"stale player head cannot survive a fresh headset sample");
@@ -228,13 +351,22 @@ int main(){
     menuEpoch.trackStereo({},rigEyes,true,100,menuHands);
     menuEpoch.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,100);
     menuEpoch.toggle();menuEpoch.resolve(11,thirdPerson,100);menuEpoch.setNativeMenuOpen(true);
+    const Pose menuLean{{},{.2f,.1f,-.3f}};
+    menuEpoch.trackStereo(menuLean,rigEyes,true,105,menuHands);
+    const auto beforeMenuRebase=menuEpoch.resolve(11,thirdPerson,105);
     menuHands.referenceEpoch=2;menuHands.predictedXrTime=10000;
-    menuEpoch.trackStereo({},rigEyes,true,110,menuHands);
-    expect(menuEpoch.status().awaitingPlayer&&!menuEpoch.status().pending&&!menuEpoch.active(),
-           "a reference-space change inside iDroid keeps native menu pixels available");
+    menuEpoch.trackStereo(Pose{{0,.258819f,0,.9659258f},{3,1,-2}},rigEyes,true,110,menuHands);
+    const auto rebasedMenu=menuEpoch.resolve(11,thirdPerson,110);
+    expect(!menuEpoch.status().awaitingPlayer&&!menuEpoch.status().pending&&menuEpoch.active()
+        &&rebasedMenu.menuOpen&&same(rebasedMenu.nativePose.position,beforeMenuRebase.nativePose.position)
+        &&same(rebasedMenu.menuPanel.position,beforeMenuRebase.menuPanel.position),
+           "a reference-space change inside iDroid rebases the live stereo menu viewpoint");
     menuEpoch.setNativeMenuOpen(false);
     menuEpoch.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,110);
-    expect(menuEpoch.resolve(11,thirdPerson,110).applied,"iDroid can return after a reference-space change");
+    const auto afterMenuRebase=menuEpoch.resolve(11,thirdPerson,110);
+    expect(afterMenuRebase.applied&&same(afterMenuRebase.nativePose.position,beforeMenuRebase.nativePose.position)
+        &&same(rotate(afterMenuRebase.nativePose.orientation,{0,0,1}),rotate(beforeMenuRebase.nativePose.orientation,{0,0,1})),
+           "closing iDroid after a reference-space change preserves the gameplay viewpoint");
     handsCamera.trackStereo({},rigEyes,true,100,hands);handsCamera.toggle();
     const auto joinedHands=handsCamera.resolve(1,nativeCamera,100);
     expect(joinedHands.applied&&joinedHands.controllers.hands[1].gripTracked&&joinedHands.controllers.predictedXrTime==9000,
@@ -394,6 +526,18 @@ int main(){
            "forearm HUD remains attached through character translation and turning");
     expect(!forearmPanel(watchElbow,watchWrist,{1,0,0}),"undefined forearm normal cannot produce a face HUD");
     SupportContact support;
+    const Vec3 heldSeparation{-.08f,0,-.24f},withdrawnSeparation{-.34f,-.06f,.04f},primaryForward{0,0,-1};
+    expect(withinSupportCone(heldSeparation,primaryForward),"a hand at the forward rifle grip can guide the barrel");
+    expect(!withinSupportCone(withdrawnSeparation,primaryForward),"withdrawing alongside the firing hand releases even when the gun follows it");
+    const Quat supportTurn{0,.70710678f,0,.70710678f};
+    expect(withinSupportCone(rotate(supportTurn,heldSeparation),rotate(supportTurn,primaryForward))
+        &&!withinSupportCone(rotate(supportTurn,withdrawnSeparation),rotate(supportTurn,primaryForward)),
+        "support release follows controller aim through body turns");
+    expect(!withinSupportCone({},primaryForward)&&!withinSupportCone(heldSeparation,{}),"invalid support directions cannot acquire a hand");
+    expect(!support.update(true,true,.07f,100)&&support.update(true,true,.07f,250)
+        &&!support.update(withinSupportCone(withdrawnSeparation,primaryForward),true,.07f,300),
+        "a close guided contact cannot retain a sideways withdrawn hand");
+    support.reset();
     SupportPose supportPose;
     const Pose acquiredSupport{{},{.25f,0,.12f}},animatedReload{{},{.15f,.2f,.05f}},stowingSupport{{},{-.4f,2.f,-.3f}};
     expect(!supportPose.update(acquiredSupport,false,false),"a free hand has no acquired support pose");
@@ -439,8 +583,10 @@ int main(){
     const auto brake=travelInput.update(brakeOnly,false,false,TravelMode::vehicle);
     expect(brake.gamepad.leftTrigger==255&&brake.gamepad.rightTrigger==0&&brake.gamepad.buttons==0,
            "vehicle braking/reversing is not consumed by the equipment modifier");
-    expect(travelInput.update({},true,false,TravelMode::vehicle).gamepad.buttons==0x0100,
-           "vehicle left grip retains the native mounted attack/call action");
+    expect(travelInput.update({},true,false,TravelMode::vehicle).gamepad.buttons==0,
+           "gripping the wheel cannot fire a vehicle weapon");
+    expect(travelInput.update(GamepadSample{0x4000},false,false,TravelMode::vehicle).gamepad.buttons==0x0100,
+           "X reaches the native vehicle weapon or radio independently of the wheel grip");
     expect(travelInput.update(brakeOnly,false,true,TravelMode::onFoot).gamepad==GamepadSample{},
            "exiting a vehicle releases brake and grip inputs before restoring foot controls");
     travelInput.update({},false,false,TravelMode::onFoot);

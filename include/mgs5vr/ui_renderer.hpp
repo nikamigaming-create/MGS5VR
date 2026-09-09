@@ -11,6 +11,7 @@ void installUiRenderer(uintptr_t moduleBase);
 std::optional<bool> nativeMenuOpen() noexcept;
 // Source time of the latest expanded native equipment-description draw.
 uint64_t nativeEquipmentPickerDrawTime() noexcept;
+uint64_t nativeCommandsDrawTime() noexcept;
 // Producer scope is the native scene invocation; the UI may execute on a worker.
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,
                        const HeadCameraSample& rig);

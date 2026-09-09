@@ -1,7 +1,31 @@
 # Status: experimental native VR mod
 
-Updated 2026-09-08. The mod source, native adapters, tests and build tooling are
+Updated 2026-09-09. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
+
+The [September 9 experimental release](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-09)
+contains the current merged source, the updated control guides and the support-hand
+release correction. Its local Release build and six native suites pass. A new SIM
+take shows one-handed fire, two-hand support and sideways withdrawal back to one
+hand. These changes still need physical headset regression coverage.
+
+The current build keeps iDroid and native Pause on a floating panel during
+tracked gameplay. Both eyes were observed with head movement and the iDroid
+handset attached. Pause no longer requires a new arm-animation publication to
+render its tracked world. Map tabs, lists, closing and reopening were exercised.
+The physical headset, title/loading transitions and later cutscenes still need
+coverage. The updated [control modes](images/control-modes.svg) include main-menu
+access and distinguish viewing zoom from native reconnaissance features.
+
+The September 9 release adds independent-eye 2×/4× viewing, motion-only palm and
+firearm-tip strikes using native kick contacts, and left-hand wheel control with
+haptic output. The September 8 public DLL remains available as the earlier baseline.
+Native truck-contact acceptance has been observed; enemy reactions/damage,
+powered arm abilities and physical wheel/haptic comfort are not certified.
+Truck entry, wheel acquisition, signed steering and exit were exercised. The
+small clip ends with a carried pistol on foot; it does not demonstrate shooting
+that gun while driving or sustained vehicle movement. See the
+[candidate review](OPTICS_MELEE_WHEEL_REVIEW.md) for the exact scope.
 
 The physical EB89CE69 follow-up received positive general gameplay feedback.
 The user identified access to horse/buddy commands, binoculars/zoom and physical
@@ -9,8 +33,8 @@ fist/bionic-arm melee as the next gaps. Their current bindings and implementatio
 requirements are recorded in [system access](SYSTEMS_ACCESS.md); those actions
 are not certified by the successful basic play session.
 
-The latest physical 1440p/native-AA run received positive user feedback. The current
-release fixes double wrist selections, gates browsing on actual
+The earlier physical 1440p/native-AA run received positive user feedback. The September 8
+release fixed double wrist selections, gated browsing on actual
 expanded-menu readiness, exposes the small native NVG label, and directs grenade
 preview/throwing from the tracked hand. A camera-visibility correction targets
 tree pop-in while turning left; that physical symptom remains unverified. See the
@@ -61,7 +85,7 @@ the hands above the slope in the reproduced prone failure. Its 14.785-second
 SIM clip is 1.42 MB, with 51 reviewed frames at 3.386 captures/second. Other
 terrain, close garment/hand presentation and physical fit remain open.
 
-iDroid and pause now open on the native menu screen and return automatically to
+An earlier build opened iDroid and pause on the native menu screen and returned automatically to
 tracked VR. Map zoom, tab switching, both-eye return and the manual override were
 checked in SIM. The 14.879-second, 1.20 MB menu clip has 54 reviewed frames and no
 black captures. This does not establish all cinematic/loading transitions.
@@ -84,7 +108,7 @@ slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation
 | Audio | Native primary and virtual listeners consume the source center-head pose; head rotation/lean and theatre restoration observed in SIM | Physical localization, output/HRTF and occlusion checks |
 | Effects | Native AA through Post Processing High, DOF Disable, motion blur Off and camera shake Off | NVG presentation/performance, remaining cinematic effects and shared per-eye temporal resources |
 | Save | Continue/Resume loads the existing checkpoint and equipped rifle | Automatic startup state adapter |
-| Menus | iDroid/pause switch to the native screen; same-player return restores VR, with held-input release protection | Every menu branch, interactive wrist iDroid and player-replacement transitions |
+| Menus | iDroid/Pause float in the tracked world, including map tabs and Return to Title confirmation; held-input release protection on close | Physical regression check, every menu branch, interactive wrist iDroid and player-replacement transitions |
 | Cinematics | Default large-screen theatre preview and native game controls | Automatic cinematic classification and complete skip coverage |
 
 ## Build and native runtime evidence

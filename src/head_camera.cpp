@@ -31,7 +31,7 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     if(!std::isfinite(units)||units<=0)throw std::invalid_argument("Camera scale must be finite and positive");
     std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=awaitingPlayer_=false;camera_=playerOwner_=0;reason_=HeadCameraStop::none;
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=0;suspended_=false;
-    controllers_={};rig_={};nativeMenuOpen_=false;
+    controllers_={};rig_={};nativeMenuOpen_=false;lastView_={};menuAnchored_=false;
 }
 bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
                                   const std::array<float,16>& root,const std::array<float,16>& head,uint64_t time){
@@ -64,8 +64,17 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
     stereoTracking_=tracking_;
     if(tracking_){
         if(controllers_.referenceEpoch&&controllers.referenceEpoch!=controllers_.referenceEpoch&&(active_||pending_||awaitingPlayer_)){
-            if(!awaitingPlayer_){active_=false;pending_=true;}
-            camera_=playerOwner_=0;
+            if(nativeMenuOpen_&&menuAnchored_&&lastView_.applied){
+                // Rebase the physical tracking origin without moving the native
+                // viewpoint or the panel already anchored in this world.
+                // Gameplay resumes in this new reference space too: carrying
+                // the old origin through menu close would teleport the view.
+                origin_=compose(compose(head,inverse(head_)),origin_);
+                menuNative_=lastView_.nativePose;menuHead_=head;rig_={};++activation_;
+            }else{
+                if(!awaitingPlayer_){active_=false;pending_=true;}
+                camera_=playerOwner_=0;
+            }
         }
         for(auto& hand:controllers.hands){
             hand.gripTracked=controllers.predictedXrTime>0&&controllers.referenceEpoch&&hand.gripTracked&&valid(hand.grip);
@@ -83,12 +92,24 @@ void HeadCamera::toggle(){
     else {pending_=true;reason_=HeadCameraStop::none;}
 }
 void HeadCamera::setNativeMenuOpen(bool open){
-    std::lock_guard lock(mutex_);nativeMenuOpen_=open;
-    if(open)awaitPlayerLocked();
+    std::lock_guard lock(mutex_);
+    if(open==nativeMenuOpen_)return;
+    nativeMenuOpen_=open;rig_={};
+    if(open){
+        menuAnchored_=active_&&!suspended_&&lastView_.applied&&lastView_.activation==activation_;
+        if(menuAnchored_){
+            menuNative_=lastView_.nativePose;menuHead_=lastView_.headPose;
+            menuPanel_=compose(nativeTrackedPose(menuNative_,menuHead_,menuHead_),Pose{{},{0,-.05f,-1.3f}});
+        }
+    }else{
+        menuAnchored_=false;
+        // Keep VR active. resolveLocked still requires a fresh publication of
+        // this same player before adopting the gameplay camera again.
+    }
 }
 void HeadCamera::cancelLocked(HeadCameraStop reason){
     if(active_||pending_||awaitingPlayer_){reason_=reason;++cancellations_;}
-    active_=pending_=suspended_=awaitingPlayer_=false;camera_=playerOwner_=0;rig_={};
+    active_=pending_=suspended_=awaitingPlayer_=false;camera_=playerOwner_=0;rig_={};lastView_={};menuAnchored_=false;
 }
 void HeadCamera::awaitPlayerLocked(){
     // A native menu/cinematic has no matching player-head publication. Keep
@@ -105,7 +126,7 @@ void HeadCamera::suspendLocked(HeadCameraStop reason){
 void HeadCamera::cancel(HeadCameraStop reason){std::lock_guard lock(mutex_);cancelLocked(reason);}
 bool HeadCamera::available() const {std::lock_guard lock(mutex_);return enabled_;}
 bool HeadCamera::active() const {std::lock_guard lock(mutex_);return active_;}
-HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_,pending_,reason_,cancellations_,activation_,suspended_,awaitingPlayer_};}
+HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_,pending_,reason_,cancellations_,activation_,suspended_,awaitingPlayer_,nativeMenuOpen_};}
 HeadCameraSample HeadCamera::resolve(uintptr_t camera,Pose nativePose,uint64_t time){
     std::lock_guard lock(mutex_);
     return resolveLocked(camera,nativePose,time);
@@ -133,8 +154,15 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(!tracking_){suspendLocked(HeadCameraStop::trackingLost);return result;}
     if(time<time_){cancelLocked(HeadCameraStop::clockMismatch);return result;}
     if(time-time_>150){suspendLocked(HeadCameraStop::staleTracking);return result;}
-    if(nativeMenuOpen_){awaitPlayerLocked();return result;}
-    if(requirePlayerHead_&&(pending_||active_||awaitingPlayer_)){
+    const bool spatialMenu=nativeMenuOpen_&&menuAnchored_&&active_;
+    if(nativeMenuOpen_&&!spatialMenu){awaitPlayerLocked();return result;}
+    if(spatialMenu){
+        if(camera!=camera_)return result;
+        nativePose=menuNative_;
+        result.menuOpen=true;result.menuPanel=menuPanel_;
+        result.playerOwner=playerOwner_;result.playerHead=lastView_.playerHead;
+        result.playerSequence=lastView_.playerSequence;
+    }else if(requirePlayerHead_&&(pending_||active_||awaitingPlayer_)){
         const auto same=[](Pose a,Pose b){
             return a.position.x==b.position.x&&a.position.y==b.position.y&&a.position.z==b.position.z
                 &&a.orientation.x==b.orientation.x&&a.orientation.y==b.orientation.y
@@ -164,13 +192,13 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         if(rig_.camera!=camera||rig_.owner!=result.playerOwner||s.activation!=activation_||!same
            ||time<s.sampleTime||time-s.sampleTime>150){suspendLocked(HeadCameraStop::rigFrameMismatch);return result;}
         const auto playerPublication=result.playerSequence;
-        result=s;result.playerSequence=playerPublication;suspended_=false;reason_=HeadCameraStop::none;return result;
+        result=s;result.playerSequence=playerPublication;suspended_=false;reason_=HeadCameraStop::none;lastView_=result;return result;
     }
     suspended_=false;reason_=HeadCameraStop::none;
     // FOX's camera-local forward/right candidates are +Z/-X. The explicit
     // 180-degree basis rotation keeps handedness intact; validate in live motion.
     const Pose basis{{0,1,0,0},{}};
-    auto relative=compose(inverse(origin_),head_);
+    auto relative=compose(inverse(spatialMenu?menuHead_:origin_),head_);
     relative.position=relative.position*units_;
     const auto nativeDelta=compose(compose(basis,relative),inverse(basis));
     result.nativePose=compose(nativePose,nativeDelta);
@@ -183,7 +211,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(!std::isfinite(length)||length<0.5)return result;
     q={static_cast<float>(q.x/length),static_cast<float>(q.y/length),static_cast<float>(q.z/length),static_cast<float>(q.w/length)};
     result.activation=activation_;result.applied=valid(result.nativePose);
-    if(result.applied)result.controllers=controllers_;
+    if(result.applied){result.controllers=controllers_;lastView_=result;}
     return result;
 }
 HeadCamera& headCamera(){static auto* instance=new HeadCamera;return *instance;}

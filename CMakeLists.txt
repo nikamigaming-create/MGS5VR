@@ -18,7 +18,7 @@ FetchContent_Declare(minhook GIT_REPOSITORY https://github.com/TsudaKageyu/minho
 FetchContent_MakeAvailable(openxr minhook)
 add_library(mgs5vr_core STATIC src/core.cpp src/input_bridge.cpp src/head_camera.cpp src/stereo.cpp src/arm_ik.cpp)
 target_include_directories(mgs5vr_core PUBLIC include)
-add_library(mgs5vr_runtime STATIC src/log.cpp src/mailbox.cpp src/gpu_timing.cpp src/native_performance.cpp src/performance_bridge.asm src/xr_runtime.cpp src/scene_capture.cpp src/ui_renderer.cpp src/player_visibility.cpp src/controller_rig.cpp)
+add_library(mgs5vr_runtime STATIC src/log.cpp src/mailbox.cpp src/gpu_timing.cpp src/native_performance.cpp src/performance_bridge.asm src/xr_runtime.cpp src/scene_capture.cpp src/ui_renderer.cpp src/player_visibility.cpp src/controller_rig.cpp src/motion_melee.cpp)
 target_include_directories(mgs5vr_runtime PUBLIC include)
 target_compile_definitions(mgs5vr_runtime PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX
   XR_USE_PLATFORM_WIN32 XR_USE_GRAPHICS_API_D3D11)
@@ -51,7 +51,7 @@ foreach(t mgs5vr_core mgs5vr_runtime dinput8 mgs5vr_probe mgs5vr_tests mgs5vr_gp
 endforeach()
 install(TARGETS dinput8 mgs5vr_probe RUNTIME DESTINATION . COMPONENT MGS5VR)
 install(FILES config/mgs5vr.ini README.md LICENSE CONTRIBUTING.md Install.cmd Uninstall.cmd DESTINATION . COMPONENT MGS5VR)
-install(DIRECTORY docs/ DESTINATION docs COMPONENT MGS5VR FILES_MATCHING PATTERN "*.md" PATTERN "*.png")
+install(DIRECTORY docs/ DESTINATION docs COMPONENT MGS5VR FILES_MATCHING PATTERN "*.md" PATTERN "*.png" PATTERN "*.svg" PATTERN "*.json")
 install(FILES tools/install.ps1 tools/uninstall.ps1 tools/setup.ps1 tools/launch-simulator.ps1 DESTINATION tools COMPONENT MGS5VR)
 install(FILES profiles/tpp-1.0.15.4.json DESTINATION profiles COMPONENT MGS5VR)
 install(FILES "${openxr_SOURCE_DIR}/LICENSE" DESTINATION licenses RENAME OpenXR.txt COMPONENT MGS5VR)

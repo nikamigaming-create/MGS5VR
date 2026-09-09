@@ -78,6 +78,7 @@ struct Session {
     XrActionSet actions{XR_NULL_HANDLE};
     XrAction grip{XR_NULL_HANDLE},aim{XR_NULL_HANDLE},recenter{XR_NULL_HANDLE};
     XrAction sticks{},triggers{},squeezes{},thumbClick{},triggerTouch{},thumbTouch{},menu{};
+    XrAction vibration{};
     std::array<XrAction,4> face{}; // Native Xbox A, B, X, Y.
     std::array<XrSpace,2> gripSpaces{},aimSpaces{};
     std::array<XrPath,2> hands{};
@@ -89,6 +90,12 @@ struct Session {
     bool priorHeadToggle{};
     MenuButton menuButton;
     RigInput rigControls;
+    RigOptics opticsControls;
+    RigCommands commandsControls;
+    bool simpleControllerProfile{};
+    float reportedMagnification{1};
+    uint64_t hapticAt{};
+    bool wheelHeld{};
     XrTime pendingLocalChange{};
     uint64_t referenceEpoch{1};
     ControllerFrame controllerFrame{};
@@ -161,9 +168,13 @@ struct Session {
         thumbClick=action("thumb_click","Native gamepad stick clicks",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         triggerTouch=action("trigger_touch","Index finger contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         thumbTouch=action("thumb_touch","Thumb contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
+        vibration=action("vibration","Native feedback and wheel contact",XR_ACTION_TYPE_VIBRATION_OUTPUT,true);
         menu=action("menu","Tap iDroid; hold Pause",XR_ACTION_TYPE_BOOLEAN_INPUT);
-        face={action("a","Native gamepad A",XR_ACTION_TYPE_BOOLEAN_INPUT),action("b","Native gamepad B",XR_ACTION_TYPE_BOOLEAN_INPUT),
-            action("x","Native gamepad X",XR_ACTION_TYPE_BOOLEAN_INPUT),action("y","Native gamepad Y",XR_ACTION_TYPE_BOOLEAN_INPUT)};
+        // Read each face button through its owning hand. An unscoped read can
+        // aggregate left-select from the simple profile into Touch's right B
+        // in an operator override, making left X also press Cancel.
+        face={action("a","Native gamepad A",XR_ACTION_TYPE_BOOLEAN_INPUT,true),action("b","Native gamepad B",XR_ACTION_TYPE_BOOLEAN_INPUT,true),
+            action("x","Native gamepad X",XR_ACTION_TYPE_BOOLEAN_INPUT,true),action("y","Native gamepad Y",XR_ACTION_TYPE_BOOLEAN_INPUT,true)};
         struct Profile { const char* name; const char* center; const char* menuButton; int layout; };
         const Profile profiles[]={
             {"/interaction_profiles/oculus/touch_controller","/user/hand/right/input/thumbstick/click","/user/hand/left/input/menu/click",0},
@@ -177,6 +188,7 @@ struct Session {
                 {grip,path("/user/hand/right/input/grip/pose")},{aim,path("/user/hand/left/input/aim/pose")},
                 {aim,path("/user/hand/right/input/aim/pose")},{recenter,path(p.center)},{menu,path(p.menuButton)}};
             const auto bind=[&](XrAction a,const std::string& s){bindings.push_back({a,path(s.c_str())});};
+            bind(vibration,"/user/hand/left/output/haptic");bind(vibration,"/user/hand/right/output/haptic");
             for(const char* hand:{"/user/hand/left/input/","/user/hand/right/input/"}){
                 const std::string h=hand;
                 if(p.layout<4){
@@ -222,6 +234,7 @@ struct Session {
             if(r==XR_EVENT_UNAVAILABLE)break;
             xrCheck(r,"Poll OpenXR events");
             if(buffer.type==XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING){exiting=true;break;}
+            if(buffer.type==XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED)priorFocused=false;
             if(buffer.type==XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING){
                 const auto& change=*reinterpret_cast<const XrEventDataReferenceSpaceChangePending*>(&buffer);
                 if(change.session==handle&&change.referenceSpaceType==XR_REFERENCE_SPACE_TYPE_LOCAL)
@@ -275,12 +288,17 @@ struct Session {
     }
     void syncInput(XrTime time){
         controllerFrame={};
-        if(!focused){rigControls.suspend();priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){rigControls.suspend();opticsControls.reset();commandsControls.suspend();priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){rigControls.suspend();priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){rigControls.suspend();opticsControls.reset();commandsControls.suspend();priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
+        if(!priorFocused){
+            XrInteractionProfileState profile{XR_TYPE_INTERACTION_PROFILE_STATE};
+            if(XR_SUCCEEDED(xrGetCurrentInteractionProfile(handle,hands[0],&profile)))
+                simpleControllerProfile=profile.interactionProfile==path("/interaction_profiles/khr/simple_controller");
+        }
         controllerFrame={{trackedHand(0,time),trackedHand(1,time)},time,referenceEpoch};
         const bool left=controllerFrame.hands[0].gripTracked,right=controllerFrame.hands[1].gripTracked;
         const float ls=left?scalar(squeezes,hands[0]):0,rs=right?scalar(squeezes,hands[1]):0;
@@ -293,7 +311,7 @@ struct Session {
             hand.thumbTouched=boolean(thumbTouch,hands[n]);
         }
         const auto nativeStatus=headCamera().status();
-        const bool rigInput=controllerRigEnabled()&&(nativeStatus.active||nativeStatus.pending);
+        const bool rigInput=controllerRigEnabled()&&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
         const bool center=boolean(recenter)&&ls>0.75f&&rs>0.75f;
         const bool headToggle=headCamera().available()&&left&&ls>0.75f&&boolean(thumbClick,hands[0]);
         if(priorFocused&&headToggle&&!priorHeadToggle){
@@ -309,8 +327,9 @@ struct Session {
         if(priorFocused&&center&&!priorRecenter)log("OpenXR recenter chord accepted");
         GamepadSample pad{};
         const auto bit=[&](bool enabled,WORD mask){if(enabled)pad.buttons|=mask;};
-        bit(right&&boolean(face[0]),XINPUT_GAMEPAD_A);bit(right&&boolean(face[1]),XINPUT_GAMEPAD_B);
-        bit(left&&boolean(face[2]),XINPUT_GAMEPAD_X);bit(left&&boolean(face[3]),XINPUT_GAMEPAD_Y);
+        bit(right&&boolean(face[0],hands[1]),XINPUT_GAMEPAD_A);
+        bit((simpleControllerProfile?left:right)&&boolean(face[1],hands[simpleControllerProfile?0:1]),XINPUT_GAMEPAD_B);
+        bit(left&&boolean(face[2],hands[0]),XINPUT_GAMEPAD_X);bit(left&&boolean(face[3],hands[0]),XINPUT_GAMEPAD_Y);
         pad.buttons|=menuButton.update(boolean(menu),left,steadyMilliseconds());
         bit(left&&boolean(thumbClick,hands[0])&&!headToggle,XINPUT_GAMEPAD_LEFT_THUMB);
         bit(right&&boolean(thumbClick,hands[1])&&!center,XINPUT_GAMEPAD_RIGHT_THUMB);
@@ -321,21 +340,54 @@ struct Session {
         const auto l=left?stick(hands[0]):XrVector2f{},rr=right?stick(hands[1]):XrVector2f{};
         pad.leftX=static_cast<int16_t>(l.x*32767);pad.leftY=static_cast<int16_t>(l.y*32767);
         pad.rightX=static_cast<int16_t>(rr.x*32767);pad.rightY=static_cast<int16_t>(rr.y*32767);
-        // Keep aiming in stereo. Native binocular/scope input is reserved until
-        // an authored optical mode can preserve the 3D scene and tracked hands.
+        // Optical magnification owns its controls and remains a native stereo
+        // scene; it never asks the game to enter its flat binocular camera.
         if(rigInput){
             const auto mode=nativeTravelMode();
+            const auto now=steadyMilliseconds();
+            const auto optical=opticsControls.update(pad,mode==TravelMode::onFoot&&left&&right&&!commandsControls.active()&&!center&&!headToggle);
+            const auto wasCommands=commandsControls.active();
+            const auto commands=commandsControls.update(pad,(mode==TravelMode::onFoot||mode==TravelMode::horse)
+                &&left&&right&&!optical.exclusive&&!center&&!headToggle,now,nativeCommandsDrawTime());
+            if(wasCommands!=commands.active)log("Wrist Commands open="+std::to_string(commands.active));
+            controllerFrame.commandControls=commands.active;
+            controllerFrame.magnification=optical.magnification;
+            if(reportedMagnification!=optical.magnification){
+                reportedMagnification=optical.magnification;log("Stereo magnification="+std::to_string(optical.magnification));
+            }
             const auto beforePhase=rigControls.equipmentPhase();
-            const auto mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode,
-                steadyMilliseconds(),nativeEquipmentPickerDrawTime(),controllerThrowReady());
+            RigInputSample mapped{};
+            if(optical.exclusive||commands.exclusive){
+                rigControls.reset();mapped.gamepad=optical.exclusive?optical.gamepad:commands.gamepad;
+            }else mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode,
+                now,nativeEquipmentPickerDrawTime(),controllerThrowReady());
             if(beforePhase!=rigControls.equipmentPhase())log("Wrist picker phase="+std::to_string(rigControls.equipmentPhase())
                 +" category="+std::to_string(rigControls.equipmentCategory()));
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
             controllerFrame.equipmentCategory=rigControls.equipmentPhase()>=2?rigControls.equipmentCategory()+1:0;
-        }else if(nativeStatus.awaitingPlayer)rigControls.suspend();
-        else rigControls.reset();
+        }else if(nativeStatus.nativeMenuOpen||nativeStatus.awaitingPlayer){rigControls.suspend();opticsControls.reset();commandsControls.suspend();}
+        else {rigControls.reset();opticsControls.reset();commandsControls.suspend();}
         gamepadMailbox().publish(pad,left||right,steadyMilliseconds());
+        const auto hapticNow=steadyMilliseconds();
+        const auto wheel=wheelMailbox().read(hapticNow);
+        const bool holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped&&ls>.5f&&!center&&!headToggle;
+        const bool tookWheel=holding&&!wheelHeld;wheelHeld=holding;
+        if(tookWheel||hapticNow-hapticAt>=50){
+            hapticAt=hapticNow;
+            const auto rumble=rumbleMailbox().read(hapticNow);
+            for(size_t side=0;side<2;++side){
+                const float native=side?rumble.high:rumble.low;
+                const float contact=!side&&tookWheel?.25f:0.f;
+                const float amplitude=std::clamp(std::max(native,contact),0.f,.75f);
+                XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};info.action=vibration;info.subactionPath=hands[side];
+                if(amplitude>0&&controllerFrame.hands[side].gripTracked){
+                    XrHapticVibration pulse{XR_TYPE_HAPTIC_VIBRATION};pulse.amplitude=amplitude;
+                    pulse.duration=60*1000*1000;pulse.frequency=XR_FREQUENCY_UNSPECIFIED;
+                    xrApplyHapticFeedback(handle,&info,reinterpret_cast<const XrHapticBaseHeader*>(&pulse));
+                }else xrStopHapticFeedback(handle,&info);
+            }
+        }
         priorRecenter=center;priorFocused=true;
     }
     ~Session(){
@@ -542,9 +594,15 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         projection.viewCount=2;projection.views=projectionViews.data();
         bool regionsValid=true;
         for(size_t n=0;n<2;++n){auto& v=projectionViews[n];const auto& sourceEye=eyeFrames[n];
-            const auto region=eyeImageRegion(sourceEye.view.fov,sourceEye.displayFov,eyeScreens[n]->width,eyeScreens[n]->height);
+            const auto optical=opticalFov(sourceEye.displayFov,sourceEye.magnification);
+            const auto region=optical?eyeImageRegion(sourceEye.view.fov,*optical,eyeScreens[n]->width,eyeScreens[n]->height):std::nullopt;
             if(!region){regionsValid=false;continue;}
-            v.pose=toXr(sourceEye.view.pose);v.fov={region->fov.left,region->fov.right,region->fov.up,region->fov.down};
+            // Render a narrower scene cone at native resolution, then map its
+            // angular rays through the magnifier. Both eyes keep their own
+            // tracked origins; this is not an enlarged mono image or a quad.
+            const auto display=opticalFov(region->fov,1.f/sourceEye.magnification);
+            if(!display){regionsValid=false;continue;}
+            v.pose=toXr(sourceEye.view.pose);v.fov={display->left,display->right,display->up,display->down};
             v.subImage.swapchain=eyeScreens[n]->handle;
             v.subImage.imageRect.offset={region->x,region->y};
             v.subImage.imageRect.extent={region->width,region->height};
