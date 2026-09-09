@@ -110,12 +110,14 @@ describe the current profile and measurement limits.
 
 ## Large screen, menus and transitions
 
-Tap left Menu for iDroid; hold it for at least 0.55 seconds for pause. These use
-the large game screen. A confirms, B goes back, sticks navigate, grips act as
-LB/RB, and triggers retain LT/RT. Close iDroid with B or hold Menu again to unpause.
-Tracked VR returns when the same player camera resumes. Release held inputs once
-before moving or firing again. The manual left-grip + left-stick-click toggle
-remains available; switching VR off inside a menu disables automatic return.
+Tap left Menu for iDroid; from gameplay, hold it for at least 0.55 seconds for
+Pause. Both menus float in front of the tracked stereo world. Holding Menu
+inside iDroid opens its native Help instead. A confirms, B goes back, sticks
+navigate, grips act as LB/RB, and triggers retain LT/RT. Close iDroid with B or
+hold Menu again to unpause. Release held inputs once before moving or firing
+again. The manual left-grip + left-stick-click VR toggle remains available.
+
+Title, loading and cutscene transitions can still use the large in-headset screen.
 
 Hold both grips and click the right stick to recenter the large screen. To resize
 it, edit `mgs5vr.ini` with the game closed: defaults are `width_cm=800` and
