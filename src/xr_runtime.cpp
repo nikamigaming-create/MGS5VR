@@ -311,7 +311,7 @@ struct Session {
             hand.thumbTouched=boolean(thumbTouch,hands[n]);
         }
         const auto nativeStatus=headCamera().status();
-        const bool rigInput=controllerRigEnabled()&&(nativeStatus.active||nativeStatus.pending);
+        const bool rigInput=controllerRigEnabled()&&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
         const bool center=boolean(recenter)&&ls>0.75f&&rs>0.75f;
         const bool headToggle=headCamera().available()&&left&&ls>0.75f&&boolean(thumbClick,hands[0]);
         if(priorFocused&&headToggle&&!priorHeadToggle){
@@ -366,7 +366,7 @@ struct Session {
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
             controllerFrame.equipmentCategory=rigControls.equipmentPhase()>=2?rigControls.equipmentCategory()+1:0;
-        }else if(nativeStatus.awaitingPlayer){rigControls.suspend();opticsControls.reset();commandsControls.suspend();}
+        }else if(nativeStatus.nativeMenuOpen||nativeStatus.awaitingPlayer){rigControls.suspend();opticsControls.reset();commandsControls.suspend();}
         else {rigControls.reset();opticsControls.reset();commandsControls.suspend();}
         gamepadMailbox().publish(pad,left||right,steadyMilliseconds());
         const auto hapticNow=steadyMilliseconds();

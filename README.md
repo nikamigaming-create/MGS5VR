@@ -29,6 +29,8 @@ No simulator or compiling needed. Install once; launch normally afterward.
 
 **[Full controls, grenades and night vision →](docs/CONTROLS.md)**
 
+[All control modes: menus, Commands, zoom, melee and vehicles](docs/images/control-modes.svg)
+
 ## Help
 
 - **Sharper picture:** start at 1920×1080 Windowed, Post Processing **High** for AA, Depth of Field **Disable**, Motion Blur **Off**. [More picture settings](docs/PERFORMANCE.md).

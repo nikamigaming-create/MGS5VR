@@ -150,7 +150,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera);
     if(!frame.applied||frame.playerOwner!=owner||!frame.controllers.hands[1].gripTracked)return false;
     const auto renderedHead=compose(*root,bone(q,p,4)).position;
-    frame.nativePose.position=frame.nativePose.position+renderedHead-frame.playerHead;
+    if(!frame.menuOpen)frame.nativePose.position=frame.nativePose.position+renderedHead-frame.playerHead;
     const auto originalQ=q;const auto originalP=p;
     std::array<Pose,2> grips{};
     for(size_t i=0;i<2;++i)if(frame.controllers.hands[i].gripTracked)
@@ -397,7 +397,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(meleeTracking!=frame.trackingSequence){
         meleeTracking=frame.trackingSequence;
         const bool available=nativeTravelMode()==TravelMode::onFoot&&!nativeManipulation
-            &&frame.controllers.magnification==1&&!frame.controllers.commandControls&&frame.controllers.hands[0].trigger<.25f;
+            &&frame.controllers.magnification==1&&!frame.controllers.commandControls&&!frame.menuOpen&&frame.controllers.hands[0].trigger<.25f;
         meleeCurl={};
         for(size_t point=0;point<3;++point){
             const size_t side=point==0?0:1;

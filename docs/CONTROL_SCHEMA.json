@@ -1,0 +1,56 @@
+{
+  "title": "MGS5VR / CONTROL MODES",
+  "edition": "Development build / 09 September 2026 / Quest Touch / Action Type",
+  "modes": [
+    {"title": "01 / MOVE & HANDLE WEAPONS", "rows": [
+      ["Left stick / click", "Move / sprint (left grip released)"],
+      ["Right stick", "Turn; wrist mode owns this stick while open"],
+      ["Right grip / trigger", "Hold to ready / fire or throw"],
+      ["Left hand near support grip", "Guide the barrel with two hands; pull away to release"],
+      ["B / A / hold A", "Reload / crouch / prone; release ready grip for stance"],
+      ["X / Y", "Dive / native interaction or pickup"],
+      ["Grip, trigger and touch", "Articulate fingers; weapons retain their authored grip"]]},
+    {"title": "02 / LEFT-WRIST EQUIPMENT", "rows": [
+      ["Hold left trigger", "Open picker; left stick still moves you"],
+      ["First right-stick flick", "Up: primary / Down: secondary / Right: support / Left: items"],
+      ["Center, then flick to a card", "All eight directions work; center between choices"],
+      ["Release left trigger", "Equip and close"],
+      ["B / A or right-stick click", "Back to categories / Use selected item"],
+      ["Items > NVG / None", "Night vision on / off"]]},
+    {"title": "03 / COMMANDS & RECON", "rows": [
+      ["Hold left trigger + tap X", "Open wrist Commands"],
+      ["Center right stick; point", "Choose an available buddy or arm command"],
+      ["Right trigger / stick click", "Confirm once; release left trigger to close"],
+      ["D-Horse call", "Stand or crouch first; then choose the horse call"],
+      ["Left trigger + tap Y", "Enter stereo viewing zoom at 2x"],
+      ["Right-stick click / B", "Switch 2x / 4x / leave zoom"],
+      ["Viewing zoom", "Native marking, analysis and authored scopes remain unfinished"]]},
+    {"title": "04 / GRENADES, MELEE & BODIES", "rows": [
+      ["Support > grenade", "Finish wrist selection, then hold right grip"],
+      ["Move and tilt right hand", "Position and aim the throw arc; right trigger throws"],
+      ["Punch / weapon bash", "Deliberate motion; no punch-arming button"],
+      ["Right trigger, grip released", "Native CQC, attack or carried-body throw"],
+      ["Y / native context prompt", "Pickup and other available interactions"],
+      ["Unlocked powered arm", "Equip ability, then right grip + right trigger; native charge rules"],
+      ["Still in development", "Enemy motion-hit reactions, powered arms and physical body grabs"]]},
+    {"title": "05 / iDROID, PAUSE & TITLE", "rows": [
+      ["Tap left Menu", "Open iDroid"],
+      ["Hold left Menu 0.55 seconds", "Pause; inside iDroid this opens Help"],
+      ["Pause > Return to Title Menu", "A opens confirmation; choose the native confirmation"],
+      ["A / B / left stick", "Confirm / back / navigate"],
+      ["Left / right grip", "Native LB / RB: switch tabs"],
+      ["Map triggers / right click / Y", "Zoom / zoom step / MAP-NAV"],
+      ["B / hold Menu again", "Close iDroid / resume Pause"],
+      ["Cutscene: hold Menu", "Choose Skip and press A when the native game offers it"]]},
+    {"title": "06 / HORSE, VEHICLES & VR", "rows": [
+      ["Horse: Y / left stick / X", "Mount or dismount / ride / gallop"],
+      ["Vehicle: right / left trigger", "Accelerate / brake or reverse"],
+      ["Left grip near the wheel", "Acquire wheel; rotate wrist to steer; release to let go"],
+      ["Vehicle: left stick / Y", "Conventional steering / enter or exit"],
+      ["Left grip + left-stick click", "Enter or leave tracked VR after Resume Game"],
+      ["Both grips + right-stick click", "Recenter the large screen"],
+      ["Not yet implemented", "Personal-gun fire through a driver's window"],
+      ["Further coverage needed", "Loading, cutscenes, later abilities and vehicle states"]]}
+  ],
+  "footer": "Experimental controls. A mapped input is not a claim that every gameplay state is finished. Full details: docs/CONTROLS.md"
+}

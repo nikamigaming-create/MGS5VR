@@ -1,7 +1,15 @@
 # Status: experimental native VR mod
 
-Updated 2026-09-08. The mod source, native adapters, tests and build tooling are
+Updated 2026-09-09. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
+
+The development build keeps iDroid and native Pause on a floating panel during
+tracked gameplay. Both eyes were observed with head movement and the iDroid
+handset attached. Pause no longer requires a new arm-animation publication to
+render its tracked world. Map tabs, lists, closing and reopening were exercised.
+The physical headset, title/loading transitions and later cutscenes still need
+coverage. The updated [control modes](images/control-modes.svg) include main-menu
+access and distinguish viewing zoom from native reconnaissance features.
 
 The development branch adds independent-eye 2×/4× viewing, motion-only palm and
 firearm-tip strikes using native kick contacts, and left-hand wheel control with

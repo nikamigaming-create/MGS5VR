@@ -1,6 +1,6 @@
 # Touch controls for the tracked VR experiment
 
-[Quick controller infographic](images/controls.png) · [Install and play](../README.md)
+[Quick controller infographic](images/controls.png) · [All control modes](images/control-modes.svg) · [Install and play](../README.md)
 
 These bindings target the game's **Action Type** controller layout. The left-arm
 HUD shows the native weapon name, ammunition and status. Native context-action
@@ -123,16 +123,27 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Toggle native VR / large game screen | Left grip + left-stick click |
 | Open iDroid map | Tap left Menu |
 | Pause | Hold left Menu for at least 0.55 seconds |
+| Main menu / options | Hold left Menu on foot; choose Return to Title Menu or Options with the left stick and A |
+| Cutscene skip | Hold left Menu; choose Skip and press A when the native game offers it |
 | Recenter the large screen | Both grips + right-stick click |
 
-iDroid and pause automatically use the large screen. **A** confirms, **B** goes
-back, sticks navigate, grips act as LB/RB, and triggers retain LT/RT. On the map,
-triggers zoom, right-stick click changes zoom step and Y switches MAP/NAV.
-Close iDroid with **B**, or hold **Menu** again to unpause. Tracked VR returns
-automatically when the same player camera resumes. Release held controls once
-after returning before moving or firing. The manual VR toggle remains available;
-switching VR off inside a menu also disables automatic return. Other cinematic,
-loading and player-replacement transitions still need acceptance.
+In the development build, opening iDroid or Pause during tracked gameplay puts
+the native menu on a floating panel in the stereo world. Head movement keeps
+working during Pause. The iDroid handset remains attached to the right hand while
+iDroid is open; closing iDroid stows it. Equipment and Commands remain on the left wrist.
+
+**A** confirms, **B** goes back, the left stick navigates, grips act as **LB/RB**,
+and triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
+zoom step and **Y** switches MAP/NAV. **B** closes iDroid; hold **Menu** again to
+unpause. Holding Menu *inside iDroid* opens its native Help, so close iDroid before
+opening Pause. Release held controls once after returning before moving or firing.
+
+For the main menu, open Pause, select **RETURN TO TITLE MENU**, press **A**, then
+answer the native confirmation. **OPTIONS** and **CONTROLS & MANUAL** are also in
+Pause. The title screen uses the large in-headset screen and native controls.
+Cutscene Skip is available only when the native game offers it. Loading,
+cutscenes and player-replacement transitions still need broader VR integration;
+the floating gameplay menus do not establish support for every transition.
 
 Wrist Commands has its own input mode, separate from equipment selection.
 Keep left trigger held, center the right stick after the commands appear, then

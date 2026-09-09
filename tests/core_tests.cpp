@@ -288,12 +288,20 @@ int main(){
     expect(!firstPerson.resolve(11,lowered,120).applied,"fresh gameplay cannot undo a manual VR disable");
     firstPerson.toggle();firstPerson.resolve(11,lowered,120);
     firstPerson.setNativeMenuOpen(true);
-    expect(!firstPerson.resolve(11,lowered,120).applied&&firstPerson.status().awaitingPlayer,
-           "iDroid keeps native menu pixels even while the same player head continues to publish");
+    const auto menuView=firstPerson.resolve(11,lowered,120);
+    expect(menuView.applied&&menuView.menuOpen&&firstPerson.active()&&!firstPerson.status().awaitingPlayer,
+           "iDroid retains the native stereo viewpoint with a world-space menu panel");
+    firstPerson.track(Pose{{},{0.4f,0.1f,-0.1f}},true,125);
+    const auto movedMenu=firstPerson.resolve(11,mismatchedCamera,125);
+    expect(movedMenu.applied&&same(movedMenu.menuPanel.position,menuView.menuPanel.position)
+        &&near(std::abs(movedMenu.nativePose.position.x-menuView.nativePose.position.x),.1f),
+           "leaning moves the menu world camera while the panel stays anchored and native iDroid camera animation is ignored");
+    expect(!firstPerson.resolve(12,lowered,125).applied&&firstPerson.active(),
+           "an unrelated native camera cannot borrow the menu viewpoint");
     firstPerson.setNativeMenuOpen(false);
-    expect(firstPerson.resolve(11,lowered,120).applied,"closing the native iDroid state restores the same tracked player");
+    expect(firstPerson.resolve(11,lowered,125).applied,"closing the native iDroid state restores the same tracked player");
     firstPerson.setNativeMenuOpen(true);firstPerson.toggle();firstPerson.setNativeMenuOpen(false);
-    expect(!firstPerson.resolve(11,lowered,120).applied,"manual disable inside iDroid prevents automatic return");
+    expect(!firstPerson.resolve(11,lowered,125).applied,"manual disable inside iDroid prevents automatic return");
     expect(same(savedHeadView.nativePose.position,{499.9f,300.4f,1300.1f}),"published player-eye frame remains immutable");
     firstPerson.track({},true,300);firstPerson.toggle();
     expect(!firstPerson.resolve(11,lowered,300).applied,"stale player head cannot survive a fresh headset sample");
@@ -343,13 +351,22 @@ int main(){
     menuEpoch.trackStereo({},rigEyes,true,100,menuHands);
     menuEpoch.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,100);
     menuEpoch.toggle();menuEpoch.resolve(11,thirdPerson,100);menuEpoch.setNativeMenuOpen(true);
+    const Pose menuLean{{},{.2f,.1f,-.3f}};
+    menuEpoch.trackStereo(menuLean,rigEyes,true,105,menuHands);
+    const auto beforeMenuRebase=menuEpoch.resolve(11,thirdPerson,105);
     menuHands.referenceEpoch=2;menuHands.predictedXrTime=10000;
-    menuEpoch.trackStereo({},rigEyes,true,110,menuHands);
-    expect(menuEpoch.status().awaitingPlayer&&!menuEpoch.status().pending&&!menuEpoch.active(),
-           "a reference-space change inside iDroid keeps native menu pixels available");
+    menuEpoch.trackStereo(Pose{{0,.258819f,0,.9659258f},{3,1,-2}},rigEyes,true,110,menuHands);
+    const auto rebasedMenu=menuEpoch.resolve(11,thirdPerson,110);
+    expect(!menuEpoch.status().awaitingPlayer&&!menuEpoch.status().pending&&menuEpoch.active()
+        &&rebasedMenu.menuOpen&&same(rebasedMenu.nativePose.position,beforeMenuRebase.nativePose.position)
+        &&same(rebasedMenu.menuPanel.position,beforeMenuRebase.menuPanel.position),
+           "a reference-space change inside iDroid rebases the live stereo menu viewpoint");
     menuEpoch.setNativeMenuOpen(false);
     menuEpoch.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,110);
-    expect(menuEpoch.resolve(11,thirdPerson,110).applied,"iDroid can return after a reference-space change");
+    const auto afterMenuRebase=menuEpoch.resolve(11,thirdPerson,110);
+    expect(afterMenuRebase.applied&&same(afterMenuRebase.nativePose.position,beforeMenuRebase.nativePose.position)
+        &&same(rotate(afterMenuRebase.nativePose.orientation,{0,0,1}),rotate(beforeMenuRebase.nativePose.orientation,{0,0,1})),
+           "closing iDroid after a reference-space change preserves the gameplay viewpoint");
     handsCamera.trackStereo({},rigEyes,true,100,hands);handsCamera.toggle();
     const auto joinedHands=handsCamera.resolve(1,nativeCamera,100);
     expect(joinedHands.applied&&joinedHands.controllers.hands[1].gripTracked&&joinedHands.controllers.predictedXrTime==9000,

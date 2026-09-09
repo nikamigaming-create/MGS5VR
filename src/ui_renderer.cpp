@@ -23,7 +23,7 @@ using NodeFn=uintptr_t(*)(void*,void*);
 QueueFn originalQueue{};ExecuteFn originalExecute{};NodeFn originalNode{};
 uintptr_t base{};
 std::atomic_bool enabled{};
-struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},itemsOpen{},commandsOpen{};};
+struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},itemsOpen{},commandsOpen{},menuOpen{};Pose menuPanel{};};
 thread_local Source producing,executing;
 std::mutex mutex;
 std::unordered_map<uintptr_t,Source> pending;
@@ -41,6 +41,7 @@ std::array<std::atomic_uint64_t,2> spatialByEye{},hiddenPanelByEye{};
 std::filesystem::path settings;
 bool spatialEnabled{};
 bool menuReaderVerified{};
+bool pauseReaderVerified{};
 std::atomic_int menuState{-1};
 std::atomic_uint64_t pickerDrawTime{};
 std::atomic_uint64_t commandsDrawTime{};
@@ -85,10 +86,13 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
         ++nodeCalls;
         const auto address=reinterpret_cast<uintptr_t>(item);
         const auto camera=field<uintptr_t>(state,0x308);
+        const auto order=field<uint32_t>(item,0x28);
         std::lock_guard lock(mutex);
-        auto found=nodes.end();for(auto it=nodes.begin();it!=nodes.end();++it)if(it->node==address&&it->camera==camera){found=it;break;}
+        // One native layer can contain many transient map tiles. Inventory the
+        // camera/layer contract, not every tile, so later menu cameras fit too.
+        auto found=nodes.end();for(auto it=nodes.begin();it!=nodes.end();++it)if(it->order==order&&it->camera==camera){found=it;break;}
         if(found==nodes.end()&&nodes.size()<96){
-            nodes.push_back({address,camera,field<uintptr_t>(state,0x340),field<uintptr_t>(state,0x348),0,0,field<uint32_t>(item,0x50),0,field<uint32_t>(item,0x28),nodeName(address)});
+            nodes.push_back({address,camera,field<uintptr_t>(state,0x340),field<uintptr_t>(state,0x348),0,0,field<uint32_t>(item,0x50),0,order,nodeName(address)});
             found=nodes.end()-1;
         }
         if(found!=nodes.end()){++found->calls;found->source=executing.eye.sourceSequence;found->eye=executing.eye.eye;}
@@ -99,9 +103,28 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             const auto camera=field<uintptr_t>(state,0x308);
             std::array<float,16> world{};
             uintptr_t cameraType{};
+            const bool layoutCamera=camera!=executing.camera
+                &&read(camera,&cameraType,sizeof(cameraType))&&cameraType==base+0x20f08c8;
+            // iDroid's map, tabs and lists use separate animated UI cameras.
+            // Their transforms do not equal the fixed HUD layout at Z=100,
+            // 135 or 150. Preserve each camera's native clip coordinates and
+            // flatten every menu layer onto the same world plane. Testing the
+            // HUD transform here left the main map head-locked in both eyes.
+            if(executing.menuOpen&&layoutCamera){
+                const auto saved=field<std::array<float,16>>(state,0x1c0);
+                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,
+                    executing.menuPanel,1.25f,1.25f*9.f/16.f);
+                if(!mapped){++suppressedDraws;return 0;}
+                auto* output=static_cast<unsigned char*>(state)+0x1c0;
+                std::memcpy(output,mapped->data(),sizeof(*mapped));
+                const auto result=originalNode(state,item);
+                std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
+                if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
+                return result;
+            }
             // These native UI cameras inhabit an artificial layout space. World
             // markers use the scene camera and retain their source eye view.
-            if(camera!=executing.camera&&read(camera,&cameraType,sizeof(cameraType))&&cameraType==base+0x20f08c8
+            if(layoutCamera
                 &&read(camera+0x30,world.data(),sizeof(world))&&world[0]==-1&&world[5]==1&&world[10]==-1&&world[15]==1
                 &&world[1]==0&&world[2]==0&&world[3]==0&&world[4]==0&&world[6]==0&&world[7]==0&&world[8]==0&&world[9]==0&&world[11]==0
                 &&world[12]==0&&world[13]==0&&(world[14]==100||world[14]==135||world[14]==150)){
@@ -171,6 +194,11 @@ void installUiRenderer(uintptr_t moduleBase){
     std::array<unsigned char,8> getterBytes{},openBytes{};
     menuReaderVerified=read(base+0x85fd00,getterBytes.data(),getterBytes.size())&&getterBytes==menuGetter
         &&read(base+0x934110,openBytes.data(),openBytes.size())&&openBytes==menuOpen;
+    constexpr std::array<unsigned char,8> sequenceGetter{0x48,0x8b,0x05,0xf9,0x98,0x69,0x02,0xc3};
+    constexpr std::array<unsigned char,6> closePause{0x89,0x43,0x38,0x89,0x43,0x48};
+    std::array<unsigned char,6> closeBytes{};
+    pauseReaderVerified=read(base+0x53a280,getterBytes.data(),getterBytes.size())&&getterBytes==sequenceGetter
+        &&read(base+0x5391ca,closeBytes.data(),closeBytes.size())&&closeBytes==closePause;
     std::array<wchar_t,32768> executable{};
     if(GetModuleFileNameW(nullptr,executable.data(),static_cast<DWORD>(executable.size()))){
         settings=std::filesystem::path(executable.data()).parent_path()/L"mgs5vr.ini";
@@ -195,8 +223,25 @@ std::optional<bool> nativeMenuOpen() noexcept {
         if(terminal&&(!read(terminal,&type,sizeof(type))||type!=base+0x22705a8
             ||!read(terminal+0x20,&open,sizeof(open))))return {};
     }
-    const int next=open!=0;
-    if(menuState.exchange(next)!=next)try{log("Native iDroid menu open="+std::to_string(next));}catch(...){}
+    bool paused=false;
+    if(pauseReaderVerified){
+        uintptr_t manager{},pause{};uint32_t kind{};
+        if(!read(base+0x2bd3b80,&manager,sizeof(manager)))return {};
+        if(manager){
+            if(!read(manager,&type,sizeof(type))||type!=base+0x218fba0
+                ||!read(manager+8,&pause,sizeof(pause)))return {};
+            if(pause){
+                if(!read(pause,&type,sizeof(type))||type!=base+0x218f648
+                    ||!read(pause+0x38,&kind,sizeof(kind)))return {};
+                // TppPauseMenu's native open handler assigns the menu kind;
+                // its close handler clears it. Menu-button intent is not a
+                // substitute: holding that button inside iDroid opens Help.
+                paused=kind>0&&kind<=0x80;
+            }
+        }
+    }
+    const int next=(open?1:0)|(paused?2:0);
+    if(menuState.exchange(next)!=next)try{log("Native menu state="+std::to_string(next)+" (iDroid=1, pause=2)");}catch(...){}
     return next!=0;
 }
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
@@ -209,7 +254,8 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
     const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,{0,.09f,-.03f})};
     producing={eye,camera,view,rig.wristPanel,picker,rig.wristPanelTracked,
-               rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),rig.controllers.equipmentCategory==4,rig.controllers.commandControls};
+               rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),rig.controllers.equipmentCategory==4,rig.controllers.commandControls,
+               rig.menuOpen,rig.menuPanel};
 }
 void clearUiRenderSource() noexcept {producing={};}
 bool applyUiEyeProjection(float* output) noexcept {
