@@ -149,13 +149,6 @@ std::optional<EyeView> binocularSceneView(const OpticPose& optic,float magnifica
     return EyeView{objective,{-halfAngle,halfAngle,halfAngle,-halfAngle}};
 }
 
-bool OpticSelection::update(bool available,bool chord,bool close){
-    if(!available||close)selected_=false;
-    else if(chord&&!priorChord_)selected_=!selected_;
-    priorChord_=chord;
-    return selected_;
-}
-
 bool validateBinocularViews(const OpticSample& optic,const Pose& head,
     const std::array<EyeView,2>& views){
     if(!optic.active||optic.pose.kind!=OpticKind::binocular||!optic.pose.tracked

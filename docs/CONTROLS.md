@@ -21,7 +21,7 @@ needs a separate review.
 | Put the weapon away | Release right grip; the game performs its native stow animation |
 | Add the support hand | Bring the left palm to the weapon's support grip and hold it there briefly |
 | Free the left hand | Pull the hand away, or turn the wrist HUD toward your eyes |
-| Reload | **Right B**; the native reload moves the support hand, then releases it |
+| Reload | **Short right B tap**; the native reload moves the support hand, then releases it |
 | Read the HUD | Raise and turn your **left forearm** toward your eyes |
 
 The right hand owns the weapon grip. With support engaged, the line from the
@@ -92,11 +92,12 @@ equipment strength; this is point-and-trigger throwing, not a velocity gesture.
 The latest SIM observations and remaining stance limits are in the
 [interaction and visibility review](INTERACTION_VISIBILITY_REVIEW.md).
 
-**Handheld binoculars:** hold **left trigger + tap Y** to select the device,
-then hold **right grip** to cup its right side in the palm. Aim by moving the right hand.
-**Click the right stick** to switch 2×/4×. **Right trigger** marks the person under
+**Handheld binoculars:** hold **right B** for about 0.3 seconds to equip the device
+in the right hand; keep holding B to keep it equipped and release B to stow it.
+A short B tap remains the native action (reload, back, or the current context action).
+Aim by moving the right hand. **Click the right stick** to switch 2×/4×. **Right trigger** marks the person under
 the optic's crosshair, or places a native waypoint on the visible surface when
-no person is targeted. A short rumble confirms marking. **B** stows it.
+no person is targeted. A short rumble confirms marking. Releasing B stows it.
 **Flick right stick down** to remove the waypoint or acquired person under the
 crosshair; center the stick before clearing another. Empty space clears nothing.
 Bring the left hand to the opposite side and squeeze
@@ -107,9 +108,8 @@ the surrounding world retains normal stereo. Bringing the eyecup close opens
 the lens view smoothly. Waypoint letters and acquired-person distances are
 drawn inside this view. Automatic identification by dwelling on a person and
 intel analysis are not implemented; marking currently requires the trigger.
-Near the face, the native camera-obstruction fade makes the hands translucent;
-the housing stays opaque. This also applies to free hands when any wrist or
-finger approaches the eyes, and clears as the hands move away. The shoulders follow physical head yaw so turning
+Tracked first-person hands remain fully opaque, including when a wrist, finger,
+or binocular approaches the face. The shoulders follow physical head yaw so turning
 does not leave the sleeve roots in the old game-camera direction.
 
 **Motion melee (development candidate):** swing either free hand, or bash with a

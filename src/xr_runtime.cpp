@@ -96,11 +96,12 @@ struct Session {
     MenuButton menuButton;
     RigInput rigControls;
     RigOptics opticsControls;
+    BinocularHold binocularHold;
     SnapTurn snapControls;
     OpticStabilizer opticStabilizer;
     float snapYaw{};
     OpticGate opticGate;
-    OpticSelection opticSelection;
+    bool priorBinocularHeld{};
     uint64_t opticMarkSequence{};
     uint64_t opticClearSequence{};
     RigCommands commandsControls;
@@ -300,11 +301,11 @@ struct Session {
     }
     void syncInput(XrTime time,Pose& head,std::array<EyeView,2>& views,bool stereoTracked){
         controllerFrame={};controllerFrame.snapYaw=snapYaw;
-        if(!focused){snapControls.reset();rigControls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){snapControls.reset();rigControls.suspend();opticsControls.reset();binocularHold.suspend();opticGate.reset();priorBinocularHeld=false;priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){snapControls.reset();rigControls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){snapControls.reset();rigControls.suspend();opticsControls.reset();binocularHold.suspend();opticGate.reset();priorBinocularHeld=false;priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
         if(!priorFocused){
             snapControls.reset();
@@ -348,13 +349,20 @@ struct Session {
         }
         const bool rigInput=controllerRigEnabled()&&mode!=TravelMode::unknown&&!title
             &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
-        // R3 is also the legacy recenter chord when both grips are squeezed.
-        // A single-handed binocular uses the right grip; only the two-grip
-        // chord is reserved for recentering, so right-stick click remains the
-        // optic's zoom control.
-        const bool centerChord=boolean(recenter)&&ls>0.75f&&rs>0.75f&&!opticSelection.selected();
-        const bool headToggle=headCamera().available()&&left&&ls>0.75f&&boolean(thumbClick,hands[0]);
         const auto now=steadyMilliseconds();
+        const bool binocularPressed=right&&boolean(face[1],hands[1]);
+        const bool binocularAvailable=rigInput&&mode==TravelMode::onFoot&&right;
+        const auto binocular=binocularHold.update(binocularAvailable,binocularPressed,now);
+        controllerFrame.binocularButtonHeld=binocular.held;
+        if(binocular.held!=priorBinocularHeld){
+            priorBinocularHeld=binocular.held;
+            log(binocular.held?"Physical binoculars equipped by B hold":"Physical binoculars stowed after B release");
+        }
+        // R3 is also the legacy recenter chord when both grips are squeezed.
+        // Holding B owns the right hand for binoculars, so it cannot trigger
+        // recentering or leak a native right-stick action.
+        const bool centerChord=boolean(recenter)&&ls>0.75f&&rs>0.75f&&!binocular.held;
+        const bool headToggle=headCamera().available()&&left&&ls>0.75f&&boolean(thumbClick,hands[0]);
         const bool menuPressed=boolean(menu);
         const auto menuBits=menuButton.update(menuPressed,left,now,ls>.75f);
         const bool utilityCenter=menuPressed&&left&&ls>.75f;
@@ -362,19 +370,14 @@ struct Session {
             headCamera().recenter();recenterRequested=true;
             log("In-game recenter requested through left grip + Menu");
         }
-        const bool opticChord=left&&lt>.5f&&boolean(face[3],hands[0]);
-        const bool opticWasSelected=opticSelection.selected();
-        const bool opticSelected=opticSelection.update(rigInput&&mode==TravelMode::onFoot&&right,
-            opticChord,opticWasSelected&&right&&boolean(face[1],hands[1]));
-        if(opticWasSelected!=opticSelected)log("Physical binocular equipped="+std::to_string(opticSelected));
         const bool opticAvailable=rigInput&&mode==TravelMode::onFoot&&right
-            &&opticSelected&&rs>.5f
+            &&binocular.held
             &&!commandsControls.active()&&!headToggle
             &&(opticGate.active()||!centerChord)&&stereoTracked;
         if(opticAvailable){
             auto& primary=controllerFrame.hands[1];const auto& support=controllerFrame.hands[0];
             if(const auto raw=solveBinocularPose(support.grip,primary.grip,support.aim,primary.aim,
-                support.gripTracked,primary.gripTracked,support.aimTracked,primary.aimTracked,ls>.5f,rs>.5f)){
+                support.gripTracked,primary.gripTracked,support.aimTracked,primary.aimTracked,ls>.5f,rs>.5f||binocular.held)){
                 const auto steady=opticStabilizer.update(head,primary.grip,*raw,true,now,referenceEpoch);
                 primary.aim=compose(compose(steady,inverse(primary.grip)),primary.aim);primary.grip=steady;
             }else opticStabilizer.reset();
@@ -384,7 +387,7 @@ struct Session {
             controllerFrame.hands[0].aim,controllerFrame.hands[1].aim,
             controllerFrame.hands[0].gripTracked,controllerFrame.hands[1].gripTracked,
             controllerFrame.hands[0].aimTracked,controllerFrame.hands[1].aimTracked,
-            ls>.5f,rs>.5f,opticAvailable,now,referenceEpoch);
+            ls>.5f,rs>.5f||binocular.held,opticAvailable,now,referenceEpoch);
         controllerFrame.optic=optic;
         // Bounded fit telemetry makes the eye-relief decision auditable from
         // the same LOCAL poses that drive the gate. It stays in the runtime
@@ -425,7 +428,8 @@ struct Session {
         GamepadSample pad{};
         const auto bit=[&](bool enabled,WORD mask){if(enabled)pad.buttons|=mask;};
         bit(right&&boolean(face[0],hands[1]),XINPUT_GAMEPAD_A);
-        bit((simpleControllerProfile?left:right)&&boolean(face[1],hands[simpleControllerProfile?0:1]),XINPUT_GAMEPAD_B);
+        const bool nativeB=(simpleControllerProfile?left:right)&&boolean(face[1],hands[simpleControllerProfile?0:1]);
+        bit(binocularAvailable?binocular.nativePress:nativeB,XINPUT_GAMEPAD_B);
         bit(left&&boolean(face[2],hands[0]),XINPUT_GAMEPAD_X);bit(left&&boolean(face[3],hands[0]),XINPUT_GAMEPAD_Y);
         pad.buttons|=menuBits;
         bit(left&&boolean(thumbClick,hands[0])&&!headToggle,XINPUT_GAMEPAD_LEFT_THUMB);
@@ -462,10 +466,8 @@ struct Session {
             }
             const auto beforePhase=rigControls.equipmentPhase();
             RigInputSample mapped{};
-            if(optical.exclusive||commands.exclusive||opticChord||(opticWasSelected&&!opticSelected)){
+            if(optical.exclusive||commands.exclusive){
                 rigControls.reset();mapped.gamepad=optical.exclusive?optical.gamepad:commands.gamepad;
-                if(opticChord||(opticWasSelected&&!opticSelected))
-                    mapped.gamepad={0,0,0,pad.leftX,pad.leftY,pad.rightX,0};
             }else mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode,
                 now,nativeEquipmentPickerDrawTime(),controllerThrowReady());
             if(beforePhase!=rigControls.equipmentPhase())log("Wrist picker phase="+std::to_string(rigControls.equipmentPhase())
@@ -473,7 +475,7 @@ struct Session {
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
             controllerFrame.equipmentCategory=rigControls.equipmentPhase()>=2?rigControls.equipmentCategory()+1:0;
-            stickNavigation=rigControls.equipmentPhase()!=0||commands.exclusive||opticChord
+            stickNavigation=rigControls.equipmentPhase()!=0||commands.exclusive
                 ||(pad.buttons&(XINPUT_GAMEPAD_START|XINPUT_GAMEPAD_BACK));
             if(!stickNavigation){pad.rightX=0;pad.rightY=0;}
             // Native on-foot movement already consumes the published camera

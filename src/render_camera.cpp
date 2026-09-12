@@ -276,7 +276,6 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         std::memcpy(authoredProjection.data(),saved.viewportMatrices.data(),sizeof(authoredProjection));
     }
     mgs5vr::publishOpticMarkerFrame(source.pair.sample);
-    mgs5vr::publishHandFade(source.pair.sample);
     const auto cameraCount=pairCount.load();uintptr_t result{};bool complete=true;
     mgs5vr::beginSceneTiming(context,id);
     const bool titleSurface=source.pair.sample.controllers.frontEnd;

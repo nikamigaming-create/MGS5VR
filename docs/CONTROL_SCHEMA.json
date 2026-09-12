@@ -7,7 +7,7 @@
       ["Right stick", "Turn; wrist mode owns this stick while open"],
       ["Right grip / trigger", "Hold to ready / fire or throw"],
       ["Left hand near support grip", "Guide the barrel with two hands; pull away to release"],
-      ["B / A / hold A", "Reload / crouch / prone; release ready grip for stance"],
+      ["Short B tap / A / hold A", "Reload / crouch / prone; hold B equips binoculars"],
       ["X / Y", "Dive / native interaction or pickup"],
       ["Grip, trigger and touch", "Articulate fingers; weapons retain their authored grip"]]},
     {"title": "02 / LEFT-WRIST EQUIPMENT", "rows": [
@@ -22,9 +22,9 @@
       ["Center right stick; point", "Choose an available buddy or arm command"],
       ["Right trigger / stick click", "Confirm once; release left trigger to close"],
       ["D-Horse call", "Stand or crouch first; then choose the horse call"],
-      ["Left trigger + tap Y", "Enter stereo viewing zoom at 2x"],
-      ["Right-stick click / B", "Switch 2x / 4x / leave zoom"],
-      ["Viewing zoom", "Native marking, analysis and authored scopes remain unfinished"]]},
+      ["Hold right B", "Equip binoculars; release B to stow"],
+      ["Right-stick click", "Switch 2x / 4x"],
+      ["Right trigger", "Mark a target or place a native waypoint"]]},
     {"title": "04 / GRENADES, MELEE & BODIES", "rows": [
       ["Support > grenade", "Finish wrist selection, then hold right grip"],
       ["Move and tilt right hand", "Position and aim the throw arc; right trigger throws"],

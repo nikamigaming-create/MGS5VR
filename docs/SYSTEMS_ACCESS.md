@@ -16,7 +16,7 @@ selection; later powered arm abilities and native binocular marking still need w
 | iDroid/map | Tap left Menu. Native full menus appear on the large in-headset screen; triggers zoom the map and grips switch tabs. Close with B to return to tracked VR. |
 | Ordinary CQC | Right trigger with right grip released reaches native attack/CQC. The game chooses the contextual action. This is a button route, not physical fist hit detection. |
 | Physical fists | Candidate: motion alone submits native kick contacts from palms or the held firearm tip. No trigger pulse or native kick animation. Target damage/reaction acceptance remains open. |
-| Binoculars/scopes | Candidate: left trigger + Y opens stereo 2× viewing; right-stick click switches 2×/4×, B exits. This does not invoke native marking, target analysis or intel calls. Those and per-weapon scopes remain unfinished. |
+| Binoculars/scopes | Hold right B for about 0.3 seconds to equip the stereo binoculars; release B to stow. Right-stick click switches 2×/4× and right trigger marks a target or places a waypoint. Native analysis/intel and per-weapon scopes remain unfinished. |
 | Marked-person display | Saved marks remain native. Blue streaks/escaping triangles were visible in prior eye captures and reported again by the user. The faulty draw has not been isolated; no current shader-fix claim. |
 | Vehicles | Candidate: left grip acquires the native wheel contact, controller rotation steers, release lets go. Truck entry, both steering directions and exit have SIM evidence. Sustained driving/braking, physical haptic feel and personal-gun fire from the driver seat remain unverified or unimplemented. |
 | Other actions | Loot, carry, Fulton, interrogation, powered arm abilities and all weapon families need individual end-to-end checks; selection alone does not prove the action. |
@@ -55,12 +55,12 @@ remains available. The candidate exercises horse calling, Stay back and the
 distraction knock. Other buddy orders, powered-arm commands and contextual
 interrogation still need complete target interactions.
 
-Add an explicit Binoculars action with a visible close control and discrete zoom
-steps. Preserve binocular stereo and head tracking while magnified. Marking/intel
-must follow the binocular viewing direction and use native target data. Keep
-NVG, map zoom, binocular magnification and an equipped weapon's authored scope as
+The binocular action now has a visible close control and discrete zoom steps.
+Preserve binocular stereo and head tracking while magnified. Marking/intel must
+follow the binocular viewing direction and use native target data. Keep NVG, map
+zoom, binocular magnification and an equipped weapon's authored scope as
 different states. An iron-sight weapon must not silently become a scoped weapon.
-Do not re-enable the old mono optical-screen prototype as a completed VR optic.
+Native analysis/intel and per-weapon scopes remain unfinished.
 
 The next priority is usable reconnaissance: repair marked-person rendering,
 connect stereo viewing to native marking/intel, and extend wrist Commands coverage.

@@ -42,6 +42,32 @@ WheelMailbox& wheelMailbox(){static WheelMailbox box;return box;}
 void RumbleMailbox::publish(RumbleSample sample){std::lock_guard lock(mutex_);sample_=sample;}
 RumbleSample RumbleMailbox::read(uint64_t time) const{std::lock_guard lock(mutex_);return time>=sample_.time&&time-sample_.time<=250?sample_:RumbleSample{};}
 RumbleMailbox& rumbleMailbox(){static RumbleMailbox box;return box;}
+BinocularInput BinocularHold::update(bool available,bool pressed,uint64_t time){
+    constexpr uint64_t holdMilliseconds=300,nativePulseMilliseconds=100;
+    if(time<lastTime_){reset();releaseRequired_=true;}
+    lastTime_=time;
+    if(!available){
+        const bool wasDown=pressed_||active_;
+        pressed_=active_=false;nativeUntil_=0;
+        if(wasDown)releaseRequired_=pressed;
+        else if(!pressed)releaseRequired_=false;
+        return {};
+    }
+    if(releaseRequired_){
+        if(pressed)return {};
+        releaseRequired_=false;
+    }
+    bool nativePress=false;
+    if(pressed&&!pressed_){
+        pressed_=true;active_=false;pressedAt_=time;nativeUntil_=0;
+    }else if(!pressed&&pressed_){
+        nativePress=!active_;pressed_=false;active_=false;
+        if(nativePress)nativeUntil_=time+nativePulseMilliseconds;
+    }
+    if(pressed&&pressed_&&!active_&&time>=pressedAt_+holdMilliseconds)active_=true;
+    if(active_)nativeUntil_=0;
+    return {active_,nativePress||time<nativeUntil_};
+}
 OpticsInput RigOptics::update(GamepadSample raw,bool available,bool held,bool /*atEye*/){
     constexpr uint16_t click=0x0080,x=0x4000,menus=0x0030;
     if(!available){

@@ -50,16 +50,19 @@ int main(){
         expect(rumble.read(110).low==.4f&&rumble.read(351).low==0,"native rumble expires without a new game sample");
     }
     {
-        OpticSelection selection;
-        expect(!selection.update(true,false),"ordinary weapon grip does not equip binoculars");
-        expect(selection.update(true,true),"explicit optic chord equips");
-        expect(selection.update(true,true),"held equip chord does not toggle repeatedly");
-        selection.update(true,false);
-        expect(!selection.update(true,true),"fresh equip chord stows the optic");
-        selection.update(false,true);
-        expect(!selection.update(true,true),"tracking recovery cannot turn a held chord into an equip");
-        selection.update(true,false);selection.update(true,true);
-        expect(!selection.update(true,false,true),"B stows the device without a native camera action");
+        BinocularHold binocular;
+        expect(!binocular.update(true,true,100).held,"B press waits before equipping binoculars");
+        expect(!binocular.update(true,true,399).held,"short B hold does not equip binoculars");
+        auto b=binocular.update(true,true,400);
+        expect(b.held&&!b.nativePress,"long B hold equips binoculars without a native B action");
+        b=binocular.update(true,false,410);
+        expect(!b.held&&!b.nativePress,"releasing B stows binoculars without a native B action");
+        BinocularHold tap;
+        tap.update(true,true,100);
+        b=tap.update(true,false,150);
+        expect(!b.held&&b.nativePress,"short B tap remains a native B action");
+        expect(tap.update(true,false,220).nativePress,"native B tap remains available through its pulse");
+        expect(!tap.update(true,false,260).nativePress,"native B pulse expires");
 
         RigOptics optics;
         GamepadSample input{};

@@ -73,6 +73,21 @@ private:
     RumbleSample sample_{};
 };
 RumbleMailbox& rumbleMailbox();
+struct BinocularInput {
+    bool held{};
+    bool nativePress{};
+};
+// A long B hold opens binoculars. A short tap remains the native B action
+// (reload, back, or the current context action).
+class BinocularHold {
+public:
+    BinocularInput update(bool available,bool pressed,uint64_t time=steadyMilliseconds());
+    void reset(){*this=BinocularHold{};}
+    void suspend(){reset();releaseRequired_=true;}
+private:
+    uint64_t pressedAt_{},nativeUntil_{},lastTime_{};
+    bool pressed_{},active_{},releaseRequired_{};
+};
 struct OpticsInput {
     GamepadSample gamepad{};
     float magnification{1};

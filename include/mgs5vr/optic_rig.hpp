@@ -95,15 +95,6 @@ private:
 // neither HMD eye pose nor its field of view is an input or an output.
 std::optional<EyeView> binocularSceneView(const OpticPose& optic,float magnification);
 
-class OpticSelection {
-public:
-    bool update(bool available,bool chord,bool close=false);
-    void reset(){*this=OpticSelection{};}
-    bool selected() const {return selected_;}
-private:
-    bool selected_{},priorChord_{};
-};
-
 // Validate tracking without moving either native head-derived stereo origin.
 // The independent device scene supplies magnification inside its aperture.
 bool validateBinocularViews(const OpticSample& optic,const Pose& head,

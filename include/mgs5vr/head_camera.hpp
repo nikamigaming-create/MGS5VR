@@ -23,6 +23,7 @@ struct ControllerFrame {
     bool vehicleControls{};
     unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
     float magnification{1};
+    bool binocularButtonHeld{};
     std::array<float,2> strikeCurl{};
     bool commandControls{};
     OpticSample optic{};

@@ -270,7 +270,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const auto& primary=frame.controllers.hands[1];
         const auto optic=solveBinocularPose(left.grip,localPalm,left.aim,primary.aim,
             left.gripTracked,primary.gripTracked,left.aimTracked,primary.aimTracked,
-            left.squeeze>.5f,primary.squeeze>.5f);
+            left.squeeze>.5f,primary.squeeze>.5f||frame.controllers.binocularButtonHeld);
         if(!optic)return false;
         frame.controllers.optic.pose=*optic;
         return true;

@@ -91,10 +91,12 @@ selection cards share the forearm surface. The rear side is hidden rather than
 rendering mirrored text. This is weapon/status UI, not a complete iDroid or damage/
 subtitle interface. Blocking menus still use their native controls and pixels.
 
-A binocular/iron-sight screen prototype was tested and removed at the user's
-request. The tracked VR input path reserves the optical action; it does not
-transition aiming to a mono quad or invent zoom for iron sights. Authored stereo
-optics remain future work.
+The current binocular path uses the retail housing and a tracked stereo lens.
+Hold right B for about 0.3 seconds to equip it, keep holding B while it is in
+the right hand, and release B to stow it. A short B tap remains the native
+reload/back/context action. Right-stick click changes 2×/4× magnification and
+right trigger follows the binocular ray for marking or waypoint placement.
+This does not implement per-weapon scopes or native analysis/intel.
 
 ## Observations
 
