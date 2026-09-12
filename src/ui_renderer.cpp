@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <mutex>
 #include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -21,9 +22,14 @@ using QueueFn=uintptr_t(*)(void*,void*);
 using ExecuteFn=uintptr_t(*)(void*,void*,void*,uint32_t);
 using NodeFn=uintptr_t(*)(void*,void*);
 QueueFn originalQueue{};ExecuteFn originalExecute{};NodeFn originalNode{};
+using TitleFn=void(*)(void*);
+TitleFn originalTitleShow{},originalTitleUpdate{};
+TitleFn originalStartShow{};
+std::atomic_uintptr_t titleMenu{};
+std::atomic_uint64_t titleUpdatedAt{};
 uintptr_t base{};
 std::atomic_bool enabled{};
-struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},itemsOpen{},commandsOpen{},menuOpen{};Pose menuPanel{};};
+struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},itemsOpen{},commandsOpen{},menuOpen{};Pose menuPanel{};bool frontEnd{};std::array<float,16> authoredView{},authoredProjection{};};
 thread_local Source producing,executing;
 std::mutex mutex;
 std::unordered_map<uintptr_t,Source> pending;
@@ -47,6 +53,27 @@ std::atomic_uint64_t pickerDrawTime{};
 std::atomic_uint64_t commandsDrawTime{};
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
+void titleShow(void* object){
+    originalTitleShow(object);
+    uintptr_t type{};
+    if(read(reinterpret_cast<uintptr_t>(object),&type,sizeof(type))&&type==base+0x23d7e58){
+        log("Native Title menu opened; spatial Continue panel requested");
+    }
+}
+void titleUpdate(void* object){
+    originalTitleUpdate(object);
+    const auto address=reinterpret_cast<uintptr_t>(object);uintptr_t type{};
+    if(read(address,&type,sizeof(type))&&type==base+0x23d7e58){
+        if(!titleMenu.exchange(address))log("Native Title live update observed");
+        titleUpdatedAt.store(steadyMilliseconds());
+    }
+}
+void startShow(void* object){
+    originalStartShow(object);
+    uintptr_t type{};
+    if(read(reinterpret_cast<uintptr_t>(object),&type,sizeof(type))&&type==base+0x23d7dd8)
+        log("Native Press Start prompt opened");
+}
 std::string nodeName(uintptr_t node){
     uintptr_t holder{},text{};
     if(!read(node+0x58,&holder,sizeof(holder))||!read(holder,&text,sizeof(text)))return {};
@@ -56,17 +83,18 @@ std::string nodeName(uintptr_t node){
 }
 __declspec(noinline) uintptr_t queue(void* job,void* state){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
-    const auto result=originalQueue(job,state);
-    if(!enabled.load()||caller!=base+0x2e7d98)return result;
+    if(!enabled.load()||caller!=base+0x2e7d98)return originalQueue(job,state);
     try{
         std::lock_guard lock(mutex);const auto key=reinterpret_cast<uintptr_t>(state)+0x120;
-        // Remove recycled state even when it was queued outside an eye draw.
+        // Publish before native dispatch: a worker may start inside the queue
+        // call. Publishing afterwards lets it consume the preceding eye tag,
+        // including incorrectly hiding the native menu capture pass.
         pending.erase(key);
         if(producing.eye.sourceSequence){
             if(pending.size()<128){pending.emplace(key,producing);++queued;}else ++overflow;
         }
     }catch(...){}
-    return result;
+    return originalQueue(job,state);
 }
 struct ExecutionScope {
     Source saved=executing;
@@ -82,6 +110,17 @@ __declspec(noinline) uintptr_t execute(void* renderer,void* info,void* task,uint
     return originalExecute(renderer,info,task,worker);
 }
 __declspec(noinline) uintptr_t node(void* state,void* item){
+    // Title's complete native menu is captured once and placed on a cabin
+    // surface after each eye. Its individual layers must not reappear here.
+    if(enabled.load()&&executing.eye.sourceSequence&&executing.frontEnd)return 0;
+    if(enabled.load()&&executing.eye.sourceSequence&&!executing.menuOpen){
+        const auto order=field<uint32_t>(item,0x28);
+        const bool worldIntel=field<uintptr_t>(state,0x308)==executing.camera&&(order==2||order==3);
+        // Native scene-camera target cues follow the device view. Flat HUD
+        // labels are replaced by native world-position labels in the lens.
+        if(executing.eye.eye==2)return worldIntel?originalNode(state,item):0;
+        if(worldIntel)return 0;
+    }
     if(enabled.load()&&executing.eye.sourceSequence)try{
         ++nodeCalls;
         const auto address=reinterpret_cast<uintptr_t>(item);
@@ -94,6 +133,21 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
         if(found==nodes.end()&&nodes.size()<96){
             nodes.push_back({address,camera,field<uintptr_t>(state,0x340),field<uintptr_t>(state,0x348),0,0,field<uint32_t>(item,0x50),0,order,nodeName(address)});
             found=nodes.end()-1;
+            if(executing.frontEnd){
+                uintptr_t type{};std::array<float,16> world{};
+                read(camera,&type,sizeof(type));read(camera+0x30,world.data(),sizeof(world));
+                std::ostringstream message;message<<"Title UI layer order="<<order<<" name="<<found->name
+                    <<" camera=0x"<<std::hex<<camera<<" type_rva=0x"<<(type-base)<<std::dec
+                    <<" source_camera="<<(camera==executing.camera)<<" panel_tracked="<<executing.panelTracked
+                    <<" world=";for(const auto f:world)message<<f<<',';
+                message<<" view=";for(const auto f:field<std::array<float,16>>(state,0x200))message<<f<<',';
+                message<<" projection=";for(const auto f:field<std::array<float,16>>(state,0x1c0))message<<f<<',';
+                if(camera==executing.camera){
+                    message<<" authored_view=";for(const auto f:executing.authoredView)message<<f<<',';
+                    message<<" authored_projection=";for(const auto f:executing.authoredProjection)message<<f<<',';
+                }
+                log(message.str());
+            }
         }
         if(found!=nodes.end()){++found->calls;found->source=executing.eye.sourceSequence;found->eye=executing.eye.eye;}
     }catch(...){}
@@ -110,14 +164,18 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             // 135 or 150. Preserve each camera's native clip coordinates and
             // flatten every menu layer onto the same world plane. Testing the
             // HUD transform here left the main map head-locked in both eyes.
-            if(executing.menuOpen&&layoutCamera){
+            const bool titleWorldUi=executing.frontEnd&&camera==executing.camera;
+            if(((executing.menuOpen||executing.frontEnd)&&layoutCamera)||titleWorldUi){
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
-                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,
-                    executing.menuPanel,1.25f,1.25f*9.f/16.f);
+                const auto savedView=field<std::array<float,16>>(state,0x200);
+                const auto mapped=uiPanelProjection(titleWorldUi?executing.authoredProjection:saved,executing.view,executing.eye.view.fov,
+                    executing.menuPanel,executing.frontEnd?1.6f:1.25f,(executing.frontEnd?1.6f:1.25f)*9.f/16.f);
                 if(!mapped){++suppressedDraws;return 0;}
                 auto* output=static_cast<unsigned char*>(state)+0x1c0;
+                if(titleWorldUi)std::memcpy(static_cast<unsigned char*>(state)+0x200,executing.authoredView.data(),sizeof(executing.authoredView));
                 std::memcpy(output,mapped->data(),sizeof(*mapped));
                 const auto result=originalNode(state,item);
+                if(titleWorldUi)std::memcpy(static_cast<unsigned char*>(state)+0x200,savedView.data(),sizeof(savedView));
                 std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
                 if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
                 return result;
@@ -181,10 +239,16 @@ void installUiRenderer(uintptr_t moduleBase){
     constexpr unsigned char queueEntry[]{0x40,0x57,0x48,0x83,0xec,0x30};
     constexpr unsigned char executeEntry[]{0x48,0x8b,0xc4,0x57,0x48,0x81,0xec,0x80,0x06,0,0};
     constexpr unsigned char nodeEntry[]{0x48,0x89,0x5c,0x24,0x10,0x57,0x48,0x83,0xec,0x20};
-    const std::array<Hook,3> hooks{{
+    constexpr unsigned char titleShowEntry[]{0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0x41,0x40};
+    constexpr unsigned char titleUpdateEntry[]{0x40,0x56,0x48,0x83,0xec,0x40,0x48,0x8b,0xf1};
+    constexpr unsigned char startShowEntry[]{0x40,0x57,0x48,0x83,0xec,0x40,0x48,0x8b,0xf9};
+    const std::array<Hook,6> hooks{{
         {0x2d3380,reinterpret_cast<void*>(&queue),reinterpret_cast<void**>(&originalQueue),queueEntry,sizeof(queueEntry)},
         {0x2e7770,reinterpret_cast<void*>(&execute),reinterpret_cast<void**>(&originalExecute),executeEntry,sizeof(executeEntry)},
-        {0x2e6be0,reinterpret_cast<void*>(&node),reinterpret_cast<void**>(&originalNode),nodeEntry,sizeof(nodeEntry)}}};
+        {0x2e6be0,reinterpret_cast<void*>(&node),reinterpret_cast<void**>(&originalNode),nodeEntry,sizeof(nodeEntry)},
+        {0x12d73e0,reinterpret_cast<void*>(&titleShow),reinterpret_cast<void**>(&originalTitleShow),titleShowEntry,sizeof(titleShowEntry)},
+        {0x12d86a0,reinterpret_cast<void*>(&titleUpdate),reinterpret_cast<void**>(&originalTitleUpdate),titleUpdateEntry,sizeof(titleUpdateEntry)},
+        {0x12d6d70,reinterpret_cast<void*>(&startShow),reinterpret_cast<void**>(&originalStartShow),startShowEntry,sizeof(startShowEntry)}}};
     for(const auto& hook:hooks){std::array<unsigned char,16> bytes{};
         if(!read(moduleBase+hook.rva,bytes.data(),hook.size)||std::memcmp(bytes.data(),hook.signature,hook.size))throw std::runtime_error("Native UI renderer signature mismatch");
     }
@@ -212,6 +276,26 @@ void installUiRenderer(uintptr_t moduleBase){
         throw std::runtime_error("Cannot enable native UI hooks");
     }
     enabled.store(true);log("Native UI worker lineage installed; experimental left-forearm weapon HUD="+std::to_string(spatialEnabled));
+}
+bool nativeTitleMenuOpen() noexcept {
+    if(!enabled.load())return false;
+    const auto object=titleMenu.load();uintptr_t type{};
+    // The reset callback and state zero also occur during entry. Only a
+    // current native update establishes that this menu owns the front end.
+    const auto updated=titleUpdatedAt.load(),now=steadyMilliseconds();
+    return updated&&now>=updated&&now-updated<=250
+        &&object&&read(object,&type,sizeof(type))&&type==base+0x23d7e58;
+}
+bool nativeLoadingTipsOpen() noexcept {
+    if(!enabled.load()||!menuReaderVerified)return false;
+    // IsEndLoadingTips obtains this UiSystem and its loading-tip terminal.
+    // The terminal's native open flag remains set while Resume Game is waiting.
+    uintptr_t system{},type{},terminal{};uint8_t open{};
+    return read(base+0x2bf1940,&system,sizeof(system))&&system
+        &&read(system,&type,sizeof(type))&&type==base+0x22447e8
+        &&read(system+0xe90,&terminal,sizeof(terminal))&&terminal
+        &&read(terminal,&type,sizeof(type))&&type==base+0x2273628
+        &&read(terminal+0x20,&open,sizeof(open))&&open==1;
 }
 std::optional<bool> nativeMenuOpen() noexcept {
     if(!enabled.load()||!menuReaderVerified)return {};
@@ -246,16 +330,18 @@ std::optional<bool> nativeMenuOpen() noexcept {
 }
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
 uint64_t nativeCommandsDrawTime() noexcept {return enabled.load()?commandsDrawTime.load():0;}
-void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const HeadCameraSample& rig){
+void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const HeadCameraSample& rig,
+    const std::array<float,16>& authoredView,const std::array<float,16>& authoredProjection){
     const std::array<Pose,2> eyes{nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),
                                 nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose)};
     // Keep status flat along the forearm, but unfold the larger native picker
     // above that wrist, facing the source head. Both eyes use this same pose.
     const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
-    const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,{0,.09f,-.03f})};
+    const Vec3 lift{0,.09f,-.03f};
+    const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,lift)};
     producing={eye,camera,view,rig.wristPanel,picker,rig.wristPanelTracked,
                rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),rig.controllers.equipmentCategory==4,rig.controllers.commandControls,
-               rig.menuOpen,rig.menuPanel};
+               rig.menuOpen,rig.menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection};
 }
 void clearUiRenderSource() noexcept {producing={};}
 bool applyUiEyeProjection(float* output) noexcept {
@@ -266,6 +352,15 @@ bool applyUiEyeProjection(float* output) noexcept {
     // GrCamera at +0x308 and the view used for this UI draw at +0x200.
     const auto* state=reinterpret_cast<const unsigned char*>(output)-0x1c0;
     if(field<uintptr_t>(state,0x308)!=executing.camera){++cameraMismatch;return false;}
+    if(executing.frontEnd){
+        // Title choices and their shading are authored in the scene camera's
+        // world space. Recover their native clip layout before placing that
+        // complete layout on the spatial panel. Using an eye camera here leaves the
+        // title backdrop crossing the cabin and its text outside the view.
+        std::memcpy(reinterpret_cast<unsigned char*>(output)-0x1c0+0x200,executing.authoredView.data(),sizeof(executing.authoredView));
+        std::memcpy(output,executing.authoredProjection.data(),sizeof(executing.authoredProjection));
+        return true;
+    }
     // The job belongs to this exact scene/eye and camera, but the shared native
     // GrCamera may already have been restored (or changed to the other eye)
     // before its worker runs. Publish the immutable view captured at enqueue.

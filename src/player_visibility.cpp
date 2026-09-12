@@ -1,19 +1,60 @@
 #include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/log.hpp"
+#include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/input_bridge.hpp"
 #include <windows.h>
+#include <MinHook.h>
 #include <array>
 #include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <sstream>
 
 namespace {
 uintptr_t base{};
 using GroupFn=void(*)(void*,uint32_t);
 GroupFn hideVisibleGroup{},showVisibleGroup{};
+using FadeUpdate=void(*)(void*);
+FadeUpdate originalFade{};
+std::atomic_uintptr_t fadeOwner{};
+std::atomic_uint64_t handFade{};
 constexpr uint32_t headName=0xa9e88501,bodyName=0x1a166b34,armName=0x4e74fd8c;
 template<class T> bool read(uintptr_t address,T& value){
     SIZE_T copied{};
     return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&value,sizeof(value),&copied)&&copied==sizeof(value);
 }
 template<class T> T get(uintptr_t address){T value{};read(address,value);return value;}
+void fadeUpdate(void* object){
+    originalFade(object);
+    const auto packed=handFade.load();const auto now=mgs5vr::steadyMilliseconds();
+    const auto when=packed>>8;const auto opacity=static_cast<uint8_t>(packed);
+    if(opacity==255||now<when||now-when>150||!mgs5vr::headCamera().active())return;
+    const auto owner=fadeOwner.load();
+    if(get<uintptr_t>(owner)!=base+0x23b8218)return;
+    const auto character=get<uintptr_t>(owner+0x370);
+    if(get<uintptr_t>(character)!=base+0x2295210)return;
+    const auto component=get<uintptr_t>(character+0x10),parts=get<uintptr_t>(component+0x10);
+    const auto model=get<uintptr_t>(parts+0x68);
+    if(get<uintptr_t>(model)!=base+0x20f4d90)return;
+    const auto system=reinterpret_cast<uintptr_t>(object),pool=get<uintptr_t>(system+0x240);
+    if(get<uintptr_t>(pool)!=base+0x23adef0||get<uintptr_t>(pool+0x38)!=character)return;
+    const auto records=get<uintptr_t>(pool+8);const auto count=get<uint32_t>(pool+0x10);
+    // Native camera obstruction fade writes the visual record's byte +0x20
+    // (0..255) after its distance/occlusion calculation at RVA 0xffe3e0.
+    // Only this player's owned arm model may receive our near-eye limit.
+    // The visual pool owns a separate record: +0 is the model, +0x20 its
+    // opacity. The character's body-parts record is not a visual record.
+    if(!records||!count||count>32)return;
+    for(uint32_t i=0;i<count;++i){
+        const auto record=records+i*0x80;
+        if(get<uintptr_t>(record)!=model)continue;
+        const auto faded=std::min(get<uint8_t>(record+0x20),opacity);
+        *reinterpret_cast<uint8_t*>(record+0x20)=faded;
+        static std::atomic_bool reported{};
+        if(!reported.exchange(true))mgs5vr::log("Native camera obstruction fade applied to first-person hands; binocular housing remains opaque");
+        break;
+    }
+}
 struct GroupChange {uint32_t name{};uint8_t previousFlags{};};
 struct Binding {
     uintptr_t owner{},character{},parts{},record{},renderer{},model{};
@@ -131,9 +172,32 @@ void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
     if(read(base+0x1ccc30,hideBytes)&&hideBytes==hideSignature&&read(base+0x1cee30,showBytes)&&showBytes==showSignature){
         hideVisibleGroup=reinterpret_cast<GroupFn>(base+0x1ccc30);showVisibleGroup=reinterpret_cast<GroupFn>(base+0x1cee30);
     }
+    constexpr std::array<unsigned char,10> fadeSignature{0x48,0x89,0x5c,0x24,0x10,0x48,0x89,0x6c,0x24,0x18};
+    std::array<unsigned char,10> fadeBytes{};
+    auto* target=reinterpret_cast<void*>(base+0xffe3e0);
+    if(read(base+0xffe3e0,fadeBytes)&&fadeBytes==fadeSignature
+       &&MH_CreateHook(target,reinterpret_cast<void*>(&fadeUpdate),reinterpret_cast<void**>(&originalFade))==MH_OK){
+        if(MH_EnableHook(target)==MH_OK)log("Native camera obstruction fade connected for near-eye hands");
+        else MH_RemoveHook(target);
+    }
+}
+void publishHandFade(const HeadCameraSample& frame) noexcept {
+    float opacity=1;
+    if(frame.applied&&frame.rigSequence&&std::isfinite(frame.handFaceDistance)){
+        const float proximity=std::clamp((.25f-frame.handFaceDistance)/.18f,0.f,1.f);
+        opacity=1-.95f*proximity*proximity*(3-2*proximity);
+    }
+    if(frame.applied&&!frame.menuOpen&&frame.controllers.optic.held&&frame.controllers.optic.pose.tracked){
+        const auto delta=compose(inverse(frame.headPose),frame.controllers.optic.pose.rightEyepiece).position;
+        const float distance=std::sqrt(dot(delta,delta));
+        const float proximity=std::clamp((.17f-distance)/.10f,0.f,1.f);
+        opacity=std::min(opacity,1-.78f*proximity*proximity*(3-2*proximity));
+    }
+    handFade.store((frame.sampleTime<<8)|static_cast<uint8_t>(std::lround(opacity*255)));
 }
 void updatePlayerVisibility(uintptr_t owner,bool firstPerson) noexcept {
     if(!base)return;
+    fadeOwner.store(firstPerson?owner:0);
     for(auto& b:hidden)if(b.model&&(!firstPerson||b.owner!=owner||!owned(b)))restore(b);
     if(!firstPerson||get<uintptr_t>(owner)!=base+0x23b8218)return;
     const auto character=get<uintptr_t>(owner+0x370);

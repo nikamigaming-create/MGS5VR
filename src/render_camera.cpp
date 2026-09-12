@@ -2,8 +2,12 @@
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
+#include "mgs5vr/optic_renderer.hpp"
+#include "mgs5vr/optic_markers.hpp"
+#include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/scene_capture.hpp"
 #include "mgs5vr/ui_renderer.hpp"
+#include "mgs5vr/menu_surface.hpp"
 #include "mgs5vr/controller_rig.hpp"
 #include <windows.h>
 #include <intrin.h>
@@ -80,6 +84,7 @@ thread_local uintptr_t eyeViewport{};
 thread_local uintptr_t visibilityViewport{};
 std::atomic_uint64_t visibilityUpdates{};
 thread_local uintptr_t stereoTarget{};
+thread_local uint32_t sceneRenderPass{};
 thread_local mgs5vr::EyeFrame drawingEye{};
 thread_local bool clipProjection{},gpuProjection{},insideStereo{};
 std::atomic_uint64_t sceneCalls{},scenePairs{},sceneRejected{},sceneCopies{};
@@ -219,7 +224,7 @@ struct NativeRestore {
 };
 __declspec(noinline) uintptr_t registerTarget(void* graphics,void* target){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
-    const bool second=enabled.load()&&insideStereo&&drawingEye.eye==1&&stereoTarget
+    const bool second=enabled.load()&&insideStereo&&sceneRenderPass>0&&stereoTarget
         &&reinterpret_cast<uintptr_t>(target)==stereoTarget&&caller==base+0x1bef27;
     const auto before=second?field<uint32_t>(graphics,0x110):0;
     // The active D3D11 implementation performs required GPU setup before
@@ -263,18 +268,38 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     if(!context){++sceneRejected;return originalScene(render,graphics,task,worker);}
     sceneContextType.store(context->GetType());
     NativeRestore saved(source.grCamera,source.viewport);insideStereo=true;stereoTarget=field<uintptr_t>(render,0x98);
+    alignas(16) std::array<float,16> authoredView{},authoredProjection{};
+    if(source.pair.sample.controllers.frontEnd){
+        // Title layout retains the native publication camera; the stereo
+        // replay alone supplies the tracked cabin cameras.
+        authoredView=source.pair.view;
+        std::memcpy(authoredProjection.data(),saved.viewportMatrices.data(),sizeof(authoredProjection));
+    }
+    mgs5vr::publishOpticMarkerFrame(source.pair.sample);
+    mgs5vr::publishHandFade(source.pair.sample);
     const auto cameraCount=pairCount.load();uintptr_t result{};bool complete=true;
     mgs5vr::beginSceneTiming(context,id);
-    for(uint32_t eye=0;eye<2;++eye){
+    const bool titleSurface=source.pair.sample.controllers.frontEnd;
+    // The telescope has one real ocular. Draw its own narrow-angle native
+    // scene first, then the two ordinary HMD eyes. All three draws use the
+    // same simulation/hand publication and only one native present is queued.
+    const auto& optic=source.pair.sample.controllers.optic;
+    const auto opticView=optic.held?mgs5vr::binocularSceneView(optic.pose,
+        source.pair.sample.controllers.magnification):std::nullopt;
+    mgs5vr::ComPtr<ID3D11Texture2D> opticScene;
+    const uint32_t extraPass=opticView?1u:0u;
+    for(uint32_t pass=0;pass<2+extraPass;++pass){
+        sceneRenderPass=pass;
+        const bool lensPass=extraPass&&pass==0;
+        const uint32_t eye=lensPass?2u:pass-extraPass;
         saved.restore();eyeViewport=source.viewport;clipProjection=gpuProjection=false;
-        drawingEye={source.pair.sample.views[eye],id,source.pair.sample.trackingSequence,status.activation,source.pair.sample.sampleTime,eye,false,false};
-        // Centered native rendering avoids the observed lighting coverage gap.
-        // Preserve the requested optical centers separately, then submit only
-        // their exact pixel region with its matching angular bounds.
+        drawingEye={lensPass?*opticView:source.pair.sample.views[eye],id,source.pair.sample.trackingSequence,status.activation,source.pair.sample.sampleTime,eye,false,false};
+        // FOX sky/lighting expects a centered render projection. Keep the
+        // runtime's asymmetric optics separately and crop the enclosing image
+        // at submission. The handheld camera alone owns magnification.
         drawingEye.displayFov=drawingEye.view.fov;
-        drawingEye.magnification=source.pair.sample.controllers.magnification;
-        const auto optical=mgs5vr::opticalFov(drawingEye.displayFov,drawingEye.magnification);
-        const auto renderFov=optical?mgs5vr::enclosingEyeFov(*optical):std::nullopt;
+        drawingEye.magnification=1.f;
+        const auto renderFov=mgs5vr::enclosingEyeFov(drawingEye.displayFov);
         if(!renderFov){complete=false;sceneFailure=4;break;}
         drawingEye.view.fov=*renderFov;
         const auto native=mgs5vr::nativeEyePose(source.pair.sample.nativePose,source.pair.sample.headPose,drawingEye.view.pose);
@@ -294,14 +319,45 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         std::memcpy(reinterpret_cast<void*>(source.viewport+0x3c0),eyeView.data(),sizeof(eyeView));
         std::memcpy(reinterpret_cast<void*>(source.viewport+0x400),reinterpret_cast<void*>(source.viewport+0x280),sizeof(eyeView));
         drawingEye.projected=true;
-        mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,source.pair.sample);
+        mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,source.pair.sample,authoredView,authoredProjection);
         result=originalScene(render,graphics,task,worker);
         mgs5vr::clearUiRenderSource();
         // Native passes may finish and replace the current deferred context.
         const auto afterOwner=field<uintptr_t>(graphics,0x150);
         auto* afterContext=afterOwner?field<ID3D11DeviceContext*>(reinterpret_cast<void*>(afterOwner),8):nullptr;
+        if(lensPass){
+            // This texture is separate from the stereo mailbox. Capturing an
+            // unfinished eye into the mailbox can publish a partial pair and
+            // later overwrite pixels that the XR compositor is still reading.
+            std::array<float,16> opticProjection{};
+            std::memcpy(opticProjection.data(),reinterpret_cast<void*>(source.viewport+0x280),sizeof(opticProjection));
+            if(!mgs5vr::capturePhysicalOpticScene(afterContext,eyeView,opticProjection,native.position,opticScene.GetAddressOf()))
+                mgs5vr::log("Physical optic scene copy unavailable; retaining normal head views");
+            continue;
+        }
+        if(afterContext&&optic.held&&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular){
+            const auto body=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,
+                source.pair.sample.headPose,optic.pose.renderBody);
+            alignas(16) auto bodyValues=values(body);
+            alignas(16) std::array<float,16> bodyWorld{};
+            std::array<float,16> projection{};
+            originalWorld(bodyValues.data(),bodyWorld.data());
+            std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+0x280),sizeof(projection));
+            mgs5vr::drawPhysicalBinoculars(afterContext,bodyWorld,eyeView,projection,
+                source.pair.sample.controllers.magnification,opticScene.Get(),eye==0);
+        }
+        if(titleSurface)mgs5vr::drawNativeMenuSurface(afterContext,eyeView,drawingEye.view.fov,source.pair.sample.menuPanel);
         try{if(mgs5vr::captureSceneEye(afterContext,drawingEye))++sceneCopies;else {complete=false;sceneFailure=5;}}
         catch(const std::exception& ex){complete=false;sceneFailure=7;mgs5vr::log(std::string("Native eye capture: ")+ex.what());}
+    }
+    if(titleSurface){
+        // Late native Title layers finish after this scene callback. Leave a
+        // clean native-camera pass last, then copy its completed menu at
+        // Present for the next stereo pair. Never feed an eye containing the
+        // spatial panel back into the panel's image.
+        saved.restore();sceneRenderPass=2+extraPass;eyeViewport=0;drawingEye={};
+        mgs5vr::clearUiRenderSource();
+        result=originalScene(render,graphics,task,worker);
     }
     if(pairCount.load()!=cameraCount){complete=false;sceneFailure=6;}
     const auto timingOwner=field<uintptr_t>(graphics,0x150);
@@ -328,14 +384,18 @@ __declspec(noinline) float* world(void* input,float* output){
         current.sample={pose(native.data()),{},0,0,false};
         if(nativePairVerified.load())current.sample=mgs5vr::headCamera().resolveCurrent(current.camera,current.sample.nativePose);
         alignas(16) auto adjusted=values(current.sample.nativePose);
-        auto* result=originalWorld(current.sample.applied?static_cast<void*>(adjusted.data()):input,output);
+        // Title's animated UI builds geometry from the native publication.
+        // Keep that source intact, and move only the two render cameras into
+        // the cabin. Moving the source first deforms its menu before UI replay.
+        const bool replace=current.sample.applied&&!current.sample.controllers.frontEnd;
+        auto* result=originalWorld(replace?static_cast<void*>(adjusted.data()):input,output);
         std::memcpy(current.world.data(),output,sizeof(current.world));
         current.applied=current.sample.applied;current.haveWorld=true;
         return result;
     }
     // The inverse builder invokes this function synchronously in the same native
     // publication. Reuse the exact pose selected for the world matrix.
-    if(caller==base+0x438c66&&current.haveWorld&&current.camera+0xf0==source&&current.applied){
+    if(caller==base+0x438c66&&current.haveWorld&&current.camera+0xf0==source&&current.applied&&!current.sample.controllers.frontEnd){
         alignas(16) auto adjusted=values(current.sample.nativePose);
         return originalWorld(adjusted.data(),output);
     }
@@ -428,6 +488,7 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
     }
     enabled.store(true);
     try{installUiRenderer(base);}catch(const std::exception& ex){log(std::string("Native UI integration unavailable: ")+ex.what());}
+    try{installOpticMarkers(base);}catch(const std::exception& ex){log(std::string("Native optic markers unavailable: ")+ex.what());}
     log("Native camera matrix integration installed; head control remains off until explicitly toggled");
     log("Native listener integration installed; guarded by the active source camera publication");
 }
@@ -496,5 +557,5 @@ EyeFrame observeRenderPresent(void*) noexcept {
     try{std::unique_lock lock(latestMutex,std::try_to_lock);if(lock.owns_lock())presentTrace=next;}catch(...){}
     return {}; // Scene-capture command-list metadata owns the image/pose join.
 }
-void stopRenderCamera() noexcept {enabled.store(false);stopUiRenderer();headCamera().cancel();try{reportRenderCamera();evidence.close();}catch(...){}}
+void stopRenderCamera() noexcept {enabled.store(false);stopOpticMarkers();stopUiRenderer();headCamera().cancel();try{reportRenderCamera();evidence.close();}catch(...){}}
 }

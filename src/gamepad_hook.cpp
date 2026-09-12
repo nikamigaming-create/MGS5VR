@@ -5,6 +5,7 @@
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/mailbox.hpp"
 #include "mgs5vr/motion_melee.hpp"
+#include "mgs5vr/animal_interaction.hpp"
 #include <cstring>
 #include <stdexcept>
 #include <mutex>
@@ -34,7 +35,7 @@ DWORD WINAPI getState(DWORD index,XINPUT_STATE* state){
         bool freshActive{};
         const auto sample=gamepadMailbox().read(steadyMilliseconds(),&freshActive);
         if(sample){
-            if(freshActive)consumeMeleeSweep();
+            if(freshActive){consumeAnimalTouch();consumeMeleeSweep();}
             // Give an attached physical pad back when XR is inactive. If none is
             // attached, synthesize neutral success to release the previous XR state.
             if(!freshActive&&original(index,state)==ERROR_SUCCESS)return ERROR_SUCCESS;

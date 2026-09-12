@@ -4,6 +4,15 @@
 #include <cmath>
 #include <cstdlib>
 namespace mgs5vr {
+float SnapTurn::update(float x,float y,bool available){
+    if(!available||!std::isfinite(x)||!std::isfinite(y)){armed_=false;return 0;}
+    if(std::abs(x)<.35f&&std::abs(y)<.35f){armed_=true;return 0;}
+    if(std::abs(y)>=.7f&&std::abs(y)>=std::abs(x)){armed_=false;return 0;}
+    if(!armed_||std::abs(x)<.7f||std::abs(x)<=std::abs(y))return 0;
+    armed_=false;
+    // FOX camera forward/right are +Z/-X: right is a negative world-Y turn.
+    return x>0?-.523598776f:.523598776f;
+}
 WheelSample WheelSteering::update(Pose tracked,Pose contact,bool available,bool squeeze,uint64_t time,uint64_t epoch,Vec3 forward){
     if(!available||!valid(tracked)||!valid(contact)||!epoch){reset();held_=squeeze;return {};}
     if(time<time_||epoch!=epoch_){reset();held_=squeeze;}
@@ -33,28 +42,37 @@ WheelMailbox& wheelMailbox(){static WheelMailbox box;return box;}
 void RumbleMailbox::publish(RumbleSample sample){std::lock_guard lock(mutex_);sample_=sample;}
 RumbleSample RumbleMailbox::read(uint64_t time) const{std::lock_guard lock(mutex_);return time>=sample_.time&&time-sample_.time<=250?sample_:RumbleSample{};}
 RumbleMailbox& rumbleMailbox(){static RumbleMailbox box;return box;}
-OpticsInput RigOptics::update(GamepadSample raw,bool available){
-    if(!available){reset();return {raw};}
-    constexpr uint16_t y=0x8000,click=0x0080,b=0x2000;
-    const bool chord=raw.leftTrigger>127&&(raw.buttons&y),pressed=raw.buttons&click,back=raw.buttons&b;
-    if(active_&&(raw.buttons&0x0030)){
-        active_=false;releaseRequired_=true;
-        return {GamepadSample{static_cast<uint16_t>(raw.buttons&0x0030)},1,true};
+OpticsInput RigOptics::update(GamepadSample raw,bool available,bool held,bool /*atEye*/){
+    constexpr uint16_t click=0x0080,x=0x4000,menus=0x0030;
+    if(!available){
+        const bool wasActive=active_||releaseRequired_;
+        reset();
+        releaseRequired_=wasActive;
     }
-    if(chord&&!priorChord_){active_=!active_;power_=0;if(!active_)releaseRequired_=true;}
-    else if(active_&&back&&!priorBack_){active_=false;releaseRequired_=true;}
-    else if(active_&&pressed&&!priorClick_)power_=(power_+1)%2;
-    priorChord_=chord;priorClick_=pressed;priorBack_=back;
-    if(active_){
-        // The optical mode owns fire, equipment and stance inputs. Walking and
-        // horizontal turning remain available, and head tracking stays live.
-        raw.buttons=0;raw.leftTrigger=raw.rightTrigger=0;raw.rightY=0;
-        return {raw,power_?4.f:2.f,true};
+    held=held&&available;
+    const bool pressed=raw.buttons&click;
+    const bool markPressed=held&&(raw.rightTrigger>127||(raw.buttons&x));
+    const bool freshMark=markPressed&&!priorMark_;
+    priorMark_=markPressed;
+    if(held){
+        if(std::abs(int(raw.rightX))<6000&&std::abs(int(raw.rightY))<6000)clearArmed_=true;
+        const bool clear=clearArmed_&&raw.rightY< -22000&&-int(raw.rightY)>std::abs(int(raw.rightX));
+        if(clear)clearArmed_=false;
+        if(pressed&&!priorClick_)power_=(power_+1)%2;
+        active_=true;releaseRequired_=false;priorClick_=pressed;
+        // Retail RB enters an authored camera/animation mode and moves the
+        // player's eye anchor. Physical eye relief must not enter that mode;
+        // native scanner/intel integration needs its own hand-ray adapter.
+        raw.buttons=static_cast<uint16_t>(raw.buttons&menus);
+        raw.leftTrigger=raw.rightTrigger=0;raw.rightY=0;
+        return {raw,power_?4.f:2.f,true,false,freshMark,clear};
     }
+    if(active_)releaseRequired_=true;
+    active_=false;priorClick_=pressed;clearArmed_=false;
     if(releaseRequired_){
-        if(!raw.buttons&&raw.leftTrigger<=24&&raw.rightTrigger<=24
-            &&std::abs(int(raw.rightX))<6000&&std::abs(int(raw.rightY))<6000)releaseRequired_=false;
-        return {{},1,true};
+        const bool neutral=!(raw.buttons&~menus)&&raw.leftTrigger<=24&&raw.rightTrigger<=24;
+        releaseRequired_=!neutral;
+        if(!neutral)return {GamepadSample{static_cast<uint16_t>(raw.buttons&menus),0,0,raw.leftX,raw.leftY,raw.rightX,0},1,true,false};
     }
     return {raw};
 }
@@ -241,13 +259,17 @@ RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,T
     // while the weapon is lowered. Let the native action state choose it.
     return {equipment_.update(raw,modifier,false,time,pickerDrawTime),ready};
 }
-uint16_t MenuButton::update(bool pressed,bool active,uint64_t time){
+uint16_t MenuButton::update(bool pressed,bool active,uint64_t time,bool recenterModifier){
+    recentered_=false;
     if(!active||time<lastTime_){
         held_=false;longSent_=false;pulse_=0;releaseRequired_=pressed;lastTime_=time;return 0;
     }
     lastTime_=time;
     if(releaseRequired_){if(!pressed)releaseRequired_=false;return 0;}
     if(pressed&&!held_){held_=true;longSent_=false;pressedAt_=time;}
+    if(pressed&&held_&&!longSent_&&recenterModifier){
+        recentered_=true;longSent_=true;pulse_=0;
+    }
     if(pressed&&held_&&!longSent_&&time-pressedAt_>=550){
         pulse_=0x0020;pulseUntil_=time+100;longSent_=true;
     }

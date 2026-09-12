@@ -9,7 +9,7 @@ The latest physical Quest 3 test retained native **2560×1440**, Post Processing
 roughly 86 fresh FPS as a useful fidelity compromise; this is not a locked-90
 claim. Keep DOF and motion blur disabled, SSAO and volumetric clouds off, effects,
 lighting and shadows High, and textures/filtering/model detail Extra High.
-Interaction checks use a separate 1280×720 SIM run and restore the physical
+Current binocular recordings use a separate 1920×1080 SIM run and restore the physical
 profile afterward. Its performance numbers must not be substituted for 1440p
 headset results. No upscaler, generated frames or third-party clarity plugin is
 included.

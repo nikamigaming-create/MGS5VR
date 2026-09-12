@@ -5,7 +5,8 @@ param(
     [string]$GraphicsConfig,
     [int]$RenderWidth=0,
     [int]$RenderHeight=0,
-    [switch]$Headless
+    [switch]$Headless,
+    [switch]$RestartSteam
 )
 $ErrorActionPreference = 'Stop'
 $mgsRoot = Split-Path -Parent $PSScriptRoot
@@ -53,22 +54,5 @@ if ($mgsGraphics.graphics.videoout_setting.window_mode -ne 'Windowed' -or
     [IO.File]::WriteAllText($mgsGraphicsPath,($mgsGraphics | ConvertTo-Json -Depth 10),[Text.UTF8Encoding]::new($false))
 }
 Write-Output ('Native render size: {0}x{1}' -f $mgsGraphics.graphics.videoout_setting.width,$mgsGraphics.graphics.videoout_setting.height)
-$mgsVariables = @('XR_RUNTIME_JSON','XR_API_LAYER_PATH','XR_ENABLE_API_LAYERS','OPENXR_SIMULATOR_HEADLESS')
-$mgsPrevious = @{}
-foreach ($mgsVariable in $mgsVariables) { $mgsPrevious[$mgsVariable] = [Environment]::GetEnvironmentVariable($mgsVariable,'Process') }
-Push-Location $mgsTarget
-try {
-    $env:XR_RUNTIME_JSON = $mgsManifest
-    if ($OperatorDir) {
-        $env:XR_API_LAYER_PATH = (Resolve-Path -LiteralPath $OperatorDir).Path
-        $env:XR_ENABLE_API_LAYERS = 'XR_APILAYER_METAX_operator'
-    } else {
-        [Environment]::SetEnvironmentVariable('XR_API_LAYER_PATH',$null,'Process')
-        [Environment]::SetEnvironmentVariable('XR_ENABLE_API_LAYERS',$null,'Process')
-    }
-    [Environment]::SetEnvironmentVariable('OPENXR_SIMULATOR_HEADLESS',$(if ($Headless) {'1'} else {$null}),'Process')
-    & $mgsExe
-} finally {
-    Pop-Location
-    foreach ($mgsVariable in $mgsVariables) { [Environment]::SetEnvironmentVariable($mgsVariable,$mgsPrevious[$mgsVariable],'Process') }
-}
+& (Join-Path $PSScriptRoot 'launch-steam-simulator.ps1') -RuntimeManifest $mgsManifest `
+    -OperatorDir $OperatorDir -Headless:$Headless -RestartSteam:$RestartSteam

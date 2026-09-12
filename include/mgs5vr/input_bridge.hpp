@@ -11,6 +11,14 @@ struct GamepadSample {
     int16_t leftX{},leftY{},rightX{},rightY{};
     bool operator==(const GamepadSample&) const = default;
 };
+// One horizontal flick turns once. Menus/focus changes require a neutral stick.
+class SnapTurn {
+public:
+    float update(float x,float y,bool available);
+    void reset(){armed_=false;}
+private:
+    bool armed_{};
+};
 // Hold the modifier to open equipment at the wrist. The left stick remains
 // locomotion. The first right-stick direction chooses the corresponding native
 // D-pad category; after centering, the stick browses without rotating its axes.
@@ -65,15 +73,23 @@ private:
     RumbleSample sample_{};
 };
 RumbleMailbox& rumbleMailbox();
-struct OpticsInput { GamepadSample gamepad{};float magnification{1};bool exclusive{}; };
-// The reserved wrist+Y chord opens stereo magnification. R-click changes power;
-// B closes it. Controls are released before returning to ordinary gameplay.
+struct OpticsInput {
+    GamepadSample gamepad{};
+    float magnification{1};
+    bool exclusive{};
+    bool nativeActive{};
+    bool markRequested{};
+    bool clearRequested{};
+};
+// A selected, held optic owns its controls at every distance from the face.
+// Magnification belongs to its lens, never to the HMD eye projection.
 class RigOptics {
 public:
-    OpticsInput update(GamepadSample raw,bool available);
+    OpticsInput update(GamepadSample raw,bool available,bool held,bool atEye=false);
     void reset(){*this=RigOptics{};}
 private:
-    bool active_{},releaseRequired_{},priorChord_{},priorClick_{},priorBack_{};
+    bool active_{},releaseRequired_{},priorClick_{},priorMark_{};
+    bool clearArmed_{};
     unsigned power_{};
 };
 struct CommandsInput { GamepadSample gamepad{};bool active{},exclusive{}; };
@@ -123,11 +139,13 @@ private:
 // Start on release; holding for 550 ms emits Back once, without opening iDroid.
 class MenuButton {
 public:
-    uint16_t update(bool pressed, bool active, uint64_t milliseconds);
+    uint16_t update(bool pressed, bool active, uint64_t milliseconds,bool recenterModifier=false);
+    bool recentered() const {return recentered_;}
 private:
     uint64_t pressedAt_{}, pulseUntil_{}, lastTime_{};
     uint16_t pulse_{};
     bool held_{}, longSent_{}, releaseRequired_{};
+    bool recentered_{};
 };
 // A virtual gamepad exists after the first active XR sample. Lost focus/tracking
 // and stale samples return neutral success so the game sees every button release.

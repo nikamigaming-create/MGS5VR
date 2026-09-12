@@ -6,7 +6,9 @@ These bindings target the game's **Action Type** controller layout. The left-arm
 HUD shows the native weapon name, ammunition and status. Native context-action
 icons appear beside that display when the game offers an action; the horse/Y
 mount prompt has been checked through mount and dismount. There is no flat aiming
-reticle or destination-letter overlay in gameplay. Native 3D people cues remain.
+reticle or destination-letter overlay in gameplay. Binocular waypoints and
+acquired-person distances appear inside the lens; native 3D glow routing still
+needs a separate review.
 
 ## Weapons and hands
 
@@ -84,17 +86,31 @@ upward slot has a small NVG label rather than a large rectangular card.
 For a grenade, choose **Support** with a first flick right and finish selection.
 Hold **right grip** to ready it. Move and tilt the **right hand** to position and
 direct the trajectory; **right trigger** throws. Hand elevation controls the arc,
-while right-stick left/right still turns your body. Right-stick up/down is
+while right-stick left/right still snap-turns. Right-stick up/down is
 suppressed while a tracked grenade is readied. Throw strength remains the native
 equipment strength; this is point-and-trigger throwing, not a velocity gesture.
 The latest SIM observations and remaining stance limits are in the
 [interaction and visibility review](INTERACTION_VISIBILITY_REVIEW.md).
 
-**Stereo zoom (development candidate):** hold **left trigger + tap Y** for 2×.
-**Click the right stick** for 4×/2×; **B** closes it. The world remains stereo with
-live head tracking. Walking and horizontal turning remain available. This is a
-separate viewing mode, not an added scope on an iron-sight gun. Native binocular
-marking/intel and authored scope integration remain unfinished.
+**Handheld binoculars:** hold **left trigger + tap Y** to select the device,
+then hold **right grip** to cup its right side in the palm. Aim by moving the right hand.
+**Click the right stick** to switch 2×/4×. **Right trigger** marks the person under
+the optic's crosshair, or places a native waypoint on the visible surface when
+no person is targeted. A short rumble confirms marking. **B** stows it.
+**Flick right stick down** to remove the waypoint or acquired person under the
+crosshair; center the stick before clearing another. Empty space clears nothing.
+Bring the left hand to the opposite side and squeeze
+**left grip** to cup it for support; release the grip or pull away to let go.
+Zoom and marking need only the right hand. Walking and turning remain available.
+The device renders its own narrow-angle scene through its physical lens while
+the surrounding world retains normal stereo. Bringing the eyecup close opens
+the lens view smoothly. Waypoint letters and acquired-person distances are
+drawn inside this view. Automatic identification by dwelling on a person and
+intel analysis are not implemented; marking currently requires the trigger.
+Near the face, the native camera-obstruction fade makes the hands translucent;
+the housing stays opaque. This also applies to free hands when any wrist or
+finger approaches the eyes, and clears as the hands move away. The shoulders follow physical head yaw so turning
+does not leave the sleeve roots in the old game-camera direction.
 
 **Motion melee (development candidate):** swing either free hand, or bash with a
 readied firearm. No button arms a punch. Deliberate movement closes the free
@@ -102,8 +118,25 @@ fingers and submits contact at the visible palm or authored weapon tip using the
 native kick attack entry. Slow movement, tracking jumps, wrist selection, optics,
 reloads and seated movement cannot generate punches. One accepted target ends a
 stroke; pull back before another strike. Native eligibility and damage rules
-apply; not every object becomes destructible. Enemy reaction/damage testing is
-still required; a collision log alone does not prove damage.
+apply; not every object becomes destructible. Automatic swings ignore D-Dog,
+puppies, companion horses, companion Quiet and non-hostile wildlife, including
+small rodents. Explicit native attacks retain their game rules. Enemy reaction
+and damage still need testing.
+
+**Pet D-Dog:** stow the weapon, open your hand and gently stroke his head or
+muzzle. Resting an open palm there also works. D-Dog performs his native pet
+response while you keep control of your head and hands. Pull away before another
+pet. This interaction has been demonstrated with native game audio in SIM;
+other animal pet responses are still being implemented.
+
+**Hold a rat:** crouch with **A**, then offer an open palm close to the ground
+beside a live rat. Keep the palm facing up and bring it under the animal briefly;
+lift your hand to carry it. Lower the palm to the ground and pause to release,
+then withdraw. Grip and trigger should remain released. The interaction follows
+active native rat instances, including rats encountered outside the test scene.
+A brief tracking interruption preserves the last hand pose; sustained tracking
+loss returns the rat to the last safe ground position. Headset testing remains
+outstanding.
 
 Basic left-arm melee needs no special arm selected. Powered prosthetic abilities
 retain campaign unlocks and equipment selection. After selecting an available
@@ -115,8 +148,9 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 
 | Action | Control |
 | --- | --- |
-| Move, including during wrist selection | Left stick |
-| Turn / native camera look | Right stick; currently smooth native turning |
+| Move, including during wrist selection | Left stick; on foot, forward follows your view heading |
+| Turn | Flick the right stick left/right for a 30° snap; center before another turn |
+| Gameplay right-stick up/down | Reserved; does not pitch the camera. Menu navigation retains both axes |
 | Sprint | Left-stick click without left grip |
 | Crouch / change stance | Right A; hold A for prone; release weapon-ready grip first |
 | Quick dive | Left X without the equipment modifier |
@@ -129,6 +163,7 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Main menu / options | Hold left Menu on foot; choose Return to Title Menu or Options with the left stick and A |
 | Cutscene skip | Hold left Menu; choose Skip and press A when the native game offers it |
 | Recenter the large screen | Both grips + right-stick click |
+| Recenter in game, including while holding binoculars | Hold left grip and tap left Menu; keeps your current facing and brings the body under your head |
 
 In the development build, opening iDroid or Pause during tracked gameplay puts
 the native menu on a floating panel in the stereo world. Head movement keeps
@@ -141,9 +176,20 @@ zoom step and **Y** switches MAP/NAV. **B** closes iDroid; hold **Menu** again t
 unpause. Holding Menu *inside iDroid* opens its native Help, so close iDroid before
 opening Pause. Release held controls once after returning before moving or firing.
 
+Recenter uses only a horizontal tracking origin. Native camera pitch/roll is
+excluded from the gameplay tracking frame, so physical turning keeps gravity
+upright. On-foot movement uses the game's published camera basis directly;
+applying another stick rotation would turn movement twice after a snap.
+
 For the main menu, open Pause, select **RETURN TO TITLE MENU**, press **A**, then
 answer the native confirmation. **OPTIONS** and **CONTROLS & MANUAL** are also in
-Pause. The title screen uses the large in-headset screen and native controls.
+Pause. At the initial title prompt, press **Enter** or tap **left Menu** to
+enter tracked stereo in the helicopter. The title choices unfold above the
+left wrist. Use the **left stick** to move the highlight and **A** to select.
+**Left grip + left-stick click** switches between immersive VR and the large
+quad, including at the title menu. The manual choice persists through the
+title-to-game transition. Loading can temporarily use the quad while the next
+player camera is created; an immersive selection resumes with that character.
 Cutscene Skip is available only when the native game offers it. Loading,
 cutscenes and player-replacement transitions still need broader VR integration;
 the floating gameplay menus do not establish support for every transition.

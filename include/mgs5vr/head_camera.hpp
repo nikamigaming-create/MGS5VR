@@ -1,5 +1,6 @@
 #pragma once
 #include "core.hpp"
+#include "optic_rig.hpp"
 #include "stereo.hpp"
 #include <mutex>
 
@@ -24,6 +25,11 @@ struct ControllerFrame {
     float magnification{1};
     std::array<float,2> strikeCurl{};
     bool commandControls{};
+    OpticSample optic{};
+    uint64_t opticMarkSequence{};
+    uint64_t opticClearSequence{};
+    float snapYaw{}; // Absolute world-Y turn carried by this tracking publication.
+    bool frontEnd{}; // Native Title menu, with menu input and a tracked wrist surface.
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};
@@ -42,6 +48,7 @@ struct HeadCameraSample {
     bool wristPanelTracked{};
     bool menuOpen{};
     Pose menuPanel{};
+    float handFaceDistance{1}; // Nearest rendered wrist/finger bone to the source eye midpoint, in meters.
 };
 // Native listener adapters consume the center-head pose from the camera's
 // existing publication, never a newer tracking sample or an individual eye.
@@ -62,6 +69,7 @@ public:
     void trackStereo(Pose head,const std::array<EyeView,2>& views,bool validTracking,uint64_t milliseconds,
                      ControllerFrame controllers={});
     void toggle();
+    void recenter();
     void setNativeMenuOpen(bool open);
     void cancel(HeadCameraStop reason=HeadCameraStop::manual);
     HeadCameraSample resolve(uintptr_t camera,Pose nativePose,uint64_t milliseconds);
@@ -80,10 +88,13 @@ private:
     void suspendLocked(HeadCameraStop reason);
     void awaitPlayerLocked();
     mutable std::mutex mutex_;
-    Pose head_{}, origin_{};
+    Pose head_{}, origin_{},frontEndOrigin_{},frontEndPanel_{};
     uintptr_t camera_{},playerOwner_{};
     uint64_t time_{},sequence_{},activation_{};
+    uint64_t trackingEpoch_{};
     float units_{1};
+    float snapYaw_{};
+    Vec3 snapTranslation_{};
     bool enabled_{},tracking_{},pending_{},active_{};
     bool stereoTracking_{};
     bool suspended_{};
@@ -92,6 +103,7 @@ private:
     HeadCameraSample lastView_{};
     Pose menuNative_{},menuHead_{},menuPanel_{};
     bool menuAnchored_{};
+    bool recenterPending_{};
     std::array<EyeView,2> views_{};
     ControllerFrame controllers_{};
     struct RigFrame { uintptr_t camera{},owner{}; Pose sourceCamera{}; HeadCameraSample sample{}; } rig_;

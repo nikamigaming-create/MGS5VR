@@ -12,6 +12,7 @@
 #include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/process_exit.hpp"
+#include "mgs5vr/native_actions.hpp"
 #include <array>
 #include <atomic>
 #include <filesystem>
@@ -31,6 +32,7 @@ void cleanupBeforeExit() noexcept {
     using namespace mgs5vr;
     log("MGS5VR process exit requested; stopping OpenXR worker");
     stopRequested.store(true);
+    stopNativeActions();
     stopNativePerformance();
     if(wakeWorker)SetEvent(wakeWorker);
     try{gamepadMailbox().publish({},false,steadyMilliseconds());}catch(...){}
@@ -114,6 +116,9 @@ DWORD WINAPI initialize(void*){
             }catch(const std::exception& e){log(std::string("Camera observer unavailable: ")+e.what());}
         }
         try{installGamepadHook();}catch(const std::exception& e){log(std::string("XR gamepad unavailable: ")+e.what());}
+        if(GetPrivateProfileIntW(L"diagnostics",L"native_actions",0,ini.c_str())==1)
+            try{installNativeActions(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),folder);}
+            catch(const std::exception& e){log(std::string("Native action queue unavailable: ")+e.what());}
         TheatreConfig config;
         config.widthMeters=static_cast<float>(GetPrivateProfileIntW(L"theatre",L"width_cm",800,ini.c_str()))/100;
         config.distanceMeters=static_cast<float>(GetPrivateProfileIntW(L"theatre",L"distance_cm",600,ini.c_str()))/100;

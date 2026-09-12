@@ -4,6 +4,8 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/motion_melee.hpp"
+#include "mgs5vr/animal_interaction.hpp"
+#include "mgs5vr/small_animal.hpp"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -155,6 +157,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::array<Pose,2> grips{};
     for(size_t i=0;i<2;++i)if(frame.controllers.hands[i].gripTracked)
         grips[i]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.hands[i].grip));
+    if(frame.controllers.optic.held&&frame.controllers.optic.pose.tracked){
+        const auto safe=binocularFaceSafeGrip(frame.headPose,frame.controllers.hands[1].grip,frame.controllers.optic.pose);
+        grips[1]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,safe));
+    }
     std::lock_guard lock(rigMutex);
     const auto rootInverse=inverse(*root);
     const float groundCeiling=frame.nativePose.position.y+.05f;
@@ -216,7 +222,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // The arm meshes also carry spine and clavicle weights. Reposition
         // the whole upper body with one rigid transform: independent shoulder
         // offsets leave those shared sleeve vertices in different body frames.
-        const auto forward=rotate(nativeCamera.orientation,{0,0,1});
+        // The shoulders must turn with the same physical head orientation as
+        // the tracked palms. Using the untouched FOX camera here leaves the
+        // sleeve roots behind when the user physically turns around.
+        auto forward=rotate(frame.nativePose.orientation,{0,0,1});
+        if(forward.x*forward.x+forward.z*forward.z<.0001f)
+            forward=rotate(nativeCamera.orientation,{0,0,1});
         const float yaw=std::atan2(forward.x,forward.z);
         const Quat torso{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
         const auto chest=bone(q,p,2);
@@ -246,6 +257,27 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(!right)return false;
     replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
     bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
+    const bool binocularHeld=frame.controllers.optic.held
+        &&frame.controllers.optic.pose.tracked
+        &&frame.controllers.optic.pose.kind==OpticKind::binocular;
+    const auto attachBinocular=[&](){
+        // Use this skin's solved palm for the body and its opposite support
+        // socket. Raw tracking can differ at a surface or arm reach limit.
+        const auto renderedPalm=compose(*root,compose(bone(q,p,12),inverse(gripFromWrist[1])));
+        const auto localPalm=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},
+            compose(inverse(frame.nativePose),renderedPalm)));
+        const auto& left=frame.controllers.hands[0];
+        const auto& primary=frame.controllers.hands[1];
+        const auto optic=solveBinocularPose(left.grip,localPalm,left.aim,primary.aim,
+            left.gripTracked,primary.gripTracked,left.aimTracked,primary.aimTracked,
+            left.squeeze>.5f,primary.squeeze>.5f);
+        if(!optic)return false;
+        frame.controllers.optic.pose=*optic;
+        return true;
+    };
+    if(binocularHeld&&!attachBinocular())return false;
+    const bool binocularSupport=binocularHeld&&frame.controllers.optic.pose.supportHeld;
+    if(binocularHeld){aimBlend=0;guidedOffset={};}
     bool nativeManipulation=false,firearmActive=false,throwableActive=false;
     std::optional<Vec3> barrelInGrip;
     std::optional<Pose> muzzleInGrip;
@@ -261,7 +293,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             firearmActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x40;
             throwableActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x80;
             const auto flags=get<uint32_t>(state+0x27c),mode=get<uint32_t>(state+0x3c0);
-            if(frame.controllers.weaponReady&&firearmActive&&!nativeManipulation&&!(flags&0x400000)&&!(mode&0x2000)){
+            if(!binocularHeld&&frame.controllers.weaponReady&&firearmActive&&!nativeManipulation&&!(flags&0x400000)&&!(mode&0x2000)){
                 // Use the same authored barrel frame as the native shot path.
                 // The vector between animated palms is not the barrel axis,
                 // especially while the game changes its support-hand pose.
@@ -280,6 +312,18 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     const auto supportOffset=compose(inverse(rightAnimated),leftAnimated);
     auto attached=compose(right->pose.wrist,supportOffset);
+    // Binocular support is a real tracked left-hand socket, not the firearm
+    // support offset. Convert the published LOCAL-frame side cup back into the
+    // character root and then use the same anatomical wrist correction as a
+    // weapon grip. This keeps the retail binocular in the right palm while
+    // the left palm cups the opposite side when the user supports it.
+    std::optional<Pose> binocularSupportWrist;
+    if(binocularSupport&&frame.controllers.hands[0].gripTracked){
+        const auto supportNative=nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.optic.pose.supportGrip);
+        const auto supportRoot=compose(inverse(*root),supportNative);
+        binocularSupportWrist=clearWrist(compose(supportRoot,gripFromWrist[0]));
+        attached=*binocularSupportWrist;
+    }
     // Test the actual support grip, never controller-to-controller distance.
     // While attached, retain the acquired contact frame through native reload
     // animation and evaluate it in the currently guided weapon frame.
@@ -303,20 +347,23 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // Clenching the left controller only articulates its fingers. Contact must
     // dwell at the weapon; inspection, lowering, tracking loss and pulling away
     // release it. A one-handed reload does not grab a distant tracked hand.
-    const bool nearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&forwardSupport&&!inspecting&&(!nativeManipulation||wasAttached),
+    const bool weaponNearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&forwardSupport&&!inspecting&&(!nativeManipulation||wasAttached),
         frame.controllers.hands[0].gripTracked,std::sqrt(dot(separation,separation)),now);
-    if(nearSupport&&!wasAttached)heldSupportOffset=supportOffset;
+    const bool nearSupport=binocularHeld?binocularSupport:weaponNearSupport;
+    if(!binocularHeld&&nearSupport&&!wasAttached)heldSupportOffset=supportOffset;
     const bool support=nearSupport;
     const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/180.f:1.f,1.f);supportAt=now;
     supportBlend=std::clamp(supportBlend+(support?step:-step),0.f,1.f);
     // A menu, stow, non-firearm or lost controller releases ownership now.
     // Distance release can blend out, but never toward a new native stow pose.
-    if(!frame.controllers.weaponReady||!firearmActive||inspecting||!frame.controllers.hands[0].gripTracked){
+    if(!binocularHeld&&(!frame.controllers.weaponReady||!firearmActive||inspecting||!frame.controllers.hands[0].gripTracked)){
         supportBlend=0;aimBlend=0;supportPose.reset();
     }
-    const auto presentedSupport=supportPose.update(supportOffset,nearSupport,nativeManipulation).value_or(supportOffset);
+    const auto presentedSupport=binocularSupportWrist
+        ?compose(inverse(right->pose.wrist),*binocularSupportWrist)
+        :supportPose.update(supportOffset,nearSupport,nativeManipulation).value_or(supportOffset);
     attached=compose(right->pose.wrist,presentedSupport);
-    bool guiding=nearSupport&&nativeManipulation&&aimBlend>0;
+    bool guiding=!binocularHeld&&nearSupport&&nativeManipulation&&aimBlend>0;
     if(barrelInGrip&&frame.controllers.hands[0].gripTracked&&nearSupport){
         if(const auto guided=twoHandGrip(grips[1],grips[0],*barrelInGrip,1.f)){
             guidedOffset=compose(inverse(grips[1]),*guided).orientation;guiding=true;
@@ -354,7 +401,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // Preserve the game's animated support-hand contact while the native
         // support is requested or a native reload/bolt cycle is running.
         auto target=attached;
-        if(frame.controllers.hands[0].gripTracked&&supportBlend<1){
+        if(binocularHeld&&!binocularSupport){
+            // A one-handed binocular hold leaves the left hand free and
+            // tracked; it must not be pulled toward the firearm support
+            // offset merely because the controller is visible.
+            target=clearWrist(compose(grips[0],gripFromWrist[0]));
+        }else if(frame.controllers.hands[0].gripTracked&&supportBlend<1){
             const auto tracked=compose(grips[0],gripFromWrist[0]);
             target.position=tracked.position+(attached.position-tracked.position)*supportBlend;
             target.orientation=blendRotation(tracked.orientation,attached.orientation,supportBlend);
@@ -433,8 +485,19 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     unsigned articulatedHands{};
     for(size_t side=0;side<2;++side){
         const auto& hand=frame.controllers.hands[side];
-        const float contact=side?((frame.controllers.weaponReady&&(firearmActive||throwableActive))?1.f:0.f):supportBlend;
-        if(!hand.gripTracked||frame.controllers.vehicleControls||contact>=1)continue;
+        // A binocular is a right-hand weapon-style grip even though it has no
+        // firearm state. Close the primary hand around the same authored palm
+        // socket, and close the optional support hand only after its grip is
+        // actually held. This keeps both hands on the device rather than
+        // leaving an open/free hand beside a floating model.
+        const float contact=side
+            ?((binocularHeld||((frame.controllers.weaponReady)&&(firearmActive||throwableActive)))?1.f:0.f)
+            :(binocularSupport?1.f:supportBlend);
+        // Native firearm contact owns the authored hand during reloads. The
+        // binocular is a VR-only physical item, so its tracked hands still
+        // need the authored curl pass at full contact or they remain open and
+        // appear to float behind the housing.
+        if(!hand.gripTracked||frame.controllers.vehicleControls||(contact>=1&&!binocularHeld))continue;
         for(size_t finger=0;finger<5;++finger)for(size_t joint=0;joint<3;++joint){
             const auto i=fingers[side][finger]+joint;
             const auto anchor=joint?i-1:(finger>=3?(side?46u:30u):wrists[side]);
@@ -444,10 +507,17 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const auto native=compose(inverse(bone(originalQ,originalP,anchor)),bone(originalQ,originalP,i));
             const float controllerCurl=finger==0?std::max(hand.squeeze,hand.thumbTouched?.65f:0.f)
                 :finger==1?std::max(hand.trigger,hand.triggerTouched?.12f:0.f):hand.squeeze;
-            const float curl=std::max(controllerCurl,frame.controllers.strikeCurl[side]);
+            const bool opticContact=binocularHeld&&(side!=0||binocularSupport);
+            const float curl=opticContact?std::clamp(controllerCurl,.55f,.82f)
+                :std::max(controllerCurl,frame.controllers.strikeCurl[side]);
             const auto rotation=fingerJointRotation(side!=0,static_cast<unsigned>(finger),static_cast<unsigned>(joint),curl);
             if(!rotation)return false;
-            const Pose local{blendRotation(*rotation,native.orientation,contact),offset+(native.position-offset)*contact};
+            // Native firearm contact can be 1 while its weapon is stowed.
+            // Blending back to that animation discards every optic curl and
+            // leaves an open palm underneath the housing. An optic contact
+            // owns the cupped fingers; its wrist still follows the same grip.
+            const float nativeContact=opticContact?0.f:contact;
+            const Pose local{blendRotation(*rotation,native.orientation,nativeContact),offset+(native.position-offset)*nativeContact};
             replace(q,p,i,compose(bone(q,p,anchor),local));
         }
         ++articulatedHands;
@@ -455,6 +525,17 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // Full render pose, before native matrix and attachment publication.
     // Native position.w metadata is retained.
     frame.playerHead=renderedHead;
+    // Measure the final native skin, including fingers and constrained grips.
+    // Controller positions alone miss the palm when its back faces the eye.
+    frame.handFaceDistance=1;
+    for(size_t side=0;side<2;++side)if(frame.controllers.hands[side].gripTracked){
+        const auto measure=[&](size_t index){
+            const auto offset=compose(*root,bone(q,p,index)).position-frame.nativePose.position;
+            frame.handFaceDistance=std::min(frame.handFaceDistance,std::sqrt(dot(offset,offset)));
+        };
+        measure(side?12u:8u);
+        for(size_t finger=0;finger<5;++finger)for(size_t joint=0;joint<3;++joint)measure(fingers[side][finger]+joint);
+    }
     if(frame.controllers.hands[0].gripTracked){
         const auto wrist=compose(*root,bone(q,p,8));
         const auto elbow=compose(*root,bone(q,p,7));
@@ -463,7 +544,24 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             frame.wristPanel=*panel;frame.wristPanelTracked=true;
         }
     }
+    if(binocularHeld){
+        // The arm solve can constrain the wrist at a surface or reach limit.
+        // Publish the device from that exact rendered palm, in this skin's
+        // source transaction, so the housing, lens camera and marking ray
+        // cannot continue independently at the unconstrained input position.
+        if(!attachBinocular())return false;
+    }
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
+    std::array<Pose,2> renderedPalms;
+    HandContacts handContacts;
+    for(size_t side=0;side<2;++side){
+        renderedPalms[side]=compose(*root,compose(bone(q,p,wrists[side]),inverse(gripFromWrist[side])));
+        handContacts[side][0]=renderedPalms[side].position;
+        for(size_t finger=0;finger<5;++finger)
+            handContacts[side][finger+1]=compose(*root,bone(q,p,fingers[side][finger]+2)).position;
+    }
+    publishAnimalHands(frame,renderedPalms,handContacts);
+    publishSmallAnimalHands(frame,renderedPalms,handContacts);
     wheelMailbox().publish(wheel);
     if(wheel.engaged)log("Driver left hand gripped authored wheel contact");
     for(const auto& strike:strikes)if(strike)publishMeleeSweep(*strike);
@@ -510,6 +608,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
 void update(void* context,void* binding){
     PoseRestore restore;
     if(enabled.load()&&headCamera().active())try{apply(context,binding,restore);}catch(...){}
+    applySmallAnimalSkin(reinterpret_cast<uintptr_t>(binding));
     original(context,binding);
     if(restore.stowedMount){
         auto matrix=get<std::array<float,16>>(restore.stowedMount);
@@ -704,10 +803,11 @@ void installControllerRig(uintptr_t imageBase){
     if(status!=MH_OK){MH_RemoveHook(originAddress);MH_RemoveHook(velocityAddress);throw std::runtime_error(std::string("Controller throw enable: ")+MH_StatusToString(status));}
     log("Controller throw origin and velocity adapters installed");
     installMotionMelee(base);
+    installSmallAnimalInteraction(base);
     enabled.store(true);log("Experimental controller rig installed at verified skin publication RVA 0x1a6caa0 and shot solver 0x1044ff0");
 }
 void observeControllerRigOwner(uintptr_t owner) noexcept{playerOwner.store(owner);}
-void stopControllerRig() noexcept{stopMotionMelee();enabled.store(false);playerOwner.store(0);}
+void stopControllerRig() noexcept{stopSmallAnimalInteraction();stopMotionMelee();enabled.store(false);playerOwner.store(0);}
 bool controllerRigEnabled() noexcept{return enabled.load();}
 TravelMode nativeTravelMode() noexcept{
     // PlayerStatus's own Lua readers select this double-buffered local player

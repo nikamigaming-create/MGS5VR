@@ -5,6 +5,16 @@
 #include <algorithm>
 
 namespace mgs5vr {
+namespace {
+float horizontalYaw(Quat orientation){
+    const auto forward=rotate(orientation,{0,0,1});
+    if(forward.x*forward.x+forward.z*forward.z>.0001f)return std::atan2(forward.x,forward.z);
+    const auto right=rotate(orientation,{1,0,0});
+    return std::atan2(-right.z,right.x);
+}
+Quat yawRotation(float yaw){return {0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};}
+Pose uprightOrigin(Pose pose){pose.orientation=yawRotation(horizontalYaw(pose.orientation));return pose;}
+}
 std::optional<Pose> trackedListenerPose(const HeadCameraSample& frame,HeadCameraStatus status,uint64_t now){
     if(!status.enabled||!status.active||status.pending||status.suspended||!frame.applied||!frame.stereoTracked
         ||!frame.trackingSequence||frame.activation!=status.activation||now<frame.sampleTime
@@ -31,7 +41,8 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     if(!std::isfinite(units)||units<=0)throw std::invalid_argument("Camera scale must be finite and positive");
     std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=awaitingPlayer_=false;camera_=playerOwner_=0;reason_=HeadCameraStop::none;
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=0;suspended_=false;
-    controllers_={};rig_={};nativeMenuOpen_=false;lastView_={};menuAnchored_=false;
+    controllers_={};rig_={};nativeMenuOpen_=false;lastView_={};menuAnchored_=false;trackingEpoch_=0;
+    snapYaw_=0;snapTranslation_={};recenterPending_=false;
 }
 bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
                                   const std::array<float,16>& root,const std::array<float,16>& head,uint64_t time){
@@ -63,14 +74,15 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
     tracking_=tracking_&&dot(separation,separation)>0.0001f&&dot(separation,separation)<0.04f;
     stereoTracking_=tracking_;
     if(tracking_){
-        if(controllers_.referenceEpoch&&controllers.referenceEpoch!=controllers_.referenceEpoch&&(active_||pending_||awaitingPlayer_)){
-            if(nativeMenuOpen_&&menuAnchored_&&lastView_.applied){
+        if(trackingEpoch_&&controllers.referenceEpoch&&controllers.referenceEpoch!=trackingEpoch_&&(active_||pending_||awaitingPlayer_)){
+            if(active_&&lastView_.applied){
                 // Rebase the physical tracking origin without moving the native
                 // viewpoint or the panel already anchored in this world.
                 // Gameplay resumes in this new reference space too: carrying
                 // the old origin through menu close would teleport the view.
-                origin_=compose(compose(head,inverse(head_)),origin_);
-                menuNative_=lastView_.nativePose;menuHead_=head;rig_={};++activation_;
+                origin_=uprightOrigin(compose(compose(head,inverse(head_)),origin_));
+                if(nativeMenuOpen_&&menuAnchored_){menuNative_=lastView_.nativePose;menuHead_=head;}
+                rig_={};++activation_;
             }else{
                 if(!awaitingPlayer_){active_=false;pending_=true;}
                 camera_=playerOwner_=0;
@@ -82,7 +94,7 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
             if(!hand.gripTracked)hand.grip={};
             if(!hand.aimTracked)hand.aim={};
         }
-        head_=head;views_=views;controllers_=controllers;time_=time;++sequence_;
+        head_=head;views_=views;controllers_=controllers;trackingEpoch_=controllers.referenceEpoch;time_=time;++sequence_;
     }else {controllers_={};suspendLocked(HeadCameraStop::trackingLost);}
 }
 void HeadCamera::toggle(){
@@ -90,6 +102,10 @@ void HeadCamera::toggle(){
     if(!enabled_)return;
     if(active_||pending_||awaitingPlayer_)cancelLocked(HeadCameraStop::manual);
     else {pending_=true;reason_=HeadCameraStop::none;}
+}
+void HeadCamera::recenter(){
+    std::lock_guard lock(mutex_);
+    if(enabled_&&(active_||pending_||awaitingPlayer_)){recenterPending_=true;rig_={};}
 }
 void HeadCamera::setNativeMenuOpen(bool open){
     std::lock_guard lock(mutex_);
@@ -110,6 +126,7 @@ void HeadCamera::setNativeMenuOpen(bool open){
 void HeadCamera::cancelLocked(HeadCameraStop reason){
     if(active_||pending_||awaitingPlayer_){reason_=reason;++cancellations_;}
     active_=pending_=suspended_=awaitingPlayer_=false;camera_=playerOwner_=0;rig_={};lastView_={};menuAnchored_=false;
+    snapYaw_=0;snapTranslation_={};recenterPending_=false;
 }
 void HeadCamera::awaitPlayerLocked(){
     // A native menu/cinematic has no matching player-head publication. Keep
@@ -174,16 +191,34 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         if(found==playerHeads_.end()){awaitPlayerLocked();return result;}
         if(awaitingPlayer_){
             if((camera_&&camera_!=camera)||(playerOwner_&&playerOwner_!=found->owner))return result;
-            if(!camera_)origin_=head_;
+            if(!camera_)origin_=uprightOrigin(head_);
             camera_=camera;playerOwner_=found->owner;awaitingPlayer_=false;active_=true;
             ++activation_; // No eye image from before the menu may be reused.
         }
         nativePose.position=found->position;
         result.playerSequence=found->sequence;result.playerOwner=found->owner;result.playerHead=found->position;
     }
-    if(pending_){camera_=camera;playerOwner_=result.playerOwner;origin_=head_;pending_=false;active_=true;++activation_;}
+    if(pending_){
+        camera_=camera;playerOwner_=result.playerOwner;origin_=uprightOrigin(head_);
+        frontEndOrigin_=uprightOrigin(nativePose);
+        frontEndPanel_=compose(nativeTrackedPose(frontEndOrigin_,head_,head_),Pose{{},{0,-.05f,-1.3f}});
+        pending_=false;active_=true;++activation_;snapTranslation_={};snapYaw_=controllers_.snapYaw;
+    }
     if(!active_)return result;
     if(camera_!=camera){cancelLocked(HeadCameraStop::cameraChanged);return result;}
+    if(controllers_.frontEnd)result.menuPanel=frontEndPanel_;
+    // The native camera can look down, lean, recoil or bank. Its yaw supplies
+    // gameplay heading; gravity and physical HMD pitch/roll supply the VR view.
+    // A full native/activation rotation tilts the tracking space when turning.
+    if(!spatialMenu){
+        nativePose=controllers_.frontEnd?frontEndOrigin_:uprightOrigin(nativePose);
+        if(recenterPending_){
+            const float baseYaw=horizontalYaw(nativePose.orientation)+controllers_.snapYaw;
+            const float facing=lastView_.applied?horizontalYaw(lastView_.nativePose.orientation):baseYaw;
+            origin_={yawRotation(horizontalYaw(head_.orientation)-facing+baseYaw),head_.position};
+            snapTranslation_={};snapYaw_=controllers_.snapYaw;recenterPending_=false;rig_={};++activation_;
+        }
+    }
     if(useRig&&rig_.camera){
         const auto& s=rig_.sample;const auto& p=rig_.sourceCamera;
         const bool same=p.position.x==sourceCamera.position.x&&p.position.y==sourceCamera.position.y&&p.position.z==sourceCamera.position.z
@@ -202,6 +237,20 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     relative.position=relative.position*units_;
     const auto nativeDelta=compose(compose(basis,relative),inverse(basis));
     result.nativePose=compose(nativePose,nativeDelta);
+    if(!spatialMenu){
+        const float turn=std::isfinite(controllers_.snapYaw)?controllers_.snapYaw:0;
+        const Quat rotation{0,std::sin(turn*.5f),0,std::cos(turn*.5f)};
+        const auto offset=result.nativePose.position-nativePose.position;
+        if(turn!=snapYaw_){
+            const Quat previous{0,std::sin(snapYaw_*.5f),0,std::cos(snapYaw_*.5f)};
+            // Turn around the current physical head, including a roomscale
+            // lean. The snap must not orbit the head around the tracking origin.
+            snapTranslation_=snapTranslation_+rotate(previous,offset)-rotate(rotation,offset);
+            snapYaw_=turn;
+        }
+        result.nativePose.position=nativePose.position+rotate(rotation,offset)+snapTranslation_;
+        result.nativePose.orientation=compose(Pose{rotation,{}},Pose{result.nativePose.orientation,{}}).orientation;
+    }
     // Native and runtime quaternions are accepted with a small norm tolerance.
     // Normalize after composition: the native inverse builder assumes a rigid
     // rotation, and even tiny norm errors are amplified by kilometer coordinates.

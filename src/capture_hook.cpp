@@ -4,6 +4,8 @@
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/scene_capture.hpp"
 #include "mgs5vr/native_performance.hpp"
+#include "mgs5vr/menu_surface.hpp"
+#include "mgs5vr/ui_renderer.hpp"
 #include <MinHook.h>
 #include <atomic>
 #include <stdexcept>
@@ -40,6 +42,8 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
                 ComPtr<ID3D11Device> device;source->GetDevice(&device);
                 ComPtr<ID3D11DeviceContext> context;device->GetImmediateContext(&context);
                 const auto eye=observeRenderPresent(swap);
+                if(headCamera().active()&&nativeTitleMenuOpen())
+                    captureNativeMenuSurface(context.Get(),presented+1);
                 // Keep the complete stereo family in the mailbox between native
                 // scene completions. A mono fallback would replace its array and
                 // force the XR consumer to rebuild both eye swapchains.
@@ -66,7 +70,7 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
 HRESULT WINAPI resize(IDXGISwapChain* swap,UINT count,UINT width,UINT height,DXGI_FORMAT format,UINT flags){
     // Serialize capture with resize. Mailbox owns copies, never backbuffer references.
     std::lock_guard lock(captureMutex);
-    if(selected==swap){destination->invalidate();invalidateSceneCapture();selected=nullptr;failed=false;log("Game swapchain resize");}
+    if(selected==swap){destination->invalidate();invalidateSceneCapture();stopNativeMenuSurface();selected=nullptr;failed=false;log("Game swapchain resize");}
     return originalResize(swap,count,width,height,format,flags);
 }
 void mh(MH_STATUS status,const char* operation){
@@ -110,6 +114,7 @@ void stopCapture() noexcept {
         failed=true;selected=nullptr;selectedWindow=nullptr;
         if(destination)destination->invalidate();
         invalidateSceneCapture();
+        stopNativeMenuSurface();
     }catch(...){}
 }
 }

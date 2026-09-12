@@ -127,6 +127,18 @@ void installSceneCapture(ID3D11Device* device){
 }
 void observeSceneSwapchain(IDXGISwapChain* swap){std::lock_guard lock(mutex);target=swap;}
 bool sceneCaptureAvailable(){std::lock_guard lock(mutex);return target!=nullptr;}
+bool sceneSourceTexture(ID3D11DeviceContext* context,ID3D11Texture2D** output) noexcept {try{
+    if(output)*output=nullptr;
+    if(!context||!output)return false;
+    ComPtr<IDXGISwapChain> swap;{std::lock_guard lock(mutex);swap=target;}
+    if(!swap)return false;
+    ComPtr<ID3D11Texture2D> source; if(FAILED(swap->GetBuffer(0,IID_PPV_ARGS(&source)))||!source)return false;
+    ComPtr<ID3D11Device> sourceDevice,contextDevice;source->GetDevice(&sourceDevice);context->GetDevice(&contextDevice);
+    if(!sourceDevice||sourceDevice.Get()!=contextDevice.Get())return false;
+    D3D11_TEXTURE2D_DESC desc{};source->GetDesc(&desc);
+    if(!desc.Width||!desc.Height||desc.ArraySize!=1||desc.MipLevels!=1||desc.SampleDesc.Count!=1)return false;
+    *output=source.Detach();return true;
+}catch(...){if(output)*output=nullptr;return false;} }
 void beginSceneTiming(ID3D11DeviceContext* context,uint64_t source) noexcept {try{
     if(source%4)return;
     std::lock_guard lock(mutex);
@@ -145,19 +157,29 @@ void endSceneTiming(ID3D11DeviceContext* context,uint64_t source,bool complete) 
         return;
     }
 }catch(...){} }
-bool captureSceneEye(ID3D11DeviceContext* context,const EyeFrame& eye){
+bool captureSceneEye(ID3D11DeviceContext* context,const EyeFrame& eye,ID3D11Texture2D** output){
+    if(output)*output=nullptr;
     if(!context||eye.eye>1||!eye.projected||!eye.sourceSequence){lastFailure=1;return false;}
     std::shared_ptr<Packet> packet;ComPtr<IDXGISwapChain> swap;
     {std::lock_guard lock(mutex);swap=target;
         if(!swap){lastFailure=2;return false;}
         if(eye.eye==0){
-            for(auto& item:pool)if(!item||item.use_count()==1){if(!item)item=std::make_shared<Packet>();packet=item;break;}
-            if(!packet){lastFailure=3;return false;}
-            packet->mask=packet->executedMask=0;packet->eyes={};packet->canceled=false;packet->swap=swap;
-            families[eye.sourceSequence]=packet;
+            // A lens capture can happen before the optic draw and the final
+            // mailbox capture can happen after it. Reuse this eye's packet
+            // for the second copy instead of opening a new family.
+            const auto existing=families.find(eye.sourceSequence);
+            if(existing!=families.end()&&existing->second&&!existing->second->canceled
+               &&(existing->second->mask&1u)&&existing->second->eyes[0].sourceSequence==eye.sourceSequence
+               &&existing->second->swap.Get()==swap.Get())packet=existing->second;
+            else {
+                for(auto& item:pool)if(!item||item.use_count()==1){if(!item)item=std::make_shared<Packet>();packet=item;break;}
+                if(!packet){lastFailure=3;return false;}
+                packet->mask=packet->executedMask=0;packet->eyes={};packet->canceled=false;packet->swap=swap;
+                families[eye.sourceSequence]=packet;
+            }
         }else {const auto found=families.find(eye.sourceSequence);if(found==families.end()){lastFailure=4;return false;}packet=found->second;}
     }
-    if(eye.eye==1&&(packet->mask!=1||packet->eyes[0].sourceSequence!=eye.sourceSequence
+    if(eye.eye==1&&(!(packet->mask&1u)||packet->eyes[0].sourceSequence!=eye.sourceSequence
         ||packet->eyes[0].trackingSequence!=eye.trackingSequence||packet->swap.Get()!=swap.Get())){lastFailure=5;return false;}
     ComPtr<ID3D11Texture2D> source;checkHr(swap->GetBuffer(0,IID_PPV_ARGS(&source)),"Get native scene output");
     ComPtr<ID3D11Device> device,contextDevice;source->GetDevice(&device);context->GetDevice(&contextDevice);
@@ -170,7 +192,15 @@ bool captureSceneEye(ID3D11DeviceContext* context,const EyeFrame& eye){
         desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;desc.MiscFlags=desc.CPUAccessFlags=0;desc.Usage=D3D11_USAGE_DEFAULT;
         packet->textures[eye.eye].Reset();checkHr(device->CreateTexture2D(&desc,nullptr,&packet->textures[eye.eye]),"Create native eye output");
     }
+    // Keep the native context's output state intact, but detach the source
+    // while recording the copy. This makes the pre-draw copy valid on the
+    // same deferred context that recorded the native scene.
+    ComPtr<ID3D11RenderTargetView> savedRenderTarget;ComPtr<ID3D11DepthStencilView> savedDepthTarget;
+    context->OMGetRenderTargets(1,savedRenderTarget.GetAddressOf(),savedDepthTarget.GetAddressOf());
+    context->OMSetRenderTargets(0,nullptr,nullptr);
     context->CopyResource(packet->textures[eye.eye].Get(),source.Get());
+    ID3D11RenderTargetView* renderTarget=savedRenderTarget.Get();
+    context->OMSetRenderTargets(1,&renderTarget,savedDepthTarget.Get());
     {std::lock_guard lock(mutex);
         packet->device=device;packet->eyes[eye.eye]=eye;packet->mask|=1u<<eye.eye;
         if(context->GetType()==D3D11_DEVICE_CONTEXT_IMMEDIATE){
@@ -179,6 +209,10 @@ bool captureSceneEye(ID3D11DeviceContext* context,const EyeFrame& eye){
                 completed=packet;
                 families.erase(eye.sourceSequence);++executed;reportPair();}
         }else recording[context].push_back({packet,1u<<eye.eye});
+    }
+    if(output&&packet->textures[eye.eye]){
+        *output=packet->textures[eye.eye].Get();
+        (*output)->AddRef();
     }
     return true;
 }

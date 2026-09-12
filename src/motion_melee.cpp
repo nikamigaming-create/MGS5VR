@@ -36,15 +36,20 @@ bool function(uintptr_t address){return address>=base+0x1000&&address<base+0x209
 uintptr_t method(uintptr_t object,size_t offset){return read<uintptr_t>(read<uintptr_t>(object)+offset);}
 uint32_t filter(void* context,void* shape,void* target,void* contact,void* cqc){
     const auto shapeAddress=reinterpret_cast<uintptr_t>(shape);
+    const auto targetAddress=reinterpret_cast<uintptr_t>(target);
+    const auto tag=read<uint64_t>(targetAddress+0x50);
     if(enabled.load()){
         std::lock_guard lock(mutex);
-        if(shapeAddress==attackShape&&hit&&steadyMilliseconds()-submittedAt<=150
-            &&read<uint16_t>(read<uintptr_t>(shapeAddress+0x28)+8)==7)return 2;
+        if(shapeAddress==attackShape&&steadyMilliseconds()-submittedAt<=150
+            &&read<uint16_t>(read<uintptr_t>(shapeAddress+0x28)+8)==7){
+            // Filter before retail processing: its accepted-contact branch can
+            // already enqueue CQC/damage. Petting or reaching past a companion
+            // must never create an automatic punch or weapon-bash contact.
+            if(protectedMotionMeleeTarget(tag)||hit)return 2;
+        }
     }
     const auto result=originalFilter(context,shape,target,contact,cqc);
     if(!enabled.load())return result;
-    const auto targetAddress=reinterpret_cast<uintptr_t>(target);
-    const auto tag=read<uint64_t>(targetAddress+0x50);
     std::lock_guard lock(mutex);
     if(shapeAddress!=attackShape||steadyMilliseconds()-submittedAt>150
         ||read<uint16_t>(read<uintptr_t>(shapeAddress+0x28)+8)!=7
