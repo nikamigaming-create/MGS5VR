@@ -93,6 +93,14 @@ precedence. See Microsoft's [execution policy documentation](https://learn.micro
 
 ## Runtime and resolution
 
+The launch script supports a requested native game size before launch; it does
+not yet automatically match Virtual Desktop Ultra/Godlike. The current XR eye
+textures still take their dimensions from the native game render target, so
+changing a runtime quality preset alone does not resize that native target.
+Independent eye-target sizing from OpenXR's recommended per-eye dimensions,
+with a separate small desktop mirror, remains to be implemented. Do not change
+Windows desktop resolution just to enlarge a copied XR image.
+
 A simulator is not required for headset play. Connect through your headset's PC
 software and select it as the active OpenXR runtime. The physical baseline uses
 Quest 3, Touch controllers and the Meta PC runtime. Other hardware remains

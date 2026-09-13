@@ -26,6 +26,9 @@ QueueFn originalQueue{};ExecuteFn originalExecute{};NodeFn originalNode{};
 using MarkerDepthFn=void(*)(void*);
 MarkerDepthFn originalMarkerDepth{};
 std::atomic_uint64_t markerDepthPreserved{};
+using ModelParameterFn=void(*)(void*,uint32_t,uint32_t,const float*);
+ModelParameterFn setReconParameter{};
+std::atomic_uint64_t reconModelGroupsHidden{};
 using TitleFn=void(*)(void*);
 TitleFn originalTitleShow{},originalTitleUpdate{};
 TitleFn originalStartShow{};
@@ -75,6 +78,28 @@ std::atomic_int diagnosticHiddenOrder{-1};
 
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
+bool reconColor(uintptr_t model,uint32_t parameter,std::array<float,4>& color){
+    uint32_t count{};uintptr_t materials{};
+    if(!read(model+0x130,&count,sizeof(count))||count>64
+        ||!read(model+0x138,&materials,sizeof(materials))||!materials)return false;
+    for(uint32_t i=0;i<count;++i){
+        uintptr_t material{},records{},values{};uint32_t name{},recordCount{},valueCount{};
+        if(!read(materials+i*8,&material,sizeof(material))||!material
+            ||!read(material+0x10,&name,sizeof(name))||name!=0xd501d11c
+            ||!read(material+0x20,&recordCount,sizeof(recordCount))||recordCount>256
+            ||!read(material+0x28,&records,sizeof(records))||!records
+            ||!read(material+0x30,&valueCount,sizeof(valueCount))||valueCount>256
+            ||!read(material+0x38,&values,sizeof(values))||!values)continue;
+        for(uint32_t p=0;p<recordCount;++p){
+            std::array<uint32_t,2> record{};
+            if(!read(records+p*8,record.data(),sizeof(record))||record[0]!=parameter)continue;
+            const auto index=record[1]&0x1fffffff;
+            return (record[1]&0x20000000)&&index<valueCount
+                &&read(values+index*16,color.data(),sizeof(color));
+        }
+    }
+    return false;
+}
 void markerDepth(void* object){
     // The native marker updater first copies the source actor's world-space
     // bone palette, then this callback compresses only bone zero toward the
@@ -330,6 +355,12 @@ void installUiRenderer(uintptr_t moduleBase){
         if(!read(moduleBase+hook.rva,bytes.data(),hook.size)||std::memcmp(bytes.data(),hook.signature,hook.size))throw std::runtime_error("Native UI renderer signature mismatch");
     }
     base=moduleBase;
+    // Native recon material writes use this setter; group visibility is
+    // prepared before scene replay and cannot independently hide each eye.
+    constexpr std::array<unsigned char,10> parameterEntry{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20};
+    std::array<unsigned char,10> parameterBytes{};
+    if(read(base+0x1ce410,parameterBytes.data(),parameterBytes.size())&&parameterBytes==parameterEntry)
+        setReconParameter=reinterpret_cast<ModelParameterFn>(base+0x1ce410);
     constexpr std::array<unsigned char,8> menuGetter{0x48,0x8b,0x05,0x11,0x18,0x39,0x02,0xc3};
     constexpr std::array<unsigned char,8> menuOpen{0x80,0x79,0x20,0,0x0f,0x95,0xc0,0xc3};
     std::array<unsigned char,8> getterBytes{},openBytes{};
@@ -436,6 +467,48 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     producing.projection=projection;
 }
 void clearUiRenderSource() noexcept {producing={};}
+ReconModelVisibilityScope::ReconModelVisibilityScope(HudMode mode,HudView view,bool glow) noexcept {
+    if(!enabled.load()||!headCamera().active()||!setReconParameter
+        ||reconModelVisible(mode,view,glow))return;
+    uintptr_t manager{},collection{},type{},data{};uint32_t count{};
+    if(!read(base+0x2be4c60,&manager,sizeof(manager))||!manager
+        ||!read(manager+0x58,&collection,sizeof(collection))||!collection
+        ||!read(collection,&type,sizeof(type))||type!=base+0x21f7f48
+        ||!read(collection+0x98,&data,sizeof(data))||!data
+        ||!read(collection+0xa8,&count,sizeof(count))||count>128)return;
+    std::array<uintptr_t,128> objects{};
+    if(!read(data,objects.data(),count*sizeof(uintptr_t)))return;
+    for(uint32_t i=0;i<count&&count_<changes_.size();++i){
+        const auto owner=objects[i];uintptr_t model{};uint16_t bones{};
+        // Never hide the source actor (+0x28), the whole mixed collector, or
+        // the occlusion-query proxy (+0x40). Only the verified recon clone.
+        if(!owner||!read(owner,&type,sizeof(type))||type!=base+0x21e0540
+            ||!read(owner+0x38,&model,sizeof(model))||!model
+            ||!read(model,&type,sizeof(type))||type!=base+0x20f4d90
+            ||!read(model+0xf8,&bones,sizeof(bones))||bones<2||bones>128)continue;
+        // Both native tint vectors carry their opacity in W. Do not change
+        // the source actor, native marking state, fade timer or RGB values.
+        for(const uint32_t parameter:{0x9224571eu,0x19bdfc21u}){
+            alignas(16) std::array<float,4> color{};
+            if(count_==changes_.size()||!reconColor(model,parameter,color)||!color[3])continue;
+            changes_[count_++]={owner,model,parameter,color};color[3]=0;
+            setReconParameter(reinterpret_cast<void*>(model),0xd501d11c,parameter,color.data());
+            if(!reconModelGroupsHidden.fetch_add(1))log("Native recon body excluded from unaided scene pass; source actor preserved");
+        }
+    }
+}
+ReconModelVisibilityScope::~ReconModelVisibilityScope(){
+    for(size_t i=0;i<count_;++i){
+        const auto& c=changes_[i];uintptr_t type{},model{};
+        if(!read(c.owner,&type,sizeof(type))||type!=base+0x21e0540
+            ||!read(c.owner+0x38,&model,sizeof(model))||model!=c.model
+            ||!read(model,&type,sizeof(type))||type!=base+0x20f4d90)continue;
+        std::array<float,4> current{},hidden=c.color;hidden[3]=0;
+        if(!reconColor(model,c.parameter,current)||current!=hidden)continue;
+        alignas(16) const auto restored=c.color;
+        setReconParameter(reinterpret_cast<void*>(model),0xd501d11c,c.parameter,restored.data());
+    }
+}
 bool applyUiEyeProjection(float* output) noexcept {
     if(!enabled.load()||!executing.eye.sourceSequence||!executing.eye.projected)return false;
     const auto status=headCamera().status();const auto now=steadyMilliseconds();
@@ -476,6 +549,7 @@ void reportUiRenderer(std::ostream& out){
        <<",\"view_restored\":"<<viewMismatch.load()<<",\"spatial_draws\":"<<spatialDraws.load()<<",\"suppressed_draws\":"<<suppressedDraws.load()
        <<",\"expired\":"<<expired.load()<<",\"overflow\":"<<overflow.load()
        <<",\"marker_depth_preserved\":"<<markerDepthPreserved.load()
+       <<",\"recon_model_groups_hidden\":"<<reconModelGroupsHidden.load()
        <<",\"spatial_by_eye\":["<<spatialByEye[0].load()<<','<<spatialByEye[1].load()<<']'
        <<",\"hidden_panel_by_eye\":["<<hiddenPanelByEye[0].load()<<','<<hiddenPanelByEye[1].load()<<']'
        <<",\"pending\":"<<pending.size()<<",\"node_calls\":"<<nodeCalls.load()<<",\"nodes\":[";

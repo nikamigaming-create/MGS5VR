@@ -75,6 +75,11 @@ int main(int argc,char** argv){
         expect(f.controls.setting("settings.binocular_pitch_degrees")==-90,"binoculars tilt down ninety degrees into the palm by default");
         expect(f.controls.setting("settings.binocular_auto_mark")==1&&f.controls.setting("settings.binocular_mark_dwell_ms")==650,
             "binocular observation acquires visible people with a configurable dwell");
+        expect(f.controls.setting("settings.binocular_actor_glow")==1,"native recon body glow is enabled within the selected HUD view by default");
+        expect(f.load("[settings]\nbinocular_actor_glow=0\n")&&f.controls.setting("settings.binocular_actor_glow")==0,
+            "native recon body glow can be disabled independently of target acquisition");
+        expect(!f.load("[settings]\nbinocular_actor_glow=2\n")&&f.controls.setting("settings.binocular_actor_glow")==0,
+            "invalid recon glow setting preserves the last working preference");
         expect(f.load("[settings]\nbinocular_auto_mark=0\nbinocular_mark_dwell_ms=1200\n")
             &&f.controls.setting("settings.binocular_auto_mark")==0&&f.controls.setting("settings.binocular_mark_dwell_ms")==1200,
             "automatic binocular marking can be disabled and retimed");

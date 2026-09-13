@@ -25,6 +25,9 @@ constexpr bool worldHudVisible(HudMode mode,HudView view) noexcept {
     return (view==HudView::world&&mode==HudMode::full)
         ||(view==HudView::binoculars&&(mode==HudMode::full||mode==HudMode::binocularsOnly));
 }
+constexpr bool reconModelVisible(HudMode mode,HudView view,bool glow) noexcept {
+    return glow&&worldHudVisible(mode,view);
+}
 // Native scene silhouettes and the independent layout-camera person cue.
 // Draw-order numbers alone are not enough: other UI cameras reuse them.
 constexpr bool nativeReconLayer(uint32_t order,bool sceneCamera,bool layoutCamera) noexcept {

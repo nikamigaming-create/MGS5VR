@@ -165,7 +165,8 @@ ControlBindings::ControlBindings(){
         {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",0,0,2},{"settings.hud_mode",1,0,2},
         {"settings.binocular_pitch_degrees",-90,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
         {"settings.binocular_roll_degrees",0,-180,180},
-        {"settings.binocular_auto_mark",1,0,1},{"settings.binocular_mark_dwell_ms",650,100,3000}};
+        {"settings.binocular_auto_mark",1,0,1},{"settings.binocular_actor_glow",1,0,1},
+        {"settings.binocular_mark_dwell_ms",650,100,3000}};
 }
 std::vector<std::string> ControlBindings::load(std::istream& input){
     ControlBindings candidate=*this;std::vector<std::string> errors;std::set<std::string> seen;

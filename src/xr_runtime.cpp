@@ -438,6 +438,7 @@ struct Session {
         controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         controllerFrame.binocularAutoMark=controls.setting("settings.binocular_auto_mark")>=.5f;
+        controllerFrame.binocularActorGlow=controls.setting("settings.binocular_actor_glow")>=.5f;
         controllerFrame.binocularMarkDwellMs=static_cast<uint64_t>(controls.setting("settings.binocular_mark_dwell_ms"));
         const bool gameplayContext=controllerRigEnabled()&&mode!=TravelMode::unknown&&!title
             &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;

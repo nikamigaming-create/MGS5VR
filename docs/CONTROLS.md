@@ -30,6 +30,9 @@ Holding binoculars down does not enable them, and firearm scopes do not reveal
 recon cues. `full` explicitly enables world cues in normal VR too; `off` hides them.
 An existing file with `hud_mode = full` retains that preference until you edit it.
 These modes do not suppress wrist controls or the general caption/HUD layer.
+`binocular_actor_glow = 0` disables the native glowing body effect while keeping
+target acquisition and labels. `1` permits it within the selected recon view;
+it does not force the game's native glow to activate for every person.
 The native game's marker preferences still apply. Acquired people and A-Z
 waypoints use native world positions in each eye. Caption restoration is still
 incomplete, and other mission/objective labels need their own world-space adapters.

@@ -17,6 +17,13 @@ static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
     {
+        expect(!reconModelVisible(HudMode::binocularsOnly,HudView::world,true),"recon model does not leak into unaided eyes");
+        expect(reconModelVisible(HudMode::binocularsOnly,HudView::binoculars,true),"binocular view may retain native recon glow");
+        expect(!reconModelVisible(HudMode::binocularsOnly,HudView::otherOptic,true),"rifle scopes cannot reveal recon bodies");
+        expect(!reconModelVisible(HudMode::full,HudView::binoculars,false),"glow switch leaves body effect disabled even in full HUD mode");
+        expect(!reconModelVisible(HudMode::off,HudView::binoculars,true),"HUD off disables recon body rendering");
+    }
+    {
         ReconDwell dwell;constexpr uint16_t person=42,other=43;
         expect(!dwell.update(person,1000,1,650),"looking at a new person starts the recon dwell");
         for(uint64_t t=1050;t<1650;t+=50)expect(!dwell.update(person,t,1,650),"a brief glance does not acquire");

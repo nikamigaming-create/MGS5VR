@@ -20,6 +20,19 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
                        const std::array<float,16>& projection,const HeadCameraSample& rig,const std::array<float,16>& authoredView,
                        const std::array<float,16>& authoredProjection,HudView hudView);
 void clearUiRenderSource() noexcept;
+// Native recon bodies are scene models, not UI nodes. Restrict their material
+// opacity during one native scene pass and restore the exact native colors.
+class ReconModelVisibilityScope {
+public:
+    ReconModelVisibilityScope(HudMode mode,HudView view,bool glow) noexcept;
+    ~ReconModelVisibilityScope();
+    ReconModelVisibilityScope(const ReconModelVisibilityScope&)=delete;
+    ReconModelVisibilityScope& operator=(const ReconModelVisibilityScope&)=delete;
+private:
+    struct Change {uintptr_t owner{},model{};uint32_t parameter{};std::array<float,4> color{};};
+    std::array<Change,128> changes_{};
+    size_t count_{};
+};
 // Called only at the verified native UI perspective-builder return address.
 bool applyUiEyeProjection(float* output) noexcept;
 void reportUiRenderer(std::ostream& output);

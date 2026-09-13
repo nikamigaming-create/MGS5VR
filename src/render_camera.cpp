@@ -405,6 +405,8 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         drawingEye.projected=true;
         const auto eyeProjection=field<std::array<float,16>>(reinterpret_cast<void*>(source.viewport),layout.gpuProjection);
         mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,eyeProjection,source.pair.sample,authoredView,authoredProjection,hudView);
+        mgs5vr::ReconModelVisibilityScope reconVisibility(source.pair.sample.controllers.hudMode,
+            hudView,source.pair.sample.controllers.binocularActorGlow);
         result=originalScene(render,graphics,task,worker);
         mgs5vr::clearUiRenderSource();
         // Native passes may finish and replace the current deferred context.
