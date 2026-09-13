@@ -46,6 +46,9 @@ uintptr_t base{};
 std::atomic_uintptr_t playerOwner{};
 std::atomic_bool enabled{};
 bool groundQueryVerified{};
+bool scopeQueryVerified{};
+bool scopeTrace{};
+WeaponScopeZoom scopeZoom;
 std::mutex rigMutex;
 uintptr_t boundOwner{};
 uintptr_t boundModel{};
@@ -282,6 +285,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     bool nativeManipulation=false,firearmActive=false,throwableActive=false;
     std::optional<Vec3> barrelInGrip;
     std::optional<Pose> muzzleInGrip;
+    std::optional<WeaponScopeGeometry> scopeInWrist;
+    uint32_t scopeResource{};
     const auto weaponComponent=get<uintptr_t>(character+0x80);
     if(!frame.controllers.vehicleControls&&get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
         const auto instances=get<uintptr_t>(weaponComponent+0x38);
@@ -306,6 +311,30 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                     if(attachment&&socket){
                         muzzleInGrip=compose(gripFromWrist[1],compose(*attachment,*socket));
                         barrelInGrip=rotate(muzzleInGrip->orientation,{0,0,1});
+                        // The native weapon initializer at 0x1060d5f queries
+                        // this same resource's muzzle, rear and front CNPs.
+                        // +0x240 is the accepted resource handle; +0x208 is
+                        // the optical part of its copied 0x90-byte gun data.
+                        const auto points=get<uintptr_t>(weaponComponent+0x60);
+                        std::array<uint8_t,4> optical{};
+                        const auto resource=get<uint32_t>(state+0x240);
+                        if(scopeQueryVerified&&get<uintptr_t>(points)==base+0x234b840
+                           &&get<uintptr_t>(base+0x234b840+0x148)==base+0xdbdc50
+                           &&read(state+0x208,optical)&&optical[3]==1&&optical[0]>1
+                           &&resource&&(resource>>16)!=0xffff){
+                            using PointGetter=bool(*)(void*,void*,uint32_t,uint64_t);
+                            const auto point=reinterpret_cast<PointGetter>(base+0xdbdc50);
+                            alignas(16) std::array<float,16> rear{},front{};
+                            if(point(reinterpret_cast<void*>(points),rear.data(),resource,0x614d8847090eull)
+                               &&point(reinterpret_cast<void*>(points),front.data(),resource,0x786932704dd6ull)){
+                                const auto rearPose=nativeAffinePose(rear),frontPose=nativeAffinePose(front);
+                                if(rearPose&&frontPose)if(auto geometry=nativeWeaponScopeGeometry(*rearPose,*frontPose,optical)){
+                                    geometry->ocular=compose(*attachment,geometry->ocular);
+                                    geometry->objective=compose(*attachment,geometry->objective);
+                                    scopeInWrist=*geometry;scopeResource=resource;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -541,6 +570,37 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // cannot continue independently at the unconstrained input position.
         if(!attachBinocular())return false;
     }
+    if(scopeInWrist&&!frame.menuOpen){
+        // Use the completed skin, including support/reach/collision solve.
+        // Never bind the lens to an unconstrained controller or a newer pose.
+        const auto wrist=compose(*root,bone(q,p,12));
+        const auto localFromWorld=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},inverse(frame.nativePose)));
+        const auto localFromWrist=compose(localFromWorld,wrist);
+        const uint64_t identity=static_cast<uint64_t>(scopeResource)<<32|scopeInWrist->sight;
+        frame.weaponScope={compose(localFromWrist,scopeInWrist->ocular),compose(localFromWrist,scopeInWrist->objective),
+            scopeInWrist->radius,frame.controllers.scopeEyeRelief,
+            scopeZoom.update(identity,frame.controllers.weaponZoomSequence,scopeInWrist->powers),identity,true};
+        static uint64_t reported{};
+        if(reported!=identity){
+            reported=identity;std::ostringstream s;s<<"Physical weapon scope sight="<<scopeInWrist->sight
+                <<" resource="<<std::hex<<scopeResource<<std::dec<<" radius="<<scopeInWrist->radius
+                <<" power="<<frame.weaponScope.magnification<<" ocular="<<frame.weaponScope.ocular.position.x<<','
+                <<frame.weaponScope.ocular.position.y<<','<<frame.weaponScope.ocular.position.z;log(s.str());
+        }
+        static uint64_t tracedAt{};
+        if(scopeTrace&&now-tracedAt>=2000){
+            tracedAt=now;std::ostringstream s;s<<"Scope trace ocular=";
+            const auto& o=frame.weaponScope.ocular;
+            s<<o.position.x<<','<<o.position.y<<','<<o.position.z<<" q="
+                <<o.orientation.x<<','<<o.orientation.y<<','<<o.orientation.z<<','<<o.orientation.w;
+            for(size_t eye=0;eye<2;++eye){
+                const auto eyeLocal=compose(inverse(o),frame.views[eye].pose).position;
+                s<<" eye"<<eye<<'='<<eyeLocal.x<<','<<eyeLocal.y<<','<<eyeLocal.z<<" visible="
+                    <<weaponScopeEyeVisible(frame.weaponScope,frame.views[eye].pose);
+            }
+            log(s.str());
+        }
+    }
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
     std::array<Pose,2> renderedPalms;
     HandContacts handContacts;
@@ -756,9 +816,14 @@ bool controllerThrowReady() noexcept {
 }
 void installControllerRig(uintptr_t imageBase){
     base=imageBase;
+    wchar_t trace[2]{};
+    scopeTrace=GetEnvironmentVariableW(L"MGS5VR_SCOPE_TRACE",trace,2)==1&&trace[0]==L'1';
     const auto matches=[&]<size_t N>(uintptr_t rva,const std::array<unsigned char,N>& bytes){
         std::array<unsigned char,N> actual{};return read(base+rva,actual)&&actual==bytes;
     };
+    scopeQueryVerified=matches(0xdbdc50,std::array<unsigned char,17>{
+        0x4c,0x89,0x4c,0x24,0x20,0x44,0x89,0x44,0x24,0x18,0x55,0x53,0x57,0x48,0x8d,0x6c,0x24});
+    log(scopeQueryVerified?"Native named sight-point adapter enabled":"Native sight-point signature differs; weapon scopes disabled");
     groundQueryVerified=matches(0xa0fb50,std::array<unsigned char,9>{0x48,0x89,0x4c,0x24,0x08,0x48,0x83,0xec,0x18})
         &&matches(0x1b9b130,std::array<unsigned char,10>{0x48,0x83,0xec,0x38,0xf3,0x0f,0x10,0x44,0x24,0x60})
         &&matches(0x1b9a5d0,std::array<unsigned char,10>{0x4c,0x8b,0xdc,0x48,0x81,0xec,0x98,0,0,0})

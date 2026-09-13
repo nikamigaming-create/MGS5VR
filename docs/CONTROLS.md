@@ -51,13 +51,19 @@ needs a separate review.
 | Reload | **Short right B tap**; the native reload moves the support hand, then releases it |
 | Pick up a dropped weapon / carry a person | **Hold left grip, then hold B** at the native prompt; keeps native B held without equipping binoculars |
 | Switch weapon while aiming | **A** while right grip readies the weapon; A does nothing when lowered |
-| Native equipped-weapon zoom | **Left-stick click** while readied; available steps depend on the weapon |
+| Physical weapon-scope zoom | **Left-stick click** while readied; cycles the fitted scope's powers, while fixed-power sights stay fixed |
 | Read the HUD | Raise and turn your **left forearm** toward your eyes |
 
 The right hand owns the weapon grip. With support engaged, the line from the
 right controller to the left guides the authored barrel direction. The left
 hand retains the native support contact; reload animations temporarily own it.
 Reloads use a button rather than manual magazine grabbing.
+Round weapon scopes show an independent magnified scene only through the eye
+behind their rear lens; the surrounding world keeps its normal stereo view.
+Set `settings.scope_eye_relief_cm` in the controls file for the preferred
+eye-to-glass distance (10 cm by default). This does not move the rifle.
+The native full-screen zoom is not triggered by this binding.
+See [scope implementation and current coverage](WEAPON_SCOPES.md) for sight limits.
 Pickup/carry and Dive temporarily lower native aim and suppress the attack trigger.
 This prevents Dive from becoming the game's aiming-mode weapon switch. Stance
 also lowers aim. These are separate configurable actions, not automatic scope

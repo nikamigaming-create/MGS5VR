@@ -20,6 +20,25 @@ struct WeaponScopeSample {
 std::optional<EyeView> weaponScopeSceneView(const WeaponScopeSample& scope);
 bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye);
 
+struct WeaponScopeGeometry {
+    Pose ocular{},objective{}; // Equipped native weapon space; optical forward -Z.
+    float radius{};
+    uint32_t sight{};
+    std::array<uint8_t,3> powers{};
+};
+// Match the equipped CNP_REAR_SIGHT / CNP_FRONT_SIGHT pair and native optical
+// parameters to a measured round sight. Unknown/iron/holographic sights close.
+std::optional<WeaponScopeGeometry> nativeWeaponScopeGeometry(Pose rear,Pose front,
+    const std::array<uint8_t,4>& powersAndUi);
+class WeaponScopeZoom {
+public:
+    float update(uint64_t identity,uint64_t sequence,const std::array<uint8_t,3>& powers);
+private:
+    uint64_t identity_{},sequence_{};
+    std::array<uint8_t,3> powers_{};
+    unsigned step_{};
+};
+
 // The retail telescope's imported mesh frame, in metres. Both the housing
 // shader and the optical camera use these sockets.
 inline constexpr Vec3 binocularOcularCenter{-.032788f,-.000562f,.05512f};

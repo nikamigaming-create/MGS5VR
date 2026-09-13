@@ -13,11 +13,22 @@ single-player; the native Pause / Disconnect action switches the mission offline
 The title percentage is not per-equipment coverage. Stock test loadouts are being
 prepared to avoid the downloaded save's modified custom-weapon configurations.
 
-Weapon scopes now have a separate objective-camera render path and an aperture,
-reticle and eye-relief model. **Equipped native sight/socket binding is not yet
-connected**, so this does not announce working per-weapon scopes. The binocular
-path remains separate. All-weapons/all-gadgets coverage and the final combined
-showcase are still incomplete.
+The 7CD5079A optics follow-up connects the equipped native resource's rear/front
+sight sockets to the completed weapon/skin frame. A real SIM run of stock
+`EQP_WP_60204` (BAMBETOV SV, native sight 17) shows its fixed 4× image/reticle in
+the aligned right eye and an ordinary unzoomed left-eye view. Two tracked shots
+were issued, and its partial reload returned the wrist ammunition display to
+9/31 (including a chambered round). The lens returns after reload/motion and
+closes when lowered. Fixed-power zoom remains 4×. Impact/obstruction, empty
+reload, other sights and individual grades remain to be exercised.
+
+This run also found a reticle shader compilation error in the earlier B1E1D8C8
+build; the 13.1 hotfix corrects it and adds a real shader/draw pixel test. On the
+fixed build, binocular hold-B equip, 2×/4× lenses, two-hand support and B stow were
+rerun. Private process-audio takes are `tpp-physical-sniper-04-av.mp4` (24.669 s)
+and `tpp-binocular-restored-05-av.mp4` (25.135 s). The native video source precedes
+runtime optical aspect/crop; final both-eye screenshots were reviewed separately.
+All-weapons/all-gadgets coverage and the final combined showcase are incomplete.
 
 Fresh-install binocular import now succeeds from the owner's `chunk0.dat` and
 `texture0.dat`, reproducing both exact working local asset hashes without

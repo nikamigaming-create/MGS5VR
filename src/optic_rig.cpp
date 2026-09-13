@@ -36,6 +36,50 @@ bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye){
     return lateral<=scope.radius*scope.radius&&facing(scope.ocular,eye)>.75f;
 }
 
+std::optional<WeaponScopeGeometry> nativeWeaponScopeGeometry(Pose rear,Pose front,
+    const std::array<uint8_t,4>& optical){
+    if(!finitePose(rear)||!finitePose(front)||optical[3]!=1||facing(rear,front)<.999f)return {};
+    const auto delta=compose(inverse(rear),front).position;
+    if(std::abs(delta.x)>.001f||std::abs(delta.y)>.001f||delta.z<=0)return {};
+    // Measurements from the owned sight FMDL aperture and named FCNP pair.
+    // Length identifies the assembled sight, not the weapon's name/grade.
+    // Insets place the portal at the glass, 0.2 mm toward the eye to avoid
+    // coincident native depth. This table contains no retail mesh or texture.
+    struct Profile{uint32_t sight;float length,radius,inset;std::array<uint8_t,3> powers;};
+    static constexpr std::array<Profile,14> profiles{{
+        {6,.124000f,.00706f,-.0002f,{2,0,0}},
+        {7,.193248f,.01334f,.00758f,{3,0,0}},
+        {9,.224005f,.01691f,-.0002f,{3,0,0}},
+        {10,.260614f,.01764f,.00940f,{3,0,0}},
+        {11,.194981f,.01701f,-.0002f,{2,6,0}},
+        {12,.346509f,.01764f,.01763f,{3,0,0}},
+        {13,.219000f,.01200f,.00780f,{4,0,0}},
+        {14,.422982f,.01800f,-.00622f,{2,4,8}},
+        {15,.289000f,.01498f,.00180f,{4,0,0}},
+        {16,.291000f,.01699f,-.0002f,{2,4,8}},
+        {17,.281990f,.01341f,.00416f,{4,0,0}},
+        {18,.308000f,.02000f,-.0002f,{4,0,0}},
+        {19,.378000f,.01432f,.000737f,{2,6,0}},
+        {20,.403998f,.02174f,-.0002f,{4,6,8}}
+    }};
+    const std::array<uint8_t,3> powers{optical[0],optical[1],optical[2]};
+    const auto found=std::find_if(profiles.begin(),profiles.end(),[&](const auto& p){
+        return std::abs(p.length-delta.z)<.0005f&&p.powers==powers;
+    });
+    if(found==profiles.end())return {};
+    const Pose basis{{0,1,0,0},{}};
+    const auto ocular=compose(rear,compose(Pose{{},{0,0,found->inset}},basis));
+    return WeaponScopeGeometry{ocular,compose(front,basis),found->radius,found->sight,powers};
+}
+float WeaponScopeZoom::update(uint64_t identity,uint64_t sequence,const std::array<uint8_t,3>& powers){
+    unsigned count=0;for(const auto power:powers){if(!power)break;if(power>16)return 1; ++count;}
+    if(!identity||!count)return 1;
+    if(identity!=identity_||powers!=powers_||sequence<sequence_){
+        identity_=identity;powers_=powers;step_=0;
+    }else if(sequence!=sequence_)step_=(step_+static_cast<unsigned>((sequence-sequence_)%count))%count;
+    sequence_=sequence;return static_cast<float>(powers[step_]);
+}
+
 std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     Pose leftAim,Pose rightAim,bool leftTracked,bool rightTracked,
     bool leftAimTracked,bool rightAimTracked,bool leftHeld,bool rightHeld){

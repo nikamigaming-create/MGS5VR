@@ -308,7 +308,10 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     // same simulation/hand publication and only one native present is queued.
     const auto& optic=source.pair.sample.controllers.optic;
     const auto& scope=source.pair.sample.weaponScope;
-    const auto scopeView=!optic.held&&!source.pair.sample.menuOpen?mgs5vr::weaponScopeSceneView(scope):std::nullopt;
+    const bool scopeAtEye=std::any_of(source.pair.sample.views.begin(),source.pair.sample.views.end(),
+        [&](const auto& eye){return mgs5vr::weaponScopeEyeVisible(scope,eye.pose);});
+    const auto scopeView=!optic.held&&!source.pair.sample.menuOpen&&scopeAtEye
+        ?mgs5vr::weaponScopeSceneView(scope):std::nullopt;
     const auto opticView=optic.held?mgs5vr::binocularSceneView(optic.pose,
         source.pair.sample.controllers.magnification):scopeView;
     mgs5vr::ComPtr<ID3D11Texture2D> opticScene;

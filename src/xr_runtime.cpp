@@ -103,6 +103,7 @@ struct Session {
     RigInput rigControls;
     RigOptics opticsControls;
     bool binocularSelected{};
+    uint64_t weaponZoomSequence{};
     SnapTurn snapControls;
     OpticStabilizer opticStabilizer;
     float snapYaw{};
@@ -343,6 +344,7 @@ struct Session {
         controllerFrame.equipmentLabels=equipmentLabels;
         controllerFrame.wristSurfaceLift=controls.setting("settings.wrist_surface_lift_cm")*.01f;
         controllerFrame.wristSelectorHeight=controls.setting("settings.wrist_selector_height_cm")*.01f;
+        controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         const bool right=controllerFrame.hands[1].gripTracked;
         // OpenXR action activity is independent of optical pose tracking.
         // Occluding a controller must not release B or the held wrist trigger.
@@ -601,10 +603,11 @@ struct Session {
                 activeControl("gameplay.stance")||activeControl("binoculars.stance"),
                 activeControl("gameplay.dive")||activeControl("binoculars.dive"),
                 activeControl("gameplay.pickup_carry"),activeControl("gameplay.switch_weapon")});
-            // Native zoom is a separate action from Dive. Never send it while
-            // lowered: native right-click has other context-dependent jobs.
-            if(controllerFrame.weaponReady&&activeControl("gameplay.zoom"))pad.buttons|=XINPUT_GAMEPAD_RIGHT_THUMB;
+            // A physical scope owns magnification. Native R3 would also enter
+            // the desktop fullscreen sight and change its world camera.
+            if(controllerFrame.weaponReady&&activeControl("gameplay.zoom"))++weaponZoomSequence;
         }
+        controllerFrame.weaponZoomSequence=weaponZoomSequence;
         if(rigInput&&!stickNavigation){pad.rightX=0;pad.rightY=0;}
         const float turnAxis=activeControl("turn.right")?1.f:activeControl("turn.left")?-1.f:0.f;
         const auto turn=snapControls.update(turnAxis,0,rigInput&&!stickNavigation&&!center&&!headToggle&&!utilityCenter)

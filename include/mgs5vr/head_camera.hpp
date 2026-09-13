@@ -36,6 +36,8 @@ struct ControllerFrame {
     std::array<std::array<char,96>,4> equipmentLabels{};
     float wristSurfaceLift{.02f},wristSelectorHeight{.12f};
     float magnification{1};
+    uint64_t weaponZoomSequence{};
+    float scopeEyeRelief{.1f};
     std::array<float,2> strikeCurl{};
     bool commandControls{};
     OpticSample optic{};

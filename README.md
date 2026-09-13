@@ -2,7 +2,7 @@
 
 Play **Metal Gear Solid V: The Phantom Pain in VR**, with tracked hands and a HUD on your left wrist.
 
-**[Download MGS5VR for Windows](https://github.com/nikamigaming-create/MGS5VR/releases/download/experimental-2026-09-13/MGS5VR-experimental-2026-09-13.zip)**
+**[Download MGS5VR for Windows](https://github.com/nikamigaming-create/MGS5VR/releases/download/experimental-2026-09-13.1/MGS5VR-experimental-2026-09-13.1.zip)**
 
 You need your own PC copy of **TPP 1.0.15.4** and a PC-connected VR headset. Tested on **Quest 3 + Touch controllers**; other headsets are unverified. This is an experimental mod.
 
@@ -53,6 +53,8 @@ supports per-mode buttons, taps, holds, release actions and combinations.
 - **Install or launch trouble:** [setup help](docs/ADVANCED_SETUP.md#quick-setup-help). You may need the [Microsoft Visual C++ x64 runtime](https://aka.ms/vc14/vc_redist.x64.exe).
 - **Remove the mod:** close MGSV, double-click **Uninstall.cmd**, and select the same `mgsvtpp.exe`.
 
-Per-weapon magnified scopes, native binocular marking, powered arms and physical body grabs remain unfinished. Complete weapon/gadget coverage and GZ tracked first-person are still in progress. [Current status](docs/STATUS.md) · [Known interaction gaps](docs/SYSTEMS_ACCESS.md)
+The optics hotfix restores binocular lens rendering and connects TPP's round weapon scopes to their native sight sockets. BAMBETOV SV's fixed 4× scope has been exercised in SIM; other sights and weapon variants are still being checked. [Scope controls and coverage](docs/WEAPON_SCOPES.md).
+
+Complete weapon/gadget coverage, some reconnaissance/powered-arm interactions, physical body grabs and GZ tracked first-person remain unfinished. [Current status](docs/STATUS.md) · [Known interaction gaps](docs/SYSTEMS_ACCESS.md)
 
 Community project, not affiliated with Konami. [MIT license](LICENSE) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md) · [Build from source](docs/ADVANCED_SETUP.md#build-from-source)

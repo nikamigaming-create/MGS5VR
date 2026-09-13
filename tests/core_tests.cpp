@@ -31,6 +31,23 @@ int main(){
         moved=scope;moved.weaponIdentity=0;expect(!weaponScopeSceneView(moved),"unidentified weapon cannot publish a scope");
         moved=scope;moved.objective.position.z=0;expect(!weaponScopeSceneView(moved),"reversed native scope socket is rejected");
         moved=scope;moved.magnification=std::numeric_limits<float>::quiet_NaN();expect(!weaponScopeSceneView(moved),"invalid scope power is rejected");
+        const Pose rear{{},{0,.025f,-.0979877f}},front{{},{0,.025f,.1840025f}};
+        const auto geometry=nativeWeaponScopeGeometry(rear,front,{4,0,0,1});
+        expect(geometry&&geometry->sight==17&&near(geometry->radius,.01341f),"native named CNP pair selects measured BAMBETOV sight");
+        expect(geometry&&rotate(geometry->ocular.orientation,{0,0,-1}).z>.999f,"native +Z barrel becomes optical -Z without reflection");
+        expect(geometry&&near(geometry->ocular.position.z,rear.position.z+.00416f),"scope aperture follows authored glass plane");
+        expect(!nativeWeaponScopeGeometry(front,rear,{4,0,0,1}),"reversed native CNP names cannot open scope");
+        expect(!nativeWeaponScopeGeometry(rear,front,{4,0,0,2}),"reflex sight cannot borrow round scope profile");
+        expect(!nativeWeaponScopeGeometry(rear,front,{8,0,0,1}),"different native optic parameters cannot borrow a scope profile");
+        const Pose fixtureMove{{0,.38268343f,0,.92387953f},{3,-2,4}};
+        const auto transformed=nativeWeaponScopeGeometry(compose(fixtureMove,rear),compose(fixtureMove,front),{4,0,0,1});
+        expect(geometry&&transformed&&same(transformed->ocular.position,compose(fixtureMove,geometry->ocular).position),"sight attachment stays rigid through weapon motion");
+        WeaponScopeZoom zoom;
+        expect(near(zoom.update(42,7,{2,4,8}),2),"new scope starts at native lowest power");
+        expect(near(zoom.update(42,8,{2,4,8}),4),"one zoom click selects next native power");
+        expect(near(zoom.update(42,8,{2,4,8}),4),"duplicate skin publication cannot double zoom");
+        expect(near(zoom.update(42,10,{2,4,8}),2),"multiple zoom clicks wrap through native powers");
+        expect(near(zoom.update(43,11,{4,0,0}),4)&&near(zoom.update(43,12,{4,0,0}),4),"fixed-power scope never fabricates another zoom step");
     }
     {
         const std::array<EyeView,2> views{{

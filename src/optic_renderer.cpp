@@ -450,8 +450,8 @@ float4 main(PSIn input) : SV_TARGET {
     if(sampleCenter.w>0.5) {
         // A world-scale weapon reticle: never a head-locked aiming overlay.
         float2 pixelWidth=max(fwidth(input.aperture),float2(0.0001,0.0001));
-        float2 line=1.0-smoothstep(pixelWidth*0.65,pixelWidth*1.35,abs(input.aperture));
-        float cross=max(line.x,line.y);
+        float2 stroke=1.0-smoothstep(pixelWidth*0.65,pixelWidth*1.35,abs(input.aperture));
+        float cross=max(stroke.x,stroke.y);
         color.rgb=lerp(color.rgb,float3(0.01,0.01,0.01),cross);
     }
     float edge=1.0-smoothstep(0.92,1.0,length(input.aperture));
@@ -500,6 +500,7 @@ struct Resources {
     bool attempted{};
     bool ready{};
     bool lensReady{};
+    bool lensAttempted{};
     bool reported{};
     bool lensReported{};
     bool lensFailureReported{};
@@ -516,7 +517,9 @@ void logHresult(const char* what,HRESULT result,ID3DBlob* errors){
     std::string message=what;message+=" hr=0x";char hex[16]{};
     std::snprintf(hex,sizeof(hex),"%08lx",static_cast<unsigned long>(result));message+=hex;
     if(errors&&errors->GetBufferPointer()&&errors->GetBufferSize()){
-        message+=" ";message.append(static_cast<const char*>(errors->GetBufferPointer()),errors->GetBufferSize());
+        const auto* errorText=static_cast<const char*>(errors->GetBufferPointer());
+        auto errorBytes=errors->GetBufferSize();while(errorBytes&&errorText[errorBytes-1]=='\0')--errorBytes;
+        message+=" ";message.append(errorText,errorBytes);
     }
     mgs5vr::log(message);
 }
@@ -531,7 +534,8 @@ bool compile(ID3D11Device* device,const char* source,const char* profile,ID3DBlo
 
 bool createLensResources(ID3D11Device* device){
     if(resources.lensReady)return true;
-    if(!device)return false;
+    if(!device||resources.lensAttempted)return false;
+    resources.lensAttempted=true;
     const std::array<LensVertex,4> vertices{{
         {{ocularCenter.x-ocularRadius,ocularCenter.y-ocularRadius,ocularCenter.z},{-1,-1}},
         {{ocularCenter.x-ocularRadius,ocularCenter.y+ocularRadius,ocularCenter.z},{-1,1}},

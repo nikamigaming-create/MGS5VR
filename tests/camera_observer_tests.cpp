@@ -184,6 +184,7 @@ int consumerChecks(){
     return failures;
 }
 }
+int opticRendererChecks();
 int main(){
     // A synthetic setter with the independently verified instruction layout.
     // This validates our detour/shim; it does not identify a retail camera.
@@ -210,5 +211,6 @@ int main(){
     MH_DisableHook(code);MH_RemoveHook(code);VirtualFree(code,0,MEM_RELEASE);
     std::cout<<"100 synthetic setter calls through camera observer; "<<failures<<" failures. Not in-game camera proof.\n";
     failures+=consumerChecks();failures+=visibilityChecks();MH_Uninitialize();
+    failures+=opticRendererChecks();
     return failures?1:0;
 }

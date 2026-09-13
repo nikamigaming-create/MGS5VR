@@ -7,15 +7,20 @@ Current source/build changes: annotated editable controller configuration with
 tap/hold/chord bindings; separated Touch face buttons from Vive/WMR fallback
 actions; deliberate four-category wrist selection fitted to both eyes; carried
 binoculars with their independent magnified scene; automatic owned binocular
-asset import; and a repaired ACC-to-mission camera handoff. The current Release
-DLL is `B1E1D8C84815F3F59141A8DDDC3F2563630EE58BF3D7AA1C9A4E4CF6FB5E4EDE`.
-Nine automated suites pass, plus the installer fixtures and a fresh owned-asset
-import. See [the actual both-game SIM coverage](DUAL_GAME_SIM_COVERAGE.md).
+asset import; and a repaired ACC-to-mission camera handoff. The September 13.1
+optics hotfix fixes a reticle shader compilation failure and connects round
+weapon scopes to the native equipped resource and authored sight sockets.
+Its DLL is `7CD5079A5512B9EAF383FCAA6C23C9AE186DAF2B679E7C586C666A1AA29B407E`.
+Nine automated suites pass, now including an asset-free rendered lens/reticle
+pixel check. A fresh SIM run shows BAMBETOV SV's fixed 4× physical lens, two
+tracked shots, a partial reload, motion and lens closure when lowered.
+Binocular 2×/4×, support and stow were rerun on the same build.
+See [the actual both-game SIM coverage](DUAL_GAME_SIM_COVERAGE.md).
 
-Still unfinished: native per-weapon scope attachment/zoom, complete weapon and
+Still unfinished: complete per-weapon/sight coverage, complete weapon and
 gadget coverage, some powered-arm/reconnaissance interactions, Ground Zeroes'
 tracked first-person rig, and the complete combined showcase. The separate
-weapon-scope render path is groundwork, not a connected gameplay feature.
+weapon-scope adapter has round-sight calibrations, not a completed all-weapons claim.
 GZ's independent native third-person stereo remains an explicit experiment.
 
 ## Earlier September 9 release
