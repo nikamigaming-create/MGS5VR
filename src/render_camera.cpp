@@ -367,6 +367,11 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         sceneRenderPass=pass;
         const bool lensPass=extraPass&&pass==0;
         const uint32_t eye=lensPass?2u:pass-extraPass;
+        // Share this pass role with native UI workers and custom markers.
+        // Equipping binoculars is not recon vision; the source-frame optic
+        // must be aligned with the eye. A rifle's lens is never binoculars.
+        const auto hudView=mgs5vr::hudViewForPass(eye,optic.held&&optic.active
+            &&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular);
         saved.restore();eyeViewport=source.viewport;clipProjection=gpuProjection=false;
         drawingEye={lensPass?*opticView:source.pair.sample.views[eye],id,source.pair.sample.trackingSequence,status.activation,source.pair.sample.sampleTime,eye,false,false};
         // FOX sky/lighting expects a centered render projection. Keep the
@@ -399,7 +404,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousProjection),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(eyeView));
         drawingEye.projected=true;
         const auto eyeProjection=field<std::array<float,16>>(reinterpret_cast<void*>(source.viewport),layout.gpuProjection);
-        mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,eyeProjection,source.pair.sample,authoredView,authoredProjection);
+        mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,eyeProjection,source.pair.sample,authoredView,authoredProjection,hudView);
         result=originalScene(render,graphics,task,worker);
         mgs5vr::clearUiRenderSource();
         // Native passes may finish and replace the current deferred context.
@@ -412,7 +417,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             std::array<float,16> opticProjection{};
             std::memcpy(opticProjection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(opticProjection));
             if(!mgs5vr::capturePhysicalOpticScene(afterContext,eyeView,opticProjection,native.position,opticScene.GetAddressOf(),
-                !scopeView&&mgs5vr::worldHudVisible(source.pair.sample.controllers.hudMode,2),&markerSnapshot))
+                mgs5vr::worldHudVisible(source.pair.sample.controllers.hudMode,hudView),&markerSnapshot))
                 mgs5vr::log("Physical optic scene copy unavailable; retaining normal head views");
             continue;
         }
@@ -437,7 +442,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         }
         if(titleSurface)mgs5vr::drawNativeMenuSurface(afterContext,eyeView,drawingEye.view.fov,source.pair.sample.menuPanel);
         const auto& wrist=source.pair.sample;
-        if(!titleSurface&&!wrist.menuOpen&&mgs5vr::worldHudVisible(wrist.controllers.hudMode,eye))
+        if(!titleSurface&&!wrist.menuOpen&&mgs5vr::worldHudVisible(wrist.controllers.hudMode,hudView))
             mgs5vr::drawWorldWaypoints(afterContext,eyeView,eyeProjection,native.position,markerSnapshot);
         if(!titleSurface&&!wrist.menuOpen&&wrist.wristPanelTracked&&wrist.controllers.equipmentOpen&&!wrist.controllers.equipmentCategory)
             mgs5vr::drawWristCategorySelector(afterContext,eyeView,drawingEye.view.fov,

@@ -71,7 +71,8 @@ int main(int argc,char** argv){
     }
     {
         Fixture f;
-        expect(f.controls.setting("settings.hud_mode")==0,"full world HUD is the default");
+        expect(f.controls.setting("settings.hud_mode")==1,"binocular-only recon is the default");
+        expect(f.controls.setting("settings.binocular_pitch_degrees")==-90,"binoculars tilt down ninety degrees into the palm by default");
         expect(f.load("[settings]\nhud_mode=binoculars_only\n")&&f.controls.setting("settings.hud_mode")==1,
             "binocular-only world HUD is configurable");
         expect(f.load("[settings]\nhud_mode=off\n")&&f.controls.setting("settings.hud_mode")==2,

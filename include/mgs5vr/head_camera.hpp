@@ -36,7 +36,7 @@ struct ControllerFrame {
     unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
     std::array<std::array<char,96>,4> equipmentLabels{};
     float wristSurfaceLift{.02f},wristSelectorHeight{.12f},wristPickerWidth{.75f};
-    HudMode hudMode{HudMode::full};
+    HudMode hudMode{HudMode::binocularsOnly};
     float magnification{1};
     uint64_t weaponZoomSequence{};
     float scopeEyeRelief{.1f};

@@ -162,8 +162,8 @@ ControlBindings::ControlBindings(){
     settings_={{"settings.snap_turn_degrees",30,5,90},{"settings.motion_melee",1,0,1},{"settings.animal_touch",1,0,1},
         {"settings.wrist_surface_lift_cm",2,0,10},{"settings.wrist_selector_height_cm",12,5,30},
         {"settings.wrist_picker_width_cm",75,42,100},
-        {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",0,0,2},{"settings.hud_mode",0,0,2},
-        {"settings.binocular_pitch_degrees",0,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
+        {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",0,0,2},{"settings.hud_mode",1,0,2},
+        {"settings.binocular_pitch_degrees",-90,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
         {"settings.binocular_roll_degrees",0,-180,180}};
 }
 std::vector<std::string> ControlBindings::load(std::istream& input){

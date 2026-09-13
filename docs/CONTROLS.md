@@ -20,8 +20,11 @@ the repository copy is a template. Every supported button action is listed,
 with separate gameplay, binocular, wrist, menu, horse and vehicle sections.
 The bindings below describe the defaults, not a hard-coded layout.
 
-`[settings] hud_mode = full` shows world cues in normal VR and binoculars.
-`binoculars_only` confines them to the binoculars; `off` hides them.
+`[settings] hud_mode = binoculars_only` is the default: enhanced world cues
+appear only in the binocular scene while the device is aligned with an eye.
+Holding binoculars down does not enable them, and firearm scopes do not reveal
+recon cues. `full` explicitly enables world cues in normal VR too; `off` hides them.
+An existing file with `hud_mode = full` retains that preference until you edit it.
 These modes do not suppress wrist controls or the general caption/HUD layer.
 The native game's marker preferences still apply. Acquired people and A-Z
 waypoints use native world positions in each eye. Caption restoration is still
@@ -236,6 +239,10 @@ aperture at all distances; it never expands into a full-screen zoom. Its image
 keeps the same left/right orientation as the unzoomed world. Waypoint letters and acquired-person distances are
 drawn inside this view. Automatic identification by dwelling on a person and
 intel analysis are not implemented; marking currently requires the trigger.
+The default `binocular_pitch_degrees = -90` tilts the device down 90° around the
+right palm, without twisting the wrist along with it. The housing, lens, aiming
+ray and opposite-hand contact share that rotation. Set this under `[settings]`
+in your existing controls file to apply the new fit; `0` restores the old angle.
 Tracked first-person hands remain fully opaque, including when a wrist, finger,
 or binocular approaches the face. The shoulders follow physical head yaw so turning
 does not leave the sleeve roots in the old game-camera direction.

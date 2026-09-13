@@ -24,11 +24,21 @@ int main(){
             "command layers require the active command context");
         expect(hudLayer(52,100,false,false)==HudLayer::context&&hudLayer(147,135,false,false)==HudLayer::status,
             "wrist action and status stay separate from general HUD");
-        expect(worldHudVisible(HudMode::full,0)&&worldHudVisible(HudMode::full,1)&&worldHudVisible(HudMode::full,2),
-            "full HUD exposes world cues in both eyes and optics");
-        expect(!worldHudVisible(HudMode::binocularsOnly,0)&&!worldHudVisible(HudMode::binocularsOnly,1)
-            &&worldHudVisible(HudMode::binocularsOnly,2),"binocular-only preference does not leak into normal eyes");
-        expect(!worldHudVisible(HudMode::off,0)&&!worldHudVisible(HudMode::off,2),"world HUD can be disabled");
+        expect(worldHudVisible(HudMode::full,HudView::world)&&worldHudVisible(HudMode::full,HudView::binoculars),
+            "full HUD exposes world cues in ordinary vision and binoculars");
+        expect(ControllerFrame{}.hudMode==HudMode::binocularsOnly,"unconfigured source frames default to normal unaided vision");
+        for(const auto mode:{HudMode::full,HudMode::binocularsOnly,HudMode::off}){
+            for(unsigned eye=0;eye<2;++eye)for(bool binocularAtEye:{false,true}){
+                const auto view=hudViewForPass(eye,binocularAtEye);
+                expect(view==HudView::world&&worldHudVisible(mode,view)==(mode==HudMode::full),
+                    "raising binoculars never enables enhanced information across an ordinary eye image");
+            }
+            expect(worldHudVisible(mode,hudViewForPass(2,true))==(mode!=HudMode::off),
+                "enhanced information belongs to the aligned binocular scene only");
+            expect(!worldHudVisible(mode,hudViewForPass(2,false)),
+                "weapon scopes and binoculars held away from the eye do not reveal recon information");
+            expect(!worldHudVisible(mode,hudViewForPass(3,true)),"unknown render passes cannot reveal recon information");
+        }
     }
     {
         struct Launcher{uint32_t sight;Vec3 rear;float length,radius,inset;};
@@ -357,6 +367,24 @@ int main(){
         }
         const auto correction=binocularGripRotation(20,-30,15);
         const auto corrected=solveBinocularPose({},quarterTurnGrip,{},Pose{},false,true,false,true,false,true,correction);
+        expect(corrected&&same(corrected->primaryGrip.position,calibrated->primaryGrip.position)
+            &&same(rotate(corrected->primaryGrip.orientation,{0,-1,0}),rotate(calibrated->primaryGrip.orientation,{0,-1,0}))
+            &&same(rotate(corrected->primaryGrip.orientation,{0,0,-1}),rotate(calibrated->primaryGrip.orientation,{0,0,-1})),
+            "device fit leaves the primary palm and wrist orientation unchanged");
+        const auto down=solveBinocularPose({},quarterTurnGrip,{},Pose{},false,true,false,true,false,true,binocularGripRotation(-90,0,0));
+        const auto downSupport=compose(down->body,Pose{{},binocularSupportSocket});
+        const auto downSupported=solveBinocularPose(downSupport,quarterTurnGrip,Pose{},Pose{},true,true,true,true,true,true,binocularGripRotation(-90,0,0));
+        expect(down&&same(down->ray.direction,{0,-1,0})
+            &&same(down->primaryGrip.position,calibrated->primaryGrip.position)
+            &&same(rotate(down->primaryGrip.orientation,{0,-1,0}),rotate(calibrated->primaryGrip.orientation,{0,-1,0}))
+            &&same(rotate(down->primaryGrip.orientation,{0,0,-1}),rotate(calibrated->primaryGrip.orientation,{0,0,-1}))
+            &&same(down->ray.direction,rotate(down->renderBody.orientation,{0,0,-1}))
+            &&same(down->ray.direction,rotate(down->rightEyepiece.orientation,{0,0,-1})),
+            "minus ninety pitches housing, lens and ray DOWN about the stationary palm, not the whole hand");
+        expect(downSupported&&downSupported->supportHeld
+            &&same(downSupported->supportGrip.position,downSupport.position)
+            &&same(rotate(downSupported->supportGrip.orientation,{0,-1,0}),rotate(calibrated->primaryGrip.orientation,{0,-1,0})),
+            "opposite palm follows the rotated housing contact without acquiring the fit as wrist twist");
         const Pose handMove{{0,.258819f,0,.965926f},{.1f,.02f,-.03f}};
         const auto resolved=attachBinocularToPalm(*corrected,compose(handMove,corrected->primaryGrip));
         const auto resolvedAgain=attachBinocularToPalm(*resolved,resolved->primaryGrip);

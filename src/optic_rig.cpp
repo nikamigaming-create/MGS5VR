@@ -111,10 +111,13 @@ std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     const auto aimFromGrip=compose(inverse(rightGrip),rightAim);
     if(!valid(Pose{aimFromGrip.orientation,{}}))return {};
     // Use THIS controller's grip-to-aim frame, not a simulator's neutral
-    // wrist quaternion. The optic points along the controller aim -Z while
-    // its palm socket stays exactly at the tracked grip position. The old
-    // fixed ~76-degree pitch made a physical Touch wrist bend back at the face.
+    // wrist quaternion. The optic starts at controller aim -Z, then applies
+    // the configured device fit about the stationary tracked palm socket.
     const Pose gripToBody=compose(Pose{aimFromGrip.orientation,{}},Pose{gripRotation,{}});
+    // Fit rotates the DEVICE around the palm, not the wrist along with it.
+    // Cancel that fit in the anatomical contacts or the IK hands follow the
+    // housing and a 90-degree adjustment changes nothing about the actual grip.
+    const auto palmInBody=compose(inverse(Pose{gripRotation,{}}),Pose{binocularPalmOrientation,{}}).orientation;
     // Seat the housing against the inside of the right palm. The rear ocular
     // remains behind the fingers, so bringing it to the eye does not bring
     // the wrist through the near plane.
@@ -141,7 +144,7 @@ std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     // Merely squeezing the left controller must not teleport that hand onto
     // the binoculars: it has to be tracked, aimed, held, and physically close
     // to this authored socket.
-    const auto supportSocket=compose(body,Pose{binocularPalmOrientation,binocularSupportSocket});
+    const auto supportSocket=compose(body,Pose{palmInBody,binocularSupportSocket});
     const float supportDistance=finitePose(leftGrip)&&finitePose(supportSocket)
         ?distance(leftGrip.position,supportSocket.position):std::numeric_limits<float>::infinity();
     const bool supportHeld=leftHeld&&leftTracked&&leftAimTracked
@@ -164,7 +167,7 @@ std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     result.primaryRight=true;
     result.supportHeld=supportHeld;
     result.supportGrip=supportHeld?supportSocket:leftGrip;
-    result.primaryGrip=compose(body,Pose{binocularPalmOrientation,binocularPrimarySocket});
+    result.primaryGrip=compose(body,Pose{palmInBody,binocularPrimarySocket});
     result.stability=supportHeld?1.f:.35f;
     result.ray=ray;
     return result;

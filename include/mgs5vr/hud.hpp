@@ -3,6 +3,9 @@
 
 namespace mgs5vr {
 enum class HudMode { full, binocularsOnly, off };
+// A lens render is not necessarily a recon device: firearm scopes and a
+// binocular held away from the eye must not gain enhanced target information.
+enum class HudView { world, binoculars, otherOptic };
 enum class HudLayer { general, worldLabels, context, status, equipment, commands };
 
 // TPP's fixed layout cameras share draw-order numbers. Camera depth and the
@@ -15,7 +18,11 @@ constexpr HudLayer hudLayer(uint32_t order,float cameraDepth,bool items,bool com
     if(order>=146&&order<=148)return HudLayer::status;
     return HudLayer::general;
 }
-constexpr bool worldHudVisible(HudMode mode,unsigned eye) noexcept {
-    return mode==HudMode::full||(mode==HudMode::binocularsOnly&&eye==2);
+constexpr HudView hudViewForPass(unsigned eye,bool binocularAtEye) noexcept {
+    return eye<2?HudView::world:eye==2&&binocularAtEye?HudView::binoculars:HudView::otherOptic;
+}
+constexpr bool worldHudVisible(HudMode mode,HudView view) noexcept {
+    return (view==HudView::world&&mode==HudMode::full)
+        ||(view==HudView::binoculars&&(mode==HudMode::full||mode==HudMode::binocularsOnly));
 }
 }

@@ -6,7 +6,7 @@ This is the current issue inventory, not a claim that all entries are fixed.
 | Report | Current change / remaining work |
 | --- | --- |
 | Right-stick up sprints out of prone | Default Sprint moved to left-stick click; grip + left-click zoom consumes Sprint. |
-| Binocular grip requires a 90-degree wrist twist | Separate controller aim from authored anatomical palm contact; palms/fingers cup the housing. Final skin reattachment moves housing, ray and lens together. Headset fit needs the tester's confirmation. |
+| Binocular grip requires a 90-degree wrist twist | Default device pitch is now -90 degrees (down), about the stationary palm. Fit no longer rotates the anatomical hand along with the housing. The opposite contact, housing, ray and lens stay attached through final skin reattachment. Existing configs with explicit pitch 0 need -90. Headset ergonomics remain unverified. |
 | Disable snap, restore smooth turning | `settings.turn_mode = native_smooth`; native yaw sensitivity, tracked HMD pitch. |
 | Horse / vehicle forward decoupled from viewing | Mounted right stick now sends native horizontal camera input, with artificial snap offset removed. Native steering remains native, not head-relative driving. Physical result unconfirmed. |
 | Body / camera center drifts; visible in cardboard box | Fixed a world-space snap-pivot accumulator that failed to follow native camera yaw; regression covers leaned snap → native yaw → recenter. Left grip + Menu clears the offset without changing facing. Collision-following roomscale and the tester's full cardboard-box case are not marked fixed. |
@@ -25,3 +25,19 @@ Front-end tracked arms are now excluded at native player publication, before
 draw preparation; the title scene no longer contains floating controller hands.
 The tracked rig is not applied to title animation. Gameplay restores the arm
 groups and retains the existing opaque-hand policy and native shadows.
+
+The requested recon policy now defaults to binoculars-only. Native scene intel
+layers and reprojected markers share an explicit view role: ordinary world,
+eye-aligned binoculars, or other optics. Holding the device down and aiming
+through a weapon scope do not enable binocular intel. Captions, interaction
+prompts, native menus and wrist status are separate. This policy does not add
+the still-missing automatic target analysis or GZ UI adapter.
+
+In the current SIM field case, binoculars-only removes the A waypoint and
+scene-camera yellow glows from normal vision and restores the waypoint at the
+ocular. A small native green person icon remains outside the device; complete
+native marker/silhouette suppression is not yet claimed.
+
+The downward-fit SIM run shows the revised right-hand wrap in carry and raised
+poses, a live ocular, left-hand support and release. This checks the rendered
+attachment; physical headset comfort remains for the tester to assess.

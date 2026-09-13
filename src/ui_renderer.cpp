@@ -41,7 +41,8 @@ struct Source {
     std::array<float,16> authoredView{},authoredProjection{};
     float pickerWidth{.75f};
     Pose hudPanel{};
-    HudMode hudMode{HudMode::full};
+    HudMode hudMode{HudMode::binocularsOnly};
+    HudView hudView{HudView::world};
     std::array<float,16> projection{};
 };
 thread_local Source producing,executing;
@@ -132,8 +133,8 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
         const bool worldIntel=field<uintptr_t>(state,0x308)==executing.camera&&(order==2||order==3);
         // Native scene-camera target cues follow the device view. Flat HUD
         // labels are replaced by native world-position labels in the lens.
-        if(executing.eye.eye==2)return worldIntel&&worldHudVisible(executing.hudMode,2)?originalNode(state,item):0;
-        if(worldIntel&&!worldHudVisible(executing.hudMode,executing.eye.eye))return 0;
+        if(executing.eye.eye==2)return worldIntel&&worldHudVisible(executing.hudMode,executing.hudView)?originalNode(state,item):0;
+        if(worldIntel&&!worldHudVisible(executing.hudMode,executing.hudView))return 0;
     }
     if(enabled.load()&&executing.eye.sourceSequence)try{
         ++nodeCalls;
@@ -383,7 +384,7 @@ Pose wristPickerPose(const HeadCameraSample& rig) noexcept{
     return fitWristPanel(head,anchor,eyes,width,width*9.f/16.f).value_or(Pose{head.orientation,anchor});
 }
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const std::array<float,16>& projection,const HeadCameraSample& rig,
-    const std::array<float,16>& authoredView,const std::array<float,16>& authoredProjection){
+    const std::array<float,16>& authoredView,const std::array<float,16>& authoredProjection,HudView hudView){
     const std::array<Pose,2> eyes{nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),
                                 nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose)};
     // Keep status flat along the forearm, but unfold the larger native picker
@@ -396,6 +397,7 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
                rig.menuOpen,rig.menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection,rig.controllers.wristPickerWidth};
     producing.hudPanel=compose(nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose),Pose{{},{0,0,-2.f}});
     producing.hudMode=rig.controllers.hudMode;
+    producing.hudView=hudView;
     producing.projection=projection;
 }
 void clearUiRenderSource() noexcept {producing={};}
