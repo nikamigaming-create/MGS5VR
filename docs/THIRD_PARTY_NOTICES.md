@@ -10,6 +10,12 @@ trees. No game binaries, assets or private reverse-engineering dumps are include
 | [OpenXR SDK](https://github.com/KhronosGroup/OpenXR-SDK) | `977f6675bc0057d5a54ed290cb5c71c699b1c0ab` (1.1.49) | [Apache 2.0](../licenses/OpenXR.txt), component notices in `licenses/OpenXR/` |
 | [JsonCpp](https://github.com/KhronosGroup/OpenXR-SDK/tree/977f6675bc0057d5a54ed290cb5c71c699b1c0ab/src/external/jsoncpp) | Included in the pinned OpenXR SDK | [MIT / public-domain dedication](../licenses/JsonCpp.txt) |
 | [MinHook](https://github.com/TsudaKageyu/minhook) | `c3fcafdc10146beb5919319d0683e44e3c30d537` (1.3.4) | [BSD 2-Clause, including HDE notices](../licenses/MinHook.txt) |
+| [GzsTool](https://github.com/Atvaark/GzsTool) | `384cb81155ada82716c21b95035b5306b1c0d9cf` | [MIT](../licenses/GzsTool.txt); QAR/FPK decoding adapted in the owned-asset importer |
+| [FtexTool](https://github.com/Atvaark/FtexTool) | `b92003125be2a05e737f0388e1e0e7e0db240d3f` | [MIT](../licenses/FtexTool.txt); FTEX layout adapted in the owned-asset importer |
+
+`mgs5vr_import.exe` uses Windows' .NET Framework and reads only the required
+entries from the player's own TPP archives. Imported FMDL/DDS data stays local
+and is not included in releases. The archives and saves are never rewritten.
 
 The native variable-frame-rate and critical-worker scheduling adapter follows
 [MGSVFix by Lyall](https://codeberg.org/Lyall/MGSVFix), with instruction sites

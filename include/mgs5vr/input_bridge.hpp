@@ -11,6 +11,11 @@ struct GamepadSample {
     int16_t leftX{},leftY{},rightX{},rightY{};
     bool operator==(const GamepadSample&) const = default;
 };
+struct OnFootActions { bool run{},stance{},dive{},pickupCarry{},switchWeapon{}; };
+// Apply after menu/equipment routing, only when on-foot gameplay owns input.
+// Native X means weapon-switch while aiming, so Dive must lower native aim.
+// Native B must stay held for pickup/carry; a timed reload pulse cannot do it.
+void applyOnFootActions(GamepadSample& sample,bool& weaponReady,OnFootActions actions);
 // One horizontal flick turns once. Menus/focus changes require a neutral stick.
 class SnapTurn {
 public:
@@ -19,11 +24,25 @@ public:
 private:
     bool armed_{};
 };
+struct LocomotionInput { GamepadSample gamepad{};bool stance{}; };
+// Gameplay only: up runs, down is native stance (tap/hold), L3 dives.
+// A vertical gesture cannot repeat or change meaning until centered. Menus,
+// wrist selection and optics keep their own stick and consume held gestures.
+class RigLocomotion {
+public:
+    LocomotionInput update(GamepadSample sample,bool available,uint64_t time);
+    void suspend(){*this=RigLocomotion{};clickReleaseRequired_=true;}
+private:
+    uint64_t lastTime_{},pulseUntil_{};
+    int direction_{};
+    bool armed_{},clickReleaseRequired_{};
+};
 // Hold the modifier to open equipment at the wrist. The left stick remains
 // locomotion. The first right-stick direction chooses the corresponding native
 // D-pad category; after centering, the stick browses without rotating its axes.
 // B returns to category selection while the modifier remains held.
-// Trigger alone sends no native category. Expanded UI readiness gates browsing;
+// Trigger alone unfolds the category display without sending a native category.
+// It waits for a fresh, centered stick gesture. Expanded UI readiness gates browsing;
 // one settled eight-way flick selects one card until the stick is centered again.
 // Release closes selection. A held navigation stick cannot leak into turning.
 class RigEquipment {
@@ -74,11 +93,11 @@ private:
 };
 RumbleMailbox& rumbleMailbox();
 struct BinocularInput {
-    bool held{};
+    bool selected{};
     bool nativePress{};
 };
-// A long B hold opens binoculars. A short tap remains the native B action
-// (reload, back, or the current context action).
+// Hold B once to select binoculars; releasing B keeps them selected.
+// A fresh B press stows them. Otherwise a short tap reloads. Menus retain B.
 class BinocularHold {
 public:
     BinocularInput update(bool available,bool pressed,uint64_t time=steadyMilliseconds());
@@ -86,7 +105,7 @@ public:
     void suspend(){reset();releaseRequired_=true;}
 private:
     uint64_t pressedAt_{},nativeUntil_{},lastTime_{};
-    bool pressed_{},active_{},releaseRequired_{};
+    bool pressed_{},longSent_{},selected_{},releaseRequired_{},wasAvailable_{true};
 };
 struct OpticsInput {
     GamepadSample gamepad{};
@@ -141,6 +160,7 @@ public:
                          uint64_t time=steadyMilliseconds(),uint64_t pickerDrawTime=0,bool throwing=false);
     unsigned equipmentPhase() const {return equipment_.phase();}
     unsigned equipmentCategory() const {return equipment_.category();}
+    void requireAttackRelease(){fireReleaseRequired_=true;}
     void suspend(){releaseRequired_=true;equipment_.reset();}
     void reset(){mode_=TravelMode::unknown;releaseRequired_=false;fireReleaseRequired_=false;wristMode_=false;equipment_.reset();}
 private:

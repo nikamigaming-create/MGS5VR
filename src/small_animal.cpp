@@ -57,9 +57,9 @@ std::array<float,16> matrix(Pose p){
 Hands latestHands(){std::lock_guard lock(handsMutex);return hands;}
 bool contextAllowed(const Hands& sample){
     const auto& f=sample.frame;const auto s=headCamera().status();
-    return enabled.load()&&!s.nativeMenuOpen&&!f.menuOpen&&!f.controllers.weaponReady
+    return enabled.load()&&f.controllers.allowAnimalTouch&&!s.nativeMenuOpen&&!f.menuOpen&&!f.controllers.weaponReady
         &&!f.controllers.vehicleControls&&!f.controllers.optic.held&&!f.controllers.commandControls
-        &&!f.controllers.equipmentCategory&&!f.controllers.frontEnd;
+        &&!f.controllers.equipmentOpen&&!f.controllers.frontEnd;
 }
 bool eligible(const Hands& sample,uint64_t now){
     const auto& f=sample.frame;const auto s=headCamera().status();

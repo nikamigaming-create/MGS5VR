@@ -50,7 +50,7 @@ struct LensVertex {
 
 struct LensConstants {
     float mvp[16]{};
-    float sampleCenter[4]{}; // source UV center, magnification, unused
+    float sampleCenter[4]{}; // source UV center, magnification, weapon reticle
     float viewport[4]{}; // target width, height, unused, unused
 };
 
@@ -424,10 +424,9 @@ VSOut main(VSIn input) {
     VSOut output;
     output.position = mul(float4(input.position, 1.0), mvp);
     output.aperture = input.aperture;
-    // At the exit pupil, open the field of view smoothly without moving the
-    // physical housing or either tracked eye through the face.
-    output.position.xy=lerp(output.position.xy,
-        float2(-input.aperture.x,input.aperture.y)*0.96*output.position.w,sampleCenter.w);
+    // The lens stays on the physical ocular at every distance. Expanding it
+    // into screen space covered the normal world and reversed its X direction
+    // on approach, creating a changing zoom/mirror transition.
     return output;
 }
 )HLSL";
@@ -446,10 +445,17 @@ float4 main(PSIn input) : SV_TARGET {
     // Perspective-correct coordinates on the physical ocular, independent
     // of its size or position in either HMD eye. Zoom is rendered by the
     // device camera, never manufactured by cropping the HMD image.
-    float2 sourceUv=float2(0.5-0.5*input.aperture.x,0.5-0.5*input.aperture.y);
+    float2 sourceUv=float2(0.5+0.5*input.aperture.x,0.5-0.5*input.aperture.y);
     float4 color=nativeScene.SampleLevel(sceneSampler,saturate(sourceUv),0.0);
+    if(sampleCenter.w>0.5) {
+        // A world-scale weapon reticle: never a head-locked aiming overlay.
+        float2 pixelWidth=max(fwidth(input.aperture),float2(0.0001,0.0001));
+        float2 line=1.0-smoothstep(pixelWidth*0.65,pixelWidth*1.35,abs(input.aperture));
+        float cross=max(line.x,line.y);
+        color.rgb=lerp(color.rgb,float3(0.01,0.01,0.01),cross);
+    }
     float edge=1.0-smoothstep(0.92,1.0,length(input.aperture));
-    color.rgb*=lerp(1.0,edge,sampleCenter.w);
+    color.rgb*=edge;
     return color;
 }
 )HLSL";
@@ -493,6 +499,7 @@ struct Resources {
     UINT indexCount{};
     bool attempted{};
     bool ready{};
+    bool lensReady{};
     bool reported{};
     bool lensReported{};
     bool lensFailureReported{};
@@ -520,6 +527,44 @@ bool compile(ID3D11Device* device,const char* source,const char* profile,ID3DBlo
         "main",profile,D3DCOMPILE_OPTIMIZATION_LEVEL3,0,bytecode,errors.GetAddressOf());
     if(FAILED(result)){logHresult("Retail optic shader compile failed",result,errors.Get());return false;}
     return device&&*bytecode;
+}
+
+bool createLensResources(ID3D11Device* device){
+    if(resources.lensReady)return true;
+    if(!device)return false;
+    const std::array<LensVertex,4> vertices{{
+        {{ocularCenter.x-ocularRadius,ocularCenter.y-ocularRadius,ocularCenter.z},{-1,-1}},
+        {{ocularCenter.x-ocularRadius,ocularCenter.y+ocularRadius,ocularCenter.z},{-1,1}},
+        {{ocularCenter.x+ocularRadius,ocularCenter.y-ocularRadius,ocularCenter.z},{1,-1}},
+        {{ocularCenter.x+ocularRadius,ocularCenter.y+ocularRadius,ocularCenter.z},{1,1}}
+    }};
+    D3D11_BUFFER_DESC vb{};vb.ByteWidth=sizeof(vertices);vb.Usage=D3D11_USAGE_IMMUTABLE;vb.BindFlags=D3D11_BIND_VERTEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA data{};data.pSysMem=vertices.data();
+    D3D11_BUFFER_DESC cb{};cb.ByteWidth=sizeof(LensConstants);cb.Usage=D3D11_USAGE_DEFAULT;cb.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
+    ComPtr<ID3DBlob> vs,ps;
+    if(!compile(device,lensVertexShaderSource,"vs_4_0",vs.GetAddressOf())
+       ||!compile(device,lensPixelShaderSource,"ps_4_0",ps.GetAddressOf()))return false;
+    const std::array<D3D11_INPUT_ELEMENT_DESC,2> elements{{
+        {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},
+        {"APERTURE",0,DXGI_FORMAT_R32G32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0}}};
+    D3D11_RASTERIZER_DESC raster{};raster.FillMode=D3D11_FILL_SOLID;raster.CullMode=D3D11_CULL_NONE;raster.DepthClipEnable=FALSE;
+    D3D11_DEPTH_STENCIL_DESC depth{};depth.DepthEnable=TRUE;depth.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ZERO;depth.DepthFunc=D3D11_COMPARISON_LESS_EQUAL;
+    D3D11_BLEND_DESC blend{};blend.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
+    D3D11_SAMPLER_DESC sampler{};sampler.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    sampler.AddressU=sampler.AddressV=sampler.AddressW=D3D11_TEXTURE_ADDRESS_CLAMP;
+    sampler.ComparisonFunc=D3D11_COMPARISON_NEVER;sampler.MaxLOD=D3D11_FLOAT32_MAX;
+    if(FAILED(device->CreateBuffer(&vb,&data,resources.lensVertices.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateBuffer(&cb,nullptr,resources.lensConstants.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateVertexShader(vs->GetBufferPointer(),vs->GetBufferSize(),nullptr,resources.lensVertexShader.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreatePixelShader(ps->GetBufferPointer(),ps->GetBufferSize(),nullptr,resources.lensPixelShader.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateInputLayout(elements.data(),static_cast<UINT>(elements.size()),vs->GetBufferPointer(),vs->GetBufferSize(),resources.lensInputLayout.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateRasterizerState(&raster,resources.lensRasterizer.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateDepthStencilState(&depth,resources.lensDepthStencil.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateBlendState(&blend,resources.blend.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateSamplerState(&sampler,resources.lensSampler.ReleaseAndGetAddressOf())))return false;
+    depth.DepthFunc=D3D11_COMPARISON_GREATER_EQUAL;
+    if(FAILED(device->CreateDepthStencilState(&depth,resources.reversedLensDepthStencil.ReleaseAndGetAddressOf())))return false;
+    resources.lensReady=true;return true;
 }
 
 bool createResources(ID3D11Device* device){
@@ -562,38 +607,16 @@ bool createResources(ID3D11Device* device){
     if(FAILED(device->CreateSamplerState(&sampler,resources.sampler.GetAddressOf())))return false;
     D3D11_BUFFER_DESC constantDesc{};constantDesc.ByteWidth=sizeof(Constants);constantDesc.Usage=D3D11_USAGE_DEFAULT;constantDesc.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
     if(FAILED(device->CreateBuffer(&constantDesc,nullptr,resources.constants.GetAddressOf())))return false;
-    const std::array<LensVertex,4> lensVertices{{
-        {{ocularCenter.x-ocularRadius,ocularCenter.y-ocularRadius,ocularCenter.z},{-1.f,-1.f}},
-        {{ocularCenter.x-ocularRadius,ocularCenter.y+ocularRadius,ocularCenter.z},{-1.f,1.f}},
-        {{ocularCenter.x+ocularRadius,ocularCenter.y-ocularRadius,ocularCenter.z},{1.f,-1.f}},
-        {{ocularCenter.x+ocularRadius,ocularCenter.y+ocularRadius,ocularCenter.z},{1.f,1.f}}
-    }};
-    D3D11_BUFFER_DESC lensVertexDesc{};lensVertexDesc.ByteWidth=static_cast<UINT>(sizeof(lensVertices));
-    lensVertexDesc.Usage=D3D11_USAGE_IMMUTABLE;lensVertexDesc.BindFlags=D3D11_BIND_VERTEX_BUFFER;
-    D3D11_SUBRESOURCE_DATA lensVertexData{};lensVertexData.pSysMem=lensVertices.data();
-    if(FAILED(device->CreateBuffer(&lensVertexDesc,&lensVertexData,resources.lensVertices.GetAddressOf())))return false;
-    D3D11_BUFFER_DESC lensConstantDesc{};lensConstantDesc.ByteWidth=sizeof(LensConstants);
-    lensConstantDesc.Usage=D3D11_USAGE_DEFAULT;lensConstantDesc.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
-    if(FAILED(device->CreateBuffer(&lensConstantDesc,nullptr,resources.lensConstants.GetAddressOf())))return false;
+    if(!createLensResources(device))return false;
     ComPtr<ID3DBlob> vs,ps;
-    ComPtr<ID3DBlob> lensVs,lensPs;
-    if(!compile(device,vertexShaderSource,"vs_4_0",vs.GetAddressOf())||!compile(device,pixelShaderSource,"ps_4_0",ps.GetAddressOf())
-       ||!compile(device,lensVertexShaderSource,"vs_4_0",lensVs.GetAddressOf())
-       ||!compile(device,lensPixelShaderSource,"ps_4_0",lensPs.GetAddressOf()))return false;
+    if(!compile(device,vertexShaderSource,"vs_4_0",vs.GetAddressOf())||!compile(device,pixelShaderSource,"ps_4_0",ps.GetAddressOf()))return false;
     if(FAILED(device->CreateVertexShader(vs->GetBufferPointer(),vs->GetBufferSize(),nullptr,resources.vertexShader.GetAddressOf()))
-       ||FAILED(device->CreatePixelShader(ps->GetBufferPointer(),ps->GetBufferSize(),nullptr,resources.pixelShader.GetAddressOf()))
-       ||FAILED(device->CreateVertexShader(lensVs->GetBufferPointer(),lensVs->GetBufferSize(),nullptr,resources.lensVertexShader.GetAddressOf()))
-       ||FAILED(device->CreatePixelShader(lensPs->GetBufferPointer(),lensPs->GetBufferSize(),nullptr,resources.lensPixelShader.GetAddressOf())))return false;
+       ||FAILED(device->CreatePixelShader(ps->GetBufferPointer(),ps->GetBufferSize(),nullptr,resources.pixelShader.GetAddressOf())))return false;
     const std::array<D3D11_INPUT_ELEMENT_DESC,3> elements{{
         {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},
         {"NORMAL",0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0},
         {"TEXCOORD",0,DXGI_FORMAT_R32G32_FLOAT,0,24,D3D11_INPUT_PER_VERTEX_DATA,0}}};
     if(FAILED(device->CreateInputLayout(elements.data(),static_cast<UINT>(elements.size()),vs->GetBufferPointer(),vs->GetBufferSize(),resources.inputLayout.GetAddressOf())))return false;
-    const std::array<D3D11_INPUT_ELEMENT_DESC,2> lensElements{{
-        {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},
-        {"APERTURE",0,DXGI_FORMAT_R32G32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0}
-    }};
-    if(FAILED(device->CreateInputLayout(lensElements.data(),static_cast<UINT>(lensElements.size()),lensVs->GetBufferPointer(),lensVs->GetBufferSize(),resources.lensInputLayout.GetAddressOf())))return false;
     D3D11_RASTERIZER_DESC rasterizer{};rasterizer.FillMode=D3D11_FILL_SOLID;rasterizer.CullMode=D3D11_CULL_NONE;
     // Use the real surface depth, including where a hand cups the housing.
     // FOX's 10 cm world near plane must not slice the eyecup at normal eye
@@ -601,24 +624,10 @@ bool createResources(ID3D11Device* device){
     // preserves its world-scale X/Y projection during the last few cm.
     rasterizer.DepthClipEnable=FALSE;
     if(FAILED(device->CreateRasterizerState(&rasterizer,resources.rasterizer.GetAddressOf())))return false;
-    D3D11_RASTERIZER_DESC lensRasterizer=rasterizer;lensRasterizer.DepthBias=0;lensRasterizer.SlopeScaledDepthBias=0;
-    if(FAILED(device->CreateRasterizerState(&lensRasterizer,resources.lensRasterizer.GetAddressOf())))return false;
     D3D11_DEPTH_STENCIL_DESC depth{};depth.DepthEnable=TRUE;depth.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ALL;depth.DepthFunc=D3D11_COMPARISON_LESS_EQUAL;
     if(FAILED(device->CreateDepthStencilState(&depth,resources.depthStencil.GetAddressOf())))return false;
     depth.DepthFunc=D3D11_COMPARISON_GREATER_EQUAL;
     if(FAILED(device->CreateDepthStencilState(&depth,resources.reversedDepthStencil.GetAddressOf())))return false;
-    // The exit pupil sits in front of its recess. Hands and world geometry
-    // must still occlude it. FOX can publish reversed depth; match that mapping.
-    D3D11_DEPTH_STENCIL_DESC lensDepth=depth;lensDepth.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ZERO;
-    if(FAILED(device->CreateDepthStencilState(&lensDepth,resources.reversedLensDepthStencil.GetAddressOf())))return false;
-    lensDepth.DepthFunc=D3D11_COMPARISON_LESS_EQUAL;
-    if(FAILED(device->CreateDepthStencilState(&lensDepth,resources.lensDepthStencil.GetAddressOf())))return false;
-    D3D11_BLEND_DESC blend{};blend.RenderTarget[0].BlendEnable=FALSE;blend.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
-    if(FAILED(device->CreateBlendState(&blend,resources.blend.GetAddressOf())))return false;
-    D3D11_SAMPLER_DESC lensSampler{};lensSampler.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-    lensSampler.AddressU=D3D11_TEXTURE_ADDRESS_CLAMP;lensSampler.AddressV=D3D11_TEXTURE_ADDRESS_CLAMP;lensSampler.AddressW=D3D11_TEXTURE_ADDRESS_CLAMP;
-    lensSampler.MaxAnisotropy=1;lensSampler.ComparisonFunc=D3D11_COMPARISON_NEVER;lensSampler.MinLOD=0;lensSampler.MaxLOD=D3D11_FLOAT32_MAX;
-    if(FAILED(device->CreateSamplerState(&lensSampler,resources.lensSampler.GetAddressOf())))return false;
     resources.indexCount=static_cast<UINT>(model->indices.size());resources.ready=true;
     std::ostringstream message;message<<"Retail binocular FMDL loaded path="<<model->path.string()
         <<" bytes="<<std::filesystem::file_size(model->path)<<" vertices="<<model->vertices.size()
@@ -892,8 +901,8 @@ void drawOpticWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
 
 bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& world,
     const std::array<float,16>& view,const std::array<float,16>& projection,float magnification,
-    const SavedState& state,ID3D11DepthStencilView* depthTarget,ID3D11ShaderResourceView* sceneSource){
-    if(magnification<=1.0001f)return false;
+    const SavedState& state,ID3D11DepthStencilView* depthTarget,ID3D11ShaderResourceView* sceneSource,bool reticle=false){
+    if(magnification<1.f)return false;
     const bool trace=(++resources.lensTraceCalls%120u)==0u;
     const char* failure=nullptr;
     if(!sceneSource||!state.renderTarget||!state.viewport.Width||!state.viewport.Height){
@@ -916,12 +925,12 @@ bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& wor
     }
     LensConstants constants{};std::copy(mvp.begin(),mvp.end(),std::begin(constants.mvp));
     constants.sampleCenter[0]=centerX;constants.sampleCenter[1]=centerY;constants.sampleCenter[2]=magnification;
+    constants.sampleCenter[3]=reticle?1.f:0.f;
     const auto worldView=matrixProduct(world,view);const auto ocular=transformPoint(worldView,ocularCenter);
     const float distance=std::sqrt(ocular.x*ocular.x+ocular.y*ocular.y+ocular.z*ocular.z);
     const float facing=-(ocular.x*worldView[8]+ocular.y*worldView[9]+ocular.z*worldView[10])/std::max(distance,.001f);
-    const float centering=std::sqrt(ocular.x*ocular.x+ocular.y*ocular.y)/std::max(distance,.001f);
-    float focus=facing>.80f&&centering<.35f?std::clamp((.115f-distance)/.055f,0.f,1.f):0.f;
-    focus=focus*focus*(3-2*focus);constants.sampleCenter[3]=focus;
+    // Never show the portal through its back face or from inside the housing.
+    if(facing<=.15f)return false;
     constants.viewport[0]=state.viewport.Width;constants.viewport[1]=state.viewport.Height;
     context->UpdateSubresource(resources.lensConstants.Get(),0,nullptr,&constants,0,0);
     ID3D11RenderTargetView* renderTarget=state.renderTarget.Get();
@@ -933,7 +942,7 @@ bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& wor
     context->VSSetShader(resources.lensVertexShader.Get(),nullptr,0);ID3D11Buffer* constantBuffer=resources.lensConstants.Get();context->VSSetConstantBuffers(0,1,&constantBuffer);context->PSSetConstantBuffers(0,1,&constantBuffer);
     context->PSSetShader(resources.lensPixelShader.Get(),nullptr,0);ID3D11ShaderResourceView* scene=sceneSource;context->PSSetShaderResources(0,1,&scene);
     ID3D11SamplerState* sampler=resources.lensSampler.Get();context->PSSetSamplers(0,1,&sampler);
-    context->RSSetState(resources.lensRasterizer.Get());context->OMSetDepthStencilState(focus>0&&resources.markerDepth?resources.markerDepth.Get():
+    context->RSSetState(resources.lensRasterizer.Get());context->OMSetDepthStencilState(
         projection[14]>0?resources.reversedLensDepthStencil.Get():resources.lensDepthStencil.Get(),0);
     const FLOAT blendFactor[4]{0,0,0,0};context->OMSetBlendState(resources.blend.Get(),blendFactor,0xffffffffu);
     context->Draw(4,0);
@@ -944,7 +953,7 @@ bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& wor
 
 namespace mgs5vr {
 bool capturePhysicalOpticScene(ID3D11DeviceContext* context,const std::array<float,16>& view,
-    const std::array<float,16>& projection,Vec3 cameraPosition,ID3D11Texture2D** output) noexcept{
+    const std::array<float,16>& projection,Vec3 cameraPosition,ID3D11Texture2D** output,bool waypoints) noexcept{
     if(output)*output=nullptr;
     if(!context||!output)return false;
     try{
@@ -955,11 +964,43 @@ bool capturePhysicalOpticScene(ID3D11DeviceContext* context,const std::array<flo
         SavedState state;save(context,state);
         const char* failure=nullptr;
         const bool copied=prepareSceneCopy(context,device.Get(),state,failure);
-        if(copied)drawOpticWaypoints(context,device.Get(),view,projection,cameraPosition);
+        if(copied&&waypoints)drawOpticWaypoints(context,device.Get(),view,projection,cameraPosition);
         restore(context,state);
         if(!copied)return false;
         *output=resources.sceneCopy.Get();(*output)->AddRef();
         return true;
+    }catch(...){return false;}
+}
+bool drawPhysicalWeaponScope(ID3D11DeviceContext* context,const std::array<float,16>& ocularWorld,
+    const std::array<float,16>& view,const std::array<float,16>& projection,float radius,float magnification,
+    ID3D11Texture2D* sceneSource) noexcept {
+    if(!context||!sceneSource||!std::isfinite(radius)||radius<.003f||radius>.06f
+       ||!std::isfinite(magnification)||magnification<1.f||magnification>16.f)return false;
+    try{
+        std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device,sourceDevice;
+        context->GetDevice(&device);sceneSource->GetDevice(&sourceDevice);
+        if(!device||device.Get()!=sourceDevice.Get())return false;
+        if(resources.device.Get()!=device.Get()){resources={};resources.device=device;}
+        if(!createLensResources(device.Get()))return false;
+        D3D11_TEXTURE2D_DESC desc{};sceneSource->GetDesc(&desc);
+        const auto format=shaderResourceFormat(desc.Format);
+        if(!desc.Width||!desc.Height||desc.ArraySize!=1||desc.MipLevels!=1||desc.SampleDesc.Count!=1||format==DXGI_FORMAT_UNKNOWN)return false;
+        D3D11_SHADER_RESOURCE_VIEW_DESC srv{};srv.Format=format;srv.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;srv.Texture2D.MipLevels=1;
+        ComPtr<ID3D11ShaderResourceView> image;
+        if(FAILED(device->CreateShaderResourceView(sceneSource,&srv,&image)))return false;
+        // Reuse the aperture mesh, not the binocular housing or its sockets.
+        // Translate its local centre to zero, scale its radius, then apply the
+        // current native scope's ocular transform from the same weapon frame.
+        const float scale=radius/ocularRadius;
+        std::array<float,16> fit{scale,0,0,0,0,scale,0,0,0,0,scale,0,
+            -ocularCenter.x*scale,-ocularCenter.y*scale,-ocularCenter.z*scale,1};
+        const auto world=matrixProduct(fit,ocularWorld);
+        for(const auto value:world)if(!std::isfinite(value))return false;
+        SavedState state;save(context,state);if(!state.renderTarget){restore(context,state);return false;}
+        ComPtr<ID3D11DepthStencilView> depth;
+        if(!bindHousingDepth(context,device.Get(),state,projection[14]>0,depth)){restore(context,state);return false;}
+        const bool drawn=drawLensPortal(context,world,view,projection,magnification,state,depth.Get(),image.Get(),true);
+        restore(context,state);return drawn;
     }catch(...){return false;}
 }
 bool drawPhysicalBinoculars(ID3D11DeviceContext* context,const std::array<float,16>& world,const std::array<float,16>& view,

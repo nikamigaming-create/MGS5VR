@@ -40,8 +40,8 @@ std::optional<Vec3> playerHeadPosition(const std::array<float,16>& root,const st
 void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     if(!std::isfinite(units)||units<=0)throw std::invalid_argument("Camera scale must be finite and positive");
     std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=awaitingPlayer_=false;camera_=playerOwner_=0;reason_=HeadCameraStop::none;
-    requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=0;suspended_=false;
-    controllers_={};rig_={};nativeMenuOpen_=false;lastView_={};menuAnchored_=false;trackingEpoch_=0;
+    requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=ownerHeadTime_=0;suspended_=false;
+    controllers_={};rig_={};nativeMenuOpen_=false;awaitingScene_=false;lastView_={};menuAnchored_=false;trackingEpoch_=0;
     snapYaw_=0;snapTranslation_={};recenterPending_=false;
 }
 bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
@@ -52,6 +52,7 @@ bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceC
     if(dot(boom,boom)>144)return false;
     std::lock_guard lock(mutex_);
     if(!enabled_||!requirePlayerHead_)return false;
+    if(camera==camera_&&owner==playerOwner_&&time>=ownerHeadTime_)ownerHeadTime_=time;
     auto found=std::find_if(playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){return p.camera==camera;});
     if(found==playerHeads_.end())found=std::find_if(playerHeads_.begin(),playerHeads_.end(),[](const auto& p){return !p.camera;});
     if(found==playerHeads_.end())found=std::min_element(playerHeads_.begin(),playerHeads_.end(),[](const auto& a,const auto& b){return a.time<b.time;});
@@ -125,7 +126,7 @@ void HeadCamera::setNativeMenuOpen(bool open){
 }
 void HeadCamera::cancelLocked(HeadCameraStop reason){
     if(active_||pending_||awaitingPlayer_){reason_=reason;++cancellations_;}
-    active_=pending_=suspended_=awaitingPlayer_=false;camera_=playerOwner_=0;rig_={};lastView_={};menuAnchored_=false;
+    active_=pending_=suspended_=awaitingPlayer_=awaitingScene_=false;camera_=playerOwner_=0;rig_={};lastView_={};menuAnchored_=false;
     snapYaw_=0;snapTranslation_={};recenterPending_=false;
 }
 void HeadCamera::awaitPlayerLocked(){
@@ -141,9 +142,13 @@ void HeadCamera::suspendLocked(HeadCameraStop reason){
     if(active_||pending_){suspended_=true;reason_=reason;}
 }
 void HeadCamera::cancel(HeadCameraStop reason){std::lock_guard lock(mutex_);cancelLocked(reason);}
+void HeadCamera::awaitScene(){
+    std::lock_guard lock(mutex_);
+    if(active_&&!awaitingScene_){awaitingScene_=true;rig_={};}
+}
 bool HeadCamera::available() const {std::lock_guard lock(mutex_);return enabled_;}
-bool HeadCamera::active() const {std::lock_guard lock(mutex_);return active_;}
-HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_,pending_,reason_,cancellations_,activation_,suspended_,awaitingPlayer_,nativeMenuOpen_};}
+bool HeadCamera::active() const {std::lock_guard lock(mutex_);return active_&&!awaitingScene_;}
+HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_&&!awaitingScene_,pending_,awaitingScene_?HeadCameraStop::sceneUnavailable:reason_,cancellations_,activation_,suspended_,awaitingPlayer_||awaitingScene_,nativeMenuOpen_};}
 HeadCameraSample HeadCamera::resolve(uintptr_t camera,Pose nativePose,uint64_t time){
     std::lock_guard lock(mutex_);
     return resolveLocked(camera,nativePose,time);
@@ -189,6 +194,17 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             return p.camera==camera&&p.sequence&&time>=p.time&&time-p.time<=150&&same(p.sourceCamera,nativePose);
         });
         if(found==playerHeads_.end()){awaitPlayerLocked();return result;}
+        if(camera_&&(camera_!=camera||playerOwner_!=found->owner)){
+            // ACC -> field / mission restart creates a new verified player.
+            // Never borrow another live owner's camera. After the previous
+            // owner has stopped publishing for a full second, adopt only a
+            // fresh player-head publication matching this rendered camera.
+            // Retained ACC eyes, rig and menu anchors must not survive travel.
+            if(time<ownerHeadTime_||time-ownerHeadTime_<=1000)return result;
+            camera_=playerOwner_=0;rig_={};lastView_={};menuAnchored_=false;
+            active_=pending_=false;awaitingPlayer_=true;awaitingScene_=false;
+            snapYaw_=controllers_.snapYaw;snapTranslation_={};recenterPending_=false;
+        }
         if(awaitingPlayer_){
             if((camera_&&camera_!=camera)||(playerOwner_&&playerOwner_!=found->owner))return result;
             if(!camera_)origin_=uprightOrigin(head_);
@@ -196,6 +212,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             ++activation_; // No eye image from before the menu may be reused.
         }
         nativePose.position=found->position;
+        ownerHeadTime_=found->time;
         result.playerSequence=found->sequence;result.playerOwner=found->owner;result.playerHead=found->position;
     }
     if(pending_){
@@ -206,6 +223,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     }
     if(!active_)return result;
     if(camera_!=camera){cancelLocked(HeadCameraStop::cameraChanged);return result;}
+    if(awaitingScene_){awaitingScene_=false;++activation_;}
     if(controllers_.frontEnd)result.menuPanel=frontEndPanel_;
     // The native camera can look down, lean, recoil or bank. Its yaw supplies
     // gameplay heading; gravity and physical HMD pitch/roll supply the VR view.

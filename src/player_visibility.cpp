@@ -1,14 +1,11 @@
 #include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/head_camera.hpp"
-#include "mgs5vr/input_bridge.hpp"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
 #include <algorithm>
 #include <atomic>
-#include <cmath>
-#include <sstream>
 
 namespace {
 uintptr_t base{};
@@ -157,6 +154,28 @@ void conceal(Binding candidate){
 }
 }
 namespace mgs5vr {
+MenuCapturePlayerExclusion::MenuCapturePlayerExclusion(uintptr_t owner) noexcept {
+    if(!base||!hideVisibleGroup||!showVisibleGroup||get<uintptr_t>(owner)!=base+0x23b8218)return;
+    const auto character=get<uintptr_t>(owner+0x370);
+    if(get<uintptr_t>(character)!=base+0x2295210)return;
+    const auto component=get<uintptr_t>(character+0x10),parts=get<uintptr_t>(component+0x10);
+    const auto model=get<uintptr_t>(parts+0x68);
+    Binding candidate{owner,character,parts,0,0,model,true};
+    if(!owned(candidate)||groupIndex(candidate,bodyName)<0||groupIndex(candidate,armName)<0
+        ||!names(model,groups_,count_)){count_=0;return;}
+    owner_=owner;character_=character;parts_=parts;model_=model;
+    for(uint16_t i=0;i<count_;++i){
+        flags_[i]=groupFlags(candidate,groups_[i]);
+        if(flags_[i]&4u)hideVisibleGroup(reinterpret_cast<void*>(model),groups_[i]);
+    }
+}
+MenuCapturePlayerExclusion::~MenuCapturePlayerExclusion(){
+    const Binding candidate{owner_,character_,parts_,0,0,model_,true};
+    if(!model_||!showVisibleGroup||!owned(candidate))return;
+    for(uint16_t i=0;i<count_;++i)
+        if((flags_[i]&4u)&&groupFlags(candidate,groups_[i])==static_cast<uint8_t>(flags_[i]&~4u))
+            showVisibleGroup(reinterpret_cast<void*>(model_),groups_[i]);
+}
 void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
     base=moduleBase;hideVisibleGroup=showVisibleGroup=nullptr;
     // StaticModel SHADOW_ONLY=1 calls the first-list hide helper. Its separate

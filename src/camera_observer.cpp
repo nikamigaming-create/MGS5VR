@@ -7,6 +7,7 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include <windows.h>
+#include <intrin.h>
 #include <MinHook.h>
 #include <array>
 #include <atomic>
@@ -23,10 +24,12 @@
 extern "C" {
 void* MgsCameraTrampoline{};
 void MgsCameraIntercept();
+void MgsCameraObserved(void*,const float*,uintptr_t,const uintptr_t*) noexcept;
 }
 namespace {
 struct Observation {
     uintptr_t object{},caller{},owner{},source{},context{};
+    std::array<uintptr_t,2> registers{};
     // Raw retail values: coordinate basis and distance units are not yet proven.
     std::array<float,8> values{};
     uint64_t calls{};
@@ -37,6 +40,18 @@ std::array<Observation,16> observations{};
 std::atomic_uint64_t totalCalls{},unrecordedCalls{};
 uintptr_t imageBase{};
 bool ownerContextVerified{};
+bool groundZeroes{};
+using PoseGetter=const float*(*)(void*);
+PoseGetter originalPoseGetter{};
+__declspec(noinline) const float* observePoseGetter(void* object){
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    const auto* result=originalPoseGetter(object);
+    // Some GZ camera producers write through the mutable getter rather than
+    // invoking the setter. Read its value and preserve the exact returned
+    // address; no camera/player ownership is inferred from this observation.
+    MgsCameraObserved(object,result,caller,nullptr);
+    return result;
+}
 HANDLE reportStop{},reportThread{};
 std::ofstream evidence;
 unsigned evidenceSamples{};
@@ -51,6 +66,19 @@ template<size_t N> std::string hexBytes(const std::array<unsigned char,N>& bytes
     return s.str();
 }
 void recordOwner(const Observation& o){
+    if(groundZeroes){
+        if(!evidence||evidenceSamples>=512)return;
+        std::array<unsigned char,0x200> camera{};
+        std::array<unsigned char,0x500> rsi{};
+        if(!readMemory(o.object,camera))return;
+        const bool readable=readMemory(o.registers[0],rsi);
+        evidence<<"{\"tick_ms\":"<<GetTickCount64()<<",\"calls\":"<<o.calls
+            <<",\"camera\":\"0x"<<std::hex<<o.object<<"\",\"caller_rva\":\"0x"<<(o.caller-imageBase)
+            <<"\",\"rsi_unclassified\":\"0x"<<o.registers[0]<<"\",\"rbp_unclassified\":\"0x"<<o.registers[1]
+            <<"\",\"source\":\"0x"<<o.source<<std::dec<<"\",\"camera_bytes\":\""<<hexBytes(camera)
+            <<"\",\"rsi_bytes\":\""<<(readable?hexBytes(rsi):std::string{})<<"\"}\n";
+        evidence.flush();++evidenceSamples;return;
+    }
     if(!evidence||!o.owner||evidenceSamples>=512)return;
     std::array<unsigned char,0x500> owner{};
     std::array<unsigned char,0x200> camera{};
@@ -123,40 +151,45 @@ extern "C" void MgsCameraObserved(void* object,const float* source,uintptr_t cal
         }
         std::lock_guard guard(observationMutex);
         Observation* slot=nullptr;
-        for(auto& o:observations)if(o.object==reinterpret_cast<uintptr_t>(object)){slot=&o;break;}
+        for(auto& o:observations)if(groundZeroes?o.caller==caller:o.object==reinterpret_cast<uintptr_t>(object)){slot=&o;break;}
         if(!slot)for(auto& o:observations)if(!o.object){slot=&o;break;}
+        if(!slot&&groundZeroes)slot=&observations[totalCalls.load()%observations.size()];
         if(!slot){++unrecordedCalls;return;}
         slot->object=reinterpret_cast<uintptr_t>(object);slot->caller=caller;
         slot->source=reinterpret_cast<uintptr_t>(source);
+        slot->registers=context?std::array<uintptr_t,2>{context[0],context[1]}:std::array<uintptr_t,2>{};
         // Only this verified callsite gives RSI/RBP the observed owner/context meaning.
         if(ownerContextVerified&&caller==imageBase+0x1118b1a&&context){slot->owner=context[0];slot->context=context[1];}
         slot->values=v;++slot->calls;slot->thread=GetCurrentThreadId();
     }catch(...){} // Diagnostics must not alter control flow of the retail setter.
 }
 namespace mgs5vr {
-void installCameraObserver(const std::filesystem::path& evidenceDirectory){
+void installCameraObserver(const std::filesystem::path& evidenceDirectory,RenderBuild build){
+    groundZeroes=build==RenderBuild::groundZeroes_1_0_0_5;
     // Candidate identified from the BSD-2-Clause IGCS MGS5 camera signature;
     // independently matched in 1.0.15.4 at RVA 0x44e960. See third-party notice.
-    constexpr std::array<unsigned char,22> expected{
+    std::array<unsigned char,22> expected{
         0x0f,0x28,0x02,0x0f,0x29,0x81,0xf0,0,0,0,0x0f,0x28,0x4a,0x10,
         0x0f,0x29,0x89,0,1,0,0,0xc3};
+    if(groundZeroes){expected[6]=0x98;expected[17]=0xa8;expected[18]=0;}
     imageBase=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
-    initializePlayerVisibility(imageBase);
+    if(!groundZeroes)initializePlayerVisibility(imageBase);
     constexpr std::array<unsigned char,20> callsite{
         0x48,0x8b,0x8e,0x80,0x03,0,0,0x48,0x8d,0x95,0x10,0x03,0,0,
         0x48,0x8b,0x01,0xff,0x50,0x08};
     std::array<unsigned char,callsite.size()> liveCallsite{};
-    ownerContextVerified=readMemory(imageBase+0x1118b06,liveCallsite)&&liveCallsite==callsite;
+    ownerContextVerified=!groundZeroes&&readMemory(imageBase+0x1118b06,liveCallsite)&&liveCallsite==callsite;
     if(!ownerContextVerified)log("Camera owner callsite differs; owner observations disabled");
     if(!evidenceDirectory.empty()){
         if(!evidenceDirectory.is_absolute())throw std::runtime_error("Camera evidence directory must be absolute");
         std::filesystem::create_directories(evidenceDirectory);
         evidence.open(evidenceDirectory/("owner-"+std::to_string(GetCurrentProcessId())+"-"+std::to_string(GetTickCount64())+".jsonl"));
         if(!evidence)throw std::runtime_error("Cannot open camera evidence file");
-        evidence<<"{\"schema\":1,\"version\":\"1.0.15.4\",\"sha256\":\"085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45\",\"image_base\":"<<imageBase
+        evidence<<"{\"schema\":1,\"version\":\""<<(groundZeroes?"1.0.0.5":"1.0.15.4")
+            <<"\",\"sha256\":\""<<(groundZeroes?"7460d9dba9b6fe34893b5d330aca201983bb1734844f3688acffcc0ab22a1815":"085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45")<<"\",\"image_base\":"<<imageBase
             <<",\"clock\":\"GetTickCount64 milliseconds\",\"coherent_frame_snapshot\":false}\n";
     }
-    auto* address=reinterpret_cast<void*>(imageBase+0x44e960);
+    auto* address=reinterpret_cast<void*>(imageBase+(groundZeroes?0x3a9aa0:0x44e960));
     MEMORY_BASIC_INFORMATION region{};
     if(!VirtualQuery(address,&region,sizeof(region))||region.State!=MEM_COMMIT
         ||(region.Protect&PAGE_GUARD)||!(region.Protect&(PAGE_EXECUTE|PAGE_EXECUTE_READ|PAGE_EXECUTE_READWRITE|PAGE_EXECUTE_WRITECOPY))
@@ -167,8 +200,20 @@ void installCameraObserver(const std::filesystem::path& evidenceDirectory){
     if(created!=MH_OK)throw std::runtime_error(std::string("Camera observer create: ")+MH_StatusToString(created));
     const auto enabled=MH_EnableHook(address);
     if(enabled!=MH_OK){MH_RemoveHook(address);throw std::runtime_error(std::string("Camera observer enable: ")+MH_StatusToString(enabled));}
-    log("Camera observer enabled at verified RVA 0x44e960. No camera pose overrides.");
-    try{installCameraConsumerObserver(imageBase,evidenceDirectory);}
+    if(groundZeroes){
+        constexpr std::array<unsigned char,8> getterBytes{0x48,0x8d,0x81,0x98,0,0,0,0xc3};
+        std::array<unsigned char,8> live{};
+        auto* getter=reinterpret_cast<void*>(imageBase+0x3a95e0);
+        if(!readMemory(imageBase+0x3a95e0,live)||live!=getterBytes)
+            throw std::runtime_error("GZ pose getter signature differs; observation refused");
+        const auto made=MH_CreateHook(getter,reinterpret_cast<void*>(&observePoseGetter),reinterpret_cast<void**>(&originalPoseGetter));
+        if(made!=MH_OK)throw std::runtime_error(std::string("GZ getter observer create: ")+MH_StatusToString(made));
+        const auto on=MH_EnableHook(getter);
+        if(on!=MH_OK){MH_RemoveHook(getter);throw std::runtime_error(std::string("GZ getter observer enable: ")+MH_StatusToString(on));}
+    }
+    log(groundZeroes?"GZ read-only camera setter observer enabled at verified RVA 0x3a9aa0; registers are not classified as player ownership."
+        :"Camera observer enabled at verified RVA 0x44e960. No camera pose overrides.");
+    try{if(!groundZeroes)installCameraConsumerObserver(imageBase,evidenceDirectory);}
     catch(const std::exception& e){log(std::string("Camera consumer observer unavailable: ")+e.what());}
     reportStop=CreateEventW(nullptr,TRUE,FALSE,nullptr);
     if(reportStop)reportThread=CreateThread(nullptr,0,&report,nullptr,0,nullptr);

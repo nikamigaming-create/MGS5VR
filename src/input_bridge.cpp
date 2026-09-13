@@ -4,6 +4,20 @@
 #include <cmath>
 #include <cstdlib>
 namespace mgs5vr {
+void applyOnFootActions(GamepadSample& sample,bool& weaponReady,OnFootActions actions){
+    constexpr uint16_t run=0x0040,stance=0x1000,carry=0x2000,diveOrSwitch=0x4000;
+    if(actions.run)sample.buttons|=run;
+    if(actions.dive||actions.stance||actions.pickupCarry){
+        sample.leftTrigger=sample.rightTrigger=0;
+        weaponReady=false;
+        // A simultaneous down-stick/click should dive, not request two stances.
+        if(actions.dive)sample.buttons|=diveOrSwitch;
+        else if(actions.stance)sample.buttons|=stance;
+        else sample.buttons|=carry;
+    }else if(actions.switchWeapon&&weaponReady){
+        sample.buttons|=diveOrSwitch;
+    }
+}
 float SnapTurn::update(float x,float y,bool available){
     if(!available||!std::isfinite(x)||!std::isfinite(y)){armed_=false;return 0;}
     if(std::abs(x)<.35f&&std::abs(y)<.35f){armed_=true;return 0;}
@@ -12,6 +26,32 @@ float SnapTurn::update(float x,float y,bool available){
     armed_=false;
     // FOX camera forward/right are +Z/-X: right is a negative world-Y turn.
     return x>0?-.523598776f:.523598776f;
+}
+LocomotionInput RigLocomotion::update(GamepadSample sample,bool available,uint64_t time){
+    constexpr uint16_t sprint=0x0040,dive=0x4000,stance=0x1000;
+    if(time<lastTime_)suspend();
+    lastTime_=time;
+    if(!available){
+        armed_=false;direction_=0;pulseUntil_=0;clickReleaseRequired_=true;
+        return {sample,false};
+    }
+    const bool click=(sample.buttons&sprint)!=0;
+    sample.buttons&=~sprint;
+    if(!click)clickReleaseRequired_=false;
+    if(click&&!clickReleaseRequired_)sample.buttons|=dive;
+    const int sx=sample.rightX,sy=sample.rightY;
+    const bool neutral=std::abs(sx)<11468&&std::abs(sy)<11468;
+    if(neutral&&time>=pulseUntil_){armed_=true;direction_=0;}
+    if(armed_&&std::abs(sy)>22937&&std::abs(sy)>std::abs(sx)){
+        direction_=sy>0?1:-1;armed_=false;pulseUntil_=time+100;
+    }
+    const bool held=direction_&&sy*direction_>14745&&std::abs(sy)>std::abs(sx);
+    const bool active=direction_&&(held||time<pulseUntil_);
+    if(active)sample.buttons|=direction_>0?sprint:stance;
+    if(!active)direction_=0;
+    // Stance changes must not become the native aiming-mode A action.
+    if(active&&direction_<0)sample.leftTrigger=0;
+    return {sample,active&&direction_<0};
 }
 WheelSample WheelSteering::update(Pose tracked,Pose contact,bool available,bool squeeze,uint64_t time,uint64_t epoch,Vec3 forward){
     if(!available||!valid(tracked)||!valid(contact)||!epoch){reset();held_=squeeze;return {};}
@@ -44,29 +84,33 @@ RumbleSample RumbleMailbox::read(uint64_t time) const{std::lock_guard lock(mutex
 RumbleMailbox& rumbleMailbox(){static RumbleMailbox box;return box;}
 BinocularInput BinocularHold::update(bool available,bool pressed,uint64_t time){
     constexpr uint64_t holdMilliseconds=300,nativePulseMilliseconds=100;
-    if(time<lastTime_){reset();releaseRequired_=true;}
+    if(time<lastTime_)suspend();
     lastTime_=time;
     if(!available){
-        const bool wasDown=pressed_||active_;
-        pressed_=active_=false;nativeUntil_=0;
-        if(wasDown)releaseRequired_=pressed;
-        else if(!pressed)releaseRequired_=false;
-        return {};
+        if(pressed_)releaseRequired_=pressed;
+        pressed_=longSent_=selected_=false;nativeUntil_=0;wasAvailable_=false;
+        if(!pressed)releaseRequired_=false;
+        return {false,pressed&&!releaseRequired_};
+    }
+    if(!wasAvailable_){
+        wasAvailable_=true;releaseRequired_=pressed;
     }
     if(releaseRequired_){
         if(pressed)return {};
         releaseRequired_=false;
     }
-    bool nativePress=false;
     if(pressed&&!pressed_){
-        pressed_=true;active_=false;pressedAt_=time;nativeUntil_=0;
-    }else if(!pressed&&pressed_){
-        nativePress=!active_;pressed_=false;active_=false;
-        if(nativePress)nativeUntil_=time+nativePulseMilliseconds;
+        pressed_=true;longSent_=selected_;pressedAt_=time;nativeUntil_=0;
+        if(selected_)selected_=false;
     }
-    if(pressed&&pressed_&&!active_&&time>=pressedAt_+holdMilliseconds)active_=true;
-    if(active_)nativeUntil_=0;
-    return {active_,nativePress||time<nativeUntil_};
+    if(pressed&&pressed_&&!longSent_&&time-pressedAt_>=holdMilliseconds){
+        selected_=true;longSent_=true;
+    }
+    if(!pressed&&pressed_){
+        if(!longSent_&&time-pressedAt_<holdMilliseconds)nativeUntil_=time+nativePulseMilliseconds;
+        pressed_=longSent_=false;
+    }
+    return {selected_,time<nativeUntil_};
 }
 OpticsInput RigOptics::update(GamepadSample raw,bool available,bool held,bool /*atEye*/){
     constexpr uint16_t click=0x0080,x=0x4000,menus=0x0030;
@@ -178,7 +222,7 @@ MotionStrike MotionMelee::update(Pose head,Pose hand,bool available,uint64_t tim
     return result;
 }
 GamepadSample RigEquipment::update(GamepadSample sample,bool modifier,bool allowOptics,uint64_t time,uint64_t pickerDrawTime){
-    constexpr uint16_t a=0x1000,b=0x2000,x=0x4000,y=0x8000,rightClick=0x0080;
+    constexpr uint16_t a=0x1000,b=0x2000,x=0x4000,y=0x8000,leftClick=0x0040,rightClick=0x0080;
     constexpr uint16_t categories[]{0x0001,0x0002,0x0008,0x0004};
     if(time<lastTime_)reset();
     lastTime_=time;
@@ -192,14 +236,14 @@ GamepadSample RigEquipment::update(GamepadSample sample,bool modifier,bool allow
     const bool freshBack=(sample.buttons&b)&&!(blockedButtons_&b);
     if(centered)blockedStick_=false;
     if(modifier&&!active_){
-        blockedStick_=!neutral;categoryChosen_=false;waitBrowseNeutral_=true;
+        blockedStick_=true;categoryChosen_=false;waitBrowseNeutral_=true;
         browseLatched_=false;candidateDirection_=-1;useUntil_=0;
     }
     if(modifier){
-        blockedButtons_|=sample.buttons&(a|b|x|y|rightClick);
+        blockedButtons_|=sample.buttons&(a|b|x|y|leftClick|rightClick);
         if(sample.buttons&x)sample.buttons|=0x0100;
         if(allowOptics&&(sample.buttons&y))sample.buttons|=0x0200;
-        sample.buttons&=~(a|b|x|y|rightClick|0x000f);
+        sample.buttons&=~(a|b|x|y|leftClick|rightClick|0x000f);
         sample.rightX=sample.rightY=0;
         if(active_&&freshBack){
             categoryChosen_=false;blockedStick_=!centered;waitBrowseNeutral_=true;

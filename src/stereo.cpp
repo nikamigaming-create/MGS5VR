@@ -26,6 +26,47 @@ bool valid(EyeFov f){
     return std::isfinite(f.left)&&std::isfinite(f.right)&&std::isfinite(f.up)&&std::isfinite(f.down)
         &&f.left<0&&f.right>0&&f.down<0&&f.up>0&&f.left>-1.56f&&f.right<1.56f&&f.down>-1.56f&&f.up<1.56f;
 }
+std::optional<Pose> fitWristPanel(Pose head,Vec3 anchor,const std::array<EyeView,2>& eyes,float width,float height){
+    if(!valid(head)||!valid(Pose{{},anchor})||!std::isfinite(width)||!std::isfinite(height)
+        ||width<=0||height<=0||width>1.2f||height>1.2f)return {};
+    std::array<Pose,2> eyeFromHead{};
+    std::array<std::array<float,4>,2> bounds{};
+    for(size_t i=0;i<eyes.size();++i){
+        if(!valid(eyes[i].pose)||!valid(eyes[i].fov))return {};
+        eyeFromHead[i]=compose(inverse(eyes[i].pose),head);
+        const auto f=eyes[i].fov;
+        const float l=std::tan(f.left),r=std::tan(f.right),d=std::tan(f.down),u=std::tan(f.up);
+        // Leave six percent of the requested optical span clear at each edge;
+        // the larger render/visibility FOV is not the user's visible image.
+        bounds[i]={l+.06f*(r-l),r-.06f*(r-l),d+.06f*(u-d),u-.06f*(u-d)};
+    }
+    const auto fits=[&](Vec3 center){
+        for(size_t i=0;i<eyes.size();++i)for(float x:{-width*.5f,width*.5f})for(float y:{-height*.5f,height*.5f}){
+            const auto p=compose(eyeFromHead[i],Pose{{},center+Vec3{x,y,0}}).position;
+            if(p.z>=-.05f)return false;
+            const auto& b=bounds[i];
+            if(p.x/(-p.z)<b[0]||p.x/(-p.z)>b[1]||p.y/(-p.z)<b[2]||p.y/(-p.z)>b[3])return false;
+        }
+        return true;
+    };
+    auto desired=compose(inverse(head),Pose{{},anchor}).position;
+    desired.z=std::clamp(desired.z,-2.f,-.55f);
+    // A centered rectangle can also be too large for a narrow/canted display.
+    // Increase depth before moving sideways; never shrink the native text.
+    Vec3 center{0,0,desired.z};
+    while(!fits(center)&&center.z> -2.f)center.z=std::max(-2.f,center.z-.05f);
+    if(!fits(center))return {};
+    desired.z=center.z;
+    if(fits(desired))return compose(head,Pose{{},desired});
+    // Frustum half-spaces are convex. Bisection along this segment finds the
+    // closest wrist-linked point that fits, including asymmetric/canted eyes.
+    float inside=0,outside=1;
+    for(unsigned n=0;n<20;++n){
+        const float middle=(inside+outside)*.5f;
+        if(fits(center+(desired-center)*middle))inside=middle;else outside=middle;
+    }
+    return compose(head,Pose{{},center+(desired-center)*inside});
+}
 std::optional<EyeFov> enclosingEyeFov(EyeFov f){
     if(!valid(f))return {};
     const float x=std::max(-f.left,f.right),y=std::max(f.up,-f.down);

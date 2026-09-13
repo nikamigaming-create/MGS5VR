@@ -21,6 +21,7 @@
 #include <iomanip>
 #include <mutex>
 #include <stdexcept>
+#include <vector>
 
 namespace {
 using MatrixFn=float*(*)(void*,float*);
@@ -35,9 +36,14 @@ using ListenerFn=void*(*)(void*,void*,const float*);
 ViewportFn originalViewport{};ProjectionFn originalProjection{};SceneFn originalScene{};
 RegisterTargetFn originalRegisterTarget{};
 ListenerFn originalListener{},originalVirtualListener{};
+using PublisherFn=uintptr_t(*)(void*);
+PublisherFn originalPublisher{};
+thread_local uintptr_t publicationOwner{};
 uintptr_t base{};
+mgs5vr::RenderBuild renderBuild=mgs5vr::RenderBuild::phantomPain_1_0_15_4;
+mgs5vr::RenderLayout layout=mgs5vr::phantomPainRender;
 struct Pair {
-    uintptr_t camera{};
+    uintptr_t camera{},identity{};
     uint64_t sequence{},tick{};
     DWORD thread{};
     mgs5vr::HeadCameraSample sample{};
@@ -61,6 +67,7 @@ struct ListenerProof {
 ListenerProof listenerProof;
 std::atomic_uint64_t listenerUpdates{},virtualListenerUpdates{},listenerFailures{};
 std::atomic_uint64_t sequence{},pairCount{},missed{};
+std::atomic_uint64_t lastCameraPublication{};
 std::atomic_bool enabled{},nativePairVerified{};
 std::ofstream evidence;
 unsigned reports{};
@@ -92,6 +99,17 @@ std::atomic_uint64_t duplicatePresentsSkipped{};
 std::atomic_uint32_t sceneContextType{99};
 std::atomic_uint32_t sceneFailure{};
 std::atomic<DWORD> sceneThread{};
+__declspec(noinline) uintptr_t publishCamera(void* publisher){
+    // GZ replaces temporary source-camera objects while a stable scene-camera
+    // publisher continues to own the viewport. Do not bind HMD activation to
+    // the address of that temporary pose buffer.
+    struct Scope {
+        uintptr_t previous{publicationOwner};
+        explicit Scope(void* owner){publicationOwner=reinterpret_cast<uintptr_t>(owner);}
+        ~Scope(){publicationOwner=previous;}
+    } scope(publisher);
+    return originalPublisher(publisher);
+}
 template<class T> T field(const void* object,size_t offset){T out{};std::memcpy(&out,static_cast<const unsigned char*>(object)+offset,sizeof(out));return out;}
 mgs5vr::Pose pose(const float* values){return {{values[0],values[1],values[2],values[3]},{values[4],values[5],values[6]}};}
 std::array<float,8> values(mgs5vr::Pose p){return {p.orientation.x,p.orientation.y,p.orientation.z,p.orientation.w,p.position.x,p.position.y,p.position.z,1};}
@@ -106,6 +124,7 @@ float inverseError(const std::array<float,16>& a,const std::array<float,16>& b){
 }
 void record(Pair& p){
     p.tick=GetTickCount64();p.thread=GetCurrentThreadId();p.sequence=++sequence;
+    lastCameraPublication.store(p.tick);
     p.inverseError=std::max(inverseError(p.world,p.view),inverseError(p.view,p.world));
     p.validInverse=p.inverseError<0.003f;
     if(p.validInverse&&!p.applied)nativePairVerified.store(true);
@@ -117,16 +136,17 @@ void record(Pair& p){
     Pair* slot=nullptr;
     for(auto& item:latest)if(item.camera==p.camera){slot=&item;break;}
     if(!slot)for(auto& item:latest)if(!item.camera){slot=&item;break;}
-    if(slot)*slot=p;else ++missed;
+    if(!slot)slot=&*std::min_element(latest.begin(),latest.end(),[](const auto& a,const auto& b){return a.tick<b.tick;});
+    *slot=p;
 }
 __declspec(noinline) void* listener(void* object,void* output,const float* input){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
-    if(!enabled.load()||caller!=base+0x438132)return originalListener(object,output,input);
+    if(!enabled.load()||caller!=base+layout.listenerReturn)return originalListener(object,output,input);
     primaryListener=0;primaryListenerSequence=0;
     // This exact camera publication selects its listener through publisher+0x60.
     // An explicitly selected alternate listener transform remains native.
     if(!current.applied||!current.validInverse||!current.sequence||!object
-        ||reinterpret_cast<uintptr_t>(input)!=current.camera+0xf0
+        ||reinterpret_cast<uintptr_t>(input)!=current.camera+layout.cameraPose
         ||std::memcmp(input,current.nativeInput.data(),sizeof(current.nativeInput)))return originalListener(object,output,input);
     const auto tracked=mgs5vr::trackedListenerPose(current.sample,mgs5vr::headCamera().status(),mgs5vr::steadyMilliseconds());
     if(!tracked)return originalListener(object,output,input);
@@ -146,9 +166,9 @@ __declspec(noinline) void* listener(void* object,void* output,const float* input
 __declspec(noinline) void* virtualListener(void* object,void* output,const float* input){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const auto source=reinterpret_cast<uintptr_t>(input);
-    if(!enabled.load()||caller!=base+0x43814e||primaryListener!=reinterpret_cast<uintptr_t>(object)
+    if(!enabled.load()||caller!=base+layout.virtualListenerReturn||primaryListener!=reinterpret_cast<uintptr_t>(object)
         ||!primaryListenerSequence||primaryListenerSequence!=current.sequence
-        ||(source!=current.camera+0xf0&&source!=current.camera+0x130))return originalVirtualListener(object,output,input);
+        ||(source!=current.camera+layout.cameraPose&&source!=current.camera+layout.alternateListenerPose))return originalVirtualListener(object,output,input);
     const auto tracked=mgs5vr::trackedListenerPose(current.sample,mgs5vr::headCamera().status(),mgs5vr::steadyMilliseconds());
     if(!tracked)return originalVirtualListener(object,output,input);
     alignas(16) const auto adjusted=values(*tracked);
@@ -167,9 +187,9 @@ __declspec(noinline) void* virtualListener(void* object,void* output,const float
 __declspec(noinline) uintptr_t projection(float* output,float a,float b,float c,float d,float e,float f,float g,float h,float i){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const auto result=originalProjection(output,a,b,c,d,e,f,g,h,i);
-    if(enabled.load()&&caller==base+0x2e68a0)mgs5vr::applyUiEyeProjection(output);
-    if(enabled.load()&&visibilityViewport&&caller==base+0x1b9691
-        &&reinterpret_cast<uintptr_t>(output)==visibilityViewport+0x300){
+    if(enabled.load()&&layout.uiProjectionReturn&&caller==base+layout.uiProjectionReturn)mgs5vr::applyUiEyeProjection(output);
+    if(enabled.load()&&visibilityViewport&&caller==base+layout.clipReturn
+        &&reinterpret_cast<uintptr_t>(output)==visibilityViewport+layout.clipProjection){
         std::array<float,16> matrix{};std::memcpy(matrix.data(),output,sizeof(matrix));
         if(mgs5vr::widenVisibilityProjection(matrix,current.sample.headPose,current.sample.views)){
             std::memcpy(output,matrix.data(),sizeof(matrix));
@@ -177,9 +197,13 @@ __declspec(noinline) uintptr_t projection(float* output,float a,float b,float c,
         }
     }
     if(!enabled.load()||!eyeViewport)return result;
-    const bool clip=caller==base+0x1b9691&&reinterpret_cast<uintptr_t>(output)==eyeViewport+0x300;
-    const bool gpu=caller==base+0x1b9724&&reinterpret_cast<uintptr_t>(output)==eyeViewport+0x280;
+    const bool clip=caller==base+layout.clipReturn&&reinterpret_cast<uintptr_t>(output)==eyeViewport+layout.clipProjection;
+    const bool gpu=caller==base+layout.gpuReturn&&reinterpret_cast<uintptr_t>(output)==eyeViewport+layout.gpuProjection;
     if(!clip&&!gpu)return result;
+    // The optical pass shares the native scene's visibility preparation.
+    // Its narrow zoom belongs ONLY to the raster projection, never to the
+    // clipping/frustum preparation reused by the subsequent full-size eyes.
+    if(clip&&drawingEye.eye==2){clipProjection=true;return result;}
     std::array<float,16> matrix{};std::memcpy(matrix.data(),output,sizeof(matrix));
     if(!mgs5vr::setEyeProjection(matrix,drawingEye.view.fov))return result;
     std::memcpy(output,matrix.data(),sizeof(matrix));if(clip)clipProjection=true;if(gpu)gpuProjection=true;
@@ -192,16 +216,16 @@ __declspec(noinline) uintptr_t viewport(void* input,uint8_t history){
     // center-head publication. Neither eye's image projection is widened here.
     const auto priorVisibility=visibilityViewport;
     const auto now=mgs5vr::steadyMilliseconds();
-    if(enabled.load()&&!insideStereo&&caller==base+0x4380b9&&current.applied&&current.validInverse
+    if(enabled.load()&&!insideStereo&&caller==base+layout.viewportReturn&&current.applied&&current.validInverse
         &&current.sample.stereoTracked&&now>=current.sample.sampleTime&&now-current.sample.sampleTime<=150){
-        const auto camera=field<uintptr_t>(input,0x570);
+        const auto camera=field<uintptr_t>(input,layout.viewportCamera);
         if(camera&&std::memcmp(reinterpret_cast<void*>(camera+0x70),current.view.data(),sizeof(current.view))==0)
             visibilityViewport=reinterpret_cast<uintptr_t>(input);
     }
     const auto result=originalViewport(input,history);
     visibilityViewport=priorVisibility;
-    if(enabled.load()&&!insideStereo&&caller==base+0x4380b9&&current.applied&&current.validInverse&&current.sample.stereoTracked){
-        const auto camera=field<uintptr_t>(input,0x570);
+    if(enabled.load()&&!insideStereo&&caller==base+layout.viewportReturn&&current.applied&&current.validInverse&&current.sample.stereoTracked){
+        const auto camera=field<uintptr_t>(input,layout.viewportCamera);
         if(camera&&std::memcmp(reinterpret_cast<void*>(camera+0x70),current.view.data(),sizeof(current.view))==0){
             std::lock_guard lock(sceneMutex);sceneSource={reinterpret_cast<uintptr_t>(input),camera,current};
         }
@@ -214,32 +238,32 @@ struct NativeRestore {
     std::array<unsigned char,0x240> viewportMatrices{};
     NativeRestore(uintptr_t c,uintptr_t v):camera(c),viewport(v){
         std::memcpy(cameraMatrices.data(),reinterpret_cast<void*>(c+0x30),cameraMatrices.size());
-        std::memcpy(viewportMatrices.data(),reinterpret_cast<void*>(v+0x280),viewportMatrices.size());
+        std::memcpy(viewportMatrices.data(),reinterpret_cast<void*>(v+layout.viewportMatrices),viewportMatrices.size());
     }
     void restore() const{
         std::memcpy(reinterpret_cast<void*>(camera+0x30),cameraMatrices.data(),cameraMatrices.size());
-        std::memcpy(reinterpret_cast<void*>(viewport+0x280),viewportMatrices.data(),viewportMatrices.size());
+        std::memcpy(reinterpret_cast<void*>(viewport+layout.viewportMatrices),viewportMatrices.data(),viewportMatrices.size());
     }
     ~NativeRestore(){restore();mgs5vr::clearUiRenderSource();eyeViewport=0;stereoTarget=0;drawingEye={};insideStereo=false;}
 };
 __declspec(noinline) uintptr_t registerTarget(void* graphics,void* target){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const bool second=enabled.load()&&insideStereo&&sceneRenderPass>0&&stereoTarget
-        &&reinterpret_cast<uintptr_t>(target)==stereoTarget&&caller==base+0x1bef27;
-    const auto before=second?field<uint32_t>(graphics,0x110):0;
+        &&reinterpret_cast<uintptr_t>(target)==stereoTarget&&caller==base+layout.registerReturn;
+    const auto before=second?field<uint32_t>(graphics,layout.presentCount):0;
     // The active D3D11 implementation performs required GPU setup before
     // appending to its present vector. Always execute that native setup.
     const auto result=originalRegisterTarget(graphics,target);
     if(second&&before){
-        const auto after=field<uint32_t>(graphics,0x110);
-        const auto capacity=field<uint32_t>(graphics,0x114);
-        const auto data=field<uintptr_t>(graphics,0x118);
+        const auto after=field<uint32_t>(graphics,layout.presentCount);
+        const auto capacity=field<uint32_t>(graphics,layout.presentCapacity);
+        const auto data=field<uintptr_t>(graphics,layout.presentData);
         if(after==before+1&&after<=capacity&&data
             &&field<uintptr_t>(reinterpret_cast<void*>(data),size_t(before-1)*8)==stereoTarget
             &&field<uintptr_t>(reinterpret_cast<void*>(data),size_t(before)*8)==stereoTarget){
             // The render job has not published this vector to its presentation
             // worker yet. Remove only the append produced by this eye's call.
-            std::memcpy(static_cast<unsigned char*>(graphics)+0x110,&before,sizeof(before));
+            std::memcpy(static_cast<unsigned char*>(graphics)+layout.presentCount,&before,sizeof(before));
             ++duplicatePresentsSkipped;
         }
     }
@@ -250,8 +274,8 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const auto status=mgs5vr::headCamera().status();
     if(!enabled.load()||!status.active||insideStereo||!mgs5vr::sceneCaptureAvailable())return originalScene(render,graphics,task,worker);
     SceneSource source;{std::lock_guard lock(sceneMutex);source=sceneSource;}
-    bool contains=false;auto candidate=field<uintptr_t>(render,0xa0);
-    for(unsigned n=0;candidate&&n<16;++n){if(candidate==source.viewport){contains=true;break;}candidate=field<uintptr_t>(reinterpret_cast<void*>(candidate),0x30);}
+    bool contains=false;auto candidate=field<uintptr_t>(render,layout.renderViewports);
+    for(unsigned n=0;candidate&&n<16;++n){if(candidate==source.viewport){contains=true;break;}candidate=field<uintptr_t>(reinterpret_cast<void*>(candidate),layout.viewportNext);}
     const auto now=mgs5vr::steadyMilliseconds();
     // The first camera update can precede tracked skin publication. Do not
     // submit that exposed third-person arm pose as the first VR eye pair.
@@ -263,11 +287,11 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence&&!source.pair.sample.menuOpen){++sceneRejected;return originalScene(render,graphics,task,worker);}
     if(!contains||source.pair.sample.activation!=status.activation||now<source.pair.sample.sampleTime||now-source.pair.sample.sampleTime>150
         ||std::memcmp(reinterpret_cast<void*>(source.grCamera+0x30),source.pair.world.data(),sizeof(source.pair.world))){++sceneRejected;return originalScene(render,graphics,task,worker);}
-    const auto contextOwner=field<uintptr_t>(graphics,0x150);
+    const auto contextOwner=field<uintptr_t>(graphics,layout.graphicsContext);
     auto* context=contextOwner?field<ID3D11DeviceContext*>(reinterpret_cast<void*>(contextOwner),8):nullptr;
     if(!context){++sceneRejected;return originalScene(render,graphics,task,worker);}
     sceneContextType.store(context->GetType());
-    NativeRestore saved(source.grCamera,source.viewport);insideStereo=true;stereoTarget=field<uintptr_t>(render,0x98);
+    NativeRestore saved(source.grCamera,source.viewport);insideStereo=true;stereoTarget=field<uintptr_t>(render,layout.renderTarget);
     alignas(16) std::array<float,16> authoredView{},authoredProjection{};
     if(source.pair.sample.controllers.frontEnd){
         // Title layout retains the native publication camera; the stereo
@@ -283,8 +307,10 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     // scene first, then the two ordinary HMD eyes. All three draws use the
     // same simulation/hand publication and only one native present is queued.
     const auto& optic=source.pair.sample.controllers.optic;
+    const auto& scope=source.pair.sample.weaponScope;
+    const auto scopeView=!optic.held&&!source.pair.sample.menuOpen?mgs5vr::weaponScopeSceneView(scope):std::nullopt;
     const auto opticView=optic.held?mgs5vr::binocularSceneView(optic.pose,
-        source.pair.sample.controllers.magnification):std::nullopt;
+        source.pair.sample.controllers.magnification):scopeView;
     mgs5vr::ComPtr<ID3D11Texture2D> opticScene;
     const uint32_t extraPass=opticView?1u:0u;
     for(uint32_t pass=0;pass<2+extraPass;++pass){
@@ -305,7 +331,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         alignas(16) auto nativeValues=values(native);
         alignas(16) std::array<float,16> eyeWorld{},eyeView{};
         alignas(16) std::array<unsigned char,0x140> inverseInput{};
-        std::memcpy(inverseInput.data()+0x120,nativeValues.data(),sizeof(nativeValues));
+        std::memcpy(inverseInput.data()+layout.inversePose,nativeValues.data(),sizeof(nativeValues));
         originalWorld(nativeValues.data(),eyeWorld.data());originalView(inverseInput.data(),eyeView.data());
         if(std::max(inverseError(eyeWorld,eyeView),inverseError(eyeView,eyeWorld))>=0.003f){complete=false;sceneFailure=3;break;}
         std::memcpy(reinterpret_cast<void*>(source.grCamera+0x30),eyeWorld.data(),sizeof(eyeWorld));
@@ -315,22 +341,22 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         std::memcpy(reinterpret_cast<void*>(source.grCamera+0xb0),eyeView.data(),sizeof(eyeView));
         originalViewport(reinterpret_cast<void*>(source.viewport),0);
         if(!clipProjection||!gpuProjection){complete=false;sceneFailure=4;break;}
-        std::memcpy(reinterpret_cast<void*>(source.viewport+0x3c0),eyeView.data(),sizeof(eyeView));
-        std::memcpy(reinterpret_cast<void*>(source.viewport+0x400),reinterpret_cast<void*>(source.viewport+0x280),sizeof(eyeView));
+        std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousView),eyeView.data(),sizeof(eyeView));
+        std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousProjection),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(eyeView));
         drawingEye.projected=true;
         mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,source.pair.sample,authoredView,authoredProjection);
         result=originalScene(render,graphics,task,worker);
         mgs5vr::clearUiRenderSource();
         // Native passes may finish and replace the current deferred context.
-        const auto afterOwner=field<uintptr_t>(graphics,0x150);
+        const auto afterOwner=field<uintptr_t>(graphics,layout.graphicsContext);
         auto* afterContext=afterOwner?field<ID3D11DeviceContext*>(reinterpret_cast<void*>(afterOwner),8):nullptr;
         if(lensPass){
             // This texture is separate from the stereo mailbox. Capturing an
             // unfinished eye into the mailbox can publish a partial pair and
             // later overwrite pixels that the XR compositor is still reading.
             std::array<float,16> opticProjection{};
-            std::memcpy(opticProjection.data(),reinterpret_cast<void*>(source.viewport+0x280),sizeof(opticProjection));
-            if(!mgs5vr::capturePhysicalOpticScene(afterContext,eyeView,opticProjection,native.position,opticScene.GetAddressOf()))
+            std::memcpy(opticProjection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(opticProjection));
+            if(!mgs5vr::capturePhysicalOpticScene(afterContext,eyeView,opticProjection,native.position,opticScene.GetAddressOf(),!scopeView))
                 mgs5vr::log("Physical optic scene copy unavailable; retaining normal head views");
             continue;
         }
@@ -341,11 +367,23 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             alignas(16) std::array<float,16> bodyWorld{};
             std::array<float,16> projection{};
             originalWorld(bodyValues.data(),bodyWorld.data());
-            std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+0x280),sizeof(projection));
+            std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
             mgs5vr::drawPhysicalBinoculars(afterContext,bodyWorld,eyeView,projection,
                 source.pair.sample.controllers.magnification,opticScene.Get(),eye==0);
         }
+        if(afterContext&&scopeView&&mgs5vr::weaponScopeEyeVisible(scope,source.pair.sample.views[eye].pose)){
+            const auto ocular=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,source.pair.sample.headPose,scope.ocular);
+            alignas(16) auto ocularValues=values(ocular);
+            alignas(16) std::array<float,16> ocularWorld{},projection{};
+            originalWorld(ocularValues.data(),ocularWorld.data());
+            std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
+            mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get());
+        }
         if(titleSurface)mgs5vr::drawNativeMenuSurface(afterContext,eyeView,drawingEye.view.fov,source.pair.sample.menuPanel);
+        const auto& wrist=source.pair.sample;
+        if(!titleSurface&&!wrist.menuOpen&&wrist.wristPanelTracked&&wrist.controllers.equipmentOpen&&!wrist.controllers.equipmentCategory)
+            mgs5vr::drawWristCategorySelector(afterContext,eyeView,drawingEye.view.fov,
+                mgs5vr::wristPickerPose(wrist),wrist.controllers.equipmentLabels);
         try{if(mgs5vr::captureSceneEye(afterContext,drawingEye))++sceneCopies;else {complete=false;sceneFailure=5;}}
         catch(const std::exception& ex){complete=false;sceneFailure=7;mgs5vr::log(std::string("Native eye capture: ")+ex.what());}
     }
@@ -356,10 +394,14 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         // spatial panel back into the panel's image.
         saved.restore();sceneRenderPass=2+extraPass;eyeViewport=0;drawingEye={};
         mgs5vr::clearUiRenderSource();
+        // Tracked arms belong to the stereo scene, not the panel's native
+        // camera image. Keep their eye draws and opaque-hand policy intact;
+        // exclude only this player's normal groups during the source replay.
+        mgs5vr::MenuCapturePlayerExclusion excludePlayer(source.pair.sample.playerOwner);
         result=originalScene(render,graphics,task,worker);
     }
     if(pairCount.load()!=cameraCount){complete=false;sceneFailure=6;}
-    const auto timingOwner=field<uintptr_t>(graphics,0x150);
+    const auto timingOwner=field<uintptr_t>(graphics,layout.graphicsContext);
     mgs5vr::endSceneTiming(timingOwner?field<ID3D11DeviceContext*>(reinterpret_cast<void*>(timingOwner),8):context,id,complete);
     if(complete){++scenePairs;}
     else {
@@ -374,14 +416,15 @@ __declspec(noinline) float* world(void* input,float* output){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     if(!enabled.load())return originalWorld(input,output);
     const auto source=reinterpret_cast<uintptr_t>(input);
-    if(caller==base+0x437c64){
+    if(caller==base+layout.worldReturn){
         if(const auto menu=mgs5vr::nativeMenuOpen())mgs5vr::headCamera().setNativeMenuOpen(*menu);
-        current={};current.camera=source-0xf0;
+        current={};current.camera=source-layout.cameraPose;
+        current.identity=layout.publisher?publicationOwner:current.camera;
         primaryListener=0;primaryListenerSequence=0;
         std::array<float,8> native{};std::memcpy(native.data(),input,sizeof(native));
         current.nativeInput=native;
         current.sample={pose(native.data()),{},0,0,false};
-        if(nativePairVerified.load())current.sample=mgs5vr::headCamera().resolveCurrent(current.camera,current.sample.nativePose);
+        if(nativePairVerified.load()&&current.identity)current.sample=mgs5vr::headCamera().resolveCurrent(current.identity,current.sample.nativePose);
         alignas(16) auto adjusted=values(current.sample.nativePose);
         // Title's animated UI builds geometry from the native publication.
         // Keep that source intact, and move only the two render cameras into
@@ -394,7 +437,7 @@ __declspec(noinline) float* world(void* input,float* output){
     }
     // The inverse builder invokes this function synchronously in the same native
     // publication. Reuse the exact pose selected for the world matrix.
-    if(caller==base+0x438c66&&current.haveWorld&&current.camera+0xf0==source&&current.applied&&!current.sample.controllers.frontEnd){
+    if(caller==base+layout.inverseWorldReturn&&current.haveWorld&&current.camera+layout.cameraPose==source&&current.applied&&!current.sample.controllers.frontEnd){
         alignas(16) auto adjusted=values(current.sample.nativePose);
         return originalWorld(adjusted.data(),output);
     }
@@ -403,7 +446,7 @@ __declspec(noinline) float* world(void* input,float* output){
 __declspec(noinline) float* view(void* input,float* output){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     auto* result=originalView(input,output);
-    if(enabled.load()&&caller==base+0x437c90&&current.haveWorld&&current.camera==reinterpret_cast<uintptr_t>(input)+0x30){
+    if(enabled.load()&&caller==base+layout.viewReturn&&current.haveWorld&&current.camera==reinterpret_cast<uintptr_t>(input)+layout.viewInputToCamera){
         std::memcpy(current.view.data(),output,sizeof(current.view));
         try{record(current);}catch(...){}
         current.haveWorld=false;
@@ -414,7 +457,7 @@ __declspec(noinline) uintptr_t extents(void* input,float* output){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const auto result=originalExtents(input,output);
     if(insideStereo&&eyeViewport==reinterpret_cast<uintptr_t>(input)&&gpuProjection){
-        const auto* matrix=reinterpret_cast<const float*>(eyeViewport+0x280);
+        const auto* matrix=reinterpret_cast<const float*>(eyeViewport+layout.gpuProjection);
         output[0]=1/matrix[0];output[1]=1/matrix[5];output[2]=matrix[14];output[3]=matrix[10];
     }
     thread_local uint64_t last{};const auto now=GetTickCount64();
@@ -425,10 +468,10 @@ __declspec(noinline) uintptr_t extents(void* input,float* output){
     std::array<unsigned char,0x5e4> bytes{};SIZE_T copied{};
     if(!ReadProcessMemory(GetCurrentProcess(),input,bytes.data(),bytes.size(),&copied)||copied!=bytes.size())return result;
     std::memcpy(next.extents.data(),output,sizeof(next.extents));
-    std::memcpy(next.matrices.data(),bytes.data()+0x280,sizeof(next.matrices));
-    std::memcpy(&next.camera,bytes.data()+0x570,sizeof(next.camera));
-    std::memcpy(&next.width,bytes.data()+0x5d8,sizeof(next.width));std::memcpy(&next.height,bytes.data()+0x5dc,sizeof(next.height));
-    std::memcpy(&next.scale,bytes.data()+0x5e0,sizeof(next.scale));
+    std::memcpy(next.matrices.data(),bytes.data()+layout.viewportMatrices,sizeof(next.matrices));
+    std::memcpy(&next.camera,bytes.data()+layout.viewportCamera,sizeof(next.camera));
+    std::memcpy(&next.width,bytes.data()+layout.viewportWidth,sizeof(next.width));std::memcpy(&next.height,bytes.data()+layout.viewportHeight,sizeof(next.height));
+    std::memcpy(&next.scale,bytes.data()+layout.viewportScale,sizeof(next.scale));
     if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(next.camera+0x30),next.cameraMatrices.data(),sizeof(next.cameraMatrices),&copied)
         ||copied!=sizeof(next.cameraMatrices))return result;
     try{
@@ -443,7 +486,9 @@ template<size_t N> bool matches(uintptr_t address,const std::array<unsigned char
 }
 }
 namespace mgs5vr {
-void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& directory){
+void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& directory,RenderBuild build){
+    renderBuild=build;layout=renderLayout(build);
+    const bool gz=build==RenderBuild::groundZeroes_1_0_0_5;
     constexpr std::array<unsigned char,10> worldEntry{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x70};
     constexpr std::array<unsigned char,8> viewEntry{0x48,0x8b,0xc4,0x48,0x89,0x58,0x08,0x55};
     constexpr std::array<unsigned char,8> extentsEntry{0xf3,0x0f,0x10,0x0d,0x24,0x23,0xee,0x01};
@@ -455,11 +500,29 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
     constexpr std::array<unsigned char,17> virtualListenerEntry{0x41,0x0f,0x28,0,0xc7,0x02,0,0,0,0,0x48,0x8b,0xc2,0x0f,0x29,0x41,0x40};
     constexpr std::array<unsigned char,15> listenerCaller{0x4c,0x8b,0xc0,0x48,0x8d,0x55,0x07,0x48,0x8b,0xcf,0xe8,0x5e,0x23,0x93,0x01};
     constexpr std::array<unsigned char,15> virtualListenerCaller{0x4c,0x8b,0xc0,0x48,0x8d,0x55,0x07,0x48,0x8b,0xcf,0xe8,0x02,0x24,0x93,0x01};
-    if(!matches(moduleBase+0x438ac0,worldEntry)||!matches(moduleBase+0x438c20,viewEntry)||!matches(moduleBase+0x1c4fa0,extentsEntry)
-        ||!matches(moduleBase+0x1b9490,viewportEntry)||!matches(moduleBase+0x241b00,projectionEntry)||!matches(moduleBase+0x1beec0,sceneEntry)
-        ||!matches(moduleBase+0x2496a0,registerEntry)||!matches(moduleBase+0x1d6a490,listenerEntry)
-        ||!matches(moduleBase+0x1d6a550,virtualListenerEntry)||!matches(moduleBase+0x438123,listenerCaller)
-        ||!matches(moduleBase+0x43813f,virtualListenerCaller))throw std::runtime_error("Native scene/matrix/listener signature mismatch");
+    constexpr std::array<unsigned char,8> gzExtentsEntry{0xf3,0x0f,0x10,0x0d,0x3c,0x5c,0x5e,0};
+    constexpr std::array<unsigned char,11> gzViewportEntry{0x48,0x8b,0xc4,0x57,0x48,0x81,0xec,0xb0,0,0,0};
+    constexpr std::array<unsigned char,11> gzPublisherEntry{0x48,0x8b,0xc4,0x55,0x57,0x41,0x54,0x41,0x56,0x41,0x57};
+    const auto directCall=[&](uintptr_t returnRva,uintptr_t targetRva){
+        std::array<unsigned char,5> bytes{};SIZE_T copied{};int32_t displacement{};
+        if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(moduleBase+returnRva-5),bytes.data(),bytes.size(),&copied)
+            ||copied!=bytes.size()||bytes[0]!=0xe8)return false;
+        std::memcpy(&displacement,bytes.data()+1,4);
+        return static_cast<int64_t>(returnRva)+displacement==static_cast<int64_t>(targetRva);
+    };
+    if(!matches(moduleBase+layout.world,worldEntry)||!matches(moduleBase+layout.view,viewEntry)
+        ||!(gz?matches(moduleBase+layout.extents,gzExtentsEntry):matches(moduleBase+layout.extents,extentsEntry))
+        ||!(gz?matches(moduleBase+layout.viewport,gzViewportEntry):matches(moduleBase+layout.viewport,viewportEntry))
+        ||!matches(moduleBase+layout.projection,projectionEntry)||!matches(moduleBase+layout.scene,sceneEntry)
+        ||!matches(moduleBase+layout.registerTarget,registerEntry)||!matches(moduleBase+layout.listener,listenerEntry)
+        ||!matches(moduleBase+layout.virtualListener,virtualListenerEntry)
+        ||(gz&&!matches(moduleBase+layout.publisher,gzPublisherEntry))
+        ||(!gz&&(!matches(moduleBase+0x438123,listenerCaller)||!matches(moduleBase+0x43813f,virtualListenerCaller)))
+        ||!directCall(layout.worldReturn,layout.world)||!directCall(layout.viewReturn,layout.view)
+        ||!directCall(layout.inverseWorldReturn,layout.world)||!directCall(layout.viewportReturn,layout.viewport)
+        ||!directCall(layout.clipReturn,layout.projection)||!directCall(layout.gpuReturn,layout.projection)
+        ||!directCall(layout.listenerReturn,layout.listener)||!directCall(layout.virtualListenerReturn,layout.virtualListener))
+        throw std::runtime_error("Native scene/matrix/listener signature mismatch");
     base=moduleBase;
     if(!directory.empty()){
         std::filesystem::create_directories(directory);
@@ -468,16 +531,17 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
         evidence<<std::setprecision(9)<<"{\"schema\":1,\"image_base\":"<<base<<",\"paired_native_publication\":true,\"joined_to_present\":false}\n";
     }
     struct Hook {uintptr_t rva;void* wrapper;void** original;};
-    const std::array<Hook,9> hooks{{
-        {0x438ac0,reinterpret_cast<void*>(&world),reinterpret_cast<void**>(&originalWorld)},
-        {0x438c20,reinterpret_cast<void*>(&view),reinterpret_cast<void**>(&originalView)},
-        {0x1c4fa0,reinterpret_cast<void*>(&extents),reinterpret_cast<void**>(&originalExtents)},
-        {0x1b9490,reinterpret_cast<void*>(&viewport),reinterpret_cast<void**>(&originalViewport)},
-        {0x241b00,reinterpret_cast<void*>(&projection),reinterpret_cast<void**>(&originalProjection)},
-        {0x1beec0,reinterpret_cast<void*>(&scene),reinterpret_cast<void**>(&originalScene)},
-        {0x2496a0,reinterpret_cast<void*>(&registerTarget),reinterpret_cast<void**>(&originalRegisterTarget)},
-        {0x1d6a490,reinterpret_cast<void*>(&listener),reinterpret_cast<void**>(&originalListener)},
-        {0x1d6a550,reinterpret_cast<void*>(&virtualListener),reinterpret_cast<void**>(&originalVirtualListener)}}};
+    std::vector<Hook> hooks{
+        {layout.world,reinterpret_cast<void*>(&world),reinterpret_cast<void**>(&originalWorld)},
+        {layout.view,reinterpret_cast<void*>(&view),reinterpret_cast<void**>(&originalView)},
+        {layout.extents,reinterpret_cast<void*>(&extents),reinterpret_cast<void**>(&originalExtents)},
+        {layout.viewport,reinterpret_cast<void*>(&viewport),reinterpret_cast<void**>(&originalViewport)},
+        {layout.projection,reinterpret_cast<void*>(&projection),reinterpret_cast<void**>(&originalProjection)},
+        {layout.scene,reinterpret_cast<void*>(&scene),reinterpret_cast<void**>(&originalScene)},
+        {layout.registerTarget,reinterpret_cast<void*>(&registerTarget),reinterpret_cast<void**>(&originalRegisterTarget)},
+        {layout.listener,reinterpret_cast<void*>(&listener),reinterpret_cast<void**>(&originalListener)},
+        {layout.virtualListener,reinterpret_cast<void*>(&virtualListener),reinterpret_cast<void**>(&originalVirtualListener)}};
+    if(layout.publisher)hooks.push_back({layout.publisher,reinterpret_cast<void*>(&publishCamera),reinterpret_cast<void**>(&originalPublisher)});
     for(const auto& hook:hooks){const auto result=MH_CreateHook(reinterpret_cast<void*>(base+hook.rva),hook.wrapper,hook.original);
         if(result!=MH_OK)throw std::runtime_error(std::string("Native scene hook: ")+MH_StatusToString(result));
     }
@@ -486,8 +550,11 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
         throw std::runtime_error("Cannot enable native scene/matrix hooks");
     }
     enabled.store(true);
-    try{installUiRenderer(base);}catch(const std::exception& ex){log(std::string("Native UI integration unavailable: ")+ex.what());}
-    try{installOpticMarkers(base);}catch(const std::exception& ex){log(std::string("Native optic markers unavailable: ")+ex.what());}
+    if(!gz){
+        try{installUiRenderer(base);}catch(const std::exception& ex){log(std::string("Native UI integration unavailable: ")+ex.what());}
+        try{installOpticMarkers(base);}catch(const std::exception& ex){log(std::string("Native optic markers unavailable: ")+ex.what());}
+    }
+    log(gz?"Ground Zeroes 1.0.0.5 native scene adapter installed":"The Phantom Pain 1.0.15.4 native scene adapter installed");
     log("Native camera matrix integration installed; head control remains off until explicitly toggled");
     log("Native listener integration installed; guarded by the active source camera publication");
 }
@@ -517,7 +584,7 @@ void reportRenderCamera(){
     array(sceneCaptureCounters());evidence<<"}\n";
     for(const auto& p:snapshot)if(p.camera){
         evidence<<"{\"tick_ms\":"<<p.tick<<",\"camera\":\"0x"<<std::hex<<p.camera<<std::dec<<"\",\"sequence\":"<<p.sequence
-            <<",\"thread\":"<<p.thread<<",\"tracking_sequence\":"<<p.sample.trackingSequence<<",\"applied\":"<<(p.applied?"true":"false")
+            <<",\"identity\":"<<p.identity<<",\"thread\":"<<p.thread<<",\"tracking_sequence\":"<<p.sample.trackingSequence<<",\"applied\":"<<(p.applied?"true":"false")
             <<",\"inverse_valid\":"<<(p.validInverse?"true":"false")
             <<",\"player_sequence\":"<<p.sample.playerSequence<<",\"player_owner\":"<<p.sample.playerOwner
             <<",\"rig_sequence\":"<<p.sample.rigSequence<<",\"predicted_xr_time\":"<<p.sample.controllers.predictedXrTime
@@ -543,17 +610,27 @@ void reportRenderCamera(){
         evidence<<"{\"event\":\"viewport_extents\",\"viewport\":\"0x"<<std::hex<<v.viewport<<"\",\"gr_camera\":\"0x"<<v.camera
             <<"\",\"caller_rva\":\"0x"<<v.caller-base<<std::dec<<"\",\"tick_ms\":"<<v.tick<<",\"thread\":"<<v.thread
             <<",\"width\":"<<v.width<<",\"height\":"<<v.height<<",\"scale\":"<<v.scale<<",\"extents\":";array(v.extents);
-        evidence<<",\"viewport_280_4bf\":";array(v.matrices);evidence<<",\"gr_camera_world_view_previous\":";array(v.cameraMatrices);
+        evidence<<",\"viewport_matrix_offset\":"<<layout.viewportMatrices<<",\"viewport_matrices\":";array(v.matrices);evidence<<",\"gr_camera_world_view_previous\":";array(v.cameraMatrices);
         evidence<<",\"stack\":[";for(USHORT n=0;n<v.stackCount;++n){if(n)evidence<<',';evidence<<"\"0x"<<std::hex<<reinterpret_cast<uintptr_t>(v.stack[n])<<std::dec<<'"';}evidence<<"]}\n";
     }
     evidence.flush();++reports;
 }
 EyeFrame observeRenderPresent(void*) noexcept {
     if(!enabled.load())return {};
+    const auto publication=lastCameraPublication.load(),now=GetTickCount64();
+    // A loading/Start Mission screen can present indefinitely without running
+    // the scene-camera publisher. Do not strand its native confirmation behind
+    // an empty stereo submission. Short producer gaps retain their eye pair.
+    if(publication&&now>=publication&&now-publication>500)headCamera().awaitScene();
     const auto frame=++presentCount;if(frame%300!=1)return {};
     PresentTrace next;next.frame=frame;next.tick=GetTickCount64();next.thread=GetCurrentThreadId();
     next.count=CaptureStackBackTrace(1,static_cast<DWORD>(next.stack.size()),next.stack.data(),nullptr);
-    try{std::unique_lock lock(latestMutex,std::try_to_lock);if(lock.owns_lock())presentTrace=next;}catch(...){}
+    try{
+        {std::unique_lock lock(latestMutex,std::try_to_lock);if(lock.owns_lock())presentTrace=next;}
+        // GZ's renderer can be exercised independently of the TPP owner/rig
+        // observer. It must still report its native image/pose transaction.
+        if(renderBuild==RenderBuild::groundZeroes_1_0_0_5)mgs5vr::reportRenderCamera();
+    }catch(...){}
     return {}; // Scene-capture command-list metadata owns the image/pose join.
 }
 void stopRenderCamera() noexcept {enabled.store(false);stopOpticMarkers();stopUiRenderer();headCamera().cancel();try{reportRenderCamera();evidence.close();}catch(...){}}

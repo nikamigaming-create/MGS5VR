@@ -3,9 +3,10 @@
 #include <atomic>
 #include <chrono>
 #include <string>
+#include <filesystem>
 
 namespace mgs5vr {
-struct TheatreConfig { float widthMeters{8}, distanceMeters{6}; };
+struct TheatreConfig { float widthMeters{8}, distanceMeters{6};std::filesystem::path controlsPath{}; };
 struct RuntimeProbe { bool instanceAvailable{}, headsetAvailable{}; std::string runtime, system, error; };
 struct RuntimeStats {
     uint64_t frames{}, submittedScreens{}, sourceFrames{}, trackingInvalidFrames{};

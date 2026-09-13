@@ -9,6 +9,17 @@ namespace mgs5vr {
 
 enum class OpticKind { none, binocular, weaponScope };
 
+// Weapon-local sockets must come from the equipped native sight, then be
+// published with the solved weapon/skin frame. These are not HMD cameras.
+struct WeaponScopeSample {
+    Pose ocular{},objective{}; // OpenXR LOCAL, optical forward -Z.
+    float radius{},eyeRelief{},magnification{};
+    uint64_t weaponIdentity{};
+    bool tracked{};
+};
+std::optional<EyeView> weaponScopeSceneView(const WeaponScopeSample& scope);
+bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye);
+
 // The retail telescope's imported mesh frame, in metres. Both the housing
 // shader and the optical camera use these sockets.
 inline constexpr Vec3 binocularOcularCenter{-.032788f,-.000562f,.05512f};

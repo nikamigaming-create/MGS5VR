@@ -12,28 +12,45 @@ float facing(Pose a,Pose b){
 bool finitePose(Pose p){return valid(p)&&std::isfinite(p.position.x)&&std::isfinite(p.position.y)&&std::isfinite(p.position.z);}
 }
 
+std::optional<EyeView> weaponScopeSceneView(const WeaponScopeSample& scope){
+    if(!scope.tracked||!scope.weaponIdentity||!finitePose(scope.ocular)||!finitePose(scope.objective)
+       ||!std::isfinite(scope.radius)||scope.radius<.003f||scope.radius>.06f
+       ||!std::isfinite(scope.eyeRelief)||scope.eyeRelief<.02f||scope.eyeRelief>.3f
+       ||!std::isfinite(scope.magnification)||scope.magnification<1.f||scope.magnification>16.f)return {};
+    const auto objective=compose(inverse(scope.ocular),scope.objective);
+    // A reversed, detached or misidentified sight must not become a camera.
+    if(objective.position.z>=-.005f||objective.position.z<-.6f
+       ||std::abs(objective.position.x)>.005f||std::abs(objective.position.y)>.005f
+       ||facing(scope.ocular,scope.objective)<.999f)return {};
+    const float angle=std::atan(scope.radius/(scope.eyeRelief*scope.magnification));
+    return EyeView{scope.objective,{-angle,angle,angle,-angle}};
+}
+
+bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye){
+    if(!weaponScopeSceneView(scope)||!finitePose(eye))return false;
+    const auto local=compose(inverse(scope.ocular),eye).position;
+    // Eye relief belongs to the physical scope. Lowering/rolling the rifle
+    // never expands the image over the world or reveals it through the back.
+    if(local.z<.005f||local.z>scope.eyeRelief*2.f)return false;
+    const float lateral=local.x*local.x+local.y*local.y;
+    return lateral<=scope.radius*scope.radius&&facing(scope.ocular,eye)>.75f;
+}
+
 std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     Pose leftAim,Pose rightAim,bool leftTracked,bool rightTracked,
     bool leftAimTracked,bool rightAimTracked,bool leftHeld,bool rightHeld){
     if(!rightHeld||!rightTracked||!rightAimTracked
        ||!finitePose(rightGrip)||!finitePose(rightAim))return {};
-    // The right hand owns the device.  The body is an authored grip socket,
-    // exactly like a firearm's weaponFromGrip socket: its translation and
-    // orientation come from the right grip pose.  The aim pose is validated
-    // separately because it is the optical alignment probe, never the body
-    // attachment owner.  This prevents the binoculars from floating when the
-    // controller's aim pose and anatomical palm pose differ.
+    // The primary palm owns the attachment position. Calibrate orientation
+    // from this runtime's same-frame grip/aim pair; do not use aim POSITION
+    // as the palm socket or assume every controller has the simulator basis.
     const auto aimFromGrip=compose(inverse(rightGrip),rightAim);
     if(!valid(Pose{aimFromGrip.orientation,{}}))return {};
-    // The actual retail telescope mesh has its large ocular recess on the
-    // broad +Z face.  Its authored grip frame is not the simulator's weapon-ready
-    // palm frame, so the mesh needs one calibrated attachment transform.  At
-    // the measured weapon grip quaternion this makes the ocular face point at
-    // the user and keeps the device upright; it is a single transform carried
-    // by the hand, not a screen-space or guessed quarter-turn.
-    const Pose referenceGrip{{.61595203f,-.00760909f,.07982154f,.78369236f},{}};
-    const Pose referenceBody{}; // +Z ocular face points back toward the user's eye.
-    const auto gripToBody=compose(inverse(referenceGrip),referenceBody);
+    // Use THIS controller's grip-to-aim frame, not a simulator's neutral
+    // wrist quaternion. The optic points along the controller aim -Z while
+    // its palm socket stays exactly at the tracked grip position. The old
+    // fixed ~76-degree pitch made a physical Touch wrist bend back at the face.
+    const Pose gripToBody{aimFromGrip.orientation,{}};
     // Seat the housing against the inside of the right palm. The rear ocular
     // remains behind the fingers, so bringing it to the eye does not bring
     // the wrist through the near plane.
@@ -60,7 +77,8 @@ std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     // Merely squeezing the left controller must not teleport that hand onto
     // the binoculars: it has to be tracked, aimed, held, and physically close
     // to this authored socket.
-    const auto supportSocket=compose(body,Pose{referenceGrip.orientation,binocularSupportSocket});
+    const auto supportAimFromGrip=compose(inverse(leftGrip),leftAim);
+    const auto supportSocket=compose(body,Pose{inverse(supportAimFromGrip).orientation,binocularSupportSocket});
     const float supportDistance=finitePose(leftGrip)&&finitePose(supportSocket)
         ?distance(leftGrip.position,supportSocket.position):std::numeric_limits<float>::infinity();
     const bool supportHeld=leftHeld&&leftTracked&&leftAimTracked

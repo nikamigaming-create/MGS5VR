@@ -29,7 +29,7 @@ std::atomic_uintptr_t titleMenu{};
 std::atomic_uint64_t titleUpdatedAt{};
 uintptr_t base{};
 std::atomic_bool enabled{};
-struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},itemsOpen{},commandsOpen{},menuOpen{};Pose menuPanel{};bool frontEnd{};std::array<float,16> authoredView{},authoredProjection{};};
+struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},choosingCategory{},itemsOpen{},commandsOpen{},menuOpen{};Pose menuPanel{};bool frontEnd{};std::array<float,16> authoredView{},authoredProjection{};};
 thread_local Source producing,executing;
 std::mutex mutex;
 std::unordered_map<uintptr_t,Source> pending;
@@ -198,6 +198,9 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 // Call uses the Z=100 layout: choices 135..137, selected action
                 // and its help 138..139. Destination marks and status stay separate.
                 const bool commandsPicker=executing.commandsOpen&&world[14]==100&&order>=135&&order<=139;
+                // LT's first stage is the explicit four-category action bar.
+                // Keep native status icons on the wrist; never stretch one
+                // status icon into a pretend four-way selector.
                 const bool expanded=equipmentPicker||commandsPicker;
                 if((!contextAction&&!expanded&&(order<146||order>148))||!executing.panelTracked||(!expanded&&!executing.panelVisible)){
                     ++suppressedDraws;
@@ -209,7 +212,8 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                     contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
                 const float layoutWidth=commandsPicker?.6f:equipmentPicker?.42f:1.2f;
                 const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
-                    expanded?0.f:contextAction?.04f:.72f,expanded?0.f:contextAction?-.52f:-.70f);
+                    expanded?0.f:contextAction?.04f:.72f,
+                    expanded?0.f:contextAction?-.52f:-.70f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));
@@ -330,17 +334,27 @@ std::optional<bool> nativeMenuOpen() noexcept {
 }
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
 uint64_t nativeCommandsDrawTime() noexcept {return enabled.load()?commandsDrawTime.load():0;}
+Pose wristPickerPose(const HeadCameraSample& rig) noexcept{
+    const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
+    const auto anchor=rig.wristPanel.position+rotate(head.orientation,{0,rig.controllers.wristSelectorHeight,-.03f});
+    const std::array<EyeView,2> eyes{{
+        {nativeTrackedPose(rig.nativePose,rig.headPose,rig.views[0].pose),rig.views[0].fov},
+        {nativeTrackedPose(rig.nativePose,rig.headPose,rig.views[1].pose),rig.views[1].fov}}};
+    // One shared envelope covers the guide, item cards and command picker.
+    // This changes only the unfolded panel, never the status mounted on skin.
+    return fitWristPanel(head,anchor,eyes,.6f,.6f*9.f/16.f).value_or(Pose{head.orientation,anchor});
+}
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const HeadCameraSample& rig,
     const std::array<float,16>& authoredView,const std::array<float,16>& authoredProjection){
     const std::array<Pose,2> eyes{nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),
                                 nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose)};
     // Keep status flat along the forearm, but unfold the larger native picker
     // above that wrist, facing the source head. Both eyes use this same pose.
-    const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
-    const Vec3 lift{0,.09f,-.03f};
-    const Pose picker{head.orientation,rig.wristPanel.position+rotate(head.orientation,lift)};
+    const auto picker=wristPickerPose(rig);
     producing={eye,camera,view,rig.wristPanel,picker,rig.wristPanelTracked,
-               rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),rig.controllers.equipmentCategory==4,rig.controllers.commandControls,
+               rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),
+               rig.controllers.equipmentOpen&&!rig.controllers.equipmentCategory,
+               rig.controllers.equipmentCategory==4,rig.controllers.commandControls,
                rig.menuOpen,rig.menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection};
 }
 void clearUiRenderSource() noexcept {producing={};}

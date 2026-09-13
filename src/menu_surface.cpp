@@ -23,7 +23,8 @@ struct Surface {
     D3D11_TEXTURE2D_DESC description{};
     uint64_t source{},capturedAt{};
     bool reported{};
-} surface;
+} surface,categorySurface;
+EquipmentLabels categoryLabels{};
 std::mutex surfaceMutex;
 struct State {
     ID3D11DeviceContext* c;
@@ -64,9 +65,9 @@ struct State {
         c->OMSetDepthStencilState(depth.Get(),stencil);c->OMSetBlendState(blend.Get(),factor,mask);
     }
 };
-bool initialize(ID3D11Device* device){
-    if(surface.device.Get()!=device){surface={};surface.device=device;}
-    if(surface.vs)return true;
+bool initialize(ID3D11Device* device,Surface& targetSurface){
+    if(targetSurface.device.Get()!=device){targetSurface={};targetSurface.device=device;}
+    if(targetSurface.vs)return true;
     constexpr char shader[]=R"(
 struct V { float4 p:SV_POSITION; float2 uv:TEXCOORD0; };
 V vertex(float4 p:POSITION,float2 uv:TEXCOORD0) { V v;v.p=p;v.uv=uv;return v; }
@@ -85,21 +86,21 @@ float4 pixel(V v):SV_TARGET { return float4(image.Sample(linearClamp,v.uv).rgb,1
     D3D11_RASTERIZER_DESC raster{};raster.FillMode=D3D11_FILL_SOLID;raster.CullMode=D3D11_CULL_NONE;raster.DepthClipEnable=TRUE;
     D3D11_DEPTH_STENCIL_DESC depth{};depth.DepthFunc=D3D11_COMPARISON_ALWAYS;
     D3D11_BLEND_DESC blend{};blend.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
-    if(FAILED(device->CreateInputLayout(input,2,vs->GetBufferPointer(),vs->GetBufferSize(),&surface.layout))
-        ||FAILED(device->CreateBuffer(&buffer,nullptr,&surface.vertices))
-        ||FAILED(device->CreateSamplerState(&sampler,&surface.sampler))
-        ||FAILED(device->CreateRasterizerState(&raster,&surface.raster))
-        ||FAILED(device->CreateDepthStencilState(&depth,&surface.depth))
-        ||FAILED(device->CreateBlendState(&blend,&surface.blend))
-        ||FAILED(device->CreatePixelShader(ps->GetBufferPointer(),ps->GetBufferSize(),nullptr,&surface.ps))
-        ||FAILED(device->CreateVertexShader(vs->GetBufferPointer(),vs->GetBufferSize(),nullptr,&surface.vs)))return false;
+    if(FAILED(device->CreateInputLayout(input,2,vs->GetBufferPointer(),vs->GetBufferSize(),&targetSurface.layout))
+        ||FAILED(device->CreateBuffer(&buffer,nullptr,&targetSurface.vertices))
+        ||FAILED(device->CreateSamplerState(&sampler,&targetSurface.sampler))
+        ||FAILED(device->CreateRasterizerState(&raster,&targetSurface.raster))
+        ||FAILED(device->CreateDepthStencilState(&depth,&targetSurface.depth))
+        ||FAILED(device->CreateBlendState(&blend,&targetSurface.blend))
+        ||FAILED(device->CreatePixelShader(ps->GetBufferPointer(),ps->GetBufferSize(),nullptr,&targetSurface.ps))
+        ||FAILED(device->CreateVertexShader(vs->GetBufferPointer(),vs->GetBufferSize(),nullptr,&targetSurface.vs)))return false;
     return true;
 }
 }
 bool captureNativeMenuSurface(ID3D11DeviceContext* context,uint64_t source) noexcept {try{
     if(!context||!source)return false;
     std::lock_guard lock(surfaceMutex);ComPtr<ID3D11Device> device;context->GetDevice(&device);
-    if(!initialize(device.Get()))return false;
+    if(!initialize(device.Get(),surface))return false;
     ComPtr<ID3D11Texture2D> native;if(!sceneSourceTexture(context,&native))return false;
     D3D11_TEXTURE2D_DESC desc{};native->GetDesc(&desc);
     if(desc.SampleDesc.Count!=1||desc.ArraySize!=1||desc.MipLevels!=1)return false;
@@ -119,13 +120,9 @@ bool captureNativeMenuSurface(ID3D11DeviceContext* context,uint64_t source) noex
     context->OMSetRenderTargets(0,nullptr,nullptr);context->CopyResource(surface.texture.Get(),native.Get());
     surface.source=source;surface.capturedAt=GetTickCount64();return true;
 }catch(...){return false;}}
-bool drawNativeMenuSurface(ID3D11DeviceContext* context,const std::array<float,16>& view,EyeFov fov,Pose panel) noexcept {try{
-    if(!context)return false;std::lock_guard lock(surfaceMutex);
-    // Menu selection comes from the last fully completed native frame. Both
-    // eyes draw that same image at their current, world-anchored panel pose.
-    if(!surface.image||!surface.source||GetTickCount64()-surface.capturedAt>250)return false;
+bool drawSurface(ID3D11DeviceContext* context,Surface& targetSurface,const std::array<float,16>& view,EyeFov fov,Pose panel,float width,float height){
     constexpr std::array<float,16> identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
-    const auto transform=uiPanelProjection(identity,view,fov,panel,1.9f,1.9f*9.f/16.f);if(!transform)return false;
+    const auto transform=uiPanelProjection(identity,view,fov,panel,width,height);if(!transform)return false;
     constexpr float corners[6][2]={{-1,1},{1,1},{-1,-1},{-1,-1},{1,1},{1,-1}};
     Vertex vertices[6]{};
     for(size_t i=0;i<6;++i){const auto x=corners[i][0],y=corners[i][1];
@@ -133,22 +130,48 @@ bool drawNativeMenuSurface(ID3D11DeviceContext* context,const std::array<float,1
         vertices[i].uv[0]=(x+1)*.5f;vertices[i].uv[1]=(1-y)*.5f;
     }
     State saved(context);ComPtr<ID3D11Texture2D> native;ComPtr<ID3D11RenderTargetView> target;
-    if(!sceneSourceTexture(context,&native)||FAILED(surface.device->CreateRenderTargetView(native.Get(),nullptr,&target)))return false;
+    if(!sceneSourceTexture(context,&native)||FAILED(targetSurface.device->CreateRenderTargetView(native.Get(),nullptr,&target)))return false;
     D3D11_MAPPED_SUBRESOURCE mapped{};
-    if(FAILED(context->Map(surface.vertices.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&mapped)))return false;
-    std::memcpy(mapped.pData,vertices,sizeof(vertices));context->Unmap(surface.vertices.Get(),0);
+    if(FAILED(context->Map(targetSurface.vertices.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&mapped)))return false;
+    std::memcpy(mapped.pData,vertices,sizeof(vertices));context->Unmap(targetSurface.vertices.Get(),0);
     auto* rt=target.Get();context->OMSetRenderTargets(1,&rt,nullptr);
-    auto* vb=surface.vertices.Get();UINT stride=sizeof(Vertex),offset=0;context->IASetVertexBuffers(0,1,&vb,&stride,&offset);
-    context->IASetInputLayout(surface.layout.Get());context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    context->VSSetShader(surface.vs.Get(),nullptr,0);context->PSSetShader(surface.ps.Get(),nullptr,0);
+    auto* vb=targetSurface.vertices.Get();UINT stride=sizeof(Vertex),offset=0;context->IASetVertexBuffers(0,1,&vb,&stride,&offset);
+    context->IASetInputLayout(targetSurface.layout.Get());context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    context->VSSetShader(targetSurface.vs.Get(),nullptr,0);context->PSSetShader(targetSurface.ps.Get(),nullptr,0);
     context->GSSetShader(nullptr,nullptr,0);context->HSSetShader(nullptr,nullptr,0);context->DSSetShader(nullptr,nullptr,0);
-    auto* image=surface.image.Get();context->PSSetShaderResources(0,1,&image);auto* sampler=surface.sampler.Get();context->PSSetSamplers(0,1,&sampler);
-    context->RSSetState(surface.raster.Get());context->OMSetDepthStencilState(surface.depth.Get(),0);
-    const FLOAT blend[4]{};context->OMSetBlendState(surface.blend.Get(),blend,~0u);
-    D3D11_VIEWPORT viewport{0,0,float(surface.description.Width),float(surface.description.Height),0,1};context->RSSetViewports(1,&viewport);
+    auto* image=targetSurface.image.Get();context->PSSetShaderResources(0,1,&image);auto* sampler=targetSurface.sampler.Get();context->PSSetSamplers(0,1,&sampler);
+    context->RSSetState(targetSurface.raster.Get());context->OMSetDepthStencilState(targetSurface.depth.Get(),0);
+    const FLOAT blend[4]{};context->OMSetBlendState(targetSurface.blend.Get(),blend,~0u);
+    D3D11_TEXTURE2D_DESC destination{};native->GetDesc(&destination);
+    D3D11_VIEWPORT viewport{0,0,float(destination.Width),float(destination.Height),0,1};context->RSSetViewports(1,&viewport);
     context->Draw(6,0);
-    if(!surface.reported){surface.reported=true;log("Complete native Title menu rendered on a spatial cabin panel");}
     return true;
+}
+bool drawNativeMenuSurface(ID3D11DeviceContext* context,const std::array<float,16>& view,EyeFov fov,Pose panel) noexcept {try{
+    if(!context)return false;std::lock_guard lock(surfaceMutex);
+    if(!surface.image||!surface.source||GetTickCount64()-surface.capturedAt>250)return false;
+    const bool drawn=drawSurface(context,surface,view,fov,panel,1.9f,1.9f*9.f/16.f);
+    if(drawn&&!surface.reported){surface.reported=true;log("Complete native Title menu rendered on a spatial cabin panel");}
+    return drawn;
 }catch(...){return false;}}
-void stopNativeMenuSurface() noexcept {std::lock_guard lock(surfaceMutex);surface={};}
+bool drawWristCategorySelector(ID3D11DeviceContext* context,const std::array<float,16>& view,EyeFov fov,Pose panel,const EquipmentLabels& labels) noexcept {try{
+    if(!context)return false;std::lock_guard lock(surfaceMutex);
+    ComPtr<ID3D11Device> device;context->GetDevice(&device);
+    if(!initialize(device.Get(),categorySurface))return false;
+    if(!categorySurface.image||categoryLabels!=labels){
+        const auto pixels=makeWristSelectorImage(labels);if(pixels.bgra.empty())return false;
+        D3D11_TEXTURE2D_DESC desc{};desc.Width=pixels.width;desc.Height=pixels.height;
+        desc.MipLevels=desc.ArraySize=desc.SampleDesc.Count=1;desc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
+        desc.Usage=D3D11_USAGE_IMMUTABLE;desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+        D3D11_SUBRESOURCE_DATA data{pixels.bgra.data(),pixels.width*4,0};
+        categorySurface.image.Reset();categorySurface.texture.Reset();
+        if(FAILED(device->CreateTexture2D(&desc,&data,&categorySurface.texture))
+            ||FAILED(device->CreateShaderResourceView(categorySurface.texture.Get(),nullptr,&categorySurface.image)))return false;
+        categorySurface.description=desc;categoryLabels=labels;
+    }
+    const bool drawn=drawSurface(context,categorySurface,view,fov,panel,.48f,.48f*320.f/1440.f);
+    if(drawn&&!categorySurface.reported){categorySurface.reported=true;log("Four-category wrist selector rendered with configured input labels");}
+    return drawn;
+}catch(...){return false;}}
+void stopNativeMenuSurface() noexcept {std::lock_guard lock(surfaceMutex);surface={};categorySurface={};categoryLabels={};}
 }

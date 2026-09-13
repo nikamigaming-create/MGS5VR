@@ -1,7 +1,24 @@
 # Status: experimental native VR mod
 
-Updated 2026-09-09. The mod source, native adapters, tests and build tooling are
+Updated 2026-09-13. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
+
+Current source/build changes: annotated editable controller configuration with
+tap/hold/chord bindings; separated Touch face buttons from Vive/WMR fallback
+actions; deliberate four-category wrist selection fitted to both eyes; carried
+binoculars with their independent magnified scene; automatic owned binocular
+asset import; and a repaired ACC-to-mission camera handoff. The current Release
+DLL is `B1E1D8C84815F3F59141A8DDDC3F2563630EE58BF3D7AA1C9A4E4CF6FB5E4EDE`.
+Nine automated suites pass, plus the installer fixtures and a fresh owned-asset
+import. See [the actual both-game SIM coverage](DUAL_GAME_SIM_COVERAGE.md).
+
+Still unfinished: native per-weapon scope attachment/zoom, complete weapon and
+gadget coverage, some powered-arm/reconnaissance interactions, Ground Zeroes'
+tracked first-person rig, and the complete combined showcase. The separate
+weapon-scope render path is groundwork, not a connected gameplay feature.
+GZ's independent native third-person stereo remains an explicit experiment.
+
+## Earlier September 9 release
 
 The [September 9 experimental release](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-09)
 contains the current merged source, the updated control guides and the support-hand

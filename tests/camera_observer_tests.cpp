@@ -84,6 +84,27 @@ int visibilityChecks(){
     const auto update=[&](bool enabled){mgs5vr::updatePlayerVisibility(address(owner),enabled);};
     update(true);
     if(model!=original||body!=originalBody||flags!=std::array<uint8_t,3>{11,11,3}||bodyFlags!=std::array<uint8_t,6>{15,11,15,11,15,15})++failures;
+    const auto stereoBodyFlags=bodyFlags;
+    {
+        mgs5vr::MenuCapturePlayerExclusion sourceOnly(address(owner));
+        if(bodyFlags!=std::array<uint8_t,6>{11,11,11,11,11,11})++failures;
+        // An inner source scope must not restore the outer scope's exclusion.
+        {mgs5vr::MenuCapturePlayerExclusion nested(address(owner));}
+        if(bodyFlags!=std::array<uint8_t,6>{11,11,11,11,11,11})++failures;
+    }
+    if(bodyFlags!=stereoBodyFlags||flags!=std::array<uint8_t,3>{11,11,3})++failures;
+    {
+        mgs5vr::MenuCapturePlayerExclusion sourceOnly(address(owner));
+        bodyFlags[2]=0; // Native state change while the source is drawn wins.
+    }
+    if(bodyFlags[2]!=0)++failures;
+    bodyFlags=stereoBodyFlags;
+    {
+        mgs5vr::MenuCapturePlayerExclusion sourceOnly(address(owner));
+        put(bodyParts,0x68,address(replacement));
+    }
+    if(bodyFlags!=std::array<uint8_t,6>{11,11,11,11,11,11})++failures;
+    put(bodyParts,0x68,address(body));bodyFlags=stereoBodyFlags;
     update(false);if(flags!=nativeFlags||bodyFlags!=nativeBodyFlags||model!=original)++failures;
     // A cyclic hierarchy or a body ancestor of arms must not hide anything.
     hierarchy[3].parent=4;update(true);if(bodyFlags!=nativeBodyFlags)++failures;update(false);hierarchy[3].parent=0;

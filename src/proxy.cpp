@@ -13,6 +13,7 @@
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/process_exit.hpp"
 #include "mgs5vr/native_actions.hpp"
+#include "mgs5vr/game_target.hpp"
 #include <array>
 #include <atomic>
 #include <filesystem>
@@ -27,6 +28,41 @@ HMODULE proxyModule{};
 std::atomic_bool stopRequested{};
 std::atomic<HANDLE> workerHandle{};
 HANDLE wakeWorker{};
+
+// GZ's original launcher remains attached to the game. XR runtimes can start
+// their own short-lived helpers; those must not become debuggees of that
+// launcher. Keep the existing game/debugger connection intact, changing only
+// inheritance by subsequently-created children, and restore it after XR stops.
+class RuntimeChildIsolation {
+    using Query=LONG(NTAPI*)(HANDLE,ULONG,void*,ULONG,ULONG*);
+    using Set=LONG(NTAPI*)(HANDLE,ULONG,void*,ULONG);
+    Set set_{};
+    ULONG previous_{};
+    bool changed_{};
+public:
+    explicit RuntimeChildIsolation(bool required){
+        if(!required)return;
+        const auto module=GetModuleHandleW(L"ntdll.dll");
+        const auto query=reinterpret_cast<Query>(GetProcAddress(module,"NtQueryInformationProcess"));
+        set_=reinterpret_cast<Set>(GetProcAddress(module,"NtSetInformationProcess"));
+        ULONG_PTR debugPort{};
+        if(!query||!set_||query(GetCurrentProcess(),7,&debugPort,sizeof(debugPort),nullptr)<0
+            ||query(GetCurrentProcess(),31,&previous_,sizeof(previous_),nullptr)<0)
+            throw std::runtime_error("Cannot query GZ runtime-helper inheritance");
+        mgs5vr::log("GZ runtime-helper inheritance="+std::to_string(previous_)+" launcher_attached="+std::to_string(debugPort!=0));
+        if(!debugPort||!previous_)return;
+        ULONG noInherit=0;
+        if(set_(GetCurrentProcess(),31,&noInherit,sizeof(noInherit))<0)
+            throw std::runtime_error("Cannot isolate XR helpers from GZ's launcher");
+        changed_=true;
+        mgs5vr::log("XR helpers isolated from GZ launcher; original game connection retained");
+    }
+    ~RuntimeChildIsolation(){
+        if(changed_)set_(GetCurrentProcess(),31,&previous_,sizeof(previous_));
+    }
+    RuntimeChildIsolation(const RuntimeChildIsolation&)=delete;
+    RuntimeChildIsolation& operator=(const RuntimeChildIsolation&)=delete;
+};
 
 void cleanupBeforeExit() noexcept {
     using namespace mgs5vr;
@@ -45,6 +81,7 @@ void cleanupBeforeExit() noexcept {
         if(!finished)log("OpenXR worker did not finish within shutdown deadline");
     }
     stopCameraObserver();
+    stopRenderCamera();
     stopCapture();
     log(finished?"MGS5VR cleanup completed before process exit":"MGS5VR cleanup incomplete at process exit");
 }
@@ -87,21 +124,24 @@ DWORD WINAPI initialize(void*){
         if(GetPrivateProfileIntW(L"theatre",L"enabled",0,ini.c_str())!=1){log("Theatre preview disabled; DirectInput forwarding remains active");return 0;}
         const auto hash=sha256(modulePath(nullptr));
         log("MGS5VR 0.1.0 development theatre preview. Executable SHA256="+hash);
-        if(hash!="085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45"){
+        const auto* target=gameTarget(hash);
+        if(!target){
             log("Unrecognized executable. Capture disabled; no game patches applied.");return 0;
         }
+        log("Game target: "+std::string(target->name)+" / "+std::string(target->id));
+        if(!target->nativeAdapter)log("Ground Zeroes target: independent native scene experiment available; TPP player, weapon and UI hooks remain disabled.");
         // All code/hooks and the compositor have process lifetime. Never unload live detours.
         HMODULE pinned{};
         if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
             reinterpret_cast<LPCWSTR>(&initialize),&pinned))throw std::runtime_error("Cannot pin capture module");
         auto& mailbox=*new TextureMailbox;
-        if(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1)
+        if(target->nativeAdapter&&GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1)
             log(enableNativeFrameRate(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))
                 ?"Native variable frame rate enabled; producer capped at 120 FPS for the 90 Hz target"
                 :"Native frame-rate signatures differ; original limiter retained");
         installCaptureHook(mailbox);
         installProcessExitHook(&cleanupBeforeExit);
-        if(GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1){
+        if(target->nativeAdapter&&GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1){
             try{
                 std::array<wchar_t,32768> evidencePath{};
                 GetPrivateProfileStringW(L"diagnostics",L"camera_evidence_dir",L"",evidencePath.data(),static_cast<DWORD>(evidencePath.size()),ini.c_str());
@@ -116,12 +156,40 @@ DWORD WINAPI initialize(void*){
             }catch(const std::exception& e){log(std::string("Camera observer unavailable: ")+e.what());}
         }
         try{installGamepadHook();}catch(const std::exception& e){log(std::string("XR gamepad unavailable: ")+e.what());}
-        if(GetPrivateProfileIntW(L"diagnostics",L"native_actions",0,ini.c_str())==1)
+        if(target->nativeAdapter&&GetPrivateProfileIntW(L"diagnostics",L"native_actions",0,ini.c_str())==1)
             try{installNativeActions(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),folder);}
             catch(const std::exception& e){log(std::string("Native action queue unavailable: ")+e.what());}
         TheatreConfig config;
+        config.controlsPath=folder/L"mgs5vr-controls.ini";
         config.widthMeters=static_cast<float>(GetPrivateProfileIntW(L"theatre",L"width_cm",800,ini.c_str()))/100;
         config.distanceMeters=static_cast<float>(GetPrivateProfileIntW(L"theatre",L"distance_cm",600,ini.c_str()))/100;
+        // The game must finish its own graphics/bootstrap phase before an XR
+        // runtime loads its graphics drivers and helper processes. In particular,
+        // GZ performs a second-process startup. Do not race that initialization
+        // merely because the first DirectInput call has happened.
+        log("Waiting for the first game image before starting OpenXR");
+        while(!stopRequested.load()&&!mailbox.latest()){
+            if(wakeWorker)WaitForSingleObject(wakeWorker,100);
+            else std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        // GZ unpacks its engine during normal startup. Qualify its independent
+        // renderer only after the native game has produced a real image.
+        if(target->id=="gz-1.0.0.5"&&!stopRequested.load()
+            &&(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1
+               ||GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1)){
+            try{
+                std::array<wchar_t,32768> evidencePath{};
+                GetPrivateProfileStringW(L"diagnostics",L"camera_evidence_dir",L"",evidencePath.data(),static_cast<DWORD>(evidencePath.size()),ini.c_str());
+                if(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1){
+                    installRenderCamera(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),evidencePath.data(),RenderBuild::groundZeroes_1_0_0_5);
+                    headCamera().configure(true,1,false);
+                    log("GZ scene-camera experiment: native stereo at the game camera, not yet a tracked first-person player rig");
+                }
+                if(GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1)
+                    installCameraObserver(evidencePath.data(),RenderBuild::groundZeroes_1_0_0_5);
+            }catch(const std::exception& e){log(std::string("GZ native scene unavailable: ")+e.what());}
+        }
+        RuntimeChildIsolation runtimeChildren(target->id=="gz-1.0.0.5");
         while(!stopRequested.load()){
             try{runTheatre(mailbox,config,stopRequested);}
             catch(const std::exception& e){if(!stopRequested.load())log(std::string("OpenXR unavailable: ")+e.what());}
@@ -136,7 +204,10 @@ void startMod() noexcept {
     try {
         static std::once_flag once;
         std::call_once(once,[]{
-            if(_wcsicmp(modulePath(nullptr).filename().c_str(),L"mgsvtpp.exe")!=0)return;
+            const auto executable=modulePath(nullptr).filename();bool recognized=false;
+            for(const auto& target:mgs5vr::gameTargets)
+                if(_wcsicmp(executable.c_str(),target.executable.data())==0){recognized=true;break;}
+            if(!recognized)return;
             HMODULE pinned{};
             if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                 reinterpret_cast<LPCWSTR>(&initialize),&pinned))return;

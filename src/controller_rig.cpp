@@ -217,7 +217,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const auto localWheelContact=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},compose(inverse(frame.nativePose),nativeWheelContact)));
     const auto wheel=wheelSteering.update(frame.controllers.hands[0].grip,localWheelContact,
         frame.controllers.vehicleControls&&frame.controllers.hands[0].gripTracked,
-        frame.controllers.hands[0].squeeze>.5f,frame.sampleTime,frame.activation,rotate(frame.headPose.orientation,{0,0,-1}));
+        frame.controllers.wheelGrip,frame.sampleTime,frame.activation,rotate(frame.headPose.orientation,{0,0,-1}));
     {
         // The arm meshes also carry spine and clavicle weights. Reposition
         // the whole upper body with one rigid transform: independent shoulder
@@ -266,11 +266,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const auto renderedPalm=compose(*root,compose(bone(q,p,12),inverse(gripFromWrist[1])));
         const auto localPalm=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},
             compose(inverse(frame.nativePose),renderedPalm)));
-        const auto& left=frame.controllers.hands[0];
-        const auto& primary=frame.controllers.hands[1];
-        const auto optic=solveBinocularPose(left.grip,localPalm,left.aim,primary.aim,
+          const auto& left=frame.controllers.hands[0];
+          const auto& primary=frame.controllers.hands[1];
+          const auto solvedAim=compose(compose(localPalm,inverse(primary.grip)),primary.aim);
+          const auto optic=solveBinocularPose(left.grip,localPalm,left.aim,solvedAim,
             left.gripTracked,primary.gripTracked,left.aimTracked,primary.aimTracked,
-            left.squeeze>.5f,primary.squeeze>.5f||frame.controllers.binocularButtonHeld);
+            frame.controllers.optic.pose.supportHeld,binocularHeld);
         if(!optic)return false;
         frame.controllers.optic.pose=*optic;
         return true;
@@ -344,10 +345,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const bool forwardSupport=primaryHand.aimTracked&&withinSupportCone(
         frame.controllers.hands[0].grip.position-primaryHand.grip.position,
         rotate(primaryHand.aim.orientation,{0,0,-1}));
-    // Clenching the left controller only articulates its fingers. Contact must
-    // dwell at the weapon; inspection, lowering, tracking loss and pulling away
-    // release it. A one-handed reload does not grab a distant tracked hand.
-    const bool weaponNearSupport=supportContact.update(frame.controllers.weaponReady&&firearmActive&&forwardSupport&&!inspecting&&(!nativeManipulation||wasAttached),
+    // The configured support grip owns contact, but still requires proximity
+    // to the authored socket. Release, inspection and pulling away free the
+    // hand. A one-handed reload must not grab a distant tracked controller.
+    const bool weaponNearSupport=supportContact.update(frame.controllers.supportGrip&&frame.controllers.weaponReady&&firearmActive&&forwardSupport&&!inspecting&&(!nativeManipulation||wasAttached),
         frame.controllers.hands[0].gripTracked,std::sqrt(dot(separation,separation)),now);
     const bool nearSupport=binocularHeld?binocularSupport:weaponNearSupport;
     if(!binocularHeld&&nearSupport&&!wasAttached)heldSupportOffset=supportOffset;
@@ -356,7 +357,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     supportBlend=std::clamp(supportBlend+(support?step:-step),0.f,1.f);
     // A menu, stow, non-firearm or lost controller releases ownership now.
     // Distance release can blend out, but never toward a new native stow pose.
-    if(!binocularHeld&&(!frame.controllers.weaponReady||!firearmActive||inspecting||!frame.controllers.hands[0].gripTracked)){
+    if(!binocularHeld&&(!frame.controllers.supportGrip||!frame.controllers.weaponReady||!firearmActive||inspecting||!frame.controllers.hands[0].gripTracked)){
         supportBlend=0;aimBlend=0;supportPose.reset();
     }
     const auto presentedSupport=binocularSupportWrist
@@ -452,7 +453,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::array<std::optional<MeleeSweep>,3> strikes{};
     if(meleeTracking!=frame.trackingSequence){
         meleeTracking=frame.trackingSequence;
-        const bool available=nativeTravelMode()==TravelMode::onFoot&&!nativeManipulation
+        const bool available=frame.controllers.allowMotionMelee&&nativeTravelMode()==TravelMode::onFoot&&!nativeManipulation
             &&frame.controllers.magnification==1&&!frame.controllers.commandControls&&!frame.menuOpen&&frame.controllers.hands[0].trigger<.25f;
         meleeCurl={};
         for(size_t point=0;point<3;++point){
@@ -525,23 +526,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // Full render pose, before native matrix and attachment publication.
     // Native position.w metadata is retained.
     frame.playerHead=renderedHead;
-    // Measure the final native skin, including fingers and constrained grips.
-    // Controller positions alone miss the palm when its back faces the eye.
-    frame.handFaceDistance=1;
-    for(size_t side=0;side<2;++side)if(frame.controllers.hands[side].gripTracked){
-        const auto measure=[&](size_t index){
-            const auto offset=compose(*root,bone(q,p,index)).position-frame.nativePose.position;
-            frame.handFaceDistance=std::min(frame.handFaceDistance,std::sqrt(dot(offset,offset)));
-        };
-        measure(side?12u:8u);
-        for(size_t finger=0;finger<5;++finger)for(size_t joint=0;joint<3;++joint)measure(fingers[side][finger]+joint);
-    }
     if(frame.controllers.hands[0].gripTracked){
         const auto wrist=compose(*root,bone(q,p,8));
         const auto elbow=compose(*root,bone(q,p,7));
         const auto surface=helpersMatch?compose(*root,bone(q,p,102)):wrist;
         if(const auto panel=forearmPanel(elbow,wrist,rotate(surface.orientation,{0,1,0}))){
-            frame.wristPanel=*panel;frame.wristPanelTracked=true;
+            frame.wristPanel=compose(*panel,Pose{{},{0,0,frame.controllers.wristSurfaceLift}});frame.wristPanelTracked=true;
         }
     }
     if(binocularHeld){

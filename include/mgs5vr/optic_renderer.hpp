@@ -12,7 +12,14 @@ namespace mgs5vr {
 // rendered. This texture never enters the stereo mailbox.
 bool capturePhysicalOpticScene(ID3D11DeviceContext* context,
     const std::array<float,16>& view,const std::array<float,16>& projection,
-    Vec3 cameraPosition,ID3D11Texture2D** output) noexcept;
+    Vec3 cameraPosition,ID3D11Texture2D** output,bool waypoints=true) noexcept;
+
+// Only the aperture is drawn: the equipped game's scope already supplies its
+// housing and lighting. No binocular asset is required by this path.
+bool drawPhysicalWeaponScope(ID3D11DeviceContext* context,
+    const std::array<float,16>& ocularWorld,const std::array<float,16>& view,
+    const std::array<float,16>& projection,float radius,float magnification,
+    ID3D11Texture2D* sceneSource) noexcept;
 
 // Draw the physical binocular housing into the current native eye scene.
 // `world` is the retail FOX world matrix for the tracked optic body, `view`

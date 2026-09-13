@@ -1,6 +1,7 @@
 #include "mgs5vr/xr_runtime.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/input_bridge.hpp"
+#include "mgs5vr/controls.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/ui_renderer.hpp"
@@ -12,6 +13,7 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -36,6 +38,7 @@ struct Instance {
     std::string runtime;
     bool refreshControl{};
     Instance() {
+        log("OpenXR loading runtime and enumerating extensions");
         uint32_t count=0;
         xrCheck(xrEnumerateInstanceExtensionProperties(nullptr,0,&count,nullptr),"Enumerate OpenXR extensions");
         std::vector<XrExtensionProperties> extensions(count,{XR_TYPE_EXTENSION_PROPERTIES});
@@ -51,6 +54,7 @@ struct Instance {
         info.applicationInfo.applicationVersion=1;
         info.applicationInfo.apiVersion=XR_MAKE_VERSION(1,0,0);
         info.enabledExtensionCount=static_cast<uint32_t>(enabled.size());info.enabledExtensionNames=enabled.data();
+        log("OpenXR creating instance");
         xrCheck(xrCreateInstance(&info,&handle),"Create OpenXR instance");
         XrInstanceProperties props{XR_TYPE_INSTANCE_PROPERTIES};
         const auto result=xrGetInstanceProperties(handle,&props);
@@ -82,6 +86,8 @@ struct Session {
     XrAction sticks{},triggers{},squeezes{},thumbClick{},triggerTouch{},thumbTouch{},menu{};
     XrAction vibration{};
     std::array<XrAction,4> face{}; // Native Xbox A, B, X, Y.
+    XrAction fallbackSelect{},fallbackBack{};
+    std::array<ControllerFaceLayout,2> faceLayouts{};
     std::array<XrSpace,2> gripSpaces{},aimSpaces{};
     std::array<XrPath,2> hands{};
     ComPtr<ID3D11Device> device;
@@ -93,15 +99,17 @@ struct Session {
     bool automaticEntryDone{};
     bool manualScreenSelected{};
     bool priorTitleMenu{};
-    MenuButton menuButton;
+    ControlBindings controls;
     RigInput rigControls;
     RigOptics opticsControls;
-    BinocularHold binocularHold;
+    bool binocularSelected{};
     SnapTurn snapControls;
     OpticStabilizer opticStabilizer;
     float snapYaw{};
     OpticGate opticGate;
-    bool priorBinocularHeld{};
+    bool priorBinocularSelected{};
+    bool priorBButton{},priorOpticTracked{};
+    std::array<std::array<char,96>,4> equipmentLabels{};
     uint64_t opticMarkSequence{};
     uint64_t opticClearSequence{};
     RigCommands commandsControls;
@@ -133,6 +141,11 @@ struct Session {
         XrAction result; xrCheck(xrCreateAction(actions,&info,&result),"Create action"); return result;
     }
     void initialize() {
+        constexpr std::array<std::string_view,4> categories{"equipment.primary","equipment.secondary","equipment.support","equipment.items"};
+        for(size_t n=0;n<categories.size();++n){
+            const auto label=controls.label(categories[n]);
+            strncpy_s(equipmentLabels[n].data(),equipmentLabels[n].size(),label.c_str(),_TRUNCATE);
+        }
         PFN_xrGetD3D11GraphicsRequirementsKHR requirementsFn{};
         xrCheck(xrGetInstanceProcAddr(instance.handle,"xrGetD3D11GraphicsRequirementsKHR",reinterpret_cast<PFN_xrVoidFunction*>(&requirementsFn)),"Get D3D11 requirements function");
         XrGraphicsRequirementsD3D11KHR requirements{XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR};
@@ -188,6 +201,11 @@ struct Session {
         // in an operator override, making left X also press Cancel.
         face={action("a","Native gamepad A",XR_ACTION_TYPE_BOOLEAN_INPUT,true),action("b","Native gamepad B",XR_ACTION_TYPE_BOOLEAN_INPUT,true),
             action("x","Native gamepad X",XR_ACTION_TYPE_BOOLEAN_INPUT,true),action("y","Native gamepad Y",XR_ACTION_TYPE_BOOLEAN_INPUT,true)};
+        // Do not bind Vive/WMR trigger-to-confirm or simple-controller select
+        // to the Touch face actions. The operator can override every suggested
+        // source, even when its profile is not the active physical controller.
+        fallbackSelect=action("fallback_select","Legacy controller select",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
+        fallbackBack=action("fallback_back","Legacy controller back",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         struct Profile { const char* name; const char* center; const char* menuButton; int layout; };
         const Profile profiles[]={
             {"/interaction_profiles/oculus/touch_controller","/user/hand/right/input/thumbstick/click","/user/hand/left/input/menu/click",0},
@@ -224,8 +242,8 @@ struct Session {
                 bind(face[2],p.layout==0?"/user/hand/left/input/x/click":"/user/hand/left/input/a/click");
                 // Index left B is reserved for Start. Its native Y mapping needs a custom binding.
                 if(p.layout==0)bind(face[3],"/user/hand/left/input/y/click");
-            }else if(p.layout==4){bind(face[0],"/user/hand/right/input/select/click");bind(face[1],"/user/hand/left/input/select/click");}
-            else {bind(face[0],"/user/hand/right/input/trigger/value");bind(face[1],"/user/hand/right/input/menu/click");}
+            }else if(p.layout==4){bind(fallbackSelect,"/user/hand/right/input/select/click");bind(fallbackSelect,"/user/hand/left/input/select/click");}
+            else {bind(fallbackSelect,"/user/hand/right/input/trigger/value");bind(fallbackBack,"/user/hand/right/input/menu/click");}
             XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
             suggested.interactionProfile=path(p.name);suggested.countSuggestedBindings=static_cast<uint32_t>(bindings.size());suggested.suggestedBindings=bindings.data();
             const auto r=xrSuggestInteractionProfileBindings(instance.handle,&suggested);
@@ -301,22 +319,35 @@ struct Session {
     }
     void syncInput(XrTime time,Pose& head,std::array<EyeView,2>& views,bool stereoTracked){
         controllerFrame={};controllerFrame.snapYaw=snapYaw;
-        if(!focused){snapControls.reset();rigControls.suspend();opticsControls.reset();binocularHold.suspend();opticGate.reset();priorBinocularHeld=false;priorFocused=false;priorRecenter=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){snapControls.reset();rigControls.suspend();opticsControls.reset();binocularHold.suspend();opticGate.reset();priorBinocularHeld=false;priorFocused=false;menuButton.update(true,false,steadyMilliseconds());gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
         if(!priorFocused){
             snapControls.reset();
-            XrInteractionProfileState profile{XR_TYPE_INTERACTION_PROFILE_STATE};
-            if(XR_SUCCEEDED(xrGetCurrentInteractionProfile(handle,hands[0],&profile)))
-                simpleControllerProfile=profile.interactionProfile==path("/interaction_profiles/khr/simple_controller");
+            for(size_t side=0;side<hands.size();++side){
+                faceLayouts[side]=ControllerFaceLayout::standard;
+                XrInteractionProfileState profile{XR_TYPE_INTERACTION_PROFILE_STATE};
+                if(XR_SUCCEEDED(xrGetCurrentInteractionProfile(handle,hands[side],&profile))&&profile.interactionProfile){
+                    char name[XR_MAX_PATH_LENGTH]{};uint32_t length{};
+                    xrCheck(xrPathToString(instance.handle,profile.interactionProfile,sizeof(name),&length,name),"Read controller profile name");
+                    faceLayouts[side]=controllerFaceLayout(name);
+                    log(std::string(side?"Right":"Left")+" controller profile="+name+"; face inputs isolated from legacy fallbacks");
+                }
+            }
+            simpleControllerProfile=faceLayouts[1]==ControllerFaceLayout::simple;
         }
         controllerFrame={{trackedHand(0,time),trackedHand(1,time)},time,referenceEpoch};
-        const bool left=controllerFrame.hands[0].gripTracked,right=controllerFrame.hands[1].gripTracked;
-        const float ls=left?scalar(squeezes,hands[0]):0,rs=right?scalar(squeezes,hands[1]):0;
-        const float lt=left?scalar(triggers,hands[0]):0,rt=right?scalar(triggers,hands[1]):0;
+        controllerFrame.equipmentLabels=equipmentLabels;
+        controllerFrame.wristSurfaceLift=controls.setting("settings.wrist_surface_lift_cm")*.01f;
+        controllerFrame.wristSelectorHeight=controls.setting("settings.wrist_selector_height_cm")*.01f;
+        const bool right=controllerFrame.hands[1].gripTracked;
+        // OpenXR action activity is independent of optical pose tracking.
+        // Occluding a controller must not release B or the held wrist trigger.
+        const float ls=scalar(squeezes,hands[0]),rs=scalar(squeezes,hands[1]);
+        const float lt=scalar(triggers,hands[0]),rt=scalar(triggers,hands[1]);
         for(size_t n=0;n<2;++n){
             auto& hand=controllerFrame.hands[n];
             if(!hand.gripTracked)continue;
@@ -337,7 +368,28 @@ struct Session {
         // Enter tracked gameplay as soon as the real player is available.
         // Front-end/loading states retain their native menu controls. A manual
         // screen/VR choice is respected for the remainder of this XR session.
-        const bool manualToggle=headCamera().available()&&left&&ls>.75f&&boolean(thumbClick,hands[0]);
+        const auto now=steadyMilliseconds();
+        const auto l=stick(hands[0]),rr=stick(hands[1]);
+        const auto faceButtons=isolatedFaceButtons(faceLayouts,
+            {boolean(face[0],hands[1]),boolean(face[1],hands[1]),boolean(face[2],hands[0]),boolean(face[3],hands[0])},
+            {boolean(fallbackSelect,hands[0]),boolean(fallbackSelect,hands[1])},
+            {boolean(fallbackBack,hands[0]),boolean(fallbackBack,hands[1])});
+        PhysicalControls physical;
+        physical.buttons={faceButtons[0]?1.f:0.f,faceButtons[1]?1.f:0.f,
+            faceButtons[2]?1.f:0.f,faceButtons[3]?1.f:0.f,
+            boolean(menu)?1.f:0.f,boolean(thumbClick,hands[0])?1.f:0.f,
+            boolean(thumbClick,hands[1])?1.f:0.f,ls,rs,lt,rt};
+        physical.leftStick={l.x,l.y};physical.rightStick={rr.x,rr.y};
+        const bool gameplayContext=controllerRigEnabled()&&mode!=TravelMode::unknown&&!title
+            &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
+        const auto controlContext=!gameplayContext?ControlContext::menus:
+            commandsControls.active()?ControlContext::commands:
+            rigControls.equipmentPhase()!=0?ControlContext::equipment:
+            binocularSelected?ControlContext::binoculars:mode==TravelMode::vehicle?ControlContext::vehicle:
+            mode==TravelMode::horse?ControlContext::horse:ControlContext::gameplay;
+        controls.update(physical,controlContext,now);
+        const auto activeControl=[&](std::string_view name){return controls.active(name);};
+        const bool manualToggle=headCamera().available()&&activeControl("system.toggle_vr");
         if(manualToggle||nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)automaticEntryDone=true;
         if(loading&&!title&&(nativeStatus.active||nativeStatus.pending)){
             headCamera().cancel();automaticEntryDone=manualScreenSelected;nativeStatus=headCamera().status();
@@ -349,35 +401,45 @@ struct Session {
         }
         const bool rigInput=controllerRigEnabled()&&mode!=TravelMode::unknown&&!title
             &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
-        const auto now=steadyMilliseconds();
-        const bool binocularPressed=right&&boolean(face[1],hands[1]);
-        const bool binocularAvailable=rigInput&&mode==TravelMode::onFoot&&right;
-        const auto binocular=binocularHold.update(binocularAvailable,binocularPressed,now);
-        controllerFrame.binocularButtonHeld=binocular.held;
-        if(binocular.held!=priorBinocularHeld){
-            priorBinocularHeld=binocular.held;
-            log(binocular.held?"Physical binoculars equipped by B hold":"Physical binoculars stowed after B release");
+        const bool menuPressed=activeControl("system.idroid")||activeControl("system.pause");
+        const bool equipmentHeld=controls.value(mode==TravelMode::vehicle?"vehicle.equipment_open":"equipment.open")
+            >(rigControls.equipmentPhase()!=0?.25f:.5f);
+        const bool binocularAvailable=rigInput&&mode==TravelMode::onFoot&&!simpleControllerProfile
+            &&!manualToggle&&!menuPressed&&!commandsControls.active()
+            &&!equipmentHeld&&rigControls.equipmentPhase()==0;
+        const bool wasBinocularSelected=binocularSelected;
+        binocularSelected=updateBinocularSelection(binocularSelected,activeControl("gameplay.equip_binoculars"),
+            activeControl("binoculars.stow"),binocularAvailable);
+        const bool binocularEquipped=binocularSelected&&!wasBinocularSelected;
+        if((physical.buttons[1]>.5f)!=priorBButton){
+            priorBButton=physical.buttons[1]>.5f;
+            std::ostringstream s;s<<"B input="<<priorBButton<<" mode="<<static_cast<int>(controlContext)
+                <<" equip_allowed="<<binocularAvailable<<" right_grip_tracked="<<right
+                <<" right_aim_tracked="<<controllerFrame.hands[1].aimTracked<<" left_trigger="<<lt
+                <<" picker_phase="<<rigControls.equipmentPhase();log(s.str());
         }
-        // R3 is also the legacy recenter chord when both grips are squeezed.
-        // Holding B owns the right hand for binoculars, so it cannot trigger
-        // recentering or leak a native right-stick action.
-        const bool centerChord=boolean(recenter)&&ls>0.75f&&rs>0.75f&&!binocular.held;
-        const bool headToggle=headCamera().available()&&left&&ls>0.75f&&boolean(thumbClick,hands[0]);
-        const bool menuPressed=boolean(menu);
-        const auto menuBits=menuButton.update(menuPressed,left,now,ls>.75f);
-        const bool utilityCenter=menuPressed&&left&&ls>.75f;
-        if(menuButton.recentered()){
-            headCamera().recenter();recenterRequested=true;
-            log("In-game recenter requested through left grip + Menu");
+        if(binocularSelected!=priorBinocularSelected){
+            priorBinocularSelected=binocularSelected;
+            if(binocularSelected)log("Physical binoculars equipped by configured input; selection latched independently of tracking");
+            else log(std::string("Physical binoculars stowed: ")+(activeControl("binoculars.stow")?"configured stow input":
+                equipmentHeld||rigControls.equipmentPhase()?"equipment selection":commandsControls.active()?"Commands":
+                menuPressed?"menu input":mode!=TravelMode::onFoot?"left on-foot mode":"left gameplay"));
         }
+        // Recenter is its own configured action; R3 remains available for zoom.
+        const bool centerChord=activeControl("system.recenter");
+        const bool headToggle=manualToggle;
+        const uint16_t menuBits=static_cast<uint16_t>((activeControl("system.idroid")?XINPUT_GAMEPAD_START:0)
+            |(activeControl("system.pause")?XINPUT_GAMEPAD_BACK:0));
+        const bool utilityCenter=centerChord;
+        const bool opticSupport=activeControl("binoculars.support_grip");
         const bool opticAvailable=rigInput&&mode==TravelMode::onFoot&&right
-            &&binocular.held
+            &&binocularSelected
             &&!commandsControls.active()&&!headToggle
             &&(opticGate.active()||!centerChord)&&stereoTracked;
         if(opticAvailable){
             auto& primary=controllerFrame.hands[1];const auto& support=controllerFrame.hands[0];
             if(const auto raw=solveBinocularPose(support.grip,primary.grip,support.aim,primary.aim,
-                support.gripTracked,primary.gripTracked,support.aimTracked,primary.aimTracked,ls>.5f,rs>.5f||binocular.held)){
+                support.gripTracked,primary.gripTracked,support.aimTracked,primary.aimTracked,opticSupport,binocularSelected)){
                 const auto steady=opticStabilizer.update(head,primary.grip,*raw,true,now,referenceEpoch);
                 primary.aim=compose(compose(steady,inverse(primary.grip)),primary.aim);primary.grip=steady;
             }else opticStabilizer.reset();
@@ -387,13 +449,13 @@ struct Session {
             controllerFrame.hands[0].aim,controllerFrame.hands[1].aim,
             controllerFrame.hands[0].gripTracked,controllerFrame.hands[1].gripTracked,
             controllerFrame.hands[0].aimTracked,controllerFrame.hands[1].aimTracked,
-            ls>.5f,rs>.5f||binocular.held,opticAvailable,now,referenceEpoch);
+            opticSupport,binocularSelected,opticAvailable,now,referenceEpoch);
         controllerFrame.optic=optic;
         // Bounded fit telemetry makes the eye-relief decision auditable from
         // the same LOCAL poses that drive the gate. It stays in the runtime
         // layer so the core contract tests remain dependency-free.
         static uint64_t fitTraceCalls{};
-        if(right&&rs>.5f&&optic.pose.tracked&&(++fitTraceCalls%120u)==0u){
+        if(right&&binocularSelected&&optic.pose.tracked&&(++fitTraceCalls%120u)==0u){
             const auto distance=[](Vec3 a,Vec3 b){const auto d=a-b;return std::sqrt(dot(d,d));};
             const auto facing=[](Pose a,Pose b){return dot(rotate(a.orientation,{0,0,-1}),rotate(b.orientation,{0,0,-1}));};
             std::ostringstream message;
@@ -408,11 +470,14 @@ struct Session {
             log(message.str());
         }
         controllerFrame.optic.held=optic.pose.tracked&&opticAvailable;
+        if(binocularSelected&&controllerFrame.optic.held!=priorOpticTracked)
+            log(controllerFrame.optic.held?"Binocular tracking restored; equipped presentation resumed":"Binocular tracking missing; selection retained");
+        priorOpticTracked=controllerFrame.optic.held;
         if(optic.active&&!validateBinocularViews(optic,head,views)){
             opticGate.reset();controllerFrame.optic={};
             log("Physical binocular view rejected: invalid tracking");
         }
-        const bool center=centerChord&&!optic.active&&!optic.aligned;
+        const bool center=centerChord;
         if(optic.opened)log("Physical binocular ocular entered eye relief");
         if(optic.closed)log("Physical binoculars left eye relief; physical optic closed");
         if(priorFocused&&headToggle&&!priorHeadToggle){
@@ -427,34 +492,72 @@ struct Session {
         if(priorFocused&&center&&!priorRecenter)log("OpenXR recenter chord accepted");
         GamepadSample pad{};
         const auto bit=[&](bool enabled,WORD mask){if(enabled)pad.buttons|=mask;};
-        bit(right&&boolean(face[0],hands[1]),XINPUT_GAMEPAD_A);
-        const bool nativeB=(simpleControllerProfile?left:right)&&boolean(face[1],hands[simpleControllerProfile?0:1]);
-        bit(binocularAvailable?binocular.nativePress:nativeB,XINPUT_GAMEPAD_B);
-        bit(left&&boolean(face[2],hands[0]),XINPUT_GAMEPAD_X);bit(left&&boolean(face[3],hands[0]),XINPUT_GAMEPAD_Y);
+        const auto mappedButton=[&](std::string_view name,WORD mask){bit(activeControl(name),mask);};
+        const auto triggerValue=[&](std::string_view name){return static_cast<uint8_t>(controls.value(name)*255);};
+        auto move=controls.axis("axes.move",physical);
+        auto navigation=controls.axis("axes.equipment",physical);
+        if(!rigInput){
+            mappedButton("menus.confirm",XINPUT_GAMEPAD_A);mappedButton("menus.back",XINPUT_GAMEPAD_B);
+            mappedButton("menus.action_x",XINPUT_GAMEPAD_X);mappedButton("menus.action_y",XINPUT_GAMEPAD_Y);
+            mappedButton("menus.previous_tab",XINPUT_GAMEPAD_LEFT_SHOULDER);mappedButton("menus.next_tab",XINPUT_GAMEPAD_RIGHT_SHOULDER);
+            mappedButton("menus.left_click",XINPUT_GAMEPAD_LEFT_THUMB);mappedButton("menus.right_click",XINPUT_GAMEPAD_RIGHT_THUMB);
+            mappedButton("menus.dpad_up",XINPUT_GAMEPAD_DPAD_UP);mappedButton("menus.dpad_down",XINPUT_GAMEPAD_DPAD_DOWN);
+            mappedButton("menus.dpad_left",XINPUT_GAMEPAD_DPAD_LEFT);mappedButton("menus.dpad_right",XINPUT_GAMEPAD_DPAD_RIGHT);
+            pad.leftTrigger=triggerValue("menus.left_trigger");pad.rightTrigger=triggerValue("menus.right_trigger");
+            move=controls.axis("axes.menu",physical);navigation=controls.axis("axes.map",physical);
+        }else if(mode==TravelMode::vehicle){
+            mappedButton("vehicle.native_a",XINPUT_GAMEPAD_A);mappedButton("vehicle.native_b",XINPUT_GAMEPAD_B);
+            mappedButton("vehicle.weapon_or_call",XINPUT_GAMEPAD_X);mappedButton("vehicle.interact",XINPUT_GAMEPAD_Y);
+            mappedButton("vehicle.left_click",XINPUT_GAMEPAD_LEFT_THUMB);mappedButton("vehicle.right_click",XINPUT_GAMEPAD_RIGHT_THUMB);
+            pad.leftTrigger=triggerValue("vehicle.brake_reverse");pad.rightTrigger=triggerValue("vehicle.accelerate");
+            move=controls.axis("axes.vehicle_steering",physical);
+        }else{
+            mappedButton("gameplay.native_a",XINPUT_GAMEPAD_A);mappedButton("gameplay.reload",XINPUT_GAMEPAD_B);
+            mappedButton("gameplay.native_x",XINPUT_GAMEPAD_X);mappedButton("gameplay.interact",XINPUT_GAMEPAD_Y);
+            mappedButton("gameplay.native_left_shoulder",XINPUT_GAMEPAD_LEFT_SHOULDER);
+            mappedButton("gameplay.native_right_shoulder",XINPUT_GAMEPAD_RIGHT_SHOULDER);
+            mappedButton("gameplay.native_right_click",XINPUT_GAMEPAD_RIGHT_THUMB);
+            mappedButton("horse.stance",XINPUT_GAMEPAD_A);mappedButton("horse.reload",XINPUT_GAMEPAD_B);
+            mappedButton("horse.gallop",XINPUT_GAMEPAD_X);mappedButton("horse.interact",XINPUT_GAMEPAD_Y);
+            mappedButton("horse.left_click",XINPUT_GAMEPAD_LEFT_THUMB);mappedButton("horse.right_click",XINPUT_GAMEPAD_RIGHT_THUMB);
+            pad.leftTrigger=triggerValue("equipment.open");
+            pad.rightTrigger=right&&controllerFrame.hands[1].aimTracked?triggerValue("gameplay.fire_or_cqc"):0;
+        }
+        if(rigInput&&controlContext==ControlContext::equipment){
+            mappedButton("equipment.back",XINPUT_GAMEPAD_B);mappedButton("equipment.use",XINPUT_GAMEPAD_A);
+            if(rigControls.equipmentPhase()==1){
+                navigation={activeControl("equipment.support")?1.f:activeControl("equipment.items")?-1.f:0.f,
+                    activeControl("equipment.primary")?1.f:activeControl("equipment.secondary")?-1.f:0.f};
+            }
+        }
         pad.buttons|=menuBits;
-        bit(left&&boolean(thumbClick,hands[0])&&!headToggle,XINPUT_GAMEPAD_LEFT_THUMB);
-        bit(right&&boolean(thumbClick,hands[1])&&!center,XINPUT_GAMEPAD_RIGHT_THUMB);
-        bit(!rigInput&&ls>0.5f&&!center&&!headToggle,XINPUT_GAMEPAD_LEFT_SHOULDER);
-        bit(!rigInput&&rs>0.5f&&!center,XINPUT_GAMEPAD_RIGHT_SHOULDER);
-        pad.leftTrigger=static_cast<uint8_t>(lt*255);
-        pad.rightTrigger=static_cast<uint8_t>(rt*255);
-        const auto l=left?stick(hands[0]):XrVector2f{},rr=right?stick(hands[1]):XrVector2f{};
-        pad.leftX=static_cast<int16_t>(l.x*32767);pad.leftY=static_cast<int16_t>(l.y*32767);
-        pad.rightX=static_cast<int16_t>(rr.x*32767);pad.rightY=static_cast<int16_t>(rr.y*32767);
-        if(utilityCenter)pad={};
+        pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
+        pad.rightX=static_cast<int16_t>(navigation[0]*32767);pad.rightY=static_cast<int16_t>(navigation[1]*32767);
+        if(utilityCenter||headToggle)pad={};
         bool stickNavigation=false;
+        bool locomotionAvailable=false;
         // The handheld optic owns zoom and trigger input. Native waypoint
         // placement consumes its aim on the game's marker-update job.
         if(rigInput){
-            const auto optical=opticsControls.update(pad,mode==TravelMode::onFoot&&right&&!commandsControls.active()&&!center&&!headToggle,
-                controllerFrame.optic.held&&controllerFrame.optic.pose.ray.tracked,controllerFrame.optic.active);
-            if(optical.markRequested)++opticMarkSequence;
-            if(optical.clearRequested)++opticClearSequence;
+            GamepadSample opticPad{menuBits,0,0,pad.leftX,pad.leftY};
+            if(activeControl("binoculars.zoom"))opticPad.buttons|=XINPUT_GAMEPAD_RIGHT_THUMB;
+            if(activeControl("binoculars.mark"))opticPad.buttons|=XINPUT_GAMEPAD_X;
+            if(activeControl("binoculars.clear_mark"))opticPad.rightY=-32767;
+            const auto optical=opticsControls.update(binocularSelected?opticPad:pad,mode==TravelMode::onFoot&&!commandsControls.active()&&!center&&!headToggle,
+                binocularSelected,controllerFrame.optic.active);
+            if(optical.markRequested&&controllerFrame.optic.pose.ray.tracked)++opticMarkSequence;
+            if(optical.clearRequested&&controllerFrame.optic.pose.ray.tracked)++opticClearSequence;
             controllerFrame.opticMarkSequence=opticMarkSequence;
             controllerFrame.opticClearSequence=opticClearSequence;
             const auto wasCommands=commandsControls.active();
-            const auto commands=commandsControls.update(pad,(mode==TravelMode::onFoot||mode==TravelMode::horse)
-                &&left&&right&&!optical.exclusive&&!center&&!headToggle,now,nativeCommandsDrawTime());
+            GamepadSample commandPad{menuBits,triggerValue(mode==TravelMode::horse?"commands.mounted_keep_open":"commands.keep_open"),
+                static_cast<uint8_t>(activeControl("commands.confirm")?255:0),pad.leftX,pad.leftY};
+            if(activeControl("commands.open")||activeControl("commands.mounted_open"))commandPad.buttons|=XINPUT_GAMEPAD_X;
+            if(activeControl("commands.back"))commandPad.buttons|=XINPUT_GAMEPAD_B;
+            const auto commandAxis=controls.axis("axes.commands",physical);
+            commandPad.rightX=static_cast<int16_t>(commandAxis[0]*32767);commandPad.rightY=static_cast<int16_t>(commandAxis[1]*32767);
+            const auto commands=commandsControls.update(commandPad,(mode==TravelMode::onFoot||mode==TravelMode::horse)
+                &&!optical.exclusive&&!center&&!headToggle,now,nativeCommandsDrawTime());
             if(wasCommands!=commands.active)log("Wrist Commands open="+std::to_string(commands.active));
             controllerFrame.commandControls=commands.active;
             // One hand gets the full lens resolution and 2x/4x power. The
@@ -468,35 +571,58 @@ struct Session {
             RigInputSample mapped{};
             if(optical.exclusive||commands.exclusive){
                 rigControls.reset();mapped.gamepad=optical.exclusive?optical.gamepad:commands.gamepad;
-            }else mapped=rigControls.update(pad,ls>0.5f&&!center&&!headToggle,rs>0.5f,mode,
+            }else mapped=rigControls.update(pad,activeControl("vehicle.wheel_grip")&&!center&&!headToggle,
+                mode==TravelMode::vehicle?equipmentHeld:right&&controllerFrame.hands[1].aimTracked&&activeControl("gameplay.ready_weapon"),mode,
                 now,nativeEquipmentPickerDrawTime(),controllerThrowReady());
             if(beforePhase!=rigControls.equipmentPhase())log("Wrist picker phase="+std::to_string(rigControls.equipmentPhase())
                 +" category="+std::to_string(rigControls.equipmentCategory()));
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
+            controllerFrame.supportGrip=activeControl("gameplay.support_grip");
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
+            controllerFrame.wheelGrip=activeControl("vehicle.wheel_grip")&&!center&&!headToggle;
+            controllerFrame.allowMotionMelee=controls.setting("settings.motion_melee")!=0;
+            controllerFrame.allowAnimalTouch=controls.setting("settings.animal_touch")!=0;
+            controllerFrame.equipmentOpen=rigControls.equipmentPhase()!=0;
             controllerFrame.equipmentCategory=rigControls.equipmentPhase()>=2?rigControls.equipmentCategory()+1:0;
             stickNavigation=rigControls.equipmentPhase()!=0||commands.exclusive
                 ||(pad.buttons&(XINPUT_GAMEPAD_START|XINPUT_GAMEPAD_BACK));
-            if(!stickNavigation){pad.rightX=0;pad.rightY=0;}
+            locomotionAvailable=mode==TravelMode::onFoot&&!stickNavigation
+                &&!commands.exclusive&&!center&&!headToggle&&!utilityCenter;
             // Native on-foot movement already consumes the published camera
             // basis. Rotating this stick again doubles physical/snap heading.
         }else if(nativeStatus.nativeMenuOpen||nativeStatus.awaitingPlayer){rigControls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();}
         else {rigControls.reset();opticsControls.reset();opticGate.reset();commandsControls.suspend();}
-        const auto turn=snapControls.update(rr.x,rr.y,rigInput&&right&&!stickNavigation&&!center&&!headToggle&&!utilityCenter);
+        if(locomotionAvailable){
+            const bool loweringAction=activeControl("gameplay.dive")||activeControl("binoculars.dive")
+                ||activeControl("gameplay.stance")||activeControl("binoculars.stance")||activeControl("gameplay.pickup_carry");
+            if(loweringAction)rigControls.requireAttackRelease();
+            applyOnFootActions(pad,controllerFrame.weaponReady,{
+                activeControl("gameplay.run")||activeControl("binoculars.run"),
+                activeControl("gameplay.stance")||activeControl("binoculars.stance"),
+                activeControl("gameplay.dive")||activeControl("binoculars.dive"),
+                activeControl("gameplay.pickup_carry"),activeControl("gameplay.switch_weapon")});
+            // Native zoom is a separate action from Dive. Never send it while
+            // lowered: native right-click has other context-dependent jobs.
+            if(controllerFrame.weaponReady&&activeControl("gameplay.zoom"))pad.buttons|=XINPUT_GAMEPAD_RIGHT_THUMB;
+        }
+        if(rigInput&&!stickNavigation){pad.rightX=0;pad.rightY=0;}
+        const float turnAxis=activeControl("turn.right")?1.f:activeControl("turn.left")?-1.f:0.f;
+        const auto turn=snapControls.update(turnAxis,0,rigInput&&!stickNavigation&&!center&&!headToggle&&!utilityCenter)
+            *controls.setting("settings.snap_turn_degrees")/30.f;
         if(!nativeStatus.active&&!nativeStatus.pending&&!nativeStatus.awaitingPlayer)snapYaw=0;
         if(turn){snapYaw=std::remainder(snapYaw+turn,6.283185307f);log("Physical snap turn degrees="+std::to_string(-turn*57.2957795f));}
         controllerFrame.snapYaw=snapYaw;
-        gamepadMailbox().publish(pad,left||right,steadyMilliseconds());
+        gamepadMailbox().publish(pad,true,steadyMilliseconds());
         const auto hapticNow=steadyMilliseconds();
         const auto wheel=wheelMailbox().read(hapticNow);
-        const bool holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped&&ls>.5f&&!center&&!headToggle;
+        const bool holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped&&controllerFrame.wheelGrip;
         const bool tookWheel=holding&&!wheelHeld;wheelHeld=holding;
-        if(tookWheel||hapticNow-hapticAt>=50){
+        if(tookWheel||binocularEquipped||hapticNow-hapticAt>=50){
             hapticAt=hapticNow;
             const auto rumble=rumbleMailbox().read(hapticNow);
             for(size_t side=0;side<2;++side){
                 const float native=side?rumble.high:rumble.low;
-                const float contact=!side&&tookWheel?.25f:0.f;
+                const float contact=side&&binocularEquipped?.3f:!side&&tookWheel?.25f:0.f;
                 const float amplitude=std::clamp(std::max(native,contact),0.f,.75f);
                 XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};info.action=vibration;info.subactionPath=hands[side];
                 if(amplitude>0&&controllerFrame.hands[side].gripTracked){
@@ -613,7 +739,16 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
     if(!std::isfinite(config.widthMeters)||config.widthMeters<1||config.widthMeters>30
         ||!std::isfinite(config.distanceMeters)||config.distanceMeters<1||config.distanceMeters>30)
         throw std::invalid_argument("Theatre dimensions must be finite values from 1 to 30 meters");
-    Instance instance;instance.getSystem();Session session(instance);session.initialize();
+    Instance instance;instance.getSystem();Session session(instance);
+    if(!config.controlsPath.empty()){
+        std::ifstream file(config.controlsPath);
+        if(file){
+            const auto errors=session.controls.load(file);
+            if(errors.empty())log("Controls loaded: "+config.controlsPath.string());
+            else {log("Controls file rejected; using built-in defaults");for(const auto& error:errors)log("Controls: "+error);}
+        }else log("Controls file absent; using built-in defaults: "+config.controlsPath.string());
+    }
+    session.initialize();
     log("OpenXR runtime="+instance.runtime+" headset="+instance.properties.systemName);
     TextureConsumer consumer(session.device.Get());Screen screen(session),leftEye(session),rightEye(session);RuntimeStats stats;
     NativeVideoRecorder video;
@@ -688,6 +823,10 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         // noninteractive surfaces live in front of the last accepted stereo
         // surroundings. Keep their original eye poses: this is an explicitly
         // frozen scene, not an old frame relabeled as current gameplay.
+        if(!mayRetainStereoSurround(cameraStatus)){
+            if(surroundTransition)screenPose=recenteredScreen(trackedHead,config.distanceMeters);
+            haveSurround=false;surroundFrames={};surroundTransition=false;
+        }
         if(session.manualScreenSelected)surroundTransition=false;
         else if(haveSurround&&!cameraStatus.active&&!surroundTransition){
             surroundTransition=true;screenPose=recenteredScreen(trackedHead,1.3f);

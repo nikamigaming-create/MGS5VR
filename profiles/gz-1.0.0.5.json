@@ -1,0 +1,22 @@
+{
+  "id": "gz-1.0.0.5",
+  "game": "Metal Gear Solid V: Ground Zeroes",
+  "executable": "MgsGroundZeroes.exe",
+  "version": "1.0.0.5",
+  "architecture": "x64",
+  "sha256": "7460d9dba9b6fe34893b5d330aca201983bb1734844f3688acffcc0ab22a1815",
+  "graphics": "D3D11",
+  "bootstrap": "DirectInput8Create",
+  "capabilities": {
+    "openxr_theatre_bootstrap": true,
+    "native_stereo_adapter": true,
+    "native_stereo_experimental": true,
+    "tracked_player_rig": false,
+    "wrist_ui_adapter": false,
+    "native_weapon_aim_adapter": false,
+    "runtime_exercised": true,
+    "all_equipment_sim_verified": false,
+    "physical_headset_verified": false
+  },
+  "notes": "Independent signature-qualified GZ camera/projection/viewport/scene/presentation layout. Native same-frame stereo exercised in the title cabin and Ground Zeroes mission using Meta XR Simulator. The camera remains at the native game viewpoint; player head anchoring, tracked arms, weapon aiming and wrist UI are not connected. Never use TPP native offsets for this executable. This is not a completed native VR port."
+}

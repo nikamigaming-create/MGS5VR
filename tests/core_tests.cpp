@@ -3,6 +3,7 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/render_layout.hpp"
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -15,6 +16,80 @@ static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
     {
+        WeaponScopeSample scope{Pose{{},{0,0,-.1f}},Pose{{},{0,0,-.3f}},.018f,.1f,4.f,17,true};
+        const auto scene=weaponScopeSceneView(scope);
+        expect(scene&&same(scene->pose.position,scope.objective.position),"scope scene starts at the native objective, not the head");
+        expect(scene&&near(std::tan(scene->fov.right),.018f/(.1f*4.f)),"scope magnification controls only its independent optical frustum");
+        expect(weaponScopeEyeVisible(scope,{}),"aligned eye sees the physical scope aperture");
+        expect(!weaponScopeEyeVisible(scope,Pose{{},{.064f,0,0}}),"other eye keeps ordinary world vision outside the aperture");
+        expect(!weaponScopeEyeVisible(scope,Pose{{},{0,0,-.2f}}),"scope does not show a reversed image through its front");
+        expect(!weaponScopeEyeVisible(scope,Pose{{},{0,0,.3f}}),"carried scope does not expand to a fullscreen zoom");
+        const Pose motion{{0,.38268343f,0,.92387953f},{2,1,-5}};
+        auto moved=scope;moved.ocular=compose(motion,scope.ocular);moved.objective=compose(motion,scope.objective);
+        expect(weaponScopeEyeVisible(moved,motion),"scope and eye visibility share a rigid motion frame");
+        moved=scope;moved.tracked=false;expect(!weaponScopeSceneView(moved),"missing scope tracking closes its scene");
+        moved=scope;moved.weaponIdentity=0;expect(!weaponScopeSceneView(moved),"unidentified weapon cannot publish a scope");
+        moved=scope;moved.objective.position.z=0;expect(!weaponScopeSceneView(moved),"reversed native scope socket is rejected");
+        moved=scope;moved.magnification=std::numeric_limits<float>::quiet_NaN();expect(!weaponScopeSceneView(moved),"invalid scope power is rejected");
+    }
+    {
+        const std::array<EyeView,2> views{{
+            {Pose{{},{-.032f,0,0}},EyeFov{-.65f,.55f,.6f,-.6f}},
+            {Pose{{},{.032f,0,0}},EyeFov{-.55f,.65f,.6f,-.6f}}}};
+        const auto inBoth=[&](Pose panel,const std::array<EyeView,2>& eyes){
+            for(const auto& eye:eyes)for(float x:{-.3f,.3f})for(float y:{-.16875f,.16875f}){
+                const auto p=compose(inverse(eye.pose),compose(panel,Pose{{},{x,y,0}})).position;
+                if(p.z>=0||p.x/(-p.z)<std::tan(eye.fov.left)||p.x/(-p.z)>std::tan(eye.fov.right)
+                    ||p.y/(-p.z)<std::tan(eye.fov.down)||p.y/(-p.z)>std::tan(eye.fov.up))return false;
+            }
+            return true;
+        };
+        for(Vec3 anchor: {Vec3{-.4f,-.1f,-.25f},Vec3{.5f,.5f,-.4f},Vec3{0,0,.1f}}){
+            const auto panel=fitWristPanel({},anchor,views,.6f,.3375f);
+            expect(panel&&inBoth(*panel,views)&&panel->position.z<=-.55f,
+                "close/off-axis wrist picker fits all corners in both requested eye views");
+        }
+        const Vec3 ordinary{.05f,-.1f,-.8f};
+        const auto panel=fitWristPanel({},ordinary,views,.6f,.3375f);
+        expect(panel&&same(panel->position,ordinary),"already readable picker retains its wrist-linked position");
+        auto canted=views;canted[0].pose.orientation={0,.06f,0,.99819838f};
+        canted[1].pose.orientation={0,-.06f,0,.99819838f};
+        const Vec3 edge{-.4f,-.1f,-.3f};
+        const auto fitted=fitWristPanel({},edge,canted,.6f,.3375f);
+        expect(fitted&&inBoth(*fitted,canted),"picker fit includes canted-eye orientation, not just IPD");
+        const Pose move{{0,.70710678f,0,.70710678f},{3,2,1}};
+        auto movedEyes=canted;for(auto& eye:movedEyes)eye.pose=compose(move,eye.pose);
+        const auto moved=fitWristPanel(move,compose(move,Pose{{},edge}).position,movedEyes,.6f,.3375f);
+        expect(fitted&&moved&&same(moved->position,compose(move,*fitted).position)&&inBoth(*moved,movedEyes),
+            "both-eye picker placement uses the same head/wrist generation through world motion");
+        auto invalid=views;invalid[0].fov={};
+        expect(!fitWristPanel({},edge,invalid,.6f,.3375f)&&!fitWristPanel({},edge,views,0,.3375f),
+            "invalid picker optical data cannot produce a fitted panel");
+    }
+    {
+        constexpr auto tpp=renderLayout(RenderBuild::phantomPain_1_0_15_4);
+        constexpr auto gz=renderLayout(RenderBuild::groundZeroes_1_0_0_5);
+        expect(tpp.cameraPose+tpp.viewInputToCamera==tpp.inversePose&&gz.cameraPose+gz.viewInputToCamera==gz.inversePose,
+            "each build joins the same source pose in its world and inverse builders");
+        expect(gz.viewportCamera==0x4b0&&gz.graphicsContext==0x120&&gz.viewportNext==0x28,
+            "GZ does not inherit TPP native object layout");
+        for(const auto l:{tpp,gz}){
+            expect(l.gpuProjection>=l.viewportMatrices&&l.previousProjection+64<=l.viewportMatrices+0x240
+                &&l.previousView>=l.viewportMatrices&&l.previousView+64<=l.viewportMatrices+0x240,
+                "both-eye matrix/history writes are covered by scoped native restoration");
+            expect(l.presentCapacity==l.presentCount+4&&l.presentData==l.presentCount+8,
+                "duplicate scene replay removes only its own native present-vector append");
+        }
+        expect(gz.uiProjectionReturn==0&&tpp.uiProjectionReturn!=0,"unmapped GZ UI cannot call the TPP adapter");
+        HeadCameraStatus transition;transition.awaitingPlayer=true;transition.reason=HeadCameraStop::playerHeadUnavailable;
+        expect(mayRetainStereoSurround(transition),"planned native loading retains its explicitly frozen surroundings");
+        for(const auto reason:{HeadCameraStop::cameraChanged,HeadCameraStop::matrixMismatch,
+                              HeadCameraStop::clockMismatch,HeadCameraStop::rigFrameMismatch}){
+            transition.reason=reason;
+            expect(!mayRetainStereoSurround(transition),"a failed camera transaction cannot linger behind a menu");
+        }
+    }
+    {
         SnapTurn snap;
         expect(near(snap.update(1,0,true),0),"held stick cannot snap on activation");
         snap.update(0,0,true);
@@ -26,6 +101,38 @@ int main(){
         expect(near(snap.update(-1,0,true),0),"menu exit requires a fresh neutral stick");
         snap.update(0,0,true);
         expect(near(snap.update(-1,0,true),.523598776f),"left flick turns left after centering");
+    }
+    {
+        RigLocomotion movement;
+        const GamepadSample up{0,0,0,18000,27000,0,30000},down{0,255,0,18000,27000,0,-30000};
+        expect(movement.update(up,true,100).gamepad.buttons==0,"a held vertical stick cannot run on gameplay activation");
+        movement.update({},true,110);
+        auto action=movement.update(up,true,120);
+        expect(action.gamepad.buttons==0x0040&&action.gamepad.leftY==27000&&!action.stance,
+            "right-stick up runs while left-stick movement is preserved");
+        expect(movement.update(up,true,600).gamepad.buttons==0x0040,"holding up sustains the native run control");
+        expect(movement.update(down,true,700).gamepad.buttons==0,"reversing the same gesture cannot also change stance");
+        movement.update({},true,710);
+        action=movement.update(down,true,720);
+        expect(action.stance&&action.gamepad.buttons==0x1000&&action.gamepad.leftTrigger==0,
+            "down requests native stance rather than the aiming-mode A action");
+        expect(movement.update({},true,730).gamepad.buttons==0x1000,"a short down flick survives native frame polling");
+        expect(movement.update({},true,830).gamepad.buttons==0,"stance tap releases to crouch or stand");
+        movement.update(down,true,840);
+        expect(movement.update(down,true,1840).gamepad.buttons==0x1000,"holding down retains native prone hold timing");
+        movement.update({},true,1850);
+        action=movement.update({0x0040},true,1860);
+        expect(action.gamepad.buttons==0x4000,"left-stick click dives instead of sprinting");
+        expect(movement.update(down,false,1900).gamepad==down,"native menus keep both stick axes and buttons");
+        expect(movement.update(down,true,2000).gamepad.buttons==0,"closing a picker cannot replay its held downward selection");
+        movement.update({0x0040},false,2005);
+        expect(movement.update({0x0040},true,2010).gamepad.buttons==0,"a click held through a menu is consumed until release");
+        movement.update({},true,2020);
+        expect(movement.update({0x0040},true,2030).gamepad.buttons==0x4000,"a fresh click dives after release");
+        movement.suspend();
+        expect(movement.update(up,true,2040).gamepad.buttons==0,"focus recovery requires a fresh centered stick");
+        movement.update({},true,2050);
+        expect(movement.update(up,true,2060).gamepad.buttons==0x0040,"fresh upward gesture works after focus recovery");
     }
     {
         WheelSteering steering;const Pose contact{{},{-.2f,-.3f,.5f}};
@@ -51,18 +158,33 @@ int main(){
     }
     {
         BinocularHold binocular;
-        expect(!binocular.update(true,true,100).held,"B press waits before equipping binoculars");
-        expect(!binocular.update(true,true,399).held,"short B hold does not equip binoculars");
+        expect(!binocular.update(true,true,100).selected,"B press waits before equipping binoculars");
+        expect(!binocular.update(true,true,399).selected,"short B hold does not equip binoculars");
         auto b=binocular.update(true,true,400);
-        expect(b.held&&!b.nativePress,"long B hold equips binoculars without a native B action");
-        b=binocular.update(true,false,410);
-        expect(!b.held&&!b.nativePress,"releasing B stows binoculars without a native B action");
+        expect(b.selected&&!b.nativePress,"long B hold equips binoculars without a native B action");
+        expect(binocular.update(true,true,600).selected,"continued B hold cannot stow the binoculars it just equipped");
+        b=binocular.update(true,false,610);
+        expect(b.selected&&!b.nativePress,"releasing B keeps binoculars equipped and does not reload");
+        b=binocular.update(true,true,650);
+        expect(!b.selected&&!b.nativePress,"a fresh B press stows binoculars without reloading");
+        b=binocular.update(true,true,1000);
+        expect(!b.selected&&!b.nativePress,"holding the stow press cannot reopen binoculars");
+        b=binocular.update(true,false,1010);
+        expect(!b.selected&&!b.nativePress,"releasing the stow press cannot reload");
         BinocularHold tap;
         tap.update(true,true,100);
         b=tap.update(true,false,150);
-        expect(!b.held&&b.nativePress,"short B tap remains a native B action");
+        expect(!b.selected&&b.nativePress,"short B tap remains a native B action");
         expect(tap.update(true,false,220).nativePress,"native B tap remains available through its pulse");
         expect(!tap.update(true,false,260).nativePress,"native B pulse expires");
+        b=tap.update(false,true,300);
+        expect(b.nativePress&&!b.selected,"menus and wrist controls retain immediate B");
+        expect(!tap.update(true,true,700).selected,"holding menu B across a transition cannot equip binoculars");
+        tap.update(true,false,710);tap.update(true,true,720);
+        expect(tap.update(true,true,1020).selected,"fresh gameplay B hold equips after a menu transition");
+        tap.suspend();
+        b=tap.update(true,true,1400);
+        expect(!b.selected&&!b.nativePress,"focus loss consumes held B until release");
 
         RigOptics optics;
         GamepadSample input{};
@@ -141,14 +263,44 @@ int main(){
         const auto gripReference=solveBinocularPose({},rotatedGrip,{},rotatedGrip,
             false,true,false,true,false,true);
         expect(gripOwned&&gripReference
-            &&std::abs(gripOwned->body.orientation.x-gripReference->body.orientation.x)<.0001f
-            &&std::abs(gripOwned->body.orientation.y-gripReference->body.orientation.y)<.0001f
-            &&std::abs(gripOwned->body.orientation.z-gripReference->body.orientation.z)<.0001f
-            &&std::abs(gripOwned->body.orientation.w-gripReference->body.orientation.w)<.0001f
-            &&std::abs(gripOwned->body.position.x-gripReference->body.position.x)<.0001f
-            &&std::abs(gripOwned->body.position.y-gripReference->body.position.y)<.0001f
-            &&std::abs(gripOwned->body.position.z-gripReference->body.position.z)<.0001f,
-            "optic housing frame is owned by the right grip rather than the aim pose");
+            &&same(compose(gripOwned->body,Pose{{},binocularPrimarySocket}).position,rotatedGrip.position)
+            &&same(compose(gripReference->body,Pose{{},binocularPrimarySocket}).position,rotatedGrip.position)
+            &&same(gripOwned->ray.direction,rotate(differentAim.orientation,{0,0,-1})),
+            "optic follows the controller aim basis without moving its primary palm socket");
+        const Pose quarterTurnGrip{{.70710678f,0,0,.70710678f},rotatedGrip.position};
+        const auto calibrated=solveBinocularPose({},quarterTurnGrip,{},Pose{{},{}},false,true,false,true,false,true);
+        expect(calibrated&&same(calibrated->ray.direction,{0,0,-1})
+            &&same(compose(calibrated->body,Pose{{},binocularPrimarySocket}).position,quarterTurnGrip.position),
+            "a controller with a ninety-degree grip/aim difference needs no backwards wrist bend");
+        const Pose motion{{0,.258819f,0,.965926f},{.25f,.1f,-.2f}};
+        const auto movedRig=solveBinocularPose({},compose(motion,rotatedGrip),{},compose(motion,differentAim),
+            false,true,false,true,false,true);
+        expect(movedRig&&gripOwned&&same(movedRig->body.position,compose(motion,gripOwned->body).position)
+            &&same(movedRig->ray.direction,rotate(motion.orientation,gripOwned->ray.direction)),
+            "binocular attachment and ray share one transform during hand motion");
+        const auto projectLandmark=[](Pose hand,Vec3 landmark){
+            const auto device=solveBinocularPose({},hand,{},hand,false,true,false,true,false,true);
+            const auto camera=binocularSceneView(*device,2);
+            const auto nativeCamera=nativeEyePose({}, {},camera->pose);
+            const auto nativePoint=nativeTrackedPose({}, {},Pose{{},landmark});
+            const auto point=compose(inverse(nativeCamera),nativePoint).position;
+            std::array<float,16> projection{};projection[11]=1;
+            setEyeProjection(projection,camera->fov);
+            return Vec3{point.x*projection[0]/point.z,point.y*projection[5]/point.z,point.z};
+        };
+        const auto centerLandmark=projectLandmark(Pose{{},{0,0,-.2f}},{0,0,-20});
+        const auto rightMove=projectLandmark(Pose{{},{.1f,0,-.2f}},{0,0,-20});
+        const auto upMove=projectLandmark(Pose{{},{0,.1f,-.2f}},{0,0,-20});
+        const auto rightPan=projectLandmark(Pose{{0,-.0436194f,0,.9990482f},{0,0,-.2f}},{0,0,-20});
+        expect(centerLandmark.z>0&&rightMove.x<centerLandmark.x&&rightPan.x<centerLandmark.x
+            &&upMove.y<centerLandmark.y,
+            "moving or panning the optic right moves a fixed landscape landmark left; lifting moves it down");
+        std::array<float,16> portalProjection{};portalProjection[11]=1;
+        setEyeProjection(portalProjection,{-.8f,.8f,.7f,-.7f});
+        const auto rightRim=nativeTrackedPose({}, {},Pose{{},{.02f,0,-.2f}}).position;
+        const auto leftRim=nativeTrackedPose({}, {},Pose{{},{-.02f,0,-.2f}}).position;
+        expect(rightRim.x*portalProjection[0]/rightRim.z>leftRim.x*portalProjection[0]/leftRim.z,
+            "positive aperture X lands on screen right, so source U must increase without a mirror");
         OpticGate gate;
         auto sample=gate.update(head,eyes,left,right,aim,aim,true,true,true,true,true,true,true,100,1);
         expect(!sample.active&&!sample.aligned,"a device held below the face cannot open binocular mode");
@@ -435,6 +587,24 @@ int main(){
     expect(near(l.position.x,10.032f)&&near(r.position.x,9.968f),"same-frame eye offsets preserve runtime IPD in FOX camera axes");
     expect(near(l.position.y,r.position.y)&&near(l.position.z,r.position.z),"parallel eye cameras do not introduce toe-in or vertical disparity");
     HeadCamera camera;
+    {
+        HeadCamera loading;loading.configure(true);loading.track({},true,100);loading.toggle();
+        const auto before=loading.resolve(7,{},100);
+        loading.awaitScene();
+        expect(before.applied&&!loading.active()&&loading.status().awaitingPlayer,
+            "a native loading screen gets mono pixels without discarding the VR request");
+        expect(!mayRetainStereoSurround(loading.status()),
+            "a loading frame cannot be duplicated as the stereo surroundings behind itself");
+        loading.track({},true,200);const auto after=loading.resolve(7,{},200);
+        expect(after.applied&&loading.active()&&after.activation>before.activation,
+            "the same native camera resumes with a new image generation after loading");
+        loading.awaitScene();loading.track({},true,300);
+        expect(!loading.resolve(8,{},300).applied&&loading.status().reason==HeadCameraStop::cameraChanged,
+            "a loading gap does not authorize adopting an unrelated camera");
+        loading.toggle();loading.resolve(7,{},300);loading.awaitScene();loading.toggle();
+        expect(!loading.resolve(7,{},300).applied&&!loading.status().awaitingPlayer,
+            "manual VR exit remains effective while a loading screen is visible");
+    }
     const std::array<float,16> playerRoot{0,0,-1,0,0,1,0,0,1,0,0,0,500,300,1300,1};
     auto headBone=std::array<float,16>{1,0,0,0,0,1,0,0,0,0,1,0,0,1.6f,0.1f,1};
     const auto headPoint=playerHeadPosition(playerRoot,headBone);
@@ -497,6 +667,27 @@ int main(){
     firstPerson.setNativeMenuOpen(true);firstPerson.toggle();firstPerson.setNativeMenuOpen(false);
     expect(!firstPerson.resolve(11,lowered,125).applied,"manual disable inside iDroid prevents automatic return");
     expect(same(savedHeadView.nativePose.position,{499.9f,300.4f,1300.1f}),"published player-eye frame remains immutable");
+    {
+        HeadCamera travel;travel.configure(true,1,true);travel.track({},true,100);
+        travel.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,100);
+        travel.toggle();const auto acc=travel.resolve(11,thirdPerson,100);
+        travel.track({},true,200);
+        travel.publishPlayerHead(12,23,lowered,playerRoot,headBone,200);
+        expect(!travel.resolve(12,lowered,200).applied&&travel.active(),
+            "fresh alternate player cannot steal the live camera or cancel VR intent");
+        travel.track(Pose{{},{.4f,0,0}},true,1200);
+        expect(!travel.resolve(12,lowered,1200).applied,
+            "travel cannot adopt a stale replacement publication");
+        travel.publishPlayerHead(12,23,lowered,playerRoot,headBone,1200);
+        const auto field=travel.resolve(12,lowered,1200);
+        expect(field.applied&&field.playerOwner==23&&field.activation>acc.activation
+            &&!field.rigSequence&&same(field.nativePose.position,*playerHeadPosition(playerRoot,headBone)),
+            "new mission player resumes VR with a fresh origin and no old rig or eye generation");
+        travel.toggle();travel.track({},true,2400);
+        travel.publishPlayerHead(13,24,lowered,playerRoot,headBone,2400);
+        expect(!travel.resolve(13,lowered,2400).applied,
+            "mission replacement never overrides manual VR disable");
+    }
     firstPerson.track({},true,300);firstPerson.toggle();
     expect(!firstPerson.resolve(11,lowered,300).applied,"stale player head cannot survive a fresh headset sample");
     const Pose nativeCamera{{},{10,20,30}};
@@ -913,11 +1104,12 @@ int main(){
     };
     GamepadSample equipmentHeld{0x0040,255,128,17000,30000,0,0};
     auto mapped=equipmentStep(equipmentHeld,true);
-    expect(mapped.buttons==0x0040&&mapped.leftX==17000&&mapped.leftY==30000,
-        "trigger alone never quick-equips the previous category and preserves movement");
+    expect(mapped.buttons==0&&mapped.leftX==17000&&mapped.leftY==30000&&equipment.phase()==1,
+        "trigger opens the chooser without selecting equipment or leaking a dive click and preserves movement");
+    expect(equipmentStep(equipmentHeld,false).buttons==0,"closing an unselected chooser cannot equip or dive");
     for(const auto direction:std::array<GamepadSample,4>{{{0,0,0,-30000,22000,0,30000},{0,0,0,-30000,22000,0,-30000},
             {0,0,0,-30000,22000,30000,0},{0,0,0,-30000,22000,-30000,0}}}){
-        equipment.reset();equipmentStep({},true);
+        equipment.reset();equipmentStep({},true);equipmentStep({},true);
         const uint16_t category=direction.rightY>0?1:direction.rightY<0?2:direction.rightX>0?8:4;
         mapped=equipmentStep(direction,true);
         expect(mapped.buttons==category&&mapped.rightX==0&&mapped.rightY==0&&mapped.leftX==-30000,
@@ -959,7 +1151,7 @@ int main(){
     expect(equipmentStep(equipmentHeld,true).buttons==0x0084,"A uses the selected item without clicking its navigation stick");
     expect(equipmentStep(equipmentHeld,true).buttons==0x0004,"holding Use does not repeatedly toggle an item");
     expect(equipmentStep(equipmentHeld,false).buttons==0,"held Use cannot become crouch after closing");
-    equipmentStep({},false);equipmentStep({},true);equipmentStep({0,0,0,0,0,-30000,0},true);
+    equipmentStep({},false);equipmentStep({},true);equipmentStep({},true);equipmentStep({0,0,0,0,0,-30000,0},true);
     equipmentStep({},true);equipmentStep({},true);
     expect(equipmentStep({0x0080},true).buttons==0x0084,"the existing right-stick item-use click remains available");
     equipmentStep({},true);

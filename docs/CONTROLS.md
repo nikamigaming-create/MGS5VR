@@ -1,6 +1,33 @@
 # Touch controls for the tracked VR experiment
 
-[Quick controller infographic](images/controls.png) · [All control modes](images/control-modes.svg) · [Install and play](../README.md)
+[Editable default config](../config/mgs5vr-controls.ini) · [All control modes](images/control-modes.svg) · [Install and play](../README.md)
+
+## Edit your controls
+
+Open **mgs5vr-controls.ini in your MGSV game folder** (beside `dinput8.dll`).
+Save and restart MGSV to apply. The installed file is the one the game reads;
+the repository copy is a template. Every supported button action is listed,
+with separate gameplay, binocular, wrist, menu, horse and vehicle sections.
+The bindings below describe the defaults, not a hard-coded layout.
+
+`right_stick_click` means pressing the stick inward; `right_stick_down` means
+pushing it downward. A plain input stays active while held. `press(a)`,
+`release(a)`, `tap(b,300)` and `hold(b,300)` provide one-shot gestures.
+Use `press(left_grip + x)` for a combination, `press(a) | press(x)` for either
+input, or `disabled` to remove a binding. Tap/hold pairs use the same duration.
+The longer chord consumes the simpler input; release held buttons after changing modes.
+
+Right-click is Dive **including with binoculars out**; left-click is zoom.
+For example, to move binocular zoom, change `[binoculars]` to
+`zoom = press(x)`.
+To use left-click for normal dive, change `[gameplay]` to
+`dive = press(left_stick_click)`. A and X do not duplicate stance/dive by default.
+
+You can optionally check syntax/conflicts by running
+`mgs5vr_controls.exe --check mgs5vr-controls.ini` from the game folder.
+Invalid files use built-in defaults and report the errors in `mgs5vr.log`.
+The file also includes movement/navigation axes, snap angle and physical-gesture
+switches. It remaps implemented actions; it does not create new native game abilities.
 
 These bindings target the game's **Action Type** controller layout. The left-arm
 HUD shows the native weapon name, ammunition and status. Native context-action
@@ -19,15 +46,22 @@ needs a separate review.
 | Fire | **Right trigger**, while holding right grip |
 | Lower the gun while keeping it in hand | Keep right grip held and lower your hand |
 | Put the weapon away | Release right grip; the game performs its native stow animation |
-| Add the support hand | Bring the left palm to the weapon's support grip and hold it there briefly |
-| Free the left hand | Pull the hand away, or turn the wrist HUD toward your eyes |
+| Add the support hand | Squeeze left grip near the weapon's support socket and hold briefly |
+| Free the left hand | Release left grip, pull away, or turn the wrist HUD toward your eyes |
 | Reload | **Short right B tap**; the native reload moves the support hand, then releases it |
+| Pick up a dropped weapon / carry a person | **Hold left grip, then hold B** at the native prompt; keeps native B held without equipping binoculars |
+| Switch weapon while aiming | **A** while right grip readies the weapon; A does nothing when lowered |
+| Native equipped-weapon zoom | **Left-stick click** while readied; available steps depend on the weapon |
 | Read the HUD | Raise and turn your **left forearm** toward your eyes |
 
 The right hand owns the weapon grip. With support engaged, the line from the
 right controller to the left guides the authored barrel direction. The left
 hand retains the native support contact; reload animations temporarily own it.
 Reloads use a button rather than manual magazine grabbing.
+Pickup/carry and Dive temporarily lower native aim and suppress the attack trigger.
+This prevents Dive from becoming the game's aiming-mode weapon switch. Stance
+also lowers aim. These are separate configurable actions, not automatic scope
+or equipment selection. Use Y for Fulton/context actions, not for native B holds.
 
 Free fingers articulate on both hands: grip curls the lower fingers and thumb,
 and trigger curls the index finger. Supported controller touch sensors also pose
@@ -40,8 +74,8 @@ for 150 ms, then blends into contact. Pulling more than 20 cm away releases it.
 Moving the left hand beside or behind the firing hand also releases support;
 guidance stays within 60 degrees of the right controller's pointing direction.
 This prevents the weapon from following a withdrawn hand and keeping it latched.
-Clenching left grip only animates the free fingers; it cannot force two-handed
-mode. Lowering the weapon or inspecting the wrist clears contact, so selection
+Clenching left grip in empty space only animates the free fingers; support also
+requires contact at the weapon. Releasing it, lowering the weapon or inspecting the wrist clears contact, so selection
 does not leave a sticky support latch. The corrective headset run received
 positive feedback; complete reach and pose coverage remains open.
 
@@ -56,10 +90,13 @@ then **release left trigger** to confirm and close. Gameplay does not pause.
 | First flick up / down / right / left | Primary / secondary / support / items |
 | After the cards appear and the stick is centered | Flick toward a card, including diagonals; center between choices |
 | Right B, while keeping left trigger held | Return to category choice |
-| Right A, on an item with a Use prompt | Use the selected item once; right-stick click also works |
+| Right A, on an item with a Use prompt | Use the selected item once |
 
-Holding left trigger alone does not equip or toggle anything. The first flick
-opens one category. Once its cards appear, center the stick and flick toward a
+Holding left trigger shows a four-card **Primary / Secondary / Support / Items**
+bar above the wrist, with the configured input printed under each choice.
+It does not enlarge the small ammo/status icon, equip anything, or choose a
+category for you. A stick already held when it opens is ignored
+until centered. A fresh flick opens one category. Once its cards appear, center the stick and flick toward a
 card. Up is up, left is left, and diagonal cards accept diagonal flicks. Keep a
 flick steady briefly; center between choices. Holding or wobbling one flick
 cannot skip into a second selection. B returns to category choice while left
@@ -67,13 +104,15 @@ trigger stays held. Native equip/stow transitions can delay opening; navigation
 is blocked until the expanded menu has rendered.
 
 The cards and descriptions use real game data and unfold above the **left wrist**,
-facing you; the small status display stays flat along the forearm. Raise that
+facing you; the small status display stays flat along the forearm. The config's
+`wrist_surface_lift_cm` raises that status surface (default: 2 cm extra), and
+`wrist_selector_height_cm` sets the picker height (default: 12 cm). Raise that
 wrist into view to read the selection. Right-stick turning is consumed while
 the picker is open and until the stick returns to neutral after closing. A held
 fire trigger must be released before it can fire after selection.
 
 For an item card with a **Use** prompt, keep the category open, select the card
-with the right stick and press **A** (or click the right stick). A held Use button
+with the right stick and press **A**. A held Use button
 produces one press, and cannot become crouch when the picker closes. Phantom Cigar use was exercised
 in SIM; **B** ended its time passage. This does not certify the other item actions.
 
@@ -86,26 +125,33 @@ upward slot has a small NVG label rather than a large rectangular card.
 For a grenade, choose **Support** with a first flick right and finish selection.
 Hold **right grip** to ready it. Move and tilt the **right hand** to position and
 direct the trajectory; **right trigger** throws. Hand elevation controls the arc,
-while right-stick left/right still snap-turns. Right-stick up/down is
-suppressed while a tracked grenade is readied. Throw strength remains the native
+while right-stick left/right still snap-turns. Right-stick up runs; down changes
+stance, never the throw angle. Throw strength remains the native
 equipment strength; this is point-and-trigger throwing, not a velocity gesture.
 The latest SIM observations and remaining stance limits are in the
 [interaction and visibility review](INTERACTION_VISIBILITY_REVIEW.md).
 
-**Handheld binoculars:** hold **right B** for about 0.3 seconds to equip the device
-in the right hand; keep holding B to keep it equipped and release B to stow it.
-A short B tap remains the native action (reload, back, or the current context action).
-Aim by moving the right hand. **Click the right stick** to switch 2×/4×. **Right trigger** marks the person under
+**Handheld binoculars:** hold **right B** for about 0.3 seconds to equip the device.
+Release B: it stays equipped in the right hand; no grip hold is required.
+Brief lost hand/aim tracking hides the presentation, not the equipped selection;
+the device returns when tracking resumes. Equipping gives a short right-hand pulse.
+Tap **B** again to stow it. When binoculars are not selected, a short B tap
+remains the native action (reload, back, or the current context action).
+Aim by moving the right hand. **Click the left stick** to switch 2×/4×. **Right trigger** marks the person under
 the optic's crosshair, or places a native waypoint on the visible surface when
-no person is targeted. A short rumble confirms marking. Releasing B stows it.
-**Flick right stick down** to remove the waypoint or acquired person under the
-crosshair; center the stick before clearing another. Empty space clears nothing.
+no person is targeted. A short rumble confirms marking. Tap B to stow.
+**Tap A** to remove the waypoint or acquired person under the
+crosshair. Empty space clears nothing. Right-stick down remains stance.
 Bring the left hand to the opposite side and squeeze
 **left grip** to cup it for support; release the grip or pull away to let go.
-Zoom and marking need only the right hand. Walking and turning remain available.
+Zoom does not require support contact. Zoom starts at **2×** and each left-stick
+click switches **2× → 4× → 2×**; lowering the device retains that selection.
+Walking, running and turning remain available; **right-stick click dives** in this
+mode, just as it does with binoculars stowed.
 The device renders its own narrow-angle scene through its physical lens while
-the surrounding world retains normal stereo. Bringing the eyecup close opens
-the lens view smoothly. Waypoint letters and acquired-person distances are
+the surrounding world retains normal stereo. The lens stays on its physical
+aperture at all distances; it never expands into a full-screen zoom. Its image
+keeps the same left/right orientation as the unzoomed world. Waypoint letters and acquired-person distances are
 drawn inside this view. Automatic identification by dwelling on a person and
 intel analysis are not implemented; marking currently requires the trigger.
 Tracked first-person hands remain fully opaque, including when a wrist, finger,
@@ -129,7 +175,7 @@ response while you keep control of your head and hands. Pull away before another
 pet. This interaction has been demonstrated with native game audio in SIM;
 other animal pet responses are still being implemented.
 
-**Hold a rat:** crouch with **A**, then offer an open palm close to the ground
+**Hold a rat:** crouch with **right-stick down**, then offer an open palm close to the ground
 beside a live rat. Keep the palm facing up and bring it under the animal briefly;
 lift your hand to carry it. Lower the palm to the ground and pause to release,
 then withdraw. Grip and trigger should remain released. The interaction follows
@@ -150,19 +196,20 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | --- | --- |
 | Move, including during wrist selection | Left stick; on foot, forward follows your view heading |
 | Turn | Flick the right stick left/right for a 30° snap; center before another turn |
-| Gameplay right-stick up/down | Reserved; does not pitch the camera. Menu navigation retains both axes |
-| Sprint | Left-stick click without left grip |
-| Crouch / change stance | Right A; hold A for prone; release weapon-ready grip first |
-| Quick dive | Left X without the equipment modifier |
-| Context action / pickup | Left Y without the equipment modifier; follow the native action when available |
+| Sprint / run | Right stick up; left stick controls movement |
+| Crouch / stand / prone | Tap right stick down for crouch/stand; hold down for prone. The weapon lowers for the stance action. No face-button duplicate |
+| Quick dive | Right-stick click on foot, including with binoculars equipped. No face-button duplicate |
+| Right-stick context | Up/down never pitch the gameplay camera. Equipment, Commands and native menus keep navigation |
+| Context action / Fulton | Left Y without the equipment modifier; hold when the native prompt requires it |
+| Pick up weapon / carry person | Hold left grip, then hold B at the native prompt |
 | Native attack / CQC / carried-body throw | Right trigger with right grip released; the native game state chooses the action |
-| Wrist Commands / buddy orders | Hold left trigger, tap X; point the right stick toward an available command and press right trigger or right-stick click; release left trigger to close |
-| Toggle native VR / large game screen | Left grip + left-stick click |
+| Wrist Commands / buddy orders | Hold X; point the right stick toward an available command and press A; release X to close |
+| Toggle native VR / large game screen | Unbound by default; optional `system.toggle_vr` in the config. VR enters automatically |
 | Open iDroid map | Tap left Menu |
 | Pause | Hold left Menu for at least 0.55 seconds |
 | Main menu / options | Hold left Menu on foot; choose Return to Title Menu or Options with the left stick and A |
 | Cutscene skip | Hold left Menu; choose Skip and press A when the native game offers it |
-| Recenter the large screen | Both grips + right-stick click |
+| Recenter the large screen | Left grip + left Menu |
 | Recenter in game, including while holding binoculars | Hold left grip and tap left Menu; keeps your current facing and brings the body under your head |
 
 In the development build, opening iDroid or Pause during tracked gameplay puts
@@ -184,26 +231,34 @@ applying another stick rotation would turn movement twice after a snap.
 For the main menu, open Pause, select **RETURN TO TITLE MENU**, press **A**, then
 answer the native confirmation. **OPTIONS** and **CONTROLS & MANUAL** are also in
 Pause. At the initial title prompt, press **Enter** or tap **left Menu** to
-enter tracked stereo in the helicopter. The title choices unfold above the
-left wrist. Use the **left stick** to move the highlight and **A** to select.
-**Left grip + left-stick click** switches between immersive VR and the large
-quad, including at the title menu. The manual choice persists through the
-title-to-game transition. Loading can temporarily use the quad while the next
-player camera is created; an immersive selection resumes with that character.
+enter tracked stereo in the helicopter. The title choices appear on the
+cabin panel. Use the **left stick** to move the highlight and **A** to select.
+Tracked arms remain in the stereo scene. The native-camera pass that supplies
+the panel excludes the owned player's normal geometry, then restores it; this
+does not globally hide arms or restore camera-obstruction fading.
+If you bind `system.toggle_vr`, it switches between immersive VR and the large
+quad, including at the title menu. That manual choice persists through the
+title-to-game transition. It is disabled by default. Loading can temporarily use
+the quad while the next player camera is created; immersive play resumes with that character.
 Cutscene Skip is available only when the native game offers it. Loading,
 cutscenes and player-replacement transitions still need broader VR integration;
 the floating gameplay menus do not establish support for every transition.
 
 Wrist Commands has its own input mode, separate from equipment selection.
-Keep left trigger held, center the right stick after the commands appear, then
+Keep X held, center the right stick after the commands appear, then
 point toward a command and confirm. Left-stick walking remains available.
-Right trigger confirms once and cannot fire the gun. B cancels; release left
-trigger and center the stick before returning to gameplay. The native game
+A confirms once. B cancels; release X and center the stick before returning to
+gameplay. On horseback, X alone remains gallop: hold left trigger and tap X,
+keep left trigger held, then use the same stick/A selection. The native game
 chooses which commands are available; stand or crouch to call D-Horse. Calling
 D-Horse, Stay back and the arm's distraction knock were exercised in SIM.
 The motion-melee candidate now
 reaches native contacts; enemy reaction and damage remain separate acceptance
 steps. See [system access and the physical-melee contract](SYSTEMS_ACCESS.md).
+
+D-Horse and D-Dog share the game's active-buddy slot; calling the deployed buddy
+does not deploy the other one as well. Switch through iDroid → Missions → Buddy
+Support. The call menu uses the native buddy and stance restrictions.
 
 ## Vehicle mapping under simulator development
 

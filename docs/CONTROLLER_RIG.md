@@ -68,9 +68,10 @@ shot path and do not establish controller aiming. Do not treat that fallback as
 tracked aiming. Collision near walls and all weapon families require further work.
 
 Right grip holds the native gun ready; right trigger fires. Corrective source
-requires the tracked palm to dwell within 10 cm of the actual weapon support
+requires the configured left support grip to be held and the tracked palm to dwell within 10 cm of the actual weapon support
 grip for 150 ms, releasing beyond 20 cm. The former hand-to-hand distance test
-and left-grip override were rejected in the headset. Wrist inspection and
+and distance-free left-grip override were rejected in the headset. The current
+grip requests contact only at the authored socket; releasing it frees the hand. Wrist inspection and
 equipment selection clear contact. Native reload and bolt-cycle animation own
 an already acquired support hand; they do not acquire a free hand. Attachment
 blends over 180 ms. The right hand remains the weapon's primary grip. During two-handed aim,
@@ -92,11 +93,20 @@ rendering mirrored text. This is weapon/status UI, not a complete iDroid or dama
 subtitle interface. Blocking menus still use their native controls and pixels.
 
 The current binocular path uses the retail housing and a tracked stereo lens.
-Hold right B for about 0.3 seconds to equip it, keep holding B while it is in
-the right hand, and release B to stow it. A short B tap remains the native
-reload/back/context action. Right-stick click changes 2×/4× magnification and
+Hold right B for about 0.3 seconds to equip it directly in the right hand.
+Release B: it stays equipped without squeezing the grip. Tap B again to stow. With binoculars unselected,
+a short B tap remains the native reload/back/context action.
+Left-stick click changes 2×/4× magnification and
 right trigger follows the binocular ray for marking or waypoint placement.
 This does not implement per-weapon scopes or native analysis/intel.
+Its authored primary socket stays at the tracked right grip; orientation uses
+the runtime's same-frame grip-to-aim calibration, not a simulator-neutral wrist
+rotation. The left support socket uses that controller's own calibration.
+The lens remains depth-tested world geometry and samples the independent scene
+with increasing U toward aperture +X. It no longer reverses X or grows into a
+screen-space overlay near the face. Its narrow raster projection is not used
+for the shared native visibility frustum. Housing shading still uses the custom
+diffuse shader and does not yet reproduce native dynamic lighting.
 
 ## Observations
 

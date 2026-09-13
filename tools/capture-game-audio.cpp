@@ -40,8 +40,11 @@ int wmain(int argc,wchar_t** argv){
         if(!output.is_absolute()||std::filesystem::exists(output))throw std::runtime_error("Use a new absolute WAV path");
         Handle process{OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid)};
         std::array<wchar_t,32768> name{};DWORD count=static_cast<DWORD>(name.size());
-        if(!process.value||!QueryFullProcessImageNameW(process.value,0,name.data(),&count)
-            ||_wcsicmp(std::filesystem::path(name.data()).filename().c_str(),L"mgsvtpp.exe"))throw std::runtime_error("PID is not the MGSV game");
+        if(!process.value||!QueryFullProcessImageNameW(process.value,0,name.data(),&count))
+            throw std::runtime_error("Cannot identify the game audio process");
+        const auto executable=std::filesystem::path(name.data()).filename();
+        if(_wcsicmp(executable.c_str(),L"mgsvtpp.exe")&&_wcsicmp(executable.c_str(),L"MgsGroundZeroes.exe"))
+            throw std::runtime_error("PID is not The Phantom Pain or Ground Zeroes");
         check(CoInitializeEx(nullptr,COINIT_MULTITHREADED),"Initialize capture COM");
         auto activation=Microsoft::WRL::Make<Activation>();
         AUDIOCLIENT_ACTIVATION_PARAMS params{};params.ActivationType=AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK;

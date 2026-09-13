@@ -74,10 +74,10 @@ void consumeAnimalTouch(){
     std::lock_guard lock(interactionMutex);
     const auto sample=hands();const auto& frame=sample.frame;
     const auto now=steadyMilliseconds();const auto status=headCamera().status();
-    if(!status.active||status.nativeMenuOpen||!frame.applied||frame.activation!=status.activation
+    if(!frame.controllers.allowAnimalTouch||!status.active||status.nativeMenuOpen||!frame.applied||frame.activation!=status.activation
        ||now<frame.sampleTime||now-frame.sampleTime>100||frame.controllers.weaponReady
        ||frame.controllers.vehicleControls||frame.controllers.optic.held||frame.controllers.commandControls
-       ||frame.controllers.equipmentCategory||frame.controllers.frontEnd){
+       ||frame.controllers.equipmentOpen||frame.controllers.frontEnd){
         // A missed tracking frame may interrupt contact, but cannot re-arm
         // a hand that has already petted the buddy. It must withdraw first.
         for(auto& stroke:strokes)resetContact(stroke);

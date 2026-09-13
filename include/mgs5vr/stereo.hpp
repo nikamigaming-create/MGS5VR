@@ -7,6 +7,11 @@ std::optional<std::array<float,16>> uiPanelProjection(const std::array<float,16>
     const std::array<float,16>& eyeView,EyeFov fov,Pose panel,float width,float height,
     float centerX=0,float centerY=0);
 struct EyeView { Pose pose{}; EyeFov fov{}; };
+// Unfold a wrist-anchored panel at readable depth. Preserve its physical size,
+// and move it inward only as far as needed to fit both requested eye frustums.
+// All poses use -Z forward and must come from the same source transaction.
+std::optional<Pose> fitWristPanel(Pose head,Vec3 anchor,const std::array<EyeView,2>& eyes,
+                                float width,float height);
 // Carried beside the pixels under the GPU mailbox mutex. Never reconstructed
 // from the newest tracking sample at presentation time.
 struct EyeFrame {

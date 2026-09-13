@@ -5,8 +5,15 @@
 #include <mutex>
 
 namespace mgs5vr {
-enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch };
+enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch, sceneUnavailable };
 struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{}; };
+// A planned native menu/loading transition may retain explicitly frozen
+// surroundings. A failed camera/pose transaction must not become that scene.
+constexpr bool mayRetainStereoSurround(HeadCameraStatus status) noexcept {
+    return status.reason!=HeadCameraStop::cameraChanged&&status.reason!=HeadCameraStop::matrixMismatch
+        &&status.reason!=HeadCameraStop::clockMismatch&&status.reason!=HeadCameraStop::rigFrameMismatch
+        &&status.reason!=HeadCameraStop::sceneUnavailable;
+}
 // All poses use the same OpenXR LOCAL space and predicted display time as
 // the eyes. Grip is the attachment frame; aim is a separate pointing frame.
 struct TrackedHand {
@@ -20,10 +27,15 @@ struct ControllerFrame {
     int64_t predictedXrTime{};
     uint64_t referenceEpoch{};
     bool weaponReady{};
+    bool supportGrip{};
     bool vehicleControls{};
+    bool wheelGrip{};
+    bool allowMotionMelee{true},allowAnimalTouch{true};
+    bool equipmentOpen{}; // Includes the unfolded chooser before any category is selected.
     unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
+    std::array<std::array<char,96>,4> equipmentLabels{};
+    float wristSurfaceLift{.02f},wristSelectorHeight{.12f};
     float magnification{1};
-    bool binocularButtonHeld{};
     std::array<float,2> strikeCurl{};
     bool commandControls{};
     OpticSample optic{};
@@ -49,7 +61,7 @@ struct HeadCameraSample {
     bool wristPanelTracked{};
     bool menuOpen{};
     Pose menuPanel{};
-    float handFaceDistance{1}; // Nearest rendered wrist/finger bone to the source eye midpoint, in meters.
+    WeaponScopeSample weaponScope{}; // Same solved weapon/skin publication as this eye pair.
 };
 // Native listener adapters consume the center-head pose from the camera's
 // existing publication, never a newer tracking sample or an individual eye.
@@ -72,6 +84,10 @@ public:
     void toggle();
     void recenter();
     void setNativeMenuOpen(bool open);
+    // Present can continue while a native loading screen publishes no camera.
+    // Keep the user's VR choice but expose mono menu pixels until that exact
+    // camera resumes; this is not permission to adopt a different owner.
+    void awaitScene();
     void cancel(HeadCameraStop reason=HeadCameraStop::manual);
     HeadCameraSample resolve(uintptr_t camera,Pose nativePose,uint64_t milliseconds);
     // Samples the steady clock while holding the same lock as the tracked pose.
@@ -101,6 +117,7 @@ private:
     bool suspended_{};
     bool awaitingPlayer_{};
     bool nativeMenuOpen_{};
+    bool awaitingScene_{};
     HeadCameraSample lastView_{};
     Pose menuNative_{},menuHead_{},menuPanel_{};
     bool menuAnchored_{};
@@ -118,7 +135,7 @@ private:
         uint64_t time{},sequence{};
     };
     std::array<PlayerHead,8> playerHeads_{};
-    uint64_t playerSequence_{};
+    uint64_t playerSequence_{},ownerHeadTime_{};
     bool requirePlayerHead_{};
 };
 HeadCamera& headCamera();

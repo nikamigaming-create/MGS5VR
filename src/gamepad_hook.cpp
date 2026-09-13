@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <Xinput.h>
 #include <MinHook.h>
+#include <intrin.h>
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/mailbox.hpp"
@@ -19,6 +20,7 @@ std::mutex stateMutex;
 GamepadSample previous{};
 DWORD packet{};
 bool reported{};
+unsigned reportedButtons{};
 DWORD WINAPI setState(DWORD index,XINPUT_VIBRATION* vibration){
     if(!vibration)return ERROR_BAD_ARGUMENTS;
     bool active{};
@@ -40,7 +42,14 @@ DWORD WINAPI getState(DWORD index,XINPUT_STATE* state){
             // attached, synthesize neutral success to release the previous XR state.
             if(!freshActive&&original(index,state)==ERROR_SUCCESS)return ERROR_SUCCESS;
             std::lock_guard guard(stateMutex);
-            if(*sample!=previous){++packet;previous=*sample;}
+            if(*sample!=previous){
+                if(sample->buttons!=previous.buttons&&reportedButtons<128){
+                    ++reportedButtons;
+                    log("Native XR input buttons="+std::to_string(sample->buttons)+" active="+std::to_string(freshActive)
+                        +" caller_rva="+std::to_string(reinterpret_cast<uintptr_t>(_ReturnAddress())-reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))));
+                }
+                ++packet;previous=*sample;
+            }
             *state={};state->dwPacketNumber=packet;
             state->Gamepad.wButtons=sample->buttons;
             state->Gamepad.bLeftTrigger=sample->leftTrigger;state->Gamepad.bRightTrigger=sample->rightTrigger;
