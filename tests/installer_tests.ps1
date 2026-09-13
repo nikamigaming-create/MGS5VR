@@ -19,7 +19,12 @@ function Get-FileHash {
         }
         return [pscustomobject]@{Hash='085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45'}
     }
-    Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $LiteralPath -Algorithm $Algorithm
+    # Compute the real hash independently of this mock and PowerShell's module
+    # auto-loader (CTest may inherit a different PSModulePath from its host).
+    $mgsStream=[IO.File]::OpenRead($LiteralPath)
+    $mgsHasher=[Security.Cryptography.SHA256]::Create()
+    try { return [pscustomobject]@{Hash=[BitConverter]::ToString($mgsHasher.ComputeHash($mgsStream)).Replace('-','')} }
+    finally { $mgsHasher.Dispose(); $mgsStream.Dispose() }
 }
 function Get-Process {
     [CmdletBinding()]param([string]$Name)
@@ -139,6 +144,59 @@ try {
     Assert-Installer (-not (Test-Path -LiteralPath (Join-Path $mgsBusyDir 'dinput8.dll'))) 'Running game was modified.'
     $mgsRunning = $false
 
+    $mgsMaintenance=Join-Path $mgsPackage 'tools\launcher-maintenance.ps1'
+    $mgsCustomControls=$mgsControlsOriginal+"`n; keep this custom controller layout"
+    $mgsCustomConfig=$mgsEnabled+"`n; keep these custom VR settings"
+    [IO.File]::WriteAllText($mgsControlsPath,$mgsCustomControls,[Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($mgsConfigPath,$mgsCustomConfig,[Text.UTF8Encoding]::new($false))
+    & $mgsMaintenance -Mode Update -GameExe $mgsPlayerExe
+    Assert-Installer ([IO.File]::ReadAllText($mgsControlsPath) -ceq $mgsCustomControls) 'Launcher update lost custom controls.'
+    Assert-Installer ([IO.File]::ReadAllText($mgsConfigPath) -ceq $mgsCustomConfig) 'Launcher update lost VR settings.'
+    $mgsBackupFolders=@(Get-ChildItem -LiteralPath (Join-Path $mgsPlayer 'mgs5vr-launcher-backups') -Directory)
+    Assert-Installer ($mgsBackupFolders.Count -eq 1) 'Launcher update did not retain exactly one backup.'
+    Assert-Installer (Test-Path -LiteralPath (Join-Path $mgsBackupFolders[0].FullName 'dinput8.dll')) 'Previous DLL not recoverable.'
+    $mgsNewRecord=Get-Content -Raw -LiteralPath (Join-Path $mgsPlayer 'mgs5vr-install.json') | ConvertFrom-Json
+    Assert-Installer ($mgsNewRecord.files.'mgs5vr-controls.ini' -eq (Get-FileHash -LiteralPath $mgsControlsPath -Algorithm SHA256).Hash) 'Updated manifest does not match preserved controls.'
+    $mgsRunning=$true
+    Assert-Refused { & $mgsMaintenance -Mode Update -GameExe $mgsPlayerExe } 'Close The Phantom Pain*'
+    $mgsRunning=$false
+    Assert-Refused { & $mgsMaintenance -Mode Install -GameExe $mgsGzExe } 'The launcher installs tracked VR for The Phantom Pain only.*'
+
+    # An installer failure after the old mod is moved must restore every file.
+    $mgsBrokenPackage=Join-Path $mgsFixtureRoot 'broken package'
+    New-Item -ItemType Directory -Path (Join-Path $mgsBrokenPackage 'tools') | Out-Null
+    Copy-Item -LiteralPath $mgsMaintenance -Destination (Join-Path $mgsBrokenPackage 'tools\launcher-maintenance.ps1')
+    $mgsSourceChecker=Join-Path $mgsPackage 'mgs5vr_controls.exe'
+    if (-not (Test-Path -LiteralPath $mgsSourceChecker)) { $mgsSourceChecker=Join-Path $mgsPackage 'build\Release\mgs5vr_controls.exe' }
+    Copy-Item -LiteralPath $mgsSourceChecker -Destination (Join-Path $mgsBrokenPackage 'mgs5vr_controls.exe')
+    [IO.File]::WriteAllText((Join-Path $mgsBrokenPackage 'tools\install.ps1'),"throw 'fixture installation failure'")
+    $mgsPreviousHashes=@{}
+    foreach ($mgsName in @('dinput8.dll','mgs5vr.ini','mgs5vr-controls.ini','mgs5vr_controls.exe','mgs5vr-install.json')) {
+        $mgsPreviousHashes[$mgsName]=(Get-FileHash -LiteralPath (Join-Path $mgsPlayer $mgsName) -Algorithm SHA256).Hash
+    }
+    Assert-Refused { & (Join-Path $mgsBrokenPackage 'tools\launcher-maintenance.ps1') -Mode Update -GameExe $mgsPlayerExe } 'Previous installation restored.*fixture installation failure*'
+    foreach ($mgsName in $mgsPreviousHashes.Keys) {
+        Assert-Installer ((Get-FileHash -LiteralPath (Join-Path $mgsPlayer $mgsName) -Algorithm SHA256).Hash -eq $mgsPreviousHashes[$mgsName]) "Rollback changed $mgsName"
+    }
+
+    # Recoverable removal retains custom settings, diagnostics and owned data.
+    [IO.File]::WriteAllText((Join-Path $mgsPlayer 'mgs5vr.log'),'Keep diagnostic log.')
+    [IO.File]::WriteAllText((Join-Path $mgsPlayer 'player-data.txt'),'Keep unrelated data.')
+    & $mgsMaintenance -Mode Remove -GameExe $mgsPlayerExe
+    foreach ($mgsName in $mgsPreviousHashes.Keys) {
+        Assert-Installer (-not (Test-Path -LiteralPath (Join-Path $mgsPlayer $mgsName))) "Launcher removal retained active $mgsName"
+        $mgsRecovered=@(Get-ChildItem -LiteralPath (Join-Path $mgsPlayer 'mgs5vr-launcher-backups') -Directory | Where-Object {
+            $mgsCandidate=Join-Path $_.FullName $mgsName
+            (Test-Path -LiteralPath $mgsCandidate) -and
+                (Get-FileHash -LiteralPath $mgsCandidate -Algorithm SHA256).Hash -eq $mgsPreviousHashes[$mgsName]
+        })
+        Assert-Installer ($mgsRecovered.Count -ge 1) "Launcher removal lost recoverable $mgsName"
+    }
+    foreach ($mgsKept in @('mgsvtpp.exe','mgs5vr.log','player-data.txt')) {
+        Assert-Installer (Test-Path -LiteralPath (Join-Path $mgsPlayer $mgsKept)) "Launcher removal changed $mgsKept"
+    }
+    & $mgsMaintenance -Mode Install -GameExe $mgsPlayerExe
+
     foreach ($mgsInstalled in @($mgsPlayer,$mgsLegacy,$mgsDefault)) {
         [IO.File]::WriteAllText((Join-Path $mgsInstalled 'mgs5vr.log'),'Keep diagnostic log.')
         [IO.File]::WriteAllText((Join-Path $mgsInstalled 'player-data.txt'),'Keep unrelated data.')
@@ -150,7 +208,7 @@ try {
             Assert-Installer (Test-Path -LiteralPath (Join-Path $mgsInstalled $mgsKept)) "Uninstall removed $mgsKept"
         }
     }
-    Write-Output "Installer checks passed on PowerShell $($PSVersionTable.PSVersion): selected-file setup, VR preset, legacy/default compatibility, unusual paths, existing/modified files, unsupported/wrong executable, running-game refusal and removal. File-picker UI was not automated."
+    Write-Output "Installer checks passed on PowerShell $($PSVersionTable.PSVersion): setup, VR preset, unusual paths, modified-file protection, unsupported/running-game refusal, removal, launcher update/settings backup and failed-update rollback. File-picker UI was not automated."
 } finally {
     $mgsResolvedFixture = [IO.Path]::GetFullPath($mgsFixtureRoot)
     $mgsTempParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')

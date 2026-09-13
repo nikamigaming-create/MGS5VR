@@ -1,83 +1,99 @@
 # MGS5VR
 
-Play **Metal Gear Solid V: The Phantom Pain in VR**, with tracked hands and a HUD on your left wrist.
+![MGS5VR — original Snake field-manual artwork](docs/images/field-header.svg)
 
-**[Download MGS5VR for Windows](https://github.com/nikamigaming-create/MGS5VR/releases/download/experimental-2026-09-13.7/MGS5VR-experimental-2026-09-13.7.zip)**
+**The Phantom Pain in native stereo VR.** Tracked hands and weapons, physical
+binoculars and scopes, and equipment on your left wrist.
 
-You need your own PC copy of **TPP 1.0.15.4** and a PC-connected VR headset. Tested on **Quest 3 + Touch controllers**; other headsets are unverified. This is an experimental mod.
+**[Download the public build](https://github.com/nikamigaming-create/MGS5VR/releases)**
+· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Known issues](docs/QUEST3_TESTER_FEEDBACK.md)
 
-This build also recognizes **Ground Zeroes 1.0.0.5**. Its independently
-mapped native stereo renderer now runs in SIM, but player head anchoring, tracked
-arms, wrist UI and weapon aiming are **not connected**. GZ is not a finished VR
-port. `tools/setup.ps1 -TheatrePreview` selects the explicit large-screen preview;
-normal VR setup will not substitute a flat screen or apply TPP hooks. The scene
-experiment requires the explicit installer experiment switches and a configured
-VR toggle. See [both-game SIM coverage](docs/DUAL_GAME_SIM_COVERAGE.md).
+Experimental Windows mod. Requires your own **TPP 1.0.15.4** and a PC-connected
+OpenXR headset. Physical feedback currently comes from **Quest 3 + Touch**;
+other headsets are unverified. This is not a standalone Quest app.
 
-## Install
+## Get in
 
-1. Close MGSV. Download the ZIP above and **extract it all**.
-2. Open the extracted **MGS5VR** folder and double-click **Install.cmd**.
-3. Select **mgsvtpp.exe** in your game folder. Done.
+1. Close the game. Download the ZIP and **extract the complete MGS5VR folder**.
+2. Open **MGS5VR-Launcher.exe**, choose **mgsvtpp.exe**, and select **Install VR**.
+   Older packages without the launcher use **Install.cmd**.
+3. Connect PC VR, select your headset software as the active OpenXR runtime,
+   and choose **Launch in Steam**. Use the game's **Action Type** controls.
+4. Load **Continue → Resume Game**. Tracked VR enters automatically.
 
-Setup imports the binocular model/material from your own TPP archives. No game
-assets are bundled; no archive or save is modified. Import needs only the .NET
-Framework included with supported Windows installations, not Python or a download.
+The native C++ launcher has game selection, recoverable updates, a controls editor,
+and the illustrated field guide. No Electron, browser runtime, or launcher account.
+[Launcher details](docs/LAUNCHER.md)
 
-Find the game folder in Steam: right-click MGSV → **Manage → Browse local files**.
-Updating? Run **Uninstall.cmd** first. Other mods using `dinput8.dll` must be removed through their own uninstall process.
+Setup imports binocular assets from your own game. Game archives and saves stay
+untouched; no game assets are distributed. For a Steam install, find the folder
+under **Manage → Browse local files**. Another mod's `dinput8.dll` is never
+silently overwritten.
 
-## Play
+## Your field controls
 
-1. Connect your headset to PC VR and make its software the **active OpenXR runtime**.
-2. Launch MGSV through Steam. Use **Action Type** controls and load **Continue → Resume Game**.
-3. Tracked VR enters automatically. Optional presentation/recenter bindings are in **mgs5vr-controls.ini**.
+![Illustrated current default Touch controls](docs/images/controls-quick.svg)
 
-No simulator or compiling needed. Install once; launch normally afterward.
+These are the defaults. Your **mgs5vr-controls.ini beside the game executable**
+is authoritative. Choose **Edit Controls** in the launcher, or **Edit-Controls.cmd**
+in older packages. The editor checks conflicts before saving and keeps a backup.
 
-## Controls
+Save, release all buttons/grips/triggers, and center both sticks for two seconds:
+valid edits apply **live**, without restarting. Buttons, taps, holds, chords,
+turning, HUD preferences, and physical fit have annotated settings.
 
-![Current control modes](docs/images/control-modes.svg)
+[Complete illustrated control modes](docs/images/control-modes.svg)
+· [Accessible full guide](docs/CONTROLS.md)
+· [Annotated configuration](config/mgs5vr-controls.ini)
 
-Current builds install **mgs5vr-controls.ini** beside the game executable. Edit it,
-save, then release all buttons/grips/triggers and center both sticks for two
-seconds: changes apply live without restarting. Invalid edits keep the last
-working layout. [Annotated default config](config/mgs5vr-controls.ini)
-supports per-mode buttons, taps, holds, release actions and combinations.
+## Hands, optics, equipment
 
-**Edit-Controls.cmd** in the extracted release checks conflicts as you type,
-prevents invalid saves and backs up your previous file. Choose the config in
-the **game folder**, not the release template. This editor runs outside the game.
-Default sprint is now **left-stick click**; zoom is **right grip + left-click**.
-Set `settings.turn_mode = native_smooth` for native smooth yaw.
-Hold **Menu + A for 0.55 seconds** to enter/leave complete native-button mode,
-then release controls. Its separate `[native]` mappings retain native holds and
-all game-facing buttons without duplicating normal VR actions.
-Existing custom files keep their explicit bindings: update those entries yourself
-or use the editor. See [the tester-reported remaining issues](docs/QUEST3_TESTER_FEEDBACK.md).
+![Original Snake support-hand and grenade field illustrations](docs/images/field-gear.svg)
 
-Recon cues default to **binoculars only**: `settings.hud_mode = binoculars_only`.
-The device must be aligned with an eye; simply holding it does not enable tags,
-and firearm scopes do not become recon devices. Use `full` to opt into normal-view
-world cues or `off` to hide them. Wrist controls, captions and menus stay separate.
-Existing files with an explicit `full` setting keep it until edited.
-The update also corrects a snap-pivot
-offset that failed to follow native camera yaw and carries the complete source-eye
-projection into UI rendering. Captions, other objective labels, full body-center
-correction, enemy-outline tails and lens-flare alignment remain unfinished.
+Hold **B** to equip binoculars; tap **B** to stow. Raise the ocular to your eye.
+**Right grip + left-stick click** changes binocular magnification or a compatible
+weapon scope's zoom; bare left-click is Sprint.
 
-**[Full controls, grenades and night vision →](docs/CONTROLS.md)**
+**Left trigger** opens the wrist selector and waits for your category choice.
+**Hold X** opens Commands. [Weapon scopes](docs/WEAPON_SCOPES.md)
+· [Buddies and other interactions](docs/SYSTEMS_ACCESS.md)
 
-[All control modes: menus, Commands, zoom, melee and vehicles](docs/images/control-modes.svg)
+Recon cues default to `hud_mode = binoculars_only`; merely carrying binoculars
+or using a firearm scope does not enable them. `full` opts into normal-view
+world cues; `off` hides them. Native model-glow leakage and caption restoration
+remain under repair—this setting is not a claim that every native HUD effect
+is already handled.
 
-## Help
+## Tune it / get help
 
-- **Sharper picture:** start at 1920×1080 Windowed, Post Processing **High** for AA, Depth of Field **Disable**, Motion Blur **Off**. [More picture settings](docs/PERFORMANCE.md).
-- **Install or launch trouble:** [setup help](docs/ADVANCED_SETUP.md#quick-setup-help). You may need the [Microsoft Visual C++ x64 runtime](https://aka.ms/vc14/vc_redist.x64.exe).
-- **Remove the mod:** close MGSV, double-click **Uninstall.cmd**, and select the same `mgsvtpp.exe`.
+- **Sharper picture:** disable Depth of Field and Motion Blur; start with
+  Post Processing High for native AA. [Resolution and performance](docs/PERFORMANCE.md)
+- **Smooth turning:** set `[settings] turn_mode = native_smooth`.
+  **Left grip + Menu** recenters without changing facing.
+- **Update:** select **Update / Keep My Settings** in the launcher. The previous
+  mod is backed up; custom controls and VR settings are retained.
+- **Remove:** **Remove Mod** disables the active mod and retains a recoverable
+  backup. The older **Uninstall.cmd** uses the original recorded-file removal.
+- **Launch or menu trouble:** [setup help](docs/ADVANCED_SETUP.md#quick-setup-help).
+  The reported hospital-bed/menu case is being fixed; do not assume finishing
+  the prologue is required or that it solves the issue.
 
-The optics hotfix restores binocular lens rendering and connects TPP's round weapon scopes to their native sight sockets. BAMBETOV SV's fixed 4× scope has been exercised in SIM; other sights and weapon variants are still being checked. [Scope controls and coverage](docs/WEAPON_SCOPES.md).
+## What is still experimental?
 
-Complete weapon/gadget coverage, some reconnaissance/powered-arm interactions, physical body grabs and GZ tracked first-person remain unfinished. [Current status](docs/STATUS.md) · [Known interaction gaps](docs/SYSTEMS_ACCESS.md)
+TPP is the priority. Missing captions and other HUD elements, blue enemy-outline
+tails, lens-flare alignment, some interactions, and complete weapon/gadget coverage
+are still being worked through. [Tester feedback](docs/QUEST3_TESTER_FEEDBACK.md)
+· [Current status](docs/STATUS.md) · [Latest rendering work](docs/RENDER_FIX_NOTES.md)
 
-Community project, not affiliated with Konami. [MIT license](LICENSE) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md) · [Build from source](docs/ADVANCED_SETUP.md#build-from-source)
+**Ground Zeroes 1.0.0.5 is not a finished first-person VR port.** Its independent
+native stereo experiment runs in SIM; tracked player anchoring, arms, wrist HUD,
+and weapon aiming are not connected. The launcher can open an existing GZ
+installation, but does not pretend to install a complete GZ first-person adapter.
+[Both-game coverage](docs/DUAL_GAME_SIM_COVERAGE.md)
+
+---
+
+Community project; not affiliated with Konami. [MIT license](LICENSE)
+· [Third-party notices](docs/THIRD_PARTY_NOTICES.md)
+· [Original artwork](docs/images/ARTWORK.md)
+· [Build from source](docs/ADVANCED_SETUP.md#build-from-source)

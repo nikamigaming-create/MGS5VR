@@ -1,10 +1,14 @@
 # Touch controls for the tracked VR experiment
 
+![MGS5VR field manual — original Snake artwork](images/field-header.svg)
+
 [Editable default config](../config/mgs5vr-controls.ini) · [All control modes](images/control-modes.svg) · [Install and play](../README.md)
+
+![Current illustrated default controller reference](images/controls-quick.svg)
 
 ## Edit your controls
 
-Open **Edit-Controls.cmd** in the extracted release, then choose the
+Choose **Edit Controls** in the native launcher, or open **Edit-Controls.cmd** in the extracted release and choose the
 `mgs5vr-controls.ini` beside your **game's** `dinput8.dll`. The external editor
 checks conflicts while you type, refuses invalid saves, and backs up the previous
 file when saving. No game launch is needed to check a layout. This is not yet

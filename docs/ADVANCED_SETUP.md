@@ -1,9 +1,16 @@
 # Advanced setup and development
 
+![MGS5VR field manual — original Snake artwork](images/field-header.svg)
+
 For normal play, start with the [README quick start](../README.md). This guide
 covers individual options, diagnostics and building from source.
 
 ## Quick setup help
+
+**MGS5VR-Launcher.exe** provides the native installer/update interface, controls
+editor and field guide. Its update path keeps custom settings and a recoverable
+backup. [Launcher and recovery details](LAUNCHER.md). Earlier ZIPs without the
+launcher retain the command-file workflow below.
 
 `Install.cmd` opens a file picker for `mgsvtpp.exe` and runs the existing installer
 with `-EnableVR`. `Uninstall.cmd` opens the same picker and removes the recorded,
@@ -22,10 +29,16 @@ unchanged. No administrator access is requested.
   organization policy blocks scripts.
 - **Missing DLL/runtime:** install the
   [Microsoft Visual C++ x64 runtime](https://aka.ms/vc14/vc_redist.x64.exe).
-- **Only a large screen:** load the save, use the game's Action Type controller
-  layout, then hold left grip and click the left stick. The title screen uses the
-  large screen. Make sure your headset is connected to PC VR with its software
-  selected as the active OpenXR runtime.
+- **Only a large screen:** use the game's Action Type controls and load
+  Continue → Resume Game. Current TPP builds enter tracked VR automatically;
+  `system.toggle_vr` is optional and unbound by default. Check that PC VR is
+  connected and its software is the active OpenXR runtime.
+- **Menu missing / viewpoint inside the hospital bed:** this is a reported
+  startup defect, not a requirement to finish the prologue first. The current
+  source corrects title-camera anchoring; the hospital case still needs a rerun.
+  See [current rendering work](RENDER_FIX_NOTES.md). Please include your build
+  version, headset/runtime and whether the problem is the title, pause or an
+  in-prologue prompt when reporting it.
 
 For manual installation, open PowerShell in the extracted MGS5VR folder and run:
 

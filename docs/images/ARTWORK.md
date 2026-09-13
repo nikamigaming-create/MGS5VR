@@ -1,4 +1,21 @@
-# Controls field card
+# Original artwork and current field-manual layouts
+
+The original **controls.png is preserved unchanged**. Its Snake portraits,
+controllers, helicopters, landscape and grenade sketch define the visual identity:
+warm ivory, charcoal, signal red and distressed field-manual headings.
+
+Current README and guides reuse pieces of that original in
+[field-header.svg](field-header.svg), [controls-quick.svg](controls-quick.svg),
+[field-gear.svg](field-gear.svg), and [control-modes.svg](control-modes.svg).
+The native **MGS5VR Field Terminal** embeds the same original image. These are
+code-native viewports/layouts, not newly generated replacements for Snake's art.
+The old bitmap's obsolete mappings must never be presented as current controls.
+
+Regenerate with `python tools/field-art.py` and
+`python tools/render-control-schema.py`. The latter uses
+[CONTROL_SCHEMA.json](../CONTROL_SCHEMA.json) for the detailed bindings.
+
+## Historical September 8 card
 
 [controls.png](controls.png) is the illustrated quick reference for the
 2026-09-08 experimental build. The accessible, detailed equivalent is
@@ -22,5 +39,5 @@ The development companion [control-modes.svg](control-modes.svg) includes the
 additional menu, Commands, zoom, melee and vehicle mappings. Its editable source
 is [CONTROL_SCHEMA.json](../CONTROL_SCHEMA.json); run
 `python tools/render-control-schema.py` to regenerate it. The September 8
-illustration remains the public-release quick card. The attempted bitmap update
-did not return a usable image; the companion uses code-native type and rules.
+illustration is retained as source artwork and a historical card, not the current
+binding reference. Current layouts reuse its illustrations with updated text.

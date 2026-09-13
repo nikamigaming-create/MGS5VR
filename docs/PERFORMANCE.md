@@ -1,5 +1,7 @@
 # VR performance
 
+![MGS5VR field manual — original Snake artwork](images/field-header.svg)
+
 The target is 90 fresh stereo frames per second, with room below the 11.11 ms
 display interval. A 90 Hz headset alone does not establish that the game renders
 90 new frames. Settings and in-game acceptance are still being measured.

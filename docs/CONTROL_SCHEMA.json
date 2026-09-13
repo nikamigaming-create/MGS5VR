@@ -7,7 +7,7 @@
       ["Right stick left-right / left click", "Turn / sprint; right-stick up is unassigned on foot"],
       ["Right stick down", "Tap: crouch or stand / Hold: prone"],
       ["Right grip / trigger", "Hold to ready / fire or throw"],
-      ["Left grip near support socket", "Guide the barrel with two hands; release grip or pull away"],
+      ["Left grip near support socket", "Hold to support the weapon; release grip to detach"],
       ["Short B tap / hold B", "Reload / equip binoculars"],
       ["Hold left grip, then hold B", "Pick up a weapon / carry a person at the native prompt"],
       ["Y / A while readied / hold X", "Native interaction / quick weapon switch / Commands"],
@@ -69,5 +69,5 @@
       ["Release Menu", "Release native D-pad and finish equipment selection"],
       ["Both games / menus", "Input access only; does not add missing GZ first-person adapters"]]}
   ],
-  "footer": "Open Edit-Controls.cmd and choose the GAME's mgs5vr-controls.ini. Conflicts appear before saving; valid saves keep a backup. Restart to apply."
+  "footer": "Open the launcher controls editor or Edit-Controls.cmd and choose the GAME's mgs5vr-controls.ini. Valid saves keep a backup. Release inputs and center both sticks for two seconds to apply live."
 }
