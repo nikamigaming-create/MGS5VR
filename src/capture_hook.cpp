@@ -6,11 +6,14 @@
 #include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/menu_surface.hpp"
 #include "mgs5vr/ui_renderer.hpp"
+#include "mgs5vr/render_size.hpp"
 #include <MinHook.h>
 #include <atomic>
 #include <stdexcept>
 #include <mutex>
 #include <chrono>
+#include <fstream>
+#include <filesystem>
 
 namespace mgs5vr {
 namespace {
@@ -24,6 +27,17 @@ IDXGISwapChain* selected{}; // Identity only. Never hold a backbuffer or swapcha
 HWND selectedWindow{};
 bool failed{};
 uint64_t presented{},copied{};
+void reportRenderSize(UINT width,UINT height,HWND window,bool windowed){
+    static uint64_t last{};static UINT previousWidth{},previousHeight{};
+    const auto tick=GetTickCount64();
+    if(tick-last<5000&&width==previousWidth&&height==previousHeight)return;
+    last=tick;previousWidth=width;previousHeight=height;
+    std::array<wchar_t,32768> path{};
+    if(!GetModuleFileNameW(nullptr,path.data(),static_cast<DWORD>(path.size())))return;
+    std::ofstream output(std::filesystem::path(path.data()).parent_path()/L"mgs5vr-render-size.txt");
+    RECT client{};GetClientRect(window,&client);
+    output<<GetCurrentProcessId()<<' '<<tick<<' '<<width<<' '<<height<<' '<<client.right<<' '<<client.bottom<<' '<<windowed<<'\n';
+}
 HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
     using Clock=std::chrono::steady_clock;const auto entered=Clock::now();
     bool pace=false;
@@ -35,6 +49,8 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
             if(owner==GetCurrentProcessId()&&desc.BufferDesc.Width>=640&&desc.BufferDesc.Height>=360
                 &&(!selectedWindow||!IsWindow(selectedWindow)||selectedWindow==desc.OutputWindow)) {
                 selected=swap;selectedWindow=desc.OutputWindow;
+                observeRenderWindow(swap);
+                reportRenderSize(desc.BufferDesc.Width,desc.BufferDesc.Height,desc.OutputWindow,desc.Windowed!=FALSE);
                 pace=nativeFrameRateEnabled();
                 observeSceneSwapchain(swap);
                 ComPtr<ID3D11Texture2D> source;
@@ -106,6 +122,7 @@ void installCaptureHook(TextureMailbox& mailbox){
         mh(MH_ApplyQueued(),"Enable capture hooks");
     }catch(...){MH_DisableHook(presentAddress);MH_DisableHook(resizeAddress);MH_RemoveHook(presentAddress);MH_RemoveHook(resizeAddress);throw;}
     installSceneCapture(dummy.device.Get());
+    installRenderSizeHooks(dummy.swap.Get());
     log("D3D11 capture hooks installed; native stereo awaits a complete scene draw pair");
 }
 void stopCapture() noexcept {

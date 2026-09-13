@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <stdexcept>
@@ -21,9 +22,10 @@ namespace {
 constexpr int designW=1080,designH=820;
 constexpr UINT timer=1;
 const Color paper(255,242,239,229),ink(255,37,38,37),red(255,175,38,36),muted(255,102,104,96);
-enum Id { tpp=101,gz,browse,launch,install,controls,guide,folder,remove,pathBox,logBox };
+enum Id { tpp=101,gz,browse,launch,install,controls,guide,folder,remove,pathBox,logBox,
+    detect,applyDisplay,accountConfig,whatsNew,presetBox,scaleBox,widthBox,heightBox };
 struct Button {Id id;RectF rect;std::wstring label;HWND window{};};
-std::array<Button,9> buttons{{
+std::array<Button,13> buttons{{
     {tpp,{36,266,331,45},L"01   THE PHANTOM PAIN"},
     {gz,{377,266,331,45},L"02   GROUND ZEROES"},
     {browse,{590,361,118,37},L"BROWSE"},
@@ -32,9 +34,17 @@ std::array<Button,9> buttons{{
     {controls,{377,543,331,48},L"EDIT CONTROLS"},
     {guide,{36,607,218,44},L"FIELD GUIDE"},
     {folder,{264,607,218,44},L"GAME FOLDER"},
-    {remove,{492,607,216,44},L"REMOVE MOD"}
+    {remove,{492,607,216,44},L"REMOVE MOD"},
+    {detect,{762,518,123,34},L"DETECT XR"},
+    {applyDisplay,{895,518,123,34},L"APPLY SIZE"},
+    {accountConfig,{762,610,256,30},L"ACCOUNT CONFIG..."},
+    {whatsNew,{735,670,309,27},L"WHAT'S NEW / STILL OPEN"}
 }};
 HWND window{},pathControl{},logControl{};
+HWND presetControl{},scaleControl{},widthControl{},heightControl{};
+std::array<fs::path,2> graphicsConfigs;
+std::wstring actual=L"ACTUAL: waiting for game";
+uint64_t actualPolled{};
 HINSTANCE instance{};
 HFONT uiFont{};
 IStream* artStream{};
@@ -48,6 +58,29 @@ float scale=1,offsetX{},offsetY{},phase{};
 std::wstring status=L"Select your game executable to get started.",transcript=L"Ready. No game or headset is launched automatically.\r\n";
 HANDLE child{},pipeRead{};
 bool failed{};
+int displayPreset(){return static_cast<int>(SendMessageW(presetControl,CB_GETCURSEL,0,0));}
+void displayEnabled(){
+    const bool available=!busy&&!selected;
+    EnableWindow(presetControl,available);
+    EnableWindow(scaleControl,available&&displayPreset()==1);
+    EnableWindow(widthControl,available&&displayPreset()==2);EnableWindow(heightControl,available&&displayPreset()==2);
+}
+void actualSize(){
+    if(smoke||GetTickCount64()-actualPolled<1000)return;actualPolled=GetTickCount64();
+    uint64_t tick{};unsigned pid{},width{},height{},pcWidth{},pcHeight{},windowed{};
+    std::ifstream input(games[selected].parent_path()/L"mgs5vr-render-size.txt");
+    std::wstring next=L"ACTUAL: waiting for game";
+    if(input>>pid>>tick>>width>>height;input&&tick<=GetTickCount64()&&GetTickCount64()-tick<10000){
+        HANDLE process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,pid);DWORD code{};
+        if(process&&GetExitCodeProcess(process,&code)&&code==STILL_ACTIVE){
+            next=L"EYE: "+std::to_wstring(width)+L" x "+std::to_wstring(height);
+            if(input>>pcWidth>>pcHeight>>windowed)
+                next+=L"\nPC: "+std::to_wstring(pcWidth)+L" x "+std::to_wstring(pcHeight)+(windowed?L" windowed":L" FULLSCREEN");
+        }
+        if(process)CloseHandle(process);
+    }
+    if(next!=actual){actual=next;InvalidateRect(window,nullptr,FALSE);}
+}
 
 std::wstring quote(const std::wstring& value){
     std::wstring out=L"\"";size_t slashes=0;
@@ -96,9 +129,13 @@ void refresh(){
         if(b.id==controls)enabled&=chosen&&file(games[selected].parent_path()/L"mgs5vr-controls.ini")&&file(package/L"tools/edit-controls.ps1");
         if(b.id==folder)enabled&=chosen;
         if(b.id==remove)enabled&=chosen&&selected==0&&installed()&&hasPackage();
+        if(b.id==applyDisplay)enabled&=chosen&&selected==0&&file(package/L"tools/launcher-display.ps1");
+        if(b.id==detect)enabled&=file(package/L"tools/launcher-display.ps1");
+        if(b.id==accountConfig)enabled&=selected==0;
         if(b.id==install)b.label=selected?L"FIRST-PERSON IN DEVELOPMENT":installed()?L"UPDATE / KEEP MY SETTINGS":L"INSTALL VR";
         if(b.window){EnableWindow(b.window,enabled);SetWindowTextW(b.window,b.label.c_str());InvalidateRect(b.window,nullptr,FALSE);}
     }
+    displayEnabled();
     InvalidateRect(window,nullptr,FALSE);
 }
 void text(Graphics& g,float x,float y,float width,float height,const std::wstring& value,float size=18,Color color=ink,int style=FontStyleRegular){
@@ -137,21 +174,22 @@ void render(Graphics& g,bool includeControls){
     fill(g,{36,415,672,35},Color(255,229,226,215));fill(g,{36,415,4,35},failed?red:muted);
     text(g,49,423,647,24,busy?L"WORKING — keep this window open until maintenance finishes.":status,14,failed?red:ink);
     fill(g,{735,266,309,385},ink);fill(g,{735,266,6,385},red);
-    text(g,762,289,256,30,L"MISSION NOTES",24,paper,FontStyleBold);
-    fill(g,{762,333,255,2},Color(255,84,84,76));fill(g,{762+phase*185,332,70,4},red);
-    const auto notes=selected
-        ?L"Independent native stereo experiment.\n\nFirst-person hands, weapon aiming and wrist HUD are not connected.\n\nExisting installations can launch. No silent flat-screen substitute."
-        :L"01  Connect your PC VR headset.\n02  Select its OpenXR runtime.\n03  Launch via Steam.\n\nUse Action Type controls.\nContinue > Resume Game.\nTracked VR enters automatically.";
-    text(g,762,351,255,191,notes,17,paper);
-    crop(g,{862,530,168,119},{245,1218,267,190});
-    text(g,759,568,111,70,L"A HIGHER\nKIND OF\nFREEDOM",14,paper,FontStyleBold);
-    text(g,37,673,1007,25,L"TRANSMISSION LOG  /  INSTALLER OUTPUT & RECOVERY DETAILS",14,muted,FontStyleBold);
+    text(g,762,286,256,30,L"VR RENDER SIZE",23,paper,FontStyleBold);
+    text(g,762,324,256,22,L"PER EYE / NOT DESKTOP OR SBS",12,paper);
+    text(g,762,390,256,21,L"HEADSET SCALE (WIDTH + HEIGHT)",12,paper);
+    text(g,762,452,256,21,L"CUSTOM WIDTH  x  HEIGHT",12,paper);
+    text(g,762,563,260,41,selected?L"GZ: existing graphics settings.\nFirst-person rig still in development.":actual,14,paper);
+    text(g,37,673,683,25,L"TRANSMISSION LOG  /  OUTPUT & RECOVERY DETAILS",14,muted,FontStyleBold);
     fill(g,{36,704,1008,76},Color(255,230,227,216));
     text(g,37,792,1000,20,L"NO TELEMETRY  /  NO ACCOUNTS  /  ORIGINAL ARTWORK PRESERVED  /  NOT AFFILIATED WITH KONAMI",11,muted);
     if(includeControls){
         fill(g,{36,361,542,37},Color(255,255,255,255));text(g,46,370,517,26,L"C:\\SteamLibrary\\steamapps\\common\\MGS_TPP\\mgsvtpp.exe",14);
         for(const auto& b:buttons)buttonPaint(g,b,b.id==(selected?gz:tpp),false,b.id!=remove,false);
-        text(g,47,715,980,57,L"Ready. Select your installation, connect PC VR, then launch.\nUpdates retain custom controls and create a recoverable backup.",14);
+        fill(g,{762,350,256,33},paper);text(g,768,357,240,23,L"Headset recommended (OpenXR)",14);
+        fill(g,{762,413,256,31},paper);text(g,768,419,240,23,L"100% - runtime recommendation",14);
+        fill(g,{762,474,123,31},paper);fill(g,{895,474,123,31},paper);
+        text(g,768,480,113,23,L"2560",14);text(g,902,480,110,23,L"2560",14);
+        text(g,47,715,980,57,L"Connect Virtual Desktop / PC VR first, then Detect XR. Set quality in your runtime.\nLauncher applies native dimensions before launch. Windows desktop and DSR stay untouched.",14);
     }
 }
 void layout(){
@@ -163,6 +201,9 @@ void layout(){
     uiFont=CreateFontW(-std::max(11,int(15*scale)),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
     for(auto& b:buttons)place(b.window,b.rect);
     place(pathControl,{36,361,542,37});place(logControl,{45,710,990,64});
+    place(presetControl,{762,350,256,180});place(scaleControl,{762,413,256,170});
+    place(widthControl,{762,474,123,31});place(heightControl,{895,474,123,31});
+    for(auto control:{presetControl,scaleControl,widthControl,heightControl})SendMessageW(control,WM_SETFONT,reinterpret_cast<WPARAM>(uiFont),TRUE);
     SendMessageW(pathControl,WM_SETFONT,reinterpret_cast<WPARAM>(uiFont),TRUE);SendMessageW(logControl,WM_SETFONT,reinterpret_cast<WPARAM>(uiFont),TRUE);
 }
 bool open(const std::wstring& target,const wchar_t* verb=L"open"){
@@ -237,8 +278,24 @@ void action(Id id){
     if(busy)return;
     if(id==tpp||id==gz){selected=id==gz?1u:0u;failed=false;status=selected?L"GZ first-person adapters are not ready. Existing installs only.":installed()?L"Installation record found. Ready to launch or update.":L"Select your game executable to get started.";refresh();}
     else if(id==browse)choose();
-    else if(id==launch){
-        if(file(games[selected])&&installed())open(selected?L"steam://rungameid/311340":L"steam://rungameid/287700");
+    else if(id==launch||id==applyDisplay||id==detect){
+        if(id!=detect&&(!file(games[selected])||(id==launch&&!installed())))return;
+        const wchar_t* preset=selected||displayPreset()==0?L"Current":displayPreset()==1?L"Headset":L"Custom";
+        const auto value=[](HWND control){std::array<wchar_t,64> buffer{};GetWindowTextW(control,buffer.data(),static_cast<int>(buffer.size()));return std::wstring(buffer.data());};
+        const std::array<const wchar_t*,5> scales{L"50",L"75",L"100",L"125",L"150"};
+        auto scaleIndex=static_cast<int>(SendMessageW(scaleControl,CB_GETCURSEL,0,0));if(scaleIndex<0||scaleIndex>4)scaleIndex=2;
+        std::vector<std::wstring> args{L"-Mode",id==detect?L"Detect":id==launch?L"Launch":L"Apply",
+            L"-GameExe",games[selected].wstring(),L"-Preset",preset,L"-Scale",scales[scaleIndex],
+            L"-Width",value(widthControl),L"-Height",value(heightControl)};
+        if(!graphicsConfigs[selected].empty()){args.push_back(L"-GraphicsConfig");args.push_back(graphicsConfigs[selected].wstring());}
+        startPowerShell(package/L"tools/launcher-display.ps1",args,true);
+    }else if(id==accountConfig){
+        std::array<wchar_t,32768> path{};OPENFILENAMEW dialog{sizeof(dialog)};dialog.hwndOwner=window;dialog.lpstrFile=path.data();
+        dialog.nMaxFile=static_cast<DWORD>(path.size());dialog.lpstrTitle=L"Steam userdata / your account / 287700 / local / TPP_GRAPHICS_CONFIG";
+        dialog.lpstrFilter=L"TPP graphics settings\0TPP_GRAPHICS_CONFIG\0\0";dialog.Flags=OFN_FILEMUSTEXIST|OFN_PATHMUSTEXIST|OFN_NOCHANGEDIR;
+        if(GetOpenFileNameW(&dialog)){graphicsConfigs[selected]=path.data();append(L"Graphics account: "+graphicsConfigs[selected].wstring()+L"\r\n");}
+    }else if(id==whatsNew){
+        MessageBoxW(window,L"NEW IN THIS LAUNCHER\n\nOpenXR per-eye recommendation, 50-150% scale, custom native width/height, pre-launch Apply, live actual render size and recoverable graphics backups. Windows resolution and DSR are untouched.\n\nCURRENT TPP CHANGES\n\nBinocular side-cup grip, pistol support acquisition, lens-only recon visibility with a glow switch, dwell acquisition, and native title/menu presentation.\n\nSTILL OPEN\n\nTrue mirrored left-handed rig; remaining HUD/cinematic/effect cases; complete weapons, gadgets and buddy interactions; Ground Zeroes first-person rig and wrist HUD. Physical headset coverage and the full showcase are not complete.",L"MGS5VR / Changes and remaining work",MB_OK|MB_ICONINFORMATION);
     }else if(id==controls){
         startPowerShell(package/L"tools/edit-controls.ps1",{L"-Path",(games[selected].parent_path()/L"mgs5vr-controls.ini").wstring()},false);
     }else if(id==guide){
@@ -260,11 +317,19 @@ LRESULT CALLBACK procedure(HWND w,UINT message,WPARAM a,LPARAM b){
             0,0,1,1,w,reinterpret_cast<HMENU>(static_cast<INT_PTR>(item.id)),instance,nullptr);
         pathControl=CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|ES_READONLY|ES_AUTOHSCROLL,0,0,1,1,w,reinterpret_cast<HMENU>(pathBox),instance,nullptr);
         logControl=CreateWindowExW(0,L"EDIT",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|ES_READONLY|ES_MULTILINE|ES_AUTOVSCROLL|WS_VSCROLL,0,0,1,1,w,reinterpret_cast<HMENU>(logBox),instance,nullptr);
+        presetControl=CreateWindowExW(0,L"COMBOBOX",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL,0,0,1,1,w,reinterpret_cast<HMENU>(presetBox),instance,nullptr);
+        scaleControl=CreateWindowExW(0,L"COMBOBOX",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL,0,0,1,1,w,reinterpret_cast<HMENU>(scaleBox),instance,nullptr);
+        for(const auto label:{L"Keep current game settings",L"Headset recommended (OpenXR)",L"Custom native size"})SendMessageW(presetControl,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label));
+        for(const auto label:{L"50% - performance",L"75% - balanced",L"100% - runtime recommendation",L"125% - supersampling",L"150% - very demanding"})SendMessageW(scaleControl,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label));
+        SendMessageW(presetControl,CB_SETCURSEL,0,0);SendMessageW(scaleControl,CB_SETCURSEL,2,0);
+        widthControl=CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"2560",WS_CHILD|WS_VISIBLE|WS_TABSTOP|ES_NUMBER|ES_AUTOHSCROLL,0,0,1,1,w,reinterpret_cast<HMENU>(widthBox),instance,nullptr);
+        heightControl=CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"2560",WS_CHILD|WS_VISIBLE|WS_TABSTOP|ES_NUMBER|ES_AUTOHSCROLL,0,0,1,1,w,reinterpret_cast<HMENU>(heightBox),instance,nullptr);
+        SendMessageW(widthControl,EM_SETLIMITTEXT,4,0);SendMessageW(heightControl,EM_SETLIMITTEXT,4,0);
         append(L"");layout();refresh();SetTimer(w,timer,50,nullptr);return 0;
     case WM_SIZE:if(pathControl)layout();InvalidateRect(w,nullptr,FALSE);return 0;
     case WM_DPICHANGED:{const auto* r=reinterpret_cast<RECT*>(b);SetWindowPos(w,nullptr,r->left,r->top,r->right-r->left,r->bottom-r->top,SWP_NOZORDER|SWP_NOACTIVATE);return 0;}
-    case WM_COMMAND:if(HIWORD(a)==BN_CLICKED)action(static_cast<Id>(LOWORD(a)));return 0;
-    case WM_TIMER:poll();if(GetForegroundWindow()==w){phase=std::fmod(float(GetTickCount64()%5000)/5000.f,1.f);RECT r{int(offsetX+759*scale),int(offsetY+330*scale),int(offsetX+1020*scale),int(offsetY+338*scale)};InvalidateRect(w,&r,FALSE);}return 0;
+    case WM_COMMAND:if(LOWORD(a)==presetBox&&HIWORD(a)==CBN_SELCHANGE)displayEnabled();else if(HIWORD(a)==BN_CLICKED)action(static_cast<Id>(LOWORD(a)));return 0;
+    case WM_TIMER:poll();actualSize();return 0;
     case WM_ERASEBKGND:return 1;
     case WM_DRAWITEM:{auto* draw=reinterpret_cast<DRAWITEMSTRUCT*>(b);
         const auto found=std::find_if(buttons.begin(),buttons.end(),[&](const auto& item){return static_cast<UINT>(item.id)==draw->CtlID;});
@@ -326,12 +391,16 @@ int WINAPI wWinMain(HINSTANCE current,HINSTANCE,PWSTR,int show){
             if(smoke){
                 // Exercise this program's actual native controls without showing
                 // a window, selecting real files or launching another process.
-                const bool created=std::all_of(buttons.begin(),buttons.end(),[](const auto& item){return IsWindow(item.window)!=FALSE;})&&pathControl&&logControl;
+                const bool created=std::all_of(buttons.begin(),buttons.end(),[](const auto& item){return IsWindow(item.window)!=FALSE;})&&pathControl&&logControl&&presetControl&&scaleControl&&widthControl&&heightControl;
+                SendMessageW(presetControl,CB_SETCURSEL,2,0);SendMessageW(window,WM_COMMAND,MAKEWPARAM(presetBox,CBN_SELCHANGE),0);
+                const bool custom=IsWindowEnabled(widthControl)&&IsWindowEnabled(heightControl)&&!IsWindowEnabled(scaleControl);
+                SendMessageW(presetControl,CB_SETCURSEL,1,0);SendMessageW(window,WM_COMMAND,MAKEWPARAM(presetBox,CBN_SELCHANGE),0);
+                const bool automatic=!IsWindowEnabled(widthControl)&&IsWindowEnabled(scaleControl);
                 SendMessageW(window,WM_COMMAND,MAKEWPARAM(gz,BN_CLICKED),0);
                 const bool gzSafe=selected==1&&!IsWindowEnabled(buttons[4].window)&&!child;
                 SendMessageW(window,WM_COMMAND,MAKEWPARAM(tpp,BN_CLICKED),0);
                 const bool tppSafe=selected==0&&!IsWindowEnabled(buttons[3].window)&&!IsWindowEnabled(buttons[4].window)&&!child;
-                DestroyWindow(window);exitCode=created&&gzSafe&&tppSafe?0:1;
+                DestroyWindow(window);exitCode=created&&custom&&automatic&&gzSafe&&tppSafe?0:1;
             }else{
                 ShowWindow(window,show);UpdateWindow(window);MSG message{};
                 while(GetMessageW(&message,nullptr,0,0)>0){if(!IsDialogMessageW(window,&message)){TranslateMessage(&message);DispatchMessageW(&message);}}

@@ -836,6 +836,17 @@ RuntimeProbe probeRuntime(){
     try {
         Instance instance;result.instanceAvailable=true;result.runtime=instance.runtime;
         instance.getSystem();result.headsetAvailable=true;result.system=instance.properties.systemName;
+        uint32_t count{};
+        xrCheck(xrEnumerateViewConfigurationViews(instance.handle,instance.system,XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+            0,&count,nullptr),"Count stereo view recommendations");
+        if(count!=2)throw std::runtime_error("Runtime did not expose two primary stereo views");
+        std::array<XrViewConfigurationView,2> views{{{XR_TYPE_VIEW_CONFIGURATION_VIEW},{XR_TYPE_VIEW_CONFIGURATION_VIEW}}};
+        xrCheck(xrEnumerateViewConfigurationViews(instance.handle,instance.system,XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+            count,&count,views.data()),"Read stereo view recommendations");
+        result.recommendedWidth=std::max(views[0].recommendedImageRectWidth,views[1].recommendedImageRectWidth);
+        result.recommendedHeight=std::max(views[0].recommendedImageRectHeight,views[1].recommendedImageRectHeight);
+        result.maximumWidth=std::min(views[0].maxImageRectWidth,views[1].maxImageRectWidth);
+        result.maximumHeight=std::min(views[0].maxImageRectHeight,views[1].maxImageRectHeight);
     }catch(const std::exception& e){result.error=e.what();}
     return result;
 }

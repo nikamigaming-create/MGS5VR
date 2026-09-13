@@ -66,8 +66,11 @@ is already handled.
 
 ## Tune it / get help
 
-- **Sharper picture:** disable Depth of Field and Motion Blur; start with
-  Post Processing High for native AA. [Resolution and performance](docs/PERFORMANCE.md)
+- **Sharper picture:** update the mod, then use **Detect XR → Headset recommendation**
+  or **Custom → Apply Size** in the launcher with TPP closed. Native VR rendering
+  is independent of the small PC preview; no desktop-resolution or DSR changes.
+  Depth of Field and Motion Blur stay off. [Resolution setup](docs/LAUNCHER.md#resolution-without-changing-your-desktop)
+  · [Performance](docs/PERFORMANCE.md)
 - **Smooth turning:** set `[settings] turn_mode = native_smooth`.
   **Left grip + Menu** recenters without changing facing.
 - **Update:** select **Update / Keep My Settings** in the launcher. The previous

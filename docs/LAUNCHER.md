@@ -11,8 +11,34 @@ or automatic game/headset launch. The launcher itself has a static C++ runtime.
 Extract the **complete release folder**, then open **MGS5VR-Launcher.exe**.
 Choose `mgsvtpp.exe` once with **Browse**; the path is remembered for your Windows
 user. **Install VR** invokes the existing version-checked TPP installer.
-**Launch in Steam** starts the normal Steam game; it does not change your OpenXR
-runtime, graphics settings, Steam configuration or multiplayer settings.
+**Launch in Steam** starts the normal Steam game. With **Keep current settings**,
+graphics are retained. A selected resolution preset is applied before launch;
+the OpenXR runtime, Steam configuration and multiplayer settings are unchanged.
+
+## Resolution without changing your desktop
+
+Update the mod with this package first. Connect Virtual Desktop / PC VR and
+select its quality setting, then **Detect XR** reads the active runtime's
+recommended resolution per eye. Choose **Headset recommendation** and a scale,
+or enter a **Custom** width and height, then **Apply Size** with TPP closed.
+The size is per eye, not the combined SBS width. Dimensions must be even:
+width 640–4096, height 360–4096. Reduce scale if the recommendation exceeds that.
+
+The launcher backs up the selected Steam account's `TPP_GRAPHICS_CONFIG`, uses
+TPP's native `FlexibleWindowed` path, and disables depth of field and motion blur.
+Other quality settings are preserved. **Account Config** selects the correct
+account file if more than one is found. Saves are not edited.
+
+The game creates its native render targets at that size, then the mod reduces
+the desktop preview to **960 × 540** without reducing the VR render targets.
+The window can briefly be larger while those targets initialize. No Windows
+resolution, DSR, or exclusive-fullscreen mode switch is requested. A hidden
+preview is not implemented. **ACTUAL** shows the live native buffer and real
+PC-window dimensions; it is not just a display of the requested preset.
+
+The game-local `mgs5vr-display.ini` retains the chosen render/preview sizes.
+Restart to apply a different size. **Keep current settings** retains that choice;
+it does not undo it. Ground Zeroes keeps its existing graphics settings.
 
 **Edit Controls** opens the existing validating editor with the installed file
 already selected. **Field Guide** opens the illustrated full control chart.

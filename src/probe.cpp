@@ -27,7 +27,9 @@ int main(int argc,char** argv){
     const auto p=probeRuntime();
     std::cout<<"{\"instance_available\":"<<(p.instanceAvailable?"true":"false")
         <<",\"headset_available\":"<<(p.headsetAvailable?"true":"false")
-        <<",\"runtime\":"<<json(p.runtime)<<",\"system\":"<<json(p.system)<<",\"error\":"<<json(p.error)<<"}\n";
+        <<",\"runtime\":"<<json(p.runtime)<<",\"system\":"<<json(p.system)<<",\"error\":"<<json(p.error)
+        <<",\"recommended_width\":"<<p.recommendedWidth<<",\"recommended_height\":"<<p.recommendedHeight
+        <<",\"maximum_width\":"<<p.maximumWidth<<",\"maximum_height\":"<<p.maximumHeight<<"}\n";
     if(!p.headsetAvailable)return 2;
     if(seconds)try{
         TextureMailbox mailbox;std::atomic_bool stop{false};
