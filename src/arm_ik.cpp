@@ -155,6 +155,10 @@ bool withinSupportCone(Vec3 separation,Vec3 forward){
     // firing hand is a release, even if the guided weapon follows that motion.
     return dot(separation,forward)>=.5f*std::sqrt(distance2*forward2);
 }
+bool closeSupportContact(Vec3 separation){
+    const float distance2=dot(separation,separation);
+    return std::isfinite(distance2)&&distance2>=.000025f&&distance2<=.18f*.18f;
+}
 bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time){
     if(!ready||!tracked||!std::isfinite(distance)||distance<0||time<lastTime_){reset();return false;}
     lastTime_=time;

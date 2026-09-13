@@ -58,11 +58,11 @@ inline constexpr float binocularEyeRelief=.10f;
 // Palm contact on the housing's two side walls, in the imported mesh frame.
 inline constexpr Vec3 binocularPrimarySocket{.085f,-.008f,0};
 inline constexpr Vec3 binocularSupportSocket{-.078f,-.008f,-.018f};
-// Anatomical palm frame before user fit. -Y runs wrist -> knuckles;
+// Anatomical palm frame on each housing side. -Y runs wrist -> knuckles;
 // -Z runs little -> index. Fingers rise over the top, thumbs face the ocular,
 // and the mirrored palms face the two side walls. This is NOT a controller
-// grip/aim calibration. Device fit rotates the housing relative to this palm,
-// not the wrist together with the housing.
+// grip/aim calibration. Fit preserves this side-cup orientation: knuckles
+// point to the housing top, never back toward the user's eyes.
 inline constexpr Quat binocularPalmOrientation{1,0,0,0};
 
 // The optical axis is continuously available while the primary hand is
@@ -122,8 +122,8 @@ std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     bool leftAimTracked,bool rightAimTracked,bool leftHeld,bool rightHeld,Quat gripRotation={});
 // Local controller-aim to device rotation: yaw * pitch * roll. The primary
 // palm socket stays fixed; housing, optical ray, eye relief and support rotate
-// together, without rotating the primary wrist. The default -90 pitch tilts
-// the device down into the palm; zero restores the unadjusted aim direction.
+// together, keeping the palms on the sides and fingers over the top. Default
+// -90 pitch tilts down; zero restores the unadjusted aim direction.
 Quat binocularGripRotation(float pitchDegrees,float yawDegrees,float rollDegrees);
 // Move the entire device transaction onto the final IK palm. Never reapply
 // controller aim calibration to a palm that has already acquired the device.

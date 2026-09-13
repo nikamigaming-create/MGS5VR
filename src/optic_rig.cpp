@@ -114,10 +114,10 @@ std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     // wrist quaternion. The optic starts at controller aim -Z, then applies
     // the configured device fit about the stationary tracked palm socket.
     const Pose gripToBody=compose(Pose{aimFromGrip.orientation,{}},Pose{gripRotation,{}});
-    // Fit rotates the DEVICE around the palm, not the wrist along with it.
-    // Cancel that fit in the anatomical contacts or the IK hands follow the
-    // housing and a 90-degree adjustment changes nothing about the actual grip.
-    const auto palmInBody=compose(inverse(Pose{gripRotation,{}}),Pose{binocularPalmOrientation,{}}).orientation;
+    // The anatomical contact belongs to the housing SIDE: palm inward,
+    // knuckles up, fingers over its top. Counter-rotating this contact by
+    // the device pitch points the fingers back toward the eyepiece instead.
+    const auto palmInBody=binocularPalmOrientation;
     // Seat the housing against the inside of the right palm. The rear ocular
     // remains behind the fingers, so bringing it to the eye does not bring
     // the wrist through the near plane.

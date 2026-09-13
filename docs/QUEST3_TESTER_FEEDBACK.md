@@ -6,7 +6,7 @@ This is the current issue inventory, not a claim that all entries are fixed.
 | Report | Current change / remaining work |
 | --- | --- |
 | Right-stick up sprints out of prone | Default Sprint moved to left-stick click; grip + left-click zoom consumes Sprint. |
-| Binocular grip requires a 90-degree wrist twist | Default device pitch is now -90 degrees (down), about the stationary palm. Fit no longer rotates the anatomical hand along with the housing. The opposite contact, housing, ray and lens stay attached through final skin reattachment. Existing configs with explicit pitch 0 need -90. Headset ergonomics remain unverified. |
+| Binocular grip requires a 90-degree wrist twist | Default device pitch is -90 degrees (down). Both palms face the housing sides, knuckles point upward and fingers curl over the top. The initial counter-rotation pointed the fingers toward the eyepiece and was rejected; side-cup orientation is now preserved at every fit angle. Housing, ray and lens stay attached through final skin reattachment. Existing configs with explicit pitch 0 need -90. Headset ergonomics remain unverified. |
 | Disable snap, restore smooth turning | `settings.turn_mode = native_smooth`; native yaw sensitivity, tracked HMD pitch. |
 | Horse / vehicle forward decoupled from viewing | Mounted right stick now sends native horizontal camera input, with artificial snap offset removed. Native steering remains native, not head-relative driving. Physical result unconfirmed. |
 | Body / camera center drifts; visible in cardboard box | Fixed a world-space snap-pivot accumulator that failed to follow native camera yaw; regression covers leaned snap → native yaw → recenter. Left grip + Menu clears the offset without changing facing. Collision-following roomscale and the tester's full cardboard-box case are not marked fixed. |
@@ -38,6 +38,19 @@ scene-camera yellow glows from normal vision and restores the waypoint at the
 ocular. A small native green person icon remains outside the device; complete
 native marker/silhouette suppression is not yet claimed.
 
-The downward-fit SIM run shows the revised right-hand wrap in carry and raised
-poses, a live ocular, left-hand support and release. This checks the rendered
-attachment; physical headset comfort remains for the tester to assess.
+The first downward-fit SIM candidate retained a live ocular and support contact,
+but its hand orientation was rejected by the user: fingers pointed toward the
+eyepiece instead of over the top. It was not published as a release. Side-cup
+contact supersedes that candidate; physical headset comfort remains unverified.
+
+The corrected SIM view keeps both palms on the binocular sides with fingers
+over the top, including support attach/release. The device remains pitched down
+90 degrees relative to controller aim.
+
+Pistol support now recognizes the native close palm contact (6.5 cm in the
+tested handgun) without requiring a rifle's forward support cone. The firing
+hand retains aim; weapon changes reset the acquired contact. SIM exercised
+beside/forward engagement, opposing head/hand motion, release, reacquisition
+and a reload input. Contact remained acquired during the motion segment with
+no support-driven aim rotation. Other handgun variants and physical headset
+play remain unverified; this is not an exhaustive weapon-completion claim.

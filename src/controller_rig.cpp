@@ -64,6 +64,8 @@ float supportBlend{};
 float aimBlend{};
 Quat guidedOffset{};
 Pose heldSupportOffset{};
+uint64_t supportWeapon{};
+bool heldCloseSupport{};
 uint64_t supportAt{};
 struct ShotRig {
     uintptr_t owner{},character{},camera{},model{};
@@ -213,6 +215,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         boundOwner=owner;boundModel=model;activation=frame.activation;
         supportContact.reset();supportPose.reset();
         supportBlend=0;aimBlend=0;guidedOffset={};heldSupportOffset={};supportAt=now;
+        supportWeapon=0;heldCloseSupport=false;
         for(auto& motion:meleeMotion)motion.reset();
         meleeTracking=0;meleeCurl={};
         wheelSteering.reset();wheelMailbox().publish({});
@@ -290,12 +293,16 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::optional<Pose> muzzleInGrip;
     std::optional<WeaponScopeGeometry> scopeInWrist;
     uint32_t scopeResource{};
+    uint64_t weaponSupportIdentity{};
     const auto weaponComponent=get<uintptr_t>(character+0x80);
     if(!frame.controllers.vehicleControls&&get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
         const auto instances=get<uintptr_t>(weaponComponent+0x38);
         const auto first=get<uint32_t>(instances+0x24),index=get<uint32_t>(owner+0x3a0);
         if(index>=first&&index-first<=15){
             const auto state=get<uintptr_t>(weaponComponent+0x58)+(index-first)*0x610ull;
+            const auto supportResource=get<uint32_t>(state+0x240);
+            if(supportResource&&(supportResource>>16)!=0xffff)
+                weaponSupportIdentity=uint64_t(supportResource)<<32|index;
             // Observed throughout rifle reload and WU pistol bolt cycling; the
             // native animation owns the support hand during these operations.
             nativeManipulation=(get<uint32_t>(state+0x27c)&0x1c0)==0x40&&(get<uint32_t>(state+0x3c0)&0x04000000)!=0;
@@ -354,7 +361,15 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             }
         }
     }
+    // An acquired contact belongs to one native weapon, not to whichever
+    // weapon happens to replace it while both grips are still held.
+    if(supportWeapon!=weaponSupportIdentity){
+        supportContact.reset();supportPose.reset();supportBlend=0;aimBlend=0;
+        guidedOffset={};heldSupportOffset={};heldCloseSupport=false;supportAt=now;
+        supportWeapon=weaponSupportIdentity;
+    }
     const auto supportOffset=compose(inverse(rightAnimated),leftAnimated);
+    const auto nativeSupportInGrip=compose(gripFromWrist[1],compose(supportOffset,inverse(gripFromWrist[0])));
     auto attached=compose(right->pose.wrist,supportOffset);
     // Binocular support is a real tracked left-hand socket, not the firearm
     // support offset. Convert the published LOCAL-frame side cup back into the
@@ -372,6 +387,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // While attached, retain the acquired contact frame through native reload
     // animation and evaluate it in the currently guided weapon frame.
     const bool wasAttached=supportContact.attached();
+    const bool compactSupport=wasAttached?heldCloseSupport:closeSupportContact(nativeSupportInGrip.position);
+    if(compactSupport){aimBlend=0;guidedOffset={};}
     const auto contactPrimary=compose(grips[1],Pose{blendRotation({},guidedOffset,aimBlend),{}});
     auto contactWrist=right->pose.wrist;
     if(aimBlend>0)if(const auto solved=groundedArm(rightAnimatedArm,clearWrist(compose(contactPrimary,gripFromWrist[1])),bendHistory[1],armBasis[1]))
@@ -391,24 +408,28 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // The configured support grip owns contact, but still requires proximity
     // to the authored socket. Release, inspection and pulling away free the
     // hand. A one-handed reload must not grab a distant tracked controller.
-    const bool weaponNearSupport=supportContact.update(frame.controllers.supportGrip&&frame.controllers.weaponReady&&firearmActive&&forwardSupport&&!inspecting&&(!nativeManipulation||wasAttached),
+    // A pistol cup is alongside/below the firing palm, not a foregrip in
+    // front of it. Socket distance still owns acquisition and release; a
+    // wrist-facing pose cannot cancel an explicitly squeezed close cup.
+    const bool supportInspect=inspecting&&!compactSupport;
+    const bool weaponNearSupport=supportContact.update(frame.controllers.supportGrip&&frame.controllers.weaponReady&&firearmActive&&(compactSupport||forwardSupport)&&!supportInspect&&(!nativeManipulation||wasAttached),
         frame.controllers.hands[0].gripTracked,std::sqrt(dot(separation,separation)),now);
     const bool nearSupport=binocularHeld?binocularSupport:weaponNearSupport;
-    if(!binocularHeld&&nearSupport&&!wasAttached)heldSupportOffset=supportOffset;
+    if(!binocularHeld&&nearSupport&&!wasAttached){heldSupportOffset=supportOffset;heldCloseSupport=compactSupport;}
     const bool support=nearSupport;
     const float step=std::min(now>=supportAt?static_cast<float>(now-supportAt)/180.f:1.f,1.f);supportAt=now;
     supportBlend=std::clamp(supportBlend+(support?step:-step),0.f,1.f);
     // A menu, stow, non-firearm or lost controller releases ownership now.
     // Distance release can blend out, but never toward a new native stow pose.
-    if(!binocularHeld&&(!frame.controllers.supportGrip||!frame.controllers.weaponReady||!firearmActive||inspecting||!frame.controllers.hands[0].gripTracked)){
+    if(!binocularHeld&&(!frame.controllers.supportGrip||!frame.controllers.weaponReady||!firearmActive||supportInspect||!frame.controllers.hands[0].gripTracked)){
         supportBlend=0;aimBlend=0;supportPose.reset();
     }
     const auto presentedSupport=binocularSupportWrist
         ?compose(inverse(right->pose.wrist),*binocularSupportWrist)
         :supportPose.update(supportOffset,nearSupport,nativeManipulation).value_or(supportOffset);
     attached=compose(right->pose.wrist,presentedSupport);
-    bool guiding=!binocularHeld&&nearSupport&&nativeManipulation&&aimBlend>0;
-    if(barrelInGrip&&frame.controllers.hands[0].gripTracked&&nearSupport){
+    bool guiding=!binocularHeld&&!compactSupport&&nearSupport&&nativeManipulation&&aimBlend>0;
+    if(!compactSupport&&barrelInGrip&&frame.controllers.hands[0].gripTracked&&nearSupport){
         if(const auto guided=twoHandGrip(grips[1],grips[0],*barrelInGrip,1.f)){
             guidedOffset=compose(inverse(grips[1]),*guided).orientation;guiding=true;
         }
@@ -552,7 +573,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const float controllerCurl=finger==0?std::max(hand.squeeze,hand.thumbTouched?.65f:0.f)
                 :finger==1?std::max(hand.trigger,hand.triggerTouched?.12f:0.f):hand.squeeze;
             const bool opticContact=binocularHeld&&(side!=0||binocularSupport);
-            const float curl=opticContact?std::clamp(controllerCurl,.55f,.82f)
+            // Cup the top instead of leaving the fingers hovering open above
+            // it. The thumb has its own opposing hinge and needs less curl.
+            const float curl=opticContact?std::clamp(controllerCurl,finger==0?.55f:.72f,finger==0?.65f:.82f)
                 :std::max(controllerCurl,frame.controllers.strikeCurl[side]);
             const auto rotation=fingerJointRotation(side!=0,static_cast<unsigned>(finger),static_cast<unsigned>(joint),curl);
             if(!rotation)return false;
@@ -658,6 +681,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             <<" reach_clamped="<<right->reachClamped<<" support="<<supportBlend<<" support_aim="<<aimBlend<<" articulated_hands="<<articulatedHands
             <<" support_near="<<nearSupport<<" support_distance="<<std::sqrt(dot(separation,separation))
             <<" hand_distance="<<std::sqrt(dot(handSeparation,handSeparation))
+            <<" support_cup="<<compactSupport<<" native_hand_distance="<<std::sqrt(dot(nativeSupportInGrip.position,nativeSupportInGrip.position))
             <<" inspecting="<<inspecting<<" arm_helpers="<<helpersMatch<<" ground_contacts="<<groundContacts
             <<" left_head="<<leftView.x<<','<<leftView.y<<','<<leftView.z
             <<" right_head="<<rightView.x<<','<<rightView.y<<','<<rightView.z;log(s.str());

@@ -21,6 +21,10 @@ std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal);
 // Support remains in front of the primary controller's unmodified aim. The
 // guided weapon cannot keep a withdrawn hand attached by rotating after it.
 bool withinSupportCone(Vec3 handSeparation,Vec3 primaryForward);
+// Classify the native palm-to-palm contact, not the current controller gap.
+// Close pistol-style cups brace the firing hand; they do not steer a barrel
+// with the unstable direction between two almost-coincident controllers.
+bool closeSupportContact(Vec3 authoredHandSeparation);
 class SupportContact {
 public:
     // Distance is from the tracked palm to the weapon's support grip.

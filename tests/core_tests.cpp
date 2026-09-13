@@ -367,24 +367,30 @@ int main(){
         }
         const auto correction=binocularGripRotation(20,-30,15);
         const auto corrected=solveBinocularPose({},quarterTurnGrip,{},Pose{},false,true,false,true,false,true,correction);
+        const auto correctedContact=compose(inverse(corrected->body),corrected->primaryGrip);
         expect(corrected&&same(corrected->primaryGrip.position,calibrated->primaryGrip.position)
-            &&same(rotate(corrected->primaryGrip.orientation,{0,-1,0}),rotate(calibrated->primaryGrip.orientation,{0,-1,0}))
-            &&same(rotate(corrected->primaryGrip.orientation,{0,0,-1}),rotate(calibrated->primaryGrip.orientation,{0,0,-1})),
-            "device fit leaves the primary palm and wrist orientation unchanged");
+            &&same(rotate(correctedContact.orientation,{0,-1,0}),{0,1,0})
+            &&same(rotate(correctedContact.orientation,{-1,0,0}),{-1,0,0}),
+            "device fit retains a side-facing palm and upward knuckles about the fixed primary position");
         const auto down=solveBinocularPose({},quarterTurnGrip,{},Pose{},false,true,false,true,false,true,binocularGripRotation(-90,0,0));
         const auto downSupport=compose(down->body,Pose{{},binocularSupportSocket});
         const auto downSupported=solveBinocularPose(downSupport,quarterTurnGrip,Pose{},Pose{},true,true,true,true,true,true,binocularGripRotation(-90,0,0));
+        const auto downPalm=compose(inverse(down->body),down->primaryGrip);
         expect(down&&same(down->ray.direction,{0,-1,0})
             &&same(down->primaryGrip.position,calibrated->primaryGrip.position)
-            &&same(rotate(down->primaryGrip.orientation,{0,-1,0}),rotate(calibrated->primaryGrip.orientation,{0,-1,0}))
-            &&same(rotate(down->primaryGrip.orientation,{0,0,-1}),rotate(calibrated->primaryGrip.orientation,{0,0,-1}))
+            &&same(rotate(down->primaryGrip.orientation,{0,-1,0}),rotate(quarterTurnGrip.orientation,{0,-1,0}))
+            &&same(rotate(down->primaryGrip.orientation,{0,0,-1}),rotate(quarterTurnGrip.orientation,{0,0,-1}))
+            &&same(rotate(downPalm.orientation,{0,-1,0}),{0,1,0})
+            &&same(rotate(downPalm.orientation,{-1,0,0}),{-1,0,0})
             &&same(down->ray.direction,rotate(down->renderBody.orientation,{0,0,-1}))
             &&same(down->ray.direction,rotate(down->rightEyepiece.orientation,{0,0,-1})),
-            "minus ninety pitches housing, lens and ray DOWN about the stationary palm, not the whole hand");
+            "minus ninety pitches the optic down while the right palm stays on its side with fingers over the top");
+        const auto supportPalm=compose(inverse(downSupported->body),downSupported->supportGrip);
         expect(downSupported&&downSupported->supportHeld
             &&same(downSupported->supportGrip.position,downSupport.position)
-            &&same(rotate(downSupported->supportGrip.orientation,{0,-1,0}),rotate(calibrated->primaryGrip.orientation,{0,-1,0})),
-            "opposite palm follows the rotated housing contact without acquiring the fit as wrist twist");
+            &&same(rotate(supportPalm.orientation,{0,-1,0}),{0,1,0})
+            &&same(rotate(supportPalm.orientation,{1,0,0}),{1,0,0}),
+            "left palm faces inward from the opposite side with fingers over the top, not toward the ocular");
         const Pose handMove{{0,.258819f,0,.965926f},{.1f,.02f,-.03f}};
         const auto resolved=attachBinocularToPalm(*corrected,compose(handMove,corrected->primaryGrip));
         const auto resolvedAgain=attachBinocularToPalm(*resolved,resolved->primaryGrip);
@@ -1218,6 +1224,13 @@ int main(){
         &&!withinSupportCone(rotate(supportTurn,withdrawnSeparation),rotate(supportTurn,primaryForward)),
         "support release follows controller aim through body turns");
     expect(!withinSupportCone({},primaryForward)&&!withinSupportCone(heldSeparation,{}),"invalid support directions cannot acquire a hand");
+    expect(closeSupportContact({-.045f,-.025f,.01f})&&!withinSupportCone({-.045f,-.025f,.01f},primaryForward),
+        "a native pistol cup is a valid close support contact even alongside and below the firing hand");
+    expect(!closeSupportContact(heldSeparation)&&!closeSupportContact({0,0,-.25f}),
+        "long-gun foregrips retain their existing directional support solve");
+    expect(closeSupportContact(rotate(supportTurn,{-.045f,-.025f,.01f}))
+        &&!closeSupportContact({})&&!closeSupportContact({std::numeric_limits<float>::quiet_NaN(),0,0}),
+        "close-cup classification follows the native weapon frame and rejects invalid contacts");
     expect(!support.update(true,true,.07f,100)&&support.update(true,true,.07f,250)
         &&!support.update(withinSupportCone(withdrawnSeparation,primaryForward),true,.07f,300),
         "a close guided contact cannot retain a sideways withdrawn hand");

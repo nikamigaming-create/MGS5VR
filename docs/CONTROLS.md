@@ -152,11 +152,17 @@ Grip and trigger keep their gameplay actions while also animating the fingers.
 
 Support requires the left palm to stay within 10 cm of the weapon's support grip
 for 150 ms, then blends into contact. Pulling more than 20 cm away releases it.
-Moving the left hand beside or behind the firing hand also releases support;
-guidance stays within 60 degrees of the right controller's pointing direction.
-This prevents the weapon from following a withdrawn hand and keeping it latched.
+For long-gun foregrips, moving the left hand beside or behind the firing hand
+also releases support; guidance stays within 60 degrees of the right controller's
+pointing direction. This prevents the weapon from following a withdrawn hand.
+Pistol-style close cups use the native palm contact instead: the support hand
+can sit beside/below the firing hand without passing a rifle's forward cone.
+The firing hand alone owns aim in a close cup, so almost-touching controllers
+cannot twist the sights. Weapon changes clear the previous weapon's acquired grip.
 Clenching left grip in empty space only animates the free fingers; support also
-requires contact at the weapon. Releasing it, lowering the weapon or inspecting the wrist clears contact, so selection
+requires contact at the weapon. Releasing it or lowering the weapon clears contact.
+Wrist inspection also releases a foregrip; release left grip to inspect while
+using a close pistol cup. Selection
 does not leave a sticky support latch. The corrective headset run received
 positive feedback; complete reach and pose coverage remains open.
 
@@ -240,8 +246,9 @@ keeps the same left/right orientation as the unzoomed world. Waypoint letters an
 drawn inside this view. Automatic identification by dwelling on a person and
 intel analysis are not implemented; marking currently requires the trigger.
 The default `binocular_pitch_degrees = -90` tilts the device down 90° around the
-right palm, without twisting the wrist along with it. The housing, lens, aiming
-ray and opposite-hand contact share that rotation. Set this under `[settings]`
+right palm position. Both palms face the housing sides, with the fingers curling
+over its top, not pointing back at the eye. Housing, lens, aiming ray and cupped
+hands share that rotation. Set this under `[settings]`
 in your existing controls file to apply the new fit; `0` restores the old angle.
 Tracked first-person hands remain fully opaque, including when a wrist, finger,
 or binocular approaches the face. The shoulders follow physical head yaw so turning
