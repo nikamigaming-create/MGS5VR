@@ -16,6 +16,21 @@ static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
     {
+        expect(hudLayer(151,100,false,false)==HudLayer::general,"subtitles/notification layers are not wrist status");
+        expect(hudLayer(133,100,false,false)==HudLayer::general,"ordinary layer 133 is not an equipment card");
+        expect(hudLayer(133,150,false,false)==HudLayer::equipment&&hudLayer(133,100,true,false)==HudLayer::equipment,
+            "equipment cameras and item context own their cards");
+        expect(hudLayer(137,100,false,true)==HudLayer::commands&&hudLayer(137,100,false,false)==HudLayer::general,
+            "command layers require the active command context");
+        expect(hudLayer(52,100,false,false)==HudLayer::context&&hudLayer(147,135,false,false)==HudLayer::status,
+            "wrist action and status stay separate from general HUD");
+        expect(worldHudVisible(HudMode::full,0)&&worldHudVisible(HudMode::full,1)&&worldHudVisible(HudMode::full,2),
+            "full HUD exposes world cues in both eyes and optics");
+        expect(!worldHudVisible(HudMode::binocularsOnly,0)&&!worldHudVisible(HudMode::binocularsOnly,1)
+            &&worldHudVisible(HudMode::binocularsOnly,2),"binocular-only preference does not leak into normal eyes");
+        expect(!worldHudVisible(HudMode::off,0)&&!worldHudVisible(HudMode::off,2),"world HUD can be disabled");
+    }
+    {
         struct Launcher{uint32_t sight;Vec3 rear;float length,radius,inset;};
         const std::array<Launcher,4> launchers{{
             {21,{.057f,.128f,-.0640001f},.168000f,.00926f,.007614f},
@@ -907,6 +922,18 @@ int main(){
         snaps.setNativeMenuOpen(false);
         expect(same(snaps.resolve(1,nativeCamera,123).nativePose.position,after.nativePose.position),
             "closing a native menu restores the same snapped gameplay viewpoint");
+        const Quat nativeTurn{0,std::sin(.6f),0,std::cos(.6f)};
+        auto turnedCamera=compose(Pose{nativeTurn,{}},nativeCamera);
+        turnedCamera.position=nativeCamera.position;
+        const auto turned=snaps.resolve(1,turnedCamera,124);
+        expect(turned.applied&&same(turned.nativePose.position-nativeCamera.position,
+            rotate(nativeTurn,after.nativePose.position-nativeCamera.position)),
+            "native smooth/vehicle yaw rotates the entire tracking offset including the leaned snap pivot");
+        snaps.recenter();
+        const auto centered=snaps.resolve(1,turnedCamera,125);
+        expect(centered.applied&&same(centered.nativePose.position,turnedCamera.position)
+            &&same(rotate(centered.nativePose.orientation,{0,0,1}),rotate(turned.nativePose.orientation,{0,0,1})),
+            "recenter clears a leaned snap/native-yaw offset without changing facing");
     }
     ControllerFrame hands;hands.referenceEpoch=1;hands.predictedXrTime=9000;
     {

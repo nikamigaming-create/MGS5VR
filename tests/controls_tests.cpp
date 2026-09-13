@@ -45,6 +45,16 @@ struct NativeFixture {
 int main(int argc,char** argv){
     {
         Fixture f;
+        expect(f.controls.setting("settings.hud_mode")==0,"full world HUD is the default");
+        expect(f.load("[settings]\nhud_mode=binoculars_only\n")&&f.controls.setting("settings.hud_mode")==1,
+            "binocular-only world HUD is configurable");
+        expect(f.load("[settings]\nhud_mode=off\n")&&f.controls.setting("settings.hud_mode")==2,
+            "world HUD can be disabled independently of wrist controls");
+        expect(!f.load("[settings]\nhud_mode=guess\n")&&f.controls.setting("settings.hud_mode")==2,
+            "invalid HUD preference keeps the previous configuration");
+    }
+    {
+        Fixture f;
         expect(f.load("[gameplay]\nrun=left_stick_click\nstance=a\nreload=tap(left_grip + b,300)\npickup_carry=b\nswitch_weapon=press(right_grip + right_stick_click)\nzoom=press(right_stick_up)\nequip_binoculars=hold(left_grip + y,300)\n"),
             "Quest3 tester direct-B pickup, A stance and grip-R3 switch layout is valid");
         f.tick();f.input.buttons[1]=1;f.tick();f.tick(1000);

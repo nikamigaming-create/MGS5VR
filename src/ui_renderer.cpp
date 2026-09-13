@@ -30,7 +30,20 @@ std::atomic_uintptr_t titleMenu{};
 std::atomic_uint64_t titleUpdatedAt{};
 uintptr_t base{};
 std::atomic_bool enabled{};
-struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},choosingCategory{},itemsOpen{},commandsOpen{},menuOpen{};Pose menuPanel{};bool frontEnd{};std::array<float,16> authoredView{},authoredProjection{};float pickerWidth{.75f};};
+struct Source {
+    EyeFrame eye{};
+    uintptr_t camera{};
+    std::array<float,16> view{};
+    Pose panel{},picker{};
+    bool panelTracked{},panelVisible{},choosingCategory{},itemsOpen{},commandsOpen{},menuOpen{};
+    Pose menuPanel{};
+    bool frontEnd{};
+    std::array<float,16> authoredView{},authoredProjection{};
+    float pickerWidth{.75f};
+    Pose hudPanel{};
+    HudMode hudMode{HudMode::full};
+    std::array<float,16> projection{};
+};
 thread_local Source producing,executing;
 std::mutex mutex;
 std::unordered_map<uintptr_t,Source> pending;
@@ -119,8 +132,8 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
         const bool worldIntel=field<uintptr_t>(state,0x308)==executing.camera&&(order==2||order==3);
         // Native scene-camera target cues follow the device view. Flat HUD
         // labels are replaced by native world-position labels in the lens.
-        if(executing.eye.eye==2)return worldIntel?originalNode(state,item):0;
-        if(worldIntel)return 0;
+        if(executing.eye.eye==2)return worldIntel&&worldHudVisible(executing.hudMode,2)?originalNode(state,item):0;
+        if(worldIntel&&!worldHudVisible(executing.hudMode,executing.eye.eye))return 0;
     }
     if(enabled.load()&&executing.eye.sourceSequence)try{
         ++nodeCalls;
@@ -188,33 +201,39 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 &&world[1]==0&&world[2]==0&&world[3]==0&&world[4]==0&&world[6]==0&&world[7]==0&&world[8]==0&&world[9]==0&&world[11]==0
                 &&world[12]==0&&world[13]==0&&(world[14]==100||world[14]==135||world[14]==150)){
                 const auto order=field<uint32_t>(item,0x28);
-                // Native contextual button/action icons are layer 52. Layer 50
-                // contains destination letters and distances and stays hidden.
-                const bool contextAction=order==52;
+                const auto layer=hudLayer(order,world[14],executing.itemsOpen,executing.commandsOpen);
+                const bool contextAction=layer==HudLayer::context;
                 // The native equipment carousel has its own layout camera at
                 // Z=150. Its cards, tabs and description are orders 133..136;
                 // the similarly numbered Z=100 layers are unrelated overlays.
-                const bool equipmentPicker=(world[14]==150&&order>=133&&order<=136)
-                    ||(executing.itemsOpen&&world[14]==100&&order==133);
+                const bool equipmentPicker=layer==HudLayer::equipment;
                 // Call uses the Z=100 layout: choices 135..137, selected action
                 // and its help 138..139. Destination marks and status stay separate.
-                const bool commandsPicker=executing.commandsOpen&&world[14]==100&&order>=135&&order<=139;
+                const bool commandsPicker=layer==HudLayer::commands;
                 // LT's first stage is the explicit four-category action bar.
                 // Keep native status icons on the wrist; never stretch one
                 // status icon into a pretend four-way selector.
                 const bool expanded=equipmentPicker||commandsPicker;
-                if((!contextAction&&!expanded&&(order<146||order>148))||!executing.panelTracked||(!expanded&&!executing.panelVisible)){
+                const bool general=layer==HudLayer::general;
+                // Layer 50 contains preprojected desktop labels. It cannot
+                // follow head motion on a face panel. Acquired people and
+                // waypoints are instead drawn from native world positions.
+                if(layer==HudLayer::worldLabels
+                    ||(!general&&(!executing.panelTracked||(!expanded&&!executing.panelVisible)))){
                     ++suppressedDraws;
                     if((contextAction||equipmentPicker||(order>=146&&order<=148))&&executing.eye.eye<2)++hiddenPanelByEye[executing.eye.eye];
                     return 0;
                 }
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
-                const auto panel=expanded?executing.picker:
+                // Subtitles and notifications are not wrist status. Use one
+                // source-head panel for both eyes, even with hands lowered or
+                // untracked. Never sample a newer head pose on this worker.
+                const auto panel=general?executing.hudPanel:expanded?executing.picker:
                     contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
-                const float layoutWidth=commandsPicker?.6f:equipmentPicker?executing.pickerWidth:1.2f;
+                const float layoutWidth=general?2.4f:commandsPicker?.6f:equipmentPicker?executing.pickerWidth:1.2f;
                 const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
-                    expanded?0.f:contextAction?.04f:.72f,
-                    expanded?0.f:contextAction?-.52f:-.70f);
+                    general||expanded?0.f:contextAction?.04f:.72f,
+                    general||expanded?0.f:contextAction?-.52f:-.70f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));
@@ -233,6 +252,23 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 }
                 // A failed wrist projection must not reintroduce a face HUD.
                 ++suppressedDraws;return 0;
+            }
+            if(layoutCamera){
+                // Captions and notices also have independent/animated layout
+                // cameras; they are not limited to the fixed wrist-HUD depths.
+                // Retain their native clip layout on the shared source-head
+                // plane instead of leaving them at desktop-screen coordinates.
+                if(field<uint32_t>(item,0x28)==50){++suppressedDraws;return 0;}
+                const auto saved=field<std::array<float,16>>(state,0x1c0);
+                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,
+                    executing.hudPanel,2.4f,1.35f);
+                if(!mapped){++suppressedDraws;return 0;}
+                auto* output=static_cast<unsigned char*>(state)+0x1c0;
+                std::memcpy(output,mapped->data(),sizeof(*mapped));
+                const auto result=originalNode(state,item);
+                std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
+                if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
+                return result;
             }
         }
     }
@@ -346,7 +382,7 @@ Pose wristPickerPose(const HeadCameraSample& rig) noexcept{
     const float width=std::max(.6f,rig.controllers.wristPickerWidth);
     return fitWristPanel(head,anchor,eyes,width,width*9.f/16.f).value_or(Pose{head.orientation,anchor});
 }
-void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const HeadCameraSample& rig,
+void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const std::array<float,16>& projection,const HeadCameraSample& rig,
     const std::array<float,16>& authoredView,const std::array<float,16>& authoredProjection){
     const std::array<Pose,2> eyes{nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),
                                 nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose)};
@@ -358,6 +394,9 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
                rig.controllers.equipmentOpen&&!rig.controllers.equipmentCategory,
                rig.controllers.equipmentCategory==4,rig.controllers.commandControls,
                rig.menuOpen,rig.menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection,rig.controllers.wristPickerWidth};
+    producing.hudPanel=compose(nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose),Pose{{},{0,0,-2.f}});
+    producing.hudMode=rig.controllers.hudMode;
+    producing.projection=projection;
 }
 void clearUiRenderSource() noexcept {producing={};}
 bool applyUiEyeProjection(float* output) noexcept {
@@ -382,13 +421,14 @@ bool applyUiEyeProjection(float* output) noexcept {
     // before its worker runs. Publish the immutable view captured at enqueue.
     // Never read the current camera here to repair an older UI job.
     const bool restoredView=std::memcmp(state+0x200,executing.view.data(),sizeof(executing.view))!=0;
-    std::array<float,16> matrix{};std::memcpy(matrix.data(),output,sizeof(matrix));
-    if(!setEyeProjection(matrix,executing.eye.view.fov))return false;
+    // Carry the complete eye projection, including its native depth mapping.
+    // Replacing only X/Y FOV on a worker-built matrix retains whichever near
+    // plane the shared camera has now (often the restored desktop plane).
     if(restoredView){
         std::memcpy(reinterpret_cast<unsigned char*>(output)-0x1c0+0x200,executing.view.data(),sizeof(executing.view));
         ++viewMismatch;
     }
-    std::memcpy(output,matrix.data(),sizeof(matrix));++patched;return true;
+    std::memcpy(output,executing.projection.data(),sizeof(executing.projection));++patched;return true;
 }
 void reportUiRenderer(std::ostream& out){
     std::lock_guard lock(mutex);

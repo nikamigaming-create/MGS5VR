@@ -2,7 +2,7 @@
 
 Play **Metal Gear Solid V: The Phantom Pain in VR**, with tracked hands and a HUD on your left wrist.
 
-**[Download MGS5VR for Windows](https://github.com/nikamigaming-create/MGS5VR/releases/download/experimental-2026-09-13.4/MGS5VR-experimental-2026-09-13.4.zip)**
+**[Download MGS5VR for Windows](https://github.com/nikamigaming-create/MGS5VR/releases/download/experimental-2026-09-13.5/MGS5VR-experimental-2026-09-13.5.zip)**
 
 You need your own PC copy of **TPP 1.0.15.4** and a PC-connected VR headset. Tested on **Quest 3 + Touch controllers**; other headsets are unverified. This is an experimental mod.
 
@@ -53,6 +53,13 @@ then release controls. Its separate `[native]` mappings retain native holds and
 all game-facing buttons without duplicating normal VR actions.
 Existing custom files keep their explicit bindings: update those entries yourself
 or use the editor. See [the tester-reported remaining issues](docs/QUEST3_TESTER_FEEDBACK.md).
+
+World-space person/waypoint labels now work outside the binoculars. Set
+`settings.hud_mode = binoculars_only` to keep world cues in binoculars, or `off`
+to hide them; wrist controls stay separate. The update also corrects a snap-pivot
+offset that failed to follow native camera yaw and carries the complete source-eye
+projection into UI rendering. Captions, other objective labels, full body-center
+correction, enemy-outline tails and lens-flare alignment remain unfinished.
 
 **[Full controls, grenades and night vision →](docs/CONTROLS.md)**
 

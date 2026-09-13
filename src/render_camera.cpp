@@ -320,6 +320,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         std::memcpy(authoredProjection.data(),saved.viewportMatrices.data(),sizeof(authoredProjection));
     }
     mgs5vr::publishOpticMarkerFrame(source.pair.sample);
+    const auto markerSnapshot=mgs5vr::opticWaypoints();
     const auto cameraCount=pairCount.load();uintptr_t result{};bool complete=true;
     mgs5vr::beginSceneTiming(context,id);
     const bool titleSurface=source.pair.sample.controllers.frontEnd;
@@ -368,7 +369,8 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousView),eyeView.data(),sizeof(eyeView));
         std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousProjection),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(eyeView));
         drawingEye.projected=true;
-        mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,source.pair.sample,authoredView,authoredProjection);
+        const auto eyeProjection=field<std::array<float,16>>(reinterpret_cast<void*>(source.viewport),layout.gpuProjection);
+        mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,eyeProjection,source.pair.sample,authoredView,authoredProjection);
         result=originalScene(render,graphics,task,worker);
         mgs5vr::clearUiRenderSource();
         // Native passes may finish and replace the current deferred context.
@@ -380,7 +382,8 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             // later overwrite pixels that the XR compositor is still reading.
             std::array<float,16> opticProjection{};
             std::memcpy(opticProjection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(opticProjection));
-            if(!mgs5vr::capturePhysicalOpticScene(afterContext,eyeView,opticProjection,native.position,opticScene.GetAddressOf(),!scopeView))
+            if(!mgs5vr::capturePhysicalOpticScene(afterContext,eyeView,opticProjection,native.position,opticScene.GetAddressOf(),
+                !scopeView&&mgs5vr::worldHudVisible(source.pair.sample.controllers.hudMode,2),&markerSnapshot))
                 mgs5vr::log("Physical optic scene copy unavailable; retaining normal head views");
             continue;
         }
@@ -405,6 +408,8 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         }
         if(titleSurface)mgs5vr::drawNativeMenuSurface(afterContext,eyeView,drawingEye.view.fov,source.pair.sample.menuPanel);
         const auto& wrist=source.pair.sample;
+        if(!titleSurface&&!wrist.menuOpen&&mgs5vr::worldHudVisible(wrist.controllers.hudMode,eye))
+            mgs5vr::drawWorldWaypoints(afterContext,eyeView,eyeProjection,native.position,markerSnapshot);
         if(!titleSurface&&!wrist.menuOpen&&wrist.wristPanelTracked&&wrist.controllers.equipmentOpen&&!wrist.controllers.equipmentCategory)
             mgs5vr::drawWristCategorySelector(afterContext,eyeView,drawingEye.view.fov,
                 mgs5vr::wristPickerPose(wrist),wrist.controllers.equipmentLabels);

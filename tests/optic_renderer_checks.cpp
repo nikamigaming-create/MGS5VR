@@ -1,5 +1,7 @@
 #include "mgs5vr/mailbox.hpp"
 #include "mgs5vr/optic_renderer.hpp"
+#include "mgs5vr/optic_markers.hpp"
+#include "mgs5vr/input_bridge.hpp"
 #include <iostream>
 #include <stdexcept>
 
@@ -45,7 +47,34 @@ int opticRendererChecks(){
         const bool reticle=sample(64,54)[1]<180;
         context->Unmap(readback.Get(),0);stopPhysicalOpticRenderer();
         if(!image||!outside||!reticle)throw std::runtime_error("Weapon lens image, aperture or reticle pixels are incorrect");
+        headCamera().configure(true);headCamera().track({},true,steadyMilliseconds());headCamera().toggle();
+        const auto frame=headCamera().resolveCurrent(1,{});
+        OpticWaypoints markers;markers.activation=frame.activation;markers.count=markers.points.size();
+        for(auto& marker:markers.points)marker={{0,0,3},1};
+        const auto markerCenter=[&](float translation,bool expired){
+            context->ClearRenderTargetView(targetView.Get(),blue);
+            auto shifted=view;shifted[12]=translation;
+            markers.sampleTime=steadyMilliseconds()-(expired?1000:0);
+            drawWorldWaypoints(context.Get(),shifted,projection,{},markers);
+            restored.Reset();restoredDepth.Reset();context->OMGetRenderTargets(1,&restored,&restoredDepth);
+            if(restored.Get()!=bound||restoredDepth)throw std::runtime_error("World markers changed native target/depth binding");
+            context->CopyResource(readback.Get(),target.Get());
+            checkHr(context->Map(readback.Get(),0,D3D11_MAP_READ,0,&mapped),"Read world marker pixels");
+            unsigned count{};double total{};
+            for(UINT y=0;y<128;++y)for(UINT x=0;x<128;++x){const auto pixel=sample(x,y);
+                if(pixel[0]>180&&pixel[1]>100&&pixel[2]<100){++count;total+=x;}
+            }
+            const bool clearCorner=sample(4,4)==std::array<unsigned char,4>{0,0,255,255};
+            context->Unmap(readback.Get(),0);
+            if(!clearCorner)throw std::runtime_error("World marker draw touched unrelated background");
+            return count?total/count:-1.;
+        };
+        const auto left=markerCenter(.3f,false),right=markerCenter(-.3f,false),stale=markerCenter(0,true);
+        headCamera().configure(false);stopPhysicalOpticRenderer();
+        if(left<0||right<0||left-right<20||stale!=-1)
+            throw std::runtime_error("World marker projection, crowded marker upload or stale-source rejection failed");
         std::cout<<"Asset-free scope shader compilation, aperture/reticle pixels and target restoration passed.\n";
+        std::cout<<"World marker per-eye motion, crowded uploads, stale-source rejection and target restoration passed.\n";
         return 0;
     }catch(const std::exception& e){
         stopPhysicalOpticRenderer();std::cerr<<"Optic renderer: "<<e.what()<<'\n';return 1;

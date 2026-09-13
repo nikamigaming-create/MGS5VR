@@ -2,6 +2,7 @@
 #include "core.hpp"
 #include "optic_rig.hpp"
 #include "stereo.hpp"
+#include "hud.hpp"
 #include <mutex>
 
 namespace mgs5vr {
@@ -35,6 +36,7 @@ struct ControllerFrame {
     unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
     std::array<std::array<char,96>,4> equipmentLabels{};
     float wristSurfaceLift{.02f},wristSelectorHeight{.12f},wristPickerWidth{.75f};
+    HudMode hudMode{HudMode::full};
     float magnification{1};
     uint64_t weaponZoomSequence{};
     float scopeEyeRelief{.1f};
@@ -113,7 +115,7 @@ private:
     uint64_t trackingEpoch_{};
     float units_{1};
     float snapYaw_{};
-    Vec3 snapTranslation_{};
+    Vec3 snapTranslation_{}; // Native-yaw local, not a persistent world-space offset.
     bool enabled_{},tracking_{},pending_{},active_{};
     bool stereoTracking_{};
     bool suspended_{};

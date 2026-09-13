@@ -349,6 +349,7 @@ struct Session {
         controllerFrame.wristSurfaceLift=controls.setting("settings.wrist_surface_lift_cm")*.01f;
         controllerFrame.wristSelectorHeight=controls.setting("settings.wrist_selector_height_cm")*.01f;
         controllerFrame.wristPickerWidth=controls.setting("settings.wrist_picker_width_cm")*.01f;
+        controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         const bool right=controllerFrame.hands[1].gripTracked;
         // OpenXR action activity is independent of optical pose tracking.

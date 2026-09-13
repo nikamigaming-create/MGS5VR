@@ -17,7 +17,7 @@ uint64_t nativeCommandsDrawTime() noexcept;
 Pose wristPickerPose(const HeadCameraSample& rig) noexcept;
 // Producer scope is the native scene invocation; the UI may execute on a worker.
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,
-                       const HeadCameraSample& rig,const std::array<float,16>& authoredView,
+                       const std::array<float,16>& projection,const HeadCameraSample& rig,const std::array<float,16>& authoredView,
                        const std::array<float,16>& authoredProjection);
 void clearUiRenderSource() noexcept;
 // Called only at the verified native UI perspective-builder return address.

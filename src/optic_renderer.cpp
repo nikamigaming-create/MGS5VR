@@ -829,11 +829,12 @@ std::array<uint8_t,7> markerGlyph(char c){
     return {};
 }
 
-void drawOpticWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
-    const std::array<float,16>& view,const std::array<float,16>& projection,mgs5vr::Vec3 camera){
-    const auto points=mgs5vr::opticWaypoints();const auto status=mgs5vr::headCamera().status();
+void drawWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
+    const std::array<float,16>& view,const std::array<float,16>& projection,mgs5vr::Vec3 camera,
+    const mgs5vr::OpticWaypoints& points,ID3D11RenderTargetView* target,const D3D11_VIEWPORT& viewport,bool lens){
+    const auto status=mgs5vr::headCamera().status();
     const auto now=mgs5vr::steadyMilliseconds();
-    if(!resources.sceneOverlayTarget||!status.active||points.activation!=status.activation
+    if(!target||!status.active||points.activation!=status.activation
         ||now<points.sampleTime||now-points.sampleTime>150||!createMarkerResources(device))return;
     std::vector<MarkerVertex> vertices;vertices.reserve(8192);
     using Color=std::array<float,3>;
@@ -851,17 +852,17 @@ void drawOpticWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
         for(const auto vertex:{a,b,c,c,b,d})vertices.push_back(vertex);
     };
     // Four short ticks leave the exact native marking ray unobstructed.
-    for(const auto color:{black,white}){
+    if(lens)for(const auto color:{black,white}){
         const float width=color==black?.006f:.0025f;
         line(-.05f,0,-.022f,0,width,color);line(.022f,0,.05f,0,width,color);
         line(0,-.05f,0,-.022f,width,color);line(0,.022f,0,.05f,width,color);
     }
     const auto vp=matrixProduct(view,projection);unsigned visible{};
-    for(size_t i=0;i<points.count;++i){
+    for(size_t i=0;i<std::min(points.count,points.points.size());++i){
         const auto& point=points.points[i];const auto clip=transformPoint(vp,point.position);
         if(!std::isfinite(clip.w)||clip.w<=.01f)continue;
         const float x=clip.x/clip.w,y=clip.y/clip.w;
-        if(!std::isfinite(x)||!std::isfinite(y)||x*x+y*y>.90f*.90f)continue;
+        if(!std::isfinite(x)||!std::isfinite(y)||(lens?x*x+y*y>.90f*.90f:std::abs(x)>.95f||std::abs(y)>.9f))continue;
         const auto delta=point.position-camera;const float distance=std::sqrt(mgs5vr::dot(delta,delta));
         if(!std::isfinite(distance)||distance>99999.f)continue;
         ++visible;
@@ -874,7 +875,7 @@ void drawOpticWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
         char label[24]{};
         if(point.letter)std::snprintf(label,sizeof(label),"%c %uM",'A'+point.letter-1,static_cast<unsigned>(std::lround(distance)));
         else std::snprintf(label,sizeof(label),"%uM",static_cast<unsigned>(std::lround(distance)));
-        constexpr float pixel=.0075f;const float length=static_cast<float>(std::strlen(label));
+        const float pixel=lens?.0075f:.0035f;const float length=static_cast<float>(std::strlen(label));
         // Keep nearby waypoint and person labels on opposite sides of the
         // marker, leaving the person and the exact aiming point visible.
         const float left=x-(length*6-1)*pixel*.5f,top=y+(point.letter?-.052f:.112f);
@@ -886,21 +887,25 @@ void drawOpticWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
             }
         }
     }
-    if(vertices.size()>16384)return;
-    D3D11_MAPPED_SUBRESOURCE mapped{};
-    if(FAILED(context->Map(resources.markerVertices.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&mapped)))return;
-    std::memcpy(mapped.pData,vertices.data(),vertices.size()*sizeof(MarkerVertex));context->Unmap(resources.markerVertices.Get(),0);
+    if(vertices.empty())return;
     ID3D11ShaderResourceView* none=nullptr;context->PSSetShaderResources(0,1,&none);
-    ID3D11RenderTargetView* target=resources.sceneOverlayTarget.Get();context->OMSetRenderTargets(1,&target,nullptr);
-    const D3D11_VIEWPORT viewport{0,0,static_cast<float>(resources.sceneDescription.Width),static_cast<float>(resources.sceneDescription.Height),0,1};
+    context->OMSetRenderTargets(1,&target,nullptr);
     context->RSSetViewports(1,&viewport);context->RSSetState(resources.markerRasterizer.Get());
     context->OMSetDepthStencilState(resources.markerDepth.Get(),0);context->OMSetBlendState(nullptr,nullptr,0xffffffffu);
     ID3D11Buffer* buffer=resources.markerVertices.Get();const UINT stride=sizeof(MarkerVertex),offset=0;
     context->IASetVertexBuffers(0,1,&buffer,&stride,&offset);context->IASetInputLayout(resources.markerInputLayout.Get());
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     context->VSSetShader(resources.markerVertexShader.Get(),nullptr,0);context->PSSetShader(resources.markerPixelShader.Get(),nullptr,0);
-    context->Draw(static_cast<UINT>(vertices.size()),0);
-    if(visible&&!resources.markerReported){resources.markerReported=true;mgs5vr::log("Native waypoint letters and distances rendered only in the binocular scene");}
+    // A busy outpost must not lose every label when it exceeds one upload.
+    // Split only at triangle boundaries and keep each upload bounded.
+    for(size_t first=0;first<vertices.size();first+=16383){
+        const auto count=std::min(size_t{16383},vertices.size()-first);
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        if(FAILED(context->Map(resources.markerVertices.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&mapped)))return;
+        std::memcpy(mapped.pData,vertices.data()+first,count*sizeof(MarkerVertex));context->Unmap(resources.markerVertices.Get(),0);
+        context->Draw(static_cast<UINT>(count),0);
+    }
+    if(visible&&!resources.markerReported){resources.markerReported=true;mgs5vr::log("Native acquired markers reprojected from world positions");}
 }
 
 bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& world,
@@ -957,7 +962,8 @@ bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& wor
 
 namespace mgs5vr {
 bool capturePhysicalOpticScene(ID3D11DeviceContext* context,const std::array<float,16>& view,
-    const std::array<float,16>& projection,Vec3 cameraPosition,ID3D11Texture2D** output,bool waypoints) noexcept{
+    const std::array<float,16>& projection,Vec3 cameraPosition,ID3D11Texture2D** output,bool waypoints,
+    const OpticWaypoints* markers) noexcept{
     if(output)*output=nullptr;
     if(!context||!output)return false;
     try{
@@ -968,12 +974,29 @@ bool capturePhysicalOpticScene(ID3D11DeviceContext* context,const std::array<flo
         SavedState state;save(context,state);
         const char* failure=nullptr;
         const bool copied=prepareSceneCopy(context,device.Get(),state,failure);
-        if(copied&&waypoints)drawOpticWaypoints(context,device.Get(),view,projection,cameraPosition);
+        if(copied&&waypoints){
+            const auto points=markers?*markers:opticWaypoints();
+            const D3D11_VIEWPORT viewport{0,0,static_cast<float>(resources.sceneDescription.Width),static_cast<float>(resources.sceneDescription.Height),0,1};
+            drawWaypoints(context,device.Get(),view,projection,cameraPosition,points,resources.sceneOverlayTarget.Get(),viewport,true);
+        }
         restore(context,state);
         if(!copied)return false;
         *output=resources.sceneCopy.Get();(*output)->AddRef();
         return true;
     }catch(...){return false;}
+}
+void drawWorldWaypoints(ID3D11DeviceContext* context,const std::array<float,16>& view,
+    const std::array<float,16>& projection,Vec3 cameraPosition,const OpticWaypoints& markers) noexcept{
+    if(!context||!markers.count)return;
+    try{
+        std::lock_guard lock(rendererMutex);
+        ComPtr<ID3D11Device> device;context->GetDevice(&device);if(!device)return;
+        if(resources.device.Get()!=device.Get()){resources=Resources{};resources.device=device;}
+        SavedState state;save(context,state);
+        if(state.renderTarget&&state.viewportCount)
+            drawWaypoints(context,device.Get(),view,projection,cameraPosition,markers,state.renderTarget.Get(),state.viewport,false);
+        restore(context,state);
+    }catch(...){}
 }
 bool drawPhysicalWeaponScope(ID3D11DeviceContext* context,const std::array<float,16>& ocularWorld,
     const std::array<float,16>& view,const std::array<float,16>& projection,float radius,float magnification,

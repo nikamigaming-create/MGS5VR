@@ -7,12 +7,20 @@ struct ID3D11DeviceContext;
 struct ID3D11Texture2D;
 
 namespace mgs5vr {
+struct OpticWaypoints;
 
 // Copy the independent device-camera scene before the normal HMD eyes are
 // rendered. This texture never enters the stereo mailbox.
 bool capturePhysicalOpticScene(ID3D11DeviceContext* context,
     const std::array<float,16>& view,const std::array<float,16>& projection,
-    Vec3 cameraPosition,ID3D11Texture2D** output,bool waypoints=true) noexcept;
+    Vec3 cameraPosition,ID3D11Texture2D** output,bool waypoints=true,
+    const OpticWaypoints* markers=nullptr) noexcept;
+
+// Reproject acquired native people/waypoints from their world positions using
+// this exact eye. Both eyes receive one immutable marker snapshot.
+void drawWorldWaypoints(ID3D11DeviceContext* context,
+    const std::array<float,16>& view,const std::array<float,16>& projection,
+    Vec3 cameraPosition,const OpticWaypoints& markers) noexcept;
 
 // Only the aperture is drawn: the equipped game's scope already supplies its
 // housing and lighting. No binocular asset is required by this path.

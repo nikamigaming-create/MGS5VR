@@ -258,7 +258,10 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(!spatialMenu){
         const float turn=std::isfinite(controllers_.snapYaw)?controllers_.snapYaw:0;
         const Quat rotation{0,std::sin(turn*.5f),0,std::cos(turn*.5f)};
-        const auto offset=result.nativePose.position-nativePose.position;
+        // Keep the turn-pivot translation in the native heading's frame.
+        // A world-space accumulator survives native smooth/vehicle yaw in the
+        // old direction and leaves the player center behind the viewpoint.
+        const auto offset=nativeDelta.position;
         if(turn!=snapYaw_){
             const Quat previous{0,std::sin(snapYaw_*.5f),0,std::cos(snapYaw_*.5f)};
             // Turn around the current physical head, including a roomscale
@@ -266,7 +269,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             snapTranslation_=snapTranslation_+rotate(previous,offset)-rotate(rotation,offset);
             snapYaw_=turn;
         }
-        result.nativePose.position=nativePose.position+rotate(rotation,offset)+snapTranslation_;
+        result.nativePose.position=nativePose.position+rotate(nativePose.orientation,rotate(rotation,offset)+snapTranslation_);
         result.nativePose.orientation=compose(Pose{rotation,{}},Pose{result.nativePose.orientation,{}}).orientation;
     }
     // Native and runtime quaternions are accepted with a small norm tolerance.

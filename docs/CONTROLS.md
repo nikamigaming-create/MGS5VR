@@ -16,6 +16,17 @@ the repository copy is a template. Every supported button action is listed,
 with separate gameplay, binocular, wrist, menu, horse and vehicle sections.
 The bindings below describe the defaults, not a hard-coded layout.
 
+`[settings] hud_mode = full` shows world cues in normal VR and binoculars.
+`binoculars_only` confines them to the binoculars; `off` hides them.
+These modes do not suppress wrist controls or the general caption/HUD layer.
+The native game's marker preferences still apply. Acquired people and A-Z
+waypoints use native world positions in each eye. Caption restoration is still
+incomplete, and other mission/objective labels need their own world-space adapters.
+
+For a shifted player center, **left grip + Menu** recenters without changing
+your current facing. Snap-turn pivot offsets now follow native camera yaw;
+this fixes one native/snap transition error, not collision-following roomscale.
+
 `right_stick_click` means pressing the stick inward; `right_stick_down` means
 pushing it downward. A plain input stays active while held. `press(a)`,
 `release(a)`, `tap(b,300)` and `hold(b,300)` provide one-shot gestures.
@@ -372,6 +383,7 @@ all inventory items, contextual targets, every menu branch and every weapon are
 not certified. The lowered-weapon trigger now reaches the native action path;
 its input contract passes, but a target interaction has not been accepted.
 The native context-action icon layer now follows the left forearm; pickup, carry
-and other target-specific prompts still need individual checks. Flat damage and
-subtitles currently have no spatial replacement. Sleeve/cuff polish remains open. This guide describes the controls
+and other target-specific prompts still need individual checks. General layout
+layers now have a separate source-head HUD plane, but captions did not appear in
+the current radio fixture and are not marked fixed. Sleeve/cuff polish remains open. This guide describes the controls
 without claiming those gates pass; see the [current SIM review](SIM_HUD_REVIEW.md).
