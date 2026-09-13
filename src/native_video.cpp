@@ -11,6 +11,7 @@
 #include <thread>
 #include <vector>
 #include <cstring>
+#include <cmath>
 
 namespace mgs5vr {
 namespace {
@@ -35,6 +36,7 @@ struct NativeVideoRecorder::State {
     uint64_t polled{},started{},budgetChecked{};
     bool budgetStopped{};
     UINT width{},height{};DXGI_FORMAT format{};
+    EyeFov renderFov{},displayFov{};bool stereo{};uint32_t eyeIndex{};
     int64_t scheduled{};
     std::atomic_bool finished{true};
     bool stopping{};uint64_t dropped{};
@@ -94,7 +96,12 @@ struct NativeVideoRecorder::State {
             std::ofstream metadata(path.string()+".json");
             metadata<<"{\"frames\":"<<frames<<",\"width\":"<<width<<",\"height\":"<<height
                 <<",\"first_qpc_100ns\":"<<first<<",\"last_qpc_100ns\":"<<last<<",\"dropped\":"<<dropped
-                <<",\"complete\":"<<(error.empty()?"true":"false")<<"}\n";}
+                <<",\"complete\":"<<(error.empty()?"true":"false");
+            if(stereo){
+                metadata<<",\"eye\":"<<eyeIndex<<",\"render_fov\":["<<renderFov.left<<','<<renderFov.right<<','<<renderFov.up<<','<<renderFov.down
+                    <<"],\"display_fov\":["<<displayFov.left<<','<<displayFov.right<<','<<displayFov.up<<','<<displayFov.down<<']';
+            }
+            metadata<<"}\n";}
         log("Native video finalized frames="+std::to_string(frames));finished.store(true);
     }
     void poll(){
@@ -126,13 +133,16 @@ struct NativeVideoRecorder::State {
         }
         path=candidate;
     }
-    void frame(ID3D11Device* device,ID3D11DeviceContext* context,ID3D11Texture2D* source,uint32_t slice){
+    void frame(ID3D11Device* device,ID3D11DeviceContext* context,ID3D11Texture2D* source,uint32_t slice,const EyeFrame* eye){
         poll();if(path.empty()||!source||!context||!device)return;
         D3D11_TEXTURE2D_DESC desc{};source->GetDesc(&desc);
         const bool rgba=desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM||desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
         const bool bgra=desc.Format==DXGI_FORMAT_B8G8R8A8_UNORM||desc.Format==DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
         if((!rgba&&!bgra)||slice>=desc.ArraySize||desc.SampleDesc.Count!=1)return;
+        const bool projected=eye&&eye->projected&&valid(eye->view.fov)&&valid(eye->displayFov);
         if(!slots[0].texture){
+            stereo=projected;
+            renderFov=stereo?eye->view.fov:EyeFov{};displayFov=stereo?eye->displayFov:EyeFov{};eyeIndex=stereo?eye->eye:0;
             width=desc.Width&~1u;height=desc.Height&~1u;format=desc.Format;
             if(!width||!height||width>4096||height>4096)return;
             desc.Width=width;desc.Height=height;desc.ArraySize=desc.MipLevels=1;desc.Usage=D3D11_USAGE_STAGING;
@@ -146,6 +156,15 @@ struct NativeVideoRecorder::State {
         {std::lock_guard lock(mutex);if(stopping)return;}
         if((desc.Width&~1u)!=width||(desc.Height&~1u)!=height||desc.Format!=format){
             log("Native video texture changed; finishing current take");stop();return;
+        }
+        const auto sameFov=[](EyeFov a,EyeFov b){
+            return std::abs(a.left-b.left)<.00001f&&std::abs(a.right-b.right)<.00001f
+                &&std::abs(a.up-b.up)<.00001f&&std::abs(a.down-b.down)<.00001f;
+        };
+        // Every frame in one take must share the projection described by its
+        // metadata. A menu/VR transition starts a new take, not mixed aspect ratios.
+        if(projected!=stereo||(stereo&&(eye->eye!=eyeIndex||!sameFov(eye->view.fov,renderFov)||!sameFov(eye->displayFov,displayFov)))){
+            log("Native video projection changed; finishing current take");stop();return;
         }
         for(auto& slot:slots)if(slot.clock){
             D3D11_MAPPED_SUBRESOURCE mapped{};
@@ -174,7 +193,7 @@ struct NativeVideoRecorder::State {
 };
 NativeVideoRecorder::NativeVideoRecorder():state_(std::make_unique<State>()){}
 NativeVideoRecorder::~NativeVideoRecorder()=default;
-void NativeVideoRecorder::frame(ID3D11Device* device,ID3D11DeviceContext* context,ID3D11Texture2D* source,uint32_t slice) noexcept {
-    try{state_->frame(device,context,source,slice);}catch(const std::exception& e){state_->stop();log(std::string("Native capture unavailable: ")+e.what());}
+void NativeVideoRecorder::frame(ID3D11Device* device,ID3D11DeviceContext* context,ID3D11Texture2D* source,uint32_t slice,const EyeFrame* eye) noexcept {
+    try{state_->frame(device,context,source,slice,eye);}catch(const std::exception& e){state_->stop();log(std::string("Native capture unavailable: ")+e.what());}
 }
 }

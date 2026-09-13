@@ -39,6 +39,16 @@ private:
     unsigned step_{};
 };
 
+// Configured presses stay active for 100 ms so the native game can sample
+// them. Convert that stretched pulse back to one event before counting zoom.
+class WeaponScopeZoomInput {
+public:
+    uint64_t update(bool requested,bool available);
+private:
+    uint64_t sequence_{};
+    bool requested_{};
+};
+
 // The retail telescope's imported mesh frame, in metres. Both the housing
 // shader and the optical camera use these sockets.
 inline constexpr Vec3 binocularOcularCenter{-.032788f,-.000562f,.05512f};

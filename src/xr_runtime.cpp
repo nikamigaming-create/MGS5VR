@@ -103,7 +103,7 @@ struct Session {
     RigInput rigControls;
     RigOptics opticsControls;
     bool binocularSelected{};
-    uint64_t weaponZoomSequence{};
+    WeaponScopeZoomInput weaponZoomInput;
     SnapTurn snapControls;
     OpticStabilizer opticStabilizer;
     float snapYaw{};
@@ -344,6 +344,7 @@ struct Session {
         controllerFrame.equipmentLabels=equipmentLabels;
         controllerFrame.wristSurfaceLift=controls.setting("settings.wrist_surface_lift_cm")*.01f;
         controllerFrame.wristSelectorHeight=controls.setting("settings.wrist_selector_height_cm")*.01f;
+        controllerFrame.wristPickerWidth=controls.setting("settings.wrist_picker_width_cm")*.01f;
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         const bool right=controllerFrame.hands[1].gripTracked;
         // OpenXR action activity is independent of optical pose tracking.
@@ -603,11 +604,12 @@ struct Session {
                 activeControl("gameplay.stance")||activeControl("binoculars.stance"),
                 activeControl("gameplay.dive")||activeControl("binoculars.dive"),
                 activeControl("gameplay.pickup_carry"),activeControl("gameplay.switch_weapon")});
-            // A physical scope owns magnification. Native R3 would also enter
-            // the desktop fullscreen sight and change its world camera.
-            if(controllerFrame.weaponReady&&activeControl("gameplay.zoom"))++weaponZoomSequence;
         }
-        controllerFrame.weaponZoomSequence=weaponZoomSequence;
+        // A configured press spans several XR frames. Count its rising edge,
+        // not every active frame (nine frames at 90 Hz wrapped a 3-power sight).
+        // Native R3 is not forwarded: it also changes the desktop camera.
+        controllerFrame.weaponZoomSequence=weaponZoomInput.update(activeControl("gameplay.zoom"),
+            locomotionAvailable&&controllerFrame.weaponReady);
         if(rigInput&&!stickNavigation){pad.rightX=0;pad.rightY=0;}
         const float turnAxis=activeControl("turn.right")?1.f:activeControl("turn.left")?-1.f:0.f;
         const auto turn=snapControls.update(turnAxis,0,rigInput&&!stickNavigation&&!center&&!headToggle&&!utilityCenter)
@@ -915,7 +917,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         const bool recordedStereo=end.layerCount&&layer==reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);
         const bool recordable=!surroundTransition&&(recordedStereo?consumer.frame().sequence&&consumer.eyes()[1].sourceSequence==eyeFrames[1].sourceSequence
             :end.layerCount&&consumer.frame().sequence&&!cameraStatus.active&&!cameraStatus.pending);
-        video.frame(session.device.Get(),session.context.Get(),recordable?consumer.texture():nullptr,recordedStereo?1u:0u);
+        video.frame(session.device.Get(),session.context.Get(),recordable?consumer.texture():nullptr,recordedStereo?1u:0u,
+            recordedStereo?&consumer.eyes()[1]:nullptr);
         const auto cycleEnd=steadyMilliseconds();
         if(cycleEnd-cycleStart>100)log("XR slow frame ms: wait="+std::to_string(waitDone-cycleStart)
             +" tracking="+std::to_string(trackingDone-waitDone)+" consume="+std::to_string(consumeDone-trackingDone)

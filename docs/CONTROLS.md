@@ -52,6 +52,7 @@ needs a separate review.
 | Pick up a dropped weapon / carry a person | **Hold left grip, then hold B** at the native prompt; keeps native B held without equipping binoculars |
 | Switch weapon while aiming | **A** while right grip readies the weapon; A does nothing when lowered |
 | Physical weapon-scope zoom | **Left-stick click** while readied; cycles the fitted scope's powers, while fixed-power sights stay fixed |
+| Detonate placed C4 / inflate thrown decoys | Keep that gadget selected, **hold right grip, then Y**; right trigger places/throws it first |
 | Read the HUD | Raise and turn your **left forearm** toward your eyes |
 
 The right hand owns the weapon grip. With support engaged, the line from the
@@ -90,6 +91,10 @@ positive feedback; complete reach and pose coverage remains open.
 Hold **left trigger** to open the left-wrist picker. The **left stick still
 moves you**, so you can select while walking. Use the **right stick** to browse,
 then **release left trigger** to confirm and close. Gameplay does not pause.
+
+`settings.wrist_picker_width_cm` enlarges the unfolded native cards and text
+(75 cm by default, 42–100 cm). The complete layout stays inside both eye views;
+the small ammunition HUD keeps its own size on the wrist.
 
 | Right stick with left trigger held | Action |
 | --- | --- |

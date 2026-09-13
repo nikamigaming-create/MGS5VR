@@ -7,12 +7,14 @@ namespace mgs5vr {
 // .mp4 path in mgs5vr-recording.txt starts a take; removing it finishes the take.
 // GPU readback and encoding are bounded and never wait on the render thread.
 // Takes finalize automatically after two minutes or below 25 GiB free space.
+// Stereo metadata includes render/display FOV for correct aspect in an edit.
+// Changing projection or texture dimensions also finalizes the current take.
 class NativeVideoRecorder {
 public:
     NativeVideoRecorder();
     ~NativeVideoRecorder();
     void frame(ID3D11Device* device,ID3D11DeviceContext* context,
-               ID3D11Texture2D* source,uint32_t slice) noexcept;
+               ID3D11Texture2D* source,uint32_t slice,const EyeFrame* eye=nullptr) noexcept;
 private:
     struct State;
     std::unique_ptr<State> state_;

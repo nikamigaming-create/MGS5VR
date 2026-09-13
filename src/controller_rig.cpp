@@ -580,9 +580,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         frame.weaponScope={compose(localFromWrist,scopeInWrist->ocular),compose(localFromWrist,scopeInWrist->objective),
             scopeInWrist->radius,frame.controllers.scopeEyeRelief,
             scopeZoom.update(identity,frame.controllers.weaponZoomSequence,scopeInWrist->powers),identity,true};
-        static uint64_t reported{};
-        if(reported!=identity){
-            reported=identity;std::ostringstream s;s<<"Physical weapon scope sight="<<scopeInWrist->sight
+        static uint64_t reported{};static float reportedPower{};
+        if(reported!=identity||reportedPower!=frame.weaponScope.magnification){
+            reported=identity;reportedPower=frame.weaponScope.magnification;
+            std::ostringstream s;s<<"Physical weapon scope sight="<<scopeInWrist->sight
                 <<" resource="<<std::hex<<scopeResource<<std::dec<<" radius="<<scopeInWrist->radius
                 <<" power="<<frame.weaponScope.magnification<<" ocular="<<frame.weaponScope.ocular.position.x<<','
                 <<frame.weaponScope.ocular.position.y<<','<<frame.weaponScope.ocular.position.z;log(s.str());

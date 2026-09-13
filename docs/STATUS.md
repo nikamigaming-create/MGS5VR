@@ -10,12 +10,23 @@ binoculars with their independent magnified scene; automatic owned binocular
 asset import; and a repaired ACC-to-mission camera handoff. The September 13.1
 optics hotfix fixes a reticle shader compilation failure and connects round
 weapon scopes to the native equipped resource and authored sight sockets.
-Its DLL is `7CD5079A5512B9EAF383FCAA6C23C9AE186DAF2B679E7C586C666A1AA29B407E`.
+That 13.1 DLL is `7CD5079A5512B9EAF383FCAA6C23C9AE186DAF2B679E7C586C666A1AA29B407E`.
 Nine automated suites pass, now including an asset-free rendered lens/reticle
 pixel check. A fresh SIM run shows BAMBETOV SV's fixed 4× physical lens, two
 tracked shots, a partial reload, motion and lens closure when lowered.
 Binocular 2×/4×, support and stow were rerun on the same build.
 See [the actual both-game SIM coverage](DUAL_GAME_SIM_COVERAGE.md).
+
+The September 13.2 follow-up fixes variable-scope clicks being counted once per
+XR frame. Its M2000-D 2×/4×/8× cycle was observed one click at a time in SIM.
+Native equipment cards are now larger (75 cm instead of 42 cm), with a
+42–100 cm config setting and both-eye fitting. The 75 cm Support picker and
+M2000-D scope were rerun on the released DLL:
+`C3A6C5946FE90752AEDE2AE01F6AC82C5E483EE32F911CBC9522B47B50D7C07B`.
+Nine automated suites pass, including configurable width limits and both-eye
+fit at the maximum width. C4 remote detonation, decoy inflation and smoke throw
+were exercised in the preceding same-scope C5F23C89 build. Their grip+Y remote
+action is now documented beside the editable context-action binding.
 
 Still unfinished: complete per-weapon/sight coverage, complete weapon and
 gadget coverage, some powered-arm/reconnaissance interactions, Ground Zeroes'

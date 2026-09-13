@@ -9,8 +9,10 @@
       ["Right grip / trigger", "Hold to ready / fire or throw"],
       ["Left grip near support socket", "Guide the barrel with two hands; release grip or pull away"],
       ["Short B tap / hold B", "Reload / equip binoculars"],
+      ["Hold left grip, then hold B", "Pick up a weapon / carry a person at the native prompt"],
       ["Y / A while readied / hold X", "Native interaction / quick weapon switch / Commands"],
-      ["Left-stick click while readied", "Native weapon zoom; available steps depend on the weapon"],
+      ["Left-stick click while readied", "Physical scope zoom; one click cycles one native power"],
+      ["C4 or decoy: right grip + Y", "Detonate placed C4 / inflate thrown decoys; trigger places or throws first"],
       ["Grip, trigger and touch", "Articulate fingers; weapons retain their authored grip"]]},
     {"title": "02 / LEFT-WRIST EQUIPMENT", "rows": [
       ["Hold left trigger", "Unfold wrist display and wait for your choice; left stick still moves you"],

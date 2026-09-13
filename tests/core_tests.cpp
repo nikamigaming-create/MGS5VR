@@ -48,13 +48,27 @@ int main(){
         expect(near(zoom.update(42,8,{2,4,8}),4),"duplicate skin publication cannot double zoom");
         expect(near(zoom.update(42,10,{2,4,8}),2),"multiple zoom clicks wrap through native powers");
         expect(near(zoom.update(43,11,{4,0,0}),4)&&near(zoom.update(43,12,{4,0,0}),4),"fixed-power scope never fabricates another zoom step");
+        for(unsigned frequency:{72u,90u,120u}){
+            WeaponScopeZoomInput input;WeaponScopeZoom variable;
+            expect(near(variable.update(16,input.update(false,true),{2,4,8}),2),"variable sight starts at 2x before input");
+            for(float expected:{4.f,8.f,2.f}){
+                for(unsigned frame=0;frame<(frequency+9)/10;++frame)
+                    expect(near(variable.update(16,input.update(true,true),{2,4,8}),expected),
+                        "100ms configured click changes power once at every supported XR rate");
+                input.update(false,true);
+            }
+            const auto sequence=input.update(true,false);
+            expect(input.update(true,true)==sequence,"holding zoom through menu/ready transition cannot create a click");
+            input.update(false,true);
+            expect(input.update(true,true)==sequence+1,"fresh available click resumes zoom after transition");
+        }
     }
     {
         const std::array<EyeView,2> views{{
             {Pose{{},{-.032f,0,0}},EyeFov{-.65f,.55f,.6f,-.6f}},
             {Pose{{},{.032f,0,0}},EyeFov{-.55f,.65f,.6f,-.6f}}}};
-        const auto inBoth=[&](Pose panel,const std::array<EyeView,2>& eyes){
-            for(const auto& eye:eyes)for(float x:{-.3f,.3f})for(float y:{-.16875f,.16875f}){
+        const auto inBoth=[&](Pose panel,const std::array<EyeView,2>& eyes,float width=.6f){
+            for(const auto& eye:eyes)for(float x:{-width*.5f,width*.5f})for(float y:{-width*.28125f,width*.28125f}){
                 const auto p=compose(inverse(eye.pose),compose(panel,Pose{{},{x,y,0}})).position;
                 if(p.z>=0||p.x/(-p.z)<std::tan(eye.fov.left)||p.x/(-p.z)>std::tan(eye.fov.right)
                     ||p.y/(-p.z)<std::tan(eye.fov.down)||p.y/(-p.z)>std::tan(eye.fov.up))return false;
@@ -62,9 +76,11 @@ int main(){
             return true;
         };
         for(Vec3 anchor: {Vec3{-.4f,-.1f,-.25f},Vec3{.5f,.5f,-.4f},Vec3{0,0,.1f}}){
-            const auto panel=fitWristPanel({},anchor,views,.6f,.3375f);
-            expect(panel&&inBoth(*panel,views)&&panel->position.z<=-.55f,
-                "close/off-axis wrist picker fits all corners in both requested eye views");
+            for(float width:{.6f,.75f,1.f}){
+                const auto panel=fitWristPanel({},anchor,views,width,width*9.f/16.f);
+                expect(panel&&inBoth(*panel,views,width)&&panel->position.z<=-.55f,
+                    "close/off-axis wrist picker fits both eyes at guide, default and maximum configurable widths");
+            }
         }
         const Vec3 ordinary{.05f,-.1f,-.8f};
         const auto panel=fitWristPanel({},ordinary,views,.6f,.3375f);

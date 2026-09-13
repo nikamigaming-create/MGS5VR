@@ -12,6 +12,8 @@ closes the aperture and does not display a mirrored image through its front.
 
 `[gameplay].zoom` defaults to left-stick click while the weapon is ready.
 It cycles the equipped sight's native powers; a fixed-power sight remains fixed.
+One click advances exactly one power, including when the configured native-safe
+press pulse spans several XR frames. Holding the click does not keep cycling.
 `[settings].scope_eye_relief_cm` controls the comfortable eye-to-glass distance
 (default 10 cm, range 3–20 cm) without moving the rifle or its sight.
 
@@ -50,3 +52,13 @@ and lowered-lens closure were exercised. Empty reload, impact/obstruction and
 individual weapon/grade coverage are still in progress;
 the calibration list is not a claim that every weapon has been exercised.
 Ground Zeroes requires its own weapon/first-person adapter.
+
+The subsequent C5F23C89 SIM run reproduced and fixed a variable-scope input bug:
+the 100 ms press pulse was counted once per XR frame, sometimes completing an
+entire 2×/4×/8× cycle in one click. `EQP_WP_60105` (M2000-D, sight 16) now visibly
+cycles 2× → 4× → 8× → 2× one click at a time. Six tracked shots were issued at
+3-second intervals, followed by the native automatic reload and a B-tap top-off.
+The later "empty" still was taken after automatic reload had begun/completed;
+its filename does not establish a manually initiated empty reload. Native
+`EQP_WP_30305` (G44, sight 7) also has an aligned fixed 3× lens; its firing and
+under-barrel behavior are not established by that static view.

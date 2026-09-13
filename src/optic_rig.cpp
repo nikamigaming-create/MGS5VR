@@ -80,6 +80,11 @@ float WeaponScopeZoom::update(uint64_t identity,uint64_t sequence,const std::arr
     sequence_=sequence;return static_cast<float>(powers[step_]);
 }
 
+uint64_t WeaponScopeZoomInput::update(bool requested,bool available){
+    if(requested&&!requested_&&available)++sequence_;
+    requested_=requested;return sequence_;
+}
+
 std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     Pose leftAim,Pose rightAim,bool leftTracked,bool rightTracked,
     bool leftAimTracked,bool rightAimTracked,bool leftHeld,bool rightHeld){

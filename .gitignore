@@ -5,6 +5,7 @@
 /captures/
 /evidence/
 /private/
+/tmp/
 .vs/
 .env
 .env.*

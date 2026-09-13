@@ -2,6 +2,28 @@
 
 ## 13 September continuation
 
+The scope-input follow-up fixes repeated zoom steps from a single 100 ms click
+pulse. The M2000-D now visibly advances 2× → 4× → 8× → 2× on separate clicks.
+Its six-shot cycle, native automatic empty reload and later B-tap top-off have
+been recorded. This is separate from the earlier fixed-power BAMBETOV run.
+
+Further single-player SIM recordings show a tracked smoke throw and visible
+cloud, C4 placement followed by grip+Y remote explosion, and decoy throw followed
+by grip+Y inflation. Stun/sleep grenades, directional-mine placement and magazine
+throw were also recorded, with effect/AI-response review still incomplete. C4
+and those later gadgets were already-carried native loadout fixtures; their
+selection is not a successful diagonal-controller-picker test. The Operator's
+separate X/Y setter appears to replace the other stick component; cardinal
+picker selection works, but that does not settle physical diagonal selection.
+
+The current source enlarges the native equipment layout from 42 to 75 cm and
+adds `wrist_picker_width_cm` (42–100 cm). The fitted both-eye envelope includes
+the configured width without enlarging the skin-mounted ammunition HUD.
+SIM on C3A6C594 shows the complete enlarged Support layout in both eyes and
+reruns the separate 2×/4×/8× scope clicks successfully.
+Native capture now records each take's actual render/display FOV and ends a
+take if the projection changes, so editing can correct source-eye aspect.
+
 The current B1E1D8C8 build fixes a reproduced ACC-to-mission transition: when
 the former verified player stops publishing, a fresh matching mission player
 gets a new VR origin and stereo generation. SIM now reaches the Afghanistan

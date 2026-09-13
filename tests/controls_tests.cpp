@@ -26,6 +26,14 @@ struct Fixture {
 }
 int main(int argc,char** argv){
     {
+        Fixture f;
+        expect(f.controls.setting("settings.wrist_picker_width_cm")==75,"native cards use the readable default width");
+        expect(f.load("[settings]\nwrist_picker_width_cm=100\n"),"native picker width is configurable");
+        expect(f.controls.setting("settings.wrist_picker_width_cm")==100,"maximum picker width is retained");
+        expect(!f.load("[settings]\nwrist_picker_width_cm=101\n")&&!f.load("[settings]\nwrist_picker_width_cm=41\n"),
+            "picker dimensions cannot escape their fitted envelope limits");
+    }
+    {
         const auto touch=controllerFaceLayout("/interaction_profiles/meta/touch_controller_plus");
         const auto simple=controllerFaceLayout("/interaction_profiles/khr/simple_controller");
         const auto vive=controllerFaceLayout("/interaction_profiles/htc/vive_controller");

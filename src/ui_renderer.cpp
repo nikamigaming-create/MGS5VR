@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <iomanip>
@@ -29,7 +30,7 @@ std::atomic_uintptr_t titleMenu{};
 std::atomic_uint64_t titleUpdatedAt{};
 uintptr_t base{};
 std::atomic_bool enabled{};
-struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},choosingCategory{},itemsOpen{},commandsOpen{},menuOpen{};Pose menuPanel{};bool frontEnd{};std::array<float,16> authoredView{},authoredProjection{};};
+struct Source {EyeFrame eye{};uintptr_t camera{};std::array<float,16> view{};Pose panel{},picker{};bool panelTracked{},panelVisible{},choosingCategory{},itemsOpen{},commandsOpen{},menuOpen{};Pose menuPanel{};bool frontEnd{};std::array<float,16> authoredView{},authoredProjection{};float pickerWidth{.75f};};
 thread_local Source producing,executing;
 std::mutex mutex;
 std::unordered_map<uintptr_t,Source> pending;
@@ -210,7 +211,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto panel=expanded?executing.picker:
                     contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
-                const float layoutWidth=commandsPicker?.6f:equipmentPicker?.42f:1.2f;
+                const float layoutWidth=commandsPicker?.6f:equipmentPicker?executing.pickerWidth:1.2f;
                 const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
                     expanded?0.f:contextAction?.04f:.72f,
                     expanded?0.f:contextAction?-.52f:-.70f);
@@ -342,7 +343,8 @@ Pose wristPickerPose(const HeadCameraSample& rig) noexcept{
         {nativeTrackedPose(rig.nativePose,rig.headPose,rig.views[1].pose),rig.views[1].fov}}};
     // One shared envelope covers the guide, item cards and command picker.
     // This changes only the unfolded panel, never the status mounted on skin.
-    return fitWristPanel(head,anchor,eyes,.6f,.6f*9.f/16.f).value_or(Pose{head.orientation,anchor});
+    const float width=std::max(.6f,rig.controllers.wristPickerWidth);
+    return fitWristPanel(head,anchor,eyes,width,width*9.f/16.f).value_or(Pose{head.orientation,anchor});
 }
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const HeadCameraSample& rig,
     const std::array<float,16>& authoredView,const std::array<float,16>& authoredProjection){
@@ -355,7 +357,7 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
                rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),
                rig.controllers.equipmentOpen&&!rig.controllers.equipmentCategory,
                rig.controllers.equipmentCategory==4,rig.controllers.commandControls,
-               rig.menuOpen,rig.menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection};
+               rig.menuOpen,rig.menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection,rig.controllers.wristPickerWidth};
 }
 void clearUiRenderSource() noexcept {producing={};}
 bool applyUiEyeProjection(float* output) noexcept {

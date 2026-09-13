@@ -136,6 +136,7 @@ ControlBindings::ControlBindings(){
     axes_={{"axes.move",0},{"axes.equipment",1},{"axes.commands",1},{"axes.menu",0},{"axes.map",1},{"axes.vehicle_steering",0}};
     settings_={{"settings.snap_turn_degrees",30,5,90},{"settings.motion_melee",1,0,1},{"settings.animal_touch",1,0,1},
         {"settings.wrist_surface_lift_cm",2,0,10},{"settings.wrist_selector_height_cm",12,5,30},
+        {"settings.wrist_picker_width_cm",75,42,100},
         {"settings.scope_eye_relief_cm",10,3,20}};
 }
 std::vector<std::string> ControlBindings::load(std::istream& input){
