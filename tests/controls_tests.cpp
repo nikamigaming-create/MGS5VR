@@ -107,17 +107,16 @@ int main(int argc,char** argv){
             "a gameplay X chord suppresses Commands opening in its actual gameplay context");
     }
     {
-        for(const auto mode:{ControlContext::gameplay,ControlContext::binoculars}){
-            Fixture f;f.mode=mode;f.tick();
-            const auto run=mode==ControlContext::gameplay?"gameplay.run":"binoculars.run";
-            const auto zoom=mode==ControlContext::gameplay?"gameplay.zoom":"binoculars.zoom";
-            f.input.rightStick={0,1};f.tick();expect(!f.active(run),"right-stick up cannot sprint out of prone by default");
-            f.input={};f.tick();f.input.buttons[5]=1;f.tick();f.tick(700);
-            expect(f.active(run)&&!f.active(zoom),"left-stick click holds native sprint without zoom");
-            f.input={};f.tick();f.input.buttons[8]=1;f.tick();f.input.buttons[5]=1;f.tick();
-            expect(!f.active(run)&&f.active(zoom),"ready-grip plus left click zooms without sprinting");
-        }
-        Fixture f;
+        Fixture f;f.mode=ControlContext::gameplay;f.tick();
+        f.input.rightStick={0,1};f.tick();
+        expect(f.active("gameplay.zoom")&&!f.active("gameplay.run"),"right-stick up is the native weapon-scope zoom");
+        f.input={};f.tick();f.input.buttons[5]=1;f.tick();f.tick(700);
+        expect(f.active("gameplay.run")&&!f.active("gameplay.zoom"),"left-stick click holds native sprint without zoom");
+        f.input={};f.tick();f.mode=ControlContext::binoculars;f.tick();
+        f.input.rightStick={0,1};f.tick();
+        expect(f.active("binoculars.run")&&!f.active("binoculars.zoom"),"right-stick up runs with binoculars without zoom");
+        f.input={};f.tick();f.input.buttons[5]=1;f.tick();
+        expect(f.active("binoculars.zoom")&&!f.active("binoculars.run"),"binocular left-stick click zooms without sprinting");
         expect(f.load("[settings]\nturn_mode=native_smooth\n")&&f.controls.setting("settings.turn_mode")==1,
             "native smooth turn has a readable config name");
         expect(f.load("[settings]\nturn_mode=off\n")&&f.controls.setting("settings.turn_mode")==2,
@@ -268,15 +267,15 @@ int main(int argc,char** argv){
         expect(!gameTarget("unknown")&&!gameTarget(""),"unknown executables cannot enable a game adapter");
     }
     {
-        Fixture f;f.input.buttons[7]=1;f.tick();f.input.buttons[1]=1;f.tick();f.tick(650);
+        Fixture f;f.input.buttons[1]=1;f.tick();f.tick(650);
         expect(f.active("gameplay.pickup_carry")&&!f.active("gameplay.equip_binoculars")&&!f.active("gameplay.reload"),
-            "left grip plus B holds native pickup without binocular/reload leakage");
+            "bare B holds native pickup without binocular/reload leakage");
         f.tick(700);expect(f.active("gameplay.pickup_carry"),"pickup remains down beyond a one-shot pulse");
-        f.input.buttons[7]=0;f.tick();f.input.buttons[1]=0;f.tick();
-        expect(!f.active("gameplay.reload")&&!f.active("gameplay.equip_binoculars"),"pickup chord release consumes simpler B actions");
-        f.input.buttons[8]=1;f.tick();f.input.buttons[0]=1;f.tick();
+        f.input.buttons[1]=0;f.tick();
+        expect(!f.active("gameplay.reload")&&!f.active("gameplay.equip_binoculars"),"pickup release consumes no other actions");
+        f.input.buttons[8]=1;f.tick();f.input.buttons[6]=1;f.tick();
         expect(f.active("gameplay.switch_weapon")&&f.active("gameplay.ready_weapon")&&!f.active("gameplay.dive"),
-            "A requests weapon switch while right grip readies the weapon");
+            "right grip plus R3 requests weapon switch while keeping the weapon ready");
     }
     {
         GamepadSample pad{0,255,255,1234,4321};bool ready=true;
@@ -335,20 +334,25 @@ int main(int argc,char** argv){
         Fixture f;
         expect(f.load("; defaults\n"),"defaults have no conflicts");f.tick();
         f.input.buttons[1]=1;f.tick();
-        expect(!f.active("gameplay.reload")&&!f.active("gameplay.equip_binoculars"),"B press waits to distinguish tap and hold");
-        f.input.buttons[1]=0;f.tick(150);
-        expect(f.active("gameplay.reload")&&!f.active("gameplay.equip_binoculars"),"short B release reloads only");
-        f.tick(101);f.input.buttons[1]=1;f.tick();f.tick(300);
-        expect(f.active("gameplay.equip_binoculars")&&!f.active("gameplay.reload"),"holding B equips without reload");
-        f.tick(200);
-        expect(!f.active("gameplay.equip_binoculars"),"a long hold fires once");
-        f.mode=ControlContext::binoculars;f.tick();
-        expect(!f.active("binoculars.stow"),"equip hold cannot immediately stow in the new mode");
-        f.input.buttons[1]=0;f.tick();f.tick(101);
-        expect(!f.active("binoculars.stow")&&!f.active("gameplay.reload"),"equip release does not stow or reload");
+        expect(f.active("gameplay.pickup_carry")&&!f.active("gameplay.reload")&&!f.active("gameplay.equip_binoculars"),
+            "bare B holds native pickup/carry without reload or binoculars");
+        f.tick(700);expect(f.active("gameplay.pickup_carry"),"pickup remains down beyond a one-shot pulse");
+        f.input={};f.tick();
+        expect(!f.active("gameplay.reload")&&!f.active("gameplay.equip_binoculars"),"pickup release does not leak another action");
+        f.input.buttons[7]=1;f.tick();f.input.buttons[1]=1;f.tick();
+        expect(f.active("gameplay.support_grip")&&!f.active("gameplay.pickup_carry")&&!f.active("gameplay.reload"),
+            "left grip plus B reserves the native reload chord");
+        f.input={};f.tick();
+        expect(f.active("gameplay.reload")&&!f.active("gameplay.pickup_carry"),"left grip plus B tap reloads on release");
+        f.tick(101);expect(!f.active("gameplay.reload"),"reload pulse ends");
+        f.input.buttons[7]=1;f.tick();f.input.buttons[1]=1;f.tick();f.tick(400);f.input={};f.tick();
+        expect(!f.active("gameplay.reload"),"a long pickup chord does not become an accidental reload");
+        f.input.buttons[7]=1;f.tick();f.input.buttons[3]=1;f.tick();f.tick(300);
+        expect(f.active("gameplay.equip_binoculars")&&!f.active("gameplay.interact"),"left grip plus Y equips binoculars without context duplication");
+        f.input={};f.tick();f.mode=ControlContext::binoculars;f.tick();
         f.input.buttons[1]=1;f.tick();
-        expect(f.active("binoculars.stow"),"a fresh B press stows");
-        f.mode=ControlContext::gameplay;f.tick();f.tick(400);f.input.buttons[1]=0;f.tick();
+        expect(f.active("binoculars.stow"),"a fresh B press stows binoculars");
+        f.input={};f.mode=ControlContext::gameplay;f.tick();
         expect(!f.active("gameplay.equip_binoculars")&&!f.active("gameplay.reload"),"stow input cannot leak into gameplay");
     }
     {
@@ -377,7 +381,7 @@ int main(int argc,char** argv){
         expect(!f.active("commands.keep_open"),"release closes commands");
     }
     {
-        Fixture f;expect(f.load("[gameplay]\nrun=right_stick_up\n"),"previous right-up sprint remains an explicit configurable option");f.tick();
+        Fixture f;expect(f.load("[gameplay]\nrun=right_stick_up\nzoom=disabled\n"),"right-up sprint remains an explicit configurable option");f.tick();
         f.input.rightStick={0,1};f.tick();
         expect(f.active("gameplay.run"),"explicitly configured right stick up runs");
         f.mode=ControlContext::equipment;f.tick();
@@ -452,8 +456,8 @@ int main(int argc,char** argv){
         f.input.buttons[2]=1;f.tick();
         expect(f.active("commands.open")&&f.active("commands.keep_open"),"Commands opens without a trigger chord on foot");
         f.input={};f.mode=ControlContext::binoculars;f.tick();
-        f.input.buttons[8]=f.input.buttons[5]=1;f.tick();
-        expect(f.active("binoculars.zoom")&&!f.active("binoculars.dive")&&!f.active("binoculars.run"),"binocular grip plus left click only zooms");
+        f.input.buttons[5]=1;f.tick();
+        expect(f.active("binoculars.zoom")&&!f.active("binoculars.dive")&&!f.active("binoculars.run"),"binocular left click only zooms");
         f.input={};f.tick(101);f.input.buttons[6]=1;f.tick();
         expect(f.active("binoculars.dive")&&!f.active("binoculars.zoom"),"binocular right click only dives");
         f.input={};f.tick(101);f.input.buttons[0]=1;f.tick();

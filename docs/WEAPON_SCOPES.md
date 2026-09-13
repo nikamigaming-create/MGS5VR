@@ -12,7 +12,7 @@ right eye poses and fields of view are unchanged. Only an eye behind the ocular
 can see that scene through the measured glass aperture. Lowering the rifle
 closes the aperture and does not display a mirrored image through its front.
 
-`[gameplay].zoom` defaults to **right grip + left-stick click**.
+`[gameplay].zoom` defaults to **right-stick up** while the weapon is ready.
 It cycles the equipped sight's native powers; a fixed-power sight remains fixed.
 One click advances exactly one power, including when the configured native-safe
 press pulse spans several XR frames. Holding the click does not keep cycling.

@@ -93,9 +93,9 @@ rendering mirrored text. This is weapon/status UI, not a complete iDroid or dama
 subtitle interface. Blocking menus still use their native controls and pixels.
 
 The current binocular path uses the retail housing and a tracked stereo lens.
-Hold right B for about 0.3 seconds to equip it directly in the right hand.
-Release B: it stays equipped without squeezing the grip. Tap B again to stow. With binoculars unselected,
-a short B tap remains the native reload/back/context action.
+Hold left grip + Y for about 0.3 seconds to equip it directly in the right hand.
+Release the chord: it stays equipped. Tap B again to stow. With binoculars
+unselected, bare B remains the native pickup/carry hold.
 Left-stick click changes 2×/4× magnification and
 right trigger follows the binocular ray for marking or waypoint placement.
 This does not implement per-weapon scopes or native analysis/intel.

@@ -50,14 +50,15 @@ Use `press(left_grip + x)` for a combination, `press(a) | press(x)` for either
 input, or `disabled` to remove a binding. Tap/hold pairs use the same duration.
 The longer chord consumes the simpler input; release held buttons after changing modes.
 
-Right-click is Dive **including with binoculars out**; left-click is Sprint.
-**Right grip + left-click** is zoom, consuming Sprint while the chord is held.
-For example, to move binocular zoom, change `[binoculars]` to
-`zoom = press(right_grip + x)`. Plain X also opens Commands in this mode;
-if you want unmodified X, explicitly disable or move `commands.open` too.
-To use left-click for normal dive, change `[gameplay]` to
-`dive = press(left_stick_click)` and move/disable `gameplay.run`, which owns that
-button by default. A and X do not duplicate stance/dive by default.
+The normal VR layout follows the native Action Type prompts where practical:
+**A** is stance, bare **B** is pickup/carry, **Y** is context, and **X** opens
+Commands. The deliberate exceptions are explicit: **left grip + B** reloads,
+**left grip + Y** equips binoculars, and **right grip + right-stick click**
+quick-switches a ready weapon. **Left-stick click** sprints and **right-stick
+click** dives. Right-stick up zooms a ready weapon's fitted scope; in binocular
+mode it runs, while left-stick click zooms the binocular lens. The wrist picker
+prints the actual configured binding under every category, so changed hints do
+not become stale.
 
 You can optionally check syntax/conflicts by running
 `mgs5vr_controls.exe --check mgs5vr-controls.ini` from the game folder.
@@ -131,10 +132,10 @@ needs a separate review.
 | Put the weapon away | Release right grip; the game performs its native stow animation |
 | Add the support hand | Squeeze left grip near the weapon's support socket and hold briefly |
 | Free the left hand | Release left grip, pull away, or turn the wrist HUD toward your eyes |
-| Reload | **Short right B tap**; the native reload moves the support hand, then releases it |
-| Pick up a dropped weapon / carry a person | **Hold left grip, then hold B** at the native prompt; keeps native B held without equipping binoculars |
-| Switch weapon while aiming | **A** while right grip readies the weapon; A does nothing when lowered |
-| Physical weapon-scope zoom | **Right grip + left-stick click**; cycles the fitted scope's powers, while fixed-power sights stay fixed |
+| Reload | **Tap left grip + B**; the native reload moves the support hand, then releases it |
+| Pick up a dropped weapon / carry a person | **Hold B** at the native prompt; bare B remains a native hold |
+| Switch weapon while aiming | **Right grip + right-stick click** while ready; the longer chord consumes Dive |
+| Physical weapon-scope zoom | **Right-stick up** while ready; cycles the fitted scope's powers, while fixed-power sights stay fixed |
 | Detonate placed C4 / inflate thrown decoys | Keep that gadget selected, **hold right grip, then Y**; right trigger places/throws it first |
 | Read the HUD | Raise and turn your **left forearm** toward your eyes |
 
@@ -225,27 +226,28 @@ upward slot has a small NVG label rather than a large rectangular card.
 For a grenade, choose **Support** with a first flick right and finish selection.
 Hold **right grip** to ready it. Move and tilt the **right hand** to position and
 direct the trajectory; **right trigger** throws. Hand elevation controls the arc,
-while right-stick left/right still turns. Left-stick click runs; stick down changes
+while right-stick left/right still turns. Left-stick click runs; **A** changes
 stance, never the throw angle. Throw strength remains the native
 equipment strength; this is point-and-trigger throwing, not a velocity gesture.
 The latest SIM observations and remaining stance limits are in the
 [interaction and visibility review](INTERACTION_VISIBILITY_REVIEW.md).
 
-**Handheld binoculars:** hold **right B** for about 0.3 seconds to equip the device.
-Release B: it stays equipped in the right hand; no grip hold is required.
+**Handheld binoculars:** hold **left grip + Y** for about 0.3 seconds to equip
+the device. Release the chord: it stays equipped in the right hand.
 Brief lost hand/aim tracking hides the presentation, not the equipped selection;
 the device returns when tracking resumes. Equipping gives a short right-hand pulse.
 Tap **B** again to stow it. When binoculars are not selected, a short B tap
-remains the native action (reload, back, or the current context action).
-Aim by moving the right hand. **Hold right grip and click the left stick** to switch 2×/4×. **Right trigger** marks the person under
+remains the native pickup/carry action. Aim by moving the right hand. **Click the
+left stick** to switch 2×/4×. **Right trigger** marks the person under
 the optic's crosshair, or places a native waypoint on the visible surface when
 no person is targeted. A short rumble confirms marking. Tap B to stow.
 **Tap A** to remove the waypoint or acquired person under the
-crosshair. Empty space clears nothing. Right-stick down remains stance.
+crosshair. Empty space clears nothing. Right-stick down remains the binocular
+stance gesture, because A owns clear in this mode.
 Bring the left hand to the opposite side and squeeze
 **left grip** to cup it for support; release the grip or pull away to let go.
 Zoom does not require support contact. Zoom starts at **2×** and each
-right-grip + left-click switches **2× → 4× → 2×**; lowering retains that selection.
+left-click switches **2× → 4× → 2×**; lowering retains that selection.
 Walking, running and turning remain available; **right-stick click dives** in this
 mode, just as it does with binoculars stowed.
 The device renders its own narrow-angle scene through its physical lens while
@@ -280,7 +282,7 @@ response while you keep control of your head and hands. Pull away before another
 pet. This interaction has been demonstrated with native game audio in SIM;
 other animal pet responses are still being implemented.
 
-**Hold a rat:** crouch with **right-stick down**, then offer an open palm close to the ground
+**Hold a rat:** crouch with **A**, then offer an open palm close to the ground
 beside a live rat. Keep the palm facing up and bring it under the animal briefly;
 lift your hand to carry it. Lower the palm to the ground and pause to release,
 then withdraw. Grip and trigger should remain released. The interaction follows
@@ -301,12 +303,12 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | --- | --- |
 | Move, including during wrist selection | Left stick; on foot, forward follows your view heading |
 | Turn | Right stick left/right: 30° snap on foot, or configurable native smooth turn |
-| Sprint / run | Left-stick click; right-stick up is unassigned on foot |
-| Crouch / stand / prone | Tap right stick down for crouch/stand; hold down for prone. The weapon lowers for the stance action. No face-button duplicate |
+| Sprint / run | Left-stick click; with binoculars, right-stick up also runs |
+| Crouch / stand / prone | Tap **A** for crouch/stand; hold **A** for prone. The weapon lowers for the stance action |
 | Quick dive | Right-stick click on foot, including with binoculars equipped. No face-button duplicate |
 | Right-stick context | Up/down never pitch the gameplay camera. Equipment, Commands and native menus keep navigation |
 | Context action / Fulton | Left Y without the equipment modifier; hold when the native prompt requires it |
-| Pick up weapon / carry person | Hold left grip, then hold B at the native prompt |
+| Pick up weapon / carry person | Hold **B** at the native prompt |
 | Native attack / CQC / carried-body throw | Right trigger with right grip released; the native game state chooses the action |
 | Wrist Commands / buddy orders | Hold X; point the right stick toward an available command and press A; release X to close |
 | Toggle native VR / large game screen | Unbound by default; optional `system.toggle_vr` in the config. VR enters automatically |

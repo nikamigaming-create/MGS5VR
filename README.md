@@ -50,9 +50,10 @@ turning, HUD preferences, and physical fit have annotated settings.
 
 ![Original Snake support-hand and grenade field illustrations](docs/images/field-gear.svg)
 
-Hold **B** to equip binoculars; tap **B** to stow. Raise the ocular to your eye.
-**Right grip + left-stick click** changes binocular magnification or a compatible
-weapon scope's zoom; bare left-click is Sprint.
+Hold **left grip + Y** to equip binoculars; tap **B** to stow. Raise the ocular
+to your eye. **Left-stick click** changes binocular magnification; **right-stick
+up** runs with binoculars and changes a compatible weapon scope's zoom on foot.
+**Right-stick click** dives.
 
 **Left trigger** opens the wrist selector and waits for your category choice.
 **Hold X** opens Commands. [Weapon scopes](docs/WEAPON_SCOPES.md)

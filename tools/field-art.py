@@ -60,15 +60,15 @@ if __name__=='__main__':
     crop(p,1190,218,179,390,(717,341,234,510))
     text(p,486,647,'TOUCH / LEFT',18,700)
     text(p,1190,647,'TOUCH / RIGHT',18,700)
-    left=[('STICK','Move'),('STICK CLICK','Sprint'),('GRIP','Support the held weapon'),('TRIGGER','Open wrist equipment'),('X / Y','Commands hold / interact'),('MENU TAP / HOLD','iDroid / pause')]
-    right=[('STICK LEFT / RIGHT','Turn'),('STICK DOWN','Tap: crouch / hold: prone'),('STICK CLICK','Dive'),('GRIP / TRIGGER','Ready / fire or throw'),('B TAP / HOLD','Reload / equip binoculars'),('A WHILE READY','Quick weapon switch')]
+    left=[('STICK','Move'),('STICK CLICK','Sprint'),('GRIP','Support the held weapon'),('TRIGGER','Open wrist equipment'),('X / Y','Commands hold / context'),('L GRIP + B / Y','Reload / binoculars')]
+    right=[('STICK LEFT / RIGHT','Turn'),('STICK UP','Scope zoom while ready'),('STICK CLICK','Dive'),('GRIP / TRIGGER','Ready / fire or throw'),('A','Tap: crouch / hold: prone'),('B','Pickup / carry')]
     for x,rows in [(56,left),(754,right)]:
         for i,(label,action) in enumerate(rows):
             y=245+i*78;text(p,x,y,label,23,800,RED);text(p,x,y+30,action,21)
     rect(p,30,723,1380,3,RED)
     sections=[(52,'01 / WRIST PICKER',['Hold left trigger. Wait for the bar.','Flick right stick to a category.','Center; flick to an item. Release LT.']),
-              (523,'02 / BINOCULARS',['Hold B to equip; tap B to stow.','Raise the device to your eye.','Right grip + left click: 2x / 4x.']),
-              (994,'03 / CONTEXT',['Left grip + hold B: pickup / carry.','Y: native interaction or Fulton.','Right grip + Y: C4 / decoy remote.'])]
+              (523,'02 / BINOCULARS',['Hold left grip + Y to equip; B stows.','Raise the device to your eye.','Left click: 2x / 4x; right stick up runs.']),
+              (994,'03 / CONTEXT',['B: pickup / carry; left grip + B: reload.','Y: native interaction or Fulton.','Right grip + R3: quick-switch ready weapon.'])]
     for x,title,lines in sections:
         text(p,x,778,title,25,900)
         for i,line in enumerate(lines):text(p,x,820+i*34,line,21)
