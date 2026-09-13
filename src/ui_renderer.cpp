@@ -23,6 +23,9 @@ using QueueFn=uintptr_t(*)(void*,void*);
 using ExecuteFn=uintptr_t(*)(void*,void*,void*,uint32_t);
 using NodeFn=uintptr_t(*)(void*,void*);
 QueueFn originalQueue{};ExecuteFn originalExecute{};NodeFn originalNode{};
+using MarkerDepthFn=void(*)(void*);
+MarkerDepthFn originalMarkerDepth{};
+std::atomic_uint64_t markerDepthPreserved{};
 using TitleFn=void(*)(void*);
 TitleFn originalTitleShow{},originalTitleUpdate{};
 TitleFn originalStartShow{};
@@ -66,8 +69,31 @@ bool pauseReaderVerified{};
 std::atomic_int menuState{-1};
 std::atomic_uint64_t pickerDrawTime{};
 std::atomic_uint64_t commandsDrawTime{};
+// Opt-in isolation for native HUD-layer diagnosis. Never used by gameplay
+// defaults; refreshed by the bounded observer, not by every render-node call.
+std::atomic_int diagnosticHiddenOrder{-1};
+
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
+void markerDepth(void* object){
+    // The native marker updater first copies the source actor's world-space
+    // bone palette, then this callback compresses only bone zero toward the
+    // desktop camera's near plane. Other bones remain at the actor: the
+    // triangles joining them become long wedges from a tracked eye camera.
+    // Keep the complete world-space palette for skinned recon silhouettes.
+    // Single-bone UI markers and non-VR presentation retain native behavior.
+    if(enabled.load()&&headCamera().active()){
+        const auto address=reinterpret_cast<uintptr_t>(object);
+        uintptr_t type{},model{};uint16_t bones{};
+        if(read(address,&type,sizeof(type))&&type==base+0x21e0540
+            &&read(address+0x38,&model,sizeof(model))&&model
+            &&read(model+0xf8,&bones,sizeof(bones))&&bones>1&&bones<=128){
+            if(!markerDepthPreserved.fetch_add(1))log("Skinned recon marker palette kept in world space; desktop root-depth compression bypassed");
+            return;
+        }
+    }
+    originalMarkerDepth(object);
+}
 void titleShow(void* object){
     originalTitleShow(object);
     uintptr_t type{};
@@ -125,18 +151,24 @@ __declspec(noinline) uintptr_t execute(void* renderer,void* info,void* task,uint
     return originalExecute(renderer,info,task,worker);
 }
 __declspec(noinline) uintptr_t node(void* state,void* item){
+    if(enabled.load()&&executing.eye.sourceSequence&&!executing.menuOpen&&!executing.frontEnd
+        &&diagnosticHiddenOrder.load()==static_cast<int>(field<uint32_t>(item,0x28)))return 0;
     // Title's complete native menu is captured once and placed on a cabin
     // surface after each eye. Its individual layers must not reappear here.
     if(enabled.load()&&executing.eye.sourceSequence&&executing.frontEnd)return 0;
     if(enabled.load()&&executing.eye.sourceSequence&&!executing.menuOpen){
         const auto order=field<uint32_t>(item,0x28);
-        const bool worldIntel=field<uintptr_t>(state,0x308)==executing.camera&&(order==2||order==3);
+        const auto camera=field<uintptr_t>(state,0x308);
+        uintptr_t cameraType{};
+        const bool sceneCamera=camera==executing.camera;
+        const bool layoutCamera=!sceneCamera&&read(camera,&cameraType,sizeof(cameraType))&&cameraType==base+0x20f08c8;
+        const bool worldIntel=nativeReconLayer(order,sceneCamera,layoutCamera);
         // Native scene-camera target cues follow the device view. Flat HUD
         // labels are replaced by native world-position labels in the lens.
-        if(executing.eye.eye==2)return worldIntel&&worldHudVisible(executing.hudMode,executing.hudView)?originalNode(state,item):0;
+        if(executing.eye.eye==2)return sceneCamera&&worldIntel&&worldHudVisible(executing.hudMode,executing.hudView)?originalNode(state,item):0;
         if(worldIntel&&!worldHudVisible(executing.hudMode,executing.hudView))return 0;
     }
-    if(enabled.load()&&executing.eye.sourceSequence)try{
+    if(enabled.load())try{
         ++nodeCalls;
         const auto address=reinterpret_cast<uintptr_t>(item);
         const auto camera=field<uintptr_t>(state,0x308);
@@ -144,7 +176,8 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
         std::lock_guard lock(mutex);
         // One native layer can contain many transient map tiles. Inventory the
         // camera/layer contract, not every tile, so later menu cameras fit too.
-        auto found=nodes.end();for(auto it=nodes.begin();it!=nodes.end();++it)if(it->order==order&&it->camera==camera){found=it;break;}
+        const bool unjoined=!executing.eye.sourceSequence;
+        auto found=nodes.end();for(auto it=nodes.begin();it!=nodes.end();++it)if(it->order==order&&it->camera==camera&&(!it->source)==unjoined){found=it;break;}
         if(found==nodes.end()&&nodes.size()<96){
             nodes.push_back({address,camera,field<uintptr_t>(state,0x340),field<uintptr_t>(state,0x348),0,0,field<uint32_t>(item,0x50),0,order,nodeName(address)});
             found=nodes.end()-1;
@@ -284,13 +317,15 @@ void installUiRenderer(uintptr_t moduleBase){
     constexpr unsigned char titleShowEntry[]{0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0x41,0x40};
     constexpr unsigned char titleUpdateEntry[]{0x40,0x56,0x48,0x83,0xec,0x40,0x48,0x8b,0xf1};
     constexpr unsigned char startShowEntry[]{0x40,0x57,0x48,0x83,0xec,0x40,0x48,0x8b,0xf9};
-    const std::array<Hook,6> hooks{{
+    constexpr unsigned char markerDepthEntry[]{0x48,0x89,0x5c,0x24,0x18,0x48,0x89,0x7c,0x24,0x20};
+    const std::array<Hook,7> hooks{{
         {0x2d3380,reinterpret_cast<void*>(&queue),reinterpret_cast<void**>(&originalQueue),queueEntry,sizeof(queueEntry)},
         {0x2e7770,reinterpret_cast<void*>(&execute),reinterpret_cast<void**>(&originalExecute),executeEntry,sizeof(executeEntry)},
         {0x2e6be0,reinterpret_cast<void*>(&node),reinterpret_cast<void**>(&originalNode),nodeEntry,sizeof(nodeEntry)},
         {0x12d73e0,reinterpret_cast<void*>(&titleShow),reinterpret_cast<void**>(&originalTitleShow),titleShowEntry,sizeof(titleShowEntry)},
         {0x12d86a0,reinterpret_cast<void*>(&titleUpdate),reinterpret_cast<void**>(&originalTitleUpdate),titleUpdateEntry,sizeof(titleUpdateEntry)},
-        {0x12d6d70,reinterpret_cast<void*>(&startShow),reinterpret_cast<void**>(&originalStartShow),startShowEntry,sizeof(startShowEntry)}}};
+        {0x12d6d70,reinterpret_cast<void*>(&startShow),reinterpret_cast<void**>(&originalStartShow),startShowEntry,sizeof(startShowEntry)},
+        {0x6bcca0,reinterpret_cast<void*>(&markerDepth),reinterpret_cast<void**>(&originalMarkerDepth),markerDepthEntry,sizeof(markerDepthEntry)}}};
     for(const auto& hook:hooks){std::array<unsigned char,16> bytes{};
         if(!read(moduleBase+hook.rva,bytes.data(),hook.size)||std::memcmp(bytes.data(),hook.signature,hook.size))throw std::runtime_error("Native UI renderer signature mismatch");
     }
@@ -433,11 +468,14 @@ bool applyUiEyeProjection(float* output) noexcept {
     std::memcpy(output,executing.projection.data(),sizeof(executing.projection));++patched;return true;
 }
 void reportUiRenderer(std::ostream& out){
+    const auto hidden=static_cast<int>(GetPrivateProfileIntW(L"diagnostics",L"ui_hide_order",-1,settings.c_str()));
+    diagnosticHiddenOrder.store(hidden>=0&&hidden<=255?hidden:-1);
     std::lock_guard lock(mutex);
     out<<"{\"event\":\"native_ui_renderer\",\"queued\":"<<queued.load()<<",\"executions\":"<<executions.load()
        <<",\"joined\":"<<joined.load()<<",\"projection_patched\":"<<patched.load()<<",\"camera_mismatch\":"<<cameraMismatch.load()
        <<",\"view_restored\":"<<viewMismatch.load()<<",\"spatial_draws\":"<<spatialDraws.load()<<",\"suppressed_draws\":"<<suppressedDraws.load()
        <<",\"expired\":"<<expired.load()<<",\"overflow\":"<<overflow.load()
+       <<",\"marker_depth_preserved\":"<<markerDepthPreserved.load()
        <<",\"spatial_by_eye\":["<<spatialByEye[0].load()<<','<<spatialByEye[1].load()<<']'
        <<",\"hidden_panel_by_eye\":["<<hiddenPanelByEye[0].load()<<','<<hiddenPanelByEye[1].load()<<']'
        <<",\"pending\":"<<pending.size()<<",\"node_calls\":"<<nodeCalls.load()<<",\"nodes\":[";

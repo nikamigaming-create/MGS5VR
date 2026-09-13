@@ -73,6 +73,12 @@ int main(int argc,char** argv){
         Fixture f;
         expect(f.controls.setting("settings.hud_mode")==1,"binocular-only recon is the default");
         expect(f.controls.setting("settings.binocular_pitch_degrees")==-90,"binoculars tilt down ninety degrees into the palm by default");
+        expect(f.controls.setting("settings.binocular_auto_mark")==1&&f.controls.setting("settings.binocular_mark_dwell_ms")==650,
+            "binocular observation acquires visible people with a configurable dwell");
+        expect(f.load("[settings]\nbinocular_auto_mark=0\nbinocular_mark_dwell_ms=1200\n")
+            &&f.controls.setting("settings.binocular_auto_mark")==0&&f.controls.setting("settings.binocular_mark_dwell_ms")==1200,
+            "automatic binocular marking can be disabled and retimed");
+        expect(!f.load("[settings]\nbinocular_mark_dwell_ms=0\n"),"automatic dwell cannot become an accidental instant mark");
         expect(f.load("[settings]\nhud_mode=binoculars_only\n")&&f.controls.setting("settings.hud_mode")==1,
             "binocular-only world HUD is configurable");
         expect(f.load("[settings]\nhud_mode=off\n")&&f.controls.setting("settings.hud_mode")==2,

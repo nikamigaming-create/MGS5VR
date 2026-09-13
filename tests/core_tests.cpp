@@ -4,6 +4,7 @@
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/render_layout.hpp"
+#include "mgs5vr/recon.hpp"
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -16,7 +17,30 @@ static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
     {
+        ReconDwell dwell;constexpr uint16_t person=42,other=43;
+        expect(!dwell.update(person,1000,1,650),"looking at a new person starts the recon dwell");
+        for(uint64_t t=1050;t<1650;t+=50)expect(!dwell.update(person,t,1,650),"a brief glance does not acquire");
+        expect(dwell.update(person,1650,1,650),"uninterrupted binocular observation acquires once");
+        expect(!dwell.update(person,1700,1,650),"an acquired person does not pulse repeatedly");
+        dwell.reset();dwell.update(person,2000,1,100);dwell.suppress();
+        expect(!dwell.update(person,2100,1,100),"a deliberate clear stays cleared while looking at that person");
+        dwell.update(std::nullopt,2150,1,100);dwell.update(person,2200,1,100);
+        expect(dwell.update(person,2300,1,100),"looking away allows a new acquisition");
+        dwell.reset();dwell.update(person,3000,1,100);
+        expect(!dwell.update(person,3000,1,100),"replaying a frozen source image never advances dwell");
+        expect(!dwell.update(person,3200,1,100),"a stale tracking gap restarts observation");
+        expect(!dwell.update(other,3250,1,100),"sweeping across people never transfers dwell time");
+        expect(!dwell.update(other,3300,2,100),"a new camera activation restarts observation");
+        expect(!dwell.update(other,3200,2,100),"a clock reversal restarts observation");
+        expect(!dwell.update(other,3300,2,0),"disabled dwell cannot acquire");
+        expect(!dwell.update(other,3400,2,100),"re-enabling requires a fresh dwell");
+    }
+    {
         expect(hudLayer(151,100,false,false)==HudLayer::general,"subtitles/notification layers are not wrist status");
+        expect(nativeReconLayer(23,false,true)&&!nativeReconLayer(23,true,false),"person cue needs its native layout-camera identity");
+        expect(nativeReconLayer(2,true,false)&&nativeReconLayer(3,true,false),"native world silhouettes are recon layers");
+        for(const auto order:{49u,51u,52u,133u,137u,147u,151u,171u})
+            expect(!nativeReconLayer(order,false,true),"recon policy cannot hide caption, interaction, picker or status layers");
         expect(hudLayer(133,100,false,false)==HudLayer::general,"ordinary layer 133 is not an equipment card");
         expect(hudLayer(133,150,false,false)==HudLayer::equipment&&hudLayer(133,100,true,false)==HudLayer::equipment,
             "equipment cameras and item context own their cards");
@@ -947,6 +971,25 @@ int main(){
         title.cancel();input.frontEnd=false;title.trackStereo({},rigEyes,true,130,input);title.toggle();
         expect(same(title.resolve(2,orbit,130).nativePose.position,orbit.position),
             "entering gameplay after Title binds the new player camera");
+    }
+    for(const bool delayedPlayer:{false,true}){
+        HeadCamera title;title.configure(true,1,true);ControllerFrame input;input.frontEnd=true;input.referenceEpoch=1;
+        title.trackStereo({},rigEyes,true,100,input);title.toggle();
+        if(delayedPlayer)expect(!title.resolve(11,thirdPerson,100).applied&&title.status().awaitingPlayer,
+            "Title waits for its verified owner without inventing a menu origin");
+        title.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,110);
+        title.trackStereo({},rigEyes,true,110,input);
+        const auto entry=title.resolve(11,thirdPerson,110);
+        const auto expectedPanel=compose(nativeTrackedPose(entry.nativePose,entry.headPose,entry.headPose),Pose{{},{0,-.05f,-1.3f}});
+        expect(entry.applied&&entry.playerOwner==22&&same(entry.nativePose.position,thirdPerson.position),
+            "Title uses the authored camera rather than the decorative character's bed/head position");
+        expect(same(entry.menuPanel.position,expectedPanel.position),
+            "Title panel initializes in front of the viewer even after delayed player publication");
+        title.cancel();input.frontEnd=false;title.trackStereo({},rigEyes,true,120,input);title.toggle();
+        title.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,120);
+        const auto gameplay=title.resolve(11,thirdPerson,120);
+        expect(gameplay.applied&&same(gameplay.nativePose.position,*playerHeadPosition(playerRoot,headBone)),
+            "leaving Title restores first-person head attachment");
     }
     {
         HeadCamera snaps;snaps.configure(true);ControllerFrame input;

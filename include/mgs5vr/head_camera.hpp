@@ -45,8 +45,10 @@ struct ControllerFrame {
     OpticSample optic{};
     uint64_t opticMarkSequence{};
     uint64_t opticClearSequence{};
+    bool binocularAutoMark{true};
+    uint64_t binocularMarkDwellMs{650};
     float snapYaw{}; // Absolute world-Y turn carried by this tracking publication.
-    bool frontEnd{}; // Native Title menu, with menu input and a tracked wrist surface.
+    bool frontEnd{}; // Native Title backdrop and floating menu; no tracked arms.
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};

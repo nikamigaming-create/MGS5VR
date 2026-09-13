@@ -207,11 +207,19 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         }
         if(awaitingPlayer_){
             if((camera_&&camera_!=camera)||(playerOwner_&&playerOwner_!=found->owner))return result;
-            if(!camera_)origin_=uprightOrigin(head_);
+            if(!camera_){
+                origin_=uprightOrigin(head_);
+                frontEndOrigin_=uprightOrigin(sourceCamera);
+                frontEndPanel_=compose(nativeTrackedPose(frontEndOrigin_,head_,head_),Pose{{},{0,-.05f,-1.3f}});
+            }
             camera_=camera;playerOwner_=found->owner;awaitingPlayer_=false;active_=true;
             ++activation_; // No eye image from before the menu may be reused.
         }
-        nativePose.position=found->position;
+        // A front-end character is scenery, not the player's viewpoint. In
+        // the prologue title backdrop its head is inside the hospital bed.
+        // Retain the authored menu camera while keeping the verified owner
+        // for model exclusion. Gameplay still attaches to the animated head.
+        if(!controllers_.frontEnd)nativePose.position=found->position;
         ownerHeadTime_=found->time;
         result.playerSequence=found->sequence;result.playerOwner=found->owner;result.playerHead=found->position;
     }
