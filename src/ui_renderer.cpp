@@ -46,7 +46,6 @@ struct Source {
     bool frontEnd{};
     std::array<float,16> authoredView{},authoredProjection{};
     float pickerWidth{.75f};
-    Pose hudPanel{};
     HudMode hudMode{HudMode::binocularsOnly};
     HudView hudView{HudView::world};
     std::array<float,16> projection{};
@@ -277,22 +276,23 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 // Layer 50 contains preprojected desktop labels. It cannot
                 // follow head motion on a face panel. Acquired people and
                 // waypoints are instead drawn from native world positions.
-                if(layer==HudLayer::worldLabels
-                    ||(!general&&(!executing.panelTracked||(!expanded&&!executing.panelVisible)))){
+                // General gameplay HUD is intentionally suppressed in tracked
+                // first-person VR. It must never fall back to a head-locked
+                // panel when a weapon is drawn. The remaining layers are
+                // limited to the authored forearm/picker poses.
+                if(layer==HudLayer::worldLabels||general
+                    ||(!executing.panelTracked||(!expanded&&!executing.panelVisible))){
                     ++suppressedDraws;
                     if((contextAction||equipmentPicker||(order>=146&&order<=148))&&executing.eye.eye<2)++hiddenPanelByEye[executing.eye.eye];
                     return 0;
                 }
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
-                // Subtitles and notifications are not wrist status. Use one
-                // source-head panel for both eyes, even with hands lowered or
-                // untracked. Never sample a newer head pose on this worker.
-                const auto panel=general?executing.hudPanel:expanded?executing.picker:
+                const auto panel=expanded?executing.picker:
                     contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
-                const float layoutWidth=general?2.4f:commandsPicker?.6f:equipmentPicker?executing.pickerWidth:1.2f;
+                const float layoutWidth=commandsPicker?.6f:equipmentPicker?executing.pickerWidth:1.2f;
                 const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
-                    general||expanded?0.f:contextAction?.04f:.72f,
-                    general||expanded?0.f:contextAction?-.52f:-.70f);
+                    expanded?0.f:contextAction?.04f:.72f,
+                    expanded?0.f:contextAction?-.52f:-.70f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));
@@ -313,21 +313,10 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 ++suppressedDraws;return 0;
             }
             if(layoutCamera){
-                // Captions and notices also have independent/animated layout
-                // cameras; they are not limited to the fixed wrist-HUD depths.
-                // Retain their native clip layout on the shared source-head
-                // plane instead of leaving them at desktop-screen coordinates.
-                if(field<uint32_t>(item,0x28)==50){++suppressedDraws;return 0;}
-                const auto saved=field<std::array<float,16>>(state,0x1c0);
-                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,
-                    executing.hudPanel,2.4f,1.35f);
-                if(!mapped){++suppressedDraws;return 0;}
-                auto* output=static_cast<unsigned char*>(state)+0x1c0;
-                std::memcpy(output,mapped->data(),sizeof(*mapped));
-                const auto result=originalNode(state,item);
-                std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
-                if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
-                return result;
+                // Captions, notices, and other non-authored layout-camera
+                // elements are general HUD. Suppress them in tracked
+                // first-person VR instead of projecting them onto the face.
+                ++suppressedDraws;return 0;
             }
         }
     }
@@ -461,7 +450,6 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
                rig.controllers.equipmentOpen&&!rig.controllers.equipmentCategory,
                rig.controllers.equipmentCategory==4,rig.controllers.commandControls,
                rig.menuOpen,rig.menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection,rig.controllers.wristPickerWidth};
-    producing.hudPanel=compose(nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose),Pose{{},{0,0,-2.f}});
     producing.hudMode=rig.controllers.hudMode;
     producing.hudView=hudView;
     producing.projection=projection;

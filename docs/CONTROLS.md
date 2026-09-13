@@ -29,7 +29,9 @@ appear only in the binocular scene while the device is aligned with an eye.
 Holding binoculars down does not enable them, and firearm scopes do not reveal
 recon cues. `full` explicitly enables world cues in normal VR too; `off` hides them.
 An existing file with `hud_mode = full` retains that preference until you edit it.
-These modes do not suppress wrist controls or the general caption/HUD layer.
+In tracked first-person VR, the general gameplay caption/HUD layer is
+suppressed rather than placed on the camera. Wrist controls, equipment, and
+weapon/status layers remain available on their authored forearm surfaces.
 `binocular_actor_glow = 0` disables the native glowing body effect while keeping
 target acquisition and labels. `1` permits it within the selected recon view;
 it does not force the game's native glow to activate for every person.
@@ -409,6 +411,7 @@ not certified. The lowered-weapon trigger now reaches the native action path;
 its input contract passes, but a target interaction has not been accepted.
 The native context-action icon layer now follows the left forearm; pickup, carry
 and other target-specific prompts still need individual checks. General layout
-layers now have a separate source-head HUD plane, but captions did not appear in
-the current radio fixture and are not marked fixed. Sleeve/cuff polish remains open. This guide describes the controls
+layers are suppressed in tracked first-person VR rather than projected onto the
+player's face. Captions did not appear in the current radio fixture and are not
+marked fixed. Sleeve/cuff polish remains open. This guide describes the controls
 without claiming those gates pass; see the [current SIM review](SIM_HUD_REVIEW.md).

@@ -119,7 +119,8 @@ if the shared native camera has since been restored. Under `wrist_hud_experiment
 verified artificial layout-camera orders 146-148 draw actual weapon/status pixels
 through a projection onto the left forearm. The native context-action icon layer
 uses a separate area beside it. Both retain the captured rig/eye transaction and
-front-facing tracking guards; other flat gameplay UI is suppressed.
+front-facing tracking guards; other flat gameplay UI is suppressed and never
+falls back to a head-locked panel.
 The back of the panel is culled. No duplicate HUD texture, fabricated values or
 new overlay pose is substituted. Full menus use the large-screen mode; pointer
 interaction and spatial damage/subtitle/context feedback are still incomplete.

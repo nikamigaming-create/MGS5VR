@@ -122,7 +122,6 @@ struct Session {
     uint64_t opticMarkSequence{};
     uint64_t opticClearSequence{};
     RigCommands commandsControls;
-    bool simpleControllerProfile{};
     float reportedMagnification{1};
     uint64_t hapticAt{};
     bool wheelHeld{};
@@ -389,7 +388,6 @@ struct Session {
                     log(std::string(side?"Right":"Left")+" controller profile="+name+"; face inputs isolated from legacy fallbacks");
                 }
             }
-            simpleControllerProfile=faceLayouts[1]==ControllerFaceLayout::simple;
         }
         controllerFrame={{trackedHand(0,time),trackedHand(1,time)},time,referenceEpoch};
         const bool right=controllerFrame.hands[1].gripTracked;
@@ -469,7 +467,11 @@ struct Session {
         const bool menuPressed=activeControl("system.idroid")||activeControl("system.pause");
         const bool equipmentHeld=controls.value(mode==TravelMode::vehicle?"vehicle.equipment_open":"equipment.open")
             >(rigControls.equipmentPhase()!=0?.25f:.5f);
-        const bool binocularAvailable=rigInput&&!nativeInput.exclusive&&mode==TravelMode::onFoot&&!simpleControllerProfile
+        // Quest/Virtual Desktop can report the KHR simple-controller profile
+        // for a frame while the Touch face buttons are still available through
+        // the isolated fallback bindings. Do not let that profile blip clear
+        // an already selected optic or strand a held B equip action.
+        const bool binocularAvailable=rigInput&&!nativeInput.exclusive&&mode==TravelMode::onFoot
             &&!manualToggle&&!menuPressed&&!commandsControls.active()
             &&!equipmentHeld&&rigControls.equipmentPhase()==0;
         const bool wasBinocularSelected=binocularSelected;
@@ -491,7 +493,11 @@ struct Session {
                 menuPressed?"menu input":mode!=TravelMode::onFoot?"left on-foot mode":"left gameplay"));
         }
         // Recenter is its own configured action; R3 remains available for zoom.
-        const bool centerChord=activeControl("system.recenter");
+        // A binocular equip/stow interaction must never also recenter the
+        // scene. Stow the optic first when an intentional recenter is needed.
+        const bool binocularInteraction=binocularSelected||wasBinocularSelected
+            ||activeControl("gameplay.equip_binoculars")||activeControl("binoculars.stow");
+        const bool centerChord=activeControl("system.recenter")&&!binocularInteraction;
         const bool headToggle=manualToggle;
         const uint16_t menuBits=static_cast<uint16_t>((activeControl("system.idroid")?XINPUT_GAMEPAD_START:0)
             |(activeControl("system.pause")?XINPUT_GAMEPAD_BACK:0));
