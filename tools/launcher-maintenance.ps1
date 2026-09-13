@@ -28,7 +28,11 @@ foreach ($mgsName in $mgsNames) {
     $mgsPath=Join-Path $mgsTarget $mgsName
     if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($mgsPath)) -ine $mgsTarget) { throw 'Unsafe mod file path.' }
     for ($mgsAncestor=$mgsPath; $mgsAncestor; $mgsAncestor=Split-Path -Parent $mgsAncestor) {
-        if ((Test-Path -LiteralPath $mgsAncestor) -and ((Get-Item -LiteralPath $mgsAncestor).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        # Resolve once, with the race between Test-Path and Get-Item treated as
+        # a missing ancestor. This also works under CTest's mocked PowerShell
+        # commands and keeps the linked-path guard fail-closed.
+        $mgsAncestorItem=Get-Item -LiteralPath $mgsAncestor -ErrorAction SilentlyContinue
+        if ($mgsAncestorItem -and ($mgsAncestorItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
             throw 'Maintenance does not follow linked paths.'
         }
     }
