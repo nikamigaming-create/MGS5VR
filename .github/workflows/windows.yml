@@ -32,7 +32,9 @@ jobs:
       - name: Build all targets
         run: cmake --build --preset release --parallel
       - name: Run tests that do not require a GPU or headset
-        run: ctest --preset release --exclude-regex d3d11_mailbox --output-junit build/ci-tests.xml
+        # The native window/canvas test, like the mailbox test, needs a real
+        # DXGI hardware device. Both are exercised locally on the SIM machine.
+        run: ctest --preset release --exclude-regex "d3d11_mailbox|independent_render_window" --output-junit build/ci-tests.xml
       - name: Check Python tooling
         run: python -m compileall -q tools
       - name: Check asset-free equipment inventory fixtures
