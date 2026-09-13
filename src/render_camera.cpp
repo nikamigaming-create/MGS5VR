@@ -90,6 +90,7 @@ std::mutex sceneMutex;
 thread_local uintptr_t eyeViewport{};
 thread_local uintptr_t visibilityViewport{};
 std::atomic_uint64_t visibilityUpdates{};
+std::atomic_bool trackedNearReported{};
 thread_local uintptr_t stereoTarget{};
 thread_local uint32_t sceneRenderPass{};
 thread_local mgs5vr::EyeFrame drawingEye{};
@@ -186,10 +187,16 @@ __declspec(noinline) void* virtualListener(void* object,void* output,const float
 }
 __declspec(noinline) uintptr_t projection(float* output,float a,float b,float c,float d,float e,float f,float g,float h,float i){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    const bool visibilityClip=enabled.load()&&visibilityViewport&&caller==base+layout.clipReturn
+        &&reinterpret_cast<uintptr_t>(output)==visibilityViewport+layout.clipProjection;
+    // Visibility is prepared before scene replay. Only its owned clip matrix
+    // needs the closer plane here; the native center camera/GPU matrix stays
+    // untouched. On TPP 1.0.15.4, the final two arguments are near and far.
+    if(visibilityClip&&layout.cameraNearPlane&&!current.sample.controllers.frontEnd)
+        h=mgs5vr::trackedNearPlane(h,i);
     const auto result=originalProjection(output,a,b,c,d,e,f,g,h,i);
     if(enabled.load()&&layout.uiProjectionReturn&&caller==base+layout.uiProjectionReturn)mgs5vr::applyUiEyeProjection(output);
-    if(enabled.load()&&visibilityViewport&&caller==base+layout.clipReturn
-        &&reinterpret_cast<uintptr_t>(output)==visibilityViewport+layout.clipProjection){
+    if(visibilityClip){
         std::array<float,16> matrix{};std::memcpy(matrix.data(),output,sizeof(matrix));
         if(mgs5vr::widenVisibilityProjection(matrix,current.sample.headPose,current.sample.views)){
             std::memcpy(output,matrix.data(),sizeof(matrix));
@@ -234,15 +241,28 @@ __declspec(noinline) uintptr_t viewport(void* input,uint8_t history){
 }
 struct NativeRestore {
     uintptr_t camera{},viewport{};
+    std::array<float,2> cameraPlanes{};
     std::array<unsigned char,0xc0> cameraMatrices{};
     std::array<unsigned char,0x240> viewportMatrices{};
     NativeRestore(uintptr_t c,uintptr_t v):camera(c),viewport(v){
         std::memcpy(cameraMatrices.data(),reinterpret_cast<void*>(c+0x30),cameraMatrices.size());
         std::memcpy(viewportMatrices.data(),reinterpret_cast<void*>(v+layout.viewportMatrices),viewportMatrices.size());
+        if(layout.cameraNearPlane)std::memcpy(cameraPlanes.data(),reinterpret_cast<void*>(c+layout.cameraNearPlane),sizeof(cameraPlanes));
     }
     void restore() const{
         std::memcpy(reinterpret_cast<void*>(camera+0x30),cameraMatrices.data(),cameraMatrices.size());
         std::memcpy(reinterpret_cast<void*>(viewport+layout.viewportMatrices),viewportMatrices.data(),viewportMatrices.size());
+        if(layout.cameraNearPlane)std::memcpy(reinterpret_cast<void*>(camera+layout.cameraNearPlane),cameraPlanes.data(),sizeof(float));
+    }
+    void applyTrackedNearPlane() const{
+        if(!layout.cameraNearPlane)return;
+        const float nearClip=mgs5vr::trackedNearPlane(cameraPlanes[0],cameraPlanes[1]);
+        if(!std::isfinite(nearClip)||nearClip==cameraPlanes[0])return;
+        // Change the source field only during this exact scene replay, not
+        // just projection Z terms after the builder. Native deferred depth
+        // reconstruction and both clip/GPU matrices then consume one plane.
+        std::memcpy(reinterpret_cast<void*>(camera+layout.cameraNearPlane),&nearClip,sizeof(nearClip));
+        if(!trackedNearReported.exchange(true))mgs5vr::log("TPP tracked scene uses a 2 cm native near plane; native camera restored between passes");
     }
     ~NativeRestore(){restore();mgs5vr::clearUiRenderSource();eyeViewport=0;stereoTarget=0;drawingEye={};insideStereo=false;}
 };
@@ -342,6 +362,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         // Until per-eye temporal resources are isolated, publish a zero-motion
         // camera history. This avoids introducing the opposite eye's history.
         std::memcpy(reinterpret_cast<void*>(source.grCamera+0xb0),eyeView.data(),sizeof(eyeView));
+        if(!titleSurface)saved.applyTrackedNearPlane();
         originalViewport(reinterpret_cast<void*>(source.viewport),0);
         if(!clipProjection||!gpuProjection){complete=false;sceneFailure=4;break;}
         std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousView),eyeView.data(),sizeof(eyeView));

@@ -263,6 +263,12 @@ cutscenes and player-replacement transitions still need broader VR integration;
 the floating gameplay menus do not establish support for every transition.
 
 Wrist Commands has its own input mode, separate from equipment selection.
+For interrogation, first hold up or restrain an eligible guard using the native
+gameplay action. Keep the existing right-grip aim or lowered-weapon CQC trigger
+held while opening Commands. That already-active input now continues through the
+menu and closing transition. Releasing it stops it; Commands cannot start a new
+attack, and confirmation cannot fire the weapon. This repairs an input-routing
+defect, not a completed guard-interaction or CQC-animation implementation.
 Keep X held, center the right stick after the commands appear, then
 point toward a command and confirm. Left-stick walking remains available.
 A confirms once. B cancels; release X and center the stick before returning to

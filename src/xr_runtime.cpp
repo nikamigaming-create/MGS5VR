@@ -561,8 +561,11 @@ struct Session {
             if(activeControl("commands.back"))commandPad.buttons|=XINPUT_GAMEPAD_B;
             const auto commandAxis=controls.axis("axes.commands",physical);
             commandPad.rightX=static_cast<int16_t>(commandAxis[0]*32767);commandPad.rightY=static_cast<int16_t>(commandAxis[1]*32767);
+            const bool carryCombat=mode==TravelMode::onFoot&&right&&controllerFrame.hands[1].aimTracked
+                &&!activeControl("gameplay.dive")&&!activeControl("gameplay.stance")&&!activeControl("gameplay.pickup_carry");
             const auto commands=commandsControls.update(commandPad,(mode==TravelMode::onFoot||mode==TravelMode::horse)
-                &&!optical.exclusive&&!center&&!headToggle,now,nativeCommandsDrawTime());
+                &&!optical.exclusive&&!center&&!headToggle,now,nativeCommandsDrawTime(),
+                carryCombat?triggerValue("gameplay.ready_weapon"):0,carryCombat?triggerValue("gameplay.fire_or_cqc"):0);
             if(wasCommands!=commands.active)log("Wrist Commands open="+std::to_string(commands.active));
             controllerFrame.commandControls=commands.active;
             // One hand gets the full lens resolution and 2x/4x power. The
@@ -576,6 +579,10 @@ struct Session {
             RigInputSample mapped{};
             if(optical.exclusive||commands.exclusive){
                 rigControls.reset();mapped.gamepad=optical.exclusive?optical.gamepad:commands.gamepad;
+                mapped.weaponReady=!optical.exclusive&&commands.weaponReady;
+                // A trigger pressed inside Commands must not become a shot on
+                // close. Only an uninterrupted pre-existing CQC hold survives.
+                if(commands.exclusive&&!commands.gamepad.rightTrigger)rigControls.requireAttackRelease();
             }else mapped=rigControls.update(pad,activeControl("vehicle.wheel_grip")&&!center&&!headToggle,
                 mode==TravelMode::vehicle?equipmentHeld:right&&controllerFrame.hands[1].aimTracked&&activeControl("gameplay.ready_weapon"),mode,
                 now,nativeEquipmentPickerDrawTime(),controllerThrowReady());
@@ -607,6 +614,10 @@ struct Session {
                 activeControl("gameplay.dive")||activeControl("binoculars.dive"),
                 activeControl("gameplay.pickup_carry"),activeControl("gameplay.switch_weapon")});
         }
+        if(rigInput&&mode==TravelMode::onFoot&&!stickNavigation&&!binocularSelected)
+            commandsControls.observeGameplay(pad,controllerFrame.weaponReady);
+        else if(!rigInput||mode!=TravelMode::onFoot||controllerFrame.equipmentOpen||binocularSelected)
+            commandsControls.observeGameplay({},false);
         // A configured press spans several XR frames. Count its rising edge,
         // not every active frame (nine frames at 90 Hz wrapped a 3-power sight).
         // Native R3 is not forwarded: it also changes the desktop camera.

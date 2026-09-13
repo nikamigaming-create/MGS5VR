@@ -28,6 +28,21 @@ fit at the maximum width. C4 remote detonation, decoy inflation and smoke throw
 were exercised in the preceding same-scope C5F23C89 build. Their grip+Y remote
 action is now documented beside the editable context-action binding.
 
+The September 13.3 source also calibrates four receiver-integrated launcher lenses
+and fixes close TPP weapon geometry being cut by the native near plane. The
+tracked scene uses a scoped 2 cm plane while retaining native far depth and
+restoring the normal camera between passes; GZ is unchanged. GROM, FB MR,
+Killer Bee and CGM 25 zoom/fire recordings on the development build are listed in the
+coverage notes. These are not guided-target or all-weapon completion claims.
+
+Wrist Commands now preserves an already-published weapon-ready or lowered-weapon
+CQC hold instead of clearing both triggers on opening. Releasing the original
+input still releases it; menu confirmation cannot fire, and a newly squeezed
+trigger cannot become a shot on close. The input regression tests cover these
+transitions. Full target interrogation and other guard actions remain unfinished.
+See the [non-weapon feature inventory](GAMEPLAY_FEATURES.md) for the remaining
+stealth, rescue, buddy, transport, UI and progression work.
+
 Still unfinished: complete per-weapon/sight coverage, complete weapon and
 gadget coverage, some powered-arm/reconnaissance interactions, Ground Zeroes'
 tracked first-person rig, and the complete combined showcase. The separate

@@ -146,7 +146,8 @@ OpticsInput RigOptics::update(GamepadSample raw,bool available,bool held,bool /*
     }
     return {raw};
 }
-CommandsInput RigCommands::update(GamepadSample raw,bool available,uint64_t time,uint64_t drawTime){
+CommandsInput RigCommands::update(GamepadSample raw,bool available,uint64_t time,uint64_t drawTime,
+                                  uint8_t heldAim,uint8_t heldCqc){
     if(time<lastTime_){reset();releaseRequired_=true;}
     lastTime_=time;
     const bool chord=raw.leftTrigger>127&&(raw.buttons&0x4000);
@@ -154,32 +155,41 @@ CommandsInput RigCommands::update(GamepadSample raw,bool available,uint64_t time
     priorChord_=chord;
     const bool confirm=raw.rightTrigger>127||(raw.buttons&0x0080);
     const bool neutral=std::abs(int(raw.rightX))<6000&&std::abs(int(raw.rightY))<6000;
+    const auto menus=static_cast<uint16_t>(raw.buttons&0x0030);
+    carryAim_=carryAim_&&heldAim>24;
+    carryCqc_=carryCqc_&&heldCqc>24&&heldAim<=24;
+    if(!available||menus)carryAim_=carryCqc_=priorAim_=priorCqc_=false;
+    const auto continuing=[&](uint16_t buttons,bool active){
+        return CommandsInput{GamepadSample{buttons,static_cast<uint8_t>(carryAim_?heldAim:0),
+            static_cast<uint8_t>(carryCqc_?heldCqc:0),raw.leftX,raw.leftY},active,true,carryAim_};
+    };
     if(!available&&active_){active_=false;releaseRequired_=true;}
     if(releaseRequired_){
         if(!raw.buttons&&raw.leftTrigger<=24&&raw.rightTrigger<=24&&neutral)releaseRequired_=false;
-        return {GamepadSample{0,0,0,raw.leftX,raw.leftY},false,true};
+        return continuing(menus,false);
     }
     if(!available)return {raw};
     if(freshChord&&!active_){
         active_=true;openedAt_=time;confirmHeld_=confirm;stickBlocked_=true;confirmUntil_=0;confirmed_=false;
+        carryAim_=priorAim_&&heldAim>127;
+        carryCqc_=!priorAim_&&priorCqc_&&heldCqc>24&&heldAim<=24;
     }
     if(!active_)return {raw};
-    const auto menus=static_cast<uint16_t>(raw.buttons&0x0030);
     if(raw.leftTrigger<64||(raw.buttons&0x2000)||menus){
         active_=false;releaseRequired_=true;confirmUntil_=0;
-        return {GamepadSample{menus,0,0,raw.leftX,raw.leftY},false,true};
+        return continuing(menus,false);
     }
     const bool ready=drawTime>openedAt_&&time>=drawTime&&time-drawTime<=150;
     if(!ready)stickBlocked_=true;
     else if(neutral)stickBlocked_=false;
     if(ready&&!stickBlocked_&&confirm&&!confirmHeld_&&!confirmed_){confirmUntil_=time+100;confirmed_=true;}
     confirmHeld_=confirm;
-    GamepadSample result{static_cast<uint16_t>(0x0100|((ready&&time<confirmUntil_)?0x0080:0)),0,0,raw.leftX,raw.leftY};
+    auto result=continuing(static_cast<uint16_t>(0x0100|((ready&&time<confirmUntil_)?0x0080:0)),true);
     // Native Call resolves direction and R3 in the same input packet. Keep
     // the selection through its bounded confirm pulse, then consume it even
     // if the user keeps holding the stick after the native menu disappears.
-    if(ready&&!stickBlocked_&&(!confirmed_||time<confirmUntil_)){result.rightX=raw.rightX;result.rightY=raw.rightY;}
-    return {result,true,true};
+    if(ready&&!stickBlocked_&&(!confirmed_||time<confirmUntil_)){result.gamepad.rightX=raw.rightX;result.gamepad.rightY=raw.rightY;}
+    return result;
 }
 MotionStrike MotionMelee::update(Pose head,Pose hand,bool available,uint64_t time,uint64_t epoch,bool weapon){
     MotionStrike result;

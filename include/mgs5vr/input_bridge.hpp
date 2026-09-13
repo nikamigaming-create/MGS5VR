@@ -126,18 +126,25 @@ private:
     bool clearArmed_{};
     unsigned power_{};
 };
-struct CommandsInput { GamepadSample gamepad{};bool active{},exclusive{}; };
-// Tap X while holding LT to enter Commands. Release LT to close; walking stays
-// independent. Native call selection owns the right stick and confirm button.
+struct CommandsInput { GamepadSample gamepad{};bool active{},exclusive{},weaponReady{}; };
+// The semantic input uses X+LT to open/hold, RT to confirm. Native Call owns
+// navigation/R3. An already-published aim or lowered-weapon CQC hold can continue
+// through the menu; opening Commands cannot start an attack or aim a new weapon.
 class RigCommands {
 public:
-    CommandsInput update(GamepadSample raw,bool available,uint64_t time,uint64_t drawTime);
+    CommandsInput update(GamepadSample raw,bool available,uint64_t time,uint64_t drawTime,
+                         uint8_t heldAim=0,uint8_t heldCqc=0);
+    void observeGameplay(GamepadSample sample,bool weaponReady){
+        priorAim_=weaponReady&&sample.leftTrigger>127;
+        priorCqc_=!weaponReady&&sample.leftTrigger<=24&&sample.rightTrigger>127;
+    }
     void reset(){*this=RigCommands{};}
     void suspend(){reset();releaseRequired_=true;}
     bool active() const {return active_;}
 private:
     uint64_t openedAt_{},lastTime_{},confirmUntil_{};
     bool active_{},releaseRequired_{},confirmHeld_{},stickBlocked_{},priorChord_{},confirmed_{};
+    bool priorAim_{},priorCqc_{},carryAim_{},carryCqc_{};
 };
 struct MotionStrike { bool strike{},started{};float curl{};Vec3 start{},end{}; };
 // No buttons arm a punch. Detect a deliberate, outward hand stroke relative to

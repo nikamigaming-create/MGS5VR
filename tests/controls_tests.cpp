@@ -203,6 +203,20 @@ int main(int argc,char** argv){
         expect(f.active("turn.right"),"fresh lateral flick snap turns");
     }
     {
+        Fixture f;f.input.buttons[8]=1;f.input.buttons[10]=.8f;f.tick();
+        f.input.buttons[2]=1;f.tick();f.mode=ControlContext::commands;f.tick();
+        expect(f.active("gameplay.ready_weapon")&&f.controls.value("gameplay.fire_or_cqc")>.79f,
+            "configured aim/CQC holds stay observable across interrogation menu ownership");
+        f.input.buttons[8]=0;f.input.buttons[10]=0;f.tick();
+        expect(!f.active("gameplay.ready_weapon")&&!f.active("gameplay.fire_or_cqc"),
+            "combat releases are not swallowed inside Commands");
+        f.mode=ControlContext::menus;f.input.buttons[8]=1;f.input.buttons[10]=1;f.tick();
+        expect(!f.active("gameplay.ready_weapon")&&!f.active("gameplay.fire_or_cqc"),
+            "combat continuity does not apply to iDroid, Pause or title menus");
+        expect(f.load("[commands]\nconfirm=press(right_trigger)\n"),
+            "a custom command confirmation may share the continuation-only CQC input");
+    }
+    {
         Fixture f;f.input.buttons[10]=1;f.tick();f.controls.suspend();f.tick();
         expect(!f.active("gameplay.fire_or_cqc"),"focus return cannot fire a held trigger");
         f.input.buttons[10]=0;f.tick();f.input.buttons[10]=.2f;f.tick();

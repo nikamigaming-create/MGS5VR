@@ -31,12 +31,29 @@ poses are composed with the native wrist attachment and final solved wrist.
 Their resulting LOCAL-space publication is carried with the same head/skin
 sample as the submitted eyes. Missing, replaced or unknown sights remain closed.
 
-The round-aperture calibrations cover native sight definitions 6, 7 and 9–20.
+The round-aperture calibrations cover native sight definitions 6, 7 and 9–24.
 They are numerical measurements of the owned FMDL glass and FCNP connection
 points, matched by connection-point separation and native optical powers.
-No retail model, texture, UI file or save is distributed. Holographic/reflex,
-flip-to-side, night-vision and launcher sight presentations are not covered by
-these round-aperture calibrations.
+The four added launcher apertures are built into their receiver models, rather
+than separate sight packages, and use their native 2×/4×/6× powers. Their portals
+fit inside the actual polygonal opening, not over the outer eyecup. Package
+filenames are not equipment IDs: RC_80103 uses ms02, RC_80203 uses ms03, and
+RC_80303 uses ms01. No retail model, texture, UI file or save is distributed.
+Holographic/reflex, flip-to-side and night-vision presentations remain separate
+work. A round launcher lens does not establish target lock or guidance support.
+
+### Close-up native depth
+
+TPP's owned tracked scene now lowers its native near plane to 2 cm when the
+original plane is farther away. This fixes the cut-open launcher tube seen at
+the prior 6.9 cm plane. The native viewport builder consumes the changed camera
+field, keeping depth reconstruction and clip/GPU projections consistent; this
+is not a global rasterizer/depth-clipping disable or a late Z-matrix rewrite.
+The far plane is unchanged. The original camera field and matrices are restored
+between scene passes, on failure, and before the native menu-source pass.
+Pre-replay visibility gets the closer plane only in its owned clip projection.
+The field is verified for TPP 1.0.15.4 graphics camera +0x168 (far +0x16c);
+Ground Zeroes is intentionally untouched.
 
 ## Current verification
 
@@ -61,4 +78,13 @@ cycles 2× → 4× → 8× → 2× one click at a time. Six tracked shots were i
 The later "empty" still was taken after automatic reload had begun/completed;
 its filename does not establish a manually initiated empty reload. Native
 `EQP_WP_30305` (G44, sight 7) also has an aligned fixed 3× lens; its firing and
-under-barrel behavior are not established by that static view.
+under-barrel behavior were not established by that earlier static view.
+
+The later 782A7919 recordings add G44 fire/partial reload, Brennan 4×/6×/8×,
+AM MRS-73 2×/6× and the scoped AM D114 sidearm's fixed 3×, including the
+grip+A quick-switch. The G44's stock UB_30105 is a foregrip, not a launcher.
+On 59E33527, the corrected GROM tube and 2×/4×/6× lens are visible in both-eye
+captures; firing consumes a rocket and its later wrist HUD reads 1/6.
+FB MR R-LAUNCHER, Killer Bee and CGM 25 also have recorded 2×/4×/6× cycles, a shot and
+loaded magazine afterward. Guidance, complete reload choreography, all grades
+and physical-headset acceptance are not established by these recordings.

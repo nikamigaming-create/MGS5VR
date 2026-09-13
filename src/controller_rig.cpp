@@ -332,6 +332,17 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                                     geometry->ocular=compose(*attachment,geometry->ocular);
                                     geometry->objective=compose(*attachment,geometry->objective);
                                     scopeInWrist=*geometry;scopeResource=resource;
+                                }else if(scopeTrace){
+                                    static uint64_t lastUnprofiled{};
+                                    const uint64_t key=uint64_t(resource)<<32|uint64_t(optical[0])<<24|uint64_t(optical[1])<<16|uint64_t(optical[2])<<8|optical[3];
+                                    if(key!=lastUnprofiled){
+                                        lastUnprofiled=key;std::ostringstream s;
+                                        s<<"Unprofiled native scope resource="<<std::hex<<resource<<std::dec<<" optical=";
+                                        for(auto value:optical)s<<unsigned(value)<<",";
+                                        const auto describe=[&](const char* label,Pose p){s<<" "<<label<<"="<<p.position.x<<","<<p.position.y<<","<<p.position.z
+                                            <<" q="<<p.orientation.x<<","<<p.orientation.y<<","<<p.orientation.z<<","<<p.orientation.w;};
+                                        describe("rear",*rearPose);describe("front",*frontPose);mgs5vr::log(s.str());
+                                    }
                                 }
                             }
                         }

@@ -87,6 +87,24 @@ an attached grenade launcher or its alternate-fire control has been tested.
 Native checkpoint/Continue can prepare new field loadouts without replaying
 the helicopter arrival. Snipers belong in the native back slot, not the hip.
 
+The launcher follow-up adds four receiver-integrated round apertures. On the
+59E33527 SIM build, GROM, FB MR R-LAUNCHER, Killer Bee and CGM 25 each show separate
+2×/4×/6× steps and actual firing. Later native wrist counts show loaded rounds
+afterward (GROM/FB MR 1/6, Killer Bee 1/4; CGM native clip 1, total ammo 5).
+Native camera near clipping was
+cutting the close GROM tube open; the scoped 2 cm near-plane change removes
+that cut in matched both-eye views without changing the far plane or GZ.
+The first FB MR shot at a downward angle caused nearby blast knockdown; that
+take is excluded from the showcase, and the repeat uses a higher firing angle.
+Launcher lock-on/guidance and complete two-hand reloads remain unverified.
+The stock RASP TB-SG two-shell break action and scoped AM D114 sidearm also
+have recorded fire/reload cycles, not complete all-grade passes.
+
+Loadout fixtures now clear the previous initial ammo arrays and call the native
+mission-start ammo copy before checkpointing. Otherwise a different weapon's
+old magazine capacity can survive a fixture change. Actual use remains native
+OpenXR controller input, not a Lua fire/reload command.
+
 An 80-second 1080p30 partial TPP/GZ field edit now exists privately, with native
 audio, aspect-correct eye footage, SBS, directional wipes and the requested
 instruction-style overlays. Its timecoded source index records the mixed

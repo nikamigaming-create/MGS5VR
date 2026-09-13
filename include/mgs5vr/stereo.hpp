@@ -32,6 +32,10 @@ std::optional<EyeImageRegion> eyeImageRegion(EyeFov rendered,EyeFov requested,ui
 // FOX row-vector projection: camera +Z forward, -X screen-right. Retains the
 // engine's depth mapping while replacing the angular field and optical center.
 bool setEyeProjection(std::array<float,16>& matrix,EyeFov fov);
+// The native perspective builder must consume this near plane itself, so its
+// depth coefficients, reconstruction and visibility agree. Never raise an
+// already closer plane, alter the far plane, or repair invalid native inputs.
+float trackedNearPlane(float nativeNear,float nativeFar);
 // Conservative angular visibility coverage before either eye is drawn. Keeps
 // native coverage if it is wider and adds a small symmetric head-turn margin.
 bool widenVisibilityProjection(std::array<float,16>& matrix,Pose head,const std::array<EyeView,2>& views);

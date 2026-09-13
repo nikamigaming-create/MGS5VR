@@ -17,6 +17,7 @@ std::string trim(std::string text){
     return begin==std::string::npos?std::string{}:text.substr(begin,end-begin+1);
 }
 std::string lower(std::string text){for(auto& c:text)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));return text;}
+bool commandContinuation(std::string_view name){return name=="gameplay.ready_weapon"||name=="gameplay.fire_or_cqc";}
 constexpr std::array<std::string_view,19> names{"a","b","x","y","menu","left_stick_click","right_stick_click",
     "left_grip","right_grip","left_trigger","right_trigger","left_stick_up","left_stick_down","left_stick_left","left_stick_right",
     "right_stick_up","right_stick_down","right_stick_left","right_stick_right"};
@@ -41,12 +42,12 @@ const std::vector<ControlDefinition>& controlDefinitions(){
         {"system.recenter","press(left_grip + menu)",all},{"system.toggle_vr","disabled",all},
         {"gameplay.run","right_stick_up",foot},{"gameplay.stance","right_stick_down",foot},
         {"gameplay.dive","press(right_stick_click)",foot},{"gameplay.interact","y",foot},
-        {"gameplay.reload","tap(b,300)",foot},{"gameplay.ready_weapon","right_grip",foot|horse,true},
+        {"gameplay.reload","tap(b,300)",foot},{"gameplay.ready_weapon","right_grip",foot|horse|commands,true},
         {"gameplay.pickup_carry","left_grip + b",foot},
         {"gameplay.support_grip","left_grip",foot|horse,true},
         {"gameplay.switch_weapon","press(a)",foot},
         {"gameplay.zoom","press(left_stick_click)",foot},
-        {"gameplay.fire_or_cqc","right_trigger",foot|horse},{"gameplay.equip_binoculars","hold(b,300)",foot},
+        {"gameplay.fire_or_cqc","right_trigger",foot|horse|commands},{"gameplay.equip_binoculars","hold(b,300)",foot},
         {"gameplay.native_a","disabled",foot},{"gameplay.native_x","disabled",foot},
         {"gameplay.native_left_shoulder","disabled",foot},{"gameplay.native_right_shoulder","disabled",foot},
         {"gameplay.native_right_click","disabled",foot},
@@ -179,7 +180,8 @@ std::vector<std::string> ControlBindings::load(std::istream& input){
     // Tap and hold on one button are intentional; disjoint contexts are safe.
     for(size_t a=0;a<candidate.entries_.size();++a)for(size_t b=a+1;b<candidate.entries_.size();++b){
         const auto& x=candidate.entries_[a];const auto& y=candidate.entries_[b];
-        if(!(x.contexts&y.contexts)||x.modifier||y.modifier)continue;
+        const auto shared=x.contexts&y.contexts;
+        if(!shared||x.modifier||y.modifier||(shared==commands&&(commandContinuation(x.name)||commandContinuation(y.name))))continue;
         for(const auto& xb:x.bindings)for(const auto& yb:y.bindings)if(xb.mask==yb.mask){
             const bool split=(xb.gesture==Gesture::tap&&yb.gesture==Gesture::hold)||(xb.gesture==Gesture::hold&&yb.gesture==Gesture::tap);
             if(!split)errors.push_back("conflict: "+x.name+" and "+y.name+" use the same input in the same mode");
@@ -217,7 +219,9 @@ void ControlBindings::update(PhysicalControls input,ControlContext context,uint6
             if(!enabled){state={};state.blocked=occupied;continue;}
             if(!state.enabled){state.enabled=true;if(occupied)state.blocked=true;}
             bool superseded=false;
-            if(!e.modifier)for(const auto& other:entries_)if((other.contexts&current)&&!other.modifier)for(const auto& chord:other.bindings)
+            if(!e.modifier&&!(current==commands&&commandContinuation(e.name)))
+                for(const auto& other:entries_)if((other.contexts&current)&&!other.modifier
+                    &&!(current==commands&&commandContinuation(other.name)))for(const auto& chord:other.bindings)
                 if(chord.mask!=binding.mask&&(chord.mask&binding.mask)==binding.mask&&(down&chord.mask)==chord.mask)superseded=true;
             if(superseded){state.blocked=true;state.until=0;}
             if(state.blocked){if(!occupied){state.blocked=false;state.held=false;}continue;}

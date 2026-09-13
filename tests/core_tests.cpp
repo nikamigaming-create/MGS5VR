@@ -16,6 +16,29 @@ static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
     {
+        struct Launcher{uint32_t sight;Vec3 rear;float length,radius,inset;};
+        const std::array<Launcher,4> launchers{{
+            {21,{.057f,.128f,-.0640001f},.168000f,.00926f,.007614f},
+            {22,{.079f,.184f,-.1429949f},.259995f,.01567f,.005989f},
+            {23,{.1139957f,.169f,-.1099949f},.431995f,.01478f,.005795f},
+            {24,{.1439957f,.2040864f,-.1533774f},.323995f,.01328f,.007445f}
+        }};
+        const Pose motion{{0,.38268343f,0,.92387953f},{3,2,-4}};
+        for(const auto& launcher:launchers){
+            const Pose rear{{},launcher.rear},front{{},launcher.rear+Vec3{0,0,launcher.length}};
+            const auto optic=nativeWeaponScopeGeometry(rear,front,{2,4,6,1});
+            expect(optic&&optic->sight==launcher.sight&&near(optic->radius,launcher.radius),"launcher CNP pair selects its own receiver aperture");
+            expect(optic&&same(optic->ocular.position,launcher.rear+Vec3{0,0,launcher.inset}),"launcher lens sits at the measured inner opening, not the outer rim");
+            expect(!nativeWeaponScopeGeometry(rear,front,{2,4,8,1}),"launcher cannot borrow rifle magnification steps");
+            expect(!nativeWeaponScopeGeometry(front,rear,{2,4,6,1}),"reversed launcher sockets cannot reveal mirrored world pixels");
+            const auto moved=nativeWeaponScopeGeometry(compose(motion,rear),compose(motion,front),{2,4,6,1});
+            expect(optic&&moved&&same(moved->ocular.position,compose(motion,optic->ocular).position),"launcher scope remains attached under rigid motion");
+        }
+        WeaponScopeZoom zoom;
+        expect(near(zoom.update(21,0,{2,4,6}),2)&&near(zoom.update(21,1,{2,4,6}),4)
+            &&near(zoom.update(21,2,{2,4,6}),6)&&near(zoom.update(21,3,{2,4,6}),2),"launcher zoom cycles only its native 2x/4x/6x powers");
+    }
+    {
         WeaponScopeSample scope{Pose{{},{0,0,-.1f}},Pose{{},{0,0,-.3f}},.018f,.1f,4.f,17,true};
         const auto scene=weaponScopeSceneView(scope);
         expect(scene&&same(scene->pose.position,scope.objective.position),"scope scene starts at the native objective, not the head");
@@ -445,6 +468,45 @@ int main(){
         commands.suspend();expect(!commands.update(input,true,1190,1180).active,"tracking or focus loss requires a fresh commands chord");
     }
     {
+        RigCommands commands;
+        commands.observeGameplay({0,255,0},true);
+        auto result=commands.update({0x4000,255},true,1000,990,255,0);
+        expect(result.active&&result.weaponReady&&result.gamepad.leftTrigger==255&&!result.gamepad.rightTrigger,
+            "opening interrogation Commands preserves an already-readied hold-up weapon");
+        commands.update({0,255},true,1020,1010,255,0);
+        result=commands.update({0,255,255,0,0,25000},true,1040,1030,255,255);
+        expect(result.gamepad.buttons==0x180&&result.gamepad.leftTrigger==255&&!result.gamepad.rightTrigger,
+            "interrogation confirmation retains aim and cannot fire even with physical trigger held");
+        result=commands.update({},true,1060,1050,255,255);
+        expect(!result.active&&result.exclusive&&result.weaponReady&&result.gamepad.leftTrigger==255&&!result.gamepad.rightTrigger,
+            "closing Commands keeps the hold-up aim without admitting a newly held attack");
+        commands.suspend();
+        result=commands.update({0x4000,255},true,1080,1070,255,255);
+        expect(!result.weaponReady&&!result.gamepad.leftTrigger&&!result.gamepad.rightTrigger,
+            "focus suspension clears all command combat continuity");
+    }
+    {
+        RigCommands commands;
+        commands.observeGameplay({0,0,230},false);
+        auto result=commands.update({0x4000,255},true,1000,990,0,230);
+        expect(result.active&&!result.weaponReady&&!result.gamepad.leftTrigger&&result.gamepad.rightTrigger==230,
+            "opening interrogation retains the previously published lowered-weapon CQC hold");
+        commands.update({0,255},true,1020,1010,0,230);
+        result=commands.update({0,255,255,0,0,0,25000},true,1040,1030,0,230);
+        expect(result.gamepad.rightTrigger==230&&result.gamepad.buttons==0x180,
+            "CQC hold and one command confirmation use independent native inputs");
+        result=commands.update({0,255},true,1060,1050,0,0);
+        expect(!result.gamepad.rightTrigger,"releasing the physical CQC trigger releases native restraint immediately");
+        result=commands.update({0,255},true,1080,1070,0,255);
+        expect(!result.gamepad.rightTrigger,"Commands cannot re-grab or attack after a released CQC hold");
+        result=commands.update({0,255},false,1100,1090,0,255);
+        expect(!result.gamepad.rightTrigger&&!result.active,"unavailable Commands cannot retain an attack");
+        commands.reset();
+        result=commands.update({0x4000,255},true,1200,1190,255,255);
+        expect(!result.gamepad.leftTrigger&&!result.gamepad.rightTrigger,
+            "fresh aim and attack on the menu-opening frame do not acquire combat ownership");
+    }
+    {
         MotionMelee melee;const Pose head{{},{0,1.6f,0}};
         const uint64_t actorTag=(uint64_t{1}<<63)|(uint64_t{1}<<59);
         for(uint64_t index=0;index<512;++index){
@@ -513,6 +575,25 @@ int main(){
     }
 
     const EyeFov asymmetric{-0.8f,0.9f,0.75f,-0.7f};
+    expect(phantomPainRender.cameraNearPlane==0x168&&groundZeroesRender.cameraNearPlane==0,
+        "tracked near-plane field is verified only for the TPP graphics camera");
+    expect(near(trackedNearPlane(.069f,4000.f),.02f),"close held geometry uses a two-centimeter native near plane");
+    expect(trackedNearPlane(.01f,4000.f)==.01f,"an already closer native plane is preserved");
+    expect(trackedNearPlane(.1f,.05f)==.1f&&trackedNearPlane(0,4000.f)==0&&trackedNearPlane(-1,4000.f)==-1,
+        "invalid native plane ordering is not silently rewritten");
+    expect(trackedNearPlane(.1f,INFINITY)==.1f&&std::isnan(trackedNearPlane(NAN,4000.f)),
+        "nonfinite native depth inputs are left to their original caller");
+    for(float nativeFar:{100.f,4000.f})for(float farDepth:{-1.f,0.f}){
+        const float nativeNear=trackedNearPlane(.069f,nativeFar);
+        std::array<float,16> depth{};depth[11]=1;
+        depth[10]=(farDepth*nativeFar-nativeNear)/(nativeFar-nativeNear);
+        depth[14]=(1-farDepth)*nativeNear*nativeFar/(nativeFar-nativeNear);
+        const auto originalDepth=depth;
+        expect(setEyeProjection(depth,asymmetric)&&depth[10]==originalDepth[10]&&depth[14]==originalDepth[14],
+            "tracked angular projection preserves native-built close clip and reversed-Z coefficients");
+        expect(near(depth[10]+depth[14]/nativeNear,1)&&near(depth[10]+depth[14]/nativeFar,farDepth),
+            "close native projection retains its original far plane and clip/GPU depth endpoints");
+    }
     std::array<float,16> projection{1,0,0,0,0,1,0,0,0,0,-0.0002f,1,0,0,0.1f,0};
     expect(setEyeProjection(projection,asymmetric),"native perspective accepts runtime asymmetric field of view");
     {

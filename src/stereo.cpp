@@ -3,6 +3,10 @@
 #include <cmath>
 
 namespace mgs5vr {
+float trackedNearPlane(float nativeNear,float nativeFar){
+    if(!std::isfinite(nativeNear)||!std::isfinite(nativeFar)||nativeNear<=0||nativeFar<=nativeNear)return nativeNear;
+    return std::min(nativeNear,.02f);
+}
 std::optional<std::array<float,16>> uiPanelProjection(const std::array<float,16>& uiProjection,
     const std::array<float,16>& eyeView,EyeFov fov,Pose panel,float width,float height,float centerX,float centerY){
     if(!valid(panel)||!valid(fov)||!std::isfinite(width)||!std::isfinite(height)||width<=0||height<=0
