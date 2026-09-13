@@ -27,6 +27,15 @@ struct Fixture {
 int main(int argc,char** argv){
     {
         Fixture f;
+        expect(f.load("[gameplay]\nnative_dpad_up=press(right_grip + x)\n"),"direct native weapon actions accept a deliberate chord");
+        f.tick();f.input.buttons[8]=1;f.tick();f.input.buttons[2]=1;f.tick();
+        expect(f.active("gameplay.native_dpad_up")&&f.active("gameplay.ready_weapon")&&!f.active("commands.open"),
+            "native D-pad chord keeps weapon ready without opening Commands");
+        f.tick(101);expect(!f.active("gameplay.native_dpad_up"),"direct native action has one bounded press");
+        f.input.buttons[2]=0;f.tick();expect(!f.active("commands.open"),"chord release does not leak into Commands");
+    }
+    {
+        Fixture f;
         expect(f.controls.setting("settings.wrist_picker_width_cm")==75,"native cards use the readable default width");
         expect(f.load("[settings]\nwrist_picker_width_cm=100\n"),"native picker width is configurable");
         expect(f.controls.setting("settings.wrist_picker_width_cm")==100,"maximum picker width is retained");

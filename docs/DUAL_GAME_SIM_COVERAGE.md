@@ -24,7 +24,7 @@ reruns the separate 2×/4×/8× scope clicks successfully.
 Native capture now records each take's actual render/display FOV and ends a
 take if the projection changes, so editing can correct source-eye aspect.
 
-The current B1E1D8C8 build fixes a reproduced ACC-to-mission transition: when
+The earlier B1E1D8C8 build fixed a reproduced ACC-to-mission transition: when
 the former verified player stops publishing, a fresh matching mission player
 gets a new VR origin and stereo generation. SIM now reaches the Afghanistan
 field view with tracked hands, rather than retaining the ACC sky. A concurrently
@@ -69,6 +69,29 @@ every parsed ID, refuses to overwrite recorded results, and starts every case as
 not run. Classify NPC/demo/resource entries explicitly before excluding them.
 Binoculars, iDroid, NVG, mounted weapons and contextual/buddy systems also need
 their separate action cases; the gun tables are not the whole game.
+
+Pass `--tpp-chimera` with the owned `parts/EquipParameters.lua` and
+`--tpp-development` with `EquipDevelopConstSetting.lua` to include modern
+numbered `WP_` weapons. The September 13 owned-table join reads 400 gunBasic
+rows and adds 294 IDs missing from the 486-entry legacy table, producing 780
+distinct definitions. These are worklist counts, not completed runs or 780
+player-usable weapons. Shared buddy/development IDs retain all source records;
+development UI categories do not silently replace actual legacy equipment types.
+
+Further SIM runs on 782A7919 exercise stock G44 (`EQP_WP_30305`, fixed 3×),
+Brennan (`EQP_WP_60406`, 4×/6×/8×), and AM MRS-73 (`EQP_WP_60304`, 2×/6×).
+Each has actual trigger input and a native partial reload recorded. These add
+individual scope/action observations, not all-grade or complete-weapon passes.
+The G44's stock `UB_30105` is a non-firing foregrip; it is not evidence that
+an attached grenade launcher or its alternate-fire control has been tested.
+Native checkpoint/Continue can prepare new field loadouts without replaying
+the helicopter arrival. Snipers belong in the native back slot, not the hip.
+
+An 80-second 1080p30 partial TPP/GZ field edit now exists privately, with native
+audio, aspect-correct eye footage, SBS, directional wipes and the requested
+instruction-style overlays. Its timecoded source index records the mixed
+development builds. GZ is labeled third-person stereo preview. All-equipment
+capture and the final exhaustive showcase remain incomplete.
 
 ## 12 September development run
 

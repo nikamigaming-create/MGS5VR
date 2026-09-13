@@ -37,3 +37,11 @@ final-eye stills. Fresh TPP rifle/pistol/switch recordings also exist. These are
 partial action observations, not complete per-item passes. Individual take
 metadata identifies the exact build and source-eye/final-compositor distinction.
 All-arsenal capture and final assembly remain incomplete.
+
+September 13: a private 80-second, 1920×1080/30-fps field edit has been assembled
+and visually reviewed at key frames. It includes Snake's title portrait,
+aspect-correct native eye sources, paired rifle/reload/gadget actions, variable
+scope and binocular sections, SBS and directional wipes, and process-only audio.
+Its edit index lists exact take builds and timecodes. GZ is explicitly labeled
+third-person stereo preview. This is a useful partial edit, not the final
+all-weapons/all-features film; subsequent equipment takes still need integration.

@@ -6,6 +6,7 @@ private working data; do not distribute the source game scripts.
 """
 import argparse
 import collections
+import decimal
 import hashlib
 import json
 import pathlib
@@ -106,10 +107,120 @@ def gz_inventory(directory):
                                   'A native definition does not establish player access.'])
 
 
+def tpp_chimera_inventory(document, source, development):
+    """Join modern numbered WP definitions that are absent from the legacy enum table.
+
+    Only parse declarative, constant gunBasic rows; never execute owned Lua.
+    Development type/name keys are provenance, not proof that an item is usable.
+    """
+    raw = source.read_bytes()
+    text = raw.decode('utf-8-sig')
+    headers = list(re.finditer(r'\bgunBasic\s*=\s*\{', text))
+    if len(headers) != 1:
+        raise ValueError(f'{source}: expected one declarative gunBasic table')
+    start = headers[0].end()
+    depth = 1
+    end = start
+    # This bounded table accepts only constants and integer grades below.
+    # Quotes/comments are deliberately rejected instead of misreading braces.
+    while depth and end < len(text):
+        depth += (text[end] == '{') - (text[end] == '}')
+        end += 1
+    if depth:
+        raise ValueError(f'{source}: unterminated gunBasic table')
+    body = text[start:end-1]
+    if any(token in body for token in ('"', "'", '--', '[', ']')):
+        raise ValueError(f'{source}: gunBasic is not a plain constant table')
+    rows = re.findall(r'\{([^{}]*)\}', body)
+    if not rows or not re.fullmatch(r'\s*1\s*(?:,\s*)*', re.sub(r'\{[^{}]*\}', '', body)):
+        raise ValueError(f'{source}: unsupported gunBasic header or row structure')
+
+    dev_raw = development.read_bytes()
+    dev_text = dev_raw.decode('utf-8-sig')
+    definitions = {}
+    for match in re.finditer(r'\bRegCstDev\s*\{([^{}]*)\}', dev_text):
+        record = match.group(1)
+        identity = re.search(r'\bp01\s*=\s*TppEquip\.(EQP_WP_\w+)\s*(?:,|$)', record)
+        if not identity:
+            continue
+        kind = re.search(r'\bp02\s*=\s*TppMbDev\.EQP_DEV_TYPE_(\w+)\s*(?:,|$)', record)
+        name = re.search(r'\bp06\s*=\s*"([^"\r\n]*)"', record)
+        record_id = re.search(r'\bp00\s*=\s*(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(?:,|$)', record)
+        if not kind or not record_id:
+            raise ValueError(f'{development}: unsupported development record for {identity[1]}')
+        numeric_id = decimal.Decimal(record_id[1])
+        if numeric_id != numeric_id.to_integral_value() or not 0 <= numeric_id <= 0x7fffffff:
+            raise ValueError(f'{development}: non-integral development identity')
+        item = dict(native_type=kind[1], name_key=name[1] if name else None,
+                    development_id=int(numeric_id))
+        if identity[1] in definitions:
+            previous = definitions[identity[1]]
+            if item['native_type'] not in previous['native_types']:
+                previous['native_types'].append(item['native_type'])
+                previous['native_type'] = 'Unknown'
+            if item not in previous['records']:
+                previous['records'].append(item)
+        else:
+            definitions[identity[1]] = dict(native_type=kind[1], native_types=[kind[1]], records=[item])
+    if not definitions:
+        raise ValueError(f'{development}: no modern weapon development records found')
+
+    existing = {entry['id']: entry for entry in document['entries']}
+    seen = set()
+    part_names = ('receiver', 'barrel', 'ammunition', 'stock', 'muzzle', 'magazine',
+                  'rear_sight', 'front_sight', 'underbarrel', 'light', 'light_secondary')
+    added = 0
+    for row in rows:
+        values = [token.strip() for token in row.split(',')]
+        if len(values) != 13 or not values[-1].isdigit() or any(
+                not re.fullmatch(r'TppEquip\.\w+', value) for value in values[:-1]):
+            raise ValueError(f'{source}: unsupported modern weapon row')
+        weapon = values[0].removeprefix('TppEquip.')
+        if not re.fullmatch(r'WP_\w+', weapon):
+            raise ValueError(f'{source}: unexpected gunBasic identity {weapon}')
+        identity = 'EQP_' + weapon
+        if identity in seen:
+            raise ValueError(f'{source}: duplicate modern weapon {identity}')
+        seen.add(identity)
+        definition = definitions.get(identity)
+        kind = definition['native_type'] if definition else 'Unknown'
+        native_parts = dict(zip(part_names, (v.removeprefix('TppEquip.') for v in values[1:-1])))
+        detail = dict(gun_basic_id=weapon, native_grade=int(values[-1]), native_parts=native_parts,
+                      development=definition, source_kind='modern_chimera_gunBasic')
+        if identity in existing:
+            if existing[identity]['native_type'] != kind and definition:
+                # Development UI categories (e.g. Quiet) need not equal the
+                # actual equipment type. Keep both; never silently reclassify.
+                detail['development_type_difference'] = [existing[identity]['native_type'], kind]
+            existing[identity].update(detail)
+            continue
+        entry = dict(game='tpp', id=identity, native_type=kind,
+                     classification='eligibility_to_check', classification_evidence=None,
+                     display_name=None, access='not_checked',
+                     tests={name: {'result': 'not_run', 'runs': []} for name in cases(kind)}, **detail)
+        document['entries'].append(entry)
+        added += 1
+    document['sources'] = [dict(path=document['source'], sha256=document['source_sha256']),
+                           dict(path=str(source.resolve()), sha256=hashlib.sha256(raw).hexdigest()),
+                           dict(path=str(development.resolve()), sha256=hashlib.sha256(dev_raw).hexdigest())]
+    document['modern_gun_rows'] = len(rows)
+    document['modern_ids_added'] = added
+    document['development_weapons_without_gunBasic'] = sorted(set(definitions) - seen)
+    document['inventory_limits'] = [
+        'Modern gunBasic joins preserve individual grades; neither development nor definition proves access.',
+        'Development-only IDs are listed separately, not invented as gunBasic weapons.',
+        'Patch load order, buddy/contextual equipment and native abilities still require reconciliation.']
+    return document
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--table', action='append', required=True, metavar='GAME=PATH')
     parser.add_argument('--output', required=True, type=pathlib.Path)
+    parser.add_argument('--tpp-chimera', type=pathlib.Path,
+                        help='Owned parts/EquipParameters.lua containing modern gunBasic rows')
+    parser.add_argument('--tpp-development', type=pathlib.Path,
+                        help='Owned EquipDevelopConstSetting.lua providing native weapon types')
     args = parser.parse_args()
     games = []
     for value in args.table:
@@ -117,6 +228,13 @@ def main():
         if game not in {'tpp', 'gz'} or any(g['game'] == game for g in games):
             parser.error('exactly one table per supplied game: tpp or gz')
         games.append(inventory(game, pathlib.Path(path)))
+    if bool(args.tpp_chimera) != bool(args.tpp_development):
+        parser.error('--tpp-chimera and --tpp-development must be supplied together')
+    if args.tpp_chimera:
+        tpp = next((game for game in games if game['game'] == 'tpp'), None)
+        if tpp is None:
+            parser.error('--tpp-chimera requires a tpp table')
+        tpp_chimera_inventory(tpp, args.tpp_chimera, args.tpp_development)
     if args.output.exists():
         parser.error('output already exists; preserve its recorded results and choose a new path')
     document = dict(schema=1, scope='per-native-equipment-ID, not family sampling',

@@ -35,6 +35,8 @@ jobs:
         run: ctest --preset release --exclude-regex d3d11_mailbox --output-junit build/ci-tests.xml
       - name: Check Python tooling
         run: python -m compileall -q tools
+      - name: Check asset-free equipment inventory fixtures
+        run: python tests/equipment_coverage_tests.py
       - name: Assemble development install tree
         run: cmake --install build --config Release --component MGS5VR --prefix dist/MGS5VR-development
       - name: Verify packaged setup on Windows PowerShell

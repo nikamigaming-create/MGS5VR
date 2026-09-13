@@ -29,6 +29,13 @@ Invalid files use built-in defaults and report the errors in `mgs5vr.log`.
 The file also includes movement/navigation axes, snap angle and physical-gesture
 switches. It remaps implemented actions; it does not create new native game abilities.
 
+Optional `[gameplay].native_dpad_up/down/left/right` bindings send native D-pad
+actions directly, bypassing the wrist category chooser. They default to
+`disabled`; native weapon/state rules still apply. They are not a universal
+alternate-fire action. For a deliberate custom chord, for example,
+`native_dpad_up = press(right_grip + x)` keeps the weapon ready without also
+opening Commands. Keep these disabled unless your custom layout needs them.
+
 These bindings target the game's **Action Type** controller layout. The left-arm
 HUD shows the native weapon name, ammunition and status. Native context-action
 icons appear beside that display when the game offers an action; the horse/Y

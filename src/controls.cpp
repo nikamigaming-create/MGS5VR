@@ -50,6 +50,8 @@ const std::vector<ControlDefinition>& controlDefinitions(){
         {"gameplay.native_a","disabled",foot},{"gameplay.native_x","disabled",foot},
         {"gameplay.native_left_shoulder","disabled",foot},{"gameplay.native_right_shoulder","disabled",foot},
         {"gameplay.native_right_click","disabled",foot},
+        {"gameplay.native_dpad_up","disabled",foot},{"gameplay.native_dpad_down","disabled",foot},
+        {"gameplay.native_dpad_left","disabled",foot},{"gameplay.native_dpad_right","disabled",foot},
         {"equipment.open","left_trigger",foot|wrist|commands|optic|horse,true},
         {"equipment.primary","right_stick_up",wrist},{"equipment.secondary","right_stick_down",wrist},
         {"equipment.support","right_stick_right",wrist},{"equipment.items","right_stick_left",wrist},

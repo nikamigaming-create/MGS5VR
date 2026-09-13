@@ -520,6 +520,8 @@ struct Session {
             mappedButton("gameplay.native_left_shoulder",XINPUT_GAMEPAD_LEFT_SHOULDER);
             mappedButton("gameplay.native_right_shoulder",XINPUT_GAMEPAD_RIGHT_SHOULDER);
             mappedButton("gameplay.native_right_click",XINPUT_GAMEPAD_RIGHT_THUMB);
+            mappedButton("gameplay.native_dpad_up",XINPUT_GAMEPAD_DPAD_UP);mappedButton("gameplay.native_dpad_down",XINPUT_GAMEPAD_DPAD_DOWN);
+            mappedButton("gameplay.native_dpad_left",XINPUT_GAMEPAD_DPAD_LEFT);mappedButton("gameplay.native_dpad_right",XINPUT_GAMEPAD_DPAD_RIGHT);
             mappedButton("horse.stance",XINPUT_GAMEPAD_A);mappedButton("horse.reload",XINPUT_GAMEPAD_B);
             mappedButton("horse.gallop",XINPUT_GAMEPAD_X);mappedButton("horse.interact",XINPUT_GAMEPAD_Y);
             mappedButton("horse.left_click",XINPUT_GAMEPAD_LEFT_THUMB);mappedButton("horse.right_click",XINPUT_GAMEPAD_RIGHT_THUMB);
