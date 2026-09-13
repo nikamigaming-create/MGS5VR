@@ -24,6 +24,15 @@ public:
 private:
     bool armed_{};
 };
+// Native analog yaw, not an accumulated/artificial VR rotation. Menus/focus
+// and a stance gesture require centering before native turning can resume.
+class NativeSmoothTurn {
+public:
+    int16_t update(float x,float y,bool available);
+    void reset(){armed_=false;}
+private:
+    bool armed_{};
+};
 struct LocomotionInput { GamepadSample gamepad{};bool stance{}; };
 // Gameplay only: up runs, down is native stance (tap/hold), L3 dives.
 // A vertical gesture cannot repeat or change meaning until centered. Menus,

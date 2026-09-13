@@ -2,6 +2,7 @@
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/controls.hpp"
+#include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/ui_renderer.hpp"
@@ -100,11 +101,13 @@ struct Session {
     bool manualScreenSelected{};
     bool priorTitleMenu{};
     ControlBindings controls;
+    NativeControls nativeControls;
     RigInput rigControls;
     RigOptics opticsControls;
     bool binocularSelected{};
     WeaponScopeZoomInput weaponZoomInput;
     SnapTurn snapControls;
+    NativeSmoothTurn smoothControls;
     OpticStabilizer opticStabilizer;
     float snapYaw{};
     OpticGate opticGate;
@@ -320,14 +323,15 @@ struct Session {
     }
     void syncInput(XrTime time,Pose& head,std::array<EyeView,2>& views,bool stereoTracked){
         controllerFrame={};controllerFrame.snapYaw=snapYaw;
-        if(!focused){snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
         if(!priorFocused){
             snapControls.reset();
+            smoothControls.reset();
             for(size_t side=0;side<hands.size();++side){
                 faceLayouts[side]=ControllerFaceLayout::standard;
                 XrInteractionProfileState profile{XR_TYPE_INTERACTION_PROFILE_STATE};
@@ -385,12 +389,17 @@ struct Session {
         physical.leftStick={l.x,l.y};physical.rightStick={rr.x,rr.y};
         const bool gameplayContext=controllerRigEnabled()&&mode!=TravelMode::unknown&&!title
             &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
-        const auto controlContext=!gameplayContext?ControlContext::menus:
+        const auto controlContext=nativeControls.selected()?ControlContext::nativeButtons:!gameplayContext?ControlContext::menus:
             commandsControls.active()?ControlContext::commands:
             rigControls.equipmentPhase()!=0?ControlContext::equipment:
             binocularSelected?ControlContext::binoculars:mode==TravelMode::vehicle?ControlContext::vehicle:
             mode==TravelMode::horse?ControlContext::horse:ControlContext::gameplay;
         controls.update(physical,controlContext,now);
+        const auto nativeInput=nativeControls.update(controls,physical);
+        if(nativeInput.changed){
+            controls.suspend();rigControls.suspend();commandsControls.suspend();opticsControls.reset();opticGate.reset();snapControls.reset();
+            log(nativeInput.selected?"Native buttons ON: all XInput controls; release inputs before use":"Native buttons OFF: normal VR bindings; release inputs before use");
+        }
         const auto activeControl=[&](std::string_view name){return controls.active(name);};
         const bool manualToggle=headCamera().available()&&activeControl("system.toggle_vr");
         if(manualToggle||nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)automaticEntryDone=true;
@@ -407,7 +416,7 @@ struct Session {
         const bool menuPressed=activeControl("system.idroid")||activeControl("system.pause");
         const bool equipmentHeld=controls.value(mode==TravelMode::vehicle?"vehicle.equipment_open":"equipment.open")
             >(rigControls.equipmentPhase()!=0?.25f:.5f);
-        const bool binocularAvailable=rigInput&&mode==TravelMode::onFoot&&!simpleControllerProfile
+        const bool binocularAvailable=rigInput&&!nativeInput.exclusive&&mode==TravelMode::onFoot&&!simpleControllerProfile
             &&!manualToggle&&!menuPressed&&!commandsControls.active()
             &&!equipmentHeld&&rigControls.equipmentPhase()==0;
         const bool wasBinocularSelected=binocularSelected;
@@ -435,6 +444,8 @@ struct Session {
             |(activeControl("system.pause")?XINPUT_GAMEPAD_BACK:0));
         const bool utilityCenter=centerChord;
         const bool opticSupport=activeControl("binoculars.support_grip");
+        const auto binocularRotation=binocularGripRotation(controls.setting("settings.binocular_pitch_degrees"),
+            controls.setting("settings.binocular_yaw_degrees"),controls.setting("settings.binocular_roll_degrees"));
         const bool opticAvailable=rigInput&&mode==TravelMode::onFoot&&right
             &&binocularSelected
             &&!commandsControls.active()&&!headToggle
@@ -442,7 +453,7 @@ struct Session {
         if(opticAvailable){
             auto& primary=controllerFrame.hands[1];const auto& support=controllerFrame.hands[0];
             if(const auto raw=solveBinocularPose(support.grip,primary.grip,support.aim,primary.aim,
-                support.gripTracked,primary.gripTracked,support.aimTracked,primary.aimTracked,opticSupport,binocularSelected)){
+                support.gripTracked,primary.gripTracked,support.aimTracked,primary.aimTracked,opticSupport,binocularSelected,binocularRotation)){
                 const auto steady=opticStabilizer.update(head,primary.grip,*raw,true,now,referenceEpoch);
                 primary.aim=compose(compose(steady,inverse(primary.grip)),primary.aim);primary.grip=steady;
             }else opticStabilizer.reset();
@@ -452,7 +463,7 @@ struct Session {
             controllerFrame.hands[0].aim,controllerFrame.hands[1].aim,
             controllerFrame.hands[0].gripTracked,controllerFrame.hands[1].gripTracked,
             controllerFrame.hands[0].aimTracked,controllerFrame.hands[1].aimTracked,
-            opticSupport,binocularSelected,opticAvailable,now,referenceEpoch);
+            opticSupport,binocularSelected,opticAvailable,now,referenceEpoch,binocularRotation);
         controllerFrame.optic=optic;
         // Bounded fit telemetry makes the eye-relief decision auditable from
         // the same LOCAL poses that drive the gate. It stays in the runtime
@@ -499,7 +510,9 @@ struct Session {
         const auto triggerValue=[&](std::string_view name){return static_cast<uint8_t>(controls.value(name)*255);};
         auto move=controls.axis("axes.move",physical);
         auto navigation=controls.axis("axes.equipment",physical);
-        if(!rigInput){
+        if(nativeInput.exclusive){
+            pad=nativeInput.gamepad;move={};navigation={};
+        }else if(!rigInput){
             mappedButton("menus.confirm",XINPUT_GAMEPAD_A);mappedButton("menus.back",XINPUT_GAMEPAD_B);
             mappedButton("menus.action_x",XINPUT_GAMEPAD_X);mappedButton("menus.action_y",XINPUT_GAMEPAD_Y);
             mappedButton("menus.previous_tab",XINPUT_GAMEPAD_LEFT_SHOULDER);mappedButton("menus.next_tab",XINPUT_GAMEPAD_RIGHT_SHOULDER);
@@ -536,14 +549,25 @@ struct Session {
             }
         }
         pad.buttons|=menuBits;
-        pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
-        pad.rightX=static_cast<int16_t>(navigation[0]*32767);pad.rightY=static_cast<int16_t>(navigation[1]*32767);
+        if(!nativeInput.exclusive){
+            pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
+            pad.rightX=static_cast<int16_t>(navigation[0]*32767);pad.rightY=static_cast<int16_t>(navigation[1]*32767);
+        }
         if(utilityCenter||headToggle)pad={};
         bool stickNavigation=false;
         bool locomotionAvailable=false;
         // The handheld optic owns zoom and trigger input. Native waypoint
         // placement consumes its aim on the game's marker-update job.
-        if(rigInput){
+        if(nativeInput.exclusive){
+            rigControls.suspend();commandsControls.suspend();opticsControls.reset();opticGate.reset();
+            controllerFrame.weaponReady=rigInput&&mode!=TravelMode::vehicle&&pad.leftTrigger>127;
+            controllerFrame.vehicleControls=rigInput&&mode==TravelMode::vehicle;
+            controllerFrame.commandControls=rigInput&&(pad.buttons&XINPUT_GAMEPAD_LEFT_SHOULDER);
+            controllerFrame.equipmentCategory=(pad.buttons&1)?1:(pad.buttons&2)?2:(pad.buttons&8)?3:(pad.buttons&4)?4:0;
+            controllerFrame.equipmentOpen=controllerFrame.equipmentCategory!=0;
+            controllerFrame.allowMotionMelee=controllerFrame.allowAnimalTouch=false;
+            stickNavigation=true;
+        }else if(rigInput){
             GamepadSample opticPad{menuBits,0,0,pad.leftX,pad.leftY};
             if(activeControl("binoculars.zoom"))opticPad.buttons|=XINPUT_GAMEPAD_RIGHT_THUMB;
             if(activeControl("binoculars.mark"))opticPad.buttons|=XINPUT_GAMEPAD_X;
@@ -623,11 +647,21 @@ struct Session {
         // Native R3 is not forwarded: it also changes the desktop camera.
         controllerFrame.weaponZoomSequence=weaponZoomInput.update(activeControl("gameplay.zoom"),
             locomotionAvailable&&controllerFrame.weaponReady);
-        if(rigInput&&!stickNavigation){pad.rightX=0;pad.rightY=0;}
+        if(rigInput&&!nativeInput.exclusive&&!stickNavigation){pad.rightX=0;pad.rightY=0;}
+        const bool turnAvailable=rigInput&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
+        const auto turnMode=controls.setting("settings.turn_mode");
+        const auto smoothAxis=controls.axis("axes.turn",physical);
+        // Mounted locomotion owns a native vehicle/horse heading. An artificial
+        // head-camera-only snap decouples that heading from what the rider sees.
+        const bool mounted=mode==TravelMode::horse||mode==TravelMode::vehicle;
+        const bool nativeTurn=turnMode==1||(mounted&&turnMode==0);
+        const auto smooth=smoothControls.update(smoothAxis[0],smoothAxis[1],turnAvailable&&nativeTurn);
+        if(turnAvailable&&nativeTurn)pad.rightX=smooth;
         const float turnAxis=activeControl("turn.right")?1.f:activeControl("turn.left")?-1.f:0.f;
-        const auto turn=snapControls.update(turnAxis,0,rigInput&&!stickNavigation&&!center&&!headToggle&&!utilityCenter)
+        const auto turn=snapControls.update(turnAxis,0,turnAvailable&&turnMode==0&&!mounted)
             *controls.setting("settings.snap_turn_degrees")/30.f;
         if(!nativeStatus.active&&!nativeStatus.pending&&!nativeStatus.awaitingPlayer)snapYaw=0;
+        if(mounted)snapYaw=0;
         if(turn){snapYaw=std::remainder(snapYaw+turn,6.283185307f);log("Physical snap turn degrees="+std::to_string(-turn*57.2957795f));}
         controllerFrame.snapYaw=snapYaw;
         gamepadMailbox().publish(pad,true,steadyMilliseconds());
@@ -635,12 +669,12 @@ struct Session {
         const auto wheel=wheelMailbox().read(hapticNow);
         const bool holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped&&controllerFrame.wheelGrip;
         const bool tookWheel=holding&&!wheelHeld;wheelHeld=holding;
-        if(tookWheel||binocularEquipped||hapticNow-hapticAt>=50){
+        if(tookWheel||binocularEquipped||nativeInput.changed||hapticNow-hapticAt>=50){
             hapticAt=hapticNow;
             const auto rumble=rumbleMailbox().read(hapticNow);
             for(size_t side=0;side<2;++side){
                 const float native=side?rumble.high:rumble.low;
-                const float contact=side&&binocularEquipped?.3f:!side&&tookWheel?.25f:0.f;
+                const float contact=nativeInput.changed?.4f:side&&binocularEquipped?.3f:!side&&tookWheel?.25f:0.f;
                 const float amplitude=std::clamp(std::max(native,contact),0.f,.75f);
                 XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};info.action=vibration;info.subactionPath=hands[side];
                 if(amplitude>0&&controllerFrame.hands[side].gripTracked){

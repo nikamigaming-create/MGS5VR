@@ -328,6 +328,30 @@ int main(){
         expect(calibrated&&same(calibrated->ray.direction,{0,0,-1})
             &&same(compose(calibrated->body,Pose{{},binocularPrimarySocket}).position,quarterTurnGrip.position),
             "a controller with a ninety-degree grip/aim difference needs no backwards wrist bend");
+        for(const auto controllerGrip:{Pose{{},rotatedGrip.position},quarterTurnGrip}){
+            const auto device=solveBinocularPose({},controllerGrip,{},Pose{},false,true,false,true,false,true);
+            const auto palmInBody=compose(inverse(device->body),device->primaryGrip);
+            expect(same(palmInBody.position,binocularPrimarySocket)
+                &&same(rotate(palmInBody.orientation,{0,-1,0}),{0,1,0})
+                &&same(rotate(palmInBody.orientation,{0,0,-1}),{0,0,1}),
+                "binocular palm contact cups over the housing with thumb toward ocular, independent of controller profile");
+            const auto attached=attachBinocularToPalm(*device,device->primaryGrip);
+            expect(attached&&same(attached->body.position,device->body.position)
+                &&same(attached->ray.direction,device->ray.direction),
+                "acquiring the authored palm does not apply a second ninety-degree aim correction");
+        }
+        const auto correction=binocularGripRotation(20,-30,15);
+        const auto corrected=solveBinocularPose({},quarterTurnGrip,{},Pose{},false,true,false,true,false,true,correction);
+        const Pose handMove{{0,.258819f,0,.965926f},{.1f,.02f,-.03f}};
+        const auto resolved=attachBinocularToPalm(*corrected,compose(handMove,corrected->primaryGrip));
+        const auto resolvedAgain=attachBinocularToPalm(*resolved,resolved->primaryGrip);
+        expect(resolved&&resolvedAgain
+            &&same(resolved->body.position,compose(handMove,corrected->body).position)
+            &&same(resolved->ray.direction,rotate(handMove.orientation,corrected->ray.direction))
+            &&same(resolvedAgain->body.position,resolved->body.position)
+            &&same(resolvedAgain->ray.direction,resolved->ray.direction),
+            "final skin reattachment preserves user calibration and never accumulates rotation across repeated solves");
+        expect(!attachBinocularToPalm(OpticPose{},{}),"untracked binoculars cannot acquire a rendered palm");
         const Pose motion{{0,.258819f,0,.965926f},{.25f,.1f,-.2f}};
         const auto movedRig=solveBinocularPose({},compose(motion,rotatedGrip),{},compose(motion,differentAim),
             false,true,false,true,false,true);

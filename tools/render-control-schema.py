@@ -6,7 +6,7 @@ parts=[]
 def text(x,y,value,size=20,weight=400,color='#252625'):
     parts.append(f'<text x="{x}" y="{y}" font-size="{size}" font-weight="{weight}" fill="{color}">{html.escape(value)}</text>')
 def rect(x,y,w,h,color):parts.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{color}"/>')
-rect(0,0,1440,3000,'#f2efe5');rect(40,40,12,84,'#af2624')
+rect(40,40,12,84,'#af2624')
 text(76,83,schema['title'],44,900);text(77,119,schema['edition'],20)
 y=164
 for mode in schema['modes']:
@@ -19,6 +19,6 @@ for mode in schema['modes']:
     y+=21
 rect(40,y,1360,2,'#af2624');y+=36
 for line in textwrap.wrap(schema['footer'],112):text(62,y,line,19);y+=27
-svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="{y+25}" viewBox="0 0 1440 {y+25}" role="img" aria-labelledby="title desc"><title id="title">MGS5VR complete controller modes</title><desc id="desc">{html.escape(schema["edition"])}</desc><g font-family="Arial, Helvetica, sans-serif">'+''.join(parts)+'</g></svg>'
+svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="{y+25}" viewBox="0 0 1440 {y+25}" role="img" aria-labelledby="title desc"><title id="title">MGS5VR complete controller modes</title><desc id="desc">{html.escape(schema["edition"])}</desc><rect width="1440" height="{y+25}" fill="#f2efe5"/><g font-family="Arial, Helvetica, sans-serif">'+''.join(parts)+'</g></svg>'
 (root/'docs/images/control-modes.svg').write_text(svg,encoding='utf-8')
 print('Updated docs/images/control-modes.svg from docs/CONTROL_SCHEMA.json')

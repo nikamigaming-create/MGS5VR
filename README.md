@@ -2,7 +2,7 @@
 
 Play **Metal Gear Solid V: The Phantom Pain in VR**, with tracked hands and a HUD on your left wrist.
 
-**[Download MGS5VR for Windows](https://github.com/nikamigaming-create/MGS5VR/releases/download/experimental-2026-09-13.3/MGS5VR-experimental-2026-09-13.3.zip)**
+**[Download MGS5VR for Windows](https://github.com/nikamigaming-create/MGS5VR/releases/download/experimental-2026-09-13.4/MGS5VR-experimental-2026-09-13.4.zip)**
 
 You need your own PC copy of **TPP 1.0.15.4** and a PC-connected VR headset. Tested on **Quest 3 + Touch controllers**; other headsets are unverified. This is an experimental mod.
 
@@ -42,6 +42,17 @@ No simulator or compiling needed. Install once; launch normally afterward.
 Current builds install **mgs5vr-controls.ini** beside the game executable. Edit it,
 save, then restart MGSV. No rebuild needed. [Annotated default config](config/mgs5vr-controls.ini)
 supports per-mode buttons, taps, holds, release actions and combinations.
+
+**Edit-Controls.cmd** in the extracted release checks conflicts as you type,
+prevents invalid saves and backs up your previous file. Choose the config in
+the **game folder**, not the release template. This editor runs outside the game.
+Default sprint is now **left-stick click**; zoom is **right grip + left-click**.
+Set `settings.turn_mode = native_smooth` for native smooth yaw.
+Hold **Menu + A for 0.55 seconds** to enter/leave complete native-button mode,
+then release controls. Its separate `[native]` mappings retain native holds and
+all game-facing buttons without duplicating normal VR actions.
+Existing custom files keep their explicit bindings: update those entries yourself
+or use the editor. See [the tester-reported remaining issues](docs/QUEST3_TESTER_FEEDBACK.md).
 
 **[Full controls, grenades and night vision →](docs/CONTROLS.md)**
 

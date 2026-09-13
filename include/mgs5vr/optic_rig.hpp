@@ -56,8 +56,13 @@ inline constexpr Vec3 binocularObjectiveCenter{-.032788f,-.000562f,-.0505f};
 inline constexpr float binocularOcularRadius=.0175f;
 inline constexpr float binocularEyeRelief=.10f;
 // Palm contact on the housing's two side walls, in the imported mesh frame.
-inline constexpr Vec3 binocularPrimarySocket{.071f,-.008f,0};
-inline constexpr Vec3 binocularSupportSocket{-.068f,-.008f,-.018f};
+inline constexpr Vec3 binocularPrimarySocket{.085f,-.008f,0};
+inline constexpr Vec3 binocularSupportSocket{-.078f,-.008f,-.018f};
+// Anatomical palm frame in housing coordinates. -Y runs wrist -> knuckles;
+// -Z runs little -> index. Fingers rise over the top, thumbs face the ocular,
+// and the mirrored palms face the two side walls. This is NOT a controller
+// grip/aim calibration: the device still points along the runtime's aim ray.
+inline constexpr Quat binocularPalmOrientation{1,0,0,0};
 
 // The optical axis is continuously available while the primary hand is
 // holding the device. It is a gameplay ray, not a visible laser: consumers
@@ -88,6 +93,7 @@ struct OpticPose {
     // The first-person rig blends onto this side cup and releases it when
     // the tracked hand leaves the contact region or opens its grip.
     Pose supportGrip{};
+    Pose primaryGrip{}; // Authored anatomical palm contact, not raw XR grip.
     // One-handed carry is intentionally less stable than a supported hold.
     // This is a presentation/gameplay hint; it never changes the native head
     // pose or stereo eye origins.
@@ -112,7 +118,14 @@ struct OpticSample {
 // alive.
 std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     Pose leftAim,Pose rightAim,bool leftTracked,bool rightTracked,
-    bool leftAimTracked,bool rightAimTracked,bool leftHeld,bool rightHeld);
+    bool leftAimTracked,bool rightAimTracked,bool leftHeld,bool rightHeld,Quat gripRotation={});
+// Local controller-aim to device rotation: yaw * pitch * roll. The primary
+// palm socket stays fixed; housing, optical ray, eye relief and support rotate
+// together. Zero preserves the runtime's measured grip-to-aim calibration.
+Quat binocularGripRotation(float pitchDegrees,float yawDegrees,float rollDegrees);
+// Move the entire device transaction onto the final IK palm. Never reapply
+// controller aim calibration to a palm that has already acquired the device.
+std::optional<OpticPose> attachBinocularToPalm(const OpticPose& optic,Pose primaryPalm);
 
 // Constrain the primary palm before solving the arms, keeping the entire
 // housing outside the face while preserving the hand/device attachment.
@@ -145,7 +158,7 @@ public:
     OpticSample update(Pose head,const std::array<EyeView,2>& eyes,
         Pose leftGrip,Pose rightGrip,Pose leftAim,Pose rightAim,
         bool leftTracked,bool rightTracked,bool leftAimTracked,bool rightAimTracked,
-        bool leftHeld,bool rightHeld,bool available,uint64_t time,uint64_t epoch);
+        bool leftHeld,bool rightHeld,bool available,uint64_t time,uint64_t epoch,Quat gripRotation={});
     void reset(){*this=OpticGate{};}
     bool active() const {return active_;}
 private:

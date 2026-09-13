@@ -27,6 +27,13 @@ float SnapTurn::update(float x,float y,bool available){
     // FOX camera forward/right are +Z/-X: right is a negative world-Y turn.
     return x>0?-.523598776f:.523598776f;
 }
+int16_t NativeSmoothTurn::update(float x,float y,bool available){
+    if(!available||!std::isfinite(x)||!std::isfinite(y)){armed_=false;return 0;}
+    if(std::abs(x)<.18f&&std::abs(y)<.18f){armed_=true;return 0;}
+    if(std::abs(y)>=.7f&&std::abs(y)>=std::abs(x)){armed_=false;return 0;}
+    if(!armed_||std::abs(x)<.18f)return 0;
+    return static_cast<int16_t>(std::clamp(x,-1.f,1.f)*32767);
+}
 LocomotionInput RigLocomotion::update(GamepadSample sample,bool available,uint64_t time){
     constexpr uint16_t sprint=0x0040,dive=0x4000,stance=0x1000;
     if(time<lastTime_)suspend();

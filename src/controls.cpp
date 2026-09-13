@@ -11,7 +11,8 @@ namespace {
 constexpr uint32_t mask(ControlContext c){return 1u<<static_cast<unsigned>(c);}
 constexpr uint32_t foot=mask(ControlContext::gameplay),wrist=mask(ControlContext::equipment),
     commands=mask(ControlContext::commands),optic=mask(ControlContext::binoculars),menus=mask(ControlContext::menus),
-    horse=mask(ControlContext::horse),vehicle=mask(ControlContext::vehicle),all=127;
+    horse=mask(ControlContext::horse),vehicle=mask(ControlContext::vehicle),normal=127,
+    native=mask(ControlContext::nativeButtons),all=normal|native;
 std::string trim(std::string text){
     const auto begin=text.find_first_not_of(" \t\r\n"),end=text.find_last_not_of(" \t\r\n");
     return begin==std::string::npos?std::string{}:text.substr(begin,end-begin+1);
@@ -36,17 +37,32 @@ std::array<bool,4> isolatedFaceButtons(const std::array<ControllerFaceLayout,2>&
             left==ControllerFaceLayout::simple&&select[0]:face[1],
         left==ControllerFaceLayout::standard&&face[2],left==ControllerFaceLayout::standard&&face[3]};
 }
+const std::array<NativeButtonDefinition,14>& nativeButtonDefinitions(){
+    static constexpr std::array<NativeButtonDefinition,14> definitions{{
+        {"native.a","a",0x1000},{"native.b","b",0x2000},
+        {"native.x","x",0x4000},{"native.y","y",0x8000},
+        {"native.left_shoulder","left_grip",0x0100},{"native.right_shoulder","right_grip",0x0200},
+        {"native.left_click","left_stick_click",0x0040},{"native.right_click","right_stick_click",0x0080},
+        {"native.start","left_grip + menu",0x0010},{"native.back","right_grip + menu",0x0020},
+        {"native.dpad_up","menu + right_stick_up",0x0001},
+        {"native.dpad_down","menu + right_stick_down",0x0002},
+        {"native.dpad_left","menu + right_stick_left",0x0004},
+        {"native.dpad_right","menu + right_stick_right",0x0008}}};
+    return definitions;
+}
 const std::vector<ControlDefinition>& controlDefinitions(){
-    static const std::vector<ControlDefinition> definitions{
-        {"system.idroid","tap(menu,550)",all},{"system.pause","hold(menu,550)",all},
-        {"system.recenter","press(left_grip + menu)",all},{"system.toggle_vr","disabled",all},
-        {"gameplay.run","right_stick_up",foot},{"gameplay.stance","right_stick_down",foot},
+    static const std::vector<ControlDefinition> definitions=[] {
+        std::vector<ControlDefinition> result{
+        {"system.idroid","tap(menu,550)",normal},{"system.pause","hold(menu,550)",normal},
+        {"system.recenter","press(left_grip + menu)",normal},{"system.toggle_vr","disabled",all},
+        {"system.native_buttons","hold(menu + a,550)",all},
+        {"gameplay.run","left_stick_click",foot},{"gameplay.stance","right_stick_down",foot},
         {"gameplay.dive","press(right_stick_click)",foot},{"gameplay.interact","y",foot},
         {"gameplay.reload","tap(b,300)",foot},{"gameplay.ready_weapon","right_grip",foot|horse|commands,true},
         {"gameplay.pickup_carry","left_grip + b",foot},
         {"gameplay.support_grip","left_grip",foot|horse,true},
         {"gameplay.switch_weapon","press(a)",foot},
-        {"gameplay.zoom","press(left_stick_click)",foot},
+        {"gameplay.zoom","press(right_grip + left_stick_click)",foot},
         {"gameplay.fire_or_cqc","right_trigger",foot|horse|commands},{"gameplay.equip_binoculars","hold(b,300)",foot},
         {"gameplay.native_a","disabled",foot},{"gameplay.native_x","disabled",foot},
         {"gameplay.native_left_shoulder","disabled",foot},{"gameplay.native_right_shoulder","disabled",foot},
@@ -63,10 +79,10 @@ const std::vector<ControlDefinition>& controlDefinitions(){
         {"commands.mounted_keep_open","left_trigger",horse|commands,true},
         {"commands.confirm","press(a)",commands},
         {"commands.back","press(b)",commands},
-        {"binoculars.stow","press(b)",optic},{"binoculars.zoom","press(left_stick_click)",optic},
+        {"binoculars.stow","press(b)",optic},{"binoculars.zoom","press(right_grip + left_stick_click)",optic},
         {"binoculars.mark","press(right_trigger)",optic},{"binoculars.clear_mark","press(a)",optic},
         {"binoculars.support_grip","left_grip",optic,true},
-        {"binoculars.run","right_stick_up",optic},{"binoculars.dive","press(right_stick_click)",optic},
+        {"binoculars.run","left_stick_click",optic},{"binoculars.dive","press(right_stick_click)",optic},
         {"binoculars.stance","right_stick_down",optic},
         {"menus.confirm","a",menus},{"menus.back","b",menus},{"menus.action_x","x",menus},{"menus.action_y","y",menus},
         {"menus.previous_tab","left_grip",menus},{"menus.next_tab","right_grip",menus},
@@ -81,8 +97,13 @@ const std::vector<ControlDefinition>& controlDefinitions(){
         {"vehicle.interact","y",vehicle},{"vehicle.weapon_or_call","x",vehicle},
         {"vehicle.native_a","a",vehicle},{"vehicle.native_b","b",vehicle},
         {"vehicle.left_click","left_stick_click",vehicle},{"vehicle.right_click","right_stick_click",vehicle},
-        {"turn.left","right_stick_left",foot|optic|horse|vehicle},{"turn.right","right_stick_right",foot|optic|horse|vehicle}
-    };
+        {"turn.left","right_stick_left",foot|optic|horse|vehicle},{"turn.right","right_stick_right",foot|optic|horse|vehicle},
+        {"native.left_trigger","left_trigger",native},{"native.right_trigger","right_trigger",native},
+        {"native.dpad_hold","menu",native,true}
+        };
+        for(const auto& button:nativeButtonDefinitions())result.push_back({button.name,button.binding,native});
+        return result;
+    }();
     return definitions;
 }
 bool updateBinocularSelection(bool selected,bool equip,bool stow,bool contextAllowed){
@@ -136,11 +157,14 @@ ControlBindings::ControlBindings(){
         auto bindings=parse(std::string(d.binding));
         entries_.push_back({std::string(d.name),bindings,std::vector<State>(bindings.size()),d.contexts,d.modifier});
     }
-    axes_={{"axes.move",0},{"axes.equipment",1},{"axes.commands",1},{"axes.menu",0},{"axes.map",1},{"axes.vehicle_steering",0}};
+    axes_={{"axes.move",0},{"axes.equipment",1},{"axes.commands",1},{"axes.menu",0},{"axes.map",1},{"axes.vehicle_steering",0},
+        {"axes.native_move",0},{"axes.native_look",1},{"axes.turn",1}};
     settings_={{"settings.snap_turn_degrees",30,5,90},{"settings.motion_melee",1,0,1},{"settings.animal_touch",1,0,1},
         {"settings.wrist_surface_lift_cm",2,0,10},{"settings.wrist_selector_height_cm",12,5,30},
         {"settings.wrist_picker_width_cm",75,42,100},
-        {"settings.scope_eye_relief_cm",10,3,20}};
+        {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",0,0,2},
+        {"settings.binocular_pitch_degrees",0,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
+        {"settings.binocular_roll_degrees",0,-180,180}};
 }
 std::vector<std::string> ControlBindings::load(std::istream& input){
     ControlBindings candidate=*this;std::vector<std::string> errors;std::set<std::string> seen;
@@ -168,6 +192,10 @@ std::vector<std::string> ControlBindings::load(std::istream& input){
                 if(value!="left_stick"&&value!="right_stick"&&value!="disabled")throw std::runtime_error("axis must be left_stick, right_stick or disabled");
                 axis->source=value=="left_stick"?0:value=="right_stick"?1:-1;
             }else if(auto setting=std::find_if(candidate.settings_.begin(),candidate.settings_.end(),[&](const auto& e){return e.name==key;});setting!=candidate.settings_.end()){
+                if(key=="settings.turn_mode"){
+                    if(value!="snap"&&value!="native_smooth"&&value!="off")throw std::runtime_error("turn_mode must be snap, native_smooth or off");
+                    setting->value=value=="snap"?0.f:value=="native_smooth"?1.f:2.f;continue;
+                }
                 size_t consumed{};const auto parsed=std::stof(value,&consumed);
                 if(consumed!=value.size()||!std::isfinite(parsed)||parsed<setting->minimum||parsed>setting->maximum
                    ||(setting->maximum==1&&parsed!=0&&parsed!=1))throw std::runtime_error("setting outside supported range: "+key);

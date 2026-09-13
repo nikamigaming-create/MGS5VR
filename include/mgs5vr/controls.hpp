@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace mgs5vr {
-enum class ControlContext { gameplay, equipment, commands, binoculars, menus, horse, vehicle };
+enum class ControlContext { gameplay, equipment, commands, binoculars, menus, horse, vehicle, nativeButtons };
 enum class ControllerFaceLayout { standard, triggerMenu, simple };
 ControllerFaceLayout controllerFaceLayout(std::string_view profile);
 // Keep legacy trigger/select fallbacks separate from physical A/B/X/Y. Some
@@ -22,6 +22,9 @@ struct PhysicalControls {
 };
 struct ControlDefinition {std::string_view name,binding;uint32_t contexts{};bool modifier{};};
 const std::vector<ControlDefinition>& controlDefinitions();
+struct NativeButtonDefinition {std::string_view name,binding;uint16_t mask{};};
+// All fourteen game-facing XInput buttons, excluding the platform Guide button.
+const std::array<NativeButtonDefinition,14>& nativeButtonDefinitions();
 // Selection is an input latch, not a tracking-validity test. Missing poses
 // temporarily withhold rendering/marking, never manufacture a stow press.
 bool updateBinocularSelection(bool selected,bool equip,bool stow,bool contextAllowed);

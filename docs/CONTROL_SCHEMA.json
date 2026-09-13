@@ -1,17 +1,17 @@
 {
   "title": "MGS5VR / CONTROL MODES",
-  "edition": "Development build / 12 September 2026 / Quest Touch / Action Type",
+  "edition": "Experimental / 13 September 2026 / Quest Touch / Action Type",
   "modes": [
     {"title": "01 / MOVE & HANDLE WEAPONS", "rows": [
       ["Left stick / right-stick click", "Move / dive; click means press inward"],
-      ["Right stick left-right / up", "Snap turn / run; wrist mode owns this stick while open"],
+      ["Right stick left-right / left click", "Turn / sprint; right-stick up is unassigned on foot"],
       ["Right stick down", "Tap: crouch or stand / Hold: prone"],
       ["Right grip / trigger", "Hold to ready / fire or throw"],
       ["Left grip near support socket", "Guide the barrel with two hands; release grip or pull away"],
       ["Short B tap / hold B", "Reload / equip binoculars"],
       ["Hold left grip, then hold B", "Pick up a weapon / carry a person at the native prompt"],
       ["Y / A while readied / hold X", "Native interaction / quick weapon switch / Commands"],
-      ["Left-stick click while readied", "Physical scope zoom; one click cycles one native power"],
+      ["Right grip + left-stick click", "Physical scope zoom; consumes sprint while held"],
       ["C4 or decoy: right grip + Y", "Detonate placed C4 / inflate thrown decoys; trigger places or throws first"],
       ["Grip, trigger and touch", "Articulate fingers; weapons retain their authored grip"]]},
     {"title": "02 / LEFT-WRIST EQUIPMENT", "rows": [
@@ -28,7 +28,7 @@
       ["D-Horse call", "Stand or crouch first; then choose the horse call"],
       ["Hold right B / tap B", "Equip binoculars / stow; releasing B keeps them selected"],
       ["Release B and grip", "Binoculars stay equipped until a fresh B tap"],
-      ["Left-stick click", "Switch 2x / 4x; right-stick click stays Dive"],
+      ["Right grip + left-stick click", "Switch 2x / 4x; bare left click runs; right click dives"],
       ["Right trigger / A", "Mark / clear; stick down changes stance"]]},
     {"title": "04 / GRENADES, MELEE & BODIES", "rows": [
       ["Support > grenade", "Finish wrist selection, then hold right grip"],
@@ -52,10 +52,21 @@
       ["Vehicle: right / left trigger", "Accelerate / brake or reverse"],
       ["Left grip near the wheel", "Acquire wheel; rotate wrist to steer; release to let go"],
       ["Vehicle: left stick / Y", "Conventional steering / enter or exit"],
+      ["Mounted: right stick left/right", "Native smooth camera yaw, not a detached snap offset"],
+      ["settings.turn_mode", "snap / native_smooth / off; native sensitivity controls smooth yaw"],
       ["VR entry / optional toggle", "Automatic / unbound; edit system.toggle_vr if wanted"],
       ["Left grip + Menu", "Recenter without changing facing"],
       ["Not yet implemented", "Personal-gun fire through a driver's window"],
-      ["Further coverage needed", "Loading, cutscenes, later abilities and vehicle states"]]}
+      ["Further coverage needed", "Loading, cutscenes, later abilities and vehicle states"]]},
+    {"title": "07 / COMPLETE NATIVE BUTTON MODE", "rows": [
+      ["Hold Menu + A, 0.55 seconds", "Switch normal VR / native inputs; release all controls after switching"],
+      ["A / B / X / Y", "Same native buttons, including holds; B retains native pickup/carry"],
+      ["Left / right grip", "Native LB / RB; normal VR actions are inactive in this mode"],
+      ["Both triggers and sticks", "Native analog triggers, all stick axes and both clicks"],
+      ["Menu first, then left/right grip", "Hold native Start / Back"],
+      ["Hold Menu; center and flick RS", "Native D-pad direction; center again to browse with the right stick"],
+      ["Release Menu", "Release native D-pad and finish equipment selection"],
+      ["Both games / menus", "Input access only; does not add missing GZ first-person adapters"]]}
   ],
-  "footer": "Edit mgs5vr-controls.ini beside the game executable. Buttons, taps, holds and combinations are remappable per mode. Save and restart."
+  "footer": "Open Edit-Controls.cmd and choose the GAME's mgs5vr-controls.ini. Conflicts appear before saving; valid saves keep a backup. Restart to apply."
 }

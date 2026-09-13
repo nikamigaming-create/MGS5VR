@@ -4,6 +4,12 @@
 
 ## Edit your controls
 
+Open **Edit-Controls.cmd** in the extracted release, then choose the
+`mgs5vr-controls.ini` beside your **game's** `dinput8.dll`. The external editor
+checks conflicts while you type, refuses invalid saves, and backs up the previous
+file when saving. No game launch is needed to check a layout. This is not yet
+an in-game rebinding screen.
+
 Open **mgs5vr-controls.ini in your MGSV game folder** (beside `dinput8.dll`).
 Save and restart MGSV to apply. The installed file is the one the game reads;
 the repository copy is a template. Every supported button action is listed,
@@ -17,17 +23,60 @@ Use `press(left_grip + x)` for a combination, `press(a) | press(x)` for either
 input, or `disabled` to remove a binding. Tap/hold pairs use the same duration.
 The longer chord consumes the simpler input; release held buttons after changing modes.
 
-Right-click is Dive **including with binoculars out**; left-click is zoom.
+Right-click is Dive **including with binoculars out**; left-click is Sprint.
+**Right grip + left-click** is zoom, consuming Sprint while the chord is held.
 For example, to move binocular zoom, change `[binoculars]` to
-`zoom = press(x)`.
+`zoom = press(right_grip + x)`. Plain X also opens Commands in this mode;
+if you want unmodified X, explicitly disable or move `commands.open` too.
 To use left-click for normal dive, change `[gameplay]` to
-`dive = press(left_stick_click)`. A and X do not duplicate stance/dive by default.
+`dive = press(left_stick_click)` and move/disable `gameplay.run`, which owns that
+button by default. A and X do not duplicate stance/dive by default.
 
 You can optionally check syntax/conflicts by running
 `mgs5vr_controls.exe --check mgs5vr-controls.ini` from the game folder.
 Invalid files use built-in defaults and report the errors in `mgs5vr.log`.
 The file also includes movement/navigation axes, snap angle and physical-gesture
 switches. It remaps implemented actions; it does not create new native game abilities.
+
+For smooth turning, set `[settings] turn_mode = native_smooth`. `snap` is the
+default on foot; `off` disables normal stick turning. Horses/vehicles use native
+horizontal camera input even with `snap`, because a camera-only snap cannot steer
+their native forward direction. This mounted change still needs headset feedback.
+Head pitch remains tracked. Menu sticks are unaffected.
+
+Missing keys do **not** remove old/default actions. A replacement must explicitly
+disable or relocate the original owner. Shared-mode exceptions are deliberate:
+weapon-ready/support may accompany longer chords; tap/hold durations must match;
+Commands continuation preserves an already-held CQC input but cannot start one.
+Send the exact rejected layout when reporting a conflict—the checker names the
+two actions involved, including inherited defaults.
+
+## Complete native-button mode
+
+Hold **Menu + right A for 0.55 seconds**, then release buttons and center sticks.
+Repeat to return to normal VR controls. This changes input only, not VR/theatre.
+The separate `[native]` section maps every game-facing native Xbox control and
+works in either game, including menus and GZ without a tracked-rig adapter.
+
+| Native control | Touch control |
+| --- | --- |
+| A / B / X / Y | Same named face button, including native holds |
+| LB / RB | Left / right grip |
+| LT / RT | Left / right trigger, including partial pressure |
+| Left / right stick and clicks | Same sticks and clicks |
+| Start / Back | Hold Menu first, then left / right grip |
+| D-pad | Hold Menu, center right stick, then flick the desired direction |
+
+After choosing D-pad, center the stick again: the selected native D-pad remains
+held while the right stick can browse equipment. Release Menu to equip/close.
+All bindings, triggers and stick assignments are editable. Plain bindings retain
+holds and combinations; normal VR mappings are inactive, so they do not duplicate
+these actions. Native B therefore retains the game's single-button pickup/carry
+hold. Game unlock/context rules still apply. This does not implement missing GZ
+first-person presentation or certify every gadget's native behavior.
+
+In native-button mode Menu + left grip means native Start, not VR recenter;
+switch back to VR controls before using the recenter chord.
 
 Optional `[gameplay].native_dpad_up/down/left/right` bindings send native D-pad
 actions directly, bypassing the wrist category chooser. They default to
@@ -58,7 +107,7 @@ needs a separate review.
 | Reload | **Short right B tap**; the native reload moves the support hand, then releases it |
 | Pick up a dropped weapon / carry a person | **Hold left grip, then hold B** at the native prompt; keeps native B held without equipping binoculars |
 | Switch weapon while aiming | **A** while right grip readies the weapon; A does nothing when lowered |
-| Physical weapon-scope zoom | **Left-stick click** while readied; cycles the fitted scope's powers, while fixed-power sights stay fixed |
+| Physical weapon-scope zoom | **Right grip + left-stick click**; cycles the fitted scope's powers, while fixed-power sights stay fixed |
 | Detonate placed C4 / inflate thrown decoys | Keep that gadget selected, **hold right grip, then Y**; right trigger places/throws it first |
 | Read the HUD | Raise and turn your **left forearm** toward your eyes |
 
@@ -143,7 +192,7 @@ upward slot has a small NVG label rather than a large rectangular card.
 For a grenade, choose **Support** with a first flick right and finish selection.
 Hold **right grip** to ready it. Move and tilt the **right hand** to position and
 direct the trajectory; **right trigger** throws. Hand elevation controls the arc,
-while right-stick left/right still snap-turns. Right-stick up runs; down changes
+while right-stick left/right still turns. Left-stick click runs; stick down changes
 stance, never the throw angle. Throw strength remains the native
 equipment strength; this is point-and-trigger throwing, not a velocity gesture.
 The latest SIM observations and remaining stance limits are in the
@@ -155,15 +204,15 @@ Brief lost hand/aim tracking hides the presentation, not the equipped selection;
 the device returns when tracking resumes. Equipping gives a short right-hand pulse.
 Tap **B** again to stow it. When binoculars are not selected, a short B tap
 remains the native action (reload, back, or the current context action).
-Aim by moving the right hand. **Click the left stick** to switch 2×/4×. **Right trigger** marks the person under
+Aim by moving the right hand. **Hold right grip and click the left stick** to switch 2×/4×. **Right trigger** marks the person under
 the optic's crosshair, or places a native waypoint on the visible surface when
 no person is targeted. A short rumble confirms marking. Tap B to stow.
 **Tap A** to remove the waypoint or acquired person under the
 crosshair. Empty space clears nothing. Right-stick down remains stance.
 Bring the left hand to the opposite side and squeeze
 **left grip** to cup it for support; release the grip or pull away to let go.
-Zoom does not require support contact. Zoom starts at **2×** and each left-stick
-click switches **2× → 4× → 2×**; lowering the device retains that selection.
+Zoom does not require support contact. Zoom starts at **2×** and each
+right-grip + left-click switches **2× → 4× → 2×**; lowering retains that selection.
 Walking, running and turning remain available; **right-stick click dives** in this
 mode, just as it does with binoculars stowed.
 The device renders its own narrow-angle scene through its physical lens while
@@ -213,8 +262,8 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Action | Control |
 | --- | --- |
 | Move, including during wrist selection | Left stick; on foot, forward follows your view heading |
-| Turn | Flick the right stick left/right for a 30° snap; center before another turn |
-| Sprint / run | Right stick up; left stick controls movement |
+| Turn | Right stick left/right: 30° snap on foot, or configurable native smooth turn |
+| Sprint / run | Left-stick click; right-stick up is unassigned on foot |
 | Crouch / stand / prone | Tap right stick down for crouch/stand; hold down for prone. The weapon lowers for the stance action. No face-button duplicate |
 | Quick dive | Right-stick click on foot, including with binoculars equipped. No face-button duplicate |
 | Right-stick context | Up/down never pitch the gameplay camera. Equipment, Commands and native menus keep navigation |

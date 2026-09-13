@@ -1,5 +1,6 @@
 #include "mgs5vr/controls.hpp"
 #include "mgs5vr/input_bridge.hpp"
+#include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/wrist_selector.hpp"
 #include "mgs5vr/game_target.hpp"
 #include <windows.h>
@@ -23,8 +24,149 @@ struct Fixture {
     bool active(std::string_view action) const{return controls.active(action);}
     bool load(const char* source){std::istringstream file(source);return controls.load(file).empty();}
 };
+struct NativeFixture {
+    ControlBindings controls;
+    NativeControls native;
+    PhysicalControls input;
+    NativeControlSample output;
+    ControlContext normalContext{ControlContext::gameplay};
+    uint64_t time{100};
+    NativeFixture(){tick();}
+    void tick(uint64_t elapsed=11){
+        time+=elapsed;
+        controls.update(input,native.selected()?ControlContext::nativeButtons:normalContext,time);
+        output=native.update(controls,input);
+        if(output.changed)controls.suspend();
+    }
+    void neutral(){input={};tick();tick();}
+    void enter(){input.buttons[4]=input.buttons[0]=1;tick();tick(550);neutral();}
+};
 }
 int main(int argc,char** argv){
+    {
+        Fixture f;
+        expect(f.load("[gameplay]\nrun=left_stick_click\nstance=a\nreload=tap(left_grip + b,300)\npickup_carry=b\nswitch_weapon=press(right_grip + right_stick_click)\nzoom=press(right_stick_up)\nequip_binoculars=hold(left_grip + y,300)\n"),
+            "Quest3 tester direct-B pickup, A stance and grip-R3 switch layout is valid");
+        f.tick();f.input.buttons[1]=1;f.tick();f.tick(1000);
+        expect(f.active("gameplay.pickup_carry")&&!f.active("gameplay.reload")&&!f.active("gameplay.equip_binoculars"),
+            "tester direct B retains native pickup hold without reload or binoculars");
+        f.input={};f.tick();f.input.buttons[8]=1;f.tick();f.input.buttons[6]=1;f.tick();
+        expect(f.active("gameplay.switch_weapon")&&!f.active("gameplay.dive"),"tester ready-grip R3 switch consumes Dive");
+        expect(f.load("[gameplay]\nswitch_weapon=press(right_grip + x)\n"),
+            "X is not forbidden in gameplay chords when Commands opens on bare X");
+        f.input={};f.tick();f.input.buttons[8]=1;f.tick();f.input.buttons[2]=1;f.tick();
+        expect(f.active("gameplay.switch_weapon")&&!f.active("commands.open"),
+            "a gameplay X chord suppresses Commands opening in its actual gameplay context");
+    }
+    {
+        for(const auto mode:{ControlContext::gameplay,ControlContext::binoculars}){
+            Fixture f;f.mode=mode;f.tick();
+            const auto run=mode==ControlContext::gameplay?"gameplay.run":"binoculars.run";
+            const auto zoom=mode==ControlContext::gameplay?"gameplay.zoom":"binoculars.zoom";
+            f.input.rightStick={0,1};f.tick();expect(!f.active(run),"right-stick up cannot sprint out of prone by default");
+            f.input={};f.tick();f.input.buttons[5]=1;f.tick();f.tick(700);
+            expect(f.active(run)&&!f.active(zoom),"left-stick click holds native sprint without zoom");
+            f.input={};f.tick();f.input.buttons[8]=1;f.tick();f.input.buttons[5]=1;f.tick();
+            expect(!f.active(run)&&f.active(zoom),"ready-grip plus left click zooms without sprinting");
+        }
+        Fixture f;
+        expect(f.load("[settings]\nturn_mode=native_smooth\n")&&f.controls.setting("settings.turn_mode")==1,
+            "native smooth turn has a readable config name");
+        expect(f.load("[settings]\nturn_mode=off\n")&&f.controls.setting("settings.turn_mode")==2,
+            "stick turning can be disabled entirely");
+        expect(!f.load("[settings]\nturn_mode=guess\n"),"invalid turning mode is explained instead of guessed");
+        NativeSmoothTurn smooth;
+        expect(!smooth.update(1,0,true),"held stick cannot turn on mode entry");
+        smooth.update(0,0,true);
+        expect(smooth.update(.5f,0,true)==16383&&smooth.update(.5f,0,true)==16383
+            &&smooth.update(-1,0,true)==-32767,"native smooth yaw stays analog and continuous in both directions");
+        expect(!smooth.update(.5f,-1,true)&&!smooth.update(.5f,0,true),"stance gesture consumes turning until centered");
+        smooth.update(0,0,true);expect(!smooth.update(1,0,false)&&!smooth.update(1,0,true),"menu/focus transition cannot leak smooth turning");
+    }
+    {
+        uint16_t allButtons{};
+        for(const auto& button:nativeButtonDefinitions()){
+            expect((allButtons&button.mask)==0&&!button.binding.empty()&&button.binding!="disabled",
+                "every native button has one distinct non-disabled default mapping");
+            allButtons|=button.mask;
+        }
+        expect(allButtons==0xf3ff,"all fourteen game-facing XInput button bits are covered");
+        for(const auto context:{ControlContext::gameplay,ControlContext::equipment,ControlContext::commands,
+            ControlContext::binoculars,ControlContext::menus,ControlContext::horse,ControlContext::vehicle}){
+            NativeFixture f;f.normalContext=context;f.tick();f.enter();
+            expect(f.native.selected()&&f.output.exclusive,"complete native buttons can be entered from every VR/game context");
+            expect(!f.controls.active("gameplay.fire_or_cqc")&&!f.controls.active("equipment.open")
+                &&!f.controls.active("commands.open")&&!f.controls.active("system.pause"),
+                "native button mode has exclusive ownership instead of duplicate VR actions");
+        }
+    }
+    {
+        NativeFixture f;f.enter();
+        struct ButtonCase {unsigned physical;uint16_t expected;};
+        const std::array<ButtonCase,8> buttons{{
+            {0,0x1000},{1,0x2000},{2,0x4000},{3,0x8000},{7,0x0100},{8,0x0200},{5,0x0040},{6,0x0080}}};
+        for(const auto [physical,expected]:buttons){
+            f.neutral();f.input.buttons[physical]=1;f.tick();
+            expect(f.output.gamepad.buttons==expected,"default native face/shoulder/click sends its exact native bit");
+            f.tick(1200);
+            expect(f.output.gamepad.buttons==expected,"native button holds are not shortened into reload/zoom/menu pulses");
+            f.neutral();expect(f.output.gamepad.buttons==0,"native button release reaches the game");
+        }
+        for(const auto [grip,expected]:std::array<ButtonCase,2>{{{7,0x0010},{8,0x0020}}}){
+            f.neutral();f.input.buttons[4]=1;f.tick();f.input.buttons[grip]=1;f.tick();f.tick(1200);
+            expect(f.output.gamepad.buttons==expected,"native Start/Back hold has no shoulder or system-menu duplicate");
+        }
+        f.neutral();f.input.buttons[9]=.35f;f.input.buttons[10]=.8f;
+        f.input.leftStick={.4f,-.6f};f.input.rightStick={-.7f,.25f};f.tick();
+        expect(f.output.gamepad.leftTrigger==89&&f.output.gamepad.rightTrigger==204,
+            "both native triggers retain partial pressure for native CQC/charge/pedals");
+        expect(f.output.gamepad.leftX==13106&&f.output.gamepad.leftY==-19660
+            &&f.output.gamepad.rightX==-22936&&f.output.gamepad.rightY==8191,
+            "both native sticks retain all four signed analog axes without VR turning interception");
+        f.input.buttons[7]=f.input.buttons[6]=1;f.tick();f.tick(1400);
+        expect(f.output.gamepad.buttons==0x0180&&f.output.gamepad.leftTrigger==89&&f.output.gamepad.rightTrigger==204,
+            "native CQC/aim, Call and R3 confirmation can be held together independently");
+    }
+    {
+        NativeFixture f;f.enter();
+        struct Direction {float x,y;uint16_t expected;};
+        for(const auto direction:std::array<Direction,4>{{{0,1,1},{0,-1,2},{-1,0,4},{1,0,8}}}){
+            f.neutral();f.input.buttons[4]=1;f.tick();
+            expect(!f.output.gamepad.buttons,"native D-pad modifier alone selects nothing");
+            f.input.rightStick={direction.x,direction.y};f.tick();
+            expect(f.output.gamepad.buttons==direction.expected&&f.output.gamepad.rightX==0&&f.output.gamepad.rightY==0,
+                "native D-pad chooses the requested category without moving the native camera");
+            f.input.rightStick={};f.tick();f.input.rightStick={.5f,-.5f};f.tick();
+            expect(f.output.gamepad.buttons==direction.expected&&f.output.gamepad.rightX==16383&&f.output.gamepad.rightY==-16383,
+                "native D-pad remains held while the independently centered right stick browses cards");
+            f.tick(1700);expect(f.output.gamepad.buttons==direction.expected,"D-pad hold lasts as long as its modifier");
+            f.neutral();expect(!f.output.gamepad.buttons,"releasing native D-pad modifier releases the category");
+        }
+        f.input.rightStick={1,0};f.tick();f.input.buttons[4]=1;f.tick();
+        expect(!f.output.gamepad.buttons&&!f.output.gamepad.rightX,"held camera direction cannot preselect a native D-pad category");
+    }
+    {
+        NativeFixture f;
+        f.input.buttons[4]=f.input.buttons[0]=f.input.buttons[10]=1;f.tick();f.tick(550);
+        expect(f.output.changed&&f.native.selected()&&f.output.gamepad==GamepadSample{},"mode entry releases the game before routing native buttons");
+        f.input.buttons[4]=f.input.buttons[0]=0;f.tick();f.tick(500);
+        expect(f.output.gamepad==GamepadSample{},"held trigger cannot fire when the input layout changes");
+        f.neutral();f.input.buttons[10]=1;f.tick();expect(f.output.gamepad.rightTrigger==255,"fresh native trigger works after mode-entry release");
+        f.native.suspend();f.controls.suspend();f.tick();
+        expect(f.native.selected()&&f.output.gamepad==GamepadSample{},"focus loss keeps chosen layout but releases every native input");
+        f.neutral();f.input.buttons[4]=f.input.buttons[0]=1;f.tick();f.tick(550);
+        expect(!f.native.selected()&&f.output.exclusive&&f.output.gamepad==GamepadSample{},"mode exit consumes the toggle instead of leaking normal quick-switch");
+        f.neutral();expect(!f.output.exclusive,"normal VR layout resumes after neutral mode exit");
+    }
+    {
+        NativeFixture f;
+        std::istringstream config("[native]\ndpad_hold=disabled\ndpad_up=y\ny=menu + right_stick_up\n[axes]\nnative_move=right_stick\nnative_look=left_stick\n");
+        expect(f.controls.load(config).empty(),"native buttons and both stick roles are configurable without source edits");
+        f.tick();f.enter();f.input.buttons[3]=1;f.input.leftStick={.2f,.3f};f.input.rightStick={-.4f,-.5f};f.tick();
+        expect(f.output.gamepad.buttons==1&&f.output.gamepad.leftX==-13106&&f.output.gamepad.rightX==6553,
+            "direct remapped D-pad works without its default hold modifier and both remapped axes apply");
+        f.input.buttons[3]=0;f.tick();expect(!f.output.gamepad.buttons,"direct D-pad release is not latched without its modifier");
+    }
     {
         Fixture f;
         expect(f.load("[gameplay]\nnative_dpad_up=press(right_grip + x)\n"),"direct native weapon actions accept a deliberate chord");
@@ -187,8 +329,9 @@ int main(int argc,char** argv){
         expect(!f.active("commands.keep_open"),"release closes commands");
     }
     {
-        Fixture f;f.input.rightStick={0,1};f.tick();
-        expect(f.active("gameplay.run"),"right stick up runs");
+        Fixture f;expect(f.load("[gameplay]\nrun=right_stick_up\n"),"previous right-up sprint remains an explicit configurable option");f.tick();
+        f.input.rightStick={0,1};f.tick();
+        expect(f.active("gameplay.run"),"explicitly configured right stick up runs");
         f.mode=ControlContext::equipment;f.tick();
         expect(!f.active("equipment.primary"),"held run direction cannot select when the wrist opens");
         f.input.rightStick={};f.tick();f.input.rightStick={0,-1};f.tick();
@@ -261,8 +404,8 @@ int main(int argc,char** argv){
         f.input.buttons[2]=1;f.tick();
         expect(f.active("commands.open")&&f.active("commands.keep_open"),"Commands opens without a trigger chord on foot");
         f.input={};f.mode=ControlContext::binoculars;f.tick();
-        f.input.buttons[5]=1;f.tick();
-        expect(f.active("binoculars.zoom")&&!f.active("binoculars.dive"),"binocular left click only zooms");
+        f.input.buttons[8]=f.input.buttons[5]=1;f.tick();
+        expect(f.active("binoculars.zoom")&&!f.active("binoculars.dive")&&!f.active("binoculars.run"),"binocular grip plus left click only zooms");
         f.input={};f.tick(101);f.input.buttons[6]=1;f.tick();
         expect(f.active("binoculars.dive")&&!f.active("binoculars.zoom"),"binocular right click only dives");
         f.input={};f.tick(101);f.input.buttons[0]=1;f.tick();

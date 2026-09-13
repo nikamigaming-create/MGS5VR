@@ -4,6 +4,13 @@ Updated 13 September 2026. These are native game systems that the VR controls,
 camera, hands and UI must preserve. A mapped button is not a claim that the whole
 interaction works. Multiplayer, FOB and MGO are outside this project request.
 
+Complete **native-button mode** is now available through Menu+A held 0.55 s.
+Its separate config maps all 14 native buttons, both analog triggers and all
+stick axes, retaining native holds/combos in both games. The table below describes
+normal VR presentation and remaining integration, not missing native input bits.
+See [Quest 3 / Virtual Desktop tester issues](QUEST3_TESTER_FEEDBACK.md) for the
+current hardware-reported gaps; renderer issues are not considered fixed by remapping.
+
 | System | Current access | Remaining work |
 | --- | --- | --- |
 | Hold-up and interrogation | Ready with right grip; Commands on held X, right-stick choice, A confirm. Existing aim/CQC holds now survive that menu. | Complete real guard interaction, readable choices/responses, target selection from the VR view, camera/hand behavior throughout restraint. |

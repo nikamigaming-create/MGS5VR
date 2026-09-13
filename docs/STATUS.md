@@ -3,6 +3,26 @@
 Updated 2026-09-13. The mod source, native adapters, tests and build tooling are
 open under the MIT license. The complete requested VR conversion remains unfinished.
 
+September 13.4 follows the Quest 3 / Virtual Desktop tester feedback: left-click
+sprint, separate grip+left-click zoom, configurable native smooth yaw, native
+mounted turning instead of a camera-only snap, a complete isolated native-button
+mode, and an external validating controls editor. Binocular hands acquire named
+anatomical palm contacts around the housing instead of retaining a gun-like
+controller wrist orientation. The final native skin solve moves the body, support,
+optical ray and lens together, including optional pitch/yaw/roll calibration.
+On DLL `B554764FE0301F548D2F31A5CACE526EC21D326298A1EE6768459ED41159D13E`,
+SIM carry, both-eye cupping/support, 2x/4x, yaw, lowering and stow were inspected.
+Nine automated suites pass, including the supplied tester's native-B pickup
+layout and X-chord arbitration. The supplied file also passes the released 13.3
+checker; its comments misdescribe X chords, and its binocular mode retains the
+old up-stick sprint. It has not been overwritten.
+
+These are not fixes for all reported rendering defects. Missing HUD/subtitles,
+stretched marked-enemy ghosts, displaced flares and the reported body-center
+drift remain open. Mounted turning and controller ergonomics still require
+physical feedback; no headset was launched. The full issue list is in
+[Quest 3 tester feedback](QUEST3_TESTER_FEEDBACK.md).
+
 Current source/build changes: annotated editable controller configuration with
 tap/hold/chord bindings; separated Touch face buttons from Vive/WMR fallback
 actions; deliberate four-category wrist selection fitted to both eyes; carried

@@ -94,11 +94,17 @@ uint64_t WeaponScopeZoomInput::update(bool requested,bool available){
     requested_=requested;return sequence_;
 }
 
+Quat binocularGripRotation(float pitchDegrees,float yawDegrees,float rollDegrees){
+    constexpr float halfRadians=.00872664626f;
+    const float pitch=pitchDegrees*halfRadians,yaw=yawDegrees*halfRadians,roll=rollDegrees*halfRadians;
+    return compose(Pose{{0,std::sin(yaw),0,std::cos(yaw)},{}},
+        compose(Pose{{std::sin(pitch),0,0,std::cos(pitch)},{}},Pose{{0,0,std::sin(roll),std::cos(roll)},{} })).orientation;
+}
 std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     Pose leftAim,Pose rightAim,bool leftTracked,bool rightTracked,
-    bool leftAimTracked,bool rightAimTracked,bool leftHeld,bool rightHeld){
+    bool leftAimTracked,bool rightAimTracked,bool leftHeld,bool rightHeld,Quat gripRotation){
     if(!rightHeld||!rightTracked||!rightAimTracked
-       ||!finitePose(rightGrip)||!finitePose(rightAim))return {};
+       ||!finitePose(rightGrip)||!finitePose(rightAim)||!valid(Pose{gripRotation,{}}))return {};
     // The primary palm owns the attachment position. Calibrate orientation
     // from this runtime's same-frame grip/aim pair; do not use aim POSITION
     // as the palm socket or assume every controller has the simulator basis.
@@ -108,7 +114,7 @@ std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     // wrist quaternion. The optic points along the controller aim -Z while
     // its palm socket stays exactly at the tracked grip position. The old
     // fixed ~76-degree pitch made a physical Touch wrist bend back at the face.
-    const Pose gripToBody{aimFromGrip.orientation,{}};
+    const Pose gripToBody=compose(Pose{aimFromGrip.orientation,{}},Pose{gripRotation,{}});
     // Seat the housing against the inside of the right palm. The rear ocular
     // remains behind the fingers, so bringing it to the eye does not bring
     // the wrist through the near plane.
@@ -135,8 +141,7 @@ std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     // Merely squeezing the left controller must not teleport that hand onto
     // the binoculars: it has to be tracked, aimed, held, and physically close
     // to this authored socket.
-    const auto supportAimFromGrip=compose(inverse(leftGrip),leftAim);
-    const auto supportSocket=compose(body,Pose{inverse(supportAimFromGrip).orientation,binocularSupportSocket});
+    const auto supportSocket=compose(body,Pose{binocularPalmOrientation,binocularSupportSocket});
     const float supportDistance=finitePose(leftGrip)&&finitePose(supportSocket)
         ?distance(leftGrip.position,supportSocket.position):std::numeric_limits<float>::infinity();
     const bool supportHeld=leftHeld&&leftTracked&&leftAimTracked
@@ -159,8 +164,26 @@ std::optional<OpticPose> solveBinocularPose(Pose leftGrip,Pose rightGrip,
     result.primaryRight=true;
     result.supportHeld=supportHeld;
     result.supportGrip=supportHeld?supportSocket:leftGrip;
+    result.primaryGrip=compose(body,Pose{binocularPalmOrientation,binocularPrimarySocket});
     result.stability=supportHeld?1.f:.35f;
     result.ray=ray;
+    return result;
+}
+
+std::optional<OpticPose> attachBinocularToPalm(const OpticPose& optic,Pose primaryPalm){
+    if(!optic.tracked||optic.kind!=OpticKind::binocular||!finitePose(primaryPalm)
+       ||!finitePose(optic.primaryGrip)||!finitePose(optic.body)||!finitePose(optic.renderBody)
+       ||!finitePose(optic.leftEyepiece)||!finitePose(optic.rightEyepiece))return {};
+    const auto delta=compose(primaryPalm,inverse(optic.primaryGrip));
+    auto result=optic;
+    result.body=compose(delta,optic.body);
+    result.renderBody=compose(delta,optic.renderBody);
+    result.leftEyepiece=compose(delta,optic.leftEyepiece);
+    result.rightEyepiece=compose(delta,optic.rightEyepiece);
+    result.primaryGrip=primaryPalm;
+    if(optic.supportHeld)result.supportGrip=compose(delta,optic.supportGrip);
+    result.ray.origin=compose(delta,Pose{{},optic.ray.origin}).position;
+    result.ray.direction=rotate(delta.orientation,optic.ray.direction);
     return result;
 }
 
@@ -237,7 +260,7 @@ bool validateBinocularViews(const OpticSample& optic,const Pose& head,
 OpticSample OpticGate::update(Pose head,const std::array<EyeView,2>& eyes,
     Pose leftGrip,Pose rightGrip,Pose leftAim,Pose rightAim,
     bool leftTracked,bool rightTracked,bool leftAimTracked,bool rightAimTracked,
-    bool leftHeld,bool rightHeld,bool available,uint64_t time,uint64_t epoch){
+    bool leftHeld,bool rightHeld,bool available,uint64_t time,uint64_t epoch,Quat gripRotation){
     OpticSample result;
     if(!available||!epoch||time<time_||(epoch_&&epoch!=epoch_)){
         const bool wasActive=active_;
@@ -247,7 +270,7 @@ OpticSample OpticGate::update(Pose head,const std::array<EyeView,2>& eyes,
     }
     time_=time;epoch_=epoch;
     const auto pose=solveBinocularPose(leftGrip,rightGrip,leftAim,rightAim,
-        leftTracked,rightTracked,leftAimTracked,rightAimTracked,leftHeld,rightHeld);
+        leftTracked,rightTracked,leftAimTracked,rightAimTracked,leftHeld,rightHeld,gripRotation);
     if(!pose||!finitePose(head)||!finitePose(eyes[0].pose)||!finitePose(eyes[1].pose)){
         const bool wasActive=active_;
         active_=false;++sequence_;

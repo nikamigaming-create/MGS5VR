@@ -161,7 +161,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     for(size_t i=0;i<2;++i)if(frame.controllers.hands[i].gripTracked)
         grips[i]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.hands[i].grip));
     if(frame.controllers.optic.held&&frame.controllers.optic.pose.tracked){
-        const auto safe=binocularFaceSafeGrip(frame.headPose,frame.controllers.hands[1].grip,frame.controllers.optic.pose);
+        // Acquire the housing's authored PALM contact. Reusing a gun-like raw
+        // controller grip leaves the fingers pointing along the tube instead
+        // of enclosing it, despite an apparently correct optical aim ray.
+        const auto safe=binocularFaceSafeGrip(frame.headPose,frame.controllers.optic.pose.primaryGrip,frame.controllers.optic.pose);
         grips[1]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,safe));
     }
     std::lock_guard lock(rigMutex);
@@ -269,14 +272,14 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const auto renderedPalm=compose(*root,compose(bone(q,p,12),inverse(gripFromWrist[1])));
         const auto localPalm=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},
             compose(inverse(frame.nativePose),renderedPalm)));
-          const auto& left=frame.controllers.hands[0];
-          const auto& primary=frame.controllers.hands[1];
-          const auto solvedAim=compose(compose(localPalm,inverse(primary.grip)),primary.aim);
-          const auto optic=solveBinocularPose(left.grip,localPalm,left.aim,solvedAim,
-            left.gripTracked,primary.gripTracked,left.aimTracked,primary.aimTracked,
-            frame.controllers.optic.pose.supportHeld,binocularHeld);
+        const auto optic=attachBinocularToPalm(frame.controllers.optic.pose,localPalm);
         if(!optic)return false;
         frame.controllers.optic.pose=*optic;
+        const auto supportDistance=optic->supportGrip.position-frame.controllers.hands[0].grip.position;
+        if(optic->supportHeld&&dot(supportDistance,supportDistance)>.12f*.12f){
+            frame.controllers.optic.pose.supportHeld=false;
+            frame.controllers.optic.pose.stability=.35f;
+        }
         return true;
     };
     if(binocularHeld&&!attachBinocular())return false;
