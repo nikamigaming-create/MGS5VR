@@ -11,7 +11,11 @@ file when saving. No game launch is needed to check a layout. This is not yet
 an in-game rebinding screen.
 
 Open **mgs5vr-controls.ini in your MGSV game folder** (beside `dinput8.dll`).
-Save and restart MGSV to apply. The installed file is the one the game reads;
+Save, release all buttons/grips/triggers and center both sticks for about two
+seconds. Changes apply live; no restart is needed. Invalid edits keep the last
+working layout, and deleting an override restores its default. This applies to
+bindings, axes, turning mode, HUD mode and the wrist/binocular adjustments.
+The installed file is the one the game reads;
 the repository copy is a template. Every supported button action is listed,
 with separate gameplay, binocular, wrist, menu, horse and vehicle sections.
 The bindings below describe the defaults, not a hard-coded layout.

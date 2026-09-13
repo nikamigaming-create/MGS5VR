@@ -19,6 +19,8 @@ struct RenderLayout {
     size_t presentCount,presentCapacity,presentData;
     // Adjacent native near/far floats. Not shared with an unverified build.
     size_t cameraNearPlane;
+    // Native perspective focal scale; independent per-build field contract.
+    size_t cameraFocalScale;
 };
 inline constexpr RenderLayout phantomPainRender{
     0x438ac0,0x438c20,0x1c4fa0,0x1b9490,0x241b00,0x1beec0,0x2496a0,0x1d6a490,0x1d6a550,0,
@@ -29,7 +31,7 @@ inline constexpr RenderLayout phantomPainRender{
     0x5d8,0x5dc,0x5e0,
     0xa0,0x30,0x98,0x150,
     0x110,0x114,0x118,
-    0x168
+    0x168,0x10c
 };
 inline constexpr RenderLayout groundZeroesRender{
     0x31ee30,0x39d2d0,0xf8edb0,0xf42270,0xf5f110,0xf47b50,0xfd3310,0x120edb0,0x120ee70,0x39c510,
@@ -40,7 +42,7 @@ inline constexpr RenderLayout groundZeroesRender{
     0x514,0x518,0x51c,
     0xa8,0x28,0xa0,0x120,
     0xe0,0xe4,0xe8,
-    0
+    0,0xf8
 };
 constexpr const RenderLayout& renderLayout(RenderBuild build) noexcept {
     return build==RenderBuild::groundZeroes_1_0_0_5?groundZeroesRender:phantomPainRender;

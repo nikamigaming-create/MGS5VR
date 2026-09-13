@@ -614,6 +614,21 @@ int main(){
     }
 
     const EyeFov asymmetric{-0.8f,0.9f,0.75f,-0.7f};
+    {
+        expect(phantomPainRender.cameraFocalScale==0x10c&&groundZeroesRender.cameraFocalScale==0xf8,
+            "TPP and GZ native focal parameters use independently mapped fields");
+        for(float aspect:{.8f,1.f,1.4f})for(float focal:{.5f,1.f,2.f}){
+            std::array<float,16> native{};native[0]=-focal;native[5]=focal*aspect*16.f/9.f;native[11]=1;native[14]=.1f;
+            for(const auto fov:{EyeFov{-.94f,.94f,.87f,-.87f},EyeFov{-.07f,.07f,.07f,-.07f}}){
+                const auto parameters=nativeProjectionScales(focal,aspect,native,fov);
+                auto target=native;setEyeProjection(target,fov);
+                expect(parameters&&near(-parameters->focal,target[0])&&near(parameters->focal*parameters->aspect*16.f/9.f,target[5]),
+                    "native focal/aspect inputs reproduce both normal-eye and scope raster scales");
+            }
+            expect(!nativeProjectionScales(focal,aspect,native,asymmetric),"asymmetric optical crop is not misrepresented as scalar native FOV");
+            expect(!nativeProjectionScales(NAN,aspect,native,{-.8f,.8f,.8f,-.8f}),"invalid native focal scale is not written");
+        }
+    }
     expect(phantomPainRender.cameraNearPlane==0x168&&groundZeroesRender.cameraNearPlane==0,
         "tracked near-plane field is verified only for the TPP graphics camera");
     expect(near(trackedNearPlane(.069f,4000.f),.02f),"close held geometry uses a two-centimeter native near plane");

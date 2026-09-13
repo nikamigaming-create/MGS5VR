@@ -93,6 +93,14 @@ int visibilityChecks(){
         if(bodyFlags!=std::array<uint8_t,6>{11,11,11,11,11,11})++failures;
     }
     if(bodyFlags!=stereoBodyFlags||flags!=std::array<uint8_t,3>{11,11,3})++failures;
+    mgs5vr::updatePlayerVisibility(address(owner),true,true);
+    if(bodyFlags!=std::array<uint8_t,6>{11,11,11,11,11,11}||flags!=std::array<uint8_t,3>{11,11,3})++failures;
+    // Publication-level front-end exclusion persists through preparation and
+    // repeated updates; leaving the menu restores exactly the gameplay arms.
+    mgs5vr::updatePlayerVisibility(address(owner),true,true);
+    if(bodyFlags!=std::array<uint8_t,6>{11,11,11,11,11,11})++failures;
+    update(true);
+    if(bodyFlags!=stereoBodyFlags||flags!=std::array<uint8_t,3>{11,11,3})++failures;
     {
         mgs5vr::MenuCapturePlayerExclusion sourceOnly(address(owner));
         bodyFlags[2]=0; // Native state change while the source is drawn wins.

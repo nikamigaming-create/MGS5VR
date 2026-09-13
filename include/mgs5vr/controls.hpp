@@ -2,6 +2,7 @@
 #include <array>
 #include <cstdint>
 #include <istream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -53,5 +54,18 @@ private:
     std::array<int,2> stickDirections_{};
     uint64_t lastTime_{};
     static std::vector<Binding> parse(std::string text);
+};
+// A complete file is validated away from the active gesture state. Applying a
+// replacement requires physically neutral controls, including analog axes.
+// Each file starts from defaults, just like a new game session; deleting an
+// override therefore really restores the default instead of retaining it.
+class LiveControls {
+public:
+    std::vector<std::string> stage(std::istream& input);
+    bool apply(ControlBindings& destination,const PhysicalControls& physical);
+    bool pending() const {return pending_.has_value();}
+    void cancel(){pending_.reset();}
+private:
+    std::optional<ControlBindings> pending_;
 };
 }

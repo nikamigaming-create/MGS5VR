@@ -40,7 +40,9 @@ No simulator or compiling needed. Install once; launch normally afterward.
 ![Current control modes](docs/images/control-modes.svg)
 
 Current builds install **mgs5vr-controls.ini** beside the game executable. Edit it,
-save, then restart MGSV. No rebuild needed. [Annotated default config](config/mgs5vr-controls.ini)
+save, then release all buttons/grips/triggers and center both sticks for two
+seconds: changes apply live without restarting. Invalid edits keep the last
+working layout. [Annotated default config](config/mgs5vr-controls.ini)
 supports per-mode buttons, taps, holds, release actions and combinations.
 
 **Edit-Controls.cmd** in the extracted release checks conflicts as you type,

@@ -4,6 +4,7 @@
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/player_visibility.hpp"
+#include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include <windows.h>
@@ -145,7 +146,7 @@ extern "C" void MgsCameraObserved(void* object,const float* source,uintptr_t cal
                     mgs5vr::headCamera().publishPlayerHead(linked,context[0],{{v[0],v[1],v[2],v[3]},{v[4],v[5],v[6]}},root,head,mgs5vr::steadyMilliseconds());
                     const auto status=mgs5vr::headCamera().status();
                     mgs5vr::observeControllerRigOwner(context[0]);
-                    mgs5vr::updatePlayerVisibility(context[0],status.active||status.pending);
+                    mgs5vr::updatePlayerVisibility(context[0],status.active||status.pending,mgs5vr::nativeTitleMenuOpen());
                 }
             }
         }

@@ -227,6 +227,22 @@ void ControlBindings::suspend(){
     for(auto& e:entries_){e.value=0;for(auto& state:e.states){state={};state.blocked=true;}}
     stickDirections_={};lastTime_=0;
 }
+std::vector<std::string> LiveControls::stage(std::istream& input){
+    pending_.reset();
+    ControlBindings candidate;
+    auto errors=candidate.load(input);
+    if(errors.empty())pending_=std::move(candidate);
+    return errors;
+}
+bool LiveControls::apply(ControlBindings& destination,const PhysicalControls& physical){
+    if(!pending_)return false;
+    for(size_t n=0;n<11;++n)
+        if(!std::isfinite(physical.buttons[n])||std::abs(physical.buttons[n])>.09f)return false;
+    for(const auto& stick:{physical.leftStick,physical.rightStick})
+        for(const auto axis:stick)if(!std::isfinite(axis)||std::abs(axis)>=.18f)return false;
+    destination=std::move(*pending_);pending_.reset();destination.suspend();
+    return true;
+}
 void ControlBindings::update(PhysicalControls input,ControlContext context,uint64_t time){
     if(time<lastTime_)suspend();lastTime_=time;
     for(auto& v:input.buttons)v=std::isfinite(v)?std::clamp(v,0.f,1.f):0;

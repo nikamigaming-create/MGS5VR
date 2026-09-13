@@ -14,5 +14,5 @@ int wmain(int argc,wchar_t** argv){
     mgs5vr::ControlBindings controls;const auto errors=controls.load(file);
     for(const auto& error:errors)std::cerr<<error<<'\n';
     if(!errors.empty())return 1;
-    std::cout<<"Controls valid. Restart MGSV to apply changes.\n";return 0;
+    std::cout<<"Controls valid. Save beside the game DLL, release all buttons/grips/triggers and center both sticks for two seconds to apply live.\n";return 0;
 }

@@ -6,9 +6,9 @@ namespace mgs5vr {
 void initializePlayerVisibility(uintptr_t moduleBase) noexcept;
 // Called on the native player camera publication thread, after the player has
 // updated its appearance. Only verified models owned by this player are changed.
-void updatePlayerVisibility(uintptr_t cameraOwner,bool firstPerson) noexcept;
+void updatePlayerVisibility(uintptr_t cameraOwner,bool firstPerson,bool hideArms=false) noexcept;
 // Exclude the owned player only from the native-camera image copied onto the
-// Title panel. The two stereo eye passes keep their normal tracked-arm draw.
+// Title panel. Front-end arms are also excluded before native draw preparation.
 // Scope restoration never re-enables native-hidden groups or a replaced model.
 class MenuCapturePlayerExclusion {
 public:

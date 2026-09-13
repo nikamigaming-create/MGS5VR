@@ -51,7 +51,7 @@ void fadeUpdate(void* object){
 struct GroupChange {uint32_t name{};uint8_t previousFlags{};};
 struct Binding {
     uintptr_t owner{},character{},parts{},record{},renderer{},model{};
-    bool body{};
+    bool body{},hideArms{};
     std::array<GroupChange,128> groups{};
     uint16_t changed{};
 };
@@ -132,15 +132,15 @@ void conceal(Binding candidate){
         slot=std::find_if(hidden.begin(),hidden.end(),[](const auto& b){return !b.model;});
         if(slot==hidden.end())return;
         *slot=candidate;
-        mgs5vr::log(candidate.body?"First-person player body hidden from main view; native shadow retained":"First-person player head hidden from main view; native shadow retained");
+        mgs5vr::log(candidate.hideArms?"Front-end player arms hidden before draw preparation; native shadow retained":candidate.body?"First-person player body hidden from main view; native shadow retained":"First-person player head hidden from main view; native shadow retained");
     }
     std::array<uint32_t,128> groups{};uint16_t count{};
     if(!names(candidate.model,groups,count))return;
     std::array<bool,128> bodyConceal{};
-    if(candidate.body&&!bodyBranches(candidate.model,groups,count,bodyConceal))return;
+    if(candidate.body&&!candidate.hideArms&&!bodyBranches(candidate.model,groups,count,bodyConceal))return;
     const auto flags=get<uintptr_t>(candidate.model+0x170);if(!flags)return;
     for(uint16_t i=0;i<count;++i){
-        if(candidate.body&&!bodyConceal[i])continue;
+        if(candidate.body&&!candidate.hideArms&&!bodyConceal[i])continue;
         uint8_t previous{};if(!read(flags+i,previous)||!(previous&4))continue;
         auto change=std::find_if(slot->groups.begin(),slot->groups.begin()+slot->changed,
             [&](const auto& g){return g.name==groups[i];});
@@ -196,16 +196,19 @@ void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
         else MH_RemoveHook(target);
     }
 }
-void updatePlayerVisibility(uintptr_t owner,bool firstPerson) noexcept {
+void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms) noexcept {
     if(!base)return;
-    fadeOwner.store(firstPerson?owner:0);
-    for(auto& b:hidden)if(b.model&&(!firstPerson||b.owner!=owner||!owned(b)))restore(b);
+    fadeOwner.store(firstPerson&&!hideArms?owner:0);
+    for(auto& b:hidden)if(b.model&&(!firstPerson||b.owner!=owner||!owned(b)||(b.body&&b.hideArms!=hideArms)))restore(b);
     if(!firstPerson||get<uintptr_t>(owner)!=base+0x23b8218)return;
     const auto character=get<uintptr_t>(owner+0x370);
     if(!character||get<uintptr_t>(character)!=base+0x2295210)return;
     const auto component=get<uintptr_t>(character+0x10),bodyParts=get<uintptr_t>(component+0x10);
     const auto bodyModel=get<uintptr_t>(bodyParts+0x68);
     Binding body{owner,character,bodyParts,0,0,bodyModel,true};
+    // Do this at player publication, before FOX builds the visible draw list.
+    // A scene-only hide is too late for already-prepared arm geometry.
+    body.hideArms=hideArms;
     if(bodyModel&&groupIndex(body,bodyName)>=0&&groupIndex(body,armName)>=0)conceal(body);
     const auto parts=get<uintptr_t>(character+0x610);
     if(!parts||get<uintptr_t>(parts)!=base+0x22e56c0||get<uintptr_t>(parts+0x38)!=character)return;

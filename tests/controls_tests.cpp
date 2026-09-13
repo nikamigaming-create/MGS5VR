@@ -44,6 +44,32 @@ struct NativeFixture {
 }
 int main(int argc,char** argv){
     {
+        ControlBindings controls;LiveControls live;PhysicalControls physical;
+        std::istringstream file("[settings]\nturn_mode=native_smooth\n");
+        expect(live.stage(file).empty()&&live.pending(),"valid complete edit waits away from active bindings");
+        physical.buttons[10]=1;
+        expect(!live.apply(controls,physical)&&controls.setting("settings.turn_mode")==0,"live edit cannot interrupt a held trigger");
+        physical={};physical.leftStick={.2f,0};
+        expect(!live.apply(controls,physical),"live edit waits for left stick neutral");
+        physical={};physical.rightStick={0,-.2f};
+        expect(!live.apply(controls,physical),"live edit waits for right stick neutral");
+        physical={};physical.buttons[7]=.1f;
+        expect(!live.apply(controls,physical),"live edit waits for analog grip release below action threshold");
+        physical={};physical.buttons[0]=std::numeric_limits<float>::quiet_NaN();
+        expect(!live.apply(controls,physical),"invalid physical state cannot accept a live edit");
+        physical={};
+        expect(live.apply(controls,physical)&&!live.pending()&&controls.setting("settings.turn_mode")==1,"neutral input atomically applies complete edited settings");
+        controls.update(physical,ControlContext::gameplay,100);
+        expect(!controls.active("gameplay.fire_or_cqc")&&!controls.active("system.pause"),"live replacement cannot manufacture an action");
+        physical.buttons[10]=1;controls.update(physical,ControlContext::gameplay,111);
+        expect(controls.active("gameplay.fire_or_cqc"),"fresh press works immediately after live replacement");
+        std::istringstream valid("[settings]\nturn_mode=off\n"),invalid("[gameplay]\ndive=press(y)\n");
+        expect(live.stage(valid).empty()&&!live.stage(invalid).empty()&&!live.pending(),"new invalid edit cancels an older queued valid edit");
+        expect(!live.apply(controls,{})&&controls.setting("settings.turn_mode")==1,"invalid live edit preserves the last working layout instead of defaults");
+        std::istringstream defaults("; remove overrides\n");
+        expect(live.stage(defaults).empty()&&live.apply(controls,{})&&controls.setting("settings.turn_mode")==0,"deleting an override restores its default just like restarting");
+    }
+    {
         Fixture f;
         expect(f.controls.setting("settings.hud_mode")==0,"full world HUD is the default");
         expect(f.load("[settings]\nhud_mode=binoculars_only\n")&&f.controls.setting("settings.hud_mode")==1,

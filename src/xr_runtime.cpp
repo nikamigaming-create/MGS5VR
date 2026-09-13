@@ -101,6 +101,11 @@ struct Session {
     bool manualScreenSelected{};
     bool priorTitleMenu{};
     ControlBindings controls;
+    LiveControls liveControls;
+    std::filesystem::path controlsPath;
+    std::optional<std::filesystem::file_time_type> observedControlsWrite;
+    std::optional<std::filesystem::file_time_type> handledControlsWrite;
+    uint64_t controlsPollAt{};
     NativeControls nativeControls;
     RigInput rigControls;
     RigOptics opticsControls;
@@ -144,12 +149,54 @@ struct Session {
         if(withHands){info.countSubactionPaths=2;info.subactionPaths=hands.data();}
         XrAction result; xrCheck(xrCreateAction(actions,&info,&result),"Create action"); return result;
     }
-    void initialize() {
+    void refreshControlLabels(){
         constexpr std::array<std::string_view,4> categories{"equipment.primary","equipment.secondary","equipment.support","equipment.items"};
         for(size_t n=0;n<categories.size();++n){
             const auto label=controls.label(categories[n]);
             strncpy_s(equipmentLabels[n].data(),equipmentLabels[n].size(),label.c_str(),_TRUNCATE);
         }
+    }
+    void reloadControls(const PhysicalControls& physical,uint64_t now){
+        if(!controlsPath.empty()&&now>=controlsPollAt){
+            controlsPollAt=now+750;
+            std::error_code error;
+            const auto write=std::filesystem::last_write_time(controlsPath,error);
+            if(error){observedControlsWrite.reset();liveControls.cancel();}
+            else if(observedControlsWrite!=write){
+                // Wait for two stable observations. Editors can truncate then
+                // rewrite a file, or replace it using an atomic rename.
+                observedControlsWrite=write;liveControls.cancel();
+            }else if(handledControlsWrite!=write){
+                const auto size=std::filesystem::file_size(controlsPath,error);
+                if(!error&&size<=262144){
+                    std::ifstream file(controlsPath,std::ios::binary);
+                    if(file){
+                        std::string contents(static_cast<size_t>(size),'\0');
+                        file.read(contents.data(),static_cast<std::streamsize>(contents.size()));
+                        const auto after=std::filesystem::last_write_time(controlsPath,error);
+                        if(file&&!error&&after==write){
+                            handledControlsWrite=write;
+                            std::istringstream input(contents);
+                            const auto errors=liveControls.stage(input);
+                            if(errors.empty())log("Controls edit validated; release all buttons and center both sticks to apply live");
+                            else {log("Controls edit rejected; keeping the last working layout");for(const auto& message:errors)log("Controls: "+message);}
+                        }
+                    }
+                }else if(!error){
+                    handledControlsWrite=write;liveControls.cancel();
+                    log("Controls edit rejected: file exceeds 256 KiB; keeping the last working layout");
+                }
+            }
+        }
+        if(liveControls.apply(controls,physical)){
+            nativeControls.suspend();rigControls.suspend();commandsControls.suspend();
+            opticsControls.reset();opticGate.reset();snapControls.reset();smoothControls.reset();
+            weaponZoomInput.update(false,false);refreshControlLabels();
+            log("Controls applied LIVE: "+controlsPath.string()+"; no restart required");
+        }
+    }
+    void initialize() {
+        refreshControlLabels();
         PFN_xrGetD3D11GraphicsRequirementsKHR requirementsFn{};
         xrCheck(xrGetInstanceProcAddr(instance.handle,"xrGetD3D11GraphicsRequirementsKHR",reinterpret_cast<PFN_xrVoidFunction*>(&requirementsFn)),"Get D3D11 requirements function");
         XrGraphicsRequirementsD3D11KHR requirements{XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR};
@@ -345,12 +392,6 @@ struct Session {
             simpleControllerProfile=faceLayouts[1]==ControllerFaceLayout::simple;
         }
         controllerFrame={{trackedHand(0,time),trackedHand(1,time)},time,referenceEpoch};
-        controllerFrame.equipmentLabels=equipmentLabels;
-        controllerFrame.wristSurfaceLift=controls.setting("settings.wrist_surface_lift_cm")*.01f;
-        controllerFrame.wristSelectorHeight=controls.setting("settings.wrist_selector_height_cm")*.01f;
-        controllerFrame.wristPickerWidth=controls.setting("settings.wrist_picker_width_cm")*.01f;
-        controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
-        controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         const bool right=controllerFrame.hands[1].gripTracked;
         // OpenXR action activity is independent of optical pose tracking.
         // Occluding a controller must not release B or the held wrist trigger.
@@ -388,6 +429,14 @@ struct Session {
             boolean(menu)?1.f:0.f,boolean(thumbClick,hands[0])?1.f:0.f,
             boolean(thumbClick,hands[1])?1.f:0.f,ls,rs,lt,rt};
         physical.leftStick={l.x,l.y};physical.rightStick={rr.x,rr.y};
+        reloadControls(physical,now);
+        // Label/geometry changes belong to this same input publication.
+        controllerFrame.equipmentLabels=equipmentLabels;
+        controllerFrame.wristSurfaceLift=controls.setting("settings.wrist_surface_lift_cm")*.01f;
+        controllerFrame.wristSelectorHeight=controls.setting("settings.wrist_selector_height_cm")*.01f;
+        controllerFrame.wristPickerWidth=controls.setting("settings.wrist_picker_width_cm")*.01f;
+        controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
+        controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         const bool gameplayContext=controllerRigEnabled()&&mode!=TravelMode::unknown&&!title
             &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
         const auto controlContext=nativeControls.selected()?ControlContext::nativeButtons:!gameplayContext?ControlContext::menus:
@@ -794,12 +843,16 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         throw std::invalid_argument("Theatre dimensions must be finite values from 1 to 30 meters");
     Instance instance;instance.getSystem();Session session(instance);
     if(!config.controlsPath.empty()){
+        session.controlsPath=config.controlsPath;
         std::ifstream file(config.controlsPath);
         if(file){
             const auto errors=session.controls.load(file);
             if(errors.empty())log("Controls loaded: "+config.controlsPath.string());
             else {log("Controls file rejected; using built-in defaults");for(const auto& error:errors)log("Controls: "+error);}
         }else log("Controls file absent; using built-in defaults: "+config.controlsPath.string());
+        std::error_code error;
+        const auto write=std::filesystem::last_write_time(config.controlsPath,error);
+        if(!error)session.observedControlsWrite=session.handledControlsWrite=write;
     }
     session.initialize();
     log("OpenXR runtime="+instance.runtime+" headset="+instance.properties.systemName);

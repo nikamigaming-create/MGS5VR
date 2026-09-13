@@ -36,6 +36,11 @@ bool setEyeProjection(std::array<float,16>& matrix,EyeFov fov);
 // depth coefficients, reconstruction and visibility agree. Never raise an
 // already closer plane, alter the far plane, or repair invalid native inputs.
 float trackedNearPlane(float nativeNear,float nativeFar);
+struct NativeProjectionScales {float focal{},aspect{};};
+// Keep native camera consumers on the same angular projection as rasterization.
+// Focal scales X/Y together; viewport aspect scales Y independently in FOX.
+std::optional<NativeProjectionScales> nativeProjectionScales(float focal,float aspect,
+    const std::array<float,16>& nativeProjection,EyeFov renderedFov);
 // Conservative angular visibility coverage before either eye is drawn. Keeps
 // native coverage if it is wider and adds a small symmetric head-turn margin.
 bool widenVisibilityProjection(std::array<float,16>& matrix,Pose head,const std::array<EyeView,2>& views);

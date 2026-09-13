@@ -153,7 +153,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const Pose nativeCamera{{cameraValues[0],cameraValues[1],cameraValues[2],cameraValues[3]},
                             {cameraValues[4],cameraValues[5],cameraValues[6]}};
     auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera);
-    if(!frame.applied||frame.playerOwner!=owner||!frame.controllers.hands[1].gripTracked)return false;
+    if(!frame.applied||frame.playerOwner!=owner||frame.controllers.frontEnd||!frame.controllers.hands[1].gripTracked)return false;
     const auto renderedHead=compose(*root,bone(q,p,4)).position;
     if(!frame.menuOpen)frame.nativePose.position=frame.nativePose.position+renderedHead-frame.playerHead;
     const auto originalQ=q;const auto originalP=p;

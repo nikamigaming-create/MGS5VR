@@ -7,6 +7,20 @@ float trackedNearPlane(float nativeNear,float nativeFar){
     if(!std::isfinite(nativeNear)||!std::isfinite(nativeFar)||nativeNear<=0||nativeFar<=nativeNear)return nativeNear;
     return std::min(nativeNear,.02f);
 }
+std::optional<NativeProjectionScales> nativeProjectionScales(float focal,float aspect,
+    const std::array<float,16>& nativeProjection,EyeFov renderedFov){
+    if(!std::isfinite(focal)||!std::isfinite(aspect)||focal<=0||aspect<=0
+       ||nativeProjection[0]>=-.00001f||nativeProjection[5]<=.00001f)return {};
+    auto target=nativeProjection;
+    if(!setEyeProjection(target,renderedFov))return {};
+    // The renderer requests centered enclosing projections. An asymmetric
+    // optical crop is submitted separately and cannot fit two scalar fields.
+    if(std::abs(target[8])>.00001f||std::abs(target[9])>.00001f)return {};
+    const float x=target[0]/nativeProjection[0],y=target[5]/nativeProjection[5];
+    const NativeProjectionScales result{focal*x,aspect*y/x};
+    if(!std::isfinite(result.focal)||!std::isfinite(result.aspect)||result.focal<=0||result.aspect<=0)return {};
+    return result;
+}
 std::optional<std::array<float,16>> uiPanelProjection(const std::array<float,16>& uiProjection,
     const std::array<float,16>& eyeView,EyeFov fov,Pose panel,float width,float height,float centerX,float centerY){
     if(!valid(panel)||!valid(fov)||!std::isfinite(width)||!std::isfinite(height)||width<=0||height<=0

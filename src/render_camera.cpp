@@ -242,17 +242,38 @@ __declspec(noinline) uintptr_t viewport(void* input,uint8_t history){
 struct NativeRestore {
     uintptr_t camera{},viewport{};
     std::array<float,2> cameraPlanes{};
+    float cameraFocal{},viewportAspect{};
     std::array<unsigned char,0xc0> cameraMatrices{};
     std::array<unsigned char,0x240> viewportMatrices{};
     NativeRestore(uintptr_t c,uintptr_t v):camera(c),viewport(v){
         std::memcpy(cameraMatrices.data(),reinterpret_cast<void*>(c+0x30),cameraMatrices.size());
         std::memcpy(viewportMatrices.data(),reinterpret_cast<void*>(v+layout.viewportMatrices),viewportMatrices.size());
         if(layout.cameraNearPlane)std::memcpy(cameraPlanes.data(),reinterpret_cast<void*>(c+layout.cameraNearPlane),sizeof(cameraPlanes));
+        if(layout.cameraFocalScale)std::memcpy(&cameraFocal,reinterpret_cast<void*>(c+layout.cameraFocalScale),sizeof(cameraFocal));
+        std::memcpy(&viewportAspect,reinterpret_cast<void*>(v+layout.viewportScale),sizeof(viewportAspect));
     }
     void restore() const{
         std::memcpy(reinterpret_cast<void*>(camera+0x30),cameraMatrices.data(),cameraMatrices.size());
         std::memcpy(reinterpret_cast<void*>(viewport+layout.viewportMatrices),viewportMatrices.data(),viewportMatrices.size());
         if(layout.cameraNearPlane)std::memcpy(reinterpret_cast<void*>(camera+layout.cameraNearPlane),cameraPlanes.data(),sizeof(float));
+        if(layout.cameraFocalScale)std::memcpy(reinterpret_cast<void*>(camera+layout.cameraFocalScale),&cameraFocal,sizeof(cameraFocal));
+        std::memcpy(reinterpret_cast<void*>(viewport+layout.viewportScale),&viewportAspect,sizeof(viewportAspect));
+    }
+    void applyNativeProjectionScales(mgs5vr::EyeFov fov) const{
+        if(!layout.cameraFocalScale)return;
+        std::array<float,16> projection{};
+        std::memcpy(projection.data(),viewportMatrices.data()+layout.gpuProjection-layout.viewportMatrices,sizeof(projection));
+        const auto scales=mgs5vr::nativeProjectionScales(cameraFocal,viewportAspect,projection,fov);
+        if(!scales)return;
+        // Updating only the final matrix leaves camera/FOV consumers on the
+        // desktop focal and aspect scales. Publish matching native parameters
+        // for this replay, then restore them before the next eye/native pass.
+        std::memcpy(reinterpret_cast<void*>(camera+layout.cameraFocalScale),&scales->focal,sizeof(float));
+        std::memcpy(reinterpret_cast<void*>(viewport+layout.viewportScale),&scales->aspect,sizeof(float));
+        static std::atomic_bool reported{};
+        if(!reported.exchange(true))mgs5vr::log("Native camera focal/aspect parameters match the replayed eye projection: focal="
+            +std::to_string(cameraFocal)+" -> "+std::to_string(scales->focal)+" aspect="
+            +std::to_string(viewportAspect)+" -> "+std::to_string(scales->aspect));
     }
     void applyTrackedNearPlane() const{
         if(!layout.cameraNearPlane)return;
@@ -304,7 +325,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     // update would black out the menu. A spatial menu can only be anchored
     // after an accepted gameplay view, and all camera/transaction checks below
     // still apply. Gameplay continues to require its current tracked skin.
-    if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence&&!source.pair.sample.menuOpen){++sceneRejected;return originalScene(render,graphics,task,worker);}
+    if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence&&!source.pair.sample.menuOpen&&!source.pair.sample.controllers.frontEnd){++sceneRejected;return originalScene(render,graphics,task,worker);}
     if(!contains||source.pair.sample.activation!=status.activation||now<source.pair.sample.sampleTime||now-source.pair.sample.sampleTime>150
         ||std::memcmp(reinterpret_cast<void*>(source.grCamera+0x30),source.pair.world.data(),sizeof(source.pair.world))){++sceneRejected;return originalScene(render,graphics,task,worker);}
     const auto contextOwner=field<uintptr_t>(graphics,layout.graphicsContext);
@@ -324,6 +345,11 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const auto cameraCount=pairCount.load();uintptr_t result{};bool complete=true;
     mgs5vr::beginSceneTiming(context,id);
     const bool titleSurface=source.pair.sample.controllers.frontEnd;
+    // The front end has no player-hand interaction. Exclude this player's
+    // verified model groups from BOTH eye replays as well as the panel source;
+    // hiding only the source leaves tracked arms floating around the title.
+    // The guard restores the exact native visibility flags on every exit.
+    mgs5vr::MenuCapturePlayerExclusion excludeTitlePlayer(titleSurface?source.pair.sample.playerOwner:0);
     // The telescope has one real ocular. Draw its own narrow-angle native
     // scene first, then the two ordinary HMD eyes. All three draws use the
     // same simulation/hand publication and only one native present is queued.
@@ -366,6 +392,9 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         if(!titleSurface)saved.applyTrackedNearPlane();
         originalViewport(reinterpret_cast<void*>(source.viewport),0);
         if(!clipProjection||!gpuProjection){complete=false;sceneFailure=4;break;}
+        // Keep native visibility preparation independent of the telescope's
+        // narrow raster FOV. Update scalar consumers only after clip/GPU build.
+        saved.applyNativeProjectionScales(drawingEye.view.fov);
         std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousView),eyeView.data(),sizeof(eyeView));
         std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousProjection),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(eyeView));
         drawingEye.projected=true;
@@ -423,10 +452,6 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         // spatial panel back into the panel's image.
         saved.restore();sceneRenderPass=2+extraPass;eyeViewport=0;drawingEye={};
         mgs5vr::clearUiRenderSource();
-        // Tracked arms belong to the stereo scene, not the panel's native
-        // camera image. Keep their eye draws and opaque-hand policy intact;
-        // exclude only this player's normal groups during the source replay.
-        mgs5vr::MenuCapturePlayerExclusion excludePlayer(source.pair.sample.playerOwner);
         result=originalScene(render,graphics,task,worker);
     }
     if(pairCount.load()!=cameraCount){complete=false;sceneFailure=6;}
@@ -552,6 +577,12 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
         ||!directCall(layout.clipReturn,layout.projection)||!directCall(layout.gpuReturn,layout.projection)
         ||!directCall(layout.listenerReturn,layout.listener)||!directCall(layout.virtualListenerReturn,layout.virtualListener))
         throw std::runtime_error("Native scene/matrix/listener signature mismatch");
+    // These are the native GPU-projection builder's focal loads, not a field
+    // borrowed from the other game: TPP +0x10c, GZ +0xf8.
+    constexpr std::array<unsigned char,8> tppFocalLoad{0xf3,0x0f,0x10,0x88,0x0c,0x01,0,0};
+    constexpr std::array<unsigned char,8> gzFocalLoad{0xf3,0x0f,0x10,0x88,0xf8,0,0,0};
+    if(!(gz?matches(moduleBase+0xf425a7,gzFocalLoad):matches(moduleBase+0x1b96ee,tppFocalLoad)))
+        throw std::runtime_error("Native perspective focal-field signature mismatch");
     base=moduleBase;
     if(!directory.empty()){
         std::filesystem::create_directories(directory);

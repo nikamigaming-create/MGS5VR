@@ -27,7 +27,7 @@ foreach ($mgsHeight in @(105,0,145,42)) {
 }
 $mgsHelp=[Windows.Forms.Label]::new()
 $mgsHelp.Dock='Fill'; $mgsHelp.Padding=[Windows.Forms.Padding]::new(12)
-$mgsHelp.Text="Choose the controls file beside the GAME's dinput8.dll. Errors appear here while you edit; invalid changes cannot be saved.`r`nPlain button = native hold. press(a) = one press. tap(b,300) / hold(b,300) share the SAME threshold.`r`nLonger chords consume simpler actions in the same mode. Missing keys keep defaults: explicitly disable actions you replace.`r`nThis is an external editor, not an in-game menu. Restart the game only after saving a valid layout."
+$mgsHelp.Text="Choose the controls file beside the GAME's dinput8.dll. Errors appear here while you edit; invalid changes cannot be saved.`r`nPlain button = native hold. press(a) = one press. tap(b,300) / hold(b,300) share the SAME threshold.`r`nLonger chords consume simpler actions in the same mode. Missing keys keep defaults: explicitly disable actions you replace.`r`nThis is an external editor. Save, then release every button/grip/trigger and center both sticks: changes apply LIVE."
 $mgsText=[Windows.Forms.TextBox]::new()
 $mgsText.Multiline=$true; $mgsText.AcceptsTab=$true; $mgsText.AcceptsReturn=$true
 $mgsText.WordWrap=$false; $mgsText.ScrollBars='Both'; $mgsText.Dock='Fill'
@@ -64,7 +64,7 @@ function Test-MgsDraft {
             $mgsOut=$mgsOutputTask.Result; $mgsError=$mgsErrorTask.Result
             $mgsValid=$mgsProcess.ExitCode -eq 0
         } finally { $mgsProcess.Dispose() }
-        $mgsErrors.Text=if ($mgsValid) { 'VALID - no game restart needed to check. Save to apply on your next launch.' } else { $mgsError+$mgsOut }
+        $mgsErrors.Text=if ($mgsValid) { 'VALID - save, then release all controls for about two seconds. Current builds apply changes without restarting.' } else { $mgsError+$mgsOut }
         $mgsErrors.ForeColor=if ($mgsValid) { [Drawing.Color]::DarkGreen } else { [Drawing.Color]::DarkRed }
         $mgsSave.Enabled=$mgsValid -and [bool]$script:mgsLoadedPath
         return $mgsValid
@@ -103,7 +103,7 @@ $mgsSave.Add_Click({
             [IO.File]::Replace($mgsPending,$script:mgsLoadedPath,$mgsBackup)
         } finally { if (Test-Path -LiteralPath $mgsPending) { Remove-Item -LiteralPath $mgsPending } }
         $script:mgsLoadedText=$mgsText.Text; $script:mgsDirty=$false
-        $mgsErrors.Text="SAVED - restart MGSV to apply. Previous layout preserved:`r`n$mgsBackup"
+        $mgsErrors.Text="SAVED - release all buttons, grips and triggers; center both sticks for two seconds to apply LIVE. Older builds need a restart.`r`nPrevious layout preserved: $mgsBackup"
     } catch { $mgsErrors.Text=$_.Exception.Message }
 })
 $mgsWindow.Add_FormClosing({ param($mgsSender,$mgsEvent)

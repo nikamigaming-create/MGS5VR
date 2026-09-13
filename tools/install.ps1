@@ -128,4 +128,4 @@ if (-not $mgsNativeAdapter) {
 if ($EnableHeadCameraExperiment -and $mgsNativeAdapter) {
     Write-Output 'Launch the game and load Continue/Resume Game. Tracked VR enters automatically.'
 }
-Write-Output "Edit controls in $mgsTarget\mgs5vr-controls.ini; save and restart MGSV to apply."
+Write-Output "Edit controls in $mgsTarget\mgs5vr-controls.ini; save, release all controls and center both sticks for two seconds to apply live."
