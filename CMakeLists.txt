@@ -16,7 +16,7 @@ FetchContent_Declare(openxr GIT_REPOSITORY https://github.com/KhronosGroup/OpenX
 FetchContent_Declare(minhook GIT_REPOSITORY https://github.com/TsudaKageyu/minhook.git
   GIT_TAG c3fcafdc10146beb5919319d0683e44e3c30d537)
 FetchContent_MakeAvailable(openxr minhook)
-add_library(mgs5vr_core STATIC src/core.cpp src/input_bridge.cpp src/controls.cpp src/native_controls.cpp src/head_camera.cpp src/stereo.cpp src/optic_rig.cpp src/arm_ik.cpp src/wrist_selector.cpp)
+add_library(mgs5vr_core STATIC src/core.cpp src/input_bridge.cpp src/controls.cpp src/native_controls.cpp src/head_camera.cpp src/stereo.cpp src/optic_rig.cpp src/arm_ik.cpp src/wrist_selector.cpp src/idroid_rig.cpp src/opening_selector.cpp)
 target_include_directories(mgs5vr_core PUBLIC include)
 target_link_libraries(mgs5vr_core PUBLIC gdi32 user32)
 target_compile_definitions(mgs5vr_core PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)

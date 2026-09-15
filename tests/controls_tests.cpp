@@ -422,6 +422,9 @@ int main(int argc,char** argv){
         f.input.buttons[10]=.25f;f.input.buttons[9]=.35f;f.tick();
         expect(std::abs(f.controls.value("vehicle.accelerate")-.25f)<.001f
             &&std::abs(f.controls.value("vehicle.brake_reverse")-.35f)<.001f,"vehicle pedals retain proportional input");
+        f.input.rightStick={-.45f,.65f};f.tick();
+        expect(f.controls.axis("axes.equipment",f.input)==f.input.rightStick,
+            "vehicle camera and turret look retain both native right-stick axes");
         f.input.buttons[8]=1;f.tick();f.mode=ControlContext::equipment;f.tick();
         expect(f.active("vehicle.equipment_open"),"vehicle picker remains open while grip is held");
     }

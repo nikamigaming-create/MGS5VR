@@ -3,6 +3,7 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/render_layout.hpp"
 #include "mgs5vr/recon.hpp"
 #include <cmath>
@@ -51,6 +52,10 @@ int main(){
         expect(hudLayer(133,100,false,false)==HudLayer::general,"ordinary layer 133 is not an equipment card");
         expect(hudLayer(133,150,false,false)==HudLayer::equipment&&hudLayer(133,100,true,false)==HudLayer::equipment,
             "equipment cameras and item context own their cards");
+        expect(hudLayer(135,100,false,false,true)==HudLayer::equipment
+            &&hudLayer(137,100,false,false,true)==HudLayer::equipment
+            &&hudLayer(137,100,false,false)==HudLayer::general,
+            "trigger-held native four-way selector uses its actual Z=100 orders");
         expect(hudLayer(137,100,false,true)==HudLayer::commands&&hudLayer(137,100,false,false)==HudLayer::general,
             "command layers require the active command context");
         expect(hudLayer(52,100,false,false)==HudLayer::context&&hudLayer(147,135,false,false)==HudLayer::status,
@@ -164,6 +169,11 @@ int main(){
         const Vec3 ordinary{.05f,-.1f,-.8f};
         const auto panel=fitWristPanel({},ordinary,views,.6f,.3375f);
         expect(panel&&same(panel->position,ordinary),"already readable picker retains its wrist-linked position");
+        const Vec3 nearWrist{-.1f,-.1f,-.3f};
+        const auto wristPanel=fitWristPanel({},nearWrist,views,.6f,.3375f);
+        expect(wristPanel&&near(wristPanel->position.x/wristPanel->position.z,nearWrist.x/nearWrist.z)
+            &&near(wristPanel->position.y/wristPanel->position.z,nearWrist.y/nearWrist.z),
+            "a readable popup moves outward on the wrist ray instead of recentering in front of the player");
         auto canted=views;canted[0].pose.orientation={0,.06f,0,.99819838f};
         canted[1].pose.orientation={0,-.06f,0,.99819838f};
         const Vec3 edge{-.4f,-.1f,-.3f};
@@ -897,6 +907,15 @@ int main(){
            "an unrelated native camera cannot borrow the menu viewpoint");
     firstPerson.setNativeMenuOpen(false);
     expect(firstPerson.resolve(11,lowered,125).applied,"closing the native iDroid state restores the same tracked player");
+    firstPerson.setNativeMenuOpen(true,true);
+    const auto liveMenuView=firstPerson.resolve(11,lowered,125);
+    auto liveNative=lowered;liveNative.position.x+=.25f;
+    const auto liveMovedMenu=firstPerson.resolve(11,liveNative,125);
+    expect(liveMenuView.applied&&liveMovedMenu.applied&&liveMovedMenu.menuOpen
+        &&near(liveMovedMenu.nativePose.position.x-liveMenuView.nativePose.position.x,.25f)
+        &&same(liveMovedMenu.menuPanel.position,liveMenuView.menuPanel.position),
+        "live iDroid keeps the native camera moving while its display stays attached");
+    firstPerson.setNativeMenuOpen(false);
     firstPerson.setNativeMenuOpen(true);firstPerson.toggle();firstPerson.setNativeMenuOpen(false);
     expect(!firstPerson.resolve(11,lowered,125).applied,"manual disable inside iDroid prevents automatic return");
     expect(same(savedHeadView.nativePose.position,{499.9f,300.4f,1300.1f}),"published player-eye frame remains immutable");
@@ -1334,6 +1353,17 @@ int main(){
            "gripping the wheel cannot fire a vehicle weapon");
     expect(travelInput.update(GamepadSample{0x4000},false,false,TravelMode::vehicle).gamepad.buttons==0x0100,
            "X reaches the native vehicle weapon or radio independently of the wheel grip");
+    RigInput vehicleEquipment;
+    vehicleEquipment.update({},false,false,TravelMode::vehicle);
+    const auto vehicleAttack=vehicleEquipment.update(GamepadSample{0x4000},false,true,TravelMode::vehicle);
+    expect((vehicleAttack.gamepad.buttons&0x0100)!=0,
+           "vehicle weapon or radio remains reachable while the right-hand equipment modifier is held");
+    expect(mountedViewOwnsRightStick(TravelMode::vehicle,true,false,false)
+        &&mountedViewOwnsRightStick(TravelMode::horse,true,false,false)
+        &&!mountedViewOwnsRightStick(TravelMode::onFoot,true,false,false)
+        &&!mountedViewOwnsRightStick(TravelMode::vehicle,true,false,true)
+        &&!mountedViewOwnsRightStick(TravelMode::vehicle,true,true,false),
+           "mounted camera and turret axes stay native while menus and native input retain ownership");
     expect(travelInput.update(brakeOnly,false,true,TravelMode::onFoot).gamepad==GamepadSample{},
            "exiting a vehicle releases brake and grip inputs before restoring foot controls");
     travelInput.update({},false,false,TravelMode::onFoot);
@@ -1448,7 +1478,7 @@ int main(){
         &&selectionInput.gamepad.leftTrigger==0&&selectionInput.gamepad.rightTrigger==0&&!selectionInput.weaponReady,
         "selection frees the wrist, lowers the weapon and consumes fire while movement continues");
     walkingSelection.leftTrigger=100;
-    expect(wristInput.update(walkingSelection,false,true,TravelMode::onFoot).gamepad.buttons==0,"trigger hysteresis keeps the picker open through a partial release");
+    expect(wristInput.update(walkingSelection,false,true,TravelMode::onFoot).gamepad.buttons==0,"trigger hysteresis keeps the native selector held through a partial release");
     walkingSelection.leftTrigger=0;
     selectionInput=wristInput.update(walkingSelection,false,true,TravelMode::onFoot);
     expect(selectionInput.gamepad.buttons==0&&selectionInput.gamepad.rightTrigger==0&&selectionInput.weaponReady&&selectionInput.gamepad.leftY==28000,
@@ -1556,6 +1586,25 @@ int main(){
         const auto h=intersectPanel(transformed,parent,3);
         expect(h&&near(h->u,0.5f)&&near(h->v,0.5f),"ray mapping invariant under world rotation/translation");
         expect(same(compose(parent,inverse(parent)).position,{}),"transform and inverse cancel");
+    }
+    {
+        HeadCameraSample frame{};
+        frame.applied=true;frame.stereoTracked=true;frame.activation=1;
+        frame.nativePose={};frame.headPose={};
+        frame.controllers.predictedXrTime=1;frame.controllers.referenceEpoch=1;
+        auto& right=frame.controllers.hands[1];
+        right.gripTracked=true;right.grip=Pose{{},{0,0,-.35f}};
+        right.aimTracked=true;right.aim=Pose{{},{0,0,-.1f}};
+        const auto idroidHit=trackedIdroidRay(frame);
+        expect(idroidHit&&near(idroidHit->hit.u,.5f)&&near(idroidHit->hit.v,.5f)
+            &&idroidHit->hit.x==idroidScreenPixelWidth/2&&idroidHit->hit.y==idroidScreenPixelHeight/2,
+            "iDroid ray starts at the right-hand aim pose and lands on the normal screen projection");
+        right.aim.position={.04f,0,-.1f};
+        const auto moved=trackedIdroidRay(frame);
+        expect(moved&&moved->hit.u>.5f&&moved->hit.u<1.f,
+            "iDroid ray follows aim origin across the display instead of the grip center");
+        right.aimTracked=false;
+        expect(!trackedIdroidRay(frame),"iDroid ray fails closed when the aim pose is not tracked");
     }
     const Pose tilted{{0.5f,0,0,0.8660254f},{1,1.7f,2}};
     const auto screen=recenteredScreen(tilted,6);

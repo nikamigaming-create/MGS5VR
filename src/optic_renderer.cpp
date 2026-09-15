@@ -5,6 +5,7 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/scene_capture.hpp"
+#include "mgs5vr/opening_selector.hpp"
 #include <windows.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
@@ -38,6 +39,18 @@ struct Vertex {
 };
 
 struct Constants {
+    float mvp[16]{};
+    float world[16]{};
+    float baseColor[4]{};
+};
+
+struct IdroidVertex {
+    float position[3]{};
+    float normal[3]{};
+    float color[4]{};
+};
+
+struct IdroidConstants {
     float mvp[16]{};
     float world[16]{};
     float baseColor[4]{};
@@ -80,6 +93,16 @@ struct RetailTexture {
     DXGI_FORMAT format{DXGI_FORMAT_UNKNOWN};
     uint32_t width{},height{};
     std::vector<std::vector<uint8_t>> mipData;
+};
+
+struct RetailGpuAsset {
+    ComPtr<ID3D11Buffer> vertices;
+    ComPtr<ID3D11Buffer> indices;
+    ComPtr<ID3D11ShaderResourceView> diffuse;
+    std::filesystem::path modelPath;
+    std::filesystem::path diffusePath;
+    UINT indexCount{};
+    bool ready{};
 };
 
 template<class T>
@@ -144,6 +167,19 @@ std::filesystem::path retailBinocularDiffusePath(){
     const auto length=GetPrivateProfileStringW(L"optics",L"binocular_diffuse_dds",
         L"retail-assets\\Assets\\tpp\\item\\tel\\Pictures\\tel0_main0_def_c00_bsm.dds",
         configured.data(),static_cast<DWORD>(configured.size()),ini.c_str());
+    if(!length||length>=configured.size())return {};
+    std::filesystem::path path(configured.data());
+    if(path.is_relative())path=root/path;
+    return path;
+}
+
+std::filesystem::path openingAssetPath(const wchar_t* key,const wchar_t* fallback){
+    const auto root=gameRoot();
+    if(root.empty())return {};
+    std::array<wchar_t,32768> configured{};
+    const auto ini=root/L"mgs5vr.ini";
+    const auto length=GetPrivateProfileStringW(L"opening",key,fallback,configured.data(),
+        static_cast<DWORD>(configured.size()),ini.c_str());
     if(!length||length>=configured.size())return {};
     std::filesystem::path path(configured.data());
     if(path.is_relative())path=root/path;
@@ -373,6 +409,56 @@ std::optional<RetailTexture> readRetailDds(const std::filesystem::path& path,std
     return texture;
 }
 
+bool createRetailDiffuseView(ID3D11Device* device,const RetailTexture& diffuse,
+    ComPtr<ID3D11ShaderResourceView>& output){
+    if(!device||!diffuse.width||!diffuse.height||diffuse.mipData.empty())return false;
+    D3D11_TEXTURE2D_DESC description{};description.Width=diffuse.width;description.Height=diffuse.height;
+    description.MipLevels=static_cast<UINT>(diffuse.mipData.size());description.ArraySize=1;
+    description.Format=diffuse.format==DXGI_FORMAT_BC1_UNORM?DXGI_FORMAT_BC1_UNORM_SRGB:DXGI_FORMAT_BC3_UNORM_SRGB;
+    description.SampleDesc.Count=1;description.Usage=D3D11_USAGE_IMMUTABLE;description.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+    std::vector<D3D11_SUBRESOURCE_DATA> data;data.reserve(diffuse.mipData.size());
+    uint32_t width=diffuse.width;
+    for(const auto& mip:diffuse.mipData){
+        D3D11_SUBRESOURCE_DATA level{};level.pSysMem=mip.data();
+        const uint32_t blockBytes=diffuse.format==DXGI_FORMAT_BC1_UNORM?8u:16u;
+        level.SysMemPitch=std::max<uint32_t>(1,(width+3)/4)*blockBytes;
+        data.push_back(level);width=std::max<uint32_t>(1,width/2);
+    }
+    ComPtr<ID3D11Texture2D> texture;
+    if(FAILED(device->CreateTexture2D(&description,data.data(),texture.GetAddressOf())))return false;
+    D3D11_SHADER_RESOURCE_VIEW_DESC view{};view.Format=description.Format;
+    view.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;view.Texture2D.MostDetailedMip=0;
+    view.Texture2D.MipLevels=static_cast<UINT>(diffuse.mipData.size());
+    return SUCCEEDED(device->CreateShaderResourceView(texture.Get(),&view,output.ReleaseAndGetAddressOf()));
+}
+
+bool createRetailGpuAsset(ID3D11Device* device,RetailGpuAsset& asset,
+    const std::filesystem::path& modelPath,const std::filesystem::path& diffusePath,const char* label){
+    if(!device||modelPath.empty()||diffusePath.empty())return false;
+    std::string failure;const auto model=readRetailFmdl(modelPath,failure);
+    if(!model){mgs5vr::log(std::string("Opening ")+label+" FMDL load failed: "+failure);return false;}
+    const auto diffuse=readRetailDds(diffusePath,failure);
+    if(!diffuse){mgs5vr::log(std::string("Opening ")+label+" diffuse load failed: "+failure);return false;}
+    if(model->vertices.empty()||model->indices.empty()
+       ||model->vertices.size()>std::numeric_limits<UINT>::max()/sizeof(Vertex)
+       ||model->indices.size()>std::numeric_limits<UINT>::max()/sizeof(uint16_t))return false;
+    D3D11_BUFFER_DESC vertexDescription{};vertexDescription.ByteWidth=static_cast<UINT>(model->vertices.size()*sizeof(Vertex));
+    vertexDescription.Usage=D3D11_USAGE_IMMUTABLE;vertexDescription.BindFlags=D3D11_BIND_VERTEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA vertexData{};vertexData.pSysMem=model->vertices.data();
+    if(FAILED(device->CreateBuffer(&vertexDescription,&vertexData,asset.vertices.ReleaseAndGetAddressOf())))return false;
+    D3D11_BUFFER_DESC indexDescription{};indexDescription.ByteWidth=static_cast<UINT>(model->indices.size()*sizeof(uint16_t));
+    indexDescription.Usage=D3D11_USAGE_IMMUTABLE;indexDescription.BindFlags=D3D11_BIND_INDEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA indexData{};indexData.pSysMem=model->indices.data();
+    if(FAILED(device->CreateBuffer(&indexDescription,&indexData,asset.indices.ReleaseAndGetAddressOf()))
+       ||!createRetailDiffuseView(device,*diffuse,asset.diffuse))return false;
+    asset.modelPath=modelPath;asset.diffusePath=diffusePath;asset.indexCount=static_cast<UINT>(model->indices.size());asset.ready=true;
+    std::ostringstream message;message<<"Opening "<<label<<" FMDL loaded path="<<modelPath.string()
+        <<" bytes="<<std::filesystem::file_size(modelPath)<<" vertices="<<model->vertices.size()
+        <<" triangles="<<model->indices.size()/3<<" bounds="<<model->min[0]<<","<<model->min[1]<<","<<model->min[2]<<".."
+        <<model->max[0]<<","<<model->max[1]<<","<<model->max[2];mgs5vr::log(message.str());
+    return true;
+}
+
 const char* vertexShaderSource=R"HLSL(
 cbuffer ViewModel : register(b0) {
     row_major float4x4 mvp;
@@ -409,6 +495,37 @@ float4 main(PSIn input) : SV_TARGET {
     float diffuse = 0.22 + 0.78 * saturate(dot(normal, light));
     float3 albedo = retailDiffuse.Sample(retailSampler,input.uv).rgb;
     return float4(albedo * diffuse, baseColor.a);
+}
+)HLSL";
+
+const char* idroidVertexShaderSource=R"HLSL(
+cbuffer IdroidView : register(b0) {
+    row_major float4x4 mvp;
+    row_major float4x4 world;
+    float4 baseColor;
+};
+struct VSIn { float3 position : POSITION; float3 normal : NORMAL; float4 color : COLOR; };
+struct VSOut { float4 position : SV_POSITION; float3 normal : NORMAL0; float4 color : COLOR0; };
+VSOut main(VSIn input) {
+    VSOut output;
+    output.position=mul(float4(input.position,1.0),mvp);
+    output.normal=mul(float4(input.normal,0.0),world).xyz;
+    output.color=input.color;
+    return output;
+}
+)HLSL";
+
+const char* idroidPixelShaderSource=R"HLSL(
+cbuffer IdroidView : register(b0) {
+    row_major float4x4 mvp;
+    row_major float4x4 world;
+    float4 baseColor;
+};
+struct PSIn { float4 position : SV_POSITION; float3 normal : NORMAL0; float4 color : COLOR0; };
+float4 main(PSIn input) : SV_TARGET {
+    float3 n=normalize(input.normal);
+    float light=.35+.65*saturate(dot(n,normalize(float3(-.35,.8,-.5))));
+    return float4(input.color.rgb*light*baseColor.rgb,input.color.a*baseColor.a);
 }
 )HLSL";
 
@@ -492,11 +609,25 @@ struct Resources {
     ComPtr<ID3D11DepthStencilState> lensDepthStencil;
     ComPtr<ID3D11DepthStencilState> reversedLensDepthStencil;
     ComPtr<ID3D11BlendState> blend;
+    ComPtr<ID3D11Buffer> idroidVertices;
+    ComPtr<ID3D11Buffer> idroidCursorVertices;
+    ComPtr<ID3D11Buffer> idroidConstants;
+    ComPtr<ID3D11VertexShader> idroidVertexShader;
+    ComPtr<ID3D11PixelShader> idroidPixelShader;
+    ComPtr<ID3D11InputLayout> idroidInputLayout;
+    ComPtr<ID3D11RasterizerState> idroidRasterizer;
+    ComPtr<ID3D11DepthStencilState> idroidDepthStencil;
+    ComPtr<ID3D11DepthStencilState> idroidReversedDepthStencil;
+    ComPtr<ID3D11BlendState> idroidBlend;
     ComPtr<ID3D11Texture2D> housingDepth;
     ComPtr<ID3D11DepthStencilView> housingDepthView;
+    RetailGpuAsset openingRadio;
+    RetailGpuAsset openingCassette;
     UINT depthWidth{},depthHeight{},depthSamples{};
     D3D11_TEXTURE2D_DESC sceneDescription{};
     UINT indexCount{};
+    UINT idroidVertexCount{};
+    UINT idroidCursorVertexCount{};
     bool attempted{};
     bool ready{};
     bool lensReady{};
@@ -504,9 +635,15 @@ struct Resources {
     bool reported{};
     bool lensReported{};
     bool lensFailureReported{};
+    bool idroidReady{};
+    bool idroidAttempted{};
+    bool idroidReported{};
     bool sourceReported{};
     bool depthReported{};
     bool markerReported{};
+    bool openingAttempted{};
+    bool openingReady{};
+    bool openingReported{};
     uint64_t lensTraceCalls{};
 };
 
@@ -569,6 +706,79 @@ bool createLensResources(ID3D11Device* device){
     depth.DepthFunc=D3D11_COMPARISON_GREATER_EQUAL;
     if(FAILED(device->CreateDepthStencilState(&depth,resources.reversedLensDepthStencil.ReleaseAndGetAddressOf())))return false;
     resources.lensReady=true;return true;
+}
+
+void appendIdroidFace(std::vector<IdroidVertex>& vertices,mgs5vr::Vec3 a,mgs5vr::Vec3 b,
+    mgs5vr::Vec3 c,mgs5vr::Vec3 d,mgs5vr::Vec3 normal,const std::array<float,4>& color){
+    const auto make=[&](mgs5vr::Vec3 p){return IdroidVertex{{p.x,p.y,p.z},{normal.x,normal.y,normal.z},
+        {color[0],color[1],color[2],color[3]}};};
+    const auto v0=make(a),v1=make(b),v2=make(c),v3=make(d);
+    for(const auto& v:{v0,v1,v2,v0,v2,v3})vertices.push_back(v);
+}
+
+void appendIdroidBox(std::vector<IdroidVertex>& vertices,mgs5vr::Vec3 minimum,mgs5vr::Vec3 maximum,
+    const std::array<float,4>& color){
+    const auto& a=minimum;const auto& b=maximum;
+    appendIdroidFace(vertices,{a.x,a.y,b.z},{b.x,a.y,b.z},{a.x,b.y,b.z},{b.x,b.y,b.z},{0,0,1},color);
+    appendIdroidFace(vertices,{b.x,a.y,a.z},{a.x,a.y,a.z},{b.x,b.y,a.z},{a.x,b.y,a.z},{0,0,-1},color);
+    appendIdroidFace(vertices,{b.x,a.y,b.z},{b.x,a.y,a.z},{b.x,b.y,b.z},{b.x,b.y,a.z},{1,0,0},color);
+    appendIdroidFace(vertices,{a.x,a.y,a.z},{a.x,a.y,b.z},{a.x,b.y,a.z},{a.x,b.y,b.z},{-1,0,0},color);
+    appendIdroidFace(vertices,{a.x,b.y,b.z},{b.x,b.y,b.z},{a.x,b.y,a.z},{b.x,b.y,a.z},{0,1,0},color);
+    appendIdroidFace(vertices,{a.x,a.y,a.z},{b.x,a.y,a.z},{a.x,a.y,b.z},{b.x,a.y,b.z},{0,-1,0},color);
+}
+
+bool createIdroidResources(ID3D11Device* device){
+    if(resources.idroidReady)return true;
+    if(!device||resources.idroidAttempted)return false;
+    resources.idroidAttempted=true;
+    // The native display is the iDroid's emitted front. Do not add a bezel or
+    // a backplate here: even a thin opaque frame masks the arm during the
+    // first menu frame. The real device/body remains native; this pass only
+    // supplies the tracked projection cursor below.
+    std::vector<IdroidVertex> vertices(1);
+    const std::array<float,4> pointer{.18f,.95f,.76f,1.f};
+    std::vector<IdroidVertex> cursor;cursor.reserve(72);
+    // Keep the hit marker legible without swallowing the native map details.
+    constexpr float cursorArm=.007f,cursorThickness=.0007f,cursorDepth=.0015f;
+    appendIdroidBox(cursor,{-cursorArm,-cursorThickness,0},{cursorArm,cursorThickness,cursorDepth},pointer);
+    appendIdroidBox(cursor,{-cursorThickness,-cursorArm,0},{cursorThickness,cursorArm,cursorDepth},pointer);
+    if(vertices.empty()||cursor.empty()
+       ||vertices.size()>std::numeric_limits<UINT>::max()/sizeof(IdroidVertex)
+       ||cursor.size()>std::numeric_limits<UINT>::max()/sizeof(IdroidVertex))return false;
+    D3D11_BUFFER_DESC vertexDesc{};vertexDesc.ByteWidth=static_cast<UINT>(vertices.size()*sizeof(IdroidVertex));
+    vertexDesc.Usage=D3D11_USAGE_IMMUTABLE;vertexDesc.BindFlags=D3D11_BIND_VERTEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA vertexData{};vertexData.pSysMem=vertices.data();
+    D3D11_BUFFER_DESC cursorDesc{};cursorDesc.ByteWidth=static_cast<UINT>(cursor.size()*sizeof(IdroidVertex));
+    cursorDesc.Usage=D3D11_USAGE_IMMUTABLE;cursorDesc.BindFlags=D3D11_BIND_VERTEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA cursorData{};cursorData.pSysMem=cursor.data();
+    D3D11_BUFFER_DESC constantsDesc{};constantsDesc.ByteWidth=sizeof(IdroidConstants);
+    constantsDesc.Usage=D3D11_USAGE_DEFAULT;constantsDesc.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
+    ComPtr<ID3DBlob> vs,ps;
+    if(!compile(device,idroidVertexShaderSource,"vs_4_0",vs.GetAddressOf())
+       ||!compile(device,idroidPixelShaderSource,"ps_4_0",ps.GetAddressOf()))return false;
+    const std::array<D3D11_INPUT_ELEMENT_DESC,3> elements{{
+        {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},
+        {"NORMAL",0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0},
+        {"COLOR",0,DXGI_FORMAT_R32G32B32A32_FLOAT,0,24,D3D11_INPUT_PER_VERTEX_DATA,0}}};
+    D3D11_RASTERIZER_DESC raster{};raster.FillMode=D3D11_FILL_SOLID;raster.CullMode=D3D11_CULL_NONE;raster.DepthClipEnable=FALSE;
+    D3D11_DEPTH_STENCIL_DESC depth{};depth.DepthEnable=TRUE;depth.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ALL;depth.DepthFunc=D3D11_COMPARISON_LESS_EQUAL;
+    D3D11_BLEND_DESC blend{};blend.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
+    if(FAILED(device->CreateBuffer(&vertexDesc,&vertexData,resources.idroidVertices.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateBuffer(&cursorDesc,&cursorData,resources.idroidCursorVertices.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateBuffer(&constantsDesc,nullptr,resources.idroidConstants.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateVertexShader(vs->GetBufferPointer(),vs->GetBufferSize(),nullptr,resources.idroidVertexShader.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreatePixelShader(ps->GetBufferPointer(),ps->GetBufferSize(),nullptr,resources.idroidPixelShader.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateInputLayout(elements.data(),static_cast<UINT>(elements.size()),vs->GetBufferPointer(),vs->GetBufferSize(),resources.idroidInputLayout.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateRasterizerState(&raster,resources.idroidRasterizer.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateDepthStencilState(&depth,resources.idroidDepthStencil.ReleaseAndGetAddressOf()))
+       ||FAILED(device->CreateBlendState(&blend,resources.idroidBlend.ReleaseAndGetAddressOf())))return false;
+    depth.DepthFunc=D3D11_COMPARISON_GREATER_EQUAL;
+    if(FAILED(device->CreateDepthStencilState(&depth,resources.idroidReversedDepthStencil.ReleaseAndGetAddressOf())))return false;
+    // No overlay bezel is drawn. Keep the buffer allocated for ABI-stable
+    // renderer resources while the live native pixels remain unobstructed.
+    resources.idroidVertexCount=0;
+    resources.idroidCursorVertexCount=static_cast<UINT>(cursor.size());
+    resources.idroidReady=true;return true;
 }
 
 bool createResources(ID3D11Device* device){
@@ -643,6 +853,27 @@ bool createResources(ID3D11Device* device){
     return true;
 }
 
+bool createOpeningResources(ID3D11Device* device){
+    if(resources.openingReady)return true;
+    if(!device||resources.openingAttempted||!resources.ready)return false;
+    resources.openingAttempted=true;
+    const auto cassetteModel=openingAssetPath(L"cassette_fmdl",
+        L"retail-assets\\Assets\\tpp\\item\\cct\\Scenes\\cct0_main1_def.fmdl");
+    const auto cassetteDiffuse=openingAssetPath(L"cassette_diffuse_dds",
+        L"retail-assets\\Assets\\tpp\\item\\cct\\Pictures\\cct0_main1_def_c00_bsm.dds");
+    const auto radioModel=openingAssetPath(L"radio_fmdl",
+        L"retail-assets\\Assets\\tpp\\item\\rdi\\Scenes\\rdi0_main0_def.fmdl");
+    const auto radioDiffuse=openingAssetPath(L"radio_diffuse_dds",
+        L"retail-assets\\Assets\\tpp\\item\\rdi\\Pictures\\rdi0_main0_def_c00_bsm.dds");
+    if(!createRetailGpuAsset(device,resources.openingRadio,radioModel,radioDiffuse,"radio")
+       ||!createRetailGpuAsset(device,resources.openingCassette,cassetteModel,cassetteDiffuse,"cassette")){
+        mgs5vr::log("Opening prop assets unavailable; native title panel remains the fallback");
+        return false;
+    }
+    resources.openingReady=true;
+    return true;
+}
+
 struct SavedState {
     ComPtr<ID3D11RenderTargetView> renderTarget;ComPtr<ID3D11DepthStencilView> depthTarget;ComPtr<ID3D11InputLayout> inputLayout;
     ComPtr<ID3D11Buffer> vertexBuffer;ComPtr<ID3D11Buffer> indexBuffer;ComPtr<ID3D11Buffer> vertexConstants;ComPtr<ID3D11Buffer> pixelConstants;
@@ -666,6 +897,35 @@ void restore(ID3D11DeviceContext* context,const SavedState& state){
     context->IASetIndexBuffer(state.indexBuffer.Get(),state.indexFormat,state.indexOffset);context->IASetPrimitiveTopology(state.topology);context->VSSetShader(state.vertexShader.Get(),nullptr,0);context->PSSetShader(state.pixelShader.Get(),nullptr,0);
     ID3D11Buffer* constants=state.vertexConstants.Get();context->VSSetConstantBuffers(0,1,&constants);ID3D11Buffer* pixelConstants=state.pixelConstants.Get();context->PSSetConstantBuffers(0,1,&pixelConstants);ID3D11ShaderResourceView* diffuse=state.diffuse.Get();context->PSSetShaderResources(0,1,&diffuse);ID3D11SamplerState* sampler=state.sampler.Get();context->PSSetSamplers(0,1,&sampler);context->RSSetState(state.rasterizer.Get());context->OMSetDepthStencilState(state.depthStencil.Get(),state.stencilRef);
     context->OMSetBlendState(state.blend.Get(),state.blendFactor,state.sampleMask);if(state.viewportCount)context->RSSetViewports(1,&state.viewport);
+}
+
+std::array<float,16> matrixProduct(const std::array<float,16>& a,const std::array<float,16>& b);
+
+bool drawOpeningAsset(ID3D11DeviceContext* context,const RetailGpuAsset& asset,
+    ID3D11RenderTargetView* target,ID3D11DepthStencilView* depth,
+    const std::array<float,16>& world,const std::array<float,16>& view,
+    const std::array<float,16>& projection){
+    if(!context||!asset.ready||!target||!depth)return false;
+    const auto mvp=matrixProduct(matrixProduct(world,view),projection);
+    for(const auto value:mvp)if(!std::isfinite(value))return false;
+    Constants constants{};std::copy(mvp.begin(),mvp.end(),std::begin(constants.mvp));
+    std::copy(world.begin(),world.end(),std::begin(constants.world));
+    constants.baseColor[0]=constants.baseColor[1]=constants.baseColor[2]=constants.baseColor[3]=1.f;
+    context->UpdateSubresource(resources.constants.Get(),0,nullptr,&constants,0,0);
+    ID3D11RenderTargetView* renderTarget=target;context->OMSetRenderTargets(1,&renderTarget,depth);
+    const UINT stride=sizeof(Vertex),offset=0;ID3D11Buffer* vertexBuffer=asset.vertices.Get();
+    context->IASetInputLayout(resources.inputLayout.Get());context->IASetVertexBuffers(0,1,&vertexBuffer,&stride,&offset);
+    context->IASetIndexBuffer(asset.indices.Get(),DXGI_FORMAT_R16_UINT,0);
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    context->VSSetShader(resources.vertexShader.Get(),nullptr,0);
+    ID3D11Buffer* constantBuffer=resources.constants.Get();context->VSSetConstantBuffers(0,1,&constantBuffer);
+    context->PSSetConstantBuffers(0,1,&constantBuffer);context->PSSetShader(resources.pixelShader.Get(),nullptr,0);
+    ID3D11ShaderResourceView* diffuse=asset.diffuse.Get();context->PSSetShaderResources(0,1,&diffuse);
+    ID3D11SamplerState* sampler=resources.sampler.Get();context->PSSetSamplers(0,1,&sampler);
+    context->RSSetState(resources.rasterizer.Get());context->OMSetDepthStencilState(
+        projection[14]>0?resources.reversedDepthStencil.Get():resources.depthStencil.Get(),0);
+    const FLOAT blendFactor[4]{0,0,0,0};context->OMSetBlendState(resources.blend.Get(),blendFactor,0xffffffffu);
+    context->DrawIndexed(asset.indexCount,0,0);return true;
 }
 
 bool bindHousingDepth(ID3D11DeviceContext* context,ID3D11Device* device,
@@ -808,7 +1068,8 @@ float4 main(float4 position:SV_POSITION,float4 color:COLOR):SV_TARGET{return col
 }
 
 // Small atlas-free glyphs remain sharp in the independently rendered lens.
-// These are native waypoint letters and measured distances, never video labels.
+// These are native waypoint letters and measured distances, plus the exact
+// semantic labels attached to the physical opening tapes.
 std::array<uint8_t,7> markerGlyph(char c){
     static constexpr std::array<std::array<uint8_t,7>,36> glyphs{{
         {{14,17,19,21,25,17,14}},{{4,12,4,4,4,4,14}},{{14,17,1,2,4,8,31}},
@@ -824,6 +1085,7 @@ std::array<uint8_t,7> markerGlyph(char c){
         {{17,17,17,17,17,17,14}},{{17,17,17,17,17,10,4}},{{17,17,17,21,21,21,10}},
         {{17,17,10,4,10,17,17}},{{17,17,10,4,4,4,4}},{{31,1,2,4,8,16,31}}
     }};
+    if(c==':')return {{0,0,4,0,0,4,0}};
     if(c>='0'&&c<='9')return glyphs[c-'0'];
     if(c>='A'&&c<='Z')return glyphs[10+c-'A'];
     return {};
@@ -906,6 +1168,83 @@ void drawWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
         context->Draw(static_cast<UINT>(count),0);
     }
     if(visible&&!resources.markerReported){resources.markerReported=true;mgs5vr::log("Native acquired markers reprojected from world positions");}
+}
+
+void drawOpeningLabels(ID3D11DeviceContext* context,ID3D11RenderTargetView* target,
+    const D3D11_VIEWPORT& viewport,const std::array<std::array<float,16>,7>& worlds,
+    const std::array<float,16>& view,const std::array<float,16>& projection,int selection){
+    if(!context||!target||!viewport.Width||!viewport.Height||!createMarkerResources(resources.device.Get()))return;
+    std::vector<MarkerVertex> vertices;vertices.reserve(4096);
+    using Color=std::array<float,3>;
+    constexpr Color white{.72f,.92f,1.f},amber{1.f,.70f,.16f};
+    const auto quad=[&](float x0,float y0,float x1,float y1,Color color){
+        const auto v=[&](float x,float y){return MarkerVertex{x,y,color[0],color[1],color[2],1};};
+        for(const auto vertex:{v(x0,y0),v(x1,y0),v(x0,y1),v(x0,y1),v(x1,y0),v(x1,y1)})vertices.push_back(vertex);
+    };
+    const auto vp=matrixProduct(view,projection);unsigned visible{};
+    for(size_t i=1;i<worlds.size();++i){
+        // Place the caption just below its own cassette. The earlier positive
+        // anchor lifted both rows into the gap; the labels then looked like a
+        // missing top row instead of names attached to the physical tapes.
+        // Keep this in the cassette's local space so the shared prop layout
+        // drives geometry, hover, and text from the same authored position.
+        const auto clip=transformPoint(matrixProduct(worlds[i],vp),{0,-.040f,0});
+        if(!std::isfinite(clip.w)||clip.w<=.01f)continue;
+        const float x=clip.x/clip.w,y=clip.y/clip.w;
+        if(!std::isfinite(x)||!std::isfinite(y)||std::abs(x)>.98f||std::abs(y)>.94f)continue;
+        ++visible;
+        const auto label=mgs5vr::openingTapeLabels[i-1];
+        // Keep the exact native action names attached to each cassette, but
+        // wrap the three long names so the 5x7 glyphs remain readable at the
+        // eye-capture resolution. This is text on the physical prop, not a
+        // replacement instruction card or a black backdrop.
+        std::array<std::string_view,2> lines{{label,{}}};
+        if(label=="DOWNLOAD MGSV: GZ SAVE DATA")lines={{"DOWNLOAD MGSV: GZ","SAVE DATA"}};
+        else if(label=="METAL GEAR ONLINE")lines={{"METAL GEAR","ONLINE"}};
+        else if(label=="DELETE SAVE DATA")lines={{"DELETE SAVE","DATA"}};
+        const float pixel=lines[1].empty() ? .0023f : .0019f;
+        const auto lineWidth=[&](std::string_view line){
+            return line.empty()?0.f:static_cast<float>(line.size()*6-1)*pixel;
+        };
+        const float width=std::max(lineWidth(lines[0]),lineWidth(lines[1]));
+        const float left=x-width*.5f,top=y+.018f;
+        const auto color=selection==static_cast<int>(i-1)?amber:white;
+        for(size_t lineIndex=0;lineIndex<lines.size();++lineIndex){
+            const auto current=lines[lineIndex];
+            if(current.empty())continue;
+            const float lineLeft=x-lineWidth(current)*.5f;
+            const float lineTop=top-static_cast<float>(lineIndex)*8*pixel;
+            for(size_t n=0;n<current.size();++n){
+                const auto glyph=markerGlyph(current[n]);
+                for(size_t row=0;row<7;++row)for(size_t col=0;col<5;++col)
+                    if(glyph[row]&(1u<<(4-col))){
+                        const float gx=lineLeft+static_cast<float>(n*6+col)*pixel;
+                        const float gy=lineTop-static_cast<float>(row)*pixel;
+                        quad(gx,gy,gx+pixel,gy-pixel,color);
+                    }
+            }
+        }
+        if(selection==static_cast<int>(i-1))
+            quad(left,top-static_cast<float>(lines[1].empty()?8:16)*pixel,
+                left+width,top-static_cast<float>(lines[1].empty()?10:18)*pixel,amber);
+    }
+    if(vertices.empty())return;
+    ID3D11ShaderResourceView* none=nullptr;context->PSSetShaderResources(0,1,&none);
+    context->OMSetRenderTargets(1,&target,nullptr);context->RSSetViewports(1,&viewport);
+    context->RSSetState(resources.markerRasterizer.Get());context->OMSetDepthStencilState(resources.markerDepth.Get(),0);
+    context->OMSetBlendState(nullptr,nullptr,0xffffffffu);
+    ID3D11Buffer* buffer=resources.markerVertices.Get();const UINT stride=sizeof(MarkerVertex),offset=0;
+    context->IASetVertexBuffers(0,1,&buffer,&stride,&offset);context->IASetInputLayout(resources.markerInputLayout.Get());
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    context->VSSetShader(resources.markerVertexShader.Get(),nullptr,0);context->PSSetShader(resources.markerPixelShader.Get(),nullptr,0);
+    for(size_t first=0;first<vertices.size();first+=16383){
+        const auto count=std::min(size_t{16383},vertices.size()-first);D3D11_MAPPED_SUBRESOURCE mapped{};
+        if(FAILED(context->Map(resources.markerVertices.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&mapped)))return;
+        std::memcpy(mapped.pData,vertices.data()+first,count*sizeof(MarkerVertex));context->Unmap(resources.markerVertices.Get(),0);
+        context->Draw(static_cast<UINT>(count),0);
+    }
+    static bool reported{};
+    if(visible&&!reported){reported=true;mgs5vr::log("Native title tape action labels attached to owned cassette props");}
 }
 
 bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& world,
@@ -1087,6 +1426,96 @@ bool drawPhysicalBinoculars(ID3D11DeviceContext* context,const std::array<float,
             restore(context,state);if(!resources.lensReported){resources.lensReported=true;mgs5vr::log("Retail optic lens portal unavailable; optical rendering remains failed closed");}return false;
         }
         restore(context,state);if(!resources.reported){resources.reported=true;mgs5vr::log("Retail binocular FMDL rendered in both native stereo eyes");}return true;
+    }catch(...){return false;}
+}
+bool drawPhysicalIdroid(ID3D11DeviceContext* context,const std::array<float,16>& world,
+    const std::array<float,16>& view,const std::array<float,16>& projection) noexcept{
+    if(!context)return false;
+    try{
+        std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(device.GetAddressOf());
+        if(!device)return false;
+        if(resources.device.Get()!=device.Get()){resources=Resources{};resources.device=device;}
+        if(!createIdroidResources(device.Get()))return false;
+        const auto mvp=matrixProduct(matrixProduct(world,view),projection);
+        for(float value:mvp)if(!std::isfinite(value))return false;
+        SavedState state;save(context,state);if(!state.renderTarget){restore(context,state);return false;}
+        ComPtr<ID3D11DepthStencilView> depth;
+        if(!bindHousingDepth(context,device.Get(),state,projection[14]>0,depth)){restore(context,state);return false;}
+        IdroidConstants constants{};std::copy(mvp.begin(),mvp.end(),std::begin(constants.mvp));
+        std::copy(world.begin(),world.end(),std::begin(constants.world));
+        constants.baseColor[0]=constants.baseColor[1]=constants.baseColor[2]=1.f;constants.baseColor[3]=1.f;
+        context->UpdateSubresource(resources.idroidConstants.Get(),0,nullptr,&constants,0,0);
+        const UINT stride=sizeof(IdroidVertex),offset=0;ID3D11Buffer* vertexBuffer=resources.idroidVertices.Get();
+        context->IASetInputLayout(resources.idroidInputLayout.Get());context->IASetVertexBuffers(0,1,&vertexBuffer,&stride,&offset);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context->VSSetShader(resources.idroidVertexShader.Get(),nullptr,0);
+        ID3D11Buffer* constantBuffer=resources.idroidConstants.Get();context->VSSetConstantBuffers(0,1,&constantBuffer);context->PSSetConstantBuffers(0,1,&constantBuffer);
+        context->PSSetShader(resources.idroidPixelShader.Get(),nullptr,0);
+        context->RSSetState(resources.idroidRasterizer.Get());
+        context->OMSetDepthStencilState(projection[14]>0?resources.idroidReversedDepthStencil.Get():resources.idroidDepthStencil.Get(),0);
+        const FLOAT blendFactor[4]{0,0,0,0};context->OMSetBlendState(resources.idroidBlend.Get(),blendFactor,0xffffffffu);
+        if(resources.idroidVertexCount)context->Draw(resources.idroidVertexCount,0);
+        restore(context,state);
+        if(!resources.idroidReported){resources.idroidReported=true;mgs5vr::log("Native iDroid front display bound to palm; overlay bezel disabled");}
+        return true;
+    }catch(...){return false;}
+}
+bool drawPhysicalIdroidCursor(ID3D11DeviceContext* context,const std::array<float,16>& world,
+    const std::array<float,16>& view,const std::array<float,16>& projection) noexcept{
+    if(!context)return false;
+    try{
+        std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(device.GetAddressOf());
+        if(!device)return false;
+        if(resources.device.Get()!=device.Get()){resources=Resources{};resources.device=device;}
+        if(!createIdroidResources(device.Get()))return false;
+        const auto mvp=matrixProduct(matrixProduct(world,view),projection);
+        for(float value:mvp)if(!std::isfinite(value))return false;
+        SavedState state;save(context,state);if(!state.renderTarget){restore(context,state);return false;}
+        ComPtr<ID3D11DepthStencilView> depth;
+        if(!bindHousingDepth(context,device.Get(),state,projection[14]>0,depth)){restore(context,state);return false;}
+        IdroidConstants constants{};std::copy(mvp.begin(),mvp.end(),std::begin(constants.mvp));
+        std::copy(world.begin(),world.end(),std::begin(constants.world));
+        // The cursor is a projection marker, not a lit housing surface. Keep
+        // it emissive enough to remain readable over the native blue map.
+        constants.baseColor[0]=constants.baseColor[1]=constants.baseColor[2]=3.f;constants.baseColor[3]=1.f;
+        context->UpdateSubresource(resources.idroidConstants.Get(),0,nullptr,&constants,0,0);
+        const UINT stride=sizeof(IdroidVertex),offset=0;ID3D11Buffer* vertexBuffer=resources.idroidCursorVertices.Get();
+        context->IASetInputLayout(resources.idroidInputLayout.Get());context->IASetVertexBuffers(0,1,&vertexBuffer,&stride,&offset);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context->VSSetShader(resources.idroidVertexShader.Get(),nullptr,0);
+        ID3D11Buffer* constantBuffer=resources.idroidConstants.Get();context->VSSetConstantBuffers(0,1,&constantBuffer);context->PSSetConstantBuffers(0,1,&constantBuffer);
+        context->PSSetShader(resources.idroidPixelShader.Get(),nullptr,0);
+        context->RSSetState(resources.idroidRasterizer.Get());
+        context->OMSetDepthStencilState(projection[14]>0?resources.idroidReversedDepthStencil.Get():resources.idroidDepthStencil.Get(),0);
+        const FLOAT blendFactor[4]{0,0,0,0};context->OMSetBlendState(resources.idroidBlend.Get(),blendFactor,0xffffffffu);
+        context->Draw(resources.idroidCursorVertexCount,0);restore(context,state);return true;
+    }catch(...){return false;}
+}
+bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<float,16>,7>& worlds,
+    const std::array<float,16>& view,const std::array<float,16>& projection,int selection) noexcept{
+    if(!context)return false;
+    try{
+        std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(device.GetAddressOf());
+        if(!device)return false;
+        if(resources.device.Get()!=device.Get()){resources=Resources{};resources.device=device;}
+        if(!resources.attempted){if(!createResources(device.Get()))return false;}
+        if(!resources.ready||!createOpeningResources(device.Get()))return false;
+        for(const auto& world:worlds)for(const auto value:world)if(!std::isfinite(value))return false;
+        SavedState state;save(context,state);if(!state.renderTarget){restore(context,state);return false;}
+        ComPtr<ID3D11DepthStencilView> depth;
+        if(!bindHousingDepth(context,device.Get(),state,projection[14]>0,depth)){restore(context,state);return false;}
+        const bool radio=drawOpeningAsset(context,resources.openingRadio,state.renderTarget.Get(),depth.Get(),
+            worlds[0],view,projection);
+        bool cassettes=true;
+        for(size_t i=1;i<worlds.size();++i)
+            cassettes=drawOpeningAsset(context,resources.openingCassette,state.renderTarget.Get(),depth.Get(),
+                worlds[i],view,projection)&&cassettes;
+        if(radio&&cassettes)drawOpeningLabels(context,state.renderTarget.Get(),state.viewport,worlds,view,projection,selection);
+        restore(context,state);
+        if(radio&&cassettes&&!resources.openingReported){
+            resources.openingReported=true;mgs5vr::log("Owned cassette and radio props rendered in the native title cabin");
+        }
+        return radio&&cassettes;
     }catch(...){return false;}
 }
 void stopPhysicalOpticRenderer() noexcept{std::lock_guard lock(rendererMutex);resources=Resources{};}

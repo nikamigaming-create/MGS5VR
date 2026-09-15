@@ -7,7 +7,7 @@
 
 namespace mgs5vr {
 enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch, sceneUnavailable };
-struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{}; };
+struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{},nativeIdroidOpen{}; };
 // A planned native menu/loading transition may retain explicitly frozen
 // surroundings. A failed camera/pose transaction must not become that scene.
 constexpr bool mayRetainStereoSurround(HeadCameraStatus status) noexcept {
@@ -50,6 +50,8 @@ struct ControllerFrame {
     uint64_t binocularMarkDwellMs{650};
     float snapYaw{}; // Absolute world-Y turn carried by this tracking publication.
     bool frontEnd{}; // Native Title backdrop and floating menu; no tracked arms.
+    bool openingSelector{}; // Physical title tape rack owns a native pulse.
+    int openingSelection{-1}; // Hovered/active tape, in openingTapeLabels order.
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};
@@ -69,6 +71,11 @@ struct HeadCameraSample {
     bool menuOpen{};
     Pose menuPanel{};
     WeaponScopeSample weaponScope{}; // Same solved weapon/skin publication as this eye pair.
+    // Final native anatomical palm frames from the published first-person
+    // skin. Handheld devices use these instead of guessing a palm side from
+    // the controller grip alone.
+    std::array<Pose,2> renderedPalms{};
+    std::array<bool,2> renderedPalmTracked{};
 };
 // Native listener adapters consume the center-head pose from the camera's
 // existing publication, never a newer tracking sample or an individual eye.
@@ -90,7 +97,7 @@ public:
                      ControllerFrame controllers={});
     void toggle();
     void recenter();
-    void setNativeMenuOpen(bool open);
+    void setNativeMenuOpen(bool open,bool idroid=false);
     // Present can continue while a native loading screen publishes no camera.
     // Keep the user's VR choice but expose mono menu pixels until that exact
     // camera resumes; this is not permission to adopt a different owner.
@@ -124,6 +131,7 @@ private:
     bool suspended_{};
     bool awaitingPlayer_{};
     bool nativeMenuOpen_{};
+    bool nativeIdroidOpen_{};
     bool awaitingScene_{};
     HeadCameraSample lastView_{};
     Pose menuNative_{},menuHead_{},menuPanel_{};

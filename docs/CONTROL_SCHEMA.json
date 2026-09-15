@@ -52,7 +52,7 @@
       ["Vehicle: right / left trigger", "Accelerate / brake or reverse"],
       ["Left grip near the wheel", "Acquire wheel; rotate wrist to steer; release to let go"],
       ["Vehicle: left stick / Y", "Conventional steering / enter or exit"],
-      ["Mounted: right stick left/right", "Native smooth camera yaw, not a detached snap offset"],
+      ["Mounted: right stick", "Native camera/turret look on both axes; not a detached snap offset"],
       ["settings.turn_mode", "snap / native_smooth / off; native sensitivity controls smooth yaw"],
       ["settings.hud_mode", "World cues: full / binoculars_only / off; wrist controls unaffected; captions incomplete"],
       ["VR entry / optional toggle", "Automatic / unbound; edit system.toggle_vr if wanted"],

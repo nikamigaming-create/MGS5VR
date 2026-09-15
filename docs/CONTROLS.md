@@ -302,7 +302,7 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Action | Control |
 | --- | --- |
 | Move, including during wrist selection | Left stick; on foot, forward follows your view heading |
-| Turn | Right stick left/right: 30° snap on foot, or configurable native smooth turn |
+| Turn | Right stick left/right: 30° snap on foot, or configurable native smooth turn; mounted view/turret uses both axes |
 | Sprint / run | Left-stick click; with binoculars, right-stick up also runs |
 | Crouch / stand / prone | Tap **A** for crouch/stand; hold **A** for prone. The weapon lowers for the stance action |
 | Quick dive | Right-stick click on foot, including with binoculars equipped. No face-button duplicate |
@@ -321,11 +321,15 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 
 In the development build, opening iDroid or Pause during tracked gameplay puts
 the native menu on a floating panel in the stereo world. Head movement keeps
-working during Pause. The iDroid handset remains attached to the right hand while
-iDroid is open; closing iDroid stows it. Equipment and Commands remain on the left wrist.
+working during Pause. The iDroid terminal is a live overlay: its left stick
+continues on-foot movement while the right stick handles map navigation, so the
+world and combat are not paused by the VR adapter. The deliberate Pause screen
+retains the game's blocking behavior. The iDroid handset remains attached to the
+right hand while iDroid is open; closing iDroid stows it. Equipment and Commands
+remain on the left wrist.
 
-**A** confirms, **B** goes back, the left stick navigates, grips act as **LB/RB**,
-and triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
+**A** confirms, **B** goes back, the right stick navigates the live iDroid map,
+grips act as **LB/RB**, and triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
 zoom step and **Y** switches MAP/NAV. **B** closes iDroid; hold **Menu** again to
 unpause. Holding Menu *inside iDroid* opens its native Help, so close iDroid before
 opening Pause. Release held controls once after returning before moving or firing.
@@ -382,7 +386,9 @@ left grip**. Turn the controller clockwise/right or counterclockwise/left;
 release grip to let go. The native driver's hand keeps its authored contact.
 The left stick remains available when the wheel is released. **Left X** invokes
 the native vehicle weapon/call action; grabbing the wheel cannot fire it.
-**Right grip** is the equipment modifier while seated. Release
+**Right grip** is the equipment modifier while seated. The **right stick**
+continues to send both native camera/turret axes, including vertical aim for
+armored vehicles and helicopter views. Release
 held controls after entry/exit or regained focus before resuming input. Truck
 entry, left-hand wheel acquisition, both steering directions and exit have SIM
 evidence. The short recording does not establish sustained driving or braking.

@@ -59,6 +59,12 @@ try {
             $mgsAssets = @{
                 'retail-assets\Assets\tpp\item\tel\Scenes\tel0_main0_def.fmdl'='935739377E6E0B14EB7186E778E265E65C8E2F66D97B8909D74725800EB21011'
                 'retail-assets\Assets\tpp\item\tel\Pictures\tel0_main0_def_c00_bsm.dds'='7CB40D536F37FAA66D8153EF04AFE6A23331D5BCE45908DC7AA3F63558F566B3'
+                'retail-assets\Assets\tpp\item\cct\Scenes\cct0_main1_def.fmdl'='58512A084176BBBC4A2F496D7D36D70AA1F33F4B67455120BB2328BFF7EE1A98'
+                'retail-assets\Assets\tpp\item\cct\Pictures\cct0_main1_def_c00_bsm.dds'='7199B3148526AC7A4DB75051762CD80808A678910A880198B381291D350D7F51'
+                'retail-assets\Assets\tpp\item\rdi\Scenes\rdi0_main0_def.fmdl'='3681E86A1B611CC33BC67D756B815D4899147532A3417D78E510CD20EDA54028'
+                'retail-assets\Assets\tpp\item\rdi\Pictures\rdi0_main0_def_c00_bsm.dds'='F8B62E027451DED9864E70C0F189F753C9EA4B85AE6F9F9C9124EAA8C6896F09'
+                'retail-assets\Assets\tpp\item\idr\Scenes\idr0_main0_def.fmdl'='6E450F67A423F83F9D42717FB6ED7A464AA7B914C4524FE7DD762FE9DFFC3F50'
+                'retail-assets\Assets\tpp\item\idr\Pictures\idr0_main0_def_c00_bsm.dds'='6129BF4BF7AB5A43F0180465356BE4735B5591C0FA77A96172377662A45E18E7'
             }
             foreach ($mgsAsset in $mgsAssets.Keys) {
                 $mgsAssetPath=Join-Path $mgsCaseDir $mgsAsset

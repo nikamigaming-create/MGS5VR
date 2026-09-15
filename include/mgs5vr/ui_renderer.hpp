@@ -9,6 +9,10 @@ namespace mgs5vr {
 void installUiRenderer(uintptr_t moduleBase);
 // Exact native IsMbDvcTerminalOpened reader; no UI state is written.
 std::optional<bool> nativeMenuOpen() noexcept;
+// The terminal bit is kept separate from the actual native pause menu. This
+// lets the tracked iDroid remain a live gameplay overlay without treating a
+// deliberate Pause screen as locomotion-capable.
+bool nativeIdroidOpen() noexcept;
 bool nativeTitleMenuOpen() noexcept;
 bool nativeLoadingTipsOpen() noexcept;
 // Source time of the latest expanded native equipment-description draw.

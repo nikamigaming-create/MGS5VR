@@ -234,13 +234,45 @@ def controller_rig_demo(proxy, output, started, status):
         (output/"demo-actions.json").write_text(json.dumps({"actions": actions, "status": status}, indent=2), encoding="utf-8")
 
 
+def run_sequence(proxy, sequence, status):
+    client = None
+    try:
+        steps = json.loads(sequence.read_text(encoding="utf-8-sig"))
+        if not isinstance(steps, list):
+            raise ValueError("Sequence must be a JSON array")
+        client = Operator(proxy)
+        for step in steps:
+            op = step["op"]
+            if op == "wait":
+                time.sleep(step["seconds"])
+            elif op == "button":
+                arguments = {"hand": step["hand"], "component": step["component"], "value": step["value"]}
+                arguments.update(step.get("args", {}))
+                client.call("openxr_set_controller_input", arguments)
+            elif op == "pose":
+                client.call("openxr_set_controller_pose", {
+                    "hand": step["hand"], "pose_type": step.get("kind", "grip"),
+                    "base_space": step.get("space", "local"), "position": step["position"],
+                    "orientation": step.get("orientation", [0, 0, 0, 1]),
+                    **({"duration_seconds": step["duration_seconds"]}
+                       if "duration_seconds" in step else {})})
+            else:
+                raise ValueError(f"Unsupported recording sequence operation: {op}")
+        status["completed"] = True
+    except Exception as exc:
+        status["error"] = repr(exc)
+    finally:
+        if client:
+            client.close()
+
+
 def stream_capture(client, capture, args):
     """Encode incoming real eye images immediately; retain no raw frame files."""
     encoder = shutil.which("ffmpeg")
     if not encoder:
         raise RuntimeError("ffmpeg is required for bounded MP4 capture")
-    if args.seconds > 30 or args.demo_controller_rig or args.demo_native_camera or args.demo_locomotion:
-        raise ValueError("MP4 capture is limited to 30 seconds; drive OpenXR actions separately")
+    if args.seconds > 45 or args.demo_controller_rig or args.demo_native_camera or args.demo_locomotion:
+        raise ValueError("MP4 capture is limited to 45 seconds; drive OpenXR actions separately")
     args.output.mkdir(parents=True, exist_ok=False)
     movie = args.output / "simulator.mp4"
     # Arrival timestamps preserve the measured capture cadence. No interpolation
@@ -257,7 +289,12 @@ def stream_capture(client, capture, args):
         creationflags=subprocess.CREATE_NO_WINDOW)
     started = time.monotonic()
     started_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    frames, error = [], None
+    frames, error, sequence_status = [], None, {}
+    sequence_thread = None
+    if args.sequence:
+        sequence_thread = threading.Thread(target=run_sequence,
+            args=(args.proxy, args.sequence, sequence_status), daemon=True)
+        sequence_thread.start()
     try:
         while time.monotonic() - started < args.seconds:
             before = time.monotonic()
@@ -281,6 +318,10 @@ def stream_capture(client, capture, args):
         raise
     finally:
         elapsed = time.monotonic() - started
+        if sequence_thread:
+            sequence_thread.join(timeout=2)
+            if sequence_thread.is_alive():
+                sequence_status["error"] = "Sequence did not complete before capture finalized"
         process.stdin.close()
         try:
             process.wait(timeout=10)
@@ -295,6 +336,8 @@ def stream_capture(client, capture, args):
                     "raw_frame_files": 0, "media_budget_bytes": 12 * 1024 * 1024,
                     "timestamp_clock": "PNG arrival at encoder; Python request/response bounds recorded",
                     "stereo_acceptance": False, "full_mod_acceptance": False,
+                    "sequence": str(args.sequence) if args.sequence else None,
+                    "sequence_status": sequence_status,
                     "error": error, "encoder_exit": process.returncode, "encoder_error": encoder_error}
         (args.output / "capture.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     if process.returncode or error:
@@ -313,6 +356,8 @@ def main():
     parser.add_argument("--max-fps", type=float, default=30)
     parser.add_argument("--mp4", action="store_true",
                         help="Stream to a 720p MP4 (12 MiB/30 s maximum); no raw frame files")
+    parser.add_argument("--sequence", type=pathlib.Path,
+                        help="OpenXR pose/input JSON sequence to run while recording an MP4")
     parser.add_argument("--demo-native-camera", action="store_true",
                         help="Record scripted head motion, native aiming/fire/reload; requires already active native FPS/stereo")
     parser.add_argument("--demo-locomotion", action="store_true",
@@ -331,6 +376,8 @@ def main():
             return
         if not args.output or not (0 < args.seconds <= 300) or not (0 < args.max_fps <= 120):
             parser.error("provide --output, 0 < seconds <= 300, and 0 < max-fps <= 120")
+        if args.sequence and not args.sequence.is_file():
+            parser.error("--sequence must name an existing JSON file")
         capture = [t["name"] for t in tools if "capture_composited_image" in t["name"]]
         if len(capture) != 1:
             raise RuntimeError(f"Expected one composited capture tool, got {capture}")

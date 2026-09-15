@@ -7,6 +7,7 @@
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/native_video.hpp"
+#include "mgs5vr/opening_selector.hpp"
 #include <Xinput.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
@@ -128,6 +129,10 @@ struct Session {
     XrTime pendingLocalChange{};
     uint64_t referenceEpoch{1};
     ControllerFrame controllerFrame{};
+    OpeningSelector openingSelector;
+    OpeningSelectorFrame openingFrame{};
+    bool openingAssetsReady{};
+    uint64_t openingAssetPollAt{};
     explicit Session(Instance& i):instance(i){}
     void requestRefreshRate(){
         if(!instance.refreshControl){log("OpenXR refresh rate is controlled by the headset runtime; 90 Hz target must be set there");return;}
@@ -369,11 +374,11 @@ struct Session {
     }
     void syncInput(XrTime time,Pose& head,std::array<EyeView,2>& views,bool stereoTracked){
         controllerFrame={};controllerFrame.snapYaw=snapYaw;
-        if(!focused){nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
         if(!priorFocused){
             snapControls.reset();
@@ -403,6 +408,7 @@ struct Session {
             hand.thumbTouched=boolean(thumbTouch,hands[n]);
         }
         auto nativeStatus=headCamera().status();
+        const bool liveIdroid=nativeStatus.nativeMenuOpen&&nativeStatus.nativeIdroidOpen;
         const auto mode=controllerRigEnabled()?nativeTravelMode():TravelMode::unknown;
         const bool title=controllerRigEnabled()&&nativeTitleMenuOpen();
         const bool loading=controllerRigEnabled()&&nativeLoadingTipsOpen();
@@ -416,6 +422,15 @@ struct Session {
         // Front-end/loading states retain their native menu controls. A manual
         // screen/VR choice is respected for the remainder of this XR session.
         const auto now=steadyMilliseconds();
+        if(now>=openingAssetPollAt){
+            openingAssetPollAt=now+1000;openingAssetsReady=openingPropsAvailable();
+        }
+        openingFrame=openingSelector.update(title,openingAssetsReady,head,controllerFrame.hands[1],now);
+        controllerFrame.openingSelector=openingFrame.active;
+        controllerFrame.openingSelection=openingFrame.selection;
+        if(openingFrame.pulse==OpeningPulse::confirm&&openingFrame.selection>=0
+           &&static_cast<size_t>(openingFrame.selection)<openingTapeLabels.size())
+            log("Opening tape confirmed native title action: "+std::string(openingTapeLabels[openingFrame.selection]));
         const auto l=stick(hands[0]),rr=stick(hands[1]);
         const auto faceButtons=isolatedFaceButtons(faceLayouts,
             {boolean(face[0],hands[1]),boolean(face[1],hands[1]),boolean(face[2],hands[0]),boolean(face[3],hands[0])},
@@ -579,7 +594,11 @@ struct Session {
             mappedButton("menus.dpad_up",XINPUT_GAMEPAD_DPAD_UP);mappedButton("menus.dpad_down",XINPUT_GAMEPAD_DPAD_DOWN);
             mappedButton("menus.dpad_left",XINPUT_GAMEPAD_DPAD_LEFT);mappedButton("menus.dpad_right",XINPUT_GAMEPAD_DPAD_RIGHT);
             pad.leftTrigger=triggerValue("menus.left_trigger");pad.rightTrigger=triggerValue("menus.right_trigger");
-            move=controls.axis("axes.menu",physical);navigation=controls.axis("axes.map",physical);
+            // The live iDroid uses the right stick for its map/navigation axis
+            // while the left stick remains the normal on-foot movement axis.
+            // Other native menus retain their ordinary left-stick navigation.
+            move=controls.axis(liveIdroid?"axes.move":"axes.menu",physical);
+            navigation=controls.axis("axes.map",physical);
         }else if(mode==TravelMode::vehicle){
             mappedButton("vehicle.native_a",XINPUT_GAMEPAD_A);mappedButton("vehicle.native_b",XINPUT_GAMEPAD_B);
             mappedButton("vehicle.weapon_or_call",XINPUT_GAMEPAD_X);mappedButton("vehicle.interact",XINPUT_GAMEPAD_Y);
@@ -608,6 +627,14 @@ struct Session {
             }
         }
         pad.buttons|=menuBits;
+        if(controllerFrame.openingSelector&&openingFrame.pulse!=OpeningPulse::none){
+            // The physical rack owns only a short native menu pulse. Walking
+            // and the rest of the title controller path remain untouched.
+            pad.leftX=pad.leftY=pad.rightX=pad.rightY=0;
+            if(openingFrame.pulse==OpeningPulse::up)pad.buttons|=XINPUT_GAMEPAD_DPAD_UP;
+            else if(openingFrame.pulse==OpeningPulse::down)pad.buttons|=XINPUT_GAMEPAD_DPAD_DOWN;
+            else if(openingFrame.pulse==OpeningPulse::confirm)pad.buttons|=XINPUT_GAMEPAD_A;
+        }
         if(!nativeInput.exclusive){
             pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
             pad.rightX=static_cast<int16_t>(navigation[0]*32767);pad.rightY=static_cast<int16_t>(navigation[1]*32767);
@@ -681,12 +708,17 @@ struct Session {
             controllerFrame.equipmentCategory=rigControls.equipmentPhase()>=2?rigControls.equipmentCategory()+1:0;
             stickNavigation=rigControls.equipmentPhase()!=0||commands.exclusive
                 ||(pad.buttons&(XINPUT_GAMEPAD_START|XINPUT_GAMEPAD_BACK));
-            locomotionAvailable=mode==TravelMode::onFoot&&!stickNavigation
-                &&!commands.exclusive&&!center&&!headToggle&&!utilityCenter;
+            // Right-stick browsing owns turning, but it must not steal the
+            // left-stick movement already carried by equipment/Commands.
+            const bool nativeMenuButton=pad.buttons&(XINPUT_GAMEPAD_START|XINPUT_GAMEPAD_BACK);
+            locomotionAvailable=mode==TravelMode::onFoot&&!nativeMenuButton
+                &&!center&&!headToggle&&!utilityCenter;
             // Native on-foot movement already consumes the published camera
             // basis. Rotating this stick again doubles physical/snap heading.
         }else if(nativeStatus.nativeMenuOpen||nativeStatus.awaitingPlayer){rigControls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();}
         else {rigControls.reset();opticsControls.reset();opticGate.reset();commandsControls.suspend();}
+        if(liveIdroid&&!nativeInput.exclusive)
+            locomotionAvailable=mode==TravelMode::onFoot&&!center&&!headToggle&&!utilityCenter;
         if(locomotionAvailable){
             const bool loweringAction=activeControl("gameplay.dive")||activeControl("binoculars.dive")
                 ||activeControl("gameplay.stance")||activeControl("binoculars.stance")||activeControl("gameplay.pickup_carry");
@@ -706,16 +738,25 @@ struct Session {
         // Native R3 is not forwarded: it also changes the desktop camera.
         controllerFrame.weaponZoomSequence=weaponZoomInput.update(activeControl("gameplay.zoom"),
             locomotionAvailable&&controllerFrame.weaponReady);
-        if(rigInput&&!nativeInput.exclusive&&!stickNavigation){pad.rightX=0;pad.rightY=0;}
+        // Mounted cameras and turrets still belong to the native gamepad
+        // right stick. Clearing it here was correct for the on-foot rig,
+        // where the head pose owns view motion, but it dropped vertical
+        // turret/camera aim for trucks, armored vehicles, and helicopters.
+        const bool mounted=mode==TravelMode::horse||mode==TravelMode::vehicle;
+        if(rigInput&&!nativeInput.exclusive&&!stickNavigation
+           &&!mountedViewOwnsRightStick(mode,rigInput,nativeInput.exclusive,stickNavigation))
+            {pad.rightX=0;pad.rightY=0;}
         const bool turnAvailable=rigInput&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
         const auto turnMode=controls.setting("settings.turn_mode");
         const auto smoothAxis=controls.axis("axes.turn",physical);
         // Mounted locomotion owns a native vehicle/horse heading. An artificial
         // head-camera-only snap decouples that heading from what the rider sees.
-        const bool mounted=mode==TravelMode::horse||mode==TravelMode::vehicle;
         const bool nativeTurn=turnMode==1||(mounted&&turnMode==0);
         const auto smooth=smoothControls.update(smoothAxis[0],smoothAxis[1],turnAvailable&&nativeTurn);
-        if(turnAvailable&&nativeTurn)pad.rightX=smooth;
+        // Do not convert a mounted camera/turret stick into the on-foot
+        // one-shot smooth-turn pulse. Vehicles need both native axes every
+        // frame for continuous view and weapon elevation.
+        if(turnAvailable&&nativeTurn&&!mounted)pad.rightX=smooth;
         const float turnAxis=activeControl("turn.right")?1.f:activeControl("turn.left")?-1.f:0.f;
         const auto turn=snapControls.update(turnAxis,0,turnAvailable&&turnMode==0&&!mounted)
             *controls.setting("settings.snap_turn_degrees")/30.f;

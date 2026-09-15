@@ -14,12 +14,39 @@ internal static class OwnedAssets
 {
     const int Limit = 16 * 1024 * 1024;
     const ulong Package = 0x522a4f25e0ac957bUL;
-    const ulong Texture = 0x1568643e638c1c21UL;
-    static readonly ulong[] Streams = { 0xb2c0643e638c1c21UL, 0xb570643e638c1c21UL, 0x5718643e638c1c21UL };
-    const string Model = "Assets/tpp/item/tel/Scenes/tel0_main0_def.fmdl";
-    const string Image = "Assets/tpp/item/tel/Pictures/tel0_main0_def_c00_bsm.dds";
-    const string ModelHash = "935739377e6e0b14eb7186e778e265e65c8e2f66d97b8909d74725800eb21011";
-    const string ImageHash = "7cb40d536f37faa66d8153ef04afe6a23331d5bce45908dc7aa3f63558f566b3";
+    sealed class ModelSpec
+    {
+        public readonly string Path, Hash;
+        public ModelSpec(string path, string hash) { Path = path; Hash = hash; }
+    }
+    sealed class TextureSpec
+    {
+        public readonly string Path, Hash;
+        public readonly ulong Base;
+        public readonly ulong[] Streams;
+        public TextureSpec(string path, string hash, ulong @base, params ulong[] streams)
+        { Path = path; Hash = hash; Base = @base; Streams = streams; }
+    }
+    // These are all authored entries from the player's common collectible FPK.
+    // cct is the game's collectible cassette; rdi is its collectible radio.
+    static readonly ModelSpec[] Models =
+    {
+        new ModelSpec("Assets/tpp/item/tel/Scenes/tel0_main0_def.fmdl", "935739377e6e0b14eb7186e778e265e65c8e2f66d97b8909d74725800eb21011"),
+        new ModelSpec("Assets/tpp/item/cct/Scenes/cct0_main1_def.fmdl", "58512a084176bbbc4a2f496d7d36d70aa1f33f4b67455120bb2328bff7ee1a98"),
+        new ModelSpec("Assets/tpp/item/rdi/Scenes/rdi0_main0_def.fmdl", "3681e86a1b611cc33bc67d756b815d4899147532a3417d78e510cd20eda54028"),
+        new ModelSpec("Assets/tpp/item/idr/Scenes/idr0_main0_def.fmdl", "6e450f67a423f83f9d42717fb6ed7a464aa7b914c4524fe7dd762fe9dffc3f50")
+    };
+    static readonly TextureSpec[] Textures =
+    {
+        new TextureSpec("Assets/tpp/item/tel/Pictures/tel0_main0_def_c00_bsm.dds", "7cb40d536f37faa66d8153ef04afe6a23331d5bce45908dc7aa3f63558f566b3",
+            0x1568643e638c1c21UL, 0xb2c0643e638c1c21UL, 0xb570643e638c1c21UL, 0x5718643e638c1c21UL),
+        new TextureSpec("Assets/tpp/item/cct/Pictures/cct0_main1_def_c00_bsm.dds", "7199b3148526ac7a4db75051762cd80808a678910a880198b381291d350d7f51",
+            0x156b3dc7c2e4e39cUL, 0xb2c33dc7c2e4e39cUL, 0xb5733dc7c2e4e39cUL, 0x571b3dc7c2e4e39cUL),
+        new TextureSpec("Assets/tpp/item/rdi/Pictures/rdi0_main0_def_c00_bsm.dds", "f8b62e027451ded9864e70c0f189f753c9ea4b85ae6f9f9c9124eaa8c6896f09",
+            0x156857c368d00700UL, 0xb2c057c368d00700UL, 0xb57057c368d00700UL),
+        new TextureSpec("Assets/tpp/item/idr/Pictures/idr0_main0_def_c00_bsm.dds", "6129bf4bf7ab5a43f0180465356be4735b5591c0fa77a96172377662a45e18e7",
+            0x15686aa73786877cUL, 0xb2c06aa73786877cUL, 0xb5706aa73786877cUL, 0x57186aa73786877cUL)
+    };
     static readonly uint[] Xor = { 0x41441043, 0x11c22050, 0xd05608c3, 0x532c7319 };
     static readonly uint[] Decode = { 0xbb8adedb, 0x65229958, 0x08453206, 0x88121302, 0x4c344955, 0x2c02f10c, 0x4887f823, 0xf3818583 };
 
@@ -111,30 +138,35 @@ internal static class OwnedAssets
             try { result.Add(hash, DecodeEntry(Read(input, position + 32, (int)stored), (uint)hash, expected)); }
             catch (InvalidDataException e) { throw new InvalidDataException("QAR entry " + hash.ToString("x16") + ": " + e.Message, e); }
         }
-        Require(result.Count == wanted.Count, "A required binocular asset is missing from the owned archive"); return result;
+        if (result.Count != wanted.Count)
+        {
+            var missing = wanted.Where(hash => !result.ContainsKey(hash)).Select(hash => hash.ToString("x16"));
+            throw new InvalidDataException("Required owned assets are missing from the archive: " + string.Join(",", missing));
+        }
+        return result;
     }
     static Dictionary<ulong, byte[]> ReadArchive(string path, params ulong[] wanted)
     { using (var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) return ReadArchive(input, new HashSet<ulong>(wanted)); }
-    static byte[] ReadModel(byte[] package)
+    static byte[] ReadModel(byte[] package, ModelSpec model)
     {
-        Require(package.Length >= 48 && Encoding.ASCII.GetString(package, 0, 6) == "foxfpk", "Invalid binocular FPK");
+        Require(package.Length >= 48 && Encoding.ASCII.GetString(package, 0, 6) == "foxfpk", "Invalid collectible FPK");
         uint count = U32(package, 36); Range(package, 48, (long)count * 48);
-        byte[] wanted; using (var md5 = MD5.Create()) wanted = md5.ComputeHash(Encoding.ASCII.GetBytes("/" + Model));
+        byte[] wanted; using (var md5 = MD5.Create()) wanted = md5.ComputeHash(Encoding.ASCII.GetBytes("/" + model.Path));
         byte[] found = null;
         for (int i = 0; i < count; i++)
         {
             int at = 48 + i * 48;
             if (!Slice(package, at + 32, 16).SequenceEqual(wanted)) continue;
-            Require(found == null, "Duplicate binocular model");
+            Require(found == null, "Duplicate collectible model");
             found = Slice(package, checked((int)U32(package, at)), checked((int)U32(package, at + 8)));
         }
-        Require(found != null && Hash(found) == ModelHash, "Owned binocular model differs from the supported asset"); return found;
+        Require(found != null && Hash(found) == model.Hash, "Owned model differs from the supported asset: " + model.Path); return found;
     }
-    static byte[] DecodeTexture(Dictionary<ulong, byte[]> archive)
+    static byte[] DecodeTexture(Dictionary<ulong, byte[]> archive, TextureSpec texture)
     {
-        byte[] info = archive[Texture]; Require(info.Length >= 64 && U32(info, 0) == 0x58455446 && U32(info, 4) == 0x4001eb85, "Expected FTEX 2.04");
+        byte[] info = archive[texture.Base]; Require(info.Length >= 64 && U32(info, 0) == 0x58455446 && U32(info, 4) == 0x4001eb85, "Expected FTEX 2.04");
         uint format = U16(info, 8), width = U16(info, 10), height = U16(info, 12), depth = U16(info, 14), mips = info[16];
-        Require((format == 2 || format == 4) && width > 0 && width <= 4096 && height > 0 && height <= 4096 && depth <= 1 && mips > 0 && mips <= 13, "Unsupported binocular texture layout");
+        Require((format == 2 || format == 4) && width > 0 && width <= 4096 && height > 0 && height <= 4096 && depth <= 1 && mips > 0 && mips <= 13, "Unsupported collectible texture layout");
         Range(info, 64, mips * 16);
         using (var output = new MemoryStream()) using (var writer = new BinaryWriter(output))
         {
@@ -148,10 +180,10 @@ internal static class OwnedAssets
                 int at = 64 + mip * 16, offset = checked((int)U32(info, at));
                 int expected = checked((int)U32(info, at + 4)), stored = checked((int)U32(info, at + 8));
                 int number = info[at + 13], chunks = U16(info, at + 14);
-                Require(info[at + 12] == mip && number >= 1 && number <= Streams.Length, "Invalid mip stream reference");
+                Require(info[at + 12] == mip && number >= 1 && number <= texture.Streams.Length, "Invalid mip stream reference");
                 uint mipBytes = Math.Max(1u, (Math.Max(1u, width >> mip) + 3) / 4) * Math.Max(1u, (Math.Max(1u, height >> mip) + 3) / 4) * blockBytes;
                 Require(expected == mipBytes, "Mip dimensions and block size disagree");
-                byte[] source = archive[Streams[number - 1]]; long start = output.Position;
+                byte[] source = archive[texture.Streams[number - 1]]; long start = output.Position;
                 if (chunks == 0) { Require(stored == expected, "Raw mip size mismatch"); writer.Write(Slice(source, offset, stored)); }
                 else
                 {
@@ -167,7 +199,11 @@ internal static class OwnedAssets
                 }
                 Require(output.Position - start == expected, "Decoded mip size mismatch");
             }
-            var data = output.ToArray(); Require(Hash(data) == ImageHash, "Imported binocular texture differs from the supported asset"); return data;
+            var data = output.ToArray();
+            var hash = Hash(data);
+            Console.WriteLine("Owned texture " + texture.Path + " " + width + "x" + height + " mips=" + mips + " sha256=" + hash);
+            Require(string.IsNullOrEmpty(texture.Hash) || hash == texture.Hash, "Imported texture differs from the supported asset: " + texture.Path);
+            return data;
         }
     }
     static string SafeTarget(string root, string relative)
@@ -181,10 +217,13 @@ internal static class OwnedAssets
     static void Import(string game, string destination)
     {
         game = Path.GetFullPath(game); destination = Path.GetFullPath(destination);
-        // Import only two mod-local files; the game archives are never changed.
-        var model = ReadModel(ReadArchive(Path.Combine(game, "master", "chunk0.dat"), Package)[Package]);
-        var image = DecodeTexture(ReadArchive(Path.Combine(game, "master", "texture0.dat"), Streams.Concat(new[] { Texture }).ToArray()));
-        var outputs = new Dictionary<string, byte[]> { { SafeTarget(destination, Model), model }, { SafeTarget(destination, Image), image } };
+        // Import only the minimum validated local files; the game archives are never changed.
+        var package = ReadArchive(Path.Combine(game, "master", "chunk0.dat"), Package)[Package];
+        var wanted = new HashSet<ulong>(Textures.SelectMany(texture => texture.Streams.Concat(new[] { texture.Base })));
+        var textureArchive = ReadArchive(Path.Combine(game, "master", "texture0.dat"), wanted.ToArray());
+        var outputs = new Dictionary<string, byte[]>();
+        foreach (var model in Models) outputs.Add(SafeTarget(destination, model.Path), ReadModel(package, model));
+        foreach (var texture in Textures) outputs.Add(SafeTarget(destination, texture.Path), DecodeTexture(textureArchive, texture));
         foreach (var file in outputs) if (File.Exists(file.Key))
         {
             Require(new FileInfo(file.Key).Length == file.Value.Length, "Existing modified asset was preserved: " + file.Key);
@@ -202,7 +241,7 @@ internal static class OwnedAssets
             }
         }
         catch { foreach (string path in created) File.Delete(path); throw; }
-        Console.WriteLine("Imported owned binocular model and 9-mip material locally. No archive or save was modified.");
+        Console.WriteLine("Imported owned binocular, cassette, radio and iDroid materials locally. No archive or save was modified.");
     }
     static void SelfTest()
     {
@@ -210,7 +249,7 @@ internal static class OwnedAssets
         Require(rejected, "QAR magic test");
         rejected = false; try { Slice(new byte[8], 4, 8); } catch (InvalidDataException) { rejected = true; }
         Require(rejected, "Extent test");
-        rejected = false; try { ReadModel(new byte[48]); } catch (InvalidDataException) { rejected = true; }
+        rejected = false; try { ReadModel(new byte[48], Models[0]); } catch (InvalidDataException) { rejected = true; }
         Require(rejected, "FPK magic test");
         rejected = false; try { SafeTarget(Path.GetFullPath("owned-fixture"), "../outside"); } catch (InvalidDataException) { rejected = true; }
         Require(rejected, "Output containment test");

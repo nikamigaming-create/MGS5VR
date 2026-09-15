@@ -154,7 +154,8 @@ void conceal(Binding candidate){
 }
 }
 namespace mgs5vr {
-MenuCapturePlayerExclusion::MenuCapturePlayerExclusion(uintptr_t owner) noexcept {
+MenuCapturePlayerExclusion::MenuCapturePlayerExclusion(uintptr_t owner,bool preserveArms) noexcept
+    :preserveArms_(preserveArms){
     if(!base||!hideVisibleGroup||!showVisibleGroup||get<uintptr_t>(owner)!=base+0x23b8218)return;
     const auto character=get<uintptr_t>(owner+0x370);
     if(get<uintptr_t>(character)!=base+0x2295210)return;
@@ -164,16 +165,22 @@ MenuCapturePlayerExclusion::MenuCapturePlayerExclusion(uintptr_t owner) noexcept
     if(!owned(candidate)||groupIndex(candidate,bodyName)<0||groupIndex(candidate,armName)<0
         ||!names(model,groups_,count_)){count_=0;return;}
     owner_=owner;character_=character;parts_=parts;model_=model;
+    std::array<bool,128> bodyConceal{};
+    if(preserveArms_&&!bodyBranches(model,groups_,count_,bodyConceal)){count_=0;return;}
     for(uint16_t i=0;i<count_;++i){
         flags_[i]=groupFlags(candidate,groups_[i]);
-        if(flags_[i]&4u)hideVisibleGroup(reinterpret_cast<void*>(model),groups_[i]);
+        if((flags_[i]&4u)&&(!preserveArms_||bodyConceal[i]))
+            hideVisibleGroup(reinterpret_cast<void*>(model),groups_[i]);
     }
 }
 MenuCapturePlayerExclusion::~MenuCapturePlayerExclusion(){
     const Binding candidate{owner_,character_,parts_,0,0,model_,true};
     if(!model_||!showVisibleGroup||!owned(candidate))return;
+    std::array<bool,128> bodyConceal{};
+    if(preserveArms_&&!bodyBranches(model_,groups_,count_,bodyConceal))return;
     for(uint16_t i=0;i<count_;++i)
-        if((flags_[i]&4u)&&groupFlags(candidate,groups_[i])==static_cast<uint8_t>(flags_[i]&~4u))
+        if((flags_[i]&4u)&&(!preserveArms_||bodyConceal[i])
+           &&groupFlags(candidate,groups_[i])==static_cast<uint8_t>(flags_[i]&~4u))
             showVisibleGroup(reinterpret_cast<void*>(model_),groups_[i]);
 }
 void initializePlayerVisibility(uintptr_t moduleBase) noexcept {

@@ -34,6 +34,10 @@ int16_t NativeSmoothTurn::update(float x,float y,bool available){
     if(!armed_||std::abs(x)<.18f)return 0;
     return static_cast<int16_t>(std::clamp(x,-1.f,1.f)*32767);
 }
+bool mountedViewOwnsRightStick(TravelMode mode,bool rigInput,bool nativeExclusive,bool stickNavigation) noexcept{
+    return rigInput&&!nativeExclusive&&!stickNavigation
+        &&(mode==TravelMode::horse||mode==TravelMode::vehicle);
+}
 LocomotionInput RigLocomotion::update(GamepadSample sample,bool available,uint64_t time){
     constexpr uint16_t sprint=0x0040,dive=0x4000,stance=0x1000;
     if(time<lastTime_)suspend();
@@ -344,6 +348,10 @@ RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,T
     if(modifier||fireReleaseRequired_)raw.rightTrigger=0;
     // The Action Type trigger also performs CQC and throws carried bodies
     // while the weapon is lowered. Let the native action state choose it.
+    // The VR trigger is only the physical hold gesture. Equipment_.update
+    // sends the native D-pad category request after the user chooses one;
+    // do not turn the trigger itself into Left Shoulder, which is TPP's
+    // separate Call/buddy menu and made the wrong native tiles appear.
     return {equipment_.update(raw,modifier,false,time,pickerDrawTime),ready};
 }
 uint16_t MenuButton::update(bool pressed,bool active,uint64_t time,bool recenterModifier){

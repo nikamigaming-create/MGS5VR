@@ -68,6 +68,14 @@ std::optional<Pose> fitWristPanel(Pose head,Vec3 anchor,const std::array<EyeView
         return true;
     };
     auto desired=compose(inverse(head),Pose{{},anchor}).position;
+    const float anchorDistance=std::sqrt(dot(desired,desired));
+    if(anchorDistance>.001f){
+        const auto direction=desired*(1.f/anchorDistance);
+        float distance=std::max(.8f,anchorDistance);
+        if(direction.z<-.001f)distance=std::max(distance,.55f/-direction.z);
+        for(;distance<=2.f;distance+=.05f)if(fits(direction*distance))
+            return compose(head,Pose{{},direction*distance});
+    }
     desired.z=std::clamp(desired.z,-2.f,-.55f);
     // A centered rectangle can also be too large for a narrow/canted display.
     // Increase depth before moving sideways; never shrink the native text.

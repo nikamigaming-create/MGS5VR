@@ -1,5 +1,6 @@
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include <windows.h>
@@ -7,6 +8,7 @@
 #include <MinHook.h>
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstring>
 #include <iomanip>
 #include <mutex>
@@ -49,6 +51,7 @@ struct Source {
     HudMode hudMode{HudMode::binocularsOnly};
     HudView hudView{HudView::world};
     std::array<float,16> projection{};
+    bool equipmentOpen{};
 };
 thread_local Source producing,executing;
 std::mutex mutex;
@@ -205,6 +208,21 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
         if(found==nodes.end()&&nodes.size()<96){
             nodes.push_back({address,camera,field<uintptr_t>(state,0x340),field<uintptr_t>(state,0x348),0,0,field<uint32_t>(item,0x50),0,order,nodeName(address)});
             found=nodes.end()-1;
+            uintptr_t traceType{};
+            const bool traceLayoutCamera=!executing.frontEnd&&camera!=executing.camera
+                &&read(camera,&traceType,sizeof(traceType))&&traceType==base+0x20f08c8;
+            if(traceLayoutCamera){
+                std::array<float,16> layoutWorld{};uintptr_t layoutType{};
+                if(read(camera,&layoutType,sizeof(layoutType))&&read(camera+0x30,layoutWorld.data(),sizeof(layoutWorld))
+                    &&std::isfinite(layoutWorld[14])&&(layoutWorld[14]==100||layoutWorld[14]==135||layoutWorld[14]==150)){
+                    std::ostringstream message;message<<"Native gameplay UI node order="<<order<<" depth="<<layoutWorld[14]
+                        <<" camera=0x"<<std::hex<<camera<<" source_camera=0x"<<executing.camera<<std::dec
+                        <<" scene="<<(camera==executing.camera)<<" eye="<<executing.eye.eye
+                        <<" equipment_open="<<executing.choosingCategory<<" items_open="<<executing.itemsOpen
+                        <<" commands_open="<<executing.commandsOpen<<" name="<<found->name;
+                    log(message.str());
+                }
+            }
             if(executing.frontEnd){
                 uintptr_t type{};std::array<float,16> world{};
                 read(camera,&type,sizeof(type));read(camera+0x30,world.data(),sizeof(world));
@@ -237,11 +255,13 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             // flatten every menu layer onto the same world plane. Testing the
             // HUD transform here left the main map head-locked in both eyes.
             const bool titleWorldUi=executing.frontEnd&&camera==executing.camera;
-            if(((executing.menuOpen||executing.frontEnd)&&layoutCamera)||titleWorldUi){
+            const bool menuCamera=executing.menuOpen&&!executing.frontEnd&&camera!=executing.camera;
+            if(((executing.menuOpen||executing.frontEnd)&&(layoutCamera||menuCamera))||titleWorldUi){
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto savedView=field<std::array<float,16>>(state,0x200);
                 const auto mapped=uiPanelProjection(titleWorldUi?executing.authoredProjection:saved,executing.view,executing.eye.view.fov,
-                    executing.menuPanel,executing.frontEnd?1.6f:1.25f,(executing.frontEnd?1.6f:1.25f)*9.f/16.f);
+                    executing.menuPanel,executing.frontEnd?1.6f:idroidScreenWidth,
+                    (executing.frontEnd?1.6f:idroidScreenWidth)*9.f/16.f);
                 if(!mapped){++suppressedDraws;return 0;}
                 auto* output=static_cast<unsigned char*>(state)+0x1c0;
                 if(titleWorldUi)std::memcpy(static_cast<unsigned char*>(state)+0x200,executing.authoredView.data(),sizeof(executing.authoredView));
@@ -252,14 +272,45 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
                 return result;
             }
+            const auto order=field<uint32_t>(item,0x28);
+            // The game's initial equipment selector uses the verified Z=100
+            // layout camera. Route those native four-way pixels through the
+            // same wrist plane so the trigger reveals the real tiles and
+            // their real prompts.
+            const bool nativeFourWay=executing.equipmentOpen&&!executing.frontEnd
+                &&layoutCamera&&order>=133&&order<=139;
+            if(nativeFourWay){
+                const auto saved=field<std::array<float,16>>(state,0x1c0);
+                const auto savedView=field<std::array<float,16>>(state,0x200);
+                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,
+                    executing.picker,executing.pickerWidth,executing.pickerWidth*9.f/16.f);
+                if(mapped){
+                    auto* output=static_cast<unsigned char*>(state)+0x1c0;
+                    std::memcpy(output,mapped->data(),sizeof(*mapped));
+                    const auto result=originalNode(state,item);
+                    std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
+                    if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
+                    static std::atomic_bool reported{};
+                    if(!reported.exchange(true)){
+                        std::ostringstream message;message<<"Native four-way equipment selector routed to wrist panel"
+                            <<" result="<<result<<" panel="<<executing.picker.position.x<<','<<executing.picker.position.y<<','<<executing.picker.position.z
+                            <<" view="<<savedView[0]<<','<<savedView[5]<<','<<savedView[10]<<','<<savedView[12]<<','<<savedView[13]<<','<<savedView[14]
+                            <<" projection="<<saved[0]<<','<<saved[5]<<','<<saved[10]<<','<<saved[11]<<','<<saved[14];
+                        log(message.str());
+                    }
+                    return result;
+                }
+                // A failed wrist projection must not reintroduce the native
+                // selector in front of the player.
+                ++suppressedDraws;return 0;
+            }
             // These native UI cameras inhabit an artificial layout space. World
             // markers use the scene camera and retain their source eye view.
             if(layoutCamera
                 &&read(camera+0x30,world.data(),sizeof(world))&&world[0]==-1&&world[5]==1&&world[10]==-1&&world[15]==1
                 &&world[1]==0&&world[2]==0&&world[3]==0&&world[4]==0&&world[6]==0&&world[7]==0&&world[8]==0&&world[9]==0&&world[11]==0
                 &&world[12]==0&&world[13]==0&&(world[14]==100||world[14]==135||world[14]==150)){
-                const auto order=field<uint32_t>(item,0x28);
-                const auto layer=hudLayer(order,world[14],executing.itemsOpen,executing.commandsOpen);
+                const auto layer=hudLayer(order,world[14],executing.itemsOpen,executing.commandsOpen,executing.choosingCategory);
                 const bool contextAction=layer==HudLayer::context;
                 // The native equipment carousel has its own layout camera at
                 // Z=150. Its cards, tabs and description are orders 133..136;
@@ -268,9 +319,9 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 // Call uses the Z=100 layout: choices 135..137, selected action
                 // and its help 138..139. Destination marks and status stay separate.
                 const bool commandsPicker=layer==HudLayer::commands;
-                // LT's first stage is the explicit four-category action bar.
-                // Keep native status icons on the wrist; never stretch one
-                // status icon into a pretend four-way selector.
+                // The initial trigger-held screen is the game's native
+                // four-way selector. Keep its pixels on the same unfolded
+                // wrist pose as the later native item cards.
                 const bool expanded=equipmentPicker||commandsPicker;
                 const bool general=layer==HudLayer::general;
                 // Layer 50 contains preprojected desktop labels. It cannot
@@ -425,34 +476,40 @@ std::optional<bool> nativeMenuOpen() noexcept {
     if(menuState.exchange(next)!=next)try{log("Native menu state="+std::to_string(next)+" (iDroid=1, pause=2)");}catch(...){}
     return next!=0;
 }
+bool nativeIdroidOpen() noexcept {
+    const auto state=menuState.load();
+    return state>=0&&(state&1)!=0;
+}
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
 uint64_t nativeCommandsDrawTime() noexcept {return enabled.load()?commandsDrawTime.load():0;}
 Pose wristPickerPose(const HeadCameraSample& rig) noexcept{
     const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
-    const auto anchor=rig.wristPanel.position+rotate(head.orientation,{0,rig.controllers.wristSelectorHeight,-.03f});
-    const std::array<EyeView,2> eyes{{
-        {nativeTrackedPose(rig.nativePose,rig.headPose,rig.views[0].pose),rig.views[0].fov},
-        {nativeTrackedPose(rig.nativePose,rig.headPose,rig.views[1].pose),rig.views[1].fov}}};
-    // One shared envelope covers the guide, item cards and command picker.
-    // This changes only the unfolded panel, never the status mounted on skin.
-    const float width=std::max(.6f,rig.controllers.wristPickerWidth);
-    return fitWristPanel(head,anchor,eyes,width,width*9.f/16.f).value_or(Pose{head.orientation,anchor});
+    // The real native selector belongs to the same authored forearm surface
+    // as the status HUD. Keep its origin on the wrist; the old head-relative
+    // lift and frustum fitting made the four-way cards hover in front of the
+    // player instead of staying attached to the arm.
+    const auto anchor=rig.wristPanel.position+rotate(rig.wristPanel.orientation,{0,0,.035f});
+    return Pose{head.orientation,anchor};
 }
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const std::array<float,16>& projection,const HeadCameraSample& rig,
     const std::array<float,16>& authoredView,const std::array<float,16>& authoredProjection,HudView hudView){
     const std::array<Pose,2> eyes{nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),
                                 nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose)};
-    // Keep status flat along the forearm, but unfold the larger native picker
-    // above that wrist, facing the source head. Both eyes use this same pose.
+    // Keep status flat along the forearm and keep the native picker on that
+    // same wrist origin. The iDroid gets its own tracked screen pose.
     const auto picker=wristPickerPose(rig);
+    const auto idroid=trackedIdroidPose(rig);
+    const auto menuPanel=rig.menuOpen&&idroid?idroid->screen:
+        rig.menuOpen?picker:rig.menuPanel;
     producing={eye,camera,view,rig.wristPanel,picker,rig.wristPanelTracked,
                rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),
                rig.controllers.equipmentOpen&&!rig.controllers.equipmentCategory,
                rig.controllers.equipmentCategory==4,rig.controllers.commandControls,
-               rig.menuOpen,rig.menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection,rig.controllers.wristPickerWidth};
+               rig.menuOpen,menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection,rig.controllers.wristPickerWidth};
     producing.hudMode=rig.controllers.hudMode;
     producing.hudView=hudView;
     producing.projection=projection;
+    producing.equipmentOpen=rig.controllers.equipmentOpen;
 }
 void clearUiRenderSource() noexcept {producing={};}
 ReconModelVisibilityScope::ReconModelVisibilityScope(HudMode mode,HudView view,bool glow) noexcept {

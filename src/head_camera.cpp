@@ -41,7 +41,7 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     if(!std::isfinite(units)||units<=0)throw std::invalid_argument("Camera scale must be finite and positive");
     std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=awaitingPlayer_=false;camera_=playerOwner_=0;reason_=HeadCameraStop::none;
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=ownerHeadTime_=0;suspended_=false;
-    controllers_={};rig_={};nativeMenuOpen_=false;awaitingScene_=false;lastView_={};menuAnchored_=false;trackingEpoch_=0;
+    controllers_={};rig_={};nativeMenuOpen_=false;nativeIdroidOpen_=false;awaitingScene_=false;lastView_={};menuAnchored_=false;trackingEpoch_=0;
     snapYaw_=0;snapTranslation_={};recenterPending_=false;
 }
 bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
@@ -108,10 +108,11 @@ void HeadCamera::recenter(){
     std::lock_guard lock(mutex_);
     if(enabled_&&(active_||pending_||awaitingPlayer_)){recenterPending_=true;rig_={};}
 }
-void HeadCamera::setNativeMenuOpen(bool open){
+void HeadCamera::setNativeMenuOpen(bool open,bool idroid){
     std::lock_guard lock(mutex_);
-    if(open==nativeMenuOpen_)return;
-    nativeMenuOpen_=open;rig_={};
+    const auto nextIdroid=open&&idroid;
+    if(open==nativeMenuOpen_&&nextIdroid==nativeIdroidOpen_)return;
+    nativeMenuOpen_=open;nativeIdroidOpen_=nextIdroid;rig_={};
     if(open){
         menuAnchored_=active_&&!suspended_&&lastView_.applied&&lastView_.activation==activation_;
         if(menuAnchored_){
@@ -148,7 +149,7 @@ void HeadCamera::awaitScene(){
 }
 bool HeadCamera::available() const {std::lock_guard lock(mutex_);return enabled_;}
 bool HeadCamera::active() const {std::lock_guard lock(mutex_);return active_&&!awaitingScene_;}
-HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_&&!awaitingScene_,pending_,awaitingScene_?HeadCameraStop::sceneUnavailable:reason_,cancellations_,activation_,suspended_,awaitingPlayer_||awaitingScene_,nativeMenuOpen_};}
+HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_&&!awaitingScene_,pending_,awaitingScene_?HeadCameraStop::sceneUnavailable:reason_,cancellations_,activation_,suspended_,awaitingPlayer_||awaitingScene_,nativeMenuOpen_,nativeIdroidOpen_};}
 HeadCameraSample HeadCamera::resolve(uintptr_t camera,Pose nativePose,uint64_t time){
     std::lock_guard lock(mutex_);
     return resolveLocked(camera,nativePose,time);
@@ -180,7 +181,11 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(nativeMenuOpen_&&!spatialMenu){awaitPlayerLocked();return result;}
     if(spatialMenu){
         if(camera!=camera_)return result;
-        nativePose=menuNative_;
+        // The native iDroid terminal is an overlay state, not the deliberate
+        // Pause screen. Keep consuming the current native camera so left-stick
+        // locomotion can continue underneath the tracked display. Pause keeps
+        // the old anchored camera and therefore retains its native behavior.
+        if(!nativeIdroidOpen_)nativePose=menuNative_;
         result.menuOpen=true;result.menuPanel=menuPanel_;
         result.playerOwner=playerOwner_;result.playerHead=lastView_.playerHead;
         result.playerSequence=lastView_.playerSequence;

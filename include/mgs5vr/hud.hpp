@@ -10,10 +10,13 @@ enum class HudLayer { general, worldLabels, context, status, equipment, commands
 
 // TPP's fixed layout cameras share draw-order numbers. Camera depth and the
 // active picker distinguish equipment cards from unrelated HUD content.
-constexpr HudLayer hudLayer(uint32_t order,float cameraDepth,bool items,bool commands) noexcept {
+// The initial native four-way selector uses the Z=100 command-style draw
+// orders 135..137; its trigger-held state is the additional discriminator.
+constexpr HudLayer hudLayer(uint32_t order,float cameraDepth,bool items,bool commands,bool category=false) noexcept {
     if(order==50)return HudLayer::worldLabels;
     if(order==52)return HudLayer::context;
     if((cameraDepth==150&&order>=133&&order<=136)||(items&&cameraDepth==100&&order==133))return HudLayer::equipment;
+    if(category&&cameraDepth==100&&order>=135&&order<=137)return HudLayer::equipment;
     if(commands&&cameraDepth==100&&order>=135&&order<=139)return HudLayer::commands;
     if(order>=146&&order<=148)return HudLayer::status;
     return HudLayer::general;

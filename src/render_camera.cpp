@@ -1,5 +1,7 @@
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/idroid_rig.hpp"
+#include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/optic_renderer.hpp"
@@ -345,11 +347,13 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const auto cameraCount=pairCount.load();uintptr_t result{};bool complete=true;
     mgs5vr::beginSceneTiming(context,id);
     const bool titleSurface=source.pair.sample.controllers.frontEnd;
+    bool openingSelectorDrawn=false;
     // The front end has no player-hand interaction. Exclude this player's
     // verified model groups from BOTH eye replays as well as the panel source;
     // hiding only the source leaves tracked arms floating around the title.
     // The guard restores the exact native visibility flags on every exit.
-    mgs5vr::MenuCapturePlayerExclusion excludeTitlePlayer(titleSurface?source.pair.sample.playerOwner:0);
+    mgs5vr::MenuCapturePlayerExclusion excludeTitlePlayer(titleSurface?source.pair.sample.playerOwner:0,
+        titleSurface&&source.pair.sample.controllers.openingSelector);
     // The telescope has one real ocular. Draw its own narrow-angle native
     // scene first, then the two ordinary HMD eyes. All three draws use the
     // same simulation/hand publication and only one native present is queued.
@@ -423,6 +427,34 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 mgs5vr::log("Physical optic scene copy unavailable; retaining normal head views");
             continue;
         }
+        if(afterContext&&titleSurface){
+            // The title camera is the only authenticated native cabin anchor
+            // currently available. Keep the props in that same FOX frame so
+            // they move with the authored helicopter shot instead of becoming
+            // a head-locked overlay. The shared layout keeps the radio and all
+            // six semantic tapes reachable and large enough to read.
+            // Use the same title-camera basis as the existing spatial panel.
+            // Raw nativePose is the FOX camera heading; placing OpenXR-local
+            // props directly on it mirrors the rack away from the viewer.
+            const auto titleOrigin=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,
+                source.pair.sample.headPose,source.pair.sample.headPose);
+            const auto offsets=mgs5vr::openingPropOffsets();
+            const auto scales=mgs5vr::openingPropScales();
+            const auto propWorld=[&](mgs5vr::Vec3 offset,float scale,mgs5vr::Quat orientation=mgs5vr::Quat{}){
+                const auto prop=mgs5vr::compose(titleOrigin,mgs5vr::Pose{orientation,offset});
+                alignas(16) auto propValues=values(prop);std::array<float,16> world{};
+                originalWorld(propValues.data(),world.data());
+                // FMDL vertices are authored in meters. Uniformly scale only
+                // the local basis, never the translated cabin position.
+                for(size_t i=0;i<12;++i)world[i]*=scale;
+                return world;
+            };
+            std::array<std::array<float,16>,7> openingWorlds{};
+            for(size_t i=0;i<openingWorlds.size();++i)
+                openingWorlds[i]=propWorld(offsets[i],scales[i]);
+            openingSelectorDrawn=mgs5vr::drawOpeningProps(afterContext,openingWorlds,eyeView,eyeProjection,
+                source.pair.sample.controllers.openingSelection)||openingSelectorDrawn;
+        }
         if(afterContext&&optic.held&&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular){
             const auto body=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,
                 source.pair.sample.headPose,optic.pose.renderBody);
@@ -442,13 +474,37 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
             mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get());
         }
-        if(titleSurface)mgs5vr::drawNativeMenuSurface(afterContext,eyeView,drawingEye.view.fov,source.pair.sample.menuPanel);
+        if(afterContext&&source.pair.sample.menuOpen){
+            if(const auto idroid=mgs5vr::trackedIdroidPose(source.pair.sample)){
+                alignas(16) auto bodyValues=values(idroid->body);
+                alignas(16) std::array<float,16> bodyWorld{},projection{};
+                originalWorld(bodyValues.data(),bodyWorld.data());
+                std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
+                mgs5vr::drawPhysicalIdroid(afterContext,bodyWorld,eyeView,projection);
+                // The pointer originates at the normal right-hand OpenXR aim
+                // pose. Convert that exact hit back onto the same physical
+                // screen pose used by the native menu projection; never use
+                // the grip, the HMD center, or a second overlay space.
+                if(const auto ray=mgs5vr::trackedIdroidRay(source.pair.sample)){
+                    const auto cursor=mgs5vr::compose(idroid->screen,mgs5vr::Pose{{},
+                        {(ray->hit.u-.5f)*mgs5vr::idroidScreenWidth,
+                         (.5f-ray->hit.v)*mgs5vr::idroidScreenHeight,.014f}});
+                    alignas(16) auto cursorValues=values(cursor);
+                    alignas(16) std::array<float,16> cursorWorld{};
+                    originalWorld(cursorValues.data(),cursorWorld.data());
+                    mgs5vr::drawPhysicalIdroidCursor(afterContext,cursorWorld,eyeView,projection);
+                    static std::atomic_bool reported{};
+                    if(!reported.exchange(true))mgs5vr::log("iDroid pointer ray bound to right-hand OpenXR aim and front-display projection");
+                }
+            }
+        }
+        if(titleSurface&&!openingSelectorDrawn)mgs5vr::drawNativeMenuSurface(afterContext,eyeView,drawingEye.view.fov,source.pair.sample.menuPanel);
         const auto& wrist=source.pair.sample;
         if(!titleSurface&&!wrist.menuOpen&&mgs5vr::worldHudVisible(wrist.controllers.hudMode,hudView))
             mgs5vr::drawWorldWaypoints(afterContext,eyeView,eyeProjection,native.position,markerSnapshot);
-        if(!titleSurface&&!wrist.menuOpen&&wrist.wristPanelTracked&&wrist.controllers.equipmentOpen&&!wrist.controllers.equipmentCategory)
-            mgs5vr::drawWristCategorySelector(afterContext,eyeView,drawingEye.view.fov,
-                mgs5vr::wristPickerPose(wrist),wrist.controllers.equipmentLabels);
+        // The equipment category screen is native UI orders 133..136. The
+        // worker-side UI hook remaps those real pixels to the wrist picker;
+        // there is deliberately no generated instruction-card draw here.
         try{if(mgs5vr::captureSceneEye(afterContext,drawingEye))++sceneCopies;else {complete=false;sceneFailure=5;}}
         catch(const std::exception& ex){complete=false;sceneFailure=7;mgs5vr::log(std::string("Native eye capture: ")+ex.what());}
     }
@@ -478,7 +534,8 @@ __declspec(noinline) float* world(void* input,float* output){
     if(!enabled.load())return originalWorld(input,output);
     const auto source=reinterpret_cast<uintptr_t>(input);
     if(caller==base+layout.worldReturn){
-        if(const auto menu=mgs5vr::nativeMenuOpen())mgs5vr::headCamera().setNativeMenuOpen(*menu);
+        if(const auto menu=mgs5vr::nativeMenuOpen())
+            mgs5vr::headCamera().setNativeMenuOpen(*menu,mgs5vr::nativeIdroidOpen());
         current={};current.camera=source-layout.cameraPose;
         current.identity=layout.publisher?publicationOwner:current.camera;
         primaryListener=0;primaryListenerSequence=0;

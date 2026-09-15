@@ -42,6 +42,30 @@ bool drawPhysicalBinoculars(ID3D11DeviceContext* context,
     ID3D11Texture2D* sceneSource,
     bool leftEye) noexcept;
 
+// Draw the hand-carried iDroid housing around the native UI screen. The
+// center stays open so the live game pixels remain the device's front display.
+bool drawPhysicalIdroid(ID3D11DeviceContext* context,
+    const std::array<float,16>& world,
+    const std::array<float,16>& view,
+    const std::array<float,16>& projection) noexcept;
+
+// Draw the live iDroid pointer at the exact front-display hit returned by the
+// tracked aim ray. `world` is the hit pose in the same native FOX space as the
+// housing, so the cursor cannot drift into a separate overlay space.
+bool drawPhysicalIdroidCursor(ID3D11DeviceContext* context,
+    const std::array<float,16>& world,
+    const std::array<float,16>& view,
+    const std::array<float,16>& projection) noexcept;
+
+// Draw the owned title-opening props in the native cabin eye. The world array
+// is ordered radio/deck, then the six action tapes in openingTapeLabels order.
+// Each matrix must be the same native FOX world space used by the current eye
+// replay. `selection` is a tape index, or -1 when no tape is hovered.
+bool drawOpeningProps(ID3D11DeviceContext* context,
+    const std::array<std::array<float,16>,7>& worlds,
+    const std::array<float,16>& view,
+    const std::array<float,16>& projection,int selection=-1) noexcept;
+
 void stopPhysicalOpticRenderer() noexcept;
 
 }

@@ -23,8 +23,7 @@ struct Surface {
     D3D11_TEXTURE2D_DESC description{};
     uint64_t source{},capturedAt{};
     bool reported{};
-} surface,categorySurface;
-EquipmentLabels categoryLabels{};
+} surface;
 std::mutex surfaceMutex;
 struct State {
     ID3D11DeviceContext* c;
@@ -154,24 +153,5 @@ bool drawNativeMenuSurface(ID3D11DeviceContext* context,const std::array<float,1
     if(drawn&&!surface.reported){surface.reported=true;log("Complete native Title menu rendered on a spatial cabin panel");}
     return drawn;
 }catch(...){return false;}}
-bool drawWristCategorySelector(ID3D11DeviceContext* context,const std::array<float,16>& view,EyeFov fov,Pose panel,const EquipmentLabels& labels) noexcept {try{
-    if(!context)return false;std::lock_guard lock(surfaceMutex);
-    ComPtr<ID3D11Device> device;context->GetDevice(&device);
-    if(!initialize(device.Get(),categorySurface))return false;
-    if(!categorySurface.image||categoryLabels!=labels){
-        const auto pixels=makeWristSelectorImage(labels);if(pixels.bgra.empty())return false;
-        D3D11_TEXTURE2D_DESC desc{};desc.Width=pixels.width;desc.Height=pixels.height;
-        desc.MipLevels=desc.ArraySize=desc.SampleDesc.Count=1;desc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
-        desc.Usage=D3D11_USAGE_IMMUTABLE;desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
-        D3D11_SUBRESOURCE_DATA data{pixels.bgra.data(),pixels.width*4,0};
-        categorySurface.image.Reset();categorySurface.texture.Reset();
-        if(FAILED(device->CreateTexture2D(&desc,&data,&categorySurface.texture))
-            ||FAILED(device->CreateShaderResourceView(categorySurface.texture.Get(),nullptr,&categorySurface.image)))return false;
-        categorySurface.description=desc;categoryLabels=labels;
-    }
-    const bool drawn=drawSurface(context,categorySurface,view,fov,panel,.48f,.48f*320.f/1440.f);
-    if(drawn&&!categorySurface.reported){categorySurface.reported=true;log("Four-category wrist selector rendered with configured input labels");}
-    return drawn;
-}catch(...){return false;}}
-void stopNativeMenuSurface() noexcept {std::lock_guard lock(surfaceMutex);surface={};categorySurface={};categoryLabels={};}
+void stopNativeMenuSurface() noexcept {std::lock_guard lock(surfaceMutex);surface={};}
 }

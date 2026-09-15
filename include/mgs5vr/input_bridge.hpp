@@ -69,6 +69,10 @@ private:
     unsigned category_{};
 };
 enum class TravelMode { unknown,onFoot,horse,vehicle };
+// A mounted view/turret consumes both native right-stick axes. The on-foot
+// controller rig may suppress those axes because the tracked head owns view
+// motion; menus and native-input mode remain exclusive as usual.
+bool mountedViewOwnsRightStick(TravelMode mode,bool rigInput,bool nativeExclusive,bool stickNavigation) noexcept;
 struct WheelSample { float axis{};bool gripped{},engaged{};uint64_t time{}; };
 // Authored driver hand contact and tracked grip are in the same LOCAL frame.
 // A fresh squeeze near that contact takes the wheel; release always lets go.

@@ -155,9 +155,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const Pose nativeCamera{{cameraValues[0],cameraValues[1],cameraValues[2],cameraValues[3]},
                             {cameraValues[4],cameraValues[5],cameraValues[6]}};
     auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera);
-    if(!frame.applied||frame.playerOwner!=owner||frame.controllers.frontEnd||!frame.controllers.hands[1].gripTracked)return false;
+    if(!frame.applied||frame.playerOwner!=owner
+       ||(frame.controllers.frontEnd&&!frame.controllers.openingSelector)
+       ||!frame.controllers.hands[1].gripTracked)return false;
     const auto renderedHead=compose(*root,bone(q,p,4)).position;
-    if(!frame.menuOpen)frame.nativePose.position=frame.nativePose.position+renderedHead-frame.playerHead;
+    if(!frame.menuOpen&&!frame.controllers.frontEnd)
+        frame.nativePose.position=frame.nativePose.position+renderedHead-frame.playerHead;
     const auto originalQ=q;const auto originalP=p;
     std::array<Pose,2> grips{};
     for(size_t i=0;i<2;++i)if(frame.controllers.hands[i].gripTracked)
@@ -590,15 +593,30 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         ++articulatedHands;
     }
     // Full render pose, before native matrix and attachment publication.
-    // Native position.w metadata is retained.
+    // Native position.w metadata is retained. Publish the final anatomical
+    // palm frames with this same skin transaction so handheld displays can
+    // choose the palm side from the rendered hand, not a raw controller guess.
+    std::array<Pose,2> renderedPalms{};
+    std::array<bool,2> renderedPalmTracked{};
+    for(size_t side=0;side<2;++side){
+        renderedPalms[side]=compose(*root,compose(bone(q,p,wrists[side]),inverse(gripFromWrist[side])));
+        renderedPalmTracked[side]=frame.controllers.hands[side].gripTracked&&valid(renderedPalms[side]);
+    }
+    frame.renderedPalms=renderedPalms;frame.renderedPalmTracked=renderedPalmTracked;
     frame.playerHead=renderedHead;
-    if(frame.controllers.hands[0].gripTracked){
+    if(frame.controllers.hands[0].gripTracked&&renderedPalmTracked[0]){
         const auto wrist=compose(*root,bone(q,p,8));
         const auto elbow=compose(*root,bone(q,p,7));
-        const auto surface=helpersMatch?compose(*root,bone(q,p,102)):wrist;
-        if(const auto panel=forearmPanel(elbow,wrist,rotate(surface.orientation,{0,1,0}))){
-            frame.wristPanel=compose(*panel,Pose{{},{0,0,frame.controllers.wristSurfaceLift}});frame.wristPanelTracked=true;
-        }
+        // Keep the always-on status strip on the original anatomical palm
+        // socket. A later forearm-segment reconstruction looked mathematically
+        // tidy but moved the visible strip off the arm after the wrist/roll
+        // changes. The palm socket plus the original 35% elbow-to-wrist anchor
+        // is the stable presentation used by the first aligned build.
+        auto panel=compose(renderedPalms[0],Pose{{0,-0.70710678f,0,0.70710678f},{}});
+        panel.position=wrist.position+(elbow.position-wrist.position)*0.35f
+            +rotate(panel.orientation,{0,0,0.025f});
+        frame.wristPanel=panel;
+        frame.wristPanelTracked=true;
     }
     if(binocularHeld){
         // The arm solve can constrain the wrist at a surface or reach limit.
@@ -640,10 +658,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
     }
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
-    std::array<Pose,2> renderedPalms;
     HandContacts handContacts;
     for(size_t side=0;side<2;++side){
-        renderedPalms[side]=compose(*root,compose(bone(q,p,wrists[side]),inverse(gripFromWrist[side])));
         handContacts[side][0]=renderedPalms[side].position;
         for(size_t finger=0;finger<5;++finger)
             handContacts[side][finger+1]=compose(*root,bone(q,p,fingers[side][finger]+2)).position;
