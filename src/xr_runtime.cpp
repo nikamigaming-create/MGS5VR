@@ -39,6 +39,7 @@ struct Instance {
     XrSystemProperties properties{XR_TYPE_SYSTEM_PROPERTIES};
     std::string runtime;
     bool refreshControl{};
+    bool touchPlusControllerProfile{};
     Instance() {
         log("OpenXR loading runtime and enumerating extensions");
         uint32_t count=0;
@@ -48,6 +49,8 @@ struct Instance {
         const bool d3d=std::any_of(extensions.begin(),extensions.end(),[](const auto& x){return std::strcmp(x.extensionName,XR_KHR_D3D11_ENABLE_EXTENSION_NAME)==0;});
         if(!d3d) throw std::runtime_error("OpenXR runtime does not expose XR_KHR_D3D11_enable");
         std::vector<const char*> enabled{XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
+        touchPlusControllerProfile=std::any_of(extensions.begin(),extensions.end(),[](const auto& x){return std::strcmp(x.extensionName,XR_META_TOUCH_CONTROLLER_PLUS_EXTENSION_NAME)==0;});
+        if(touchPlusControllerProfile)enabled.push_back(XR_META_TOUCH_CONTROLLER_PLUS_EXTENSION_NAME);
         refreshControl=std::any_of(extensions.begin(),extensions.end(),[](const auto& x){return std::strcmp(x.extensionName,XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME)==0;});
         if(refreshControl)enabled.push_back(XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
         XrInstanceCreateInfo info{XR_TYPE_INSTANCE_CREATE_INFO};
@@ -262,13 +265,15 @@ struct Session {
         fallbackSelect=action("fallback_select","Legacy controller select",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         fallbackBack=action("fallback_back","Legacy controller back",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         struct Profile { const char* name; const char* center; const char* menuButton; int layout; };
-        const Profile profiles[]={
+        std::vector<Profile> profiles{
             {"/interaction_profiles/oculus/touch_controller","/user/hand/right/input/thumbstick/click","/user/hand/left/input/menu/click",0},
             {"/interaction_profiles/valve/index_controller","/user/hand/right/input/thumbstick/click","/user/hand/left/input/b/click",1},
             {"/interaction_profiles/htc/vive_controller","/user/hand/right/input/trackpad/click","/user/hand/left/input/menu/click",2},
             {"/interaction_profiles/microsoft/motion_controller","/user/hand/right/input/thumbstick/click","/user/hand/left/input/menu/click",3},
             {"/interaction_profiles/khr/simple_controller","/user/hand/right/input/select/click","/user/hand/left/input/menu/click",4}
         };
+        if(instance.touchPlusControllerProfile)
+            profiles.push_back({"/interaction_profiles/meta/touch_controller_plus","/user/hand/right/input/thumbstick/click","/user/hand/left/input/menu/click",0});
         for(const auto& p:profiles){
             std::vector<XrActionSuggestedBinding> bindings={{grip,path("/user/hand/left/input/grip/pose")},
                 {grip,path("/user/hand/right/input/grip/pose")},{aim,path("/user/hand/left/input/aim/pose")},
