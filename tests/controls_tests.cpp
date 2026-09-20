@@ -44,6 +44,19 @@ struct NativeFixture {
 }
 int main(int argc,char** argv){
     {
+        GamepadSample menuInput{};
+        menuInput.leftX=10000;menuInput.leftY=26000;
+        menuInput.rightX=-13000;menuInput.rightY=19000;
+        menuInput.buttons=0xffff;menuInput.leftTrigger=menuInput.rightTrigger=255;
+        expect(cabinTitleGamepad(menuInput,true,false)==GamepadSample{},
+            "walking and pressing buttons at the spatial rack cannot navigate or confirm the hidden title menu");
+        GamepadSample tapeConfirm{};tapeConfirm.buttons=0x1000;
+        expect(cabinTitleGamepad(menuInput,true,true)==tapeConfirm,
+            "selecting Continue publishes only its native confirm while both sticks are held");
+        expect(cabinTitleGamepad(menuInput,false,false)==menuInput,
+            "ordinary menus and scripted gameplay keep their existing input outside the spatial rack");
+    }
+    {
         ControlBindings controls;LiveControls live;PhysicalControls physical;
         std::istringstream file("[settings]\nturn_mode=native_smooth\n");
         expect(live.stage(file).empty()&&live.pending(),"valid complete edit waits away from active bindings");

@@ -632,14 +632,6 @@ struct Session {
             }
         }
         pad.buttons|=menuBits;
-        if(controllerFrame.openingSelector&&openingFrame.pulse!=OpeningPulse::none){
-            // The physical rack owns only a short native menu pulse. Walking
-            // and the rest of the title controller path remain untouched.
-            pad.leftX=pad.leftY=pad.rightX=pad.rightY=0;
-            if(openingFrame.pulse==OpeningPulse::up)pad.buttons|=XINPUT_GAMEPAD_DPAD_UP;
-            else if(openingFrame.pulse==OpeningPulse::down)pad.buttons|=XINPUT_GAMEPAD_DPAD_DOWN;
-            else if(openingFrame.pulse==OpeningPulse::confirm)pad.buttons|=XINPUT_GAMEPAD_A;
-        }
         if(!nativeInput.exclusive){
             pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
             pad.rightX=static_cast<int16_t>(navigation[0]*32767);pad.rightY=static_cast<int16_t>(navigation[1]*32767);
@@ -769,6 +761,10 @@ struct Session {
         if(mounted)snapYaw=0;
         if(turn){snapYaw=std::remainder(snapYaw+turn,6.283185307f);log("Physical snap turn degrees="+std::to_string(-turn*57.2957795f));}
         controllerFrame.snapYaw=snapYaw;
+        // Apply LAST: the generic menu mapping otherwise overwrites the zero
+        // axes and moves native focus while the user walks around the cabin.
+        pad=cabinTitleGamepad(pad,controllerFrame.openingSelector,
+            openingFrame.pulse==OpeningPulse::confirm&&!utilityCenter&&!headToggle);
         gamepadMailbox().publish(pad,true,steadyMilliseconds());
         const auto hapticNow=steadyMilliseconds();
         const auto wheel=wheelMailbox().read(hapticNow);

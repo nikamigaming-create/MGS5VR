@@ -2,6 +2,12 @@
 #include <cmath>
 
 namespace mgs5vr {
+GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept {
+    if(!spatialTitle)return sample;
+    GamepadSample result{};
+    if(confirm)result.buttons=0x1000;
+    return result;
+}
 NativeControlSample NativeControls::update(const ControlBindings& bindings,const PhysicalControls& physical){
     NativeControlSample result;
     const bool toggle=bindings.active("system.native_buttons");

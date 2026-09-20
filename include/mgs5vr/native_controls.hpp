@@ -3,6 +3,9 @@
 #include "input_bridge.hpp"
 
 namespace mgs5vr {
+// A spatial rack owns title selection. Sticks, grips and face buttons must not
+// also navigate its hidden native menu; only a selected tape confirms it.
+GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept;
 struct NativeControlSample {
     GamepadSample gamepad{};
     bool selected{},exclusive{},changed{};

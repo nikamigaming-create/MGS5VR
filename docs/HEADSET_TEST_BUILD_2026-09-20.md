@@ -1,7 +1,10 @@
 # September 20 headset test build
 
-This candidate is ready for human headset testing. It is not an all-weapons,
-all-missions, or physical-headset pass. The simulator gameplay sweep is stopped.
+The initial headset candidate was rejected in physical testing: Continue was
+difficult to select, cabin movement was confusing, and the view was unstable.
+The v2 candidate corrects the input and camera faults listed below and needs a
+new physical test. It is not an all-weapons, all-missions, or physical-headset
+pass. The simulator gameplay sweep is stopped.
 
 ## Start testing
 
@@ -26,6 +29,24 @@ configuration without opening the game. A fresh September 20 launch reached
 the Oculus runtime on Meta Quest 3, a focused XR session, and both Touch
 controllers without restarting Steam. Gameplay acceptance belongs to the
 headset tester.
+
+## Cabin controls and v2 corrections
+
+Reach either controller to the Continue tape until it highlights, then squeeze
+that hand's trigger. Touching alone does not select it. The left stick moves
+the viewpoint within the sampled cabin boundary. Turn your head/body to look
+around; right-stick cabin turning is not implemented. Only Continue currently
+has an enabled tape action.
+
+The previous build sent cabin movement to the hidden native title menu too.
+That could move focus away from Continue. The v2 build suppresses those native
+inputs while the rack owns selection, and sends only the tape's confirm pulse.
+It also corrects reversed strafing, preserves the walking offset when the right
+controller loses tracking, and stops horizontal wall clearance from pushing
+the viewpoint downward near the ceiling.
+
+Installed v2 DLL SHA-256:
+`980bd469817692d64d6e849d5762a6359baa0b3306577c96ee19303b030e98bf`.
 
 ## Included changes to test
 
