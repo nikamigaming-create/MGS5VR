@@ -26,14 +26,16 @@ std::optional<IdroidPose> trackedIdroidPose(const HeadCameraSample& frame) noexc
 
     // The screen is on the anatomical palm side: the verified right-hand
     // palm frame points into the palm on +X, so its outward display normal is
-    // -X. Keep the display axes in that same frame instead of replacing the
+    // -X. Anatomical +Y points toward the wrist, so screen up is -Y
+    // (toward the fingers) and screen right is -Z. Keep these device axes
+    // in the same frame instead of replacing the
     // hand's palm side with a head-facing billboard. The raw-grip path remains
     // a safe readable fallback before the final skin publication is available.
     std::optional<Vec3> normal;
     Vec3 xDirection{};
     if(palmTracked){
         normal=unit(rotate(attachment.orientation,{-1,0,0}));
-        xDirection=rotate(attachment.orientation,{0,0,1});
+        xDirection=rotate(attachment.orientation,{0,0,-1});
     }else{
         normal=unit(head.position-attachment.position);
         xDirection=rotate(attachment.orientation,{1,0,0});
@@ -57,18 +59,15 @@ std::optional<IdroidPose> trackedIdroidPose(const HeadCameraSample& frame) noexc
         0,0,0,1};
     const auto orientation=nativeAffinePose(axes);
     if(!orientation)return {};
-    // Keep the emitted native image upright in the user's normal look
-    // position. The palm-side frame already supplies the correct display
-    // normal; rotating it to match the handset's diagonal antenna also
-    // rotates every native menu and the aim marker, which is the crooked
-    // presentation we explicitly do not want. Move the screen down its own
-    // upright axis toward the round front emitter instead.
-    const auto displayOrientation=orientation->orientation;
+    const auto attachmentOrientation=orientation->orientation;
+    // With the fingers up and palm facing the viewer, these axes give an
+    // upright display without adding a camera-dependent rotation.
+    const auto displayOrientation=attachmentOrientation;
     const auto displayNormal=rotate(displayOrientation,{0,0,1});
-    const auto displayUp=rotate(displayOrientation,{0,1,0});
+    const auto attachmentUp=rotate(attachmentOrientation,{0,1,0});
     const auto body=Pose{displayOrientation,attachment.position+displayNormal*(palmTracked?.012f:.035f)};
     const auto screen=Pose{body.orientation,body.position+displayNormal*(palmTracked?.012f:.022f)
-        +(palmTracked?displayUp*-.045f:Vec3{})};
+        +(palmTracked?attachmentUp*.045f:Vec3{})};
     if(!valid(body)||!valid(screen))return {};
     return IdroidPose{body,screen};
 }

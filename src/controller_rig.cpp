@@ -547,6 +547,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     frame.controllers.strikeCurl=meleeCurl;
     // Free fingers follow controller curls. Preserve authored contact around a
     // weapon and during reloads, including when the support hand is blending.
+    // The native iDroid also owns its cupped right-hand contact animation;
+    // free-hand curl must not straighten those fingers through the handset.
     // Read native locals from the saved pose so updating one joint cannot alter
     // the native reference for its children.
     constexpr std::array<std::array<size_t,5>,2> fingers{{{21,24,27,31,34},{37,40,43,47,50}}};
@@ -559,7 +561,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // actually held. This keeps both hands on the device rather than
         // leaving an open/free hand beside a floating model.
         const float contact=side
-            ?((binocularHeld||((frame.controllers.weaponReady)&&(firearmActive||throwableActive)))?1.f:0.f)
+            ?((binocularHeld||(frame.menuOpen&&frame.menuIdroid)||((frame.controllers.weaponReady)&&(firearmActive||throwableActive)))?1.f:0.f)
             :(binocularSupport?1.f:supportBlend);
         // Native firearm contact owns the authored hand during reloads. The
         // binocular is a VR-only physical item, so its tracked hands still

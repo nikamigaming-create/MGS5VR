@@ -187,9 +187,14 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         // locomotion can continue underneath the tracked display. Pause keeps
         // the old anchored camera and therefore retains its native behavior.
         if(!nativeIdroidOpen_)nativePose=menuNative_;
-        result.menuOpen=true;result.menuPanel=menuPanel_;
+        result.menuOpen=true;result.menuIdroid=nativeIdroidOpen_;result.menuPanel=menuPanel_;
         result.playerOwner=playerOwner_;result.playerHead=lastView_.playerHead;
         result.playerSequence=lastView_.playerSequence;
+        // Paused native menus keep the last skin on screen. Keep its palm
+        // attachment too; a raw controller fallback would detach the display
+        // from that still-visible hand. A fresh skin replaces these below.
+        result.renderedPalms=lastView_.renderedPalms;
+        result.renderedPalmTracked=lastView_.renderedPalmTracked;
     }else if(requirePlayerHead_&&(pending_||active_||awaitingPlayer_)){
         const auto same=[](Pose a,Pose b){
             return a.position.x==b.position.x&&a.position.y==b.position.y&&a.position.z==b.position.z
@@ -319,7 +324,13 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(!std::isfinite(length)||length<0.5)return result;
     q={static_cast<float>(q.x/length),static_cast<float>(q.y/length),static_cast<float>(q.z/length),static_cast<float>(q.w/length)};
     result.activation=activation_;result.applied=valid(result.nativePose);
-    if(result.applied){result.controllers=controllers_;lastView_=result;}
+    if(result.applied){
+        result.controllers=controllers_;
+        // Menu state can arrive between input publications. The iDroid owns
+        // the hand immediately, even if the last input still held an optic.
+        if(result.menuOpen)result.controllers.optic={};
+        lastView_=result;
+    }
     return result;
 }
 HeadCamera& headCamera(){static auto* instance=new HeadCamera;return *instance;}

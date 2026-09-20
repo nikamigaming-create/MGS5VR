@@ -1180,14 +1180,23 @@ int main(){
         &&same(rotate(afterMenuRebase.nativePose.orientation,{0,0,1}),rotate(beforeMenuRebase.nativePose.orientation,{0,0,1})),
            "closing iDroid after a reference-space change preserves the gameplay viewpoint");
     menuEpoch.setNativeMenuOpen(true,true);
-    const auto beforeMenuPause=menuEpoch.resolve(11,thirdPerson,110);
+    auto beforeMenuPause=menuEpoch.resolve(11,thirdPerson,110);
+    beforeMenuPause.renderedPalms[1]=Pose{{0,0,.258819f,.9659258f},{2,1,3}};
+    beforeMenuPause.renderedPalmTracked[1]=true;
     expect(menuEpoch.publishRigFrame(11,22,thirdPerson,beforeMenuPause),"menu accepts its final live skin publication");
+    menuEpoch.resolve(11,thirdPerson,110);
     menuHands.predictedXrTime=11000;
+    menuHands.optic.held=true;
     menuEpoch.trackStereo(Pose{{0,.258819f,0,.9659258f},{3.1f,1,-2}},rigEyes,true,400,menuHands);
     const auto afterMenuPause=menuEpoch.resolve(11,thirdPerson,400);
     expect(afterMenuPause.applied&&afterMenuPause.menuOpen&&!afterMenuPause.rigSequence
         &&!menuEpoch.status().suspended&&afterMenuPause.trackingSequence>beforeMenuPause.trackingSequence,
         "paused skin publication cannot black out a live tracked menu or masquerade as a current rig");
+    expect(afterMenuPause.renderedPalmTracked[1]
+        &&same(afterMenuPause.renderedPalms[1].position,beforeMenuPause.renderedPalms[1].position)
+        &&same(rotate(afterMenuPause.renderedPalms[1].orientation,{0,1,0}),rotate(beforeMenuPause.renderedPalms[1].orientation,{0,1,0}))
+        &&!afterMenuPause.controllers.optic.held,
+        "paused iDroid keeps its visible palm attachment and hides an optic from an older input publication");
     menuEpoch.setNativeMenuOpen(true,false);
     const auto helpMenu=menuEpoch.resolve(11,thirdPerson,400);
     expect(helpMenu.applied&&helpMenu.menuOpen&&!helpMenu.menuIdroid
@@ -1662,16 +1671,35 @@ int main(){
         auto& right=frame.controllers.hands[1];
         right.gripTracked=true;right.grip=Pose{{},{0,0,-.35f}};
         right.aimTracked=true;right.aim=Pose{{},{0,0,-.1f}};
+        const auto idroid=trackedIdroidPose(frame);
+        expect(idroid&&near(rotate(idroid->screen.orientation,{0,0,1}).z,-1)
+            &&near(rotate(idroid->screen.orientation,{0,1,0}).y,1)
+            &&near(rotate(idroid->screen.orientation,{1,0,0}).x,-1),
+            "iDroid screen remains upright without an extra half-turn");
         const auto idroidHit=trackedIdroidRay(frame);
         expect(idroidHit&&near(idroidHit->hit.u,.5f)&&near(idroidHit->hit.v,.5f)
             &&idroidHit->hit.x==idroidScreenPixelWidth/2&&idroidHit->hit.y==idroidScreenPixelHeight/2,
             "iDroid ray starts at the right-hand aim pose and lands on the normal screen projection");
-        right.aim.position={.04f,0,-.1f};
+        right.aim.position={-.04f,0,-.1f};
         const auto moved=trackedIdroidRay(frame);
-        expect(moved&&moved->hit.u>.5f&&moved->hit.u<1.f,
+        expect(moved&&moved->hit.u<.5f&&moved->hit.u>0.f,
             "iDroid ray follows aim origin across the display instead of the grip center");
         right.aimTracked=false;
         expect(!trackedIdroidRay(frame),"iDroid ray fails closed when the aim pose is not tracked");
+        frame.renderedPalmTracked[1]=true;
+        frame.renderedPalms[1]=Pose{{},{0,0,-.35f}};
+        const auto palmDisplay=trackedIdroidPose(frame);
+        expect(palmDisplay&&same(rotate(palmDisplay->screen.orientation,{0,1,0}),{0,-1,0})
+            &&same(rotate(palmDisplay->screen.orientation,{1,0,0}),{0,0,-1})
+            &&same(rotate(palmDisplay->screen.orientation,{0,0,1}),{-1,0,0}),
+            "iDroid faces out of the palm with screen up toward the fingers");
+        const Pose move{{.3f,.4f,0,.8660254f},{1,2,3}};
+        frame.renderedPalms[1]=compose(move,frame.renderedPalms[1]);
+        const auto movedDisplay=trackedIdroidPose(frame);
+        expect(movedDisplay&&palmDisplay
+            &&same(movedDisplay->screen.position,compose(move,palmDisplay->screen).position)
+            &&same(rotate(movedDisplay->screen.orientation,{0,1,0}),rotate(move.orientation,{0,-1,0})),
+            "iDroid center and upright axes travel rigidly with the rendered palm");
     }
     const Pose tilted{{0.5f,0,0,0.8660254f},{1,1.7f,2}};
     const auto screen=recenteredScreen(tilted,6);
