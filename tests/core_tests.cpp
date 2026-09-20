@@ -784,6 +784,29 @@ int main(){
     const auto panelClip=[](const std::array<float,16>& m,float x,float y){
         const float w=x*m[3]+y*m[7]+m[15];
         return Vec3{(x*m[0]+y*m[4]+m[12])/w,(x*m[1]+y*m[5]+m[13])/w,(x*m[2]+y*m[6]+m[14])/w};};
+    {
+        auto authored=identityMatrix;authored[0]=-1.19531f;authored[5]=2.12499f;
+        auto eye=authored;eye[0]=-.726542f;eye[5]=.8391f;
+        auto canvas=identityMatrix;canvas[0]=-.015625f;canvas[5]=.02777778f;
+        const float inheritedAspect=(-eye[5]/eye[0])/(-authored[5]/authored[0]);
+        auto replayCanvas=canvas;replayCanvas[5]*=inheritedAspect;
+        const auto restored=nativeUiCanvasProjection(replayCanvas,authored,eye);
+        // The status anchor is authored on a 128 x 72 canvas. An eye replay
+        // must not move it upward by 8 cm on a 1.2 m layout or squash its text.
+        const auto anchor=panelClip(restored,-46.08f,-25.2f);
+        expect(near(anchor.x,.72f)&&near(anchor.y,-.70f),
+            "eye viewport aspect cannot displace the authored wrist HUD anchor");
+        expect(near(restored[5],canvas[5])&&near(restored[0],canvas[0]),
+            "native HUD retains its authored text proportions under wide eye replay");
+        auto zoomedEye=eye;zoomedEye[0]*=4;zoomedEye[5]*=4;
+        expect(nativeUiCanvasProjection(replayCanvas,authored,zoomedEye)==restored,
+            "canvas correction depends on aspect, not scene magnification");
+        expect(nativeUiCanvasProjection(canvas,authored,authored)==canvas,
+            "unchanged viewport preserves every native canvas projection term");
+        auto invalidEye=eye;invalidEye[0]=0;
+        expect(nativeUiCanvasProjection(canvas,authored,invalidEye)==canvas,
+            "invalid scene projection cannot corrupt a native UI canvas");
+    }
     const Pose spatialPanel{{0,1,0,0},{0,0,2}};
     const auto uiProjection=uiPanelProjection(identityMatrix,identityMatrix,squareEye,spatialPanel,0.8f,0.4f);
     expect(uiProjection&&same(panelClip(*uiProjection,1,1),{0.2f,0.1f,0.015f}),

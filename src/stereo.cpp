@@ -21,6 +21,20 @@ std::optional<NativeProjectionScales> nativeProjectionScales(float focal,float a
     if(!std::isfinite(result.focal)||!std::isfinite(result.aspect)||result.focal<=0||result.aspect<=0)return {};
     return result;
 }
+std::array<float,16> nativeUiCanvasProjection(const std::array<float,16>& uiProjection,
+    const std::array<float,16>& authoredProjection,const std::array<float,16>& eyeProjection) noexcept{
+    auto result=uiProjection;
+    const auto aspect=[](const auto& p){return -p[5]/p[0];};
+    if(authoredProjection[0]>=-.00001f||eyeProjection[0]>=-.00001f
+       ||authoredProjection[5]<=.00001f||eyeProjection[5]<=.00001f)return result;
+    const float correction=aspect(authoredProjection)/aspect(eyeProjection);
+    if(!std::isfinite(correction)||correction<=0)return result;
+    // Native layout cameras inherit the scene viewport's aspect scalar.
+    // Replaying a wide eye changes that scalar, shrinking native HUD Y and
+    // moving its bottom-right anchor off the wrist even with correct bones.
+    for(const size_t index:{1u,5u,9u,13u})result[index]*=correction;
+    return result;
+}
 std::optional<std::array<float,16>> uiPanelProjection(const std::array<float,16>& uiProjection,
     const std::array<float,16>& eyeView,EyeFov fov,Pose panel,float width,float height,float centerX,float centerY){
     if(!valid(panel)||!valid(fov)||!std::isfinite(width)||!std::isfinite(height)||width<=0||height<=0

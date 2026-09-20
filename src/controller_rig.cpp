@@ -607,16 +607,16 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(frame.controllers.hands[0].gripTracked&&renderedPalmTracked[0]){
         const auto wrist=compose(*root,bone(q,p,8));
         const auto elbow=compose(*root,bone(q,p,7));
-        // Keep the always-on status strip on the original anatomical palm
-        // socket. A later forearm-segment reconstruction looked mathematically
-        // tidy but moved the visible strip off the arm after the wrist/roll
-        // changes. The palm socket plus the original 35% elbow-to-wrist anchor
-        // is the stable presentation used by the first aligned build.
-        auto panel=compose(renderedPalms[0],Pose{{0,-0.70710678f,0,0.70710678f},{}});
-        panel.position=wrist.position+(elbow.position-wrist.position)*0.35f
-            +rotate(panel.orientation,{0,0,0.025f});
-        frame.wristPanel=panel;
-        frame.wristPanelTracked=true;
+        // Status belongs to the forearm, not the independently articulated
+        // palm. The anatomical left palm's -X is the dorsal side; the native
+        // wrist bone's authored Y is not that surface after the grip solve.
+        // Project the dorsal direction across the solved forearm segment so
+        // the text lies along the skin instead of standing above it.
+        if(auto panel=forearmPanel(elbow,wrist,rotate(renderedPalms[0].orientation,{-1,0,0}))){
+            panel->position=panel->position+(elbow.position-wrist.position)*.1f;
+            frame.wristPanel=*panel;
+            frame.wristPanelTracked=true;
+        }
     }
     if(binocularHeld){
         // The arm solve can constrain the wrist at a surface or reach limit.

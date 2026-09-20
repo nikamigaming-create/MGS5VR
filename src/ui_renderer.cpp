@@ -282,7 +282,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             if(nativeFourWay){
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto savedView=field<std::array<float,16>>(state,0x200);
-                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,
+                const auto mapped=uiPanelProjection(nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection),executing.view,executing.eye.view.fov,
                     executing.picker,executing.pickerWidth,executing.pickerWidth*9.f/16.f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
@@ -341,7 +341,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 const auto panel=expanded?executing.picker:
                     contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
                 const float layoutWidth=commandsPicker?.6f:equipmentPicker?executing.pickerWidth:1.2f;
-                const auto mapped=uiPanelProjection(saved,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
+                const auto mapped=uiPanelProjection(nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection),executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
                     expanded?0.f:contextAction?.04f:.72f,
                     expanded?0.f:contextAction?-.52f:-.70f);
                 if(mapped){
@@ -484,12 +484,14 @@ uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerD
 uint64_t nativeCommandsDrawTime() noexcept {return enabled.load()?commandsDrawTime.load():0;}
 Pose wristPickerPose(const HeadCameraSample& rig) noexcept{
     const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
-    // The real native selector belongs to the same authored forearm surface
-    // as the status HUD. Keep its origin on the wrist; the old head-relative
-    // lift and frustum fitting made the four-way cards hover in front of the
-    // player instead of staying attached to the arm.
-    const auto anchor=rig.wristPanel.position+rotate(rig.wristPanel.orientation,{0,0,.035f});
-    return Pose{head.orientation,anchor};
+    // Unfold the real cards above their forearm anchor. Fit the complete native
+    // panel into both eyes instead of clipping its text at close wrist range.
+    const auto anchor=rig.wristPanel.position+rotate(head.orientation,{0,rig.controllers.wristSelectorHeight,0});
+    const std::array<EyeView,2> eyes{{
+        {nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),rig.views[0].fov},
+        {nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose),rig.views[1].fov}}};
+    const auto width=rig.controllers.wristPickerWidth;
+    return fitWristPanel(head,anchor,eyes,width,width*9.f/16.f).value_or(Pose{head.orientation,anchor});
 }
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const std::array<float,16>& projection,const HeadCameraSample& rig,
     const std::array<float,16>& authoredView,const std::array<float,16>& authoredProjection,HudView hudView){

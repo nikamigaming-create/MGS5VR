@@ -3,6 +3,10 @@
 
 namespace mgs5vr {
 struct EyeFov { float left{},right{},up{},down{}; };
+// Undo the replayed scene viewport's aspect change on native layout cameras.
+// The UI canvas keeps its authored coordinates before mounting in the world.
+std::array<float,16> nativeUiCanvasProjection(const std::array<float,16>& uiProjection,
+    const std::array<float,16>& authoredProjection,const std::array<float,16>& eyeProjection) noexcept;
 std::optional<std::array<float,16>> uiPanelProjection(const std::array<float,16>& uiProjection,
     const std::array<float,16>& eyeView,EyeFov fov,Pose panel,float width,float height,
     float centerX=0,float centerY=0);
