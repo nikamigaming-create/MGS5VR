@@ -1,4 +1,5 @@
 #include "mgs5vr/native_actions.hpp"
+#include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/animal_interaction.hpp"
 #include "mgs5vr/small_animal.hpp"
@@ -6,6 +7,7 @@
 #include <MinHook.h>
 #include <intrin.h>
 #include <array>
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <fstream>
@@ -32,6 +34,7 @@ std::unordered_set<uint64_t> traced;
 std::atomic_bool enabled{};
 std::mutex requestMutex;
 std::filesystem::path requestPath,resultPath,tracePath;
+bool externalCommands{};
 uint64_t checkedAt{};
 thread_local unsigned depth{};
 template<class T> T read(uintptr_t address){
@@ -76,6 +79,23 @@ void pump(void* state){
     const auto now=GetTickCount64();
     if(!lock.owns_lock()||now-checkedAt<250)return;
     checkedAt=now;
+    if(takeNativeIdroidClose()){
+        const int top=getTop(state);
+        // Stop is the terminal's own cleanup path. CloseMbDvcTerminal only
+        // sets a deferred close flag, which the forced FOB tutorial ignores.
+        // Do not mark any tutorial complete or write progression variables.
+        constexpr char closeScript[]=
+            "if type(TppUiCommand)=='table' and type(TppUiCommand.IsMbDvcTerminalOpened)=='function' "
+            "and type(TppUiCommand.StopMbDvcTerminal)=='function' and TppUiCommand.IsMbDvcTerminalOpened() "
+            "then TppUiCommand.StopMbDvcTerminal(); return 'requested' end return 'already closed'";
+        int closeStatus=load(state,closeScript,sizeof(closeScript)-1,"@mgs5vr-idroid-back-recovery");
+        if(!closeStatus)closeStatus=original(state,0,1,0);
+        size_t length{};const auto* result=getString(state,-1,&length);
+        log("Native iDroid held-Back recovery status="+std::to_string(closeStatus)+": "
+            +(result?std::string(result,std::min(length,size_t{300})):"no result"));
+        setTop(state,top);
+    }
+    if(!externalCommands)return;
     traceCommands();
     std::error_code error;
     if(!std::filesystem::exists(requestPath,error))return;
@@ -124,7 +144,7 @@ template<size_t N> bool matches(uintptr_t address,const std::array<unsigned char
         &&count==N&&bytes==expected;
 }
 }
-void installNativeActions(uintptr_t base,const std::filesystem::path& folder){
+void installNativeActions(uintptr_t base,const std::filesystem::path& folder,bool allowExternalCommands){
     if(!matches(base+0x1a116c0,std::array<unsigned char,13>{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x40,0x41,0x8b,0xf8})
        ||!matches(base+0x1a178e0,std::array<unsigned char,9>{0x48,0x83,0xec,0x38,0x48,0x89,0x54,0x24,0x20})
        ||!matches(base+0x1a112e0,std::array<unsigned char,13>{0x48,0x8b,0x41,0x10,0x48,0x2b,0x41,0x18,0x48,0xc1,0xf8,0x04,0xc3})
@@ -138,7 +158,9 @@ void installNativeActions(uintptr_t base,const std::filesystem::path& folder){
     auto* address=reinterpret_cast<void*>(base+0x1a116c0);
     if(MH_CreateHook(address,reinterpret_cast<void*>(&call),reinterpret_cast<void**>(&original))!=MH_OK||MH_EnableHook(address)!=MH_OK)
         throw std::runtime_error("Cannot install native action queue");
-    enabled.store(true);log("Local native action queue installed on the game's Lua transaction thread");
+    externalCommands=allowExternalCommands;
+    enabled.store(true);
+    log(externalCommands?"Native control recovery and local action queue installed":"Native control recovery installed; external actions disabled");
 }
-void stopNativeActions() noexcept{enabled.store(false);}
+void stopNativeActions() noexcept{enabled.store(false);requestNativeIdroidClose(false);}
 }

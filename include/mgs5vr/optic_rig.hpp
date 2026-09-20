@@ -149,6 +149,8 @@ private:
 // Independent native scene camera. It follows the device even while carried;
 // neither HMD eye pose nor its field of view is an input or an output.
 std::optional<EyeView> binocularSceneView(const OpticPose& optic,float magnification);
+// Only the eye behind the real exit pupil receives its magnified image.
+bool binocularEyeVisible(const OpticPose& optic,Pose eye);
 
 // Validate tracking without moving either native head-derived stereo origin.
 // The independent device scene supplies magnification inside its aperture.

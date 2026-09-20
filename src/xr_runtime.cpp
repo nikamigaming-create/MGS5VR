@@ -111,6 +111,7 @@ struct Session {
     std::optional<std::filesystem::file_time_type> handledControlsWrite;
     uint64_t controlsPollAt{};
     NativeControls nativeControls;
+    IdroidBackRecovery idroidBackRecovery;
     RigInput rigControls;
     RigOptics opticsControls;
     bool binocularSelected{};
@@ -379,11 +380,11 @@ struct Session {
     }
     void syncInput(XrTime time,Pose& head,std::array<EyeView,2>& views,bool stereoTracked){
         controllerFrame={};controllerFrame.snapYaw=snapYaw;
-        if(!focused){nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
         if(!priorFocused){
             snapControls.reset();
@@ -472,6 +473,9 @@ struct Session {
             log(nativeInput.selected?"Native buttons ON: all XInput controls; release inputs before use":"Native buttons OFF: normal VR bindings; release inputs before use");
         }
         const auto activeControl=[&](std::string_view name){return controls.active(name);};
+        if(idroidBackRecovery.update(liveIdroid,activeControl("menus.back"),!nativeInput.exclusive,now))
+            requestNativeIdroidClose(true);
+        if(!liveIdroid||nativeInput.exclusive)requestNativeIdroidClose(false);
         const bool manualToggle=headCamera().available()&&activeControl("system.toggle_vr");
         if(manualToggle||nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)automaticEntryDone=true;
         if(loading&&!title&&(nativeStatus.active||nativeStatus.pending)){

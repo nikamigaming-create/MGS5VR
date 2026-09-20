@@ -69,6 +69,7 @@ struct HeadCameraSample {
     Pose wristPanel{}; // World-space forearm surface from this skin publication.
     bool wristPanelTracked{};
     bool menuOpen{};
+    bool menuIdroid{};
     Pose menuPanel{};
     WeaponScopeSample weaponScope{}; // Same solved weapon/skin publication as this eye pair.
     // Final native anatomical palm frames from the published first-person

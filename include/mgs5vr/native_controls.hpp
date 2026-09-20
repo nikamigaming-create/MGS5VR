@@ -6,6 +6,19 @@ namespace mgs5vr {
 // A spatial rack owns title selection. Sticks, grips and face buttons must not
 // also navigate its hidden native menu; only a selected tape confirms it.
 GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept;
+// Keep native Back taps intact. A deliberate held Back can dismiss an iDroid
+// terminal whose tutorial has disabled its ordinary cancel path.
+class IdroidBackRecovery {
+public:
+    bool update(bool idroidOpen,bool back,bool available,uint64_t time) noexcept;
+    void suspend() noexcept {held_=sent_=false;releaseRequired_=true;}
+private:
+    uint64_t since_{},lastTime_{};
+    bool held_{},sent_{},releaseRequired_{true};
+};
+// Transfer a short-lived recovery request from XR input to the native Lua job.
+void requestNativeIdroidClose(bool requested) noexcept;
+bool takeNativeIdroidClose() noexcept;
 struct NativeControlSample {
     GamepadSample gamepad{};
     bool selected{},exclusive{},changed{};

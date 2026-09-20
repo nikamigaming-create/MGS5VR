@@ -44,6 +44,34 @@ struct NativeFixture {
 }
 int main(int argc,char** argv){
     {
+        IdroidBackRecovery recovery;
+        expect(!recovery.update(true,true,true,100)&&!recovery.update(true,true,true,1000),
+            "held Back at menu entry cannot dismiss a newly opened iDroid");
+        recovery.update(true,false,true,1010);
+        expect(!recovery.update(true,true,true,1020)&&!recovery.update(true,true,true,1200),
+            "ordinary Back taps remain native submenu navigation");
+        recovery.update(true,false,true,1210);
+        recovery.update(true,true,true,1220);
+        expect(!recovery.update(true,true,true,1969)&&recovery.update(true,true,true,1970)
+            &&!recovery.update(true,true,true,2200),"held Back requests one native recovery after 750 ms");
+        recovery.update(false,true,true,2210);recovery.update(true,true,true,2400);
+        expect(!recovery.update(true,true,true,3400),"holding Back across close/reopen cannot close the new terminal");
+        recovery.update(true,false,true,3410);recovery.update(true,true,true,3420);
+        recovery.update(true,true,false,3800);recovery.update(true,true,true,4000);
+        expect(!recovery.update(true,true,true,5000),"focus loss cancels recovery and requires fresh Back");
+        recovery.update(true,false,true,5010);recovery.update(true,true,true,5020);
+        expect(!recovery.update(true,true,true,50)&&!recovery.update(true,true,true,900),
+            "clock reset cannot manufacture a held-Back recovery");
+        Fixture original;original.mode=ControlContext::menus;original.tick();original.tick();
+        original.input.buttons[1]=1;original.tick();
+        expect(original.active("menus.back"),
+            "original right B still sends native Back without a new binding");
+        original.input={};original.tick();original.input.buttons[4]=1;original.tick();
+        original.input={};original.tick(120);
+        expect(original.active("system.idroid")&&!original.active("system.pause"),
+            "original left Menu tap still opens iDroid");
+    }
+    {
         GamepadSample menuInput{};
         menuInput.leftX=10000;menuInput.leftY=26000;
         menuInput.rightX=-13000;menuInput.rightY=19000;

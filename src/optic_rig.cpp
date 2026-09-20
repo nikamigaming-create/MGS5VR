@@ -251,6 +251,14 @@ std::optional<EyeView> binocularSceneView(const OpticPose& optic,float magnifica
     return EyeView{objective,{-halfAngle,halfAngle,halfAngle,-halfAngle}};
 }
 
+bool binocularEyeVisible(const OpticPose& optic,Pose eye){
+    if(!binocularSceneView(optic,1.f)||!finitePose(eye))return false;
+    const auto local=compose(inverse(optic.rightEyepiece),eye).position;
+    if(local.z<binocularEyeRelief*.5f||local.z>binocularEyeRelief*2.f)return false;
+    return local.x*local.x+local.y*local.y<=binocularOcularRadius*binocularOcularRadius
+        &&facing(optic.rightEyepiece,eye)>.75f;
+}
+
 bool validateBinocularViews(const OpticSample& optic,const Pose& head,
     const std::array<EyeView,2>& views){
     if(!optic.active||optic.pose.kind!=OpticKind::binocular||!optic.pose.tracked

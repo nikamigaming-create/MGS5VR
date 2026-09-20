@@ -1,7 +1,25 @@
 #include "mgs5vr/native_controls.hpp"
 #include <cmath>
+#include <atomic>
 
 namespace mgs5vr {
+namespace {std::atomic_uint64_t idroidCloseRequestedAt{};}
+void requestNativeIdroidClose(bool requested) noexcept {
+    idroidCloseRequestedAt.store(requested?steadyMilliseconds():0);
+}
+bool takeNativeIdroidClose() noexcept {
+    const auto requested=idroidCloseRequestedAt.exchange(0),now=steadyMilliseconds();
+    return requested&&now>=requested&&now-requested<=1000;
+}
+bool IdroidBackRecovery::update(bool idroidOpen,bool back,bool available,uint64_t time) noexcept {
+    if(!available||!idroidOpen||time<lastTime_){suspend();lastTime_=time;return false;}
+    lastTime_=time;
+    if(!back){held_=sent_=releaseRequired_=false;return false;}
+    if(releaseRequired_)return false;
+    if(!held_){held_=true;since_=time;}
+    if(!sent_&&time-since_>=750){sent_=true;return true;}
+    return false;
+}
 GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept {
     if(!spatialTitle)return sample;
     GamepadSample result{};

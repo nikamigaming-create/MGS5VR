@@ -3,6 +3,6 @@
 #include <filesystem>
 namespace mgs5vr {
 // Local development requests run at the end of a native Lua transaction.
-void installNativeActions(uintptr_t imageBase,const std::filesystem::path& folder);
+void installNativeActions(uintptr_t imageBase,const std::filesystem::path& folder,bool allowExternalCommands=false);
 void stopNativeActions() noexcept;
 }
