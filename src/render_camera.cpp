@@ -336,11 +336,14 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     sceneContextType.store(context->GetType());
     NativeRestore saved(source.grCamera,source.viewport);insideStereo=true;stereoTarget=field<uintptr_t>(render,layout.renderTarget);
     alignas(16) std::array<float,16> authoredView{},authoredProjection{};
+    // Every native UI camera inherits this viewport's aspect, including the
+    // field HUD. Preserve its canvas projection before any eye replay changes
+    // the scalar; a title-only snapshot leaves gameplay correction disabled.
+    std::memcpy(authoredProjection.data(),saved.viewportMatrices.data(),sizeof(authoredProjection));
     if(source.pair.sample.controllers.frontEnd){
         // Title layout retains the native publication camera; the stereo
         // replay alone supplies the tracked cabin cameras.
         authoredView=source.pair.view;
-        std::memcpy(authoredProjection.data(),saved.viewportMatrices.data(),sizeof(authoredProjection));
     }
     mgs5vr::publishOpticMarkerFrame(source.pair.sample);
     const auto markerSnapshot=mgs5vr::opticWaypoints();
