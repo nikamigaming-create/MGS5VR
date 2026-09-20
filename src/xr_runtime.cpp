@@ -1018,6 +1018,11 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
                     if(leftReady&&rightReady){
                         for(size_t n=0;n<2;++n)eyeScreens[n]->publishPrepared(consumer.texture(),consumer.frame(),static_cast<uint32_t>(n));
                         eyeFrames=metadata;
+                        // The loading panel moved nearer while the frozen scene
+                        // was retained. Restore its normal distance before
+                        // clearing that state, or a later menu uses theatre
+                        // dimensions on the old near plane and crops its edges.
+                        if(surroundTransition)screenPose=recenteredScreen(trackedHead,config.distanceMeters);
                         surroundFrames=metadata;haveSurround=true;surroundTransition=false;
                     }
                 }
