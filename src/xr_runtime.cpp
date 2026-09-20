@@ -714,6 +714,8 @@ struct Session {
             // basis. Rotating this stick again doubles physical/snap heading.
         }else if(nativeStatus.nativeMenuOpen||nativeStatus.awaitingPlayer){rigControls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();}
         else {rigControls.reset();opticsControls.reset();opticGate.reset();commandsControls.suspend();}
+        requestNativeEquipmentPreview(controllerFrame.equipmentOpen&&!controllerFrame.equipmentCategory
+            &&rigInput&&!nativeInput.exclusive&&!nativeStatus.nativeMenuOpen);
         if(liveIdroid&&!nativeInput.exclusive)
             locomotionAvailable=mode==TravelMode::onFoot&&!center&&!headToggle&&!utilityCenter;
         if(locomotionAvailable){

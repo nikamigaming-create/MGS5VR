@@ -34,6 +34,11 @@ std::atomic_uint64_t reconModelGroupsHidden{};
 using TitleFn=void(*)(void*);
 TitleFn originalTitleShow{},originalTitleUpdate{};
 TitleFn originalStartShow{};
+TitleFn originalEquipmentUpdate{},openEquipmentOverview{},closeEquipmentOverview{},stopEquipmentCloseAnimation{};
+using UiLayerFn=void(*)(void*,void*);
+UiLayerFn activateEquipmentLayer{};
+std::atomic_uint64_t equipmentPreviewRequestedAt{};
+void* equipmentPreviewOwner{}; // Accessed only on the native equipment update.
 std::atomic_uintptr_t titleMenu{};
 std::atomic_uint64_t titleUpdatedAt{};
 uintptr_t base{};
@@ -80,6 +85,40 @@ std::atomic_int diagnosticHiddenOrder{-1};
 
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
+void equipmentUpdate(void* object){
+    const auto requested=equipmentPreviewRequestedAt.load(),now=steadyMilliseconds();
+    const bool preview=enabled.load()&&spatialEnabled&&requested&&now>=requested&&now-requested<250
+        &&headCamera().active()&&menuState.load()==0;
+    // Never retain a pointer across native object replacement. A previous
+    // scene's owner may already have been destroyed.
+    if(equipmentPreviewOwner&&equipmentPreviewOwner!=object)equipmentPreviewOwner=nullptr;
+    if(equipmentPreviewOwner&&(!preview||!field<uint8_t>(object,0x2c4)||field<uint32_t>(object,0x2c0)!=3)){
+        // Once native navigation advances out of idle it owns the same layer.
+        // Do not tear down a category that opened between XR publications.
+        if(field<uint8_t>(object,0x2c4)&&field<uint32_t>(object,0x2c0)==3)closeEquipmentOverview(object);
+        equipmentPreviewOwner=nullptr;
+        log("Native equipment category preview relinquished");
+    }
+    // Back has already released the native category. State 9 only waits for
+    // its four outgoing card animations; finish those through the game's own
+    // animation routine, then let the normal update complete its cleanup.
+    if(preview&&stopEquipmentCloseAnimation&&field<uint8_t>(object,0x2c4)
+        &&field<uint32_t>(object,0x2c0)==9)stopEquipmentCloseAnimation(object);
+    originalEquipmentUpdate(object);
+    if(preview&&!equipmentPreviewOwner&&openEquipmentOverview&&closeEquipmentOverview&&activateEquipmentLayer
+        &&field<uint8_t>(object,0x2c4)&&field<uint32_t>(object,0x2c0)==3
+        &&field<uintptr_t>(object,0x130)&&field<uintptr_t>(object,0x110)
+        &&field<uintptr_t>(object,0xc0)&&field<uintptr_t>(object,0xf8)){
+        // This native UI routine initializes all four current-equipment cards
+        // and their own direction/help artwork. It does not send a pad event
+        // or run the native category/item confirmation state machine.
+        // The native menu normally sends this activation only after a category
+        // input. Without it the card data exists but the UI graph stays hidden.
+        activateEquipmentLayer(field<void*>(object,0xf8),field<void*>(object,0xc0));
+        openEquipmentOverview(object);equipmentPreviewOwner=object;
+        log("Native equipment category preview opened from idle HUD state");
+    }
+}
 bool reconColor(uintptr_t model,uint32_t parameter,std::array<float,4>& color){
     uint32_t count{};uintptr_t materials{};
     if(!read(model+0x130,&count,sizeof(count))||count>64
@@ -390,18 +429,36 @@ void installUiRenderer(uintptr_t moduleBase){
     constexpr unsigned char titleUpdateEntry[]{0x40,0x56,0x48,0x83,0xec,0x40,0x48,0x8b,0xf1};
     constexpr unsigned char startShowEntry[]{0x40,0x57,0x48,0x83,0xec,0x40,0x48,0x8b,0xf9};
     constexpr unsigned char markerDepthEntry[]{0x48,0x89,0x5c,0x24,0x18,0x48,0x89,0x7c,0x24,0x20};
-    const std::array<Hook,7> hooks{{
+    constexpr unsigned char equipmentUpdateEntry[]{0x40,0x57,0x48,0x83,0xec,0x30,0x80,0xb9,0xc4,0x02,0,0,0};
+    const std::array<Hook,8> hooks{{
         {0x2d3380,reinterpret_cast<void*>(&queue),reinterpret_cast<void**>(&originalQueue),queueEntry,sizeof(queueEntry)},
         {0x2e7770,reinterpret_cast<void*>(&execute),reinterpret_cast<void**>(&originalExecute),executeEntry,sizeof(executeEntry)},
         {0x2e6be0,reinterpret_cast<void*>(&node),reinterpret_cast<void**>(&originalNode),nodeEntry,sizeof(nodeEntry)},
         {0x12d73e0,reinterpret_cast<void*>(&titleShow),reinterpret_cast<void**>(&originalTitleShow),titleShowEntry,sizeof(titleShowEntry)},
         {0x12d86a0,reinterpret_cast<void*>(&titleUpdate),reinterpret_cast<void**>(&originalTitleUpdate),titleUpdateEntry,sizeof(titleUpdateEntry)},
         {0x12d6d70,reinterpret_cast<void*>(&startShow),reinterpret_cast<void**>(&originalStartShow),startShowEntry,sizeof(startShowEntry)},
-        {0x6bcca0,reinterpret_cast<void*>(&markerDepth),reinterpret_cast<void**>(&originalMarkerDepth),markerDepthEntry,sizeof(markerDepthEntry)}}};
+        {0x6bcca0,reinterpret_cast<void*>(&markerDepth),reinterpret_cast<void**>(&originalMarkerDepth),markerDepthEntry,sizeof(markerDepthEntry)},
+        {0x8b56f0,reinterpret_cast<void*>(&equipmentUpdate),reinterpret_cast<void**>(&originalEquipmentUpdate),equipmentUpdateEntry,sizeof(equipmentUpdateEntry)}}};
     for(const auto& hook:hooks){std::array<unsigned char,16> bytes{};
         if(!read(moduleBase+hook.rva,bytes.data(),hook.size)||std::memcmp(bytes.data(),hook.signature,hook.size))throw std::runtime_error("Native UI renderer signature mismatch");
     }
     base=moduleBase;
+    constexpr std::array<unsigned char,11> overviewEntry{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57};
+    constexpr std::array<unsigned char,10> overviewCloseEntry{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x6c,0x24,0x10};
+    constexpr std::array<unsigned char,9> activateLayerEntry{0x48,0x83,0xec,0x28,0x48,0x85,0xd2,0x74,0x15};
+    constexpr std::array<unsigned char,10> stopCloseEntry{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20};
+    std::array<unsigned char,11> overviewBytes{};std::array<unsigned char,10> overviewCloseBytes{};
+    std::array<unsigned char,9> activateLayerBytes{};
+    std::array<unsigned char,10> stopCloseBytes{};
+    if(read(base+0x8acdc0,overviewBytes.data(),overviewBytes.size())&&overviewBytes==overviewEntry
+        &&read(base+0x8ac000,overviewCloseBytes.data(),overviewCloseBytes.size())&&overviewCloseBytes==overviewCloseEntry
+        &&read(base+0x50c610,activateLayerBytes.data(),activateLayerBytes.size())&&activateLayerBytes==activateLayerEntry
+        &&read(base+0x8b5020,stopCloseBytes.data(),stopCloseBytes.size())&&stopCloseBytes==stopCloseEntry){
+        openEquipmentOverview=reinterpret_cast<TitleFn>(base+0x8acdc0);
+        closeEquipmentOverview=reinterpret_cast<TitleFn>(base+0x8ac000);
+        activateEquipmentLayer=reinterpret_cast<UiLayerFn>(base+0x50c610);
+        stopEquipmentCloseAnimation=reinterpret_cast<TitleFn>(base+0x8b5020);
+    }
     // Native recon material writes use this setter; group visibility is
     // prepared before scene replay and cannot independently hide each eye.
     constexpr std::array<unsigned char,10> parameterEntry{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20};
@@ -488,6 +545,7 @@ bool nativeIdroidOpen() noexcept {
     return state>=0&&(state&1)!=0;
 }
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
+void requestNativeEquipmentPreview(bool visible) noexcept {equipmentPreviewRequestedAt.store(visible?steadyMilliseconds():0);}
 uint64_t nativeCommandsDrawTime() noexcept {return enabled.load()?commandsDrawTime.load():0;}
 Pose wristPickerPose(const HeadCameraSample& rig) noexcept{
     const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);

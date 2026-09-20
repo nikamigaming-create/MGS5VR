@@ -17,6 +17,9 @@ bool nativeTitleMenuOpen() noexcept;
 bool nativeLoadingTipsOpen() noexcept;
 // Source time of the latest expanded native equipment-description draw.
 uint64_t nativeEquipmentPickerDrawTime() noexcept;
+// Request the game's neutral four-category equipment cross, without a D-pad
+// press. Its UI update owns opening/closing; no equipment action is synthesized.
+void requestNativeEquipmentPreview(bool visible) noexcept;
 uint64_t nativeCommandsDrawTime() noexcept;
 Pose wristPickerPose(const HeadCameraSample& rig) noexcept;
 // Producer scope is the native scene invocation; the UI may execute on a worker.

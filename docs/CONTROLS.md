@@ -191,9 +191,9 @@ the small ammunition HUD keeps its own size on the wrist.
 | Right B, while keeping left trigger held | Return to category choice |
 | Right A, on an item with a Use prompt | Use the selected item once |
 
-Holding left trigger enters category selection without equipping anything.
-The requested four-direction preview with native game icons is still missing;
-the native cards currently appear only after choosing a direction.
+Holding left trigger shows the game's four-direction equipment overview without
+equipping anything: primary above, secondary below, support right, items left.
+The icons, names, counts and unavailable/None states come from the native game.
 A stick already held when selection opens is ignored
 until centered. A fresh flick opens one category. Once its cards appear, center the stick and flick toward a
 card. Up is up, left is left, and diagonal cards accept diagonal flicks. Keep a
