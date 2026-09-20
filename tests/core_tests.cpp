@@ -951,6 +951,28 @@ int main(){
     expect(!firstPerson.resolve(11,lowered,125).applied,"manual disable inside iDroid prevents automatic return");
     expect(same(savedHeadView.nativePose.position,{499.9f,300.4f,1300.1f}),"published player-eye frame remains immutable");
     {
+        HeadCamera interrupted;interrupted.configure(true,1,true);interrupted.track({},true,100);
+        interrupted.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,100);
+        interrupted.toggle();const auto before=interrupted.resolve(11,thirdPerson,100);
+        expect(before.applied&&!interrupted.resolve(12,lowered,100).applied
+            &&interrupted.active()&&!interrupted.status().suspended
+            &&interrupted.status().activation==before.activation,
+            "an unpublished secondary camera cannot interrupt active player VR");
+        interrupted.track(Pose{{},{.1f,0,0}},true,700);
+        expect(!interrupted.resolve(11,thirdPerson,700).applied&&interrupted.active()
+            &&interrupted.status().suspended&&!interrupted.status().awaitingPlayer
+            &&interrupted.status().activation==before.activation,
+            "a brief same-camera skin gap rejects stale geometry without resetting VR or input context");
+        interrupted.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,701);
+        interrupted.track(Pose{{},{.1f,0,0}},true,701);
+        const auto after=interrupted.resolve(11,thirdPerson,701);
+        expect(after.applied&&!interrupted.status().suspended&&after.activation==before.activation,
+            "fresh player skin resumes the existing stereo generation after a publication gap");
+        interrupted.track({},true,1802);
+        expect(!interrupted.resolve(11,thirdPerson,1802).applied&&interrupted.status().awaitingPlayer,
+            "a retired primary still yields native scene control after the bounded recovery window");
+    }
+    {
         HeadCamera travel;travel.configure(true,1,true);travel.track({},true,100);
         travel.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,100);
         travel.toggle();const auto acc=travel.resolve(11,thirdPerson,100);

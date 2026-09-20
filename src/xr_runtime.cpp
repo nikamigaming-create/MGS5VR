@@ -1066,7 +1066,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
                 // for at most 500 ms while current headset tracking is valid.
                 // Keep its original poses/FOVs; never relabel old pixels with
                 // current tracking or use this allowance to accept new sources.
-                const bool recoverable=!cameraStatus.suspended||cameraStatus.reason==HeadCameraStop::staleTracking;
+                const bool recoverable=!cameraStatus.suspended||cameraStatus.reason==HeadCameraStop::staleTracking
+                    ||cameraStatus.reason==HeadCameraStop::playerHeadUnavailable;
                 const bool freshEyes=readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds());
                 if(cameraStatus.active&&recoverable&&regionsValid&&readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds(),500)){
                     layer=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);end.layerCount=1;end.layers=&layer;++projectionFrames;

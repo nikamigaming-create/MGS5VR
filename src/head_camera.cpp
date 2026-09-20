@@ -199,7 +199,23 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         const auto found=std::find_if(playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){
             return p.camera==camera&&p.sequence&&time>=p.time&&time-p.time<=150&&same(p.sourceCamera,nativePose);
         });
-        if(found==playerHeads_.end()){awaitPlayerLocked();return result;}
+        if(found==playerHeads_.end()){
+            // A decorative/retired camera has no authority to suspend the
+            // accepted player, even when its own head publication is absent.
+            if(camera_&&camera_!=camera)return result;
+            const bool interrupted=active_&&camera_==camera&&std::any_of(
+                playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){
+                    return p.camera==camera&&p.owner==playerOwner_&&p.sequence
+                        &&time>=p.time&&time-p.time<=1000&&same(p.sourceCamera,nativePose);
+                });
+            if(interrupted){
+                // Reject this stale skin without changing activation/input
+                // context. Only an already accepted stereo pair may cover
+                // the gap; the next fresh skin resumes this same session.
+                rig_={};suspendLocked(HeadCameraStop::playerHeadUnavailable);
+            }else awaitPlayerLocked();
+            return result;
+        }
         if(camera_&&(camera_!=camera||playerOwner_!=found->owner)){
             // ACC -> field / mission restart creates a new verified player.
             // Never borrow another live owner's camera. After the previous
