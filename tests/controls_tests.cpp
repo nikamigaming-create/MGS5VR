@@ -58,10 +58,10 @@ int main(int argc,char** argv){
     }
     {
         ControlBindings controls;LiveControls live;PhysicalControls physical;
-        std::istringstream file("[settings]\nturn_mode=native_smooth\n");
+        std::istringstream file("[settings]\nturn_mode=snap\n");
         expect(live.stage(file).empty()&&live.pending(),"valid complete edit waits away from active bindings");
         physical.buttons[10]=1;
-        expect(!live.apply(controls,physical)&&controls.setting("settings.turn_mode")==0,"live edit cannot interrupt a held trigger");
+        expect(!live.apply(controls,physical)&&controls.setting("settings.turn_mode")==1,"live edit cannot interrupt a held trigger");
         physical={};physical.leftStick={.2f,0};
         expect(!live.apply(controls,physical),"live edit waits for left stick neutral");
         physical={};physical.rightStick={0,-.2f};
@@ -71,16 +71,16 @@ int main(int argc,char** argv){
         physical={};physical.buttons[0]=std::numeric_limits<float>::quiet_NaN();
         expect(!live.apply(controls,physical),"invalid physical state cannot accept a live edit");
         physical={};
-        expect(live.apply(controls,physical)&&!live.pending()&&controls.setting("settings.turn_mode")==1,"neutral input atomically applies complete edited settings");
+        expect(live.apply(controls,physical)&&!live.pending()&&controls.setting("settings.turn_mode")==0,"neutral input atomically applies an explicit snap-turn selection");
         controls.update(physical,ControlContext::gameplay,100);
         expect(!controls.active("gameplay.fire_or_cqc")&&!controls.active("system.pause"),"live replacement cannot manufacture an action");
         physical.buttons[10]=1;controls.update(physical,ControlContext::gameplay,111);
         expect(controls.active("gameplay.fire_or_cqc"),"fresh press works immediately after live replacement");
         std::istringstream valid("[settings]\nturn_mode=off\n"),invalid("[gameplay]\ndive=press(y)\n");
         expect(live.stage(valid).empty()&&!live.stage(invalid).empty()&&!live.pending(),"new invalid edit cancels an older queued valid edit");
-        expect(!live.apply(controls,{})&&controls.setting("settings.turn_mode")==1,"invalid live edit preserves the last working layout instead of defaults");
+        expect(!live.apply(controls,{})&&controls.setting("settings.turn_mode")==0,"invalid live edit preserves the last working layout instead of defaults");
         std::istringstream defaults("; remove overrides\n");
-        expect(live.stage(defaults).empty()&&live.apply(controls,{})&&controls.setting("settings.turn_mode")==0,"deleting an override restores its default just like restarting");
+        expect(live.stage(defaults).empty()&&live.apply(controls,{})&&controls.setting("settings.turn_mode")==1,"deleting an override restores smooth turning without enabling snap");
     }
     {
         Fixture f;
@@ -130,6 +130,9 @@ int main(int argc,char** argv){
         expect(f.active("binoculars.run")&&!f.active("binoculars.zoom"),"right-stick up runs with binoculars without zoom");
         f.input={};f.tick();f.input.buttons[5]=1;f.tick();
         expect(f.active("binoculars.zoom")&&!f.active("binoculars.run"),"binocular left-stick click zooms without sprinting");
+        expect(f.controls.setting("settings.turn_mode")==1,"snap turning is opt-in; the default uses native smooth turning");
+        expect(f.load("[settings]\nturn_mode=snap\n")&&f.controls.setting("settings.turn_mode")==0,
+            "snap turning remains an explicit selectable option");
         expect(f.load("[settings]\nturn_mode=native_smooth\n")&&f.controls.setting("settings.turn_mode")==1,
             "native smooth turn has a readable config name");
         expect(f.load("[settings]\nturn_mode=off\n")&&f.controls.setting("settings.turn_mode")==2,

@@ -64,8 +64,8 @@ Invalid files use built-in defaults and report the errors in `mgs5vr.log`.
 The file also includes movement/navigation axes, snap angle and physical-gesture
 switches. It remaps implemented actions; it does not create new native game abilities.
 
-For smooth turning, set `[settings] turn_mode = native_smooth`. `snap` is the
-default on foot; `off` disables normal stick turning. Horses/vehicles use native
+Smooth turning is the default: `[settings] turn_mode = native_smooth`.
+Set `turn_mode = snap` to enable snap turning; `off` disables normal stick turning. Horses/vehicles use native
 horizontal camera input even with `snap`, because a camera-only snap cannot steer
 their native forward direction. This mounted change still needs headset feedback.
 Head pitch remains tracked. Menu sticks are unaffected.
