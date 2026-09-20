@@ -288,6 +288,13 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));
                     const auto result=originalNode(state,item);
+                    // This route also owns the expanded equipment camera.
+                    // Publish its successful draw here; returning before the
+                    // ordinary HUD route must not leave navigation locked.
+                    if(order==135&&read(camera+0x30,world.data(),sizeof(world))&&world[14]==150){
+                        auto previous=pickerDrawTime.load();
+                        while(previous<executing.eye.sampleTime&&!pickerDrawTime.compare_exchange_weak(previous,executing.eye.sampleTime)){}
+                    }
                     std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
                     if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
                     static std::atomic_bool reported{};
