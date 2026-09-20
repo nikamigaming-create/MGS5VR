@@ -45,8 +45,23 @@ int opticRendererChecks(){
         const bool image=sample(74,54)[1]>240&&sample(74,54)[2]<10;
         const bool outside=sample(20,20)==std::array<unsigned char,4>{0,0,255,255};
         const bool reticle=sample(64,54)[1]<180;
-        context->Unmap(readback.Get(),0);stopPhysicalOpticRenderer();
+        context->Unmap(readback.Get(),0);
         if(!image||!outside||!reticle)throw std::runtime_error("Weapon lens image, aperture or reticle pixels are incorrect");
+        // Actual D3D pixels: a lens passing the near plane must not be depth
+        // clamped across the user's normal eye image.
+        for(float z:{.015f,-.02f}){
+            context->ClearRenderTargetView(targetView.Get(),blue);
+            auto crossing=world;crossing[14]=z;
+            drawPhysicalWeaponScope(context.Get(),crossing,view,projection,.02f,4,scene.Get());
+            context->CopyResource(readback.Get(),target.Get());
+            checkHr(context->Map(readback.Get(),0,D3D11_MAP_READ,0,&mapped),"Read near-eye scope pixels");
+            bool untouched=true;
+            for(UINT y=0;y<128&&untouched;++y)for(UINT x=0;x<128;++x)
+                if(sample(x,y)!=std::array<unsigned char,4>{0,0,255,255}){untouched=false;break;}
+            context->Unmap(readback.Get(),0);
+            if(!untouched)throw std::runtime_error("Near-eye scope obscures the surrounding world");
+        }
+        stopPhysicalOpticRenderer();
         headCamera().configure(true);headCamera().track({},true,steadyMilliseconds());headCamera().toggle();
         const auto frame=headCamera().resolveCurrent(1,{});
         OpticWaypoints markers;markers.activation=frame.activation;markers.count=markers.points.size();

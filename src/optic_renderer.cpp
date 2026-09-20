@@ -688,7 +688,7 @@ bool createLensResources(ID3D11Device* device){
     const std::array<D3D11_INPUT_ELEMENT_DESC,2> elements{{
         {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},
         {"APERTURE",0,DXGI_FORMAT_R32G32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0}}};
-    D3D11_RASTERIZER_DESC raster{};raster.FillMode=D3D11_FILL_SOLID;raster.CullMode=D3D11_CULL_NONE;raster.DepthClipEnable=FALSE;
+    D3D11_RASTERIZER_DESC raster{};raster.FillMode=D3D11_FILL_SOLID;raster.CullMode=D3D11_CULL_NONE;raster.DepthClipEnable=TRUE;
     D3D11_DEPTH_STENCIL_DESC depth{};depth.DepthEnable=TRUE;depth.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ZERO;depth.DepthFunc=D3D11_COMPARISON_LESS_EQUAL;
     D3D11_BLEND_DESC blend{};blend.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
     D3D11_SAMPLER_DESC sampler{};sampler.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -832,11 +832,10 @@ bool createResources(ID3D11Device* device){
         {"TEXCOORD",0,DXGI_FORMAT_R32G32_FLOAT,0,24,D3D11_INPUT_PER_VERTEX_DATA,0}}};
     if(FAILED(device->CreateInputLayout(elements.data(),static_cast<UINT>(elements.size()),vs->GetBufferPointer(),vs->GetBufferSize(),resources.inputLayout.GetAddressOf())))return false;
     D3D11_RASTERIZER_DESC rasterizer{};rasterizer.FillMode=D3D11_FILL_SOLID;rasterizer.CullMode=D3D11_CULL_NONE;
-    // Use the real surface depth, including where a hand cups the housing.
-    // FOX's 10 cm world near plane must not slice the eyecup at normal eye
-    // relief. The grip solver keeps it outside the face; D3D depth clamping
-    // preserves its world-scale X/Y projection during the last few cm.
-    rasterizer.DepthClipEnable=FALSE;
+    // The tracked scene already uses its close near plane. Clip housing
+    // triangles that cross the eye rather than projecting a near/behind-eye
+    // face across the surrounding world.
+    rasterizer.DepthClipEnable=TRUE;
     if(FAILED(device->CreateRasterizerState(&rasterizer,resources.rasterizer.GetAddressOf())))return false;
     D3D11_DEPTH_STENCIL_DESC depth{};depth.DepthEnable=TRUE;depth.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ALL;depth.DepthFunc=D3D11_COMPARISON_LESS_EQUAL;
     if(FAILED(device->CreateDepthStencilState(&depth,resources.depthStencil.GetAddressOf())))return false;
@@ -1370,7 +1369,7 @@ bool drawPhysicalWeaponScope(ID3D11DeviceContext* context,const std::array<float
     }catch(...){return false;}
 }
 bool drawPhysicalBinoculars(ID3D11DeviceContext* context,const std::array<float,16>& world,const std::array<float,16>& view,
-    const std::array<float,16>& projection,float magnification,ID3D11Texture2D* sceneSource,bool) noexcept{
+    const std::array<float,16>& projection,float magnification,ID3D11Texture2D* sceneSource,bool lensVisible) noexcept{
     if(!context)return false;
     try{
         std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(device.GetAddressOf());if(!device)return false;
@@ -1388,7 +1387,7 @@ bool drawPhysicalBinoculars(ID3D11DeviceContext* context,const std::array<float,
         // Copy the native scene before drawing the housing; the portal is
         // composited after the housing so its pixels survive the housing's
         // depth pass and remain confined to the real aperture.
-        const bool needsLens=magnification>1.0001f&&sceneSource;
+        const bool needsLens=lensVisible&&magnification>1.0001f&&sceneSource;
         ComPtr<ID3D11ShaderResourceView> sceneSourceView;
         if(needsLens){
             const char* failure=nullptr;

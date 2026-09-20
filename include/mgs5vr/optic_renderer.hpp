@@ -40,7 +40,7 @@ bool drawPhysicalBinoculars(ID3D11DeviceContext* context,
     const std::array<float,16>& projection,
     float magnification,
     ID3D11Texture2D* sceneSource,
-    bool leftEye) noexcept;
+    bool lensVisible) noexcept;
 
 // Draw the hand-carried iDroid housing around the native UI screen. The
 // center stays open so the live game pixels remain the device's front display.

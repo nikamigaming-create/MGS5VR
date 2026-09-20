@@ -287,8 +287,53 @@ struct NativeRestore {
         std::memcpy(reinterpret_cast<void*>(camera+layout.cameraNearPlane),&nearClip,sizeof(nearClip));
         if(!trackedNearReported.exchange(true))mgs5vr::log("TPP tracked scene uses a 2 cm native near plane; native camera restored between passes");
     }
+    void preserveOpticVisibility() const{
+        if(renderBuild!=mgs5vr::RenderBuild::phantomPain_1_0_15_4)return;
+        // TPP viewport builder 0x1b9490 derives six normalized world-space
+        // visibility planes at +0x440..+0x49f from clip*view. The optical pass
+        // may change its raster camera, but reuses the head scene's prepared
+        // draw/LOD lists. Preserve that exact wide visibility volume instead
+        // of replacing it with a volume centered on the hand-held optic.
+        constexpr size_t planes=0x440,bytes=6*4*sizeof(float);
+        std::memcpy(reinterpret_cast<void*>(viewport+planes),
+            viewportMatrices.data()+planes-layout.viewportMatrices,bytes);
+    }
     ~NativeRestore(){restore();mgs5vr::clearUiRenderSource();eyeViewport=0;stereoTarget=0;drawingEye={};insideStereo=false;}
 };
+// The magnified native draw changes shared visibility/LOD state.
+// Preserve both full head draws while the independent lens is rendered, then
+// finish their overlays from the same source transaction. This keeps three
+// native draws and never borrows an optic image from the preceding frame.
+struct HeadSceneCopy {
+    mgs5vr::ComPtr<ID3D11Texture2D> texture;
+    uint64_t source{};
+    bool transfer(ID3D11DeviceContext* context,uint64_t sourceId,bool restore){
+        if(!context)return false;
+        mgs5vr::ComPtr<ID3D11Texture2D> target;
+        if(!mgs5vr::sceneSourceTexture(context,target.GetAddressOf()))return false;
+        D3D11_TEXTURE2D_DESC desc{},prior{};target->GetDesc(&desc);
+        mgs5vr::ComPtr<ID3D11Device> device,copyDevice;target->GetDevice(&device);
+        if(texture){texture->GetDesc(&prior);texture->GetDevice(&copyDevice);}
+        const bool compatible=texture&&copyDevice.Get()==device.Get()&&desc.Width==prior.Width
+            &&desc.Height==prior.Height&&desc.Format==prior.Format&&desc.SampleDesc.Count==prior.SampleDesc.Count;
+        if(restore&&(!compatible||source!=sourceId))return false;
+        if(!restore&&!compatible){
+            texture.Reset();desc.BindFlags=0;desc.MiscFlags=desc.CPUAccessFlags=0;desc.Usage=D3D11_USAGE_DEFAULT;
+            if(FAILED(device->CreateTexture2D(&desc,nullptr,texture.GetAddressOf())))return false;
+        }
+        ID3D11RenderTargetView* targets[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT]{};
+        ID3D11DepthStencilView* depth{};
+        context->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT,targets,&depth);
+        context->OMSetRenderTargets(0,nullptr,nullptr);
+        context->CopyResource(restore?target.Get():texture.Get(),restore?texture.Get():target.Get());
+        context->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT,targets,depth);
+        for(auto* view:targets)if(view)view->Release();
+        if(depth)depth->Release();
+        if(!restore)source=sourceId;
+        return true;
+    }
+};
+thread_local std::array<HeadSceneCopy,2> opticHeadScenes;
 __declspec(noinline) uintptr_t registerTarget(void* graphics,void* target){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const bool second=enabled.load()&&insideStereo&&sceneRenderPass>0&&stereoTarget
@@ -358,7 +403,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     mgs5vr::MenuCapturePlayerExclusion excludeTitlePlayer(titleSurface?source.pair.sample.playerOwner:0,
         titleSurface&&source.pair.sample.controllers.openingSelector);
     // The telescope has one real ocular. Draw its own narrow-angle native
-    // scene first, then the two ordinary HMD eyes. All three draws use the
+    // scene after both ordinary HMD eyes. All three draws use the
     // same simulation/hand publication and only one native present is queued.
     const auto& optic=source.pair.sample.controllers.optic;
     const auto& scope=source.pair.sample.weaponScope;
@@ -366,14 +411,19 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         [&](const auto& eye){return mgs5vr::weaponScopeEyeVisible(scope,eye.pose);});
     const auto scopeView=!optic.held&&!source.pair.sample.menuOpen&&scopeAtEye
         ?mgs5vr::weaponScopeSceneView(scope):std::nullopt;
-    const auto opticView=optic.held?mgs5vr::binocularSceneView(optic.pose,
+    const bool binocularAtEye=optic.held&&optic.active&&std::any_of(
+        source.pair.sample.views.begin(),source.pair.sample.views.end(),
+        [&](const auto& eye){return mgs5vr::binocularEyeVisible(optic.pose,eye.pose);});
+    const auto opticView=binocularAtEye?mgs5vr::binocularSceneView(optic.pose,
         source.pair.sample.controllers.magnification):scopeView;
     mgs5vr::ComPtr<ID3D11Texture2D> opticScene;
     const uint32_t extraPass=opticView?1u:0u;
-    for(uint32_t pass=0;pass<2+extraPass;++pass){
+    for(uint32_t pass=0;pass<(extraPass?5u:2u);++pass){
         sceneRenderPass=pass;
-        const bool lensPass=extraPass&&pass==0;
-        const uint32_t eye=lensPass?2u:pass-extraPass;
+        const bool headPreparation=extraPass&&pass<2;
+        const bool lensPass=extraPass&&pass==2;
+        const bool restoreHead=extraPass&&pass>=3;
+        const uint32_t eye=restoreHead?pass-3:pass;
         // Share this pass role with native UI workers and custom markers.
         // Equipping binoculars is not recon vision; the source-frame optic
         // must be aligned with the eye. A rifle's lens is never binoculars.
@@ -404,9 +454,16 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         if(!titleSurface)saved.applyTrackedNearPlane();
         originalViewport(reinterpret_cast<void*>(source.viewport),0);
         if(!clipProjection||!gpuProjection){complete=false;sceneFailure=4;break;}
+        if(lensPass)saved.preserveOpticVisibility();
         // Keep native visibility preparation independent of the telescope's
         // narrow raster FOV. Update scalar consumers only after clip/GPU build.
-        saved.applyNativeProjectionScales(drawingEye.view.fov);
+        // The optical raster has its own narrow projection. Keep the shared
+        // camera's focal/LOD consumers on the HMD scale: those native jobs
+        // outlive this draw and must not cull the peripheral world as though
+        // the user were looking only through the magnified camera.
+        saved.applyNativeProjectionScales(lensPass
+            ?mgs5vr::enclosingEyeFov(source.pair.sample.views[0].fov).value_or(source.pair.sample.views[0].fov)
+            :drawingEye.view.fov);
         std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousView),eyeView.data(),sizeof(eyeView));
         std::memcpy(reinterpret_cast<void*>(source.viewport+layout.previousProjection),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(eyeView));
         drawingEye.projected=true;
@@ -414,11 +471,15 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,eyeProjection,source.pair.sample,authoredView,authoredProjection,hudView);
         mgs5vr::ReconModelVisibilityScope reconVisibility(source.pair.sample.controllers.hudMode,
             hudView,source.pair.sample.controllers.binocularActorGlow);
-        result=originalScene(render,graphics,task,worker);
+        if(!restoreHead)result=originalScene(render,graphics,task,worker);
         mgs5vr::clearUiRenderSource();
         // Native passes may finish and replace the current deferred context.
         const auto afterOwner=field<uintptr_t>(graphics,layout.graphicsContext);
         auto* afterContext=afterOwner?field<ID3D11DeviceContext*>(reinterpret_cast<void*>(afterOwner),8):nullptr;
+        if(headPreparation||restoreHead){
+            if(!opticHeadScenes[eye].transfer(afterContext,id,restoreHead)){complete=false;sceneFailure=8;break;}
+            if(headPreparation)continue;
+        }
         if(lensPass){
             // This texture is separate from the stereo mailbox. Capturing an
             // unfinished eye into the mailbox can publish a partial pair and
@@ -467,7 +528,11 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             originalWorld(bodyValues.data(),bodyWorld.data());
             std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
             mgs5vr::drawPhysicalBinoculars(afterContext,bodyWorld,eyeView,projection,
-                source.pair.sample.controllers.magnification,opticScene.Get(),eye==0);
+                source.pair.sample.controllers.magnification,opticScene.Get(),
+                // Raising the ocular to either eye opens its physical lens
+                // for both eyes. Independent pupil-radius gates left the
+                // other eye looking at opaque brown glass at normal IPD.
+                binocularAtEye);
         }
         if(afterContext&&scopeView&&mgs5vr::weaponScopeEyeVisible(scope,source.pair.sample.views[eye].pose)){
             const auto ocular=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,source.pair.sample.headPose,scope.ocular);
