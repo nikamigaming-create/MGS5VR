@@ -1,4 +1,4 @@
-# iDroid controls hotfix â€” playtest v12
+# iDroid controls hotfix — playtest v12
 
 The original controller layout is preserved:
 
