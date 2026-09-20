@@ -6,12 +6,18 @@ $mgsFixture=Join-Path ([IO.Path]::GetTempPath()) ('mgs5vr-display-'+[guid]::NewG
 $mgsRunning=$false;$mgsLaunches=[pscustomobject]@{Count=0}
 function Get-Process {
     [CmdletBinding()]param([string]$Name)
+    if ($Name -eq 'steam') { return [pscustomobject]@{Id=123} }
     if ($mgsRunning) { $p=New-Object PSObject; $p | Add-Member ScriptMethod WaitForExit {param($ms) $false}; return $p }
 }
+function Get-ItemProperty {
+    [CmdletBinding()]param([string]$LiteralPath)
+    return [pscustomobject]@{ActiveRuntime=(Join-Path $mgsFixture 'headset.json')}
+}
 function Start-Process {
-    param([string]$FilePath)
-    if ($FilePath -notin @('steam://rungameid/287700','steam://rungameid/311340')) { throw 'Unexpected launch' }
+    param([string]$FilePath,[string]$WorkingDirectory,[string]$WindowStyle,[switch]$PassThru)
+    if ($FilePath -notin @((Join-Path $mgsFixture 'mgsvtpp.exe'),'steam://rungameid/311340')) { throw 'Unexpected launch' }
     $mgsLaunches.Count++
+    return [pscustomobject]@{Id=456}
 }
 function Assert([bool]$ok,[string]$why) { if (-not $ok) { throw $why } }
 function Refuses([scriptblock]$action,[string]$pattern) {
@@ -25,6 +31,7 @@ try {
     $mgsConfig=Join-Path $mgsFixture 'TPP_GRAPHICS_CONFIG'
     [IO.File]::WriteAllText($mgsExe,'Not executable: authored test fixture.')
     [IO.File]::WriteAllText($mgsGz,'Not executable: authored test fixture.')
+    [IO.File]::WriteAllText((Join-Path $mgsFixture 'headset.json'),'{"runtime":{"name":"Fixture headset","library_path":"fixture.dll"}}')
     $mgsBuiltDll=Join-Path (Split-Path -Parent $PSScriptRoot) 'build\Release\dinput8.dll'
     $mgsFixtureDll=Join-Path $mgsFixture 'dinput8.dll'
     Copy-Item -LiteralPath $mgsBuiltDll -Destination $mgsFixtureDll
@@ -49,7 +56,7 @@ try {
     Assert ([IO.File]::ReadAllText($mgsConfig) -ceq $mgsSaved) 'Rejected requests changed graphics.'
     Assert ($mgsLaunches.Count -eq 0) 'Apply launched a game.'
     & $mgsTool -Mode Launch -GameExe $mgsExe -Preset Current
-    Assert ($mgsLaunches.Count -eq 1) 'Launch did not go through the Steam URI.'
+    Assert ($mgsLaunches.Count -eq 1) 'Launch did not use the physical headset launcher.'
     Assert ([IO.File]::ReadAllText($mgsConfig) -ceq $mgsSaved) 'Current preset edited graphics.'
     [IO.File]::WriteAllText($mgsFixtureDll,'Authored mismatched DLL fixture; not executable.')
     Refuses { & $mgsTool -Mode Apply -GameExe $mgsExe -Preset Custom -Width 1280 -Height 720 -GraphicsConfig $mgsConfig } '*before applying a resolution*'
@@ -57,7 +64,7 @@ try {
     Copy-Item -LiteralPath $mgsBuiltDll -Destination $mgsFixtureDll -Force
     [IO.File]::WriteAllText($mgsConfig,'{"project":"wrong","graphics":{}}')
     Refuses { & $mgsTool -Mode Apply -GameExe $mgsExe -Preset Custom -Width 1280 -Height 720 -GraphicsConfig $mgsConfig } '*Not a supported TPP graphics configuration*'
-    Write-Output 'Launcher display settings: backups, preservation, validation, running-game refusal and safe Steam launch passed.'
+    Write-Output 'Launcher display settings: backups, preservation, validation, running-game refusal and headset launch passed.'
 } finally {
     $mgsResolved=[IO.Path]::GetFullPath($mgsFixture)
     $mgsTemp=[IO.Path]::GetFullPath([IO.Path]::GetTempPath())

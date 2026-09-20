@@ -21,8 +21,7 @@ function Read-HeadsetSize {
     if (-not (Test-Path -LiteralPath $mgsProbe -PathType Leaf)) { $mgsProbe=Join-Path $mgsPackage 'build\Release\mgs5vr_probe.exe' }
     if (-not (Test-Path -LiteralPath $mgsProbe -PathType Leaf)) { throw 'Extract the complete launcher package; mgs5vr_probe.exe is missing.' }
     # No XR session, game launch, runtime switch, Steam restart or desktop change.
-    $mgsProbeOutput=& $mgsProbe
-    if ($LASTEXITCODE -ne 0) { throw ('Connect PC VR and select its OpenXR runtime, then Detect again. '+($mgsProbeOutput -join ' ')) }
+    $mgsProbeOutput=& (Join-Path $PSScriptRoot 'launch-headset.ps1') -Probe
     $mgsResult=($mgsProbeOutput -join '') | ConvertFrom-Json
     if (-not $mgsResult.headset_available -or $mgsResult.recommended_width -lt 1 -or $mgsResult.recommended_height -lt 1) {
         throw ('OpenXR did not provide a stereo resolution: '+$mgsResult.error)
@@ -108,6 +107,10 @@ if ($Preset -ne 'Current') {
     Write-Output 'Depth of field OFF. Motion blur OFF. PC preview: 960 x 540 with the matching DLL. Check ACTUAL after launch.'
 } else { Write-Output 'Keeping existing game graphics settings.' }
 if ($Mode -eq 'Launch') {
-    Start-Process ('steam://rungameid/'+$mgsApp)
-    Write-Output 'Launch requested through Steam. Existing Steam/runtime settings were retained.'
+    if ($mgsTpp) {
+        & (Join-Path $PSScriptRoot 'launch-headset.ps1') -GameDir ([IO.Path]::GetDirectoryName($mgsExe))
+    } else {
+        Start-Process ('steam://rungameid/'+$mgsApp)
+        Write-Output 'Ground Zeroes launch requested through Steam.'
+    }
 }
