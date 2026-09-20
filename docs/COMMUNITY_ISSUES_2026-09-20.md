@@ -5,7 +5,15 @@ describe different builds and personal configurations. A source correction or
 unit-test pass is not a headset gameplay pass. Older rescue/handoff documents
 are historical; this is the current triage plan.
 
-## Current SIM result: v8
+## Current handoff: v11
+
+[The v11 playtest note](PLAYTEST_V11_2026-09-20.md) records the current DLL,
+completed high-risk SIM checks and remaining failures. Map geometry now has
+projected canvas bounds. Pause arm tracking, the forced FOB tutorial and full
+notification routing remain open. The user requested a bounded headset playtest
+before completing the full showcase matrix. Public beta acceptance is pending.
+
+## Historical SIM result: v8
 
 The equipment sequence passes the bounded SIM check. This is **not yet the
 next physical-headset candidate**: Pause and iDroid map clipping still fail.
