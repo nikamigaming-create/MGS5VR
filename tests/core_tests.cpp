@@ -1126,6 +1126,20 @@ int main(){
     expect(afterMenuRebase.applied&&same(afterMenuRebase.nativePose.position,beforeMenuRebase.nativePose.position)
         &&same(rotate(afterMenuRebase.nativePose.orientation,{0,0,1}),rotate(beforeMenuRebase.nativePose.orientation,{0,0,1})),
            "closing iDroid after a reference-space change preserves the gameplay viewpoint");
+    menuEpoch.setNativeMenuOpen(true,true);
+    const auto beforeMenuPause=menuEpoch.resolve(11,thirdPerson,110);
+    expect(menuEpoch.publishRigFrame(11,22,thirdPerson,beforeMenuPause),"menu accepts its final live skin publication");
+    menuHands.predictedXrTime=11000;
+    menuEpoch.trackStereo(Pose{{0,.258819f,0,.9659258f},{3.1f,1,-2}},rigEyes,true,400,menuHands);
+    const auto afterMenuPause=menuEpoch.resolve(11,thirdPerson,400);
+    expect(afterMenuPause.applied&&afterMenuPause.menuOpen&&!afterMenuPause.rigSequence
+        &&!menuEpoch.status().suspended&&afterMenuPause.trackingSequence>beforeMenuPause.trackingSequence,
+        "paused skin publication cannot black out a live tracked menu or masquerade as a current rig");
+    menuEpoch.setNativeMenuOpen(true,false);
+    const auto helpMenu=menuEpoch.resolve(11,thirdPerson,400);
+    expect(helpMenu.applied&&helpMenu.menuOpen&&!helpMenu.menuIdroid
+        &&same(helpMenu.menuPanel.position,beforeMenuPause.menuPanel.position),
+        "iDroid Help keeps the accepted menu anchor while applying the native pause policy");
     handsCamera.trackStereo({},rigEyes,true,100,hands);handsCamera.toggle();
     const auto joinedHands=handsCamera.resolve(1,nativeCamera,100);
     expect(joinedHands.applied&&joinedHands.controllers.hands[1].gripTracked&&joinedHands.controllers.predictedXrTime==9000,

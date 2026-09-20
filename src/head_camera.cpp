@@ -112,10 +112,11 @@ void HeadCamera::setNativeMenuOpen(bool open,bool idroid){
     std::lock_guard lock(mutex_);
     const auto nextIdroid=open&&idroid;
     if(open==nativeMenuOpen_&&nextIdroid==nativeIdroidOpen_)return;
+    const bool retainMenuAnchor=open&&nativeMenuOpen_&&menuAnchored_;
     nativeMenuOpen_=open;nativeIdroidOpen_=nextIdroid;rig_={};
     if(open){
-        menuAnchored_=active_&&!suspended_&&lastView_.applied&&lastView_.activation==activation_;
-        if(menuAnchored_){
+        menuAnchored_=retainMenuAnchor||(active_&&!suspended_&&lastView_.applied&&lastView_.activation==activation_);
+        if(menuAnchored_&&!retainMenuAnchor){
             menuNative_=lastView_.nativePose;menuHead_=lastView_.headPose;
             menuPanel_=compose(nativeTrackedPose(menuNative_,menuHead_,menuHead_),Pose{{},{0,-.05f,-1.3f}});
         }
@@ -255,10 +256,18 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         const bool same=p.position.x==sourceCamera.position.x&&p.position.y==sourceCamera.position.y&&p.position.z==sourceCamera.position.z
             &&p.orientation.x==sourceCamera.orientation.x&&p.orientation.y==sourceCamera.orientation.y
             &&p.orientation.z==sourceCamera.orientation.z&&p.orientation.w==sourceCamera.orientation.w;
-        if(rig_.camera!=camera||rig_.owner!=result.playerOwner||s.activation!=activation_||!same
-           ||time<s.sampleTime||time-s.sampleTime>150){suspendLocked(HeadCameraStop::rigFrameMismatch);return result;}
-        const auto playerPublication=result.playerSequence;
-        result=s;result.playerSequence=playerPublication;suspended_=false;reason_=HeadCameraStop::none;lastView_=result;return result;
+        const bool sameOwner=rig_.camera==camera&&rig_.owner==result.playerOwner&&s.activation==activation_;
+        const bool freshRig=sameOwner&&same&&time>=s.sampleTime&&time-s.sampleTime<=150;
+        if(freshRig){
+            const auto playerPublication=result.playerSequence;
+            result=s;result.playerSequence=playerPublication;suspended_=false;reason_=HeadCameraStop::none;lastView_=result;return result;
+        }
+        // Native Pause/Help stops skin updates while its camera and UI keep
+        // drawing. A cached rig must not poison every subsequent menu frame
+        // after 150 ms. Resolve fresh tracked eyes from this accepted menu
+        // anchor without relabeling the old hand publication as current.
+        if(!spatialMenu||!sameOwner){suspendLocked(HeadCameraStop::rigFrameMismatch);return result;}
+        rig_={};
     }
     suspended_=false;reason_=HeadCameraStop::none;
     // FOX's camera-local forward/right candidates are +Z/-X. The explicit
