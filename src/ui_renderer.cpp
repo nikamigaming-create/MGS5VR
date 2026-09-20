@@ -494,9 +494,11 @@ Pose wristPickerPose(const HeadCameraSample& rig) noexcept{
     // Unfold the real cards above their forearm anchor. Fit the complete native
     // panel into both eyes instead of clipping its text at close wrist range.
     const auto anchor=rig.wristPanel.position+rotate(head.orientation,{0,rig.controllers.wristSelectorHeight,0});
+    // Frustum fitting uses tracked -Z-forward poses. Native camera poses are
+    // +Z-forward and make every corner appear behind the eye, forcing fallback.
     const std::array<EyeView,2> eyes{{
-        {nativeEyePose(rig.nativePose,rig.headPose,rig.views[0].pose),rig.views[0].fov},
-        {nativeEyePose(rig.nativePose,rig.headPose,rig.views[1].pose),rig.views[1].fov}}};
+        {nativeTrackedPose(rig.nativePose,rig.headPose,rig.views[0].pose),rig.views[0].fov},
+        {nativeTrackedPose(rig.nativePose,rig.headPose,rig.views[1].pose),rig.views[1].fov}}};
     const auto width=rig.controllers.wristPickerWidth;
     return fitWristPanel(head,anchor,eyes,width,width*9.f/16.f).value_or(Pose{head.orientation,anchor});
 }

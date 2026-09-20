@@ -171,9 +171,9 @@ int main(){
         expect(panel&&same(panel->position,ordinary),"already readable picker retains its wrist-linked position");
         const Vec3 nearWrist{-.1f,-.1f,-.3f};
         const auto wristPanel=fitWristPanel({},nearWrist,views,.6f,.3375f);
-        expect(wristPanel&&near(wristPanel->position.x/wristPanel->position.z,nearWrist.x/nearWrist.z)
-            &&near(wristPanel->position.y/wristPanel->position.z,nearWrist.y/nearWrist.z),
-            "a readable popup moves outward on the wrist ray instead of recentering in front of the player");
+        expect(wristPanel&&wristPanel->position.z<=-.55f&&wristPanel->position.z>=-.7f
+            &&wristPanel->position.x<0&&wristPanel->position.y<0&&inBoth(*wristPanel,views),
+            "a close wrist popup stays readable and moves inward only enough to fit both eyes");
         auto canted=views;canted[0].pose.orientation={0,.06f,0,.99819838f};
         canted[1].pose.orientation={0,-.06f,0,.99819838f};
         const Vec3 edge{-.4f,-.1f,-.3f};
@@ -184,6 +184,14 @@ int main(){
         const auto moved=fitWristPanel(move,compose(move,Pose{{},edge}).position,movedEyes,.6f,.3375f);
         expect(fitted&&moved&&same(moved->position,compose(move,*fitted).position)&&inBoth(*moved,movedEyes),
             "both-eye picker placement uses the same head/wrist generation through world motion");
+        const Pose nativeHead{{0,.38268343f,0,.92387953f},{752.7f,322.6f,1214.5f}};
+        const auto trackedHead=nativeTrackedPose(nativeHead,{},{});
+        auto nativeEyes=views;
+        for(auto& eye:nativeEyes)eye.pose=nativeTrackedPose(nativeHead,{},eye.pose);
+        const auto nativeWrist=compose(trackedHead,Pose{{},{.2f,-.18f,-.38f}}).position;
+        const auto nativeFit=fitWristPanel(trackedHead,nativeWrist,nativeEyes,.75f,.421875f);
+        expect(nativeFit&&inBoth(*nativeFit,nativeEyes,.75f),
+            "native-world menu fitting retains tracked -Z eye convention at field coordinates");
         auto invalid=views;invalid[0].fov={};
         expect(!fitWristPanel({},edge,invalid,.6f,.3375f)&&!fitWristPanel({},edge,views,0,.3375f),
             "invalid picker optical data cannot produce a fitted panel");

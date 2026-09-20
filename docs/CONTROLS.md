@@ -56,9 +56,7 @@ Commands. The deliberate exceptions are explicit: **left grip + B** reloads,
 **left grip + Y** equips binoculars, and **right grip + right-stick click**
 quick-switches a ready weapon. **Left-stick click** sprints and **right-stick
 click** dives. Right-stick up zooms a ready weapon's fitted scope; in binocular
-mode it runs, while left-stick click zooms the binocular lens. The wrist picker
-prints the actual configured binding under every category, so changed hints do
-not become stale.
+mode it runs, while left-stick click zooms the binocular lens.
 
 You can optionally check syntax/conflicts by running
 `mgs5vr_controls.exe --check mgs5vr-controls.ini` from the game folder.
@@ -193,10 +191,10 @@ the small ammunition HUD keeps its own size on the wrist.
 | Right B, while keeping left trigger held | Return to category choice |
 | Right A, on an item with a Use prompt | Use the selected item once |
 
-Holding left trigger shows a four-card **Primary / Secondary / Support / Items**
-bar above the wrist, with the configured input printed under each choice.
-It does not enlarge the small ammo/status icon, equip anything, or choose a
-category for you. A stick already held when it opens is ignored
+Holding left trigger enters category selection without equipping anything.
+The requested four-direction preview with native game icons is still missing;
+the native cards currently appear only after choosing a direction.
+A stick already held when selection opens is ignored
 until centered. A fresh flick opens one category. Once its cards appear, center the stick and flick toward a
 card. Up is up, left is left, and diagonal cards accept diagonal flicks. Keep a
 flick steady briefly; center between choices. Holding or wobbling one flick
@@ -205,9 +203,11 @@ trigger stays held. Native equip/stow transitions can delay opening; navigation
 is blocked until the expanded menu has rendered.
 
 The cards and descriptions use real game data and unfold above the **left wrist**,
-facing you; the small status display stays flat along the forearm. The config's
-`wrist_surface_lift_cm` raises that status surface (default: 2 cm extra), and
-`wrist_selector_height_cm` sets the picker height (default: 12 cm). Raise that
+facing you; the small status display stays flat along the rendered left forearm.
+Its canvas preserves the native aspect before the stereo eye replay; changing
+the picker does not change that mount. `wrist_surface_lift_cm` is currently
+reserved and does not move the status surface. `wrist_selector_height_cm`
+sets the picker height (default: 12 cm). Raise that
 wrist into view to read the selection. Right-stick turning is consumed while
 the picker is open and until the stick returns to neutral after closing. A held
 fire trigger must be released before it can fire after selection.
