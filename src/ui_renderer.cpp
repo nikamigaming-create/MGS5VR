@@ -1,6 +1,7 @@
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/idroid_rig.hpp"
+#include "mgs5vr/ui_clip.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include <windows.h>
@@ -305,6 +306,11 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 auto* output=static_cast<unsigned char*>(state)+0x1c0;
                 if(titleWorldUi)std::memcpy(static_cast<unsigned char*>(state)+0x200,executing.authoredView.data(),sizeof(executing.authoredView));
                 std::memcpy(output,mapped->data(),sizeof(*mapped));
+                constexpr std::array<float,16> identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+                const auto bounds=uiPanelProjection(identity,executing.view,executing.eye.view.fov,
+                    executing.menuPanel,executing.frontEnd?1.6f:idroidScreenWidth,
+                    (executing.frontEnd?1.6f:idroidScreenWidth)*9.f/16.f);
+                UiClipScope clip(bounds.value_or(std::array<float,16>{}));
                 const auto result=originalNode(state,item);
                 if(titleWorldUi)std::memcpy(static_cast<unsigned char*>(state)+0x200,savedView.data(),sizeof(savedView));
                 std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;

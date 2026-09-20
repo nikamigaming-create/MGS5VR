@@ -6,6 +6,7 @@
 #include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/menu_surface.hpp"
 #include "mgs5vr/ui_renderer.hpp"
+#include "mgs5vr/ui_clip.hpp"
 #include "mgs5vr/render_size.hpp"
 #include <MinHook.h>
 #include <atomic>
@@ -122,6 +123,7 @@ void installCaptureHook(TextureMailbox& mailbox){
         mh(MH_ApplyQueued(),"Enable capture hooks");
     }catch(...){MH_DisableHook(presentAddress);MH_DisableHook(resizeAddress);MH_RemoveHook(presentAddress);MH_RemoveHook(resizeAddress);throw;}
     installSceneCapture(dummy.device.Get());
+    installUiClip(dummy.device.Get());
     installRenderSizeHooks(dummy.swap.Get());
     log("D3D11 capture hooks installed; native stereo awaits a complete scene draw pair");
 }
