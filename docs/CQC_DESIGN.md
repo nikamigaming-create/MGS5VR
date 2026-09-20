@@ -11,7 +11,7 @@ the intended interaction; it does not claim that physical grabbing is installed.
 | Bionic fist | Punch with the left hand while any ordinary equipment is selected. | Uses the same motion contact path; no powered ability is activated. |
 | Weapon bash | Strike with the held weapon. | Candidate uses its native tip contact; firearm trigger stays separate. |
 | Grab a standing enemy | Reach to the upper body and squeeze grip; keep holding to restrain. | Physical acquisition is not implemented. Native right-trigger CQC remains available. |
-| Interrogate | While restraining or holding someone up, open wrist Commands and choose an available question. | Commands input and wrist display implemented; interrogation needs a target interaction. |
+| Interrogate | While restraining or holding someone up, open wrist Commands and choose an available question. | Native trigger restraint, Commands selection, interrogation, map update and release exercised in SIM on 2026-09-20. Physical hand acquisition and hold-up remain separate checks. |
 | Throw | While holding a valid grab, deliberate push and release. | Planned. Must enter a native throw, not teleport a ragdoll. |
 | Knock out a restrained enemy | Deliberate free-hand strike or explicit wrist action. | Planned. Ordinary grip movement must not injure the person. |
 | Lethal knife finish | Explicit labeled choice while restraining. | Native contextual knife action only; no free-hand knife system. |
@@ -38,3 +38,27 @@ hand strike. That does not turn scenery into destructible objects or make every
 enemy state eligible. Preserve native obstructions and target reactions.
 
 Native reference: [Konami's CQC, hold-up, interrogation and extraction guide](https://mgstpp-app.konamionline.com/manual/pc/na/en/pc_12.html).
+
+## Native guard check, 2026-09-20
+
+On mission 30010, a setup-only native warp placed the player beside retail
+guard 1142. Right trigger acquired the restraint with the weapon lowered;
+holding X opened the actual interrogation choices without releasing him.
+Right-stick selection and A confirmation produced native `_OnInterrogation`
+and `_OnMapUpdate` events for that guard. Releasing right trigger released him
+alive. Player damage stayed enabled, and cleanup restored the original player
+position. No scripted grab, interrogation result, knockout or actor spawn was
+used.
+
+The continuous native right-eye take is
+`artifacts/showcase-20260920/16-guard-cqc/guard-interrogate-release-02.mp4`,
+with matching input/event JSON and paired compositor captures. The take lasts
+24.87 seconds: 741 captured frames, five reported drops, finalized successfully.
+This establishes the tested trigger-and-menu sequence in the simulator, not
+physical hand contact, headset acceptance, all questions or all guard states.
+
+Still open: weapon hold-up and surrender, threatened-guard commands, escape and
+alert transitions, restraint locomotion, knockout/choke/knife/throw controls,
+carrying and dropping bodies, concealment, Fulton extraction, and their hand
+and camera animation ownership. Physical grabs, dragging and shoulder transfer
+remain unimplemented as described above.
