@@ -5,6 +5,11 @@ Reviewed every visible branch in all five GitHub forks against upstream
 in `artifacts/fork-review-20260920`. This is a source review, not a claim of
 headset validation of those branches.
 
+The user plans to use both community forks and the two supplied C++ files in
+the **next build**, after the approved September 20 package. Decisions below
+identify integration work and conflicts, not a decision to discard contributions.
+Preserve author attribution and reconcile each change with the current rig.
+
 | Fork | Unique work | Decision |
 | --- | --- | --- |
 | [s-ilent](https://github.com/s-ilent/MGS5VR/tree/perf/adaptive-frame-pacing) | Adaptive pacing, mailbox worker, diagnostics | Adaptive pacing is worth a bounded integration. Do not import the worker: its final commit removes D3D11 immediate-context synchronization and relies on DXVK behavior. Current native D3D11 must remain supported. |
