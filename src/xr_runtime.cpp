@@ -3,11 +3,13 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/controls.hpp"
 #include "mgs5vr/native_controls.hpp"
+#include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/native_video.hpp"
 #include "mgs5vr/opening_selector.hpp"
+#include "mgs5vr/cabin_walk.hpp"
 #include <Xinput.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
@@ -122,6 +124,7 @@ struct Session {
     WeaponScopeZoomInput weaponZoomInput;
     SnapTurn snapControls;
     NativeSmoothTurn smoothControls;
+    CabinTurn cabinTurn;
     OpticStabilizer opticStabilizer;
     float snapYaw{};
     OpticGate opticGate;
@@ -382,13 +385,21 @@ struct Session {
         result.aimTracked=locate(aim,aimSpaces[n],result.aim);
         return result;
     }
+    WeaponGripSmoothing weaponSmoothing;
+    void suspendInput(XrTime time){
+        controllerFrame=passiveControllerFrame(controllerFrame,time,referenceEpoch);
+        idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();
+        snapControls.reset();smoothControls.reset();cabinTurn.reset();rigControls.suspend();controls.suspend();
+        opticsControls.reset();opticGate.reset();opticStabilizer.reset();weaponSmoothing.reset();commandsControls.suspend();
+        openingSelector.reset();openingFrame={};priorFocused=false;priorRecenter=false;
+        gamepadMailbox().publish({},false,steadyMilliseconds());
+    }
     void syncInput(XrTime time,Pose& head,std::array<EyeView,2>& views,bool stereoTracked){
-        controllerFrame={};controllerFrame.snapYaw=snapYaw;
-        if(!focused){idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};openingBackend=false;cabinPlay=false;priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){suspendInput(time);return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};openingBackend=false;cabinPlay=false;priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){suspendInput(time);return;}
         xrCheck(r,"Sync controller actions");
         if(!priorFocused){
             snapControls.reset();
@@ -421,7 +432,7 @@ struct Session {
         const bool liveIdroid=nativeStatus.nativeMenuOpen&&nativeStatus.nativeIdroidOpen;
         const auto detectedMode=controllerRigEnabled()?nativeTravelMode():TravelMode::unknown;
         const bool title=controllerRigEnabled()&&nativeTitleModeActive();
-        const bool spatialTitle=title&&nativeTitleCabinMode();
+        const bool spatialTitle=title&&nativeTitleCabinMode()&&!manualScreenSelected&&!nativeGamepadActive();
         const bool loading=controllerRigEnabled()&&nativeLoadingTipsOpen();
         const bool avatarEditor=controllerRigEnabled()&&nativeAvatarEditActive();
         const bool scriptedDemo=controllerRigEnabled()&&nativeScriptedDemoActive();
@@ -443,7 +454,7 @@ struct Session {
             // cameras. If the accepted title camera was discarded during that
             // handoff, let the first verified player-head publication enter
             // tracked VR again instead of leaving the user on the theatre quad.
-            if(wasLoading&&!loading&&!title&&!headCamera().status().active){
+            if(wasLoading&&!loading&&!title&&!manualScreenSelected&&!headCamera().status().active){
                 automaticEntryDone=false;
                 log("Re-arming automatic tracked VR after native loading handoff");
             }
@@ -498,6 +509,18 @@ struct Session {
             boolean(thumbClick,hands[1])?1.f:0.f,ls,rs,lt,rt};
         physical.leftStick={l.x,l.y};physical.rightStick={rr.x,rr.y};
         reloadControls(physical,now);
+        setHandheldMenus(controls.setting("settings.handheld_menus")>=.5f);
+        // Apply controller fit once, before devices, skin and action rays fork.
+        for(size_t n=0;n<2;++n){
+            auto& hand=controllerFrame.hands[n];if(!hand.gripTracked)continue;
+            const std::string prefix=n?"settings.right_hand_":"settings.left_hand_";
+            const Pose offset{binocularGripRotation(controls.setting(prefix+"pitch_degrees"),
+                controls.setting(prefix+"yaw_degrees"),controls.setting(prefix+"roll_degrees")),
+                {controls.setting(prefix+"x_cm")*.01f,controls.setting(prefix+"y_cm")*.01f,controls.setting(prefix+"z_cm")*.01f}};
+            const auto fitted=compose(hand.grip,offset);
+            if(hand.aimTracked)hand.aim=compose(compose(fitted,inverse(hand.grip)),hand.aim);
+            hand.grip=fitted;
+        }
         controllerFrame.frontEnd=title||loading;
         controllerFrame.loading=loading;
         controllerFrame.avatarEditor=avatarEditor;
@@ -505,7 +528,7 @@ struct Session {
         controllerFrame.authoredCamera=(title&&!spatialTitle)||avatarEditor||scriptedDemo;
         controllerFrame.openingBackend=openingBackend;
         controllerFrame.cabinPlay=cabinPlay;
-        const bool titleCabin=spatialTitle&&openingCabinEnabled()&&nativeTitleMenuOpen();
+        const bool titleCabin=spatialTitle&&openingCabinEnabled()&&nativeTitleMenuOpen()&&!manualScreenSelected&&!nativeGamepadActive();
         if(titleCabin)openingFrame=openingSelector.update(true,openingAssetsReady,false,head,controllerFrame.hands,now,
             headCamera().openingTrackingOrigin(now));
         else if(cabinPlay)openingFrame=openingSelector.updateCabin(true,head,controllerFrame.hands,now);
@@ -523,10 +546,21 @@ struct Session {
             log("Opening tape blocked by native safety policy: "+std::string(openingTapeLabels[openingFrame.selection]));
         // Label/geometry changes belong to this same input publication.
         controllerFrame.equipmentLabels=equipmentLabels;
+        controllerFrame.nativeGamepad=nativeGamepadActive();
         controllerFrame.wristSurfaceLift=controls.setting("settings.wrist_surface_lift_cm")*.01f;
         controllerFrame.wristSelectorHeight=controls.setting("settings.wrist_selector_height_cm")*.01f;
         controllerFrame.wristPickerWidth=controls.setting("settings.wrist_picker_width_cm")*.01f;
         controllerFrame.idroidScreenWidth=controls.setting("settings.idroid_screen_width_cm")*.01f;
+        controllerFrame.idroidScreenDepth=controls.setting("settings.idroid_screen_depth_cm")*.01f;
+        controllerFrame.handheldMenus=handheldMenusSelected();
+        controllerFrame.menuQuadWidth=controls.setting("settings.menu_quad_width_cm")*.01f;
+        controllerFrame.menuQuadDistance=controls.setting("settings.menu_quad_distance_cm")*.01f;
+        controllerFrame.menuQuadTilt=controls.setting("settings.menu_quad_tilt_degrees");
+        controllerFrame.playerHeightOffset=controls.setting("settings.player_height_offset_cm")*.01f;
+        controllerFrame.supportGripRadius=controls.setting("settings.support_grip_radius_cm")*.01f;
+        controllerFrame.supportDetachRadius=controls.setting("settings.support_detach_radius_cm")*.01f;
+        controllerFrame.handRestCurl=controls.setting("settings.hand_rest_curl_percent")*.01f;
+        controllerFrame.handTouchCurl=controls.setting("settings.hand_touch_curl_percent")*.01f;
         controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         controllerFrame.binocularAutoMark=controls.setting("settings.binocular_auto_mark")>=.5f;
@@ -545,7 +579,7 @@ struct Session {
             binocularSelected?ControlContext::binoculars:mode==TravelMode::vehicle?ControlContext::vehicle:
             mode==TravelMode::horse?ControlContext::horse:ControlContext::gameplay;
         controls.update(physical,controlContext,now);
-        const auto nativeInput=nativeControls.update(controls,physical);
+        const auto nativeInput=nativeControls.update(controls,physical,manualScreenSelected);
         if(nativeInput.changed){
             controls.suspend();rigControls.suspend();commandsControls.suspend();opticsControls.reset();opticGate.reset();snapControls.reset();
             log(nativeInput.selected?"Native buttons ON: all XInput controls; release inputs before use":"Native buttons OFF: normal VR bindings; release inputs before use");
@@ -562,7 +596,7 @@ struct Session {
             headCamera().awaitScene();
             nativeStatus=headCamera().status();
         }
-        if(!automaticEntryDone&&!startupScreen&&!loading&&stereoTracked&&(detectedMode!=TravelMode::unknown||title||avatarEditor||scriptedDemo)
+        if(!automaticEntryDone&&!manualScreenSelected&&!startupScreen&&!loading&&stereoTracked&&(detectedMode!=TravelMode::unknown||title||avatarEditor||scriptedDemo)
            &&nativeStatus.enabled&&headCamera().available()&&!nativeStatus.nativeMenuOpen){
             automaticEntryDone=true;headCamera().toggle();nativeStatus=headCamera().status();
             log(title?"Tracked VR entered for the native Title menu":"Tracked VR entered automatically on the first playable character");
@@ -610,6 +644,7 @@ struct Session {
         const bool opticSupport=activeControl("binoculars.support_grip");
         const auto binocularRotation=binocularGripRotation(controls.setting("settings.binocular_pitch_degrees"),
             controls.setting("settings.binocular_yaw_degrees"),controls.setting("settings.binocular_roll_degrees"));
+        const float binocularMaxEyeDistance=controls.setting("settings.binocular_max_eye_distance_cm")*.01f;
         const bool opticAvailable=rigInput&&mode==TravelMode::onFoot&&right
             &&binocularSelected
             &&!commandsControls.active()&&!headToggle
@@ -618,7 +653,7 @@ struct Session {
             auto& primary=controllerFrame.hands[1];const auto& support=controllerFrame.hands[0];
             if(const auto raw=solveBinocularPose(support.grip,primary.grip,support.aim,primary.aim,
                 support.gripTracked,primary.gripTracked,support.aimTracked,primary.aimTracked,opticSupport,binocularSelected,binocularRotation)){
-                const auto steady=opticStabilizer.update(head,primary.grip,*raw,true,now,referenceEpoch);
+                const auto steady=opticStabilizer.update(head,primary.grip,*raw,true,now,referenceEpoch,binocularMaxEyeDistance);
                 primary.aim=compose(compose(steady,inverse(primary.grip)),primary.aim);primary.grip=steady;
             }else opticStabilizer.reset();
         }else opticStabilizer.reset();
@@ -627,7 +662,7 @@ struct Session {
             controllerFrame.hands[0].aim,controllerFrame.hands[1].aim,
             controllerFrame.hands[0].gripTracked,controllerFrame.hands[1].gripTracked,
             controllerFrame.hands[0].aimTracked,controllerFrame.hands[1].aimTracked,
-            opticSupport,binocularSelected,opticAvailable,now,referenceEpoch,binocularRotation);
+            opticSupport,binocularSelected,opticAvailable,now,referenceEpoch,binocularRotation,binocularMaxEyeDistance);
         controllerFrame.optic=optic;
         // Bounded fit telemetry makes the eye-relief decision auditable from
         // the same LOCAL poses that drive the gate. It stays in the runtime
@@ -663,6 +698,7 @@ struct Session {
             // transitions may rebind the camera, but cannot override this choice.
             manualScreenSelected=nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer;
             headCamera().toggle();
+            if(manualScreenSelected)recenterRequested=true;
             log(manualScreenSelected?"Manual presentation: large quad":"Manual presentation: immersive VR");
         }
         priorHeadToggle=headToggle;
@@ -678,7 +714,7 @@ struct Session {
             pad=nativeInput.gamepad;move={};navigation={};
         }else if(!rigInput){
             const auto fallbackMode=scriptedDemo?NativeMenuInput::cinematic:
-                sceneFallback?NativeMenuInput::scriptedScene:liveIdroid?NativeMenuInput::liveIdroid:NativeMenuInput::menu;
+                sceneFallback?NativeMenuInput::scriptedScene:liveIdroid&&controllerFrame.handheldMenus?NativeMenuInput::liveIdroid:NativeMenuInput::menu;
             pad=nativeMenuGamepad(controls,physical,fallbackMode);
             move={float(pad.leftX)/32767.f,float(pad.leftY)/32767.f};
             navigation={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
@@ -710,7 +746,7 @@ struct Session {
             }
         }
         pad.buttons|=menuBits;
-        if(!nativeInput.exclusive){
+        if(!nativeInput.exclusive&&rigInput){
             pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
             pad.rightX=static_cast<int16_t>(navigation[0]*32767);pad.rightY=static_cast<int16_t>(navigation[1]*32767);
         }
@@ -827,7 +863,9 @@ struct Session {
         if(rigInput&&!nativeInput.exclusive&&!stickNavigation
            &&!mountedViewOwnsRightStick(mode,rigInput,nativeInput.exclusive,stickNavigation))
             {pad.rightX=0;pad.rightY=0;}
-        const bool turnAvailable=rigInput&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
+        const bool cabinTurning=(controllerFrame.openingSelector||cabinPlay)&&nativeStatus.active
+            &&!nativeStatus.nativeMenuOpen&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
+        const bool turnAvailable=rigInput&&!cabinTurning&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
         const auto turnMode=controls.setting("settings.turn_mode");
         const auto smoothAxis=controls.axis("axes.turn",physical);
         // Mounted locomotion owns a native vehicle/horse heading. An artificial
@@ -841,15 +879,23 @@ struct Session {
         const float turnAxis=activeControl("turn.right")?1.f:activeControl("turn.left")?-1.f:0.f;
         const auto turn=snapControls.update(turnAxis,0,turnAvailable&&turnMode==0&&!mounted)
             *controls.setting("settings.snap_turn_degrees")/30.f;
+        if(!priorFocused)cabinTurn.reset();
+        const auto cabinYaw=cabinTurn.update(smoothAxis,static_cast<int>(turnMode),
+            controls.setting("settings.snap_turn_degrees"),cabinTurning,now,nativeStatus.activation);
         if(!nativeStatus.active&&!nativeStatus.pending&&!nativeStatus.awaitingPlayer)snapYaw=0;
-        if(mounted)snapYaw=0;
+        if(mounted&&!cabinTurning)snapYaw=0;
         if(turn){snapYaw=std::remainder(snapYaw+turn,6.283185307f);log("Physical snap turn degrees="+std::to_string(-turn*57.2957795f));}
+        if(cabinYaw)snapYaw=std::remainder(snapYaw+cabinYaw,6.283185307f);
         controllerFrame.snapYaw=snapYaw;
         // Apply LAST: the generic menu mapping otherwise overwrites the zero
         // axes and moves native focus while the user walks around the cabin.
         pad=cabinTitleGamepad(pad,controllerFrame.openingSelector,
             openingFrame.pulse==OpeningPulse::confirm&&!utilityCenter&&!headToggle);
-        gamepadMailbox().publish(pad,true,steadyMilliseconds());
+        bool xrIntent=false;
+        for(size_t n=0;n<11;++n)xrIntent=xrIntent||physical.buttons[n]>.25f;
+        for(const auto stick:{physical.leftStick,physical.rightStick})
+            xrIntent=xrIntent||std::abs(stick[0])>.25f||std::abs(stick[1])>.25f;
+        gamepadMailbox().publish(pad,true,steadyMilliseconds(),xrIntent);
         const auto hapticNow=steadyMilliseconds();
         const auto wheel=wheelMailbox().read(hapticNow);
         const bool holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped&&controllerFrame.wheelGrip;
@@ -869,6 +915,12 @@ struct Session {
                 }else xrStopHapticFeedback(handle,&info);
             }
         }
+        auto& weaponHand=controllerFrame.hands[1];
+        const auto steadyGrip=weaponSmoothing.update(head,weaponHand.grip,
+            weaponHand.gripTracked&&controllerFrame.weaponReady&&!binocularSelected&&!nativeStatus.nativeMenuOpen,
+            controls.setting("settings.weapon_smoothing_ms"),now,referenceEpoch);
+        if(weaponHand.aimTracked)weaponHand.aim=compose(compose(steadyGrip,inverse(weaponHand.grip)),weaponHand.aim);
+        weaponHand.grip=steadyGrip;
         priorRecenter=center;priorFocused=true;
     }
     ~Session(){
@@ -984,6 +1036,8 @@ RuntimeProbe probeRuntime(){
 }
 
 RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const std::atomic_bool& stop,std::chrono::seconds duration){
+    struct DisplayPeriodReset {~DisplayPeriodReset(){reportConsumerDisplayPeriod(0);}} displayPeriodReset;
+    reportConsumerDisplayPeriod(0);
     if(!std::isfinite(config.widthMeters)||config.widthMeters<1||config.widthMeters>30
         ||!std::isfinite(config.distanceMeters)||config.distanceMeters<1||config.distanceMeters>30)
         throw std::invalid_argument("Theatre dimensions must be finite values from 1 to 30 meters");
@@ -1029,14 +1083,15 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         }
         session.poll();if(session.exiting||(closing&&!session.running))break;
         if(closing&&now>=closeDeadline){log("OpenXR STOPPING event deadline exceeded");break;}
-        if(!session.running){std::this_thread::sleep_for(std::chrono::milliseconds(10));continue;}
+        if(!session.running){reportConsumerDisplayPeriod(0);std::this_thread::sleep_for(std::chrono::milliseconds(10));continue;}
         XrFrameWaitInfo wi{XR_TYPE_FRAME_WAIT_INFO};XrFrameState frame{XR_TYPE_FRAME_STATE};
         xrCheck(xrWaitFrame(session.handle,&wi,&frame),"Wait XR frame");
         const auto waitDone=steadyMilliseconds();
         XrFrameBeginInfo bi{XR_TYPE_FRAME_BEGIN_INFO};xrCheck(xrBeginFrame(session.handle,&bi),"Begin XR frame");
         EndFrameGuard guard{session.handle,frame.predictedDisplayTime};++stats.frames;
         // Keep paired empty frames until STOPPING; do not publish more native input during exit.
-        if(closing)continue;
+        if(closing){reportConsumerDisplayPeriod(0);continue;}
+        reportConsumerDisplayPeriod(frame.predictedDisplayPeriod);
         if(session.pendingLocalChange&&frame.predictedDisplayTime>=session.pendingLocalChange){
             session.pendingLocalChange=0;session.recenterRequested=true;anchored=false;
             ++session.referenceEpoch;
@@ -1058,7 +1113,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         if(!stats.haveViews&&tracking&&stereoTracked){
             stats.firstHead=trackedHead;stats.firstViews=trackedViews;stats.haveViews=true;
         }
-        headCamera().trackStereo(trackedHead,trackedViews,tracking&&stereoTracked&&session.focused,steadyMilliseconds(),session.controllerFrame);
+        headCamera().trackStereo(trackedHead,trackedViews,tracking&&stereoTracked,steadyMilliseconds(),session.controllerFrame);
         const auto trackingDone=steadyMilliseconds();
         if(tracking&&(!anchored||session.recenterRequested)){
             screenPose=recenteredScreen(fromXr(head.pose),config.distanceMeters);anchored=true;session.recenterRequested=false;

@@ -15,9 +15,6 @@ namespace mgs5vr {
 namespace {
 struct Hands {HeadCameraSample frame;std::array<Pose,2> palms;HandContacts contacts;};
 std::mutex publicationMutex,interactionMutex;
-std::mutex contactMutex;
-std::optional<AnimalContactCapsule> headContact;
-uint64_t contactAt{},contactActivation{};
 Hands latest;
 struct Stroke {
     Vec3 relative{},local{};
@@ -79,11 +76,6 @@ bool respond(){
 }
 Hands hands(){std::lock_guard lock(publicationMutex);return latest;}
 }
-std::optional<AnimalContactCapsule> nativeDogHeadContact(uint64_t now,uint64_t activation){
-    std::lock_guard lock(contactMutex);
-    if(activation!=contactActivation||now<contactAt||now-contactAt>100)return {};
-    return headContact;
-}
 void publishAnimalHands(const HeadCameraSample& frame,const std::array<Pose,2>& palms,const HandContacts& contacts){
     std::lock_guard lock(publicationMutex);latest={frame,palms,contacts};
 }
@@ -91,22 +83,6 @@ void consumeAnimalTouch(){
     std::lock_guard lock(interactionMutex);
     const auto sample=hands();const auto& frame=sample.frame;
     const auto now=steadyMilliseconds();const auto status=headCamera().status();
-    const auto bones=dogBones();
-    {
-        std::lock_guard contactLock(contactMutex);headContact.reset();
-        if(bones&&status.active&&frame.applied&&frame.activation==status.activation
-           &&now>=frame.sampleTime&&now-frame.sampleTime<=100&&cabinActor(frame,(*bones)[0])){
-            const auto forward=(*bones)[0]-(*bones)[1];
-            const auto direction=forward*(1.f/std::max(length(forward),.001f));
-            headContact=AnimalContactCapsule{(*bones)[0]+direction*.20f,(*bones)[0]-direction*.10f,.16f};
-            contactAt=frame.sampleTime;contactActivation=frame.activation;
-        }
-    }
-    if(frame.controllers.cabinPlay&&now-lastRuntimeReport>=2000){
-        lastRuntimeReport=now;
-        log(std::string("Cabin native D-Dog runtime=")+(bones?"present":"absent")
-            +" hand_touch_enabled="+std::to_string(frame.controllers.allowAnimalTouch));
-    }
     if(!frame.controllers.allowAnimalTouch||!status.active||status.nativeMenuOpen||!frame.applied||frame.activation!=status.activation
        ||now<frame.sampleTime||now-frame.sampleTime>100||frame.controllers.weaponReady
        ||frame.controllers.vehicleControls||frame.controllers.optic.held||frame.controllers.commandControls
@@ -119,6 +95,13 @@ void consumeAnimalTouch(){
     }
     if(frame.sampleTime<=consumed)return;
     consumed=frame.sampleTime;
+    if(!frame.controllers.hands[0].gripTracked&&!frame.controllers.hands[1].gripTracked)return;
+    const auto bones=dogBones();
+    if(frame.controllers.cabinPlay&&now-lastRuntimeReport>=2000){
+        lastRuntimeReport=now;
+        log(std::string("Cabin native D-Dog runtime=")+(bones?"present":"absent")
+            +" hand_touch_enabled="+std::to_string(frame.controllers.allowAnimalTouch));
+    }
     if(handActivation!=frame.activation){strokes={};handActivation=frame.activation;}
     if(!bones){for(auto& stroke:strokes)resetContact(stroke);return;}
     if(!cabinActor(frame,(*bones)[0])){
@@ -165,7 +148,7 @@ void consumeAnimalTouch(){
         // cannot contribute a stroke. Both reference frames must see movement.
         if(speed>.025f)stroke.travel+=std::min(relativeStep,localStep);
         const auto touchingFor=frame.sampleTime-stroke.startedAt;
-        if((touchingFor>=500&&stroke.travel>=.025f)||touchingFor>=1200){
+        if(touchingFor>=500&&stroke.travel>=.025f){
             if(respond()){
                 // Buddy responses are shared across the two hands. Preserve
                 // the cooldown even if tracking or the native pose pauses.

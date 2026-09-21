@@ -12,7 +12,7 @@ Preserve author attribution and reconcile each change with the current rig.
 
 | Fork | Unique work | Decision |
 | --- | --- | --- |
-| [s-ilent](https://github.com/s-ilent/MGS5VR/tree/perf/adaptive-frame-pacing) | Adaptive pacing, mailbox worker, diagnostics | Adaptive pacing is worth a bounded integration. Do not import the worker: its final commit removes D3D11 immediate-context synchronization and relies on DXVK behavior. Current native D3D11 must remain supported. |
+| [s-ilent](https://github.com/s-ilent/MGS5VR/tree/perf/adaptive-frame-pacing) | Adaptive pacing, mailbox worker, diagnostics | Adaptive pacing is incorporated in the next local candidate with rate bounds, jitter handling and session reset. The worker is not imported: its final commit removes D3D11 immediate-context synchronization and relies on DXVK behavior. Current native D3D11 must remain supported. |
 | [vinionsinho](https://github.com/vinionsinho/MGS5VR/tree/movement-stabilization-test) | Native head animation filter | Keep the useful discontinuity/reset ideas for comparison. Do not layer this filter over the existing root-relative head stabilization: that would add a second filter and change stance response. |
 | [lukebluetiger](https://github.com/lukebluetiger/MGS5VR) | Older grenade/support-hand lab and README branches | Compare individual fixes with the retained local lab branches. Do not replace the current rig with the older prototype; it predates subsequent interaction and cabin fixes. |
 | [kyus2001](https://github.com/kyus2001/MGS5VR) | Main matches upstream | Nothing unique to import. |

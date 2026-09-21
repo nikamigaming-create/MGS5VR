@@ -3,6 +3,20 @@
 #include <cmath>
 
 namespace mgs5vr {
+std::optional<std::array<size_t,14>> armHelperIndices(std::span<const uint32_t> names,
+    std::span<const int32_t> parents){
+    if(names.empty()||names.size()!=parents.size())return {};
+    std::array<size_t,14> result{};
+    for(size_t helper=0;helper<armHelperNames.size();++helper){
+        bool found=false;
+        for(size_t i=0;i<names.size();++i)if(names[i]==armHelperNames[helper]){
+            if(found||parents[i]!=armHelperParents[helper])return {};
+            result[helper]=i;found=true;
+        }
+        if(!found)return {};
+    }
+    return result;
+}
 namespace {
 Vec3 cross(Vec3 a,Vec3 b){return {a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};}
 float length(Vec3 v){return std::sqrt(dot(v,v));}
@@ -33,6 +47,16 @@ std::optional<Vec3> outsideArmSurface(Vec3 point,const ArmSurface& surface){
        ||!std::isfinite(surface.clearance)||surface.clearance<0||surface.clearance>.15f)return {};
     return point+surface.normal*std::max(0.f,surface.clearance-dot(point-surface.point,surface.normal));
 }
+std::optional<Pose> aimedWeaponGrip(Pose primary,Pose aim,Vec3 forwardInPrimary){
+    if(!valid(primary)||!valid(aim)||!valid(Pose{{},forwardInPrimary}))return {};
+    const float axisLength=length(forwardInPrimary);
+    if(axisLength<.001f||axisLength>2.f)return {};
+    const auto current=rotate(primary.orientation,forwardInPrimary);
+    const auto requested=rotate(aim.orientation,{0,0,-1});
+    // Reject a reversed/unrelated muzzle frame instead of flipping the wrist.
+    if(dot(unit(current),unit(requested))<-.8f)return {};
+    return Pose{turn(swing(current,requested),primary.orientation),primary.position};
+}
 std::optional<Pose> twoHandGrip(Pose primary,Pose support,Vec3 forwardInPrimary,float influence){
     if(!valid(primary)||!valid(support)||!valid(Pose{{},forwardInPrimary})
        ||!std::isfinite(influence)||influence<0||influence>1)return {};
@@ -47,6 +71,10 @@ std::optional<Pose> twoHandGrip(Pose primary,Pose support,Vec3 forwardInPrimary,
     if(delta.w<0)delta={-delta.x,-delta.y,-delta.z,-delta.w};
     delta=normalize({delta.x*influence,delta.y*influence,delta.z*influence,1+(delta.w-1)*influence});
     return Pose{turn(delta,primary.orientation),primary.position};
+}
+float freeFingerCurl(unsigned finger,float trigger,float squeeze,bool triggerTouched,bool thumbTouched,float resting,float touched){
+    const float contact=finger==0?(thumbTouched?touched:resting):finger==1?(triggerTouched?touched:resting):resting;
+    return std::clamp(std::max(contact,finger==1?trigger:squeeze),0.f,1.f);
 }
 std::optional<Quat> fingerJointRotation(bool right,unsigned finger,unsigned joint,float curl){
     if(finger>=5||joint>=3||!std::isfinite(curl)||curl<0||curl>1)return {};
@@ -159,11 +187,12 @@ bool closeSupportContact(Vec3 separation){
     const float distance2=dot(separation,separation);
     return std::isfinite(distance2)&&distance2>=.000025f&&distance2<=.18f*.18f;
 }
-bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time){
-    if(!ready||!tracked||!std::isfinite(distance)||distance<0||time<lastTime_){reset();return false;}
+bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time,float acquireRadius,float detachRadius){
+    if(!ready||!tracked||!std::isfinite(distance)||distance<0||time<lastTime_
+       ||!std::isfinite(acquireRadius)||!std::isfinite(detachRadius)||acquireRadius<.03f||detachRadius<acquireRadius+.019f||detachRadius>.60f){reset();return false;}
     lastTime_=time;
-    if(attached_){if(distance<.20f)return true;reset();return false;}
-    if(distance>=.10f){candidate_=false;return false;}
+    if(attached_){if(distance<detachRadius)return true;reset();return false;}
+    if(distance>=acquireRadius){candidate_=false;return false;}
     if(!candidate_){candidate_=true;since_=time;}
     if(time-since_>=150){attached_=true;candidate_=false;}
     return attached_;

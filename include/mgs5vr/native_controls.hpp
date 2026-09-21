@@ -21,6 +21,9 @@ private:
 // Transfer a short-lived recovery request from XR input to the native Lua job.
 void requestNativeIdroidClose(bool requested) noexcept;
 bool takeNativeIdroidClose() noexcept;
+// The native Lua job owns the pause registration; XR only publishes the mode.
+void setHandheldMenus(bool enabled) noexcept;
+bool handheldMenusSelected() noexcept;
 struct NativeControlSample {
     GamepadSample gamepad{};
     bool selected{},exclusive{},changed{};
@@ -30,12 +33,12 @@ struct NativeControlSample {
 // physical controls before either layout can send anything to the game.
 class NativeControls {
 public:
-    NativeControlSample update(const ControlBindings& bindings,const PhysicalControls& physical);
-    bool selected() const {return selected_;}
+    NativeControlSample update(const ControlBindings& bindings,const PhysicalControls& physical,bool screenMode=false);
+    bool selected() const {return selected_||screenMode_;}
     void suspend(){releaseRequired_=true;priorToggle_=false;resetDpad();}
 private:
     void resetDpad(){dpad_=0;shiftHeld_=waitDirectionNeutral_=waitBrowseNeutral_=false;}
-    bool selected_{},priorToggle_{},releaseRequired_{};
+    bool selected_{},priorToggle_{},releaseRequired_{},screenMode_{};
     bool shiftHeld_{},waitDirectionNeutral_{},waitBrowseNeutral_{};
     uint16_t dpad_{};
 };

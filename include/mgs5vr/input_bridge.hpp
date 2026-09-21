@@ -12,6 +12,17 @@ struct GamepadSample {
     int16_t leftX{},leftY{},rightX{},rightY{};
     bool operator==(const GamepadSample&) const = default;
 };
+bool gamepadHasIntent(GamepadSample sample) noexcept;
+// Connected gamepads own input by default. A fresh VR action can take over
+// when the pad is neutral; held VR controls cannot steal it back.
+class GamepadOwnership {
+public:
+    bool update(bool connected,GamepadSample native,bool xrAvailable,bool xrIntent) noexcept;
+private:
+    bool native_{},connected_{},priorXrIntent_{};
+};
+bool nativeGamepadActive() noexcept;
+void setNativeGamepadActive(bool active) noexcept;
 struct OnFootActions { bool run{},stance{},dive{},pickupCarry{},switchWeapon{}; };
 // Apply after menu/equipment routing, only when on-foot gameplay owns input.
 // Native X means weapon-switch while aiming, so Dive must lower native aim.
@@ -207,9 +218,9 @@ private:
 // and stale samples return neutral success so the game sees every button release.
 class GamepadMailbox {
 public:
-    void publish(GamepadSample sample,bool active,uint64_t steadyMilliseconds);
+    void publish(GamepadSample sample,bool active,uint64_t steadyMilliseconds,bool intent=false);
     void publishExternal(GamepadSample sample,bool active,uint64_t steadyMilliseconds);
-    std::optional<GamepadSample> read(uint64_t steadyMilliseconds, bool* freshActive = nullptr) const;
+    std::optional<GamepadSample> read(uint64_t steadyMilliseconds, bool* freshActive = nullptr,bool* intent=nullptr) const;
 private:
     struct ExternalEvent {
         GamepadSample sample{};
@@ -219,7 +230,7 @@ private:
     mutable std::mutex mutex_;
     GamepadSample sample_{};
     uint64_t timestamp_{};
-    bool connected_{},active_{};
+    bool connected_{},active_{},intent_{};
     mutable std::deque<ExternalEvent> externalQueue_;
     mutable ExternalEvent externalCurrent_{};
     mutable bool externalCurrentValid_{},externalCurrentDelivered_{};

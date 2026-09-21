@@ -10,6 +10,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <mutex>
+#include <atomic>
 namespace mgs5vr {
 namespace {
 using GetState=DWORD(WINAPI*)(DWORD,XINPUT_STATE*);
@@ -21,8 +22,14 @@ GamepadSample previous{};
 DWORD packet{};
 bool reported{};
 unsigned reportedButtons{};
+GamepadOwnership ownership;
+std::atomic<DWORD> physicalIndex{};
+GamepadSample sampleOf(const XINPUT_STATE& state){
+    const auto& p=state.Gamepad;return {p.wButtons,p.bLeftTrigger,p.bRightTrigger,p.sThumbLX,p.sThumbLY,p.sThumbRX,p.sThumbRY};
+}
 DWORD WINAPI setState(DWORD index,XINPUT_VIBRATION* vibration){
     if(!vibration)return ERROR_BAD_ARGUMENTS;
+    if(index==0&&nativeGamepadActive())return originalSet(physicalIndex.load(),vibration);
     bool active{};
     gamepadMailbox().read(steadyMilliseconds(),&active);
     if(index==0&&active){
@@ -34,13 +41,23 @@ DWORD WINAPI setState(DWORD index,XINPUT_VIBRATION* vibration){
 DWORD WINAPI getState(DWORD index,XINPUT_STATE* state){
     if(!state)return ERROR_BAD_ARGUMENTS;
     if(index==0){
-        bool freshActive{};
-        const auto sample=gamepadMailbox().read(steadyMilliseconds(),&freshActive);
+        bool freshActive{},xrIntent{};
+        const auto sample=gamepadMailbox().read(steadyMilliseconds(),&freshActive,&xrIntent);
+        XINPUT_STATE physical{};bool connected=false;const DWORD slot=physicalIndex.load();
+        for(DWORD n=0;n<XUSER_MAX_COUNT;++n){
+            const DWORD candidate=(slot+n)%XUSER_MAX_COUNT;XINPUT_STATE found{};
+            if(original(candidate,&found)!=ERROR_SUCCESS)continue;
+            if(!connected){physical=found;physicalIndex.store(candidate);connected=true;}
+            if(gamepadHasIntent(sampleOf(found))){physical=found;physicalIndex.store(candidate);break;}
+        }
+        bool usePhysical{};
+        {std::lock_guard guard(stateMutex);usePhysical=ownership.update(connected,sampleOf(physical),freshActive,xrIntent);}
+        setNativeGamepadActive(usePhysical);
+        if(usePhysical){*state=physical;return ERROR_SUCCESS;}
         if(sample){
             if(freshActive){consumeAnimalTouch();consumeMeleeSweep();}
             // Give an attached physical pad back when XR is inactive. If none is
             // attached, synthesize neutral success to release the previous XR state.
-            if(!freshActive&&original(index,state)==ERROR_SUCCESS)return ERROR_SUCCESS;
             std::lock_guard guard(stateMutex);
             if(*sample!=previous){
                 if(sample->buttons!=previous.buttons&&reportedButtons<128){

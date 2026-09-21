@@ -13,6 +13,19 @@ int main(){try{
     } fixture;
     if(!fixture.bytes)throw std::runtime_error("allocate graphics-option fixture");
     const auto require=[](bool condition,const char* reason){if(!condition)throw std::runtime_error(reason);};
+    using mgs5vr::nativeProducerIntervalNs;
+    require(nativeProducerIntervalNs(0)==8333333&&nativeProducerIntervalNs(-1)==8333333,
+        "missing or lost runtime returns to bounded 120 Hz fallback");
+    require(nativeProducerIntervalNs(999999)==8333333&&nativeProducerIntervalNs(50000001)==8333333,
+        "invalid runtime periods cannot command extreme engine rates");
+    require(nativeProducerIntervalNs(13888889)==10416667,"72 Hz runtime targets 96 Hz producer");
+    require(nativeProducerIntervalNs(11111111)==8333334,"90 Hz retains historical 120 Hz pacing");
+    require(nativeProducerIntervalNs(8333333)==6250000,"120 Hz runtime leaves producer scheduling margin");
+    require(nativeProducerIntervalNs(1000000)==5555556&&nativeProducerIntervalNs(50000000)==16666667,
+        "producer remains bounded at 60..180 Hz for every accepted period");
+    for(int64_t period=1000000;period<=50000000;period+=10000)
+        require(nativeProducerIntervalNs(period)>=5555556&&nativeProducerIntervalNs(period)<=16666667,
+            "all valid runtime periods preserve the engine rate bounds");
     require(!mgs5vr::nativeFrameRateEnabled(),"native pacing must start disabled");
     require(!mgs5vr::enableNativeFrameRate(0),"null image refused");
     constexpr std::array<unsigned char,13> target{0x49,0x85,0xcc,0x75,0x1d,0xf2,0x0f,0x10,0x0d,0xe3,0xcf,0xeb,0x01};

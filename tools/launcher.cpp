@@ -15,6 +15,7 @@
 #include <string>
 #include <stdexcept>
 #include <vector>
+#include <iostream>
 
 namespace fs=std::filesystem;
 using namespace Gdiplus;
@@ -31,7 +32,7 @@ std::array<Button,13> buttons{{
     {browse,{590,361,118,37},L"BROWSE"},
     {launch,{36,463,672,64},L"LAUNCH IN STEAM   >"},
     {install,{36,543,331,48},L"INSTALL VR"},
-    {controls,{377,543,331,48},L"EDIT CONTROLS"},
+    {controls,{377,543,331,48},L"VR SETTINGS / CONTROLS"},
     {guide,{36,607,218,44},L"FIELD GUIDE"},
     {folder,{264,607,218,44},L"GAME FOLDER"},
     {remove,{492,607,216,44},L"REMOVE MOD"},
@@ -54,6 +55,10 @@ std::array<fs::path,2> games;
 unsigned selected{};
 bool busy{},preview{};
 bool smoke{};
+bool headless{};
+struct Invocation {fs::path script;std::vector<std::wstring> args;bool monitor;};
+std::vector<Invocation> smokeInvocations;
+std::vector<std::wstring> smokeOpened;
 float scale=1,offsetX{},offsetY{},phase{};
 std::wstring status=L"Select your game executable to get started.",transcript=L"Ready. No game or headset is launched automatically.\r\n";
 HANDLE child{},pipeRead{};
@@ -97,6 +102,7 @@ std::wstring systemError(DWORD code){
     std::wstring result=message?message:L"Windows could not complete the request.";LocalFree(message);return result;
 }
 void append(const std::wstring& value){
+    if(headless){std::wcout<<value<<std::flush;return;}
     transcript+=value;
     if(transcript.size()>24000)transcript.erase(0,transcript.size()-24000);
     if(logControl){SetWindowTextW(logControl,transcript.c_str());SendMessageW(logControl,EM_SETSEL,transcript.size(),transcript.size());SendMessageW(logControl,EM_SCROLLCARET,0,0);}
@@ -120,13 +126,14 @@ void loadGames(){
     }
 }
 void refresh(){
+    if(headless)return;
     const bool chosen=file(games[selected]);
     SetWindowTextW(pathControl,chosen?games[selected].c_str():L"Choose mgsvtpp.exe or MgsGroundZeroes.exe...");
     for(auto& b:buttons){
         bool enabled=!busy;
         if(b.id==launch)enabled&=chosen&&installed();
         if(b.id==install)enabled&=chosen&&selected==0&&hasPackage();
-        if(b.id==controls)enabled&=chosen&&file(games[selected].parent_path()/L"mgs5vr-controls.ini")&&file(package/L"tools/edit-controls.ps1");
+        if(b.id==controls)enabled&=chosen&&file(games[selected].parent_path()/L"mgs5vr-controls.ini")&&file(package/L"tools/edit-settings.ps1");
         if(b.id==folder)enabled&=chosen;
         if(b.id==remove)enabled&=chosen&&selected==0&&installed()&&hasPackage();
         if(b.id==applyDisplay)enabled&=chosen&&selected==0&&file(package/L"tools/launcher-display.ps1");
@@ -207,6 +214,7 @@ void layout(){
     SendMessageW(pathControl,WM_SETFONT,reinterpret_cast<WPARAM>(uiFont),TRUE);SendMessageW(logControl,WM_SETFONT,reinterpret_cast<WPARAM>(uiFont),TRUE);
 }
 bool open(const std::wstring& target,const wchar_t* verb=L"open"){
+    if(smoke){smokeOpened.push_back(target);return true;}
     const auto result=reinterpret_cast<INT_PTR>(ShellExecuteW(window,verb,target.c_str(),nullptr,nullptr,SW_SHOWNORMAL));
     if(result>32)return true;
     failed=true;status=L"Windows could not open that item.";append(status+L"\r\n");refresh();return false;
@@ -230,6 +238,7 @@ void choose(){
     failed=false;status=installed()?L"Installation record found. Ready to launch or update.":L"Game selected. Install the mod before launching in VR.";refresh();
 }
 bool startPowerShell(const fs::path& script,const std::vector<std::wstring>& args,bool monitor){
+    if(smoke){smokeInvocations.push_back({script,args,monitor});return true;}
     if(!file(script)){failed=true;status=L"Package incomplete: extract all files beside the launcher.";append(status+L"\r\n");refresh();return false;}
     std::array<wchar_t,32768> system{};GetSystemDirectoryW(system.data(),static_cast<UINT>(system.size()));
     const auto exe=fs::path(system.data())/L"WindowsPowerShell/v1.0/powershell.exe";
@@ -253,7 +262,7 @@ bool startPowerShell(const fs::path& script,const std::vector<std::wstring>& arg
     const auto error=GetLastError();if(write)CloseHandle(write);if(nullInput&&nullInput!=INVALID_HANDLE_VALUE)CloseHandle(nullInput);
     if(!ok){if(pipeRead){CloseHandle(pipeRead);pipeRead=nullptr;}failed=true;status=L"Could not start the installer/editor.";append(systemError(error));refresh();return false;}
     CloseHandle(info.hThread);
-    if(monitor){child=info.hProcess;busy=true;failed=false;append(L"\r\nWorking. Keep this window open; detailed output follows.\r\n");refresh();}
+    if(monitor){child=info.hProcess;busy=true;failed=false;if(!headless)append(L"\r\nWorking. Keep this window open; detailed output follows.\r\n");refresh();}
     else CloseHandle(info.hProcess);
     return true;
 }
@@ -273,13 +282,13 @@ void poll(){
         if(PeekNamedPipe(pipeRead,nullptr,0,nullptr,&available,nullptr)&&available)return;
         CloseHandle(child);child=nullptr;CloseHandle(pipeRead);pipeRead=nullptr;busy=false;failed=code!=0;
         status=failed?L"Operation stopped. Details and any recovery path are in the log.":L"Complete. Your game archives and saves were not changed.";
-        append(L"\r\n"+status+L"\r\n");refresh();
+        if(!headless)append(L"\r\n"+status+L"\r\n");refresh();
     }
 }
 void action(Id id){
     if(busy)return;
     if(id==tpp||id==gz){selected=id==gz?1u:0u;failed=false;status=selected?L"GZ first-person adapters are not ready. Existing installs only.":installed()?L"Installation record found. Ready to launch or update.":L"Select your game executable to get started.";refresh();}
-    else if(id==browse)choose();
+    else if(id==browse){if(smoke)smokeOpened.push_back(L"choose-game");else choose();}
     else if(id==launch||id==applyDisplay||id==detect){
         if(id!=detect&&(!file(games[selected])||(id==launch&&!installed())))return;
         const wchar_t* preset=selected||displayPreset()==0?L"Current":displayPreset()==1?L"Headset":L"Custom";
@@ -292,14 +301,16 @@ void action(Id id){
         if(!graphicsConfigs[selected].empty()){args.push_back(L"-GraphicsConfig");args.push_back(graphicsConfigs[selected].wstring());}
         startPowerShell(package/L"tools/launcher-display.ps1",args,true);
     }else if(id==accountConfig){
+        if(smoke){smokeOpened.push_back(L"choose-account");return;}
         std::array<wchar_t,32768> path{};OPENFILENAMEW dialog{sizeof(dialog)};dialog.hwndOwner=window;dialog.lpstrFile=path.data();
         dialog.nMaxFile=static_cast<DWORD>(path.size());dialog.lpstrTitle=L"Steam userdata / your account / 287700 / local / TPP_GRAPHICS_CONFIG";
         dialog.lpstrFilter=L"TPP graphics settings\0TPP_GRAPHICS_CONFIG\0\0";dialog.Flags=OFN_FILEMUSTEXIST|OFN_PATHMUSTEXIST|OFN_NOCHANGEDIR;
         if(GetOpenFileNameW(&dialog)){graphicsConfigs[selected]=path.data();append(L"Graphics account: "+graphicsConfigs[selected].wstring()+L"\r\n");}
     }else if(id==whatsNew){
+        if(smoke){smokeOpened.push_back(L"changes");return;}
         MessageBoxW(window,L"NEW IN THIS LAUNCHER\n\nOpenXR per-eye recommendation, 50-150% scale, custom native width/height, pre-launch Apply, live actual render size and recoverable graphics backups. Windows resolution and DSR are untouched.\n\nCURRENT TPP CHANGES\n\nBinocular side-cup grip, pistol support acquisition, lens-only recon visibility with a glow switch, dwell acquisition, and native title/menu presentation.\n\nSTILL OPEN\n\nTrue mirrored left-handed rig; remaining HUD/cinematic/effect cases; complete weapons, gadgets and buddy interactions; Ground Zeroes first-person rig and wrist HUD. Physical headset coverage and the full showcase are not complete.",L"MGS5VR / Changes and remaining work",MB_OK|MB_ICONINFORMATION);
     }else if(id==controls){
-        startPowerShell(package/L"tools/edit-controls.ps1",{L"-Path",(games[selected].parent_path()/L"mgs5vr-controls.ini").wstring()},false);
+        startPowerShell(package/L"tools/edit-settings.ps1",{L"-Path",(games[selected].parent_path()/L"mgs5vr-controls.ini").wstring()},false);
     }else if(id==guide){
         const auto local=package/L"docs/images/control-modes.svg";
         open(file(local)?local.wstring():L"https://github.com/nikamigaming-create/MGS5VR/blob/main/docs/CONTROLS.md");
@@ -307,7 +318,7 @@ void action(Id id){
     else if(id==install||id==remove){
         if(selected||!file(games[selected]))return;
         const std::wstring mode=id==remove?L"Remove":installed()?L"Update":L"Install";
-        if(mode==L"Remove"&&MessageBoxW(window,L"Remove MGS5VR from game startup?\n\nMod files and settings are moved to a recoverable backup. Game archives and saves stay untouched.",L"Remove MGS5VR",MB_YESNO|MB_ICONQUESTION)!=IDYES)return;
+        if(mode==L"Remove"&&!smoke&&MessageBoxW(window,L"Remove MGS5VR from game startup?\n\nMod files and settings are moved to a recoverable backup. Game archives and saves stay untouched.",L"Remove MGS5VR",MB_YESNO|MB_ICONQUESTION)!=IDYES)return;
         startPowerShell(package/L"tools/launcher-maintenance.ps1",{L"-Mode",mode,L"-GameExe",games[selected].wstring()},true);
     }
 }
@@ -369,6 +380,17 @@ bool selfTest(){
 }
 }
 int WINAPI wWinMain(HINSTANCE current,HINSTANCE,PWSTR,int show){
+    // Same scripts as the visible buttons, with inherited output and no UI.
+    int cliCount{};auto** cliArgs=CommandLineToArgvW(GetCommandLineW(),&cliCount);
+    if(cliCount>=2&&!wcscmp(cliArgs[1],L"--headless")){
+        headless=true;package=exePath().parent_path();
+        if(!file(package/L"tools/launcher-cli.ps1"))package=package.parent_path().parent_path();
+        std::vector<std::wstring> arguments;for(int i=2;i<cliCount;++i)arguments.emplace_back(cliArgs[i]);LocalFree(cliArgs);
+        if(!startPowerShell(package/L"tools/launcher-cli.ps1",arguments,true))return 1;
+        while(child){poll();if(child)Sleep(10);}
+        return failed?1:0;
+    }
+    if(cliArgs)LocalFree(cliArgs);
     instance=current;GdiplusStartupInput startup;ULONG_PTR token{};
     if(GdiplusStartup(&token,&startup,nullptr)!=Ok)return 1;
     CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
@@ -402,7 +424,30 @@ int WINAPI wWinMain(HINSTANCE current,HINSTANCE,PWSTR,int show){
                 const bool gzSafe=selected==1&&!IsWindowEnabled(buttons[4].window)&&!child;
                 SendMessageW(window,WM_COMMAND,MAKEWPARAM(tpp,BN_CLICKED),0);
                 const bool tppSafe=selected==0&&!IsWindowEnabled(buttons[3].window)&&!IsWindowEnabled(buttons[4].window)&&!child;
-                DestroyWindow(window);exitCode=created&&custom&&automatic&&gzSafe&&tppSafe?0:1;
+                // Actual button dispatcher, isolated filesystem, recorded side
+                // effects. No game, browser, file picker or desktop input.
+                const auto fixture=fs::temp_directory_path()/(L"mgs5vr-launcher-"+std::to_wstring(GetCurrentProcessId()));
+                fs::create_directory(fixture);games[0]=fixture/L"mgsvtpp.exe";
+                for(const auto name:{L"mgsvtpp.exe",L"dinput8.dll",L"mgs5vr-install.json",L"mgs5vr-controls.ini"})std::ofstream(fixture/name)<<"fixture";
+                graphicsConfigs[0]=fixture/L"TPP_GRAPHICS_CONFIG";
+                SendMessageW(presetControl,CB_SETCURSEL,2,0);SetWindowTextW(widthControl,L"5120");SetWindowTextW(heightControl,L"4096");refresh();
+                for(const auto id:{launch,applyDisplay,detect,controls,install,Id::remove,browse,accountConfig,guide,folder,whatsNew})
+                    SendMessageW(window,WM_COMMAND,MAKEWPARAM(id,BN_CLICKED),0);
+                const auto argument=[](const Invocation& call,const std::wstring& name){
+                    const auto found=std::find(call.args.begin(),call.args.end(),name);
+                    return found!=call.args.end()&&found+1!=call.args.end()?*(found+1):L"";
+                };
+                bool actions=smokeInvocations.size()==6&&smokeOpened.size()==5;
+                if(actions)actions=argument(smokeInvocations[0],L"-Mode")==L"Launch"
+                    &&argument(smokeInvocations[0],L"-Width")==L"5120"&&argument(smokeInvocations[0],L"-Height")==L"4096"
+                    &&argument(smokeInvocations[1],L"-Mode")==L"Apply"&&argument(smokeInvocations[2],L"-Mode")==L"Detect"
+                    &&smokeInvocations[3].script.filename()==L"edit-settings.ps1"&&!smokeInvocations[3].monitor
+                    &&argument(smokeInvocations[4],L"-Mode")==L"Update"&&argument(smokeInvocations[5],L"-Mode")==L"Remove";
+                busy=true;action(launch);busy=false;actions=actions&&smokeInvocations.size()==6;
+                // Delete only the four files this self-test created.
+                for(const auto name:{L"mgsvtpp.exe",L"dinput8.dll",L"mgs5vr-install.json",L"mgs5vr-controls.ini"})fs::remove(fixture/name);
+                fs::remove(fixture);
+                DestroyWindow(window);exitCode=created&&custom&&automatic&&gzSafe&&tppSafe&&actions?0:1;
             }else{
                 ShowWindow(window,show);UpdateWindow(window);MSG message{};
                 while(GetMessageW(&message,nullptr,0,0)>0){if(!IsDialogMessageW(window,&message)){TranslateMessage(&message);DispatchMessageW(&message);}}

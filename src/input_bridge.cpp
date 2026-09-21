@@ -5,7 +5,21 @@
 #include <cmath>
 #include <cstdlib>
 namespace mgs5vr {
-namespace { std::atomic_bool loadingPromptConfirm{}; }
+namespace { std::atomic_bool loadingPromptConfirm{},physicalGamepad{}; }
+bool nativeGamepadActive() noexcept{return physicalGamepad.load();}
+void setNativeGamepadActive(bool active) noexcept{physicalGamepad.store(active);}
+bool gamepadHasIntent(GamepadSample p) noexcept{
+    return p.buttons||p.leftTrigger>30||p.rightTrigger>30
+        ||std::abs(int(p.leftX))>7849||std::abs(int(p.leftY))>7849
+        ||std::abs(int(p.rightX))>8689||std::abs(int(p.rightY))>8689;
+}
+bool GamepadOwnership::update(bool connected,GamepadSample native,bool xrAvailable,bool xrIntent) noexcept{
+    if(!connected)native_=false;
+    else if(!connected_||!xrAvailable||gamepadHasIntent(native))native_=true;
+    else if(xrIntent&&!priorXrIntent_)native_=false;
+    connected_=connected;priorXrIntent_=xrAvailable&&xrIntent;
+    return native_;
+}
 void applyOnFootActions(GamepadSample& sample,bool& weaponReady,OnFootActions actions){
     constexpr uint16_t run=0x0040,stance=0x1000,carry=0x2000,diveOrSwitch=0x4000;
     if(actions.run)sample.buttons|=run;
@@ -377,8 +391,8 @@ uint16_t MenuButton::update(bool pressed,bool active,uint64_t time,bool recenter
     if(time>=pulseUntil_)pulse_=0;
     return pulse_;
 }
-void GamepadMailbox::publish(GamepadSample sample,bool active,uint64_t time){
-    std::lock_guard guard(mutex_);sample_=sample;active_=active;connected_=connected_||active;timestamp_=time;
+void GamepadMailbox::publish(GamepadSample sample,bool active,uint64_t time,bool intent){
+    std::lock_guard guard(mutex_);sample_=sample;active_=active;intent_=intent;connected_=connected_||active;timestamp_=time;
 }
 void GamepadMailbox::publishExternal(GamepadSample sample,bool active,uint64_t time){
     std::lock_guard guard(mutex_);
@@ -387,9 +401,10 @@ void GamepadMailbox::publishExternal(GamepadSample sample,bool active,uint64_t t
     externalQueue_.push_back({sample,time,active});
     connected_=connected_||active;
 }
-std::optional<GamepadSample> GamepadMailbox::read(uint64_t time,bool* freshActive) const {
+std::optional<GamepadSample> GamepadMailbox::read(uint64_t time,bool* freshActive,bool* intent) const {
     std::lock_guard guard(mutex_);
     if(freshActive)*freshActive=false;
+    if(intent)*intent=false;
     if(!connected_)return {};
     if(externalCurrentValid_&&externalCurrentDelivered_&&!externalQueue_.empty()){
         externalCurrent_=externalQueue_.front();externalQueue_.pop_front();
@@ -405,11 +420,13 @@ std::optional<GamepadSample> GamepadMailbox::read(uint64_t time,bool* freshActiv
         }else{
             externalCurrentDelivered_=true;
             if(freshActive)*freshActive=true;
+            if(intent)*intent=true;
             return externalCurrent_.active?externalCurrent_.sample:GamepadSample{};
         }
     }
     if(!active_||time<timestamp_||time-timestamp_>250)return GamepadSample{};
     if(freshActive)*freshActive=true;
+    if(intent)*intent=intent_;
     return sample_;
 }
 GamepadMailbox& gamepadMailbox(){static GamepadMailbox box;return box;}

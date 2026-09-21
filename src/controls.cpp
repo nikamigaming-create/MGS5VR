@@ -54,7 +54,7 @@ const std::vector<ControlDefinition>& controlDefinitions(){
     static const std::vector<ControlDefinition> definitions=[] {
         std::vector<ControlDefinition> result{
         {"system.idroid","tap(menu,550)",normal},{"system.pause","hold(menu,550)",normal},
-        {"system.recenter","press(left_grip + menu)",normal},{"system.toggle_vr","disabled",all},
+        {"system.recenter","press(left_grip + menu)",normal},{"system.toggle_vr","hold(menu + b,550)",all},
         {"system.native_buttons","hold(menu + a,550)",all},
         {"gameplay.run","left_stick_click",foot},{"gameplay.stance","a",foot},
         {"gameplay.dive","press(right_stick_click)",foot},{"gameplay.interact","y",foot},
@@ -152,6 +152,29 @@ std::vector<ControlBindings::Binding> ControlBindings::parse(std::string text){
     }
     return result;
 }
+const std::vector<SettingDefinition>& settingDefinitions(){
+    static const std::vector<SettingDefinition> definitions{
+        {"settings.snap_turn_degrees",30,5,90},{"settings.motion_melee",1,0,1},{"settings.animal_touch",1,0,1},
+        {"settings.wrist_surface_lift_cm",2,0,10},{"settings.wrist_selector_height_cm",15,5,30},
+        {"settings.wrist_picker_width_cm",42,42,100},{"settings.idroid_screen_width_cm",30,20,60},
+        {"settings.idroid_screen_depth_cm",0,0,20},
+        {"settings.handheld_menus",0,0,1},{"settings.menu_quad_width_cm",120,60,240},
+        {"settings.menu_quad_distance_cm",130,75,300},{"settings.menu_quad_tilt_degrees",-10,-30,30},
+        {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",1,0,2},{"settings.hud_mode",1,0,2},
+        {"settings.binocular_pitch_degrees",-90,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
+        {"settings.binocular_roll_degrees",0,-180,180},{"settings.binocular_auto_mark",1,0,1},
+        {"settings.binocular_max_eye_distance_cm",30,15,50},
+        {"settings.binocular_actor_glow",1,0,1},{"settings.binocular_mark_dwell_ms",650,100,3000},
+        {"settings.player_height_offset_cm",0,-50,50},
+        {"settings.left_hand_x_cm",0,-15,15},{"settings.left_hand_y_cm",0,-15,15},{"settings.left_hand_z_cm",0,-15,15},
+        {"settings.left_hand_pitch_degrees",0,-90,90},{"settings.left_hand_yaw_degrees",0,-90,90},{"settings.left_hand_roll_degrees",0,-90,90},
+        {"settings.right_hand_x_cm",0,-15,15},{"settings.right_hand_y_cm",0,-15,15},{"settings.right_hand_z_cm",0,-15,15},
+        {"settings.right_hand_pitch_degrees",0,-90,90},{"settings.right_hand_yaw_degrees",0,-90,90},{"settings.right_hand_roll_degrees",0,-90,90},
+        {"settings.weapon_smoothing_ms",0,0,150},
+        {"settings.support_grip_radius_cm",10,3,30},{"settings.support_detach_radius_cm",30,5,60},
+        {"settings.hand_rest_curl_percent",8,0,30},{"settings.hand_touch_curl_percent",20,0,60}};
+    return definitions;
+}
 ControlBindings::ControlBindings(){
     for(const auto& d:controlDefinitions()){
         auto bindings=parse(std::string(d.binding));
@@ -159,15 +182,7 @@ ControlBindings::ControlBindings(){
     }
     axes_={{"axes.move",0},{"axes.equipment",1},{"axes.commands",1},{"axes.menu",0},{"axes.map",1},{"axes.vehicle_steering",0},
         {"axes.native_move",0},{"axes.native_look",1},{"axes.turn",1}};
-    settings_={{"settings.snap_turn_degrees",30,5,90},{"settings.motion_melee",1,0,1},{"settings.animal_touch",1,0,1},
-        {"settings.wrist_surface_lift_cm",2,0,10},{"settings.wrist_selector_height_cm",15,5,30},
-        {"settings.wrist_picker_width_cm",42,42,100},
-        {"settings.idroid_screen_width_cm",30,20,60},
-        {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",1,0,2},{"settings.hud_mode",1,0,2},
-        {"settings.binocular_pitch_degrees",-90,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
-        {"settings.binocular_roll_degrees",0,-180,180},
-        {"settings.binocular_auto_mark",1,0,1},{"settings.binocular_actor_glow",1,0,1},
-        {"settings.binocular_mark_dwell_ms",650,100,3000}};
+    for(const auto& d:settingDefinitions())settings_.push_back({std::string(d.name),d.value,d.minimum,d.maximum});
 }
 std::vector<std::string> ControlBindings::load(std::istream& input){
     ControlBindings candidate=*this;std::vector<std::string> errors;std::set<std::string> seen;
@@ -211,6 +226,10 @@ std::vector<std::string> ControlBindings::load(std::istream& input){
         }catch(const std::exception& e){errors.push_back("line "+std::to_string(number)+": "+e.what());}
     }
     if(input.bad())errors.push_back("could not read the complete controls file");
+    if(candidate.setting("settings.support_detach_radius_cm")<candidate.setting("settings.support_grip_radius_cm")+2)
+        errors.push_back("support_detach_radius_cm must exceed support_grip_radius_cm by at least 2 cm");
+    if(candidate.setting("settings.hand_touch_curl_percent")<candidate.setting("settings.hand_rest_curl_percent"))
+        errors.push_back("hand_touch_curl_percent must be at least hand_rest_curl_percent");
     // Ambiguous identical bindings in the same context are almost always a typo.
     // Tap and hold on one button are intentional; disjoint contexts are safe.
     for(size_t a=0;a<candidate.entries_.size();++a)for(size_t b=a+1;b<candidate.entries_.size();++b){

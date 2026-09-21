@@ -208,10 +208,11 @@ Pose binocularFaceSafeGrip(Pose head,Pose primary,const OpticPose& optic){
     return primary;
 }
 
-Pose OpticStabilizer::update(Pose head,Pose grip,const OpticPose& optic,bool available,uint64_t time,uint64_t epoch){
-    if(!available||!epoch||!finitePose(head)||!finitePose(grip)||!optic.tracked){reset();return grip;}
+Pose OpticStabilizer::update(Pose head,Pose grip,const OpticPose& optic,bool available,uint64_t time,uint64_t epoch,float maxEyeDistance){
+    if(!available||!epoch||!finitePose(head)||!finitePose(grip)||!optic.tracked
+       ||!std::isfinite(maxEyeDistance)||maxEyeDistance<.15f||maxEyeDistance>.50f){reset();return grip;}
     const auto local=compose(inverse(head),grip);
-    const bool close=distance(head.position,optic.rightEyepiece.position)<.18f
+    const bool close=distance(head.position,optic.rightEyepiece.position)<maxEyeDistance+.04f
         &&facing(head,optic.rightEyepiece)>.6f;
     if(!ready_||epoch!=epoch_||time<=time_||time-time_>150||!close){
         filtered_=local;ready_=true;time_=time;epoch_=epoch;return grip;
@@ -237,6 +238,23 @@ Pose OpticStabilizer::update(Pose head,Pose grip,const OpticPose& optic,bool ava
     return compose(head,filtered_);
 }
 
+Pose WeaponGripSmoothing::update(Pose head,Pose grip,bool available,float milliseconds,uint64_t time,uint64_t epoch){
+    if(!available||!epoch||!finitePose(head)||!finitePose(grip)||!std::isfinite(milliseconds)||milliseconds<=0||milliseconds>150){reset();return grip;}
+    const auto local=compose(inverse(head),grip);
+    if(!ready_||epoch!=epoch_||time<=time_||time-time_>150||distance(local.position,filtered_.position)>.25f){
+        filtered_=local;ready_=true;time_=time;epoch_=epoch;return grip;
+    }
+    const float alpha=1.f-std::exp(-static_cast<float>(time-time_)/milliseconds);time_=time;
+    auto target=local.orientation;const auto prior=filtered_.orientation;
+    if(prior.x*target.x+prior.y*target.y+prior.z*target.z+prior.w*target.w<0)
+        target={-target.x,-target.y,-target.z,-target.w};
+    Quat q{prior.x+(target.x-prior.x)*alpha,prior.y+(target.y-prior.y)*alpha,
+        prior.z+(target.z-prior.z)*alpha,prior.w+(target.w-prior.w)*alpha};
+    const float norm=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
+    filtered_.orientation={q.x/norm,q.y/norm,q.z/norm,q.w/norm};
+    filtered_.position=filtered_.position+(local.position-filtered_.position)*alpha;
+    return compose(head,filtered_);
+}
 std::optional<EyeView> binocularSceneView(const OpticPose& optic,float magnification){
     if(optic.kind!=OpticKind::binocular||!optic.tracked||!optic.ray.tracked
        ||!finitePose(optic.rightEyepiece)||!std::isfinite(magnification)
@@ -254,12 +272,13 @@ std::optional<EyeView> binocularSceneView(const OpticPose& optic,float magnifica
     return EyeView{objective,{-halfAngle,halfAngle,halfAngle,-halfAngle}};
 }
 
-bool binocularEyeVisible(const OpticPose& optic,Pose eye){
-    if(!binocularSceneView(optic,1.f)||!finitePose(eye))return false;
+bool binocularEyeVisible(const OpticPose& optic,Pose eye,float maxEyeDistance){
+    if(!binocularSceneView(optic,1.f)||!finitePose(eye)||!std::isfinite(maxEyeDistance)
+       ||maxEyeDistance<.15f||maxEyeDistance>.50f)return false;
     const auto local=compose(inverse(optic.rightEyepiece),eye).position;
-    if(local.z<binocularEyeRelief*.5f||local.z>binocularEyeRelief*2.f)return false;
-    return local.x*local.x+local.y*local.y<=binocularOcularRadius*binocularOcularRadius
-        &&facing(optic.rightEyepiece,eye)>.75f;
+    if(local.z<.04f||local.z>maxEyeDistance)return false;
+    return local.x*local.x+local.y*local.y<=binocularEyeBoxRadius*binocularEyeBoxRadius
+        &&facing(optic.rightEyepiece,eye)>.6f;
 }
 
 bool validateBinocularViews(const OpticSample& optic,const Pose& head,
@@ -274,9 +293,10 @@ bool validateBinocularViews(const OpticSample& optic,const Pose& head,
 OpticSample OpticGate::update(Pose head,const std::array<EyeView,2>& eyes,
     Pose leftGrip,Pose rightGrip,Pose leftAim,Pose rightAim,
     bool leftTracked,bool rightTracked,bool leftAimTracked,bool rightAimTracked,
-    bool leftHeld,bool rightHeld,bool available,uint64_t time,uint64_t epoch,Quat gripRotation){
+    bool leftHeld,bool rightHeld,bool available,uint64_t time,uint64_t epoch,Quat gripRotation,float maxEyeDistance){
     OpticSample result;
-    if(!available||!epoch||time<time_||(epoch_&&epoch!=epoch_)){
+    if(!available||!epoch||time<time_||(epoch_&&epoch!=epoch_)||!std::isfinite(maxEyeDistance)
+       ||maxEyeDistance<.15f||maxEyeDistance>.50f){
         const bool wasActive=active_;
         reset();
         result.closed=wasActive;
@@ -292,22 +312,25 @@ OpticSample OpticGate::update(Pose head,const std::array<EyeView,2>& eyes,
         return result;
     }
     result.pose=*pose;
-    const float leftDistance=distance(pose->leftEyepiece.position,eyes[0].pose.position);
-    const float rightDistance=distance(pose->rightEyepiece.position,eyes[1].pose.position);
-    const float leftFacing=facing(pose->leftEyepiece,eyes[0].pose);
-    const float rightFacing=facing(pose->rightEyepiece,eyes[1].pose);
+    result.maxEyeDistance=maxEyeDistance;
     // Enter conservatively, then keep the optic alive through normal hand
     // tremor and eye-relief motion.  The hysteresis is important in VR: a
     // single noisy pose must not flicker the native binocular state or reset
     // the marker/intel acquisition transaction.
-    // The native scene keeps a roughly 10 cm near clip.  The real retail
-    // ocular therefore has to sit just beyond it while still being inside
-    // eye relief; the measured 14 cm gate covers the near-clip-safe pose and
-    // the two-eye lateral offset without allowing activation at arm's length.
-    const float radius=active_?.17f:.14f;
-    const float cosine=active_?.68f:.82f;
-    result.aligned=(leftDistance<=radius&&leftFacing>=cosine)
-        ||(rightDistance<=radius&&rightFacing>=cosine);
+    // Face clearance can move the whole device beyond the nominal 10 cm
+    // relief. Keep that safe raised pose usable without pin-point alignment.
+    // Lens clipping still confines magnification to the actual glass.
+    const float radius=active_?maxEyeDistance+.04f:maxEyeDistance-.02f;
+    const float cosine=active_?.60f:.70f;
+    const float lateral=active_?.10f:.08f;
+    const auto aligned=[&](Pose ocular,Pose eye){
+        const auto local=compose(inverse(ocular),eye).position;
+        // Extending relief permits a farther forward hold, not a device down
+        // at the chest or pointing back through the viewer's head.
+        return local.z>=-.025f&&local.z<=radius
+            &&local.x*local.x+local.y*local.y<=lateral*lateral&&facing(ocular,eye)>=cosine;
+    };
+    result.aligned=aligned(pose->leftEyepiece,eyes[0].pose)||aligned(pose->rightEyepiece,eyes[1].pose);
     const bool wasActive=active_;
     if(result.aligned&&!active_){active_=true;result.opened=true;}
     else if(!result.aligned&&active_){active_=false;result.closed=true;}

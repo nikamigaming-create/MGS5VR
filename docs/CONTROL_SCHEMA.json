@@ -1,6 +1,6 @@
 {
   "title": "MGS5VR / CONTROL MODES",
-  "edition": "Experimental / 13 September 2026 / Quest Touch / Action Type",
+  "edition": "Local candidate / 20 September 2026 / Quest Touch / Action Type",
   "modes": [
     {"title": "01 / MOVE & HANDLE WEAPONS", "rows": [
       ["Left stick / left-stick click / right-stick click", "Move / sprint / dive; clicks mean press inward"],
@@ -40,6 +40,8 @@
       ["Still in development", "Enemy motion-hit reactions, powered arms and physical body grabs"]]},
     {"title": "05 / iDROID, PAUSE & TITLE", "rows": [
       ["Tap left Menu", "Open iDroid"],
+      ["Default menus", "Paused, tilted world panel; keep the 3D scene and head tracking"],
+      ["settings.handheld_menus = 1", "Opt in to live handheld iDroid and wrist Pause"],
       ["Hold left Menu 0.55 seconds", "Pause; inside iDroid this opens Help"],
       ["Pause > Return to Title Menu", "A opens confirmation; choose the native confirmation"],
       ["A / B / left stick", "Confirm / back / navigate"],
@@ -55,11 +57,12 @@
       ["Mounted: right stick", "Native camera/turret look on both axes; not a detached snap offset"],
       ["settings.turn_mode", "snap / native_smooth / off; native sensitivity controls smooth yaw"],
       ["settings.hud_mode", "World cues: full / binoculars_only / off; wrist controls unaffected; captions incomplete"],
-      ["VR entry / optional toggle", "Automatic / unbound; edit system.toggle_vr if wanted"],
+      ["Hold left Menu + right B, 0.55 seconds", "Toggle immersive 3D / recentered big screen; release before repeating"],
       ["Left grip + Menu", "Recenter without changing facing"],
       ["Not yet implemented", "Personal-gun fire through a driver's window"],
       ["Further coverage needed", "Loading, cutscenes, later abilities and vehicle states"]]},
     {"title": "07 / COMPLETE NATIVE BUTTON MODE", "rows": [
+      ["Xbox / XInput pad", "Normal native controls in 3D and theatre; physical input takes ownership"],
       ["Hold Menu + A, 0.55 seconds", "Switch normal VR / native inputs; release all controls after switching"],
       ["A / B / X / Y", "Same native buttons, including holds; B retains native pickup/carry"],
       ["Left / right grip", "Native LB / RB; normal VR actions are inactive in this mode"],

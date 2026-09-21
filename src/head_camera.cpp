@@ -218,7 +218,10 @@ void HeadCamera::setNativeMenuOpen(bool open,bool idroid){
         menuAnchored_=retainMenuAnchor||(active_&&!suspended_&&lastView_.applied&&lastView_.activation==activation_);
         if(menuAnchored_&&!retainMenuAnchor){
             menuNative_=lastView_.nativePose;menuHead_=lastView_.headPose;
-            menuPanel_=compose(nativeTrackedPose(menuNative_,menuHead_,menuHead_),Pose{{},{0,-.05f,-1.3f}});
+            const auto head=uprightOrigin(nativeTrackedPose(menuNative_,menuHead_,menuHead_));
+            const float tilt=controllers_.menuQuadTilt*.00872664626f;
+            menuPanel_=compose(head,Pose{{std::sin(tilt),0,0,std::cos(tilt)},
+                {0,-.20f,-controllers_.menuQuadDistance}});
         }
     }else{
         menuAnchored_=false;
@@ -326,11 +329,9 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(nativeMenuOpen_&&!spatialMenu){awaitPlayerLocked();return result;}
     if(spatialMenu){
         if(camera!=camera_)return result;
-        // The native iDroid terminal is an overlay state, not the deliberate
-        // Pause screen. Keep consuming the current native camera so left-stick
-        // locomotion can continue underneath the tracked display. Pause keeps
-        // the old anchored camera and therefore retains its native behavior.
-        if(!nativeIdroidOpen_)nativePose=menuNative_;
+        // Default menus pause the native world but keep fresh stereo head
+        // tracking. Only the opt-in handheld iDroid follows live locomotion.
+        if(!nativeIdroidOpen_||!controllers_.handheldMenus)nativePose=menuNative_;
         result.menuOpen=true;result.menuIdroid=nativeIdroidOpen_;result.menuPanel=menuPanel_;
         result.playerOwner=playerOwner_;result.playerHead=lastView_.playerHead;
         result.playerSequence=lastView_.playerSequence;
@@ -505,6 +506,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     }
     // FOX's camera-local forward/right candidates are +Z/-X. The explicit
     // 180-degree basis rotation keeps handedness intact; validate in live motion.
+    if(!spatialMenu&&!controllers_.authoredCamera)nativePose.position.y+=controllers_.playerHeightOffset;
     const Pose basis{{0,1,0,0},{}};
     auto relative=compose(inverse(spatialMenu?menuHead_:origin_),head_);
     relative.position=relative.position*units_;

@@ -31,6 +31,7 @@ struct ControllerFrame {
     bool weaponReady{};
     bool supportGrip{};
     bool vehicleControls{};
+    bool nativeGamepad{}; // Physical XInput owns actions and native animated hands.
     bool wheelGrip{};
     bool allowMotionMelee{true},allowAnimalTouch{true};
     bool equipmentOpen{}; // Includes the unfolded chooser before any category is selected.
@@ -40,6 +41,11 @@ struct ControllerFrame {
     // Native iDroid display width; height remains 16:9 so the map never
     // stretches when the user chooses a more comfortable panel size.
     float idroidScreenWidth{.30f};
+    float idroidScreenDepth{},playerHeightOffset{};
+    bool handheldMenus{}; // Opt-in: iDroid on the palm and Pause on the wrist.
+    float menuQuadWidth{1.2f},menuQuadDistance{1.3f},menuQuadTilt{-10.f};
+    float supportGripRadius{.10f},supportDetachRadius{.30f};
+    float handRestCurl{.08f},handTouchCurl{.20f};
     HudMode hudMode{HudMode::binocularsOnly};
     float magnification{1};
     uint64_t weaponZoomSequence{};
@@ -62,12 +68,22 @@ struct ControllerFrame {
     bool openingBackend{}; // Actual title only; never suppress loading/prologue UI.
     bool cabinPlay{}; // Post-loading helicopter cabin sandbox owns tracked interaction.
     std::array<float,2> cabinMove{}; // Title-cabin thumbstick locomotion; does not enter the native gamepad.
-    NativeRoomBounds cabinBounds{}; // Native collision volume shared by rig and actors.
+    NativeRoomBounds cabinBounds{}; // Sampled native actor envelope, not a walking boundary.
     int openingSelection{-1}; // Hovered/active tape, in openingTapeLabels order.
     Pose openingOrigin{};
     Pose openingWorldOrigin{}; // Native anchor captured once, before collision correction.
     bool openingWorldAnchored{};
 };
+// A platform overlay takes input focus, not ownership of the game scene.
+// Keep presentation settings and native scene identity; discard every action.
+inline ControllerFrame passiveControllerFrame(ControllerFrame frame,int64_t time,uint64_t epoch){
+    frame.hands={};frame.optic={};frame.strikeCurl={};frame.cabinMove={};
+    frame.weaponReady=frame.supportGrip=frame.vehicleControls=frame.wheelGrip=false;
+    frame.allowMotionMelee=frame.allowAnimalTouch=frame.commandControls=frame.equipmentOpen=false;
+    frame.equipmentCategory=0;frame.openingSelection=-1;
+    frame.predictedXrTime=time;frame.referenceEpoch=epoch;
+    return frame;
+}
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};
     uint64_t trackingSequence{}, activation{};

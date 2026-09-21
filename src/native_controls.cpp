@@ -3,7 +3,9 @@
 #include <atomic>
 
 namespace mgs5vr {
-namespace {std::atomic_uint64_t idroidCloseRequestedAt{};}
+namespace {std::atomic_uint64_t idroidCloseRequestedAt{};std::atomic_bool handheldMenus{};}
+void setHandheldMenus(bool enabled) noexcept {handheldMenus.store(enabled);}
+bool handheldMenusSelected() noexcept {return handheldMenus.load();}
 void requestNativeIdroidClose(bool requested) noexcept {
     idroidCloseRequestedAt.store(requested?steadyMilliseconds():0);
 }
@@ -46,11 +48,12 @@ GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalCo
     }
     return pad;
 }
-NativeControlSample NativeControls::update(const ControlBindings& bindings,const PhysicalControls& physical){
+NativeControlSample NativeControls::update(const ControlBindings& bindings,const PhysicalControls& physical,bool screenMode){
     NativeControlSample result;
+    if(screenMode_!=screenMode){screenMode_=screenMode;releaseRequired_=true;resetDpad();result.changed=true;}
     const bool toggle=bindings.active("system.native_buttons");
     if(toggle&&!priorToggle_){selected_=!selected_;releaseRequired_=true;resetDpad();result.changed=true;}
-    priorToggle_=toggle;result.selected=selected_;
+    priorToggle_=toggle;result.selected=selected();
     if(releaseRequired_){
         bool neutral=true;
         for(size_t n=0;n<11;++n)neutral=neutral&&std::isfinite(physical.buttons[n])&&physical.buttons[n]<=.09f;
@@ -59,7 +62,7 @@ NativeControlSample NativeControls::update(const ControlBindings& bindings,const
         if(neutral)releaseRequired_=false;
         result.exclusive=true;return result;
     }
-    if(!selected_)return result;
+    if(!selected())return result;
     result.exclusive=true;
     auto& pad=result.gamepad;
     for(const auto& button:nativeButtonDefinitions())if(bindings.active(button.name))pad.buttons|=button.mask;

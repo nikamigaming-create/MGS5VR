@@ -82,6 +82,7 @@ std::array<std::atomic_uint64_t,2> spatialByEye{},hiddenPanelByEye{};
 std::filesystem::path settings;
 bool spatialEnabled{};
 bool menuReaderVerified{};
+bool idroidCloseReaderVerified{};
 bool pauseReaderVerified{};
 std::atomic_int menuState{-1};
 std::atomic_uint64_t pickerDrawTime{};
@@ -501,6 +502,12 @@ void installUiRenderer(uintptr_t moduleBase){
     std::array<unsigned char,8> getterBytes{},openBytes{};
     menuReaderVerified=read(base+0x85fd00,getterBytes.data(),getterBytes.size())&&getterBytes==menuGetter
         &&read(base+0x934110,openBytes.data(),openBytes.size())&&openBytes==menuOpen;
+    // CloseMbDvcTerminal writes the terminal's deferred close byte at +0x25.
+    // Back at the root sets this same byte before the stow animation runs.
+    constexpr std::array<unsigned char,4> requestClose{0xc6,0x41,0x25,0x01};
+    std::array<unsigned char,4> requestCloseBytes{};
+    idroidCloseReaderVerified=menuReaderVerified
+        &&read(base+0x8cecc7,requestCloseBytes.data(),requestCloseBytes.size())&&requestCloseBytes==requestClose;
     constexpr std::array<unsigned char,8> sequenceGetter{0x48,0x8b,0x05,0xf9,0x98,0x69,0x02,0xc3};
     constexpr std::array<unsigned char,6> closePause{0x89,0x43,0x38,0x89,0x43,0x48};
     std::array<unsigned char,6> closeBytes{};
@@ -585,6 +592,16 @@ bool nativeIdroidOpen() noexcept {
     const auto state=menuState.load();
     return state>=0&&(state&1)!=0;
 }
+bool nativeIdroidClosing() noexcept {
+    if(!enabled.load()||!idroidCloseReaderVerified)return true;
+    uintptr_t system{},terminal{},type{};uint8_t closing{};
+    if(!read(base+0x2bf1518,&system,sizeof(system))||!system
+       ||!read(system,&type,sizeof(type))||type!=base+0x2242d78
+       ||!read(system+0x7c0,&terminal,sizeof(terminal))||!terminal
+       ||!read(terminal,&type,sizeof(type))||type!=base+0x22705a8
+       ||!read(terminal+0x25,&closing,sizeof(closing)))return true;
+    return closing!=0;
+}
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
 void requestNativeEquipmentPreview(bool visible) noexcept {equipmentPreviewRequestedAt.store(visible?steadyMilliseconds():0);}
 uint64_t nativeCommandsDrawTime() noexcept {return enabled.load()?commandsDrawTime.load():0;}
@@ -601,9 +618,10 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     // same wrist origin. The iDroid gets its own tracked screen pose.
     const auto picker=wristPickerPose(rig);
     const auto idroid=trackedIdroidPose(rig);
-    const bool handMenu=rig.menuOpen&&rig.menuIdroid&&idroid.has_value();
+    const bool handMenu=rig.menuOpen&&rig.menuIdroid&&rig.controllers.handheldMenus&&idroid.has_value();
+    const bool quadMenu=rig.menuOpen&&!rig.controllers.handheldMenus;
     const bool startup=rig.controllers.frontEnd||rig.controllers.avatarEditor;
-    const auto menuPanel=startup?rig.menuPanel:handMenu?idroid->screen:picker.value_or(Pose{});
+    const auto menuPanel=(startup||quadMenu)?rig.menuPanel:handMenu?idroid->screen:picker.value_or(Pose{});
     producing={eye,camera,view,rig.wristPanel,picker.value_or(Pose{}),picker.has_value(),
                rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),
                rig.controllers.equipmentOpen&&!rig.controllers.equipmentCategory,
@@ -611,14 +629,14 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
                       rig.menuOpen,rig.menuIdroid,menuPanel,rig.controllers.frontEnd,rig.controllers.loading,
                       rig.controllers.openingSelector,rig.controllers.openingBackend,rig.controllers.avatarEditor,
                       authoredView,authoredProjection,
-                rig.controllers.wristPickerWidth,handMenu?rig.controllers.idroidScreenWidth:rig.controllers.wristPickerWidth};
+                rig.controllers.wristPickerWidth,quadMenu?rig.controllers.menuQuadWidth:handMenu?rig.controllers.idroidScreenWidth:rig.controllers.wristPickerWidth};
     producing.loading=rig.controllers.loading;
     producing.openingSelector=rig.controllers.openingSelector;
     producing.hudMode=rig.controllers.hudMode;
     producing.hudView=hudView;
     producing.projection=projection;
     producing.equipmentOpen=rig.controllers.equipmentOpen;
-    producing.menuPanelTracked=startup||(rig.menuIdroid?handMenu:picker.has_value());
+    producing.menuPanelTracked=startup||quadMenu||(rig.menuIdroid?handMenu:picker.has_value());
 }
 void clearUiRenderSource() noexcept {producing={};}
 ReconModelVisibilityScope::ReconModelVisibilityScope(HudMode mode,HudView view,bool glow) noexcept {

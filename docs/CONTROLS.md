@@ -8,7 +8,8 @@
 
 ## Edit your controls
 
-Choose **Edit Controls** in the native launcher, or open **Edit-Controls.cmd** in the extracted release and choose the
+Choose **VR Settings / Controls** in the native launcher for editable settings,
+controller mappings and runtime options, or open **Edit-Controls.cmd** in the extracted release and choose the
 `mgs5vr-controls.ini` beside your **game's** `dinput8.dll`. The external editor
 checks conflicts while you type, refuses invalid saves, and backs up the previous
 file when saving. No game launch is needed to check a layout. This is not yet
@@ -22,6 +23,19 @@ bindings, axes, turning mode, HUD mode and the wrist/binocular adjustments.
 The installed file is the one the game reads;
 the repository copy is a template. Every supported button action is listed,
 with separate gameplay, binocular, wrist, menu, horse and vehicle sections.
+
+The settings editor includes player height, each hand's local position/rotation,
+iDroid width/depth, paused panel size/distance/tilt, wrist placement, weapon smoothing, support acquire/detach
+radii and relaxed/touched finger curl. Missing settings show their defaults.
+Saving checks ranges, preserves other settings and creates an exact backup.
+Runtime settings in `mgs5vr.ini` require restarting the game.
+
+For a window-free workflow, run `MGS5VR-Launcher.exe --headless -Action Settings
+-GameExe "D:\Games\MGS_TPP\mgsvtpp.exe"`. Actions `Set` and `Validate` use the
+same validation as the editor; `Detect`, `Apply`, `Launch`, `Install`, `Update`
+and explicit `Remove -ConfirmRemove` use the launcher's normal operations.
+For example, `-Action Set -Setting settings.support_detach_radius_cm=35` changes
+only that setting. Add `-Runtime` to edit runtime options.
 The bindings below describe the defaults, not a hard-coded layout.
 
 `[settings] hud_mode = binoculars_only` is the default: enhanced world cues
@@ -66,6 +80,10 @@ The file also includes movement/navigation axes, snap angle and physical-gesture
 switches. It remaps implemented actions; it does not create new native game abilities.
 
 Smooth turning is the default: `[settings] turn_mode = native_smooth`.
+In the launcher's **VR SETTINGS / CONTROLS**, set `settings.turn_mode` to `snap` and
+`settings.snap_turn_degrees` to the angle you want (5–90 degrees; default 30).
+The same settings can be edited in `mgs5vr-controls.ini`. The selected angle
+applies in the cabin and on foot; center the stick between turns.
 Set `turn_mode = snap` to enable snap turning; `off` disables normal stick turning. Horses/vehicles use native
 horizontal camera input even with `snap`, because a camera-only snap cannot steer
 their native forward direction. This mounted change still needs headset feedback.
@@ -79,6 +97,18 @@ Send the exact rejected layout when reporting a conflict—the checker names the
 two actions involved, including inherited defaults.
 
 ## Complete native-button mode
+
+A connected Xbox/XInput pad works with the game's normal controls in immersive
+3D and on the big screen. Any of the four XInput slots can supply it. Physical
+pad input takes control; a fresh VR button or stick action can take over after
+the pad returns to neutral. Idle VR input no longer masks the pad. In gamepad
+mode the game's authored hand/weapon animation supplies the poses.
+
+Hold **left Menu + right B for 0.55 seconds**, then release, to switch between
+immersive VR and a large screen. The screen recenters in front of the headset
+and defaults to 12 metres wide at 6 metres away. Screen mode automatically uses
+the native-button layout below; returning to VR restores the previous input
+mode. There is currently no physical Xbox shortcut for switching presentation.
 
 Hold **Menu + right A for 0.55 seconds**, then release buttons and center sticks.
 Repeat to return to normal VR controls. This changes input only, not VR/theatre.
@@ -160,7 +190,9 @@ tracking. Hands in contact with a weapon retain its native grip animation.
 Grip and trigger keep their gameplay actions while also animating the fingers.
 
 Support requires the left palm to stay within 10 cm of the weapon's support grip
-for 150 ms, then blends into contact. Pulling more than 20 cm away releases it.
+for 150 ms, then blends into contact. Pulling more than 30 cm away releases it.
+Both distances are editable as `support_grip_radius_cm` and
+`support_detach_radius_cm`; detach must exceed acquire by at least 2 cm.
 For long-gun foregrips, moving the left hand beside or behind the firing hand
 also releases support; guidance stays within 60 degrees of the right controller's
 pointing direction. This prevents the weapon from following a withdrawn hand.
@@ -267,6 +299,10 @@ right palm position. Both palms face the housing sides, with the fingers curling
 over its top, not pointing back at the eye. Housing, lens, aiming ray and cupped
 hands share that rotation. Set this under `[settings]`
 in your existing controls file to apply the new fit; `0` restores the old angle.
+`binocular_max_eye_distance_cm` sets how far the eye may sit behind the ocular:
+30 cm by default, editable from 15 to 50 cm. G2/WMR users can increase it to
+keep controllers in their tracking volume. This changes activation and
+stabilization tolerance, not lens size, scope geometry or world culling.
 Tracked first-person hands remain fully opaque, including when a wrist, finger,
 or binocular approaches the face. The shoulders follow physical head yaw so turning
 does not leave the sleeve roots in the old game-camera direction.
@@ -283,7 +319,8 @@ small rodents. Explicit native attacks retain their game rules. Enemy reaction
 and damage still need testing.
 
 **Pet D-Dog:** stow the weapon, open your hand and gently stroke his head or
-muzzle. Resting an open palm there also works. D-Dog performs his native pet
+muzzle. Keep contact for at least half a second and move the palm a few
+centimetres. D-Dog performs his native pet
 response while you keep control of your head and hands. Pull away before another
 pet. This interaction has been demonstrated with native game audio in SIM;
 other animal pet responses are still being implemented.
@@ -317,7 +354,7 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Pick up weapon / carry person | Hold **B** at the native prompt |
 | Native attack / CQC / carried-body throw | Right trigger with right grip released; the native game state chooses the action |
 | Wrist Commands / buddy orders | Hold X; point the right stick toward an available command and press A; release X to close |
-| Toggle native VR / large game screen | Unbound by default; optional `system.toggle_vr` in the config. VR enters automatically |
+| Toggle native VR / large game screen | Hold **left Menu + right B** for 0.55 seconds, then release |
 | Open iDroid map | Tap left Menu |
 | Pause | Hold left Menu for at least 0.55 seconds |
 | Main menu / options | Hold left Menu on foot; choose Return to Title Menu or Options with the left stick and A |
@@ -325,22 +362,29 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Recenter the large screen | Left grip + left Menu |
 | Recenter in game, including while holding binoculars | Hold left grip and tap left Menu; keeps your current facing and brings the body under your head |
 
-In the development build, iDroid targets the cupped right palm and Pause targets
-the left wrist. **Current SIM failures:** Pause freezes the visible arm, its
-panel is oversized/partly off-screen, and zoomed map geometry escapes the iDroid
-canvas. These menus are not yet ready for a physical-headset handoff.
-Head movement keeps working during Pause. The iDroid terminal is a live overlay: its left stick
-continues on-foot movement while the right stick handles map navigation, so the
-world and combat are not paused by the VR adapter. The deliberate Pause screen
-retains the game's blocking behavior. The iDroid handset remains attached to the
-right hand while iDroid is open; closing iDroid stows it. Equipment and Commands
-remain on the left wrist.
+By default, **iDroid and Pause use a stable tilted panel in the 3D scene**.
+Gameplay pauses while iDroid is open. Head tracking and stereo stay active;
+the panel stays where it opened, rather than following your face or hand.
+It defaults to 1.2 metres wide, 1.3 metres away, slightly below eye level and
+tilted up by 10 degrees. Width, distance and tilt are editable in VR Settings.
+Closing the menu releases only the mod's own pause; other native pauses remain.
 
-**A** confirms, **B** goes back, the right stick navigates the live iDroid map,
-grips act as **LB/RB**, and triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
+Set **`settings.handheld_menus = 1`** to opt into the live handheld iDroid and
+wrist Pause panel. The handset and projection then follow the cupped right
+palm, and iDroid leaves the world running. This experimental mode still needs
+headset feedback. Equipment and Commands remain on the left wrist in both modes.
+
+**Left stick** selects menu rows; **A** confirms and **B** goes back.
+The **right stick** moves the live map. **Left/right grip** change tabs as
+**LB/RB**, and triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
 zoom step and **Y** switches MAP/NAV. **B** closes iDroid; hold **Menu** again to
 unpause. Holding Menu *inside iDroid* opens its native Help, so close iDroid before
-opening Pause. Release held controls once after returning before moving or firing.
+opening Pause. If a native tutorial traps B, hold **B for 0.75 seconds** to
+request its exit, then answer the game's confirmation. If the handset remains
+out after the panel closes, tap left Menu to stow it before reopening.
+Release held controls once after returning before moving or firing.
+The handheld projection uses native stick/button selection; it does not show
+a decorative touch pointer that cannot select anything.
 
 Recenter uses only a horizontal tracking origin. Native camera pitch/roll is
 excluded from the gameplay tracking frame, so physical turning keeps gravity
@@ -355,9 +399,23 @@ cabin panel. Use the **left stick** to move the highlight and **A** to select.
 Tracked arms remain in the stereo scene. The native-camera pass that supplies
 the panel excludes the owned player's normal geometry, then restores it; this
 does not globally hide arms or restore camera-obstruction fading.
-If you bind `system.toggle_vr`, it switches between immersive VR and the large
+
+With `opening.interactive_cabin=1`, the title cabin uses the physical cassette
+rack. **Left stick** walks through the cabin; **right stick** turns according
+to `settings.turn_mode` (smooth by default, snap only when selected). Sticks
+do not move the hidden title-menu highlight. Movement checks native swept head
+and shoulder clearance and floor support; the initial six-ray actor envelope
+does not restrict walking to a small box. This is camera clearance, not a full
+native player capsule. The cabin keeps the game's original world scale.
+
+Hands follow the controllers when reaching toward D-Dog. An open-hand stroke
+in contact with the native dog triggers his response. There is no dog-specific
+hand snapping or pushback, and merely holding a hand still is not a pet stroke.
+`system.toggle_vr` switches between immersive VR and the large
 quad, including at the title menu. That manual choice persists through the
-title-to-game transition. It is disabled by default. Loading can temporarily use
+title-to-game transition. Its default is **Menu + B held for 0.55 seconds**.
+Existing configurations with an explicit `disabled` retain that choice.
+Loading can temporarily use
 the quad while the next player camera is created; immersive play resumes with that character.
 Cutscene Skip is available only when the native game offers it. Loading,
 cutscenes and player-replacement transitions still need broader VR integration;

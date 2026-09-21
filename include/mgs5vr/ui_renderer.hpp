@@ -13,6 +13,9 @@ std::optional<bool> nativeMenuOpen() noexcept;
 // lets the tracked iDroid remain a live gameplay overlay without treating a
 // deliberate Pause screen as locomotion-capable.
 bool nativeIdroidOpen() noexcept;
+// Closing needs native character updates to stow the device. Unknown state
+// is treated as closing so our optional pause can never trap that transition.
+bool nativeIdroidClosing() noexcept;
 bool nativeTitleMenuOpen() noexcept;
 void publishNativeAvatarEdit(bool active) noexcept;
 bool nativeAvatarEditActive() noexcept;

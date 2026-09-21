@@ -6,7 +6,7 @@
 #include <filesystem>
 
 namespace mgs5vr {
-struct TheatreConfig { float widthMeters{8}, distanceMeters{6};std::filesystem::path controlsPath{}; };
+struct TheatreConfig { float widthMeters{12}, distanceMeters{6};std::filesystem::path controlsPath{}; };
 struct RuntimeProbe {
     bool instanceAvailable{}, headsetAvailable{};
     std::string runtime, system, error;

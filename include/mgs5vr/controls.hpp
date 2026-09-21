@@ -23,6 +23,8 @@ struct PhysicalControls {
 };
 struct ControlDefinition {std::string_view name,binding;uint32_t contexts{};bool modifier{};};
 const std::vector<ControlDefinition>& controlDefinitions();
+struct SettingDefinition {std::string_view name;float value{},minimum{},maximum{};};
+const std::vector<SettingDefinition>& settingDefinitions();
 struct NativeButtonDefinition {std::string_view name,binding;uint16_t mask{};};
 // All fourteen game-facing XInput buttons, excluding the platform Guide button.
 const std::array<NativeButtonDefinition,14>& nativeButtonDefinitions();

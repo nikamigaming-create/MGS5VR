@@ -15,7 +15,8 @@ std::optional<Vec3> unit(Vec3 value){
 }
 
 std::optional<IdroidPose> trackedIdroidPose(const HeadCameraSample& frame) noexcept{
-    if(!frame.applied||!frame.stereoTracked||!frame.activation||!frame.controllers.hands[1].gripTracked
+    const bool nativePalm=frame.controllers.nativeGamepad&&frame.renderedPalmTracked[1]&&valid(frame.renderedPalms[1]);
+    if(!frame.applied||!frame.stereoTracked||!frame.activation||(!frame.controllers.hands[1].gripTracked&&!nativePalm)
        ||!valid(frame.nativePose)||!valid(frame.headPose)||!valid(frame.controllers.hands[1].grip))return {};
     const auto head=nativeTrackedPose(frame.nativePose,frame.headPose,frame.headPose);
     const auto grip=nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.hands[1].grip);
@@ -66,7 +67,8 @@ std::optional<IdroidPose> trackedIdroidPose(const HeadCameraSample& frame) noexc
     const auto displayNormal=rotate(displayOrientation,{0,0,1});
     const auto attachmentUp=rotate(attachmentOrientation,{0,1,0});
     const auto body=Pose{displayOrientation,attachment.position+displayNormal*(palmTracked?.012f:.035f)};
-    const auto screen=Pose{body.orientation,body.position+displayNormal*(palmTracked?.012f:.022f)
+    if(!std::isfinite(frame.controllers.idroidScreenDepth)||frame.controllers.idroidScreenDepth<0||frame.controllers.idroidScreenDepth>.20f)return {};
+    const auto screen=Pose{body.orientation,body.position+displayNormal*((palmTracked?.012f:.022f)+frame.controllers.idroidScreenDepth)
         +(palmTracked?attachmentUp*.045f:Vec3{})};
     if(!valid(body)||!valid(screen))return {};
     return IdroidPose{body,screen};

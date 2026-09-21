@@ -1,7 +1,6 @@
 #include "mgs5vr/core.hpp"
 #include "mgs5vr/cabin_walk.hpp"
 #include "mgs5vr/arm_ik.hpp"
-#include "mgs5vr/animal_contact.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/head_camera.hpp"
@@ -22,19 +21,16 @@ static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
     {
-        const AnimalContactCapsule head{{0,0,-1},{0,0,-1.2f},.16f};
-        const auto stopped=animalContactPoint({0,0,-.4f},{0,0,-1.6f},head,{});
-        expect(stopped&&stopped->z>-.841f,"fast hand cannot tunnel through the animal head");
-        const auto clear=animalContactPoint({.4f,0,-.4f},{.4f,0,-1.6f},head,{});
-        expect(clear&&same(*clear,{.4f,0,-1.6f}),"hand clear of the animal follows tracking unchanged");
-        const auto sliding=animalContactPoint({0,0,-.839f},{.1f,0,-1},head,{});
-        expect(sliding&&sliding->x>.05f&&sliding->z>-.9f,"contact slides across the near surface");
-        expect(!animalContactPoint({},{},AnimalContactCapsule{{},{},0},{}),"absent animal cannot constrain a hand");
-        const Pose moved{{0,.70710678f,0,.70710678f},{12,3,-4}};
-        const auto transform=[&](Vec3 p){return compose(moved,Pose{{},p}).position;};
-        const AnimalContactCapsule turned{transform(head.a),transform(head.b),head.radius};
-        const auto world=animalContactPoint(transform({0,0,-.4f}),transform({0,0,-1.6f}),turned,transform({}));
-        expect(world&&stopped&&same(*world,transform(*stopped)),"native animal translation and rotation preserve contact");
+        for(const size_t first:{93u,97u}){
+            std::array<uint32_t,128> names{};
+            std::array<int32_t,128> parents{};
+            for(size_t j=0;j<armHelperNames.size();++j){names[first+j]=armHelperNames[j];parents[first+j]=armHelperParents[j];}
+            const auto binding=armHelperIndices(names,parents);
+            expect(binding&&(*binding)[0]==first&&(*binding)[13]==first+13,
+                "cabin and field outfits resolve arm corrective joints by identity");
+            parents[first+2]=12;
+            expect(!armHelperIndices(names,parents),"a same-named correction under the wrong parent is rejected");
+        }
     }
     expect(!hidePlayerInFirstPerson(false,false),"inactive immersive presentation leaves the native body visible");
     expect(hidePlayerInFirstPerson(true,false),"immersive first-person gameplay hides the native torso/head");
@@ -563,6 +559,15 @@ int main(){
     {
         const auto eye=compose(aimed.pose.rightEyepiece,Pose{{},{0,0,binocularEyeRelief}});
         expect(binocularEyeVisible(aimed.pose,eye),"the eye behind the binocular pupil receives its image");
+        expect(binocularEyeVisible(aimed.pose,compose(eye,Pose{{},{.032f,.015f,.06f}})),
+            "binocular image tolerates a natural raised-hand offset beyond the small glass radius");
+        expect(!binocularEyeVisible(aimed.pose,compose(eye,Pose{{},{0,0,.3f}})),
+            "binoculars held at arm's length cannot put zoom into the eye");
+        const auto fartherEye=compose(aimed.pose.rightEyepiece,Pose{{},{0,0,.35f}});
+        expect(!binocularEyeVisible(aimed.pose,fartherEye,.30f)&&binocularEyeVisible(aimed.pose,fartherEye,.40f),
+            "G2 controller clearance can extend binocular eye distance without enlarging the lens");
+        expect(!binocularEyeVisible(aimed.pose,fartherEye,std::numeric_limits<float>::quiet_NaN()),
+            "invalid binocular distance cannot open the lens");
         expect(!binocularEyeVisible(aimed.pose,compose(eye,Pose{{},{.064f,0,0}})),
             "the other eye keeps its ordinary world image");
         expect(!binocularEyeVisible(aimed.pose,compose(aimed.pose.rightEyepiece,Pose{{},{0,0,.01f}})),
@@ -1026,9 +1031,9 @@ int main(){
     auto liveNative=lowered;liveNative.position.x+=.25f;
     const auto liveMovedMenu=firstPerson.resolve(11,liveNative,125);
     expect(liveMenuView.applied&&liveMovedMenu.applied&&liveMovedMenu.menuOpen
-        &&near(liveMovedMenu.nativePose.position.x-liveMenuView.nativePose.position.x,.25f)
+        &&same(liveMovedMenu.nativePose.position,liveMenuView.nativePose.position)
         &&same(liveMovedMenu.menuPanel.position,liveMenuView.menuPanel.position),
-        "live iDroid keeps the native camera moving while its display stays attached");
+        "default paused iDroid ignores native camera animation and keeps its world panel anchored");
     firstPerson.setNativeMenuOpen(false);
     firstPerson.setNativeMenuOpen(true);firstPerson.toggle();firstPerson.setNativeMenuOpen(false);
     expect(!firstPerson.resolve(11,lowered,125).applied,"manual disable inside iDroid prevents automatic return");
@@ -1333,54 +1338,77 @@ int main(){
             "missing native room bounds cannot authorize actor contact");
     }
     {
-        const NativeRoomSamples samples{{3.f,3.f,2.f,2.f,.4f,1.f}};
-        const auto bounds=nativeRoomBoundsFromSamples(Pose{},1,samples,4.f);
+        // The actual wall is at Z=2. The old start-position envelope stopped
+        // movement at Z=.15 when a bench was hit by one axial ray.
+        const auto wall=[](Vec3 from,Vec3 to){
+            if(to.z>1.8f&&to.z>from.z)
+                return CabinSweep{true,true,(1.8f-from.z)/(to.z-from.z),{0,0,-1}};
+            return CabinSweep{true,false};
+        };
+        const auto support=[](Vec3 p){return p.x<2.f;};
+        const auto resolve=[&](Vec3 a,Vec3 b){return resolveCabinMovement(a,b,wall,support);};
         CabinWalkState walk{};
-        auto position=advanceCabinWalk(walk,bounds,{},{},{0,1},1000,1,1.f,.25f);
+        auto position=advanceCabinWalk(walk,{},{},{0,1},1000,1,resolve,1.f);
         expect(same(position,{}),"cabin walking starts without a synthetic teleport");
-        position=advanceCabinWalk(walk,bounds,{},{},{0,1},1050,1,1.f,.25f);
+        position=advanceCabinWalk(walk,{},{},{0,1},1050,1,resolve,1.f);
         expect(near(position.z,.05f),"forward stick input advances the native cabin view at a bounded rate");
-        position=advanceCabinWalk(walk,bounds,{},{},{0,-1},1100,1,1.f,.25f);
+        position=advanceCabinWalk(walk,{},{},{0,-1},1100,1,resolve,1.f);
         expect(std::abs(position.z)<.0001f,"reverse stick input returns through the same bounded path");
 
         CabinWalkState turned{};
         const Quat quarterTurn{0,.70710678f,0,.70710678f};
-        advanceCabinWalk(turned,bounds,{},quarterTurn,{0,1},1000,1,1.f,.25f);
-        const auto sideways=advanceCabinWalk(turned,bounds,{},quarterTurn,{0,1},1050,1,1.f,.25f);
+        advanceCabinWalk(turned,{},quarterTurn,{0,1},1000,1,resolve,1.f);
+        const auto sideways=advanceCabinWalk(turned,{},quarterTurn,{0,1},1050,1,resolve,1.f);
         expect(near(sideways.x,.05f)&&std::abs(sideways.z)<.0001f,
             "cabin forward follows the tracked horizontal facing");
 
         CabinWalkState strafe{};
-        advanceCabinWalk(strafe,bounds,{},{},{1,0},1000,1,1.f,.25f);
-        const auto right=advanceCabinWalk(strafe,bounds,{},{},{1,0},1050,1,1.f,.25f);
+        advanceCabinWalk(strafe,{},{},{1,0},1000,1,resolve,1.f);
+        const auto right=advanceCabinWalk(strafe,{},{},{1,0},1050,1,resolve,1.f);
         expect(near(right.x,-.05f)&&near(right.z,0),
             "cabin right stick movement follows FOX camera right, not world positive X");
-        const auto left=advanceCabinWalk(strafe,bounds,{},{},{-1,0},1100,1,1.f,.25f);
+        const auto left=advanceCabinWalk(strafe,{},{},{-1,0},1100,1,resolve,1.f);
         expect(same(left,{}),"opposite cabin strafe returns to the starting point");
 
-        const NativeRoomSamples seatedSamples{{.4917f,1.644f,.089f,1.282f,.568f,2.405f}};
-        const auto seatedBounds=nativeRoomBoundsFromSamples(Pose{},1,seatedSamples,4.f);
         CabinWalkState seated{};
-        advanceCabinWalk(seated,seatedBounds,{},{},{0,1},1000,1,.65f,.30f);
-        const auto seatedMove=advanceCabinWalk(seated,seatedBounds,{},{},{0,1},1050,1,.65f,.30f);
+        advanceCabinWalk(seated,{},{},{0,1},1000,1,resolve);
+        const auto seatedMove=advanceCabinWalk(seated,{},{},{0,1},1050,1,resolve);
         expect(near(seatedMove.y,0)&&seatedMove.z>0,
             "measured Quest cabin ceiling does not push a seated viewer down when walking");
 
         CabinWalkState bounded{};
-        position=advanceCabinWalk(bounded,bounds,{},{},{0,0},1000,1,1.f,.25f);
-        for(uint64_t time=1050;time<=2050;time+=50)
-            position=advanceCabinWalk(bounded,bounds,{},{},{0,1},time,1,1.f,.25f);
-        expect(near(position.z,.15f)
-            &&nativeRoomContains(bounds,nativeRoomLocal(bounds,position),.25f),
-            "cabin walking stops at the sampled room clearance boundary");
-        position=advanceCabinWalk(bounded,bounds,{}, {},{0,0},2100,2,1.f,.25f);
+        position=advanceCabinWalk(bounded,{},{},{0,0},1000,1,resolve,1.f);
+        for(uint64_t time=1050;time<=4000;time+=50)
+            position=advanceCabinWalk(bounded,{},{},{0,1},time,1,resolve,1.f);
+        expect(position.z>1.79f&&position.z<1.8f,
+            "cabin walking reaches the actual wall instead of the small initial sample box");
+        const auto slide=resolve(position,position+Vec3{.2f,0,.2f});
+        expect(slide&&slide->x>.19f&&slide->z<1.8f,"diagonal motion slides along the solid cabin wall");
+        expect(!resolve({},{3,0,0}),"missing floor at an open door refuses movement outside the cabin");
+        position=advanceCabinWalk(bounded,{}, {},{0,0},4100,2,resolve,1.f);
         expect(same(position,{})&&same(bounded.offset,{}),
             "a new scene generation clears stale cabin locomotion offset");
 
-        auto missing=bounds;missing.valid=false;
         CabinWalkState failClosed{};
-        position=advanceCabinWalk(failClosed,missing,{},{},{0,1},1000,1,1.f,.25f);
-        expect(same(position,{}),"unknown room collision fails closed without cabin movement");
+        const auto unavailable=[](Vec3,Vec3)->std::optional<Vec3>{return {};};
+        advanceCabinWalk(failClosed,{},{},{0,1},1000,1,unavailable);
+        position=advanceCabinWalk(failClosed,{},{},{0,1},1050,1,unavailable);
+        expect(same(position,{}),"unavailable native clearance fails closed without cabin movement");
+    }
+    {
+        CabinTurn turn;
+        expect(near(turn.update({1,0},1,30,true,1000,1),0),"entering a cabin with stick held cannot turn");
+        turn.update({0,0},1,30,true,1010,1);
+        const auto yaw=turn.update({1,0},1,30,true,1060,1);
+        expect(yaw<0&&near(yaw,-1.570796327f*.05f),"cabin smooth right turn uses elapsed time and FOX handedness");
+        expect(near(turn.update({1,0},1,30,true,2060,1),0),"a stalled frame cannot accumulate a cabin turn jump");
+        turn.update({0,0},0,45,true,2070,1);
+        expect(near(turn.update({1,0},0,45,true,2080,1),-.785398164f),"cabin snap turn obeys the opt-in angle");
+        expect(near(turn.update({1,0},0,45,true,2090,1),0),"a held cabin snap cannot repeat");
+        turn.update({0,0},2,30,true,2100,1);
+        expect(near(turn.update({1,0},2,30,true,2150,1),0),"turning off disables cabin stick yaw");
+        turn.update({0,0},1,30,true,2160,1);
+        expect(near(turn.update({1,0},1,30,true,2170,2),0),"new cabin generation discards an armed stick");
     }
     {
         HeadCamera cabinCamera;cabinCamera.configure(true);
@@ -1773,7 +1801,8 @@ int main(){
     expect(!support.update(true,true,.09f,1300)&&!support.update(true,true,.09f,1400)
         &&support.update(true,true,.09f,1450),"support engages only after dwelling at the actual weapon grip");
     expect(support.update(true,true,.19f,1500),"a small movement at the acquired grip retains support");
-    expect(!support.update(true,true,.21f,1600)&&!support.update(true,true,.19f,1800),"pulling away releases support without edge chatter");
+    expect(support.update(true,true,.25f,1550),"ordinary support movement beyond the old 20 cm boundary remains attached");
+    expect(!support.update(true,true,.31f,1600)&&!support.update(true,true,.19f,1800),"pulling away releases support without edge chatter");
     support.update(true,true,.05f,2000);
     expect(support.update(true,true,.05f,2150)&&!support.update(true,false,.05f,2160),"lost hand tracking releases support");
     support.update(true,true,.05f,2300);

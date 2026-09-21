@@ -3,11 +3,26 @@
 #include <fstream>
 #include <iostream>
 int wmain(int argc,wchar_t** argv){
+    if((argc==2||argc==3)&&std::wstring_view(argv[1])==L"--settings-json"){
+        mgs5vr::ControlBindings controls;
+        if(argc==3){
+            std::ifstream file{std::filesystem::path(argv[2])};if(!file){std::cerr<<"Cannot open controls file.\n";return 2;}
+            const auto errors=controls.load(file);
+            for(const auto& error:errors)std::cerr<<error<<'\n';if(!errors.empty())return 1;
+        }
+        std::cout<<'[';bool first=true;
+        for(const auto& d:mgs5vr::settingDefinitions()){
+            if(!first)std::cout<<',';first=false;
+            std::cout<<"{\"name\":\""<<d.name<<"\",\"value\":"<<controls.setting(d.name)
+                <<",\"default\":"<<d.value<<",\"min\":"<<d.minimum<<",\"max\":"<<d.maximum<<'}';
+        }
+        std::cout<<"]\n";return 0;
+    }
     if(argc==2&&std::wstring_view(argv[1])==L"--list"){
         for(const auto& entry:mgs5vr::controlDefinitions())std::cout<<entry.name<<" = "<<entry.binding<<'\n';return 0;
     }
     if(argc!=3||std::wstring_view(argv[1])!=L"--check"){
-        std::cerr<<"Usage: mgs5vr_controls --check mgs5vr-controls.ini\n       mgs5vr_controls --list\n";return 2;
+        std::cerr<<"Usage: mgs5vr_controls --check mgs5vr-controls.ini\n       mgs5vr_controls --list\n       mgs5vr_controls --settings-json [mgs5vr-controls.ini]\n";return 2;
     }
     std::ifstream file{std::filesystem::path(argv[2])};
     if(!file){std::cerr<<"Cannot open controls file.\n";return 2;}

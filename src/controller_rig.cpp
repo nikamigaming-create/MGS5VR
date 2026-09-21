@@ -112,7 +112,8 @@ std::optional<ArmSurface> groundSurface(Vec3 point,float ceiling,float clearance
        ||std::abs(hit.x-point.x)+std::abs(hit.z-point.z)>.02f)return {};
     return surface;
 }
-std::optional<Vec3> collisionRay(Vec3 start,Vec3 end){
+struct NativeCollision {bool available{};std::optional<Vec3> point;Vec3 normal{};};
+NativeCollision collisionCast(Vec3 start,Vec3 end,float radius=0){
     if(!groundQueryVerified||!valid(Pose{{},start})||!valid(Pose{{},end})
        ||!get<uintptr_t>(base+0x2c79710))return {};
     alignas(16) std::array<std::byte,0x250> query{};
@@ -124,15 +125,47 @@ std::optional<Vec3> collisionRay(Vec3 start,Vec3 end){
     std::memcpy(query.data(),&layers,sizeof(layers));
     std::memcpy(query.data()+0x18,&filter,sizeof(filter));
     alignas(16) const Vector4 from{start.x,start.y,start.z,0},to{end.x,end.y,end.z,0};
-    if(!reinterpret_cast<Ray>(base+0x1b9b130)(query.data(),0x04000700,&from,&to,0.f))return {};
+    // Native query radius is copied to the shape's +0x20 radius vector by
+    // 1B9B160. Zero is the existing ray; positive radii sweep a sphere.
+    if(!reinterpret_cast<Ray>(base+0x1b9b130)(query.data(),0x04000700,&from,&to,radius))return {true,{},{}};
     const auto address=reinterpret_cast<uintptr_t>(query.data());
     const auto count=get<uint32_t>(address+0x60);
     const auto index=get<int32_t>(address+0x64);
     if(!count||count>5||index<0||static_cast<uint32_t>(index)>=count)return {};
-    alignas(16) Vector4 hit{};const auto record=query.data()+0x70+index*0x60;
+    alignas(16) Vector4 hit{},normal{};const auto record=query.data()+0x70+index*0x60;
     reinterpret_cast<HitValue>(base+0x1b9a5d0)(record,&hit);
+    reinterpret_cast<HitValue>(base+0x1b99910)(record,&normal);
     const Vec3 result{hit.x,hit.y,hit.z};
-    return valid(Pose{{},result})?std::optional<Vec3>{result}:std::nullopt;
+    return valid(Pose{{},result})?NativeCollision{true,result,{normal.x,normal.y,normal.z}}:NativeCollision{};
+}
+std::optional<Vec3> collisionRay(Vec3 start,Vec3 end){return collisionCast(start,end).point;}
+std::optional<Vec3> moveNativeCabin(Vec3 from,Vec3 to){
+    return resolveCabinMovement(from,to,[](Vec3 start,Vec3 end){
+        CabinSweep result{true,false};
+        const auto delta=end-start;const float squared=dot(delta,delta);
+        // Camera clearance, not the native player capsule: one swept head
+        // sphere and one shoulder sphere retain the seated cabin viewpoint.
+        for(const auto shape:std::array<std::array<float,2>,2>{{{0,.12f},{-.30f,.18f}}}){
+            const Vec3 offset{0,shape[0],0};const float radius=shape[1];
+            const auto hit=collisionCast(start+offset,end+offset,radius);
+            if(!hit.available)return CabinSweep{};
+            if(!hit.point)continue;
+            const float normalLength=std::sqrt(dot(hit.normal,hit.normal));
+            if(!std::isfinite(normalLength)||normalLength<.5f)return CabinSweep{};
+            const auto normal=hit.normal*(1.f/normalLength);
+            // The native getter returns surface contact, not sphere center.
+            const auto center=*hit.point+normal*radius;
+            const float fraction=dot(center-start-offset,delta)/std::max(squared,1e-8f);
+            // A surface behind the motion cannot block withdrawal/slide.
+            if(dot(delta,normal)>=-.00001f)continue;
+            if(!result.hit||fraction<result.fraction)result={true,true,fraction,normal};
+        }
+        return result;
+    },[](Vec3 point){
+        const auto floor=collisionCast(point+Vec3{0,.05f,0},point-Vec3{0,2.f,0});
+        return floor.available&&floor.point&&floor.normal.y>.5f
+            &&floor.point->y<point.y-.25f;
+    });
 }
 NativeRoomBounds measureNativeCabin(Pose origin,uint64_t generation,NativeRoomSamples& samples){
     const auto forward=rotate(origin.orientation,{0,0,1});
@@ -219,12 +252,24 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // right controller must not publish an unshifted camera for one frame and
     // snap back to the walking offset when its tracking returns.
     publishNativeCabinBounds(frame);
-    if(!frame.controllers.hands[1].gripTracked){
+    if(frame.controllers.nativeGamepad||!frame.controllers.hands[1].gripTracked){
         // Controller occlusion does not invalidate a tracked headset. Publish
         // this unchanged native skin with its actual camera transaction; no
         // stale tracked weapon, palm, scope or wrist UI may accompany it.
         frame.controllers.hands={};frame.controllers.optic={};
         frame.controllers.weaponReady=frame.controllers.supportGrip=false;
+        if(frame.controllers.nativeGamepad){
+            // Real gamepads keep the game's authored hands and weapon poses.
+            // The wrist HUD and iDroid can still use those actual skin joints.
+            for(size_t side=0;side<2;++side){
+                const auto palm=anatomicalGrip(bone(q,p,side?12:8),bone(q,p,side?40:24).position,bone(q,p,side?50:34).position);
+                if(palm){frame.renderedPalms[side]=compose(*root,*palm);frame.renderedPalmTracked[side]=true;}
+            }
+            const auto elbow=compose(*root,bone(q,p,7)),wrist=compose(*root,bone(q,p,8));
+            if(const auto panel=forearmPanel(elbow,wrist,rotate(wrist.orientation,{0,1,0}))){
+                frame.wristPanel=*panel;frame.wristPanelTracked=true;
+            }
+        }
         return headCamera().publishRigFrame(camera,owner,nativeCamera,frame);
     }
     const auto renderedHead=compose(*root,bone(q,p,4)).position;
@@ -431,6 +476,21 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             }
         }
     }
+    // OpenXR grip describes a palm, not a gun barrel. Runtime aim accounts
+    // for each controller profile's pointing angle. Swing the common wrist
+    // owner using the native muzzle socket before solving support contact;
+    // changing only the weapon would detach its grip, sights and shot path.
+    if(barrelInGrip&&frame.controllers.hands[1].aimTracked){
+        const auto aim=compose(rootInverse,nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.hands[1].aim));
+        if(const auto aimed=aimedWeaponGrip(grips[1],aim,*barrelInGrip)){
+            grips[1]=*aimed;
+            rightTarget=clearWrist(compose(grips[1],gripFromWrist[1]));
+            right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
+            if(!right)return false;
+            replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
+            bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
+        }
+    }
     // An acquired contact belongs to one native weapon, not to whichever
     // weapon happens to replace it while both grips are still held.
     if(supportWeapon!=weaponSupportIdentity){
@@ -483,7 +543,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // wrist-facing pose cannot cancel an explicitly squeezed close cup.
     const bool supportInspect=inspecting&&!compactSupport&&!wasAttached;
     const bool weaponNearSupport=supportContact.update(frame.controllers.supportGrip&&frame.controllers.weaponReady&&firearmActive&&(wasAttached||compactSupport||forwardSupport)&&!supportInspect&&(!nativeManipulation||wasAttached),
-        frame.controllers.hands[0].gripTracked,std::sqrt(dot(separation,separation)),now);
+        frame.controllers.hands[0].gripTracked,std::sqrt(dot(separation,separation)),now,
+        frame.controllers.supportGripRadius,frame.controllers.supportDetachRadius);
     const bool nearSupport=binocularHeld?binocularSupport:weaponNearSupport;
     if(!binocularHeld&&nearSupport&&!wasAttached){heldSupportOffset=supportOffset;heldCloseSupport=compactSupport;}
     const bool support=nearSupport;
@@ -564,19 +625,18 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // These named corrective joints belong to the verified native arm mesh.
     // Recompute their native local corrections from the solved joints. Neither
     // stale animation corrections nor rigid parent copies match this skin.
-    constexpr std::array<uint32_t,14> helperNames{0x8cb42ff9,0x17c46537,0x668bcff7,0xf8ae9203,0x9ccbd1fd,0xc7a9a0c4,0x6cae37b1,
-        0x82901b42,0x4b89fc94,0x18f26b1e,0x24ce95fb,0x0831f646,0x9bed7bf0,0xa4b3e85d};
-    constexpr std::array<int32_t,14> helperParents{5,6,6,7,7,7,8,9,10,10,11,11,11,12};
     const auto names=get<uintptr_t>(model+0xe8);
-    bool helpersMatch=count>110;
-    for(size_t j=0;helpersMatch&&j<helperNames.size();++j)
-        helpersMatch=parent[97+j]==helperParents[j]&&get<uint32_t>(names+(97+j)*4)==helperNames[j];
+    std::array<uint32_t,512> boneNames{};
+    const bool namesRead=names&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(names),
+        boneNames.data(),count*sizeof(uint32_t),&copied)&&copied==count*sizeof(uint32_t);
+    const auto helpers=namesRead?armHelperIndices({boneNames.data(),count},{parent.data(),count}):std::nullopt;
+    const bool helpersMatch=helpers.has_value();
     if(helpersMatch)for(size_t side=0;side<2;++side){
         const size_t clavicle=side?9:5;
         const auto local=[&](size_t i){return compose(inverse(bone(q,p,parent[i])),bone(q,p,i)).orientation;};
         const auto corrections=armCorrectiveRotations(local(clavicle),local(clavicle+1),local(clavicle+2),local(clavicle+3),side!=0);
         for(size_t j=0;j<7;++j){
-            const auto i=97+side*7+j,anchor=static_cast<size_t>(helperParents[side*7+j]);
+            const auto i=(*helpers)[side*7+j],anchor=static_cast<size_t>(armHelperParents[side*7+j]);
             // Retain the native shoulder-slide and wrist-bulge translations;
             // these channels are animated, not constant asset bind offsets.
             const auto offset=compose(inverse(bone(originalQ,originalP,anchor)),bone(originalQ,originalP,i)).position;
@@ -642,8 +702,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const auto offset=bindOffset(i);
             if(!valid(Pose{{},offset})||dot(offset,offset)<.000025f||dot(offset,offset)>.015f)return false;
             const auto native=compose(inverse(bone(originalQ,originalP,anchor)),bone(originalQ,originalP,i));
-            const float controllerCurl=finger==0?std::max(hand.squeeze,hand.thumbTouched?.65f:0.f)
-                :finger==1?std::max(hand.trigger,hand.triggerTouched?.12f:0.f):hand.squeeze;
+            const float controllerCurl=freeFingerCurl(static_cast<unsigned>(finger),hand.trigger,hand.squeeze,
+                hand.triggerTouched,hand.thumbTouched,frame.controllers.handRestCurl,frame.controllers.handTouchCurl);
             const bool opticContact=binocularHeld&&(side!=0||binocularSupport);
             // Cup the top instead of leaving the fingers hovering open above
             // it. The thumb has its own opposing hinge and needs less curl.
@@ -661,49 +721,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
         ++articulatedHands;
     }
-    // Constrain free hands against the native dog's animated head before the
-    // skin is published. Re-solve the arm and carry every finger with the wrist
-    // so contact cannot detach the hand or change forearm length.
-    struct PreviousDogHand { std::array<Vec3,6> points{};uint64_t at{},activation{}; };
-    static std::array<PreviousDogHand,2> previousDogHands;
-    const auto dogContact=nativeDogHeadContact(now,frame.activation);
-    for(size_t side=0;side<2;++side){
-        auto& previous=previousDogHands[side];const auto& hand=frame.controllers.hands[side];
-        const bool free=hand.gripTracked&&hand.squeeze<.4f&&hand.trigger<.2f
-            &&frame.controllers.allowAnimalTouch&&!frame.controllers.weaponReady&&!binocularHeld
-            &&!frame.controllers.vehicleControls&&!frame.controllers.equipmentOpen;
-        if(!dogContact||!free){previous={};continue;}
-        const auto wristBefore=bone(q,p,wrists[side]);
-        const auto palm=compose(*root,compose(wristBefore,inverse(gripFromWrist[side])));
-        std::array<Vec3,6> points{};points[0]=palm.position;
-        for(size_t finger=0;finger<5;++finger)points[finger+1]=compose(*root,bone(q,p,fingers[side][finger]+2)).position;
-        const bool history=previous.activation==frame.activation&&now>=previous.at&&now-previous.at<=100;
-        Vec3 correction{};
-        for(unsigned pass=0;pass<3;++pass)for(size_t i=0;i<points.size();++i){
-            const auto target=points[i]+correction;
-            const auto from=history?previous.points[i]:frame.nativePose.position;
-            if(const auto contact=animalContactPoint(from,target,*dogContact,frame.nativePose.position))
-                correction=correction+(*contact-target);
-        }
-        if(dot(correction,correction)>1e-8f){
-            auto target=wristBefore;target.position=target.position+rotate(rootInverse.orientation,correction);
-            const ArmPose animated{bone(q,p,shoulders[side]),bone(q,p,wrists[side]-1),wristBefore};
-            if(const auto arm=groundedArm(animated,target,bendHistory[side],armBasis[side])){
-                const auto change=compose(arm->pose.wrist,inverse(wristBefore));
-                for(size_t i=wrists[side]+1;i<count;++i){
-                    auto ancestor=parent[i];
-                    while(ancestor>=0&&ancestor!=static_cast<int32_t>(wrists[side]))ancestor=parent[ancestor];
-                    if(ancestor==static_cast<int32_t>(wrists[side]))replace(q,p,i,compose(change,bone(q,p,i)));
-                }
-                replace(q,p,shoulders[side],arm->pose.shoulder);
-                replace(q,p,wrists[side]-1,arm->pose.elbow);replace(q,p,wrists[side],arm->pose.wrist);
-                bendHistory[side]=arm->pose.elbow.position-arm->pose.shoulder.position;
-            }
-        }
-        previous.points[0]=compose(*root,compose(bone(q,p,wrists[side]),inverse(gripFromWrist[side]))).position;
-        for(size_t finger=0;finger<5;++finger)previous.points[finger+1]=compose(*root,bone(q,p,fingers[side][finger]+2)).position;
-        previous.at=now;previous.activation=frame.activation;
-    }
+    // Animals never displace the controller-owned hands. Detect a stroke from
+    // the rendered contact points below; an oversized collision proxy must
+    // not hold the wrist away from the fur or redirect the player's fingers.
     // Full render pose, before native matrix and attachment publication.
     // Native position.w metadata is retained. Publish the final anatomical
     // palm frames with this same skin transaction so handheld displays can
@@ -993,6 +1013,7 @@ void installControllerRig(uintptr_t imageBase){
     log(scopeQueryVerified?"Native named sight-point adapter enabled":"Native sight-point signature differs; weapon scopes disabled");
     groundQueryVerified=matches(0xa0fb50,std::array<unsigned char,9>{0x48,0x89,0x4c,0x24,0x08,0x48,0x83,0xec,0x18})
         &&matches(0x1b9b130,std::array<unsigned char,10>{0x48,0x83,0xec,0x38,0xf3,0x0f,0x10,0x44,0x24,0x60})
+        &&matches(0x1b9b21e,std::array<unsigned char,18>{0xf3,0x0f,0x10,0x84,0x24,0xe0,0,0,0,0x0f,0xc6,0xc0,0,0x0f,0x29,0x44,0x24,0x50})
         &&matches(0x1b9a5d0,std::array<unsigned char,10>{0x4c,0x8b,0xdc,0x48,0x81,0xec,0x98,0,0,0})
         &&matches(0x1b99910,std::array<unsigned char,7>{0x48,0x81,0xec,0x88,0,0,0});
     log(groundQueryVerified?"Controller rig native ground-query signatures verified":"Controller rig ground contacts disabled: native query signature differs");
@@ -1036,7 +1057,6 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
     static uint64_t measuredActivation{};
     static uint64_t nextAttempt{};
     static bool reportedInvalid{};
-    static bool reportedClamp{};
     static NativeRoomBounds cached{};
     static Pose worldOrigin{};
     static bool worldAnchored{};
@@ -1048,7 +1068,6 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
         measuredActivation=0;
         nextAttempt=0;
         reportedInvalid=false;
-        reportedClamp=false;
         cached={};
         worldAnchored=false;
         walk={};
@@ -1062,7 +1081,6 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
         measuredActivation=frame.activation;
         nextAttempt=0;
         reportedInvalid=false;
-        reportedClamp=false;
         cached={};
         worldAnchored=false;
         walk={};
@@ -1074,12 +1092,11 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
     }
     frame.controllers.openingWorldOrigin=worldOrigin;
     frame.controllers.openingWorldAnchored=worldAnchored;
-    const auto applyRoomConstraint=[&](const NativeRoomBounds& bounds){
-        if(!validNativeRoomBounds(bounds))return;
+    const auto applyRoomMovement=[&](){
         const auto before=frame.nativePose.position;
         const auto previousOffset=walk.offset;
-        frame.nativePose.position=advanceCabinWalk(walk,bounds,before,frame.nativePose.orientation,
-            c.cabinMove,now,frame.activation,.65f,.30f);
+        frame.nativePose.position=advanceCabinWalk(walk,before,frame.nativePose.orientation,
+            c.cabinMove,now,frame.activation,moveNativeCabin);
         const auto moved=frame.nativePose.position-(before+previousOffset);
         const float stickMagnitude=std::hypot(c.cabinMove[0],c.cabinMove[1]);
         if(stickMagnitude>.2f&&dot(moved,moved)>.000001f&&now>=nextWalkReport){
@@ -1088,20 +1105,10 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
                 <<" head="<<frame.nativePose.position.x<<','<<frame.nativePose.position.y<<','<<frame.nativePose.position.z;
             log(s.str());nextWalkReport=now+500;
         }
-        constexpr float rigClearance=.20f;
-        const auto clamped=nativeRoomClamp(bounds,frame.nativePose.position,Vec3{rigClearance,0,rigClearance});
-        const auto delta=clamped-frame.nativePose.position;
-        if(dot(delta,delta)>.000001f){
-            frame.nativePose.position=clamped;
-            if(!reportedClamp){
-                log("Native VR head constrained by sampled cabin collision envelope (point constraint)");
-                reportedClamp=true;
-            }
-        }
     };
     if(validNativeRoomBounds(cached)||now<nextAttempt){
         frame.controllers.cabinBounds=cached;
-        applyRoomConstraint(cached);
+        applyRoomMovement();
         return;
     }
     const auto origin=worldOrigin;
@@ -1122,12 +1129,19 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
             <<" local_min="<<measured.min.x<<','<<measured.min.y<<','<<measured.min.z
             <<" local_max="<<measured.max.x<<','<<measured.max.y<<','<<measured.max.z
             <<" generation="<<measured.sceneGeneration;log(s.str());
-        applyRoomConstraint(measured);
+        const auto ray=collisionCast(origin.position,origin.position-Vec3{0,2.f,0});
+        const auto sphere=collisionCast(origin.position,origin.position-Vec3{0,2.f,0},.12f);
+        if(ray.point&&sphere.point){
+            std::ostringstream cast;cast<<"Native cabin clearance floor ray="<<ray.point->y
+                <<" sphere="<<sphere.point->y<<" normal="<<sphere.normal.y
+                <<" radius=0.12 camera_sweeps=enabled";log(cast.str());
+        }
     }else if(!reportedInvalid){
-        log("Native cabin collision volume unavailable; animal and room interaction fail closed");
+        log("Native cabin actor envelope unavailable; movement still requires native clearance and floor queries");
         reportedInvalid=true;
     }
     nextAttempt=now+1000;
+    applyRoomMovement();
 }
 TravelMode nativeTravelMode() noexcept{
     // PlayerStatus's own Lua readers select this double-buffered local player

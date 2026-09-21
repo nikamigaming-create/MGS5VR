@@ -58,6 +58,11 @@ try {
     Refuses { & $mgsTool -Mode Apply -GameExe $mgsGz -Preset Custom -Width 1280 -Height 720 -GraphicsConfig $mgsConfig } '*currently supports TPP*'
     Assert ([IO.File]::ReadAllText($mgsConfig) -ceq $mgsSaved) 'Rejected requests changed graphics.'
     Assert ($mgsLaunches.Count -eq 0) 'Apply launched a game.'
+    & $mgsTool -Mode Apply -GameExe $mgsExe -Preset Custom -Width 5120 -Height 4096 -GraphicsConfig $mgsConfig
+    $mgsHigh=[IO.File]::ReadAllText($mgsConfig) | ConvertFrom-Json
+    Assert ($mgsHigh.graphics.videoout_setting.width -eq 5120 -and $mgsHigh.graphics.videoout_setting.height -eq 4096) 'High-resolution Apply did not persist both dimensions.'
+    Assert ($mgsHigh.graphics.videoout_setting.window_mode -eq 'FlexibleWindowed') 'High resolution lost the native arbitrary-size mode.'
+    $mgsSaved=[IO.File]::ReadAllText($mgsConfig)
     & $mgsTool -Mode Launch -GameExe $mgsExe -Preset Current
     Assert ($mgsLaunches.Count -eq 1) 'Launch did not use the physical headset launcher.'
     Assert ([IO.File]::ReadAllText($mgsConfig) -ceq $mgsSaved) 'Current preset edited graphics.'

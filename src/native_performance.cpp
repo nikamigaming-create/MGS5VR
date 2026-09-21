@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <mmsystem.h>
 #include <MinHook.h>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -18,6 +19,7 @@ namespace mgs5vr {
 namespace {
 std::atomic_bool enabled{};
 std::atomic_bool fineTimer{};
+std::atomic_int64_t consumerPeriodNs{};
 using TimerResolutionFn=LONG(WINAPI*)(ULONG,BOOLEAN,PULONG);
 TimerResolutionFn setTimerResolution{};
 std::atomic_bool nativeTimer{};
@@ -68,26 +70,47 @@ bool enableNativeFrameRate(uintptr_t base) noexcept {
 bool nativeFrameRateEnabled() noexcept {return enabled.load();}
 void stopNativePerformance() noexcept {
     enabled.store(false);
+    consumerPeriodNs.store(0,std::memory_order_relaxed);
     // A worker may already be inside the bridge. Keep its trampoline alive
     // until process exit even after preventing new entries.
     if(sleepSite){MH_DisableHook(sleepSite);sleepSite=nullptr;}
     if(nativeTimer.exchange(false)){ULONG resolution{};setTimerResolution(5000,FALSE,&resolution);}
     if(fineTimer.exchange(false))timeEndPeriod(1);
 }
+int64_t nativeProducerIntervalNs(int64_t displayPeriodNs) noexcept {
+    // Adaptive pacing contributed by s-ilent. Validate the runtime period and
+    // bound the producer to 60..180 Hz, including title/loading transitions.
+    if(displayPeriodNs<1000000||displayPeriodNs>50000000)return 8333333;
+    return std::clamp(displayPeriodNs-displayPeriodNs/4,int64_t{5555556},int64_t{16666667});
+}
+void reportConsumerDisplayPeriod(int64_t displayPeriodNs) noexcept {
+    if(displayPeriodNs<1000000||displayPeriodNs>50000000)displayPeriodNs=0;
+    const auto current=consumerPeriodNs.load(std::memory_order_relaxed);
+    // Some runtimes report tiny period jitter. It must not reset the producer
+    // deadline every frame or spam the log; follow actual refresh changes.
+    if(current&&displayPeriodNs&&std::abs(current-displayPeriodNs)<=current/100)return;
+    const auto prior=consumerPeriodNs.exchange(displayPeriodNs,std::memory_order_relaxed);
+    if(prior==displayPeriodNs)return;
+    try{log("Native producer pacing display_period_ns="+std::to_string(displayPeriodNs)
+        +" target_interval_ns="+std::to_string(nativeProducerIntervalNs(displayPeriodNs)));}catch(...){}
+}
 void paceNativePresent() noexcept {
     if(!enabled.load())return;
-    // A 120 FPS producer leaves scheduling margin for the 90 Hz consumer.
-    // Cap title/loading too: unlimited loading rates are unsafe in this engine.
+    // Keep a scheduling margin ahead of the consumer without an unbounded
+    // engine rate. The original 90 Hz runtime still has a 120 Hz producer cap.
+    const auto interval=nativeProducerIntervalNs(consumerPeriodNs.load(std::memory_order_relaxed));
     using Clock=std::chrono::steady_clock;
     static std::mutex mutex;std::lock_guard lock(mutex);
     static HANDLE timer=CreateWaitableTimerExW(nullptr,nullptr,CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,TIMER_ALL_ACCESS);
     static auto next=Clock::now();
+    static int64_t priorInterval{};
     const auto now=Clock::now();
+    if(priorInterval!=interval){next=now;priorInterval=interval;}
     if(timer&&now<next){
         LARGE_INTEGER due{};due.QuadPart=-std::chrono::duration_cast<std::chrono::nanoseconds>(next-now).count()/100;
         if(due.QuadPart<0&&SetWaitableTimer(timer,&due,0,nullptr,nullptr,FALSE))WaitForSingleObject(timer,50);
     }
-    next+=std::chrono::nanoseconds(8333333);
+    next+=std::chrono::nanoseconds(interval);
     if(next<Clock::now())next=Clock::now();
 }
 void recordNativePresent(double captureMs,double pacingMs,double presentMs) noexcept {try{

@@ -287,6 +287,33 @@ void pump(void* state){
     checkedAt=now;
     if(controllerRigEnabled()&&luaReady(state)){
         const int top=getTop(state);
+        // This is the retail pause API used by TppMain and TppException.
+        // Own one named registration and release only that registration;
+        // another menu, loading transition or script may also hold a pause.
+        static bool idroidPauseRegistered{};
+        // A native close request precedes IsMbDvcTerminalOpened becoming
+        // false: the character must run its stow animation in between.
+        // Keeping our pause until the open bit clears deadlocks that exit.
+        const bool pauseIdroid=nativeIdroidOpen()&&!nativeIdroidClosing()&&!handheldMenusSelected();
+        if(pauseIdroid!=idroidPauseRegistered){
+            // The ordinary menu mask also freezes the iDroid's own update:
+            // opening stops halfway and Back/tab input never runs. Retail's
+            // iDroid tutorial mask pauses gameplay while leaving UI active.
+            const std::string script=pauseIdroid
+                ?"if type(TppPause)=='table' and type(TppPause.RegisterPause)=='function' "
+                 "and type(TppPause.PAUSE_LEVEL_MB_DVC_TUTORIAL)=='number' then "
+                 "TppPause.RegisterPause('MGS5VR_iDroid',TppPause.PAUSE_LEVEL_MB_DVC_TUTORIAL); return 'ok' end return 'unavailable'"
+                :"if type(TppPause)=='table' and type(TppPause.UnregisterPause)=='function' then "
+                 "TppPause.UnregisterPause('MGS5VR_iDroid'); return 'ok' end return 'unavailable'";
+            int pauseStatus=load(state,script.data(),script.size(),"@mgs5vr-idroid-pause");
+            if(!pauseStatus)pauseStatus=original(state,0,1,0);
+            size_t length{};const auto* result=getString(state,-1,&length);
+            if(!pauseStatus&&result&&length==2&&std::memcmp(result,"ok",2)==0){
+                idroidPauseRegistered=pauseIdroid;
+                log(pauseIdroid?"iDroid quad: native gameplay paused; stereo retained":"iDroid quad: owned pause released");
+            }
+            setTop(state,top);
+        }
         if(takeNativeIdroidClose()){
             // Stop is the terminal's own cleanup path. CloseMbDvcTerminal only
             // sets a deferred close flag, which the forced FOB tutorial ignores.

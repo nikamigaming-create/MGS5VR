@@ -162,7 +162,7 @@ DWORD WINAPI initialize(void*){
             catch(const std::exception& e){log(std::string("Native action queue unavailable: ")+e.what());}
         TheatreConfig config;
         config.controlsPath=folder/L"mgs5vr-controls.ini";
-        config.widthMeters=static_cast<float>(GetPrivateProfileIntW(L"theatre",L"width_cm",800,ini.c_str()))/100;
+        config.widthMeters=static_cast<float>(GetPrivateProfileIntW(L"theatre",L"width_cm",1200,ini.c_str()))/100;
         config.distanceMeters=static_cast<float>(GetPrivateProfileIntW(L"theatre",L"distance_cm",600,ini.c_str()))/100;
         // The game must finish its own graphics/bootstrap phase before an XR
         // runtime loads its graphics drivers and helper processes. In particular,

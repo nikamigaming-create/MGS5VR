@@ -13,6 +13,56 @@ limits. The inventory below is the earlier triage record; it does not imply
 that every community issue was fixed or retested. The iDroid tutorial escape
 and launcher startup have since been addressed.
 
+## Next local candidate
+
+The next candidate defaults iDroid and Pause to a tilted, world-anchored panel
+while retaining the 3D scene and head tracking. iDroid uses its own named retail
+pause registration with the native iDroid tutorial mask, which leaves UI updates
+running; the terminal's verified close-request byte releases only that
+registration before the native stow animation. Waiting for the open bit to
+clear also deadlocked exit and was corrected. The ordinary menu mask
+was rejected in SIM because it froze opening and navigation. Handheld iDroid
+and wrist Pause are opt-in with `settings.handheld_menus=1`.
+
+The source also adds editable player/hand fit, menu size/depth/tilt, weapon
+smoothing, support grip/detach radii and relaxed/touched finger curl. Binocular
+eye alignment tolerates a wider eye box without enlarging the physical lens.
+Dog-specific hand pushback is removed. Cabin movement uses native swept camera
+clearance and floor checks instead of the initial small ray envelope.
+
+Controller ownership now preserves connected XInput pads in 3D and theatre.
+Theatre uses normal native buttons and a recentered 12-metre screen; Menu+B
+toggles presentation. Loading may not override the manual choice. Menu axes no
+longer overwrite native menu routing. These source changes need the exact
+candidate's SIM and headset checks; no all-controller claim is implied.
+
+Release build and all 18 automated suites pass, including hidden native launcher
+button dispatch, headless editing/validation, 5120x4096 configuration, menu
+anchoring and controller ownership. The test does not establish actual 5K
+headset performance. Meta platform-menu/idle reproduction, physical Xbox input,
+tanks/turrets, long play sessions and the raised-arm sleeve defect remain open.
+The bounded adaptive pacing portion of s-ilent's fork is included; its unsynchronized
+worker is not. Vinion's alternative filter and the supplied C++ replacements
+are not represented as integrated. See [performance findings](PERFORMANCE.md).
+
+### Reverb G2 / SteamVR report on the preceding build
+
+The tester reports that the helicopter menu works, enemy interrogation works,
+and the binocular culling defect is gone. Preserve these results as headset
+feedback for that build, separate from the local candidate's SIM checks.
+
+Still reported: the handheld iDroid is sideways, one-hand gun pitch is too low,
+binoculars require controllers inside the G2's reliable tracking distance,
+prone firing sometimes produces a UI sound until standing and lying down again,
+and arms feel short with restricted IK. The candidate adds adjustable binocular
+eye distance and defaults menus to the paused quad. The one-hand correction
+swings the authored muzzle axis toward the runtime aim pose at the tracked palm
+pivot; the wrist remains the common owner of the hand, weapon, scope and shot
+socket. This still needs the affected G2 user's physical-controller check. In
+SIM, a prone shot blocked near a well edge fired after crawling backward without
+standing. The reported UI sound, short-arm reach, sleeve deformation and prone
+model fading remain open.
+
 ## Historical handoff: v11
 
 [The v11 playtest note](PLAYTEST_V11_2026-09-20.md) records the current DLL,

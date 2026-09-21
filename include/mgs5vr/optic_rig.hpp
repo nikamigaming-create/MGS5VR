@@ -55,6 +55,9 @@ inline constexpr Vec3 binocularOcularCenter{-.032788f,-.000562f,.05512f};
 inline constexpr Vec3 binocularObjectiveCenter{-.032788f,-.000562f,-.0505f};
 inline constexpr float binocularOcularRadius=.0175f;
 inline constexpr float binocularEyeRelief=.10f;
+// Controller alignment tolerance is separate from the visible glass radius.
+// The image still occupies only the retail aperture, in either eligible eye.
+inline constexpr float binocularEyeBoxRadius=.045f;
 // Palm contact on the housing's two side walls, in the imported mesh frame.
 inline constexpr Vec3 binocularPrimarySocket{.085f,-.008f,0};
 inline constexpr Vec3 binocularSupportSocket{-.078f,-.008f,-.018f};
@@ -110,6 +113,7 @@ struct OpticSample {
     bool opened{};
     bool closed{};
     uint64_t sequence{};
+    float maxEyeDistance{.30f};
 };
 
 // Build the binocular frame from the right primary grip/aim publication.  The
@@ -138,8 +142,19 @@ Pose binocularFaceSafeGrip(Pose head,Pose primary,const OpticPose& optic);
 // scene and marking all consume this same adjusted grip publication.
 class OpticStabilizer {
 public:
-    Pose update(Pose head,Pose grip,const OpticPose& optic,bool available,uint64_t time,uint64_t epoch);
+    Pose update(Pose head,Pose grip,const OpticPose& optic,bool available,uint64_t time,uint64_t epoch,float maxEyeDistance=.30f);
     void reset(){*this=OpticStabilizer{};}
+private:
+    Pose filtered_{};
+    uint64_t time_{},epoch_{};
+    bool ready_{};
+};
+// Optional complete weapon-grip filtering. The skin, weapon, sight and ray
+// consume this one pose; HMD tracking is never filtered.
+class WeaponGripSmoothing {
+public:
+    Pose update(Pose head,Pose grip,bool available,float milliseconds,uint64_t time,uint64_t epoch);
+    void reset(){*this=WeaponGripSmoothing{};}
 private:
     Pose filtered_{};
     uint64_t time_{},epoch_{};
@@ -149,8 +164,8 @@ private:
 // Independent native scene camera. It follows the device even while carried;
 // neither HMD eye pose nor its field of view is an input or an output.
 std::optional<EyeView> binocularSceneView(const OpticPose& optic,float magnification);
-// Only the eye behind the real exit pupil receives its magnified image.
-bool binocularEyeVisible(const OpticPose& optic,Pose eye);
+// Eyes inside the comfortable exit-pupil region receive the aperture image.
+bool binocularEyeVisible(const OpticPose& optic,Pose eye,float maxEyeDistance=.30f);
 
 // Validate tracking without moving either native head-derived stereo origin.
 // The independent device scene supplies magnification inside its aperture.
@@ -162,7 +177,7 @@ public:
     OpticSample update(Pose head,const std::array<EyeView,2>& eyes,
         Pose leftGrip,Pose rightGrip,Pose leftAim,Pose rightAim,
         bool leftTracked,bool rightTracked,bool leftAimTracked,bool rightAimTracked,
-        bool leftHeld,bool rightHeld,bool available,uint64_t time,uint64_t epoch,Quat gripRotation={});
+        bool leftHeld,bool rightHeld,bool available,uint64_t time,uint64_t epoch,Quat gripRotation={},float maxEyeDistance=.30f);
     void reset(){*this=OpticGate{};}
     bool active() const {return active_;}
 private:

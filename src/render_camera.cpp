@@ -416,7 +416,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         ?mgs5vr::weaponScopeSceneView(scope):std::nullopt;
     const bool binocularAtEye=optic.held&&optic.active&&std::any_of(
         source.pair.sample.views.begin(),source.pair.sample.views.end(),
-        [&](const auto& eye){return mgs5vr::binocularEyeVisible(optic.pose,eye.pose);});
+        [&](const auto& eye){return mgs5vr::binocularEyeVisible(optic.pose,eye.pose,optic.maxEyeDistance);});
     const auto opticView=binocularAtEye?mgs5vr::binocularSceneView(optic.pose,
         source.pair.sample.controllers.magnification):scopeView;
     mgs5vr::ComPtr<ID3D11Texture2D> opticScene;
@@ -573,31 +573,16 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
             mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get());
         }
-        if(afterContext&&source.pair.sample.menuOpen&&source.pair.sample.menuIdroid){
+        if(afterContext&&source.pair.sample.menuOpen&&source.pair.sample.menuIdroid&&source.pair.sample.controllers.handheldMenus){
             if(const auto idroid=mgs5vr::trackedIdroidPose(source.pair.sample)){
                 alignas(16) auto bodyValues=values(idroid->body);
                 alignas(16) std::array<float,16> bodyWorld{},projection{};
                 originalWorld(bodyValues.data(),bodyWorld.data());
                 std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
                 mgs5vr::drawPhysicalIdroid(afterContext,bodyWorld,eyeView,projection);
-                // The pointer originates at the normal right-hand OpenXR aim
-                // pose. Convert that exact hit back onto the same physical
-                // screen pose used by the native menu projection; never use
-                // the grip, the HMD center, or a second overlay space.
-                if(const auto ray=mgs5vr::trackedIdroidRay(source.pair.sample)){
-                    const float screenWidth=source.pair.sample.controllers.idroidScreenWidth>0
-                        ?source.pair.sample.controllers.idroidScreenWidth:mgs5vr::idroidScreenWidth;
-                    const float screenHeight=screenWidth*9.f/16.f;
-                    const auto cursor=mgs5vr::compose(idroid->screen,mgs5vr::Pose{{},
-                        {(ray->hit.u-.5f)*screenWidth,
-                         (.5f-ray->hit.v)*screenHeight,.014f}});
-                    alignas(16) auto cursorValues=values(cursor);
-                    alignas(16) std::array<float,16> cursorWorld{};
-                    originalWorld(cursorValues.data(),cursorWorld.data());
-                    mgs5vr::drawPhysicalIdroidCursor(afterContext,cursorWorld,eyeView,projection);
-                    static std::atomic_bool reported{};
-                    if(!reported.exchange(true))mgs5vr::log("iDroid pointer ray bound to right-hand OpenXR aim and front-display projection");
-                }
+                // Native sticks/buttons own this menu. The former decorative
+                // ray dot did not drive a native selection and suggested a
+                // touch interaction that was not implemented.
             }
         }
         const auto& wrist=source.pair.sample;
