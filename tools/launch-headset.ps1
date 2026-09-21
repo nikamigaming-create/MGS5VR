@@ -57,7 +57,7 @@ if (-not $Probe -and -not (Get-Process -Name steam -ErrorAction SilentlyContinue
 }
 # A running Steam client retains its old XR environment. Launch the owned game
 # directly so only this child receives the requested runtime and clean controls.
-$mgsNames=@('XR_RUNTIME_JSON','XR_API_LAYER_PATH','XR_ENABLE_API_LAYERS','OPENXR_SIMULATOR_HEADLESS')
+$mgsNames=@('XR_RUNTIME_JSON','XR_API_LAYER_PATH','XR_ENABLE_API_LAYERS','OPENXR_SIMULATOR_HEADLESS','SteamAppId','SteamGameId')
 $mgsPrevious=@{}
 foreach ($mgsName in $mgsNames) { $mgsPrevious[$mgsName]=[Environment]::GetEnvironmentVariable($mgsName,'Process') }
 try {
@@ -78,6 +78,11 @@ try {
         if ($LASTEXITCODE -ne 0) { throw ('Connect PC VR, then Detect again. '+($mgsProbeOutput -join ' ')) }
         $mgsProbeOutput
     } else {
+        # Direct launch keeps XR settings local to MGSV, but Explorer does not
+        # supply Steam's app identity. Set it for this child, including when a
+        # different game's identity was inherited from the parent launcher.
+        $env:SteamAppId='287700'
+        $env:SteamGameId='287700'
         $mgsGame=Start-Process -FilePath $mgsExe -WorkingDirectory $mgsTarget -WindowStyle Normal -PassThru
         Write-Output ('Headset game launched, PID '+$mgsGame.Id+'. Steam and other applications were retained.')
     }
