@@ -143,14 +143,15 @@ extern "C" void MgsCameraObserved(void* object,const float* source,uintptr_t cal
                     std::array<float,16> root{},head{};
                     std::memcpy(root.data(),ownerBytes.data()+0x30,sizeof(root));
                     std::memcpy(head.data(),ownerBytes.data()+0x70,sizeof(head));
-                    mgs5vr::headCamera().publishPlayerHead(linked,context[0],{{v[0],v[1],v[2],v[3]},{v[4],v[5],v[6]}},root,head,mgs5vr::steadyMilliseconds());
+                    const mgs5vr::Pose sourceCamera{{v[0],v[1],v[2],v[3]},{v[4],v[5],v[6]}};
+                    mgs5vr::headCamera().publishPlayerHead(linked,context[0],sourceCamera,root,head,mgs5vr::steadyMilliseconds());
                     const auto status=mgs5vr::headCamera().status();
                     mgs5vr::observeControllerRigOwner(context[0]);
-                    // Keep the verified arm subtree available in the title
-                    // cabin so the physical selector is held by both hands.
-                    // The normal first-person path still hides the head and
-                    // non-arm body branches through its body-group contract.
-                    mgs5vr::updatePlayerVisibility(context[0],status.active||status.pending,false);
+                    // Scripted cutscenes use the authored camera and must show
+                    // the complete player model. Reveal it during the demo;
+                    // restore first-person concealment when the demo ends.
+                    mgs5vr::updatePlayerVisibility(context[0],mgs5vr::hidePlayerInFirstPerson(
+                        status.active||status.pending,mgs5vr::nativeScriptedDemoActive()),false);
                 }
             }
         }

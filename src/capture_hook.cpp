@@ -59,9 +59,7 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
                 ComPtr<ID3D11Device> device;source->GetDevice(&device);
                 ComPtr<ID3D11DeviceContext> context;device->GetImmediateContext(&context);
                 const auto eye=observeRenderPresent(swap);
-                if(headCamera().active()&&nativeTitleMenuOpen())
-                    captureNativeMenuSurface(context.Get(),presented+1);
-                // Keep the complete stereo family in the mailbox between native
+                 // Keep the complete stereo family in the mailbox between native
                 // scene completions. A mono fallback would replace its array and
                 // force the XR consumer to rebuild both eye swapchains.
                 const bool published=headCamera().active()

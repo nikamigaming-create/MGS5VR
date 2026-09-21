@@ -1,0 +1,5 @@
+#pragma once
+#include <string_view>
+namespace mgs5vr {
+inline constexpr std::string_view nativePresentationScript=R"MGS5VR_LUA(@MGS5VR_NATIVE_PRESENTATION_LUA@)MGS5VR_LUA";
+}

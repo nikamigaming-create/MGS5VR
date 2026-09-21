@@ -78,7 +78,9 @@ std::optional<IdroidRayHit> trackedIdroidRay(const HeadCameraSample& frame) noex
     if(!idroid||!hand.aimTracked||!valid(hand.aim))return {};
     const auto aim=nativeTrackedPose(frame.nativePose,frame.headPose,hand.aim);
     if(!valid(aim))return {};
-    const Panel display{idroid->screen,idroidScreenWidth,idroidScreenHeight,
+    const float width=frame.controllers.idroidScreenWidth>0?frame.controllers.idroidScreenWidth:idroidScreenWidth;
+    const float height=width*9.f/16.f;
+    const Panel display{idroid->screen,width,height,
         idroidScreenPixelWidth,idroidScreenPixelHeight};
     if(const auto hit=intersectPanel(display,aim,idroidRayMaxDistance))return IdroidRayHit{*hit,aim};
     return {};

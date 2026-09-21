@@ -19,8 +19,8 @@ $mgsRuntime = Get-Content -Raw -LiteralPath $mgsManifest | ConvertFrom-Json
 if (-not $mgsRuntime.runtime.library_path) { throw 'Not an OpenXR runtime manifest.' }
 if ($OperatorDir -and -not (Test-Path -LiteralPath (Join-Path $OperatorDir 'XrApiLayer_METAX_operator.json'))) { throw 'Meta XR Operator layer manifest not found.' }
 if (($RenderWidth -eq 0) -ne ($RenderHeight -eq 0)) { throw 'Specify both -RenderWidth and -RenderHeight.' }
-if ($RenderWidth -and ($RenderWidth -lt 640 -or $RenderWidth -gt 4096 -or $RenderHeight -lt 360 -or $RenderHeight -gt 4096 -or $RenderWidth % 2 -or $RenderHeight % 2)) {
-    throw 'Render dimensions must be even pixels, width 640..4096 and height 360..4096.'
+if ($RenderWidth -and ($RenderWidth -lt 640 -or $RenderWidth -gt 8192 -or $RenderHeight -lt 360 -or $RenderHeight -gt 8192 -or $RenderWidth % 2 -or $RenderHeight % 2)) {
+    throw 'Render dimensions must be even pixels, width 640..8192 and height 360..8192.'
 }
 # Keep the lightweight SIM default. A physical launch preserves the game's
 # selected resolution unless an explicit render size is requested.

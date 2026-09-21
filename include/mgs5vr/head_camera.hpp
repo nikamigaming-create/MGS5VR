@@ -1,6 +1,7 @@
 #pragma once
 #include "core.hpp"
 #include "optic_rig.hpp"
+#include "room_bounds.hpp"
 #include "stereo.hpp"
 #include "hud.hpp"
 #include <mutex>
@@ -35,7 +36,10 @@ struct ControllerFrame {
     bool equipmentOpen{}; // Includes the unfolded chooser before any category is selected.
     unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
     std::array<std::array<char,96>,4> equipmentLabels{};
-    float wristSurfaceLift{.02f},wristSelectorHeight{.12f},wristPickerWidth{.75f};
+    float wristSurfaceLift{.02f},wristSelectorHeight{.15f},wristPickerWidth{.42f};
+    // Native iDroid display width; height remains 16:9 so the map never
+    // stretches when the user chooses a more comfortable panel size.
+    float idroidScreenWidth{.30f};
     HudMode hudMode{HudMode::binocularsOnly};
     float magnification{1};
     uint64_t weaponZoomSequence{};
@@ -49,9 +53,20 @@ struct ControllerFrame {
     bool binocularActorGlow{true};
     uint64_t binocularMarkDwellMs{650};
     float snapYaw{}; // Absolute world-Y turn carried by this tracking publication.
-    bool frontEnd{}; // Native Title backdrop and floating menu; no tracked arms.
+    bool frontEnd{}; // Native Title/loading backdrop and floating menu.
+    bool loading{}; // Native loading/help terminal owns a live, actionable screen.
+    bool avatarEditor{}; // Native name/appearance layout belongs on a quad over the retained hospital view.
+    bool scriptedDemo{}; // Native demo state; keep the first world viewpoint while rendering the full 3D scene.
+    bool authoredCamera{}; // Use the native camera for authored 3D scenes outside a held scripted demo.
     bool openingSelector{}; // Physical title tape rack owns a native pulse.
+    bool openingBackend{}; // Actual title only; never suppress loading/prologue UI.
+    bool cabinPlay{}; // Post-loading helicopter cabin sandbox owns tracked interaction.
+    std::array<float,2> cabinMove{}; // Title-cabin thumbstick locomotion; does not enter the native gamepad.
+    NativeRoomBounds cabinBounds{}; // Native collision volume shared by rig and actors.
     int openingSelection{-1}; // Hovered/active tape, in openingTapeLabels order.
+    Pose openingOrigin{};
+    Pose openingWorldOrigin{}; // Native anchor captured once, before collision correction.
+    bool openingWorldAnchored{};
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};
@@ -111,6 +126,7 @@ public:
     HeadCameraSample resolveCurrent(uintptr_t camera,Pose nativePose);
     HeadCameraSample resolveCurrentForRig(uintptr_t camera,Pose nativePose);
     bool publishRigFrame(uintptr_t camera,uintptr_t owner,Pose sourceCamera,HeadCameraSample frame);
+    std::optional<Pose> openingTrackingOrigin(uint64_t milliseconds) const;
     bool available() const;
     bool active() const;
     HeadCameraStatus status() const;
@@ -121,6 +137,8 @@ private:
     void awaitPlayerLocked();
     mutable std::mutex mutex_;
     Pose head_{}, origin_{},frontEndOrigin_{},frontEndPanel_{};
+    Pose lastTitleSource_{},avatarEditorBackdrop_{};
+    Pose scriptedCameraAnchor_{};
     uintptr_t camera_{},playerOwner_{};
     uint64_t time_{},sequence_{},activation_{};
     uint64_t trackingEpoch_{};
@@ -138,6 +156,8 @@ private:
     Pose menuNative_{},menuHead_{},menuPanel_{};
     bool menuAnchored_{};
     bool recenterPending_{};
+    bool lastTitleSourceValid_{},avatarEditorBackdropValid_{};
+    bool scriptedCameraAnchorValid_{},scriptedDemoActive_{};
     std::array<EyeView,2> views_{};
     ControllerFrame controllers_{};
     struct RigFrame { uintptr_t camera{},owner{}; Pose sourceCamera{}; HeadCameraSample sample{}; } rig_;

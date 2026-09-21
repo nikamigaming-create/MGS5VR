@@ -45,8 +45,11 @@ try {
     Assert ($mgsChanged.as -eq 'keep-me' -and $mgsChanged.graphics.quality_setting.texture -eq 'ExtraHigh' -and $mgsChanged.graphics.videoout_setting.display_index -eq 2) 'Unrelated graphics settings changed.'
     $mgsBackups=@(Get-ChildItem -LiteralPath $mgsFixture -Filter '*.backup')
     Assert ($mgsBackups.Count -eq 1 -and [IO.File]::ReadAllText($mgsBackups[0].FullName) -ceq $mgsOriginal) 'Exact recovery copy missing.'
+    & $mgsTool -Mode Apply -GameExe $mgsExe -Preset Custom -Width 5120 -Height 5120 -GraphicsConfig $mgsConfig
+    $mgsChanged=[IO.File]::ReadAllText($mgsConfig) | ConvertFrom-Json
+    Assert ($mgsChanged.graphics.videoout_setting.width -eq 5120 -and $mgsChanged.graphics.videoout_setting.height -eq 5120) 'Above-4K dimensions were rejected or clamped.'
     $mgsSaved=[IO.File]::ReadAllText($mgsConfig)
-    foreach ($mgsSize in @(@(2559,2560),@(4098,2560),@(0,2560),@(2560,1))) {
+    foreach ($mgsSize in @(@(2559,2560),@(8194,2560),@(0,2560),@(2560,1))) {
         Refuses { & $mgsTool -Mode Apply -GameExe $mgsExe -Preset Custom -Width $mgsSize[0] -Height $mgsSize[1] -GraphicsConfig $mgsConfig } '*Use even native dimensions*'
     }
     $mgsRunning=$true

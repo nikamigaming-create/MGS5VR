@@ -6,7 +6,8 @@
 binoculars and scopes, and equipment on your left wrist.
 
 **[Download the public build](https://github.com/nikamigaming-create/MGS5VR/releases)**
-· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Known issues](docs/QUEST3_TESTER_FEEDBACK.md)
+· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-09-20.md)
+· [Live native actions](docs/NATIVE_ACTIONS.md)
 
 Experimental Windows mod. Requires your own **TPP 1.0.15.4** and a PC-connected
 OpenXR headset. Physical feedback currently comes from **Quest 3 + Touch**;
@@ -18,7 +19,8 @@ other headsets are unverified. This is not a standalone Quest app.
 2. Open **MGS5VR-Launcher.exe**, choose **mgsvtpp.exe**, and select **Install VR**.
    Older packages without the launcher use **Install.cmd**.
 3. Connect PC VR, select your headset software as the active OpenXR runtime,
-   and choose **Launch in Steam**. Use the game's **Action Type** controls.
+   and choose **Launch**. Steam must be running and signed in. Use the game's
+   **Action Type** controls. `Launch-Headset.cmd` also launches the saved selection.
 4. Load **Continue → Resume Game**. Tracked VR enters automatically.
 
 The native C++ launcher has game selection, recoverable updates, a controls editor,
@@ -56,7 +58,7 @@ up** runs with binoculars and changes a compatible weapon scope's zoom on foot.
 **Right-stick click** dives.
 
 **Left trigger** opens the wrist selector and waits for your category choice.
-**Hold X** opens Commands. [Weapon scopes](docs/WEAPON_SCOPES.md)
+**Press X** opens Commands. [Weapon scopes](docs/WEAPON_SCOPES.md)
 · [Buddies and other interactions](docs/SYSTEMS_ACCESS.md)
 
 Recon cues default to `hud_mode = binoculars_only`; merely carrying binoculars

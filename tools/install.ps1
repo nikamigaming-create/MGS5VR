@@ -57,6 +57,11 @@ foreach ($mgsName in $mgsNames) {
 $mgsConfigPath = Join-Path $mgsRoot 'config\mgs5vr.ini'
 if (-not (Test-Path -LiteralPath $mgsConfigPath -PathType Leaf)) { $mgsConfigPath = Join-Path $mgsRoot 'mgs5vr.ini' }
 $mgsConfig = Get-Content -Raw -LiteralPath $mgsConfigPath
+# The downloadable INI starts in VR. Explicit installer modes still select
+# their own adapters, including the independent Ground Zeroes scene mode.
+foreach ($mgsKey in @('enabled','camera_observer','head_camera_experiment','controller_rig_experiment','wrist_hud_experiment')) {
+    $mgsConfig = $mgsConfig -replace ('(?m)^'+$mgsKey+'=1(?=\r?$)'),($mgsKey+'=0')
+}
 if ($EnableTheatrePreview) { $mgsConfig = $mgsConfig.Replace('enabled=0','enabled=1') }
 if ($EnableCameraObserver) { $mgsConfig = $mgsConfig.Replace('camera_observer=0','camera_observer=1') }
 if ($EnableHeadCameraExperiment) {

@@ -1,9 +1,11 @@
 #include "mgs5vr/input_bridge.hpp"
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 namespace mgs5vr {
+namespace { std::atomic_bool loadingPromptConfirm{}; }
 void applyOnFootActions(GamepadSample& sample,bool& weaponReady,OnFootActions actions){
     constexpr uint16_t run=0x0040,stance=0x1000,carry=0x2000,diveOrSwitch=0x4000;
     if(actions.run)sample.buttons|=run;
@@ -378,14 +380,40 @@ uint16_t MenuButton::update(bool pressed,bool active,uint64_t time,bool recenter
 void GamepadMailbox::publish(GamepadSample sample,bool active,uint64_t time){
     std::lock_guard guard(mutex_);sample_=sample;active_=active;connected_=connected_||active;timestamp_=time;
 }
+void GamepadMailbox::publishExternal(GamepadSample sample,bool active,uint64_t time){
+    std::lock_guard guard(mutex_);
+    constexpr size_t maxExternalEvents=64;
+    if(externalQueue_.size()>=maxExternalEvents)externalQueue_.pop_front();
+    externalQueue_.push_back({sample,time,active});
+    connected_=connected_||active;
+}
 std::optional<GamepadSample> GamepadMailbox::read(uint64_t time,bool* freshActive) const {
     std::lock_guard guard(mutex_);
     if(freshActive)*freshActive=false;
     if(!connected_)return {};
+    if(externalCurrentValid_&&externalCurrentDelivered_&&!externalQueue_.empty()){
+        externalCurrent_=externalQueue_.front();externalQueue_.pop_front();
+        externalCurrentDelivered_=false;
+    }
+    if(!externalCurrentValid_&&!externalQueue_.empty()){
+        externalCurrent_=externalQueue_.front();externalQueue_.pop_front();
+        externalCurrentValid_=true;externalCurrentDelivered_=false;
+    }
+    if(externalCurrentValid_){
+        if(time<externalCurrent_.timestamp||time-externalCurrent_.timestamp>400){
+            externalCurrentValid_=externalCurrentDelivered_=false;
+        }else{
+            externalCurrentDelivered_=true;
+            if(freshActive)*freshActive=true;
+            return externalCurrent_.active?externalCurrent_.sample:GamepadSample{};
+        }
+    }
     if(!active_||time<timestamp_||time-timestamp_>250)return GamepadSample{};
     if(freshActive)*freshActive=true;
     return sample_;
 }
 GamepadMailbox& gamepadMailbox(){static GamepadMailbox box;return box;}
+void requestLoadingPromptConfirm() noexcept{loadingPromptConfirm.store(true,std::memory_order_release);}
+bool consumeLoadingPromptConfirm() noexcept{return loadingPromptConfirm.exchange(false,std::memory_order_acq_rel);}
 uint64_t steadyMilliseconds(){return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());}
 }

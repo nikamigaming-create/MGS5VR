@@ -85,6 +85,42 @@ int main(int argc,char** argv){
             "ordinary menus and scripted gameplay keep their existing input outside the spatial rack");
     }
     {
+        ControlBindings bindings;PhysicalControls input;
+        bindings.update(input,ControlContext::menus,100);
+        bindings.update(input,ControlContext::menus,120);
+        input.leftStick={.3f,.8f};input.rightStick={-.4f,.6f};input.buttons[0]=1;input.buttons[9]=input.buttons[10]=1;
+        bindings.update(input,ControlContext::menus,140);
+        const auto fallback=nativeMenuGamepad(bindings,input,NativeMenuInput::scriptedScene);
+        expect(fallback.leftY>20000
+            &&fallback.rightX<0&&fallback.rightY>0&&(fallback.buttons&0x1000),
+            "scripted prologue retains native movement, look and held A without a tracked rig");
+        const auto cinematic=nativeMenuGamepad(bindings,input,NativeMenuInput::cinematic);
+        expect(cinematic.leftX==0&&cinematic.leftY==0&&cinematic.rightX==0&&cinematic.rightY==0
+            &&cinematic.leftTrigger==0&&cinematic.rightTrigger==0&&(cinematic.buttons&0x1000),
+            "native cutscenes preserve confirm while suppressing movement, look, and action triggers");
+        input={};bindings.update(input,ControlContext::menus,160);
+        input.buttons[4]=1;bindings.update(input,ControlContext::menus,180);
+        bindings.update(input,ControlContext::menus,740);
+        expect(bindings.active("system.pause"),"scripted scene fallback preserves the ordinary Menu-hold pause binding");
+    }
+    {
+        GamepadMailbox mailbox;
+        GamepadSample confirm{};confirm.buttons=0x1000;
+        bool fresh{};
+        mailbox.publishExternal(confirm,true,1000);
+        mailbox.publishExternal({},false,1001);
+        const auto first=mailbox.read(1002,&fresh);
+        expect(first&&*first==confirm&&fresh,"fast external confirm survives an immediate release");
+        const auto second=mailbox.read(1003,&fresh);
+        expect(second&&*second==GamepadSample{}&&fresh,"fast external release is observed after its confirm");
+        GamepadSample held{};held.buttons=0x2000;
+        mailbox.publishExternal(held,true,1010);
+        expect(mailbox.read(1011,&fresh)&&*mailbox.read(1012)==held&&fresh,
+            "fast external held input remains active until the next event");
+        expect(mailbox.read(1411,&fresh)&&*mailbox.read(1411)==GamepadSample{}&&!fresh,
+            "expired fast external input returns to the normal mailbox");
+    }
+    {
         ControlBindings controls;LiveControls live;PhysicalControls physical;
         std::istringstream file("[settings]\nturn_mode=snap\n");
         expect(live.stage(file).empty()&&live.pending(),"valid complete edit waits away from active bindings");
@@ -269,11 +305,19 @@ int main(int argc,char** argv){
     }
     {
         Fixture f;
-        expect(f.controls.setting("settings.wrist_picker_width_cm")==75,"native cards use the readable default width");
+        expect(f.controls.setting("settings.wrist_picker_width_cm")==42,"native cards use the compact wrist width");
         expect(f.load("[settings]\nwrist_picker_width_cm=100\n"),"native picker width is configurable");
         expect(f.controls.setting("settings.wrist_picker_width_cm")==100,"maximum picker width is retained");
         expect(!f.load("[settings]\nwrist_picker_width_cm=101\n")&&!f.load("[settings]\nwrist_picker_width_cm=41\n"),
             "picker dimensions cannot escape their fitted envelope limits");
+        expect(f.controls.setting("settings.idroid_screen_width_cm")==30,
+            "iDroid keeps a readable 30 cm default width");
+        expect(f.load("[settings]\nidroid_screen_width_cm=45\n")
+            &&f.controls.setting("settings.idroid_screen_width_cm")==45,
+            "iDroid screen width is configurable without changing its aspect ratio");
+        expect(!f.load("[settings]\nidroid_screen_width_cm=61\n")
+            &&!f.load("[settings]\nidroid_screen_width_cm=19\n"),
+            "iDroid screen width stays inside a bounded readable range");
     }
     {
         const auto touch=controllerFaceLayout("/interaction_profiles/meta/touch_controller_plus");

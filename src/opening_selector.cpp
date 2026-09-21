@@ -3,21 +3,22 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <atomic>
 
 namespace mgs5vr {
 
 std::array<Vec3,7> openingPropOffsets() noexcept {
     // The native title camera's LOCAL basis is also the physical cabin basis.
-    // Keep the rack in front of the authored bench, high enough to be read in
-    // the first eye capture and far enough away to avoid a hand-sized overlay.
+    // Keep the rack on the authored bench, below and beyond the face plane so
+    // the tapes remain room props while the Continue target stays reachable.
     return {{
-        { .60f, -.22f, -1.05f }, // radio/deck
-        {-.12f, -.48f, -1.00f }, // Continue
-        { .11f, -.48f, -1.00f }, // Download MGSV: GZ Save Data
-        { .34f, -.48f, -1.00f }, // Metal Gear Online
-        {-.12f, -.67f, -1.00f }, // Options
-        { .11f, -.67f, -1.00f }, // Delete Save Data
-        { .34f, -.67f, -1.00f }  // Quit Game
+        { .60f, -.30f, -1.40f }, // radio/deck
+        {-.12f, -.58f, -1.35f }, // Continue
+        { .11f, -.58f, -1.35f }, // Download MGSV: GZ Save Data
+        { .34f, -.58f, -1.35f }, // Metal Gear Online
+        {-.12f, -.76f, -1.35f }, // Options
+        { .11f, -.76f, -1.35f }, // Delete Save Data
+        { .34f, -.76f, -1.35f }  // Quit Game
     }};
 }
 
@@ -25,7 +26,23 @@ std::array<float,7> openingPropScales() noexcept {
     return {{1.45f,1.75f,1.75f,1.75f,1.75f,1.75f,1.75f}};
 }
 
+bool openingCabinEnabled() noexcept {
+    static const auto ini=[] {
+        std::array<wchar_t,32768> module{};
+        const auto length=GetModuleFileNameW(nullptr,module.data(),static_cast<DWORD>(module.size()));
+        if(!length||length>=module.size())return std::filesystem::path{};
+        return std::filesystem::path(module.data()).parent_path()/L"mgs5vr.ini";
+    }();
+    static std::atomic_bool enabled{};
+    static std::atomic_uint64_t checked{};
+    const auto now=GetTickCount64();auto prior=checked.load();
+    if(!ini.empty()&&(!prior||now-prior>=500)&&checked.compare_exchange_strong(prior,now))
+        enabled.store(GetPrivateProfileIntW(L"opening",L"interactive_cabin",0,ini.c_str())==1);
+    return enabled.load();
+}
+
 bool openingPropsAvailable() noexcept {
+    if(!openingCabinEnabled())return false;
     try{
         std::array<wchar_t,32768> module{};
         const auto length=GetModuleFileNameW(nullptr,module.data(),static_cast<DWORD>(module.size()));
@@ -52,57 +69,95 @@ bool openingPropsAvailable() noexcept {
 void OpeningSelector::reset() noexcept {
     phase_=Phase::idle;
     target_=-1;
-    upRemaining_=downRemaining_=0;
-    nextPulseAt_=0;
+    confirmUntil_=0;
     previousTrigger_=false;
+    initialized_=false;
+    origin_={};
 }
 
-OpeningSelectorFrame OpeningSelector::update(bool title,bool assetsAvailable,Pose head,
-    const TrackedHand& hand,uint64_t now){
+OpeningSelectorFrame OpeningSelector::update(bool title,bool assetsAvailable,bool dogAvailable,Pose head,
+    const std::array<TrackedHand,2>& hands,uint64_t now,std::optional<Pose> anchoredOrigin){
     OpeningSelectorFrame frame{};
-    const bool pressed=hand.trigger>.68f;
-    if(!title||!assetsAvailable||!valid(head)||!hand.gripTracked||!valid(hand.grip)){
+    if(!title||!assetsAvailable){
         // Remember a held trigger while disabled so re-entering the title
         // cannot turn an old controller hold into a new native action.
-        reset();previousTrigger_=pressed;return frame;
+        reset();
+        return frame;
     }
+    if(!valid(head))return frame;
+    if(!initialized_){
+        initialized_=true;
+        origin_=head;
+    }
+    if(anchoredOrigin&&valid(*anchoredOrigin))origin_=*anchoredOrigin;
     frame.active=true;
+    frame.origin=origin_;
+    // A mesh on disk is not a native D-Dog.  Petting is owned by
+    // animal_interaction.cpp and is accepted only when TppBuddyDog2 exposes
+    // real bones.  This selector must never turn an authored pose into a
+    // claimed pet or gate Continue on a synthetic state.
+    (void)dogAvailable;
+    frame.continueReady=true;
 
-    const auto relative=compose(inverse(head),hand.grip).position;
+    int handIndex=-1;
+    Vec3 relative{};
     const auto offsets=openingPropOffsets();
     int hovered=-1;float nearest=.15f*.15f;
-    for(size_t i=1;i<offsets.size();++i){
-        const auto delta=relative-offsets[i];
-        const float distance=dot(delta,delta);
-        if(std::isfinite(distance)&&distance<=nearest){nearest=distance;hovered=static_cast<int>(i-1);}
+    for(unsigned side=0;side<2;++side){
+        const auto& hand=hands[side];
+        if(!hand.gripTracked||!valid(hand.grip))continue;
+        const auto handRelative=compose(inverse(origin_),hand.grip).position;
+        for(size_t i=1;i<offsets.size();++i){
+            const auto delta=handRelative-offsets[i];
+            const float distance=dot(delta,delta);
+            if(std::isfinite(distance)&&distance<=nearest){
+                nearest=distance;hovered=static_cast<int>(i-1);handIndex=static_cast<int>(side);relative=handRelative;
+            }
+        }
     }
+    (void)relative;
+    const bool pressed=handIndex>=0&&hands[static_cast<size_t>(handIndex)].trigger>.68f;
     const bool rising=pressed&&!previousTrigger_;previousTrigger_=pressed;
     if(phase_==Phase::idle&&rising&&hovered>=0){
+        // The native title enters with CONTINUE focused.  Sending a guessed
+        // six-Up/six-Down traversal was what routed a bad title state into
+        // the GZ/FOB screens.  Keep the only proven route bounded to that
+        // initial focus and refuse every other action until its native focus
+        // reader is verified.
+        if(hovered!=0||!frame.continueReady){
+            frame.blocked=true;
+            frame.selection=hovered;
+            if(hovered>=0)frame.action=static_cast<OpeningTapeAction>(hovered);
+            return frame;
+        }
         target_=hovered;
-        // The screenshot-verified native English Title list has six rows.
-        // Reset to the top first, so the physical label maps to the native
-        // action even if a previous title input left another row selected.
-        phase_=Phase::resetToTop;upRemaining_=6;
-        downRemaining_=static_cast<unsigned>(target_);nextPulseAt_=now;
+        // Hold the native confirm long enough to cross at least one full
+        // simulator/native input transaction, but never long enough to
+        // become a second menu selection if the save-data prompt appears.
+        phase_=Phase::confirm;
+        confirmUntil_=now+160;
     }
 
     frame.selection=phase_==Phase::idle?hovered:target_;
     if(frame.selection>=0)frame.action=static_cast<OpeningTapeAction>(frame.selection);
-    if(phase_!=Phase::idle&&now>=nextPulseAt_){
-        if(phase_==Phase::resetToTop&&upRemaining_){
-            --upRemaining_;frame.pulse=OpeningPulse::up;nextPulseAt_=now+90;
-            if(!upRemaining_)phase_=Phase::moveDown;
-        }else if(phase_==Phase::moveDown&&downRemaining_){
-            --downRemaining_;frame.pulse=OpeningPulse::down;nextPulseAt_=now+90;
-            if(!downRemaining_)phase_=Phase::confirm;
-        }else if(phase_==Phase::confirm){
-            frame.pulse=OpeningPulse::confirm;phase_=Phase::idle;nextPulseAt_=now+300;
-        }else if(phase_==Phase::resetToTop){
-            phase_=Phase::moveDown;nextPulseAt_=now;
-        }else if(phase_==Phase::moveDown){
-            phase_=Phase::confirm;nextPulseAt_=now;
-        }
+    if(phase_==Phase::confirm){
+        if(now<confirmUntil_)frame.pulse=OpeningPulse::confirm;
+        else {phase_=Phase::idle;target_=-1;confirmUntil_=0;}
     }
+    return frame;
+}
+
+OpeningSelectorFrame OpeningSelector::updateCabin(bool active,Pose head,
+    const std::array<TrackedHand,2>& hands,uint64_t now){
+    OpeningSelectorFrame frame{};
+    if(!active||!valid(head))return frame;
+    if(!initialized_){
+        initialized_=true;
+        origin_=head;
+    }
+    frame.cabinActive=true;
+    frame.origin=origin_;
+    (void)hands;(void)now;
     return frame;
 }
 

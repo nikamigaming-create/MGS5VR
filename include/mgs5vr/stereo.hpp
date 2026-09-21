@@ -3,6 +3,10 @@
 
 namespace mgs5vr {
 struct EyeFov { float left{},right{},up{},down{}; };
+enum class SpatialUiLayout { frontEndMenu, pauseMenu, avatarEditor, wristMenu };
+SpatialUiLayout selectSpatialUiLayout(bool frontEnd,bool avatarEditor,bool menuOpen,bool idroidMenu,bool wristMounted=false) noexcept;
+std::array<float,16> spatialUiProjection(const std::array<float,16>& nativeProjection,SpatialUiLayout layout) noexcept;
+float spatialUiPlaneCenterX(SpatialUiLayout layout) noexcept;
 // Undo the replayed scene viewport's aspect change on native layout cameras.
 // The UI canvas keeps its authored coordinates before mounting in the world.
 std::array<float,16> nativeUiCanvasProjection(const std::array<float,16>& uiProjection,
@@ -11,11 +15,10 @@ std::optional<std::array<float,16>> uiPanelProjection(const std::array<float,16>
     const std::array<float,16>& eyeView,EyeFov fov,Pose panel,float width,float height,
     float centerX=0,float centerY=0);
 struct EyeView { Pose pose{}; EyeFov fov{}; };
-// Unfold a wrist-anchored panel at readable depth. Preserve its physical size,
-// and move it inward only as far as needed to fit both requested eye frustums.
-// All poses use -Z forward and must come from the same source transaction.
-std::optional<Pose> fitWristPanel(Pose head,Vec3 anchor,const std::array<EyeView,2>& eyes,
-                                float width,float height);
+// Keep the popup centered above the rendered forearm, including when the wrist
+// leaves the view. Head orientation supplies readability, never a new position.
+// All poses must belong to the same source transaction; native world Y is up.
+std::optional<Pose> wristPopupPose(Pose forearm,Pose head,float height);
 // Carried beside the pixels under the GPU mailbox mutex. Never reconstructed
 // from the newest tracking sample at presentation time.
 struct EyeFrame {

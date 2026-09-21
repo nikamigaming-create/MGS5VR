@@ -14,6 +14,23 @@ std::optional<bool> nativeMenuOpen() noexcept;
 // deliberate Pause screen as locomotion-capable.
 bool nativeIdroidOpen() noexcept;
 bool nativeTitleMenuOpen() noexcept;
+void publishNativeAvatarEdit(bool active) noexcept;
+bool nativeAvatarEditActive() noexcept;
+void publishNativeScriptedDemo(bool active) noexcept;
+bool nativeScriptedDemoActive() noexcept;
+// Published on the native Lua transaction thread. A still-updating terminal
+// must not resurrect cassette geometry after ClearTitleMode has run.
+void publishNativeTitleMode(bool active) noexcept;
+bool nativeTitleModeActive() noexcept;
+// The physical cassette selector is valid only for the native helicopter
+// title cabin. Fresh-start title flows can keep TitleMode while showing the
+// hospital intro and must retain their native menu and input.
+void publishNativeTitleCabinMode(bool active) noexcept;
+bool nativeTitleCabinMode() noexcept;
+// The native title closes before a saved helicopter-cabin session publishes a
+// player rig. Keep that verified cabin scene alive until the field scene loads.
+void publishNativeCabinPlay(bool active) noexcept;
+bool nativeCabinPlay() noexcept;
 bool nativeLoadingTipsOpen() noexcept;
 // Source time of the latest expanded native equipment-description draw.
 uint64_t nativeEquipmentPickerDrawTime() noexcept;
@@ -21,7 +38,7 @@ uint64_t nativeEquipmentPickerDrawTime() noexcept;
 // press. Its UI update owns opening/closing; no equipment action is synthesized.
 void requestNativeEquipmentPreview(bool visible) noexcept;
 uint64_t nativeCommandsDrawTime() noexcept;
-Pose wristPickerPose(const HeadCameraSample& rig) noexcept;
+std::optional<Pose> wristPickerPose(const HeadCameraSample& rig) noexcept;
 // Producer scope is the native scene invocation; the UI may execute on a worker.
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,
                        const std::array<float,16>& projection,const HeadCameraSample& rig,const std::array<float,16>& authoredView,

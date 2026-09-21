@@ -3,6 +3,8 @@
 #include "input_bridge.hpp"
 
 namespace mgs5vr {
+enum class NativeMenuInput { menu, liveIdroid, scriptedScene, cinematic };
+GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalControls& physical,NativeMenuInput mode);
 // A spatial rack owns title selection. Sticks, grips and face buttons must not
 // also navigate its hidden native menu; only a selected tape confirms it.
 GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept;

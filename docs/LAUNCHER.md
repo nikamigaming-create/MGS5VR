@@ -11,7 +11,9 @@ or automatic game/headset launch. The launcher itself has a static C++ runtime.
 Extract the **complete release folder**, then open **MGS5VR-Launcher.exe**.
 Choose `mgsvtpp.exe` once with **Browse**; the path is remembered for your Windows
 user. **Install VR** invokes the existing version-checked TPP installer.
-**Launch in Steam** starts the normal Steam game. With **Keep current settings**,
+**Launch** starts the selected game with its physical OpenXR runtime and Steam
+app identity. Steam must already be running and signed in. `Launch-Headset.cmd`
+is the equivalent command-file entry point. With **Keep current settings**,
 graphics are retained. A selected resolution preset is applied before launch;
 the OpenXR runtime, Steam configuration and multiplayer settings are unchanged.
 
@@ -22,7 +24,8 @@ select its quality setting, then **Detect XR** reads the active runtime's
 recommended resolution per eye. Choose **Headset recommendation** and a scale,
 or enter a **Custom** width and height, then **Apply Size** with TPP closed.
 The size is per eye, not the combined SBS width. Dimensions must be even:
-width 640–4096, height 360–4096. Reduce scale if the recommendation exceeds that.
+width 640–8192, height 360–8192. These are configuration bounds, not a guarantee
+of playable performance at the maximum. Reduce scale if necessary.
 
 The launcher backs up the selected Steam account's `TPP_GRAPHICS_CONFIG`, uses
 TPP's native `FlexibleWindowed` path, and disables depth of field and motion blur.

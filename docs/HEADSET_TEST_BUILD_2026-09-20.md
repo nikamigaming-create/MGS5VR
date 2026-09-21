@@ -1,10 +1,15 @@
-# September 20 headset test build
+# Historical September 20 v2 headset test build
+
+**Superseded; do not use this note as a request to retest v2.** The current
+candidate and its remaining failures are recorded in
+[the September 20 release note](RELEASE_2026-09-20.md).
+The launch instructions below describe the historical v2 candidate.
 
 The initial headset candidate was rejected in physical testing: Continue was
 difficult to select, cabin movement was confusing, and the view was unstable.
 The v2 candidate corrects the input and camera faults listed below and needs a
-new physical test. It is not an all-weapons, all-missions, or physical-headset
-pass. The simulator gameplay sweep is stopped.
+new physical test at the time. It was not an all-weapons, all-missions, or
+physical-headset pass. SIM work has since resumed on v8.
 
 ## Start testing
 

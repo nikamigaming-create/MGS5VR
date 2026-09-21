@@ -236,7 +236,9 @@ bool startPowerShell(const fs::path& script,const std::vector<std::wstring>& arg
     std::wstring command=quote(exe.wstring())+L" -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File "+quote(script.wstring());
     for(const auto& arg:args)command+=L" "+quote(arg);
     SECURITY_ATTRIBUTES security{sizeof(security),nullptr,TRUE};HANDLE write{};
-    STARTUPINFOW startup{sizeof(startup)};startup.dwFlags=STARTF_USESHOWWINDOW;startup.wShowWindow=SW_HIDE;
+    // CREATE_NO_WINDOW hides PowerShell's console. SW_HIDE also hides the
+    // editor's first WinForms window, making Edit controls appear broken.
+    STARTUPINFOW startup{sizeof(startup)};startup.dwFlags=monitor?STARTF_USESHOWWINDOW:0;startup.wShowWindow=SW_HIDE;
     HANDLE nullInput{};
     if(monitor){
         if(!CreatePipe(&pipeRead,&write,&security,0)||!SetHandleInformation(pipeRead,HANDLE_FLAG_INHERIT,0)){

@@ -26,6 +26,26 @@ GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool conf
     if(confirm)result.buttons=0x1000;
     return result;
 }
+GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalControls& physical,NativeMenuInput mode){
+    GamepadSample pad;
+    struct Button {std::string_view name;uint16_t mask;};
+    constexpr Button buttons[]{
+        {"menus.confirm",0x1000},{"menus.back",0x2000},{"menus.action_x",0x4000},{"menus.action_y",0x8000},
+        {"menus.previous_tab",0x100},{"menus.next_tab",0x200},{"menus.left_click",0x40},{"menus.right_click",0x80},
+        {"menus.dpad_up",1},{"menus.dpad_down",2},{"menus.dpad_left",4},{"menus.dpad_right",8}};
+    for(const auto& [name,mask]:buttons)if(bindings.active(name))pad.buttons|=mask;
+    if(mode!=NativeMenuInput::cinematic){
+        pad.leftTrigger=static_cast<uint8_t>(bindings.value("menus.left_trigger")*255);
+        pad.rightTrigger=static_cast<uint8_t>(bindings.value("menus.right_trigger")*255);
+    }
+    if(mode!=NativeMenuInput::cinematic){
+        const auto move=bindings.axis(mode==NativeMenuInput::menu?"axes.menu":"axes.move",physical);
+        const auto look=bindings.axis(mode==NativeMenuInput::scriptedScene?"axes.native_look":"axes.map",physical);
+        pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
+        pad.rightX=static_cast<int16_t>(look[0]*32767);pad.rightY=static_cast<int16_t>(look[1]*32767);
+    }
+    return pad;
+}
 NativeControlSample NativeControls::update(const ControlBindings& bindings,const PhysicalControls& physical){
     NativeControlSample result;
     const bool toggle=bindings.active("system.native_buttons");

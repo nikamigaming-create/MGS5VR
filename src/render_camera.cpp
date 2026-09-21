@@ -6,6 +6,7 @@
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/optic_renderer.hpp"
 #include "mgs5vr/optic_markers.hpp"
+#include "mgs5vr/small_animal.hpp"
 #include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/scene_capture.hpp"
 #include "mgs5vr/ui_renderer.hpp"
@@ -372,7 +373,9 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     // update would black out the menu. A spatial menu can only be anchored
     // after an accepted gameplay view, and all camera/transaction checks below
     // still apply. Gameplay continues to require its current tracked skin.
-    if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence&&!source.pair.sample.menuOpen&&!source.pair.sample.controllers.frontEnd){++sceneRejected;return originalScene(render,graphics,task,worker);}
+    if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence&&!source.pair.sample.menuOpen
+       &&!source.pair.sample.controllers.frontEnd&&!source.pair.sample.controllers.avatarEditor
+       &&!source.pair.sample.controllers.authoredCamera){++sceneRejected;return originalScene(render,graphics,task,worker);}
     if(!contains||source.pair.sample.activation!=status.activation||now<source.pair.sample.sampleTime||now-source.pair.sample.sampleTime>150
         ||std::memcmp(reinterpret_cast<void*>(source.grCamera+0x30),source.pair.world.data(),sizeof(source.pair.world))){++sceneRejected;return originalScene(render,graphics,task,worker);}
     const auto contextOwner=field<uintptr_t>(graphics,layout.graphicsContext);
@@ -394,8 +397,8 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const auto markerSnapshot=mgs5vr::opticWaypoints();
     const auto cameraCount=pairCount.load();uintptr_t result{};bool complete=true;
     mgs5vr::beginSceneTiming(context,id);
-    const bool titleSurface=source.pair.sample.controllers.frontEnd;
-    bool openingSelectorDrawn=false;
+    const bool titleSurface=source.pair.sample.controllers.frontEnd
+        &&!source.pair.sample.controllers.scriptedDemo;
     // The front end has no player-hand interaction. Exclude this player's
     // verified model groups from BOTH eye replays as well as the panel source;
     // hiding only the source leaves tracked arms floating around the title.
@@ -491,7 +494,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 mgs5vr::log("Physical optic scene copy unavailable; retaining normal head views");
             continue;
         }
-        if(afterContext&&titleSurface){
+        if(afterContext&&titleSurface&&source.pair.sample.controllers.openingSelector){
             // The title camera is the only authenticated native cabin anchor
             // currently available. Keep the props in that same FOX frame so
             // they move with the authored helicopter shot instead of becoming
@@ -500,8 +503,9 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             // Use the same title-camera basis as the existing spatial panel.
             // Raw nativePose is the FOX camera heading; placing OpenXR-local
             // props directly on it mirrors the rack away from the viewer.
-            const auto titleOrigin=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,
-                source.pair.sample.headPose,source.pair.sample.headPose);
+            const auto& cabin=source.pair.sample.controllers;
+            const auto titleOrigin=cabin.openingWorldAnchored?cabin.openingWorldOrigin:
+                mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,source.pair.sample.headPose,cabin.openingOrigin);
             const auto offsets=mgs5vr::openingPropOffsets();
             const auto scales=mgs5vr::openingPropScales();
             const auto propWorld=[&](mgs5vr::Vec3 offset,float scale,mgs5vr::Quat orientation=mgs5vr::Quat{}){
@@ -516,8 +520,35 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             std::array<std::array<float,16>,7> openingWorlds{};
             for(size_t i=0;i<openingWorlds.size();++i)
                 openingWorlds[i]=propWorld(offsets[i],scales[i]);
-            openingSelectorDrawn=mgs5vr::drawOpeningProps(afterContext,openingWorlds,eyeView,eyeProjection,
-                source.pair.sample.controllers.openingSelection)||openingSelectorDrawn;
+             // The rack is an owned visual aid.  Animals are never drawn from
+             // poses supplied by the VR layer: TppBuddyDog2/TppRat must own
+             // their meshes, bones, animation, and world position.
+            mgs5vr::drawOpeningProps(afterContext,openingWorlds,eyeView,eyeProjection,
+                 source.pair.sample.controllers.openingSelection);
+        }
+        if(afterContext&&source.pair.sample.controllers.cabinPlay){
+            // Cabin play uses the full native scene replay. Do not replace it
+            // with the small retained title/loading panel; add animals to the
+            // same world frame after the helicopter scene is rendered.
+            const auto& cabin=source.pair.sample.controllers;
+            const auto cabinOrigin=cabin.openingWorldAnchored?cabin.openingWorldOrigin:
+                mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,source.pair.sample.headPose,cabin.openingOrigin);
+            const auto propWorld=[&](mgs5vr::Pose local,float scale){
+                const auto worldPose=mgs5vr::compose(cabinOrigin,local);
+                alignas(16) auto valuesAt=values(worldPose);std::array<float,16> world{};
+                originalWorld(valuesAt.data(),world.data());
+                for(size_t i=0;i<12;++i)world[i]*=scale;
+                return world;
+            };
+             const auto offsets=mgs5vr::openingPropOffsets();
+            const auto scales=mgs5vr::openingPropScales();
+            std::array<std::array<float,16>,7> openingWorlds{};
+            for(size_t i=0;i<openingWorlds.size();++i)
+                openingWorlds[i]=propWorld(mgs5vr::Pose{{},offsets[i]},scales[i]);
+             // Keep only the owned rack props.  Real cabin animals are
+             // rendered by the native scene; no fallback mesh may impersonate
+             // an absent actor.
+             mgs5vr::drawOpeningProps(afterContext,openingWorlds,eyeView,eyeProjection,-1);
         }
         if(afterContext&&optic.held&&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular){
             const auto body=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,
@@ -542,7 +573,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
             mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get());
         }
-        if(afterContext&&source.pair.sample.menuOpen){
+        if(afterContext&&source.pair.sample.menuOpen&&source.pair.sample.menuIdroid){
             if(const auto idroid=mgs5vr::trackedIdroidPose(source.pair.sample)){
                 alignas(16) auto bodyValues=values(idroid->body);
                 alignas(16) std::array<float,16> bodyWorld{},projection{};
@@ -554,9 +585,12 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 // screen pose used by the native menu projection; never use
                 // the grip, the HMD center, or a second overlay space.
                 if(const auto ray=mgs5vr::trackedIdroidRay(source.pair.sample)){
+                    const float screenWidth=source.pair.sample.controllers.idroidScreenWidth>0
+                        ?source.pair.sample.controllers.idroidScreenWidth:mgs5vr::idroidScreenWidth;
+                    const float screenHeight=screenWidth*9.f/16.f;
                     const auto cursor=mgs5vr::compose(idroid->screen,mgs5vr::Pose{{},
-                        {(ray->hit.u-.5f)*mgs5vr::idroidScreenWidth,
-                         (.5f-ray->hit.v)*mgs5vr::idroidScreenHeight,.014f}});
+                        {(ray->hit.u-.5f)*screenWidth,
+                         (.5f-ray->hit.v)*screenHeight,.014f}});
                     alignas(16) auto cursorValues=values(cursor);
                     alignas(16) std::array<float,16> cursorWorld{};
                     originalWorld(cursorValues.data(),cursorWorld.data());
@@ -566,7 +600,6 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 }
             }
         }
-        if(titleSurface&&!openingSelectorDrawn)mgs5vr::drawNativeMenuSurface(afterContext,eyeView,drawingEye.view.fov,source.pair.sample.menuPanel);
         const auto& wrist=source.pair.sample;
         if(!titleSurface&&!wrist.menuOpen&&mgs5vr::worldHudVisible(wrist.controllers.hudMode,hudView))
             mgs5vr::drawWorldWaypoints(afterContext,eyeView,eyeProjection,native.position,markerSnapshot);
@@ -602,8 +635,9 @@ __declspec(noinline) float* world(void* input,float* output){
     if(!enabled.load())return originalWorld(input,output);
     const auto source=reinterpret_cast<uintptr_t>(input);
     if(caller==base+layout.worldReturn){
-        if(const auto menu=mgs5vr::nativeMenuOpen())
+        if(const auto menu=mgs5vr::nativeMenuOpen()){
             mgs5vr::headCamera().setNativeMenuOpen(*menu,mgs5vr::nativeIdroidOpen());
+        }
         current={};current.camera=source-layout.cameraPose;
         current.identity=layout.publisher?publicationOwner:current.camera;
         primaryListener=0;primaryListenerSequence=0;
@@ -615,7 +649,7 @@ __declspec(noinline) float* world(void* input,float* output){
         // Title's animated UI builds geometry from the native publication.
         // Keep that source intact, and move only the two render cameras into
         // the cabin. Moving the source first deforms its menu before UI replay.
-        const bool replace=current.sample.applied&&!current.sample.controllers.frontEnd;
+    const bool replace=current.sample.applied&&!current.sample.controllers.frontEnd&&!current.sample.controllers.avatarEditor;
         auto* result=originalWorld(replace?static_cast<void*>(adjusted.data()):input,output);
         std::memcpy(current.world.data(),output,sizeof(current.world));
         current.applied=current.sample.applied;current.haveWorld=true;
@@ -623,7 +657,8 @@ __declspec(noinline) float* world(void* input,float* output){
     }
     // The inverse builder invokes this function synchronously in the same native
     // publication. Reuse the exact pose selected for the world matrix.
-    if(caller==base+layout.inverseWorldReturn&&current.haveWorld&&current.camera+layout.cameraPose==source&&current.applied&&!current.sample.controllers.frontEnd){
+    if(caller==base+layout.inverseWorldReturn&&current.haveWorld&&current.camera+layout.cameraPose==source
+       &&current.applied&&!current.sample.controllers.frontEnd&&!current.sample.controllers.avatarEditor){
         alignas(16) auto adjusted=values(current.sample.nativePose);
         return originalWorld(adjusted.data(),output);
     }

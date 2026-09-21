@@ -142,7 +142,7 @@ void installRenderSizeHooks(IDXGISwapChain* probe,const std::filesystem::path& c
     renderHeight=GetPrivateProfileIntW(L"display",L"render_height",0,path.c_str());
     mirrorWidth=GetPrivateProfileIntW(L"display",L"mirror_width",960,path.c_str());
     mirrorHeight=GetPrivateProfileIntW(L"display",L"mirror_height",540,path.c_str());
-    if(renderWidth<640||renderWidth>4096||renderHeight<360||renderHeight>4096||renderWidth%2||renderHeight%2
+    if(renderWidth<640||renderWidth>8192||renderHeight<360||renderHeight>8192||renderWidth%2||renderHeight%2
         ||mirrorWidth<320||mirrorWidth>1920||mirrorHeight<240||mirrorHeight>1080){
         renderWidth=renderHeight=mirrorWidth=mirrorHeight=0;log("Invalid display configuration; native display handling retained");return;
     }

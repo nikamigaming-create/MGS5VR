@@ -48,8 +48,8 @@ if (Get-Process -Name ([IO.Path]::GetFileNameWithoutExtension($mgsExe)) -ErrorAc
     throw 'Close the game normally before applying resolution. The launcher will not terminate it.'
 }
 if ($Preset -ne 'Current') {
-    if ($Width -lt 640 -or $Width -gt 4096 -or $Height -lt 360 -or $Height -gt 4096 -or $Width%2 -or $Height%2) {
-        throw 'Use even native dimensions: width 640..4096, height 360..4096. Reduce headset scale if necessary.'
+    if ($Width -lt 640 -or $Width -gt 8192 -or $Height -lt 360 -or $Height -gt 8192 -or $Width%2 -or $Height%2) {
+        throw 'Use even native dimensions: width 640..8192, height 360..8192. Reduce headset scale if necessary.'
     }
     # GZ's graphics format must be established independently; never edit it as TPP.
     if (-not $mgsTpp) { throw 'Resolution editing currently supports TPP. Ground Zeroes keeps its existing native graphics settings.' }

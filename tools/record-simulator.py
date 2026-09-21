@@ -51,17 +51,28 @@ class Operator:
         self.send({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params})
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
-            response = self.messages.get(timeout=max(.01, deadline - time.monotonic()))
+            try:
+                response = self.messages.get(timeout=max(.01, deadline - time.monotonic()))
+            except queue.Empty as error:
+                raise TimeoutError(f"{method} request {request_id}: completion unknown") from error
+            if response.get("id") != request_id:
+                if "id" not in response and "error" in response:
+                    raise RuntimeError(response["error"])
+                continue
             if "error" in response:
                 raise RuntimeError(response["error"])
-            if response.get("id") == request_id:
-                return response["result"]
+            return response["result"]
         raise TimeoutError(method)
 
     def call(self, name, arguments):
         result = self.request("tools/call", {"name": name, "arguments": arguments})
         if result.get("isError"):
             raise RuntimeError(result)
+        # Some operator versions return textual errors without MCP isError.
+        # An accepted RPC envelope is not proof an input was performed.
+        for block in result.get("content", []):
+            if block.get("type") == "text" and block.get("text", "").lstrip().startswith("Error:"):
+                raise RuntimeError(block["text"])
         return result
 
     def close(self):
@@ -236,6 +247,8 @@ def controller_rig_demo(proxy, output, started, status):
 
 def run_sequence(proxy, sequence, status):
     client = None
+    started = time.monotonic()
+    status.update(completed=False, actions=[])
     try:
         steps = json.loads(sequence.read_text(encoding="utf-8-sig"))
         if not isinstance(steps, list):
@@ -243,14 +256,16 @@ def run_sequence(proxy, sequence, status):
         client = Operator(proxy)
         for step in steps:
             op = step["op"]
+            row = {"seconds": time.monotonic() - started, "step": step}
+            status["actions"].append(row)
             if op == "wait":
                 time.sleep(step["seconds"])
             elif op == "button":
                 arguments = {"hand": step["hand"], "component": step["component"], "value": step["value"]}
                 arguments.update(step.get("args", {}))
-                client.call("openxr_set_controller_input", arguments)
+                row["result"] = client.call("openxr_set_controller_input", arguments)
             elif op == "pose":
-                client.call("openxr_set_controller_pose", {
+                row["result"] = client.call("openxr_set_controller_pose", {
                     "hand": step["hand"], "pose_type": step.get("kind", "grip"),
                     "base_space": step.get("space", "local"), "position": step["position"],
                     "orientation": step.get("orientation", [0, 0, 0, 1]),
@@ -322,6 +337,8 @@ def stream_capture(client, capture, args):
             sequence_thread.join(timeout=2)
             if sequence_thread.is_alive():
                 sequence_status["error"] = "Sequence did not complete before capture finalized"
+            if not sequence_status.get("completed") or sequence_status.get("error"):
+                error = error or sequence_status.get("error", "Input sequence did not complete")
         process.stdin.close()
         try:
             process.wait(timeout=10)
@@ -331,7 +348,8 @@ def stream_capture(client, capture, args):
             error = error or "Encoder did not finalize within ten seconds"
         encoder_error = process.stderr.read().decode("utf-8", errors="replace")[-4000:]
         metadata = {"schema": 2, "eye": args.eye, "source": "Meta OpenXR composited eye",
-                    "started_utc": started_utc, "seconds": elapsed, "requested_seconds": args.seconds,
+                    "started_utc": started_utc, "started_monotonic_seconds": started,
+                    "seconds": elapsed, "requested_seconds": args.seconds,
                     "frames": frames, "measured_capture_fps": len(frames) / max(elapsed, .001),
                     "raw_frame_files": 0, "media_budget_bytes": 12 * 1024 * 1024,
                     "timestamp_clock": "PNG arrival at encoder; Python request/response bounds recorded",

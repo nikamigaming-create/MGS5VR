@@ -5,7 +5,15 @@ describe different builds and personal configurations. A source correction or
 unit-test pass is not a headset gameplay pass. Older rescue/handoff documents
 are historical; this is the current triage plan.
 
-## Current handoff: v11
+## Current release: September 20 experimental
+
+The user approved packaging the v12 candidate after the Steam launcher fix.
+[Release notes](RELEASE_2026-09-20.md) describe the shipped candidate and its
+limits. The inventory below is the earlier triage record; it does not imply
+that every community issue was fixed or retested. The iDroid tutorial escape
+and launcher startup have since been addressed.
+
+## Historical handoff: v11
 
 [The v11 playtest note](PLAYTEST_V11_2026-09-20.md) records the current DLL,
 completed high-risk SIM checks and remaining failures. Map geometry now has

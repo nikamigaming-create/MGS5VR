@@ -31,7 +31,7 @@ bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye){
     const auto local=compose(inverse(scope.ocular),eye).position;
     // Eye relief belongs to the physical scope. Lowering/rolling the rifle
     // never expands the image over the world or reveals it through the back.
-    if(local.z<.005f||local.z>scope.eyeRelief*2.f)return false;
+    if(local.z<std::max(.025f,scope.eyeRelief*.5f)||local.z>scope.eyeRelief*2.f)return false;
     const float lateral=local.x*local.x+local.y*local.y;
     return lateral<=scope.radius*scope.radius&&facing(scope.ocular,eye)>.75f;
 }
@@ -200,8 +200,11 @@ Pose binocularFaceSafeGrip(Pose head,Pose primary,const OpticPose& optic){
         low={std::min(low.x,p.x),std::min(low.y,p.y),std::min(low.z,p.z)};
         high={std::max(high.x,p.x),std::max(high.y,p.y),std::max(high.z,p.z)};
     }
-    if(low.x<.075f&&high.x>-.075f&&low.y<.075f&&high.y>-.06f&&low.z<.10f&&high.z>-.045f)
-        primary.position=primary.position+rotate(head.orientation,{0,0,-.045f-high.z});
+    // Stop at the device's authored eye relief. At 4.5 cm the broad housing
+    // fills most of the HMD view even though the pupil itself is very small.
+    // Translate the entire hand/device contact; never fade either mesh.
+    if(low.x<.075f&&high.x>-.075f&&low.y<.075f&&high.y>-.06f&&low.z<.10f&&high.z>-binocularEyeRelief)
+        primary.position=primary.position+rotate(head.orientation,{0,0,-binocularEyeRelief-high.z});
     return primary;
 }
 

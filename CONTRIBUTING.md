@@ -9,8 +9,9 @@ repository. There is no private mod component required to build it.
 
 Use Windows x64, Visual Studio 2022 C++ tools, a Windows SDK, Git, CMake 3.24+
 and Python 3. Run `./tools/build.ps1` to fetch the pinned dependencies, build
-and run all six native suites. The D3D11 mailbox suite requires a hardware GPU.
-GitHub-hosted CI builds every target and runs the other five suites. CI also
+and run the automated suites. The D3D11 mailbox and independent render-window
+suites require a hardware GPU. GitHub-hosted CI builds every target and runs
+the remaining suites. CI also
 checks the packaged installer with authored fixtures using `tests/installer_tests.ps1`.
 CI does
 not launch the game or certify a headset.

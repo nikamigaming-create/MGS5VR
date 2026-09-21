@@ -7,6 +7,30 @@ float trackedNearPlane(float nativeNear,float nativeFar){
     if(!std::isfinite(nativeNear)||!std::isfinite(nativeFar)||nativeNear<=0||nativeFar<=nativeNear)return nativeNear;
     return std::min(nativeNear,.02f);
 }
+SpatialUiLayout selectSpatialUiLayout(bool frontEnd,bool avatarEditor,bool menuOpen,bool idroidMenu,bool wristMounted) noexcept{
+    if(avatarEditor)return SpatialUiLayout::avatarEditor;
+    if(frontEnd)return SpatialUiLayout::frontEndMenu;
+    if(menuOpen&&wristMounted&&!idroidMenu)return SpatialUiLayout::wristMenu;
+    if(menuOpen&&!idroidMenu)return SpatialUiLayout::pauseMenu;
+    return SpatialUiLayout::frontEndMenu;
+}
+std::array<float,16> spatialUiProjection(const std::array<float,16>& nativeProjection,SpatialUiLayout layout) noexcept{
+    auto result=nativeProjection;
+    // The avatar editor concentrates its name/appearance controls in the
+    // center of the native canvas. Game-over/pause rows exceed the native
+    // canvas on the right in the live prologue view, so fit them with a modest
+    // uniform reduction. The front-end menu keeps its full canvas.
+    const float zoom=layout==SpatialUiLayout::avatarEditor?2.f
+        :layout==SpatialUiLayout::pauseMenu?.75f:1.f;
+    for(const size_t index:{0u,4u,8u,12u})result[index]*=zoom;
+    for(const size_t index:{1u,5u,9u,13u})result[index]*=zoom;
+    return result;
+}
+float spatialUiPlaneCenterX(SpatialUiLayout layout) noexcept{
+    // The game-over/pause menu is authored on the right half of the canvas.
+    // Shift its spatial quad left so the selected row and its full label fit.
+    return layout==SpatialUiLayout::pauseMenu?.75f:0.f;
+}
 std::optional<NativeProjectionScales> nativeProjectionScales(float focal,float aspect,
     const std::array<float,16>& nativeProjection,EyeFov renderedFov){
     if(!std::isfinite(focal)||!std::isfinite(aspect)||focal<=0||aspect<=0
@@ -58,50 +82,11 @@ bool valid(EyeFov f){
     return std::isfinite(f.left)&&std::isfinite(f.right)&&std::isfinite(f.up)&&std::isfinite(f.down)
         &&f.left<0&&f.right>0&&f.down<0&&f.up>0&&f.left>-1.56f&&f.right<1.56f&&f.down>-1.56f&&f.up<1.56f;
 }
-std::optional<Pose> fitWristPanel(Pose head,Vec3 anchor,const std::array<EyeView,2>& eyes,float width,float height){
-    if(!valid(head)||!valid(Pose{{},anchor})||!std::isfinite(width)||!std::isfinite(height)
-        ||width<=0||height<=0||width>1.2f||height>1.2f)return {};
-    std::array<Pose,2> eyeFromHead{};
-    std::array<std::array<float,4>,2> bounds{};
-    for(size_t i=0;i<eyes.size();++i){
-        if(!valid(eyes[i].pose)||!valid(eyes[i].fov))return {};
-        eyeFromHead[i]=compose(inverse(eyes[i].pose),head);
-        const auto f=eyes[i].fov;
-        const float l=std::tan(f.left),r=std::tan(f.right),d=std::tan(f.down),u=std::tan(f.up);
-        // Leave six percent of the requested optical span clear at each edge;
-        // the larger render/visibility FOV is not the user's visible image.
-        bounds[i]={l+.06f*(r-l),r-.06f*(r-l),d+.06f*(u-d),u-.06f*(u-d)};
-    }
-    const auto fits=[&](Vec3 center){
-        for(size_t i=0;i<eyes.size();++i)for(float x:{-width*.5f,width*.5f})for(float y:{-height*.5f,height*.5f}){
-            const auto p=compose(eyeFromHead[i],Pose{{},center+Vec3{x,y,0}}).position;
-            if(p.z>=-.05f)return false;
-            const auto& b=bounds[i];
-            if(p.x/(-p.z)<b[0]||p.x/(-p.z)>b[1]||p.y/(-p.z)<b[2]||p.y/(-p.z)>b[3])return false;
-        }
-        return true;
-    };
-    auto desired=compose(inverse(head),Pose{{},anchor}).position;
-    // Keep a readable panel near the wrist. Following an off-axis wrist ray
-    // farther away can technically fit the canvas while making its text tiny.
-    // Only add depth when the centered canvas itself cannot fit; otherwise
-    // bring its center inward just enough to fit both eyes.
-    desired.z=std::clamp(desired.z,-2.f,-.55f);
-    // A centered rectangle can also be too large for a narrow/canted display.
-    // Increase depth before moving sideways; never shrink the native text.
-    Vec3 center{0,0,desired.z};
-    while(!fits(center)&&center.z> -2.f)center.z=std::max(-2.f,center.z-.05f);
-    if(!fits(center))return {};
-    desired.z=center.z;
-    if(fits(desired))return compose(head,Pose{{},desired});
-    // Frustum half-spaces are convex. Bisection along this segment finds the
-    // closest wrist-linked point that fits, including asymmetric/canted eyes.
-    float inside=0,outside=1;
-    for(unsigned n=0;n<20;++n){
-        const float middle=(inside+outside)*.5f;
-        if(fits(center+(desired-center)*middle))inside=middle;else outside=middle;
-    }
-    return compose(head,Pose{{},center+(desired-center)*inside});
+std::optional<Pose> wristPopupPose(Pose forearm,Pose head,float height){
+    if(!valid(forearm)||!valid(head)||!std::isfinite(height)||height<0||height>.3f)return {};
+    // The forearm owns the position. Looking away, lowering the hand or using
+    // narrower optics must never pull its menu into the center of vision.
+    return Pose{head.orientation,forearm.position+Vec3{0,height,0}};
 }
 std::optional<EyeFov> enclosingEyeFov(EyeFov f){
     if(!valid(f))return {};

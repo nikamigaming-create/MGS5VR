@@ -146,9 +146,10 @@ bool drawSurface(ID3D11DeviceContext* context,Surface& targetSurface,const std::
     context->Draw(6,0);
     return true;
 }
-bool drawNativeMenuSurface(ID3D11DeviceContext* context,const std::array<float,16>& view,EyeFov fov,Pose panel) noexcept {try{
+bool drawNativeMenuSurface(ID3D11DeviceContext* context,const std::array<float,16>& view,EyeFov fov,Pose panel,
+                           bool retainForLoading) noexcept {try{
     if(!context)return false;std::lock_guard lock(surfaceMutex);
-    if(!surface.image||!surface.source||GetTickCount64()-surface.capturedAt>250)return false;
+    if(!surface.image||!surface.source||(!retainForLoading&&GetTickCount64()-surface.capturedAt>250))return false;
     const bool drawn=drawSurface(context,surface,view,fov,panel,1.9f,1.9f*9.f/16.f);
     if(drawn&&!surface.reported){surface.reported=true;log("Complete native Title menu rendered on a spatial cabin panel");}
     return drawn;

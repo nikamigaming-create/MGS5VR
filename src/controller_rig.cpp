@@ -1,4 +1,5 @@
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/cabin_walk.hpp"
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/input_bridge.hpp"
@@ -23,6 +24,9 @@ using namespace mgs5vr;
 using Update=void(*)(void*,void*);
 Update original{};
 struct Vector4{float x{},y{},z{},w{};};
+constexpr Quat identityQuaternion() noexcept {
+    return {0.f,0.f,0.f,1.f};
+}
 struct PoseRestore {
     uintptr_t rotations{},positions{};
     uintptr_t stowedMount{};
@@ -62,7 +66,7 @@ SupportContact supportContact;
 SupportPose supportPose;
 float supportBlend{};
 float aimBlend{};
-Quat guidedOffset{};
+Quat guidedOffset=identityQuaternion();
 Pose heldSupportOffset{};
 uint64_t supportWeapon{};
 bool heldCloseSupport{};
@@ -108,14 +112,68 @@ std::optional<ArmSurface> groundSurface(Vec3 point,float ceiling,float clearance
        ||std::abs(hit.x-point.x)+std::abs(hit.z-point.z)>.02f)return {};
     return surface;
 }
+std::optional<Vec3> collisionRay(Vec3 start,Vec3 end){
+    if(!groundQueryVerified||!valid(Pose{{},start})||!valid(Pose{{},end})
+       ||!get<uintptr_t>(base+0x2c79710))return {};
+    alignas(16) std::array<std::byte,0x250> query{};
+    using Init=void*(*)(void*,uint32_t);
+    using Ray=uint32_t(*)(void*,uint32_t,const Vector4*,const Vector4*,float);
+    using HitValue=void*(*)(const void*,Vector4*);
+    reinterpret_cast<Init>(base+0xa0fb50)(query.data(),0);
+    const uint64_t layers=0x800,filter=0x80000006;
+    std::memcpy(query.data(),&layers,sizeof(layers));
+    std::memcpy(query.data()+0x18,&filter,sizeof(filter));
+    alignas(16) const Vector4 from{start.x,start.y,start.z,0},to{end.x,end.y,end.z,0};
+    if(!reinterpret_cast<Ray>(base+0x1b9b130)(query.data(),0x04000700,&from,&to,0.f))return {};
+    const auto address=reinterpret_cast<uintptr_t>(query.data());
+    const auto count=get<uint32_t>(address+0x60);
+    const auto index=get<int32_t>(address+0x64);
+    if(!count||count>5||index<0||static_cast<uint32_t>(index)>=count)return {};
+    alignas(16) Vector4 hit{};const auto record=query.data()+0x70+index*0x60;
+    reinterpret_cast<HitValue>(base+0x1b9a5d0)(record,&hit);
+    const Vec3 result{hit.x,hit.y,hit.z};
+    return valid(Pose{{},result})?std::optional<Vec3>{result}:std::nullopt;
+}
+NativeRoomBounds measureNativeCabin(Pose origin,uint64_t generation,NativeRoomSamples& samples){
+    const auto forward=rotate(origin.orientation,{0,0,1});
+    if(!std::isfinite(forward.x)||!std::isfinite(forward.z)
+       ||forward.x*forward.x+forward.z*forward.z<.0001f)return {};
+    const auto yaw=std::atan2(forward.x,forward.z);
+    const Pose roomOrigin{{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)},origin.position};
+    NativeRoomBounds result;result.origin=roomOrigin;result.sceneGeneration=generation;
+    if(!valid(roomOrigin))return result;
+    const auto world=[&](Vec3 local){return compose(roomOrigin,Pose{{},local}).position;};
+    constexpr float reach=4.f;
+    const auto trace=[&](Vec3 direction)->std::optional<float>{
+        const auto hit=collisionRay(world({}),world(direction*reach));
+        if(!hit)return {};
+        const auto local=compose(inverse(roomOrigin),Pose{{},*hit}).position;
+        const float distance=dot(local,direction);
+        return std::isfinite(distance)&&distance>.08f&&distance<reach-.02f
+            ?std::optional<float>{distance}:std::nullopt;
+    };
+    // Always sample floor/ceiling, even if an open doorway misses a wall ray.
+    // Incomplete samples must not authorize a fabricated enclosing room.
+    constexpr std::array<Vec3,6> directions{{{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}}};
+    for(size_t i=0;i<directions.size();++i)samples[i]=trace(directions[i]);
+    return nativeRoomBoundsFromSamples(roomOrigin,generation,samples,reach);
+}
 Pose bone(const std::array<Quat,512>& q,const std::array<Vector4,512>& p,size_t i){return {q[i],{p[i].x,p[i].y,p[i].z}};}
 void replace(std::array<Quat,512>& q,std::array<Vector4,512>& p,size_t i,Pose value){
     q[i]=value.orientation;p[i].x=value.position.x;p[i].y=value.position.y;p[i].z=value.position.z;
 }
 Quat blendRotation(Quat a,Quat b,float weight){
+    weight=std::clamp(weight,0.f,1.f);
+    const float aLengthSquared=a.x*a.x+a.y*a.y+a.z*a.z+a.w*a.w;
+    const float bLengthSquared=b.x*b.x+b.y*b.y+b.z*b.z+b.w*b.w;
+    constexpr float epsilon=1e-12f;
+    if(!std::isfinite(aLengthSquared)||aLengthSquared<=epsilon)a=identityQuaternion();
+    if(!std::isfinite(bLengthSquared)||bLengthSquared<=epsilon)b=identityQuaternion();
     if(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w<0)b={-b.x,-b.y,-b.z,-b.w};
     Quat q{a.x+(b.x-a.x)*weight,a.y+(b.y-a.y)*weight,a.z+(b.z-a.z)*weight,a.w+(b.w-a.w)*weight};
-    const float length=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
+    const float lengthSquared=q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w;
+    if(!std::isfinite(lengthSquared)||lengthSquared<=epsilon)return identityQuaternion();
+    const float length=std::sqrt(lengthSquared);
     return {q.x/length,q.y/length,q.z/length,q.w/length};
 }
 bool apply(void* context,void* binding,PoseRestore& restore){
@@ -155,12 +213,21 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const Pose nativeCamera{{cameraValues[0],cameraValues[1],cameraValues[2],cameraValues[3]},
                             {cameraValues[4],cameraValues[5],cameraValues[6]}};
     auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera);
-    if(!frame.applied||frame.playerOwner!=owner
-       ||(frame.controllers.frontEnd&&!frame.controllers.openingSelector)
-       ||!frame.controllers.hands[1].gripTracked)return false;
+    if(!frame.applied||frame.playerOwner!=owner||frame.controllers.avatarEditor
+       ||(frame.controllers.frontEnd&&!frame.controllers.openingSelector&&!frame.controllers.cabinPlay))return false;
+    // Cabin locomotion belongs to the tracked head. A temporarily occluded
+    // right controller must not publish an unshifted camera for one frame and
+    // snap back to the walking offset when its tracking returns.
+    publishNativeCabinBounds(frame);
+    if(!frame.controllers.hands[1].gripTracked){
+        // Controller occlusion does not invalidate a tracked headset. Publish
+        // this unchanged native skin with its actual camera transaction; no
+        // stale tracked weapon, palm, scope or wrist UI may accompany it.
+        frame.controllers.hands={};frame.controllers.optic={};
+        frame.controllers.weaponReady=frame.controllers.supportGrip=false;
+        return headCamera().publishRigFrame(camera,owner,nativeCamera,frame);
+    }
     const auto renderedHead=compose(*root,bone(q,p,4)).position;
-    if(!frame.menuOpen&&!frame.controllers.frontEnd)
-        frame.nativePose.position=frame.nativePose.position+renderedHead-frame.playerHead;
     const auto originalQ=q;const auto originalP=p;
     std::array<Pose,2> grips{};
     for(size_t i=0;i<2;++i)if(frame.controllers.hands[i].gripTracked)
@@ -217,7 +284,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
         boundOwner=owner;boundModel=model;activation=frame.activation;
         supportContact.reset();supportPose.reset();
-        supportBlend=0;aimBlend=0;guidedOffset={};heldSupportOffset={};supportAt=now;
+        supportBlend=0;aimBlend=0;guidedOffset=identityQuaternion();heldSupportOffset={};supportAt=now;
         supportWeapon=0;heldCloseSupport=false;
         for(auto& motion:meleeMotion)motion.reset();
         meleeTracking=0;meleeCurl={};
@@ -290,7 +357,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     };
     if(binocularHeld&&!attachBinocular())return false;
     const bool binocularSupport=binocularHeld&&frame.controllers.optic.pose.supportHeld;
-    if(binocularHeld){aimBlend=0;guidedOffset={};}
+    if(binocularHeld){aimBlend=0;guidedOffset=identityQuaternion();}
     bool nativeManipulation=false,firearmActive=false,throwableActive=false;
     std::optional<Vec3> barrelInGrip;
     std::optional<Pose> muzzleInGrip;
@@ -368,7 +435,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // weapon happens to replace it while both grips are still held.
     if(supportWeapon!=weaponSupportIdentity){
         supportContact.reset();supportPose.reset();supportBlend=0;aimBlend=0;
-        guidedOffset={};heldSupportOffset={};heldCloseSupport=false;supportAt=now;
+        guidedOffset=identityQuaternion();heldSupportOffset={};heldCloseSupport=false;supportAt=now;
         supportWeapon=weaponSupportIdentity;
     }
     const auto supportOffset=compose(inverse(rightAnimated),leftAnimated);
@@ -391,7 +458,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // animation and evaluate it in the currently guided weapon frame.
     const bool wasAttached=supportContact.attached();
     const bool compactSupport=wasAttached?heldCloseSupport:closeSupportContact(nativeSupportInGrip.position);
-    if(compactSupport){aimBlend=0;guidedOffset={};}
+    if(compactSupport){aimBlend=0;guidedOffset=identityQuaternion();}
     const auto contactPrimary=compose(grips[1],Pose{blendRotation({},guidedOffset,aimBlend),{}});
     auto contactWrist=right->pose.wrist;
     if(aimBlend>0)if(const auto solved=groundedArm(rightAnimatedArm,clearWrist(compose(contactPrimary,gripFromWrist[1])),bendHistory[1],armBasis[1]))
@@ -414,8 +481,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // A pistol cup is alongside/below the firing palm, not a foregrip in
     // front of it. Socket distance still owns acquisition and release; a
     // wrist-facing pose cannot cancel an explicitly squeezed close cup.
-    const bool supportInspect=inspecting&&!compactSupport;
-    const bool weaponNearSupport=supportContact.update(frame.controllers.supportGrip&&frame.controllers.weaponReady&&firearmActive&&(compactSupport||forwardSupport)&&!supportInspect&&(!nativeManipulation||wasAttached),
+    const bool supportInspect=inspecting&&!compactSupport&&!wasAttached;
+    const bool weaponNearSupport=supportContact.update(frame.controllers.supportGrip&&frame.controllers.weaponReady&&firearmActive&&(wasAttached||compactSupport||forwardSupport)&&!supportInspect&&(!nativeManipulation||wasAttached),
         frame.controllers.hands[0].gripTracked,std::sqrt(dot(separation,separation)),now);
     const bool nearSupport=binocularHeld?binocularSupport:weaponNearSupport;
     if(!binocularHeld&&nearSupport&&!wasAttached){heldSupportOffset=supportOffset;heldCloseSupport=compactSupport;}
@@ -593,6 +660,49 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             replace(q,p,i,compose(bone(q,p,anchor),local));
         }
         ++articulatedHands;
+    }
+    // Constrain free hands against the native dog's animated head before the
+    // skin is published. Re-solve the arm and carry every finger with the wrist
+    // so contact cannot detach the hand or change forearm length.
+    struct PreviousDogHand { std::array<Vec3,6> points{};uint64_t at{},activation{}; };
+    static std::array<PreviousDogHand,2> previousDogHands;
+    const auto dogContact=nativeDogHeadContact(now,frame.activation);
+    for(size_t side=0;side<2;++side){
+        auto& previous=previousDogHands[side];const auto& hand=frame.controllers.hands[side];
+        const bool free=hand.gripTracked&&hand.squeeze<.4f&&hand.trigger<.2f
+            &&frame.controllers.allowAnimalTouch&&!frame.controllers.weaponReady&&!binocularHeld
+            &&!frame.controllers.vehicleControls&&!frame.controllers.equipmentOpen;
+        if(!dogContact||!free){previous={};continue;}
+        const auto wristBefore=bone(q,p,wrists[side]);
+        const auto palm=compose(*root,compose(wristBefore,inverse(gripFromWrist[side])));
+        std::array<Vec3,6> points{};points[0]=palm.position;
+        for(size_t finger=0;finger<5;++finger)points[finger+1]=compose(*root,bone(q,p,fingers[side][finger]+2)).position;
+        const bool history=previous.activation==frame.activation&&now>=previous.at&&now-previous.at<=100;
+        Vec3 correction{};
+        for(unsigned pass=0;pass<3;++pass)for(size_t i=0;i<points.size();++i){
+            const auto target=points[i]+correction;
+            const auto from=history?previous.points[i]:frame.nativePose.position;
+            if(const auto contact=animalContactPoint(from,target,*dogContact,frame.nativePose.position))
+                correction=correction+(*contact-target);
+        }
+        if(dot(correction,correction)>1e-8f){
+            auto target=wristBefore;target.position=target.position+rotate(rootInverse.orientation,correction);
+            const ArmPose animated{bone(q,p,shoulders[side]),bone(q,p,wrists[side]-1),wristBefore};
+            if(const auto arm=groundedArm(animated,target,bendHistory[side],armBasis[side])){
+                const auto change=compose(arm->pose.wrist,inverse(wristBefore));
+                for(size_t i=wrists[side]+1;i<count;++i){
+                    auto ancestor=parent[i];
+                    while(ancestor>=0&&ancestor!=static_cast<int32_t>(wrists[side]))ancestor=parent[ancestor];
+                    if(ancestor==static_cast<int32_t>(wrists[side]))replace(q,p,i,compose(change,bone(q,p,i)));
+                }
+                replace(q,p,shoulders[side],arm->pose.shoulder);
+                replace(q,p,wrists[side]-1,arm->pose.elbow);replace(q,p,wrists[side],arm->pose.wrist);
+                bendHistory[side]=arm->pose.elbow.position-arm->pose.shoulder.position;
+            }
+        }
+        previous.points[0]=compose(*root,compose(bone(q,p,wrists[side]),inverse(gripFromWrist[side]))).position;
+        for(size_t finger=0;finger<5;++finger)previous.points[finger+1]=compose(*root,bone(q,p,fingers[side][finger]+2)).position;
+        previous.at=now;previous.activation=frame.activation;
     }
     // Full render pose, before native matrix and attachment publication.
     // Native position.w metadata is retained. Publish the final anatomical
@@ -921,6 +1031,104 @@ void installControllerRig(uintptr_t imageBase){
 void observeControllerRigOwner(uintptr_t owner) noexcept{playerOwner.store(owner);}
 void stopControllerRig() noexcept{stopSmallAnimalInteraction();stopMotionMelee();enabled.store(false);playerOwner.store(0);}
 bool controllerRigEnabled() noexcept{return enabled.load();}
+void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
+    static bool cacheActive{};
+    static uint64_t measuredActivation{};
+    static uint64_t nextAttempt{};
+    static bool reportedInvalid{};
+    static bool reportedClamp{};
+    static NativeRoomBounds cached{};
+    static Pose worldOrigin{};
+    static bool worldAnchored{};
+    static CabinWalkState walk{};
+    static uint64_t nextWalkReport{};
+    const auto& c=frame.controllers;
+    if(!c.openingSelector&&!c.cabinPlay){
+        cacheActive=false;
+        measuredActivation=0;
+        nextAttempt=0;
+        reportedInvalid=false;
+        reportedClamp=false;
+        cached={};
+        worldAnchored=false;
+        walk={};
+        nextWalkReport=0;
+        frame.controllers.cabinBounds={};
+        return;
+    }
+    const auto now=steadyMilliseconds();
+    if(!cacheActive||measuredActivation!=frame.activation){
+        cacheActive=true;
+        measuredActivation=frame.activation;
+        nextAttempt=0;
+        reportedInvalid=false;
+        reportedClamp=false;
+        cached={};
+        worldAnchored=false;
+        walk={};
+        nextWalkReport=0;
+    }
+    if(!worldAnchored){
+        worldOrigin=nativeTrackedPose(frame.nativePose,frame.headPose,c.openingOrigin);
+        worldAnchored=valid(worldOrigin);
+    }
+    frame.controllers.openingWorldOrigin=worldOrigin;
+    frame.controllers.openingWorldAnchored=worldAnchored;
+    const auto applyRoomConstraint=[&](const NativeRoomBounds& bounds){
+        if(!validNativeRoomBounds(bounds))return;
+        const auto before=frame.nativePose.position;
+        const auto previousOffset=walk.offset;
+        frame.nativePose.position=advanceCabinWalk(walk,bounds,before,frame.nativePose.orientation,
+            c.cabinMove,now,frame.activation,.65f,.30f);
+        const auto moved=frame.nativePose.position-(before+previousOffset);
+        const float stickMagnitude=std::hypot(c.cabinMove[0],c.cabinMove[1]);
+        if(stickMagnitude>.2f&&dot(moved,moved)>.000001f&&now>=nextWalkReport){
+            std::ostringstream s;s<<"Native title-cabin stick walk axis="<<c.cabinMove[0]<<','<<c.cabinMove[1]
+                <<" step="<<moved.x<<','<<moved.y<<','<<moved.z
+                <<" head="<<frame.nativePose.position.x<<','<<frame.nativePose.position.y<<','<<frame.nativePose.position.z;
+            log(s.str());nextWalkReport=now+500;
+        }
+        constexpr float rigClearance=.20f;
+        const auto clamped=nativeRoomClamp(bounds,frame.nativePose.position,Vec3{rigClearance,0,rigClearance});
+        const auto delta=clamped-frame.nativePose.position;
+        if(dot(delta,delta)>.000001f){
+            frame.nativePose.position=clamped;
+            if(!reportedClamp){
+                log("Native VR head constrained by sampled cabin collision envelope (point constraint)");
+                reportedClamp=true;
+            }
+        }
+    };
+    if(validNativeRoomBounds(cached)||now<nextAttempt){
+        frame.controllers.cabinBounds=cached;
+        applyRoomConstraint(cached);
+        return;
+    }
+    const auto origin=worldOrigin;
+    NativeRoomSamples samples{};
+    const auto measured=measureNativeCabin(origin,frame.activation,samples);
+    if(!reportedInvalid){
+        std::ostringstream s;s<<"Native cabin rays layer=0x800 origin="<<origin.position.x<<','<<origin.position.y<<','<<origin.position.z
+            <<" generation="<<frame.activation;
+        constexpr std::array<const char*,6> names{{"+x","-x","ceiling","floor","+z","-z"}};
+        for(size_t i=0;i<samples.size();++i){s<<' '<<names[i]<<'=';if(samples[i])s<<*samples[i];else s<<"miss";}
+        log(s.str());
+    }
+    cached=measured;
+    frame.controllers.cabinBounds=measured;
+    if(validNativeRoomBounds(measured)){
+        const auto size=nativeRoomDimensions(measured);
+        std::ostringstream s;s<<"Native cabin sampled collision envelope x="<<size.x<<" y="<<size.y<<" z="<<size.z
+            <<" local_min="<<measured.min.x<<','<<measured.min.y<<','<<measured.min.z
+            <<" local_max="<<measured.max.x<<','<<measured.max.y<<','<<measured.max.z
+            <<" generation="<<measured.sceneGeneration;log(s.str());
+        applyRoomConstraint(measured);
+    }else if(!reportedInvalid){
+        log("Native cabin collision volume unavailable; animal and room interaction fail closed");
+        reportedInvalid=true;
+    }
+    nextAttempt=now+1000;
+}
 TravelMode nativeTravelMode() noexcept{
     // PlayerStatus's own Lua readers select this double-buffered local player
     // table (0x53c990 / 0x53ca40). Registration at 0x5547cc assigns ON_HORSE

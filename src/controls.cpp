@@ -160,8 +160,9 @@ ControlBindings::ControlBindings(){
     axes_={{"axes.move",0},{"axes.equipment",1},{"axes.commands",1},{"axes.menu",0},{"axes.map",1},{"axes.vehicle_steering",0},
         {"axes.native_move",0},{"axes.native_look",1},{"axes.turn",1}};
     settings_={{"settings.snap_turn_degrees",30,5,90},{"settings.motion_melee",1,0,1},{"settings.animal_touch",1,0,1},
-        {"settings.wrist_surface_lift_cm",2,0,10},{"settings.wrist_selector_height_cm",12,5,30},
-        {"settings.wrist_picker_width_cm",75,42,100},
+        {"settings.wrist_surface_lift_cm",2,0,10},{"settings.wrist_selector_height_cm",15,5,30},
+        {"settings.wrist_picker_width_cm",42,42,100},
+        {"settings.idroid_screen_width_cm",30,20,60},
         {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",1,0,2},{"settings.hud_mode",1,0,2},
         {"settings.binocular_pitch_degrees",-90,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
         {"settings.binocular_roll_degrees",0,-180,180},

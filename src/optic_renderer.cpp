@@ -864,13 +864,12 @@ bool createOpeningResources(ID3D11Device* device){
         L"retail-assets\\Assets\\tpp\\item\\rdi\\Scenes\\rdi0_main0_def.fmdl");
     const auto radioDiffuse=openingAssetPath(L"radio_diffuse_dds",
         L"retail-assets\\Assets\\tpp\\item\\rdi\\Pictures\\rdi0_main0_def_c00_bsm.dds");
-    if(!createRetailGpuAsset(device,resources.openingRadio,radioModel,radioDiffuse,"radio")
-       ||!createRetailGpuAsset(device,resources.openingCassette,cassetteModel,cassetteDiffuse,"cassette")){
-        mgs5vr::log("Opening prop assets unavailable; native title panel remains the fallback");
-        return false;
-    }
-    resources.openingReady=true;
-    return true;
+    const bool radio=createRetailGpuAsset(device,resources.openingRadio,radioModel,radioDiffuse,"radio");
+    const bool cassette=createRetailGpuAsset(device,resources.openingCassette,cassetteModel,cassetteDiffuse,"cassette");
+    resources.openingReady=radio&&cassette;
+    if(!resources.openingReady)
+        mgs5vr::log("Opening title props unavailable; native title panel remains the fallback");
+    return resources.openingReady;
 }
 
 struct SavedState {
@@ -1498,7 +1497,7 @@ bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<f
         if(!device)return false;
         if(resources.device.Get()!=device.Get()){resources=Resources{};resources.device=device;}
         if(!resources.attempted){if(!createResources(device.Get()))return false;}
-        if(!resources.ready||!createOpeningResources(device.Get()))return false;
+        if(!resources.ready||!createOpeningResources(device.Get())||!resources.openingReady)return false;
         for(const auto& world:worlds)for(const auto value:world)if(!std::isfinite(value))return false;
         SavedState state;save(context,state);if(!state.renderTarget){restore(context,state);return false;}
         ComPtr<ID3D11DepthStencilView> depth;
@@ -1509,7 +1508,8 @@ bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<f
         for(size_t i=1;i<worlds.size();++i)
             cassettes=drawOpeningAsset(context,resources.openingCassette,state.renderTarget.Get(),depth.Get(),
                 worlds[i],view,projection)&&cassettes;
-        if(radio&&cassettes)drawOpeningLabels(context,state.renderTarget.Get(),state.viewport,worlds,view,projection,selection);
+        if(radio&&cassettes)
+            drawOpeningLabels(context,state.renderTarget.Get(),state.viewport,worlds,view,projection,selection);
         restore(context,state);
         if(radio&&cassettes&&!resources.openingReported){
             resources.openingReported=true;mgs5vr::log("Owned cassette and radio props rendered in the native title cabin");
@@ -1517,5 +1517,6 @@ bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<f
         return radio&&cassettes;
     }catch(...){return false;}
 }
+
 void stopPhysicalOpticRenderer() noexcept{std::lock_guard lock(rendererMutex);resources=Resources{};}
 }

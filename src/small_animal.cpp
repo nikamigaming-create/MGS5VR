@@ -2,6 +2,7 @@
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
+#include "mgs5vr/opening_selector.hpp"
 #include <windows.h>
 #include <algorithm>
 #include <atomic>
@@ -41,6 +42,7 @@ struct ReleasedContact {
     Vec3 position{};
 } releasedContact;
 uint64_t skinUpdates{};
+uint64_t lastRuntimeReport{};
 template<class T> T read(uintptr_t address){
     T out{};SIZE_T n{};
     if(address)ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&out,sizeof(out),&n);
@@ -59,12 +61,17 @@ bool contextAllowed(const Hands& sample){
     const auto& f=sample.frame;const auto s=headCamera().status();
     return enabled.load()&&f.controllers.allowAnimalTouch&&!s.nativeMenuOpen&&!f.menuOpen&&!f.controllers.weaponReady
         &&!f.controllers.vehicleControls&&!f.controllers.optic.held&&!f.controllers.commandControls
-        &&!f.controllers.equipmentOpen&&!f.controllers.frontEnd;
+        &&!f.controllers.equipmentOpen&&!f.controllers.avatarEditor
+        &&(!f.controllers.frontEnd||f.controllers.cabinPlay||f.controllers.openingSelector);
 }
 bool eligible(const Hands& sample,uint64_t now){
     const auto& f=sample.frame;const auto s=headCamera().status();
     return contextAllowed(sample)&&s.active&&f.applied&&f.activation==s.activation
         &&now>=f.sampleTime&&now-f.sampleTime<150;
+}
+bool cabinContains(const HeadCameraSample& frame,Vec3 world){
+    const auto& bounds=frame.controllers.cabinBounds;
+    return nativeRoomContains(bounds,nativeRoomLocal(bounds,world),.035f);
 }
 Vec3 palmNormal(const Hands& h,unsigned side){return rotate(h.palms[side].orientation,{side?-1.f:1.f,0,0});}
 Pose perch(const Hands& h,unsigned side){
@@ -154,6 +161,9 @@ void observe(const Animal& a,const Hands& h){
         carry.lastUsable=now;
         const auto& input=h.frame.controllers.hands[carry.hand];
         const auto target=perch(h,carry.hand);
+        if(h.frame.controllers.cabinPlay&&!cabinContains(h.frame,target.position)){
+            release(a,"cabin boundary",now);return;
+        }
         const auto separation=length(target.position-carry.ground.position);
         if(!carry.held){
             if(separation>.45f||input.trigger>.2f||input.squeeze>.7f){release(a,"hand withdrew",now);return;}
@@ -183,6 +193,8 @@ void observe(const Animal& a,const Hands& h){
         carry.pose=target;place(a,target);return;
     }
     if(carry.model||!usable||now<carry.cooldown)return;
+    if((h.frame.controllers.openingSelector||h.frame.controllers.cabinPlay)
+       &&!cabinContains(h.frame,a.pose.position))return;
     if(releasedContact.model==a.model&&releasedContact.module==a.module&&releasedContact.logical==a.logical){
         // Lowering the rat is a release, even when an open hand rests nearby.
         // Both hands must leave the contact area before offering it again.
@@ -197,7 +209,7 @@ void observe(const Animal& a,const Hands& h){
         const auto target=perch(h,side);
         if(length(target.position-a.pose.position)>.35f)continue;
         if(h.frame.nativePose.position.y-target.position.y<.35f)continue;
-        const auto floor=floorAt(a.pose.position,h.frame.nativePose.position.y+.2f);
+        auto floor=floorAt(a.pose.position,h.frame.nativePose.position.y+.2f);
         if(!floor||std::abs(floor->y-a.pose.position.y)>.3f)continue;
         carry={};carry.module=a.module;carry.model=a.model;carry.logical=a.logical;carry.hand=side;
         carry.ground=a.pose;carry.ground.position=*floor;carry.pose=carry.ground;
@@ -238,8 +250,32 @@ void installSmallAnimalInteraction(uintptr_t imageBase){
 }
 void stopSmallAnimalInteraction() noexcept{enabled.store(false);}
 void publishSmallAnimalHands(const HeadCameraSample& f,const std::array<Pose,2>& p,const HandContacts& c){
-    {std::lock_guard lock(handsMutex);hands={f,p,c};}
-    if(enabled.load())refreshAnimals();
+    Hands sample;
+    {std::lock_guard lock(handsMutex);hands={f,p,c};sample=hands;}
+    if(enabled.load()){
+        refreshAnimals();
+        const auto now=steadyMilliseconds();
+        if(f.controllers.cabinPlay&&now-lastRuntimeReport>=2000){
+            lastRuntimeReport=now;
+            std::lock_guard lock(animalsMutex);
+            unsigned present{};
+            for(const auto& animal:animals)if(animal.model&&now-animal.seen<2000)++present;
+            log("Cabin native rat runtime slots="+std::to_string(present));
+        }
+    }
+}
+std::array<Pose,2> cabinAnimalPoses(const HeadCameraSample& frame){
+    std::array<Pose,2> result{};
+    if(!frame.controllers.cabinPlay&&!frame.controllers.openingSelector)return result;
+    std::lock_guard lock(animalsMutex);
+    size_t output=0;
+    const auto now=steadyMilliseconds();
+    for(const auto& animal:animals){
+        if(output>=result.size()||!animal.model||now-animal.seen>=2000
+           ||!cabinContains(frame,animal.pose.position))continue;
+        result[output++]=animal.pose;
+    }
+    return result;
 }
 void applySmallAnimalSkin(uintptr_t binding){
     if(!enabled.load())return;
@@ -270,6 +306,13 @@ std::string inspectSmallAnimals(){
         o<<"{\"id\":"<<a.logical<<",\"position\":["<<a.pose.position.x<<','<<a.pose.position.y<<','<<a.pose.position.z<<']';
         if(const auto f=floorAt(a.pose.position,h.frame.nativePose.position.y+.2f))o<<",\"floor\":"<<f->y;
         o<<'}';
+    }
+    o<<"],\"cabin\":[";
+    bool cabinFirst=true;
+    for(const auto& a:animals)if(a.model&&now-a.seen<2000&&cabinContains(h.frame,a.pose.position)){
+        if(!cabinFirst)o<<',';cabinFirst=false;
+        o<<"{\"id\":"<<a.logical<<",\"position\":["
+            <<a.pose.position.x<<','<<a.pose.position.y<<','<<a.pose.position.z<<"]}";
     }
     o<<"]}";return o.str();
 }

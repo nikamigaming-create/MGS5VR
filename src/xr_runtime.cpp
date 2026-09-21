@@ -104,6 +104,10 @@ struct Session {
     bool automaticEntryDone{};
     bool manualScreenSelected{};
     bool priorTitleMenu{};
+    bool titleUiReady{};
+    bool priorLoadingTips{};
+    bool openingBackend{};
+    bool cabinPlay{};
     ControlBindings controls;
     LiveControls liveControls;
     std::filesystem::path controlsPath;
@@ -380,11 +384,11 @@ struct Session {
     }
     void syncInput(XrTime time,Pose& head,std::array<EyeView,2>& views,bool stereoTracked){
         controllerFrame={};controllerFrame.snapYaw=snapYaw;
-        if(!focused){idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(!focused){idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};openingBackend=false;cabinPlay=false;priorFocused=false;priorRecenter=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         XrActiveActionSet active{actions,XR_NULL_PATH};
         XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&active;
         const auto r=xrSyncActions(handle,&sync);
-        if(r==XR_SESSION_NOT_FOCUSED){idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
+        if(r==XR_SESSION_NOT_FOCUSED){idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();snapControls.reset();rigControls.suspend();controls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();openingSelector.reset();openingFrame={};openingBackend=false;cabinPlay=false;priorFocused=false;gamepadMailbox().publish({},false,steadyMilliseconds());return;}
         xrCheck(r,"Sync controller actions");
         if(!priorFocused){
             snapControls.reset();
@@ -415,28 +419,73 @@ struct Session {
         }
         auto nativeStatus=headCamera().status();
         const bool liveIdroid=nativeStatus.nativeMenuOpen&&nativeStatus.nativeIdroidOpen;
-        const auto mode=controllerRigEnabled()?nativeTravelMode():TravelMode::unknown;
-        const bool title=controllerRigEnabled()&&nativeTitleMenuOpen();
+        const auto detectedMode=controllerRigEnabled()?nativeTravelMode():TravelMode::unknown;
+        const bool title=controllerRigEnabled()&&nativeTitleModeActive();
+        const bool spatialTitle=title&&nativeTitleCabinMode();
         const bool loading=controllerRigEnabled()&&nativeLoadingTipsOpen();
-        controllerFrame.frontEnd=title;
+        const bool avatarEditor=controllerRigEnabled()&&nativeAvatarEditActive();
+        const bool scriptedDemo=controllerRigEnabled()&&nativeScriptedDemoActive();
+        // Continue can close the title widget while TPP remains in its native
+        // 40050 helicopter scene. Enter cabin play only after the Lua reader
+        // confirms that mission and TitleMode is off; loading stays front-end.
+        cabinPlay=openingCabinEnabled()&&controllerRigEnabled()&&nativeCabinPlay()&&!title&&!loading;
+        // The native loading terminal is not a playable cabin.  Never turn a
+        // button press into an invented sandbox state; leave the handoff to
+        // the game's own player/camera publication.
+        // Only the actual title owns title UI suppression. A missing player
+        // publication during loading/prologue must not latch this state.
+        openingBackend=title;
+        const auto mode=cabinPlay&&!title&&detectedMode==TravelMode::unknown?TravelMode::onFoot:detectedMode;
+        if(loading!=priorLoadingTips){
+            const bool wasLoading=priorLoadingTips;
+            priorLoadingTips=loading;
+            // The Title cabin and the playable field publish different native
+            // cameras. If the accepted title camera was discarded during that
+            // handoff, let the first verified player-head publication enter
+            // tracked VR again instead of leaving the user on the theatre quad.
+            if(wasLoading&&!loading&&!title&&!headCamera().status().active){
+                automaticEntryDone=false;
+                log("Re-arming automatic tracked VR after native loading handoff");
+            }
+            log(std::string("Native loading tips ")+(loading?"opened":"closed")
+                +" title="+std::to_string(title)+" head_active="+std::to_string(headCamera().status().active));
+        }
+        // Native title/loading screens own their pixels until real gameplay
+        // publishes a fresh player camera. No frozen cabin can cover them.
+        controllerFrame.frontEnd=title||loading;
+        controllerFrame.loading=loading;
+        controllerFrame.avatarEditor=avatarEditor;
+        controllerFrame.scriptedDemo=scriptedDemo;
+        controllerFrame.authoredCamera=(title&&!spatialTitle)||avatarEditor||scriptedDemo;
+        controllerFrame.openingBackend=openingBackend;
+        controllerFrame.cabinPlay=cabinPlay;
         if(title!=priorTitleMenu){
-            priorTitleMenu=title;headCamera().cancel();automaticEntryDone=manualScreenSelected;
+            priorTitleMenu=title;
+            titleUiReady=false;
+            // Title UI closure precedes the Lua mission-state publication on
+            // some frames. Keep the accepted camera until the verified cabin,
+            // loading terminal, or player scene takes ownership.
+            automaticEntryDone=manualScreenSelected;
             nativeStatus=headCamera().status();
             log(title?"Native Title presentation active":"Native Title presentation closed; preserving VR/screen choice");
+        }
+        if(title&&nativeTitleMenuOpen())titleUiReady=true;
+        const bool startupScreen=title&&!titleUiReady;
+        // Startup logos/Press Start belong to one stable native screen. The
+        // title backdrop can publish a player before its real menu exists;
+        // accepting that camera early makes logos jump onto a near VR panel.
+        if(startupScreen&&(nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)){
+            headCamera().cancel();automaticEntryDone=manualScreenSelected;
+            nativeStatus=headCamera().status();
         }
         // Enter tracked gameplay as soon as the real player is available.
         // Front-end/loading states retain their native menu controls. A manual
         // screen/VR choice is respected for the remainder of this XR session.
         const auto now=steadyMilliseconds();
         if(now>=openingAssetPollAt){
-            openingAssetPollAt=now+1000;openingAssetsReady=openingPropsAvailable();
+            openingAssetPollAt=now+1000;
+            openingAssetsReady=openingPropsAvailable();
         }
-        openingFrame=openingSelector.update(title,openingAssetsReady,head,controllerFrame.hands[1],now);
-        controllerFrame.openingSelector=openingFrame.active;
-        controllerFrame.openingSelection=openingFrame.selection;
-        if(openingFrame.pulse==OpeningPulse::confirm&&openingFrame.selection>=0
-           &&static_cast<size_t>(openingFrame.selection)<openingTapeLabels.size())
-            log("Opening tape confirmed native title action: "+std::string(openingTapeLabels[openingFrame.selection]));
         const auto l=stick(hands[0]),rr=stick(hands[1]);
         const auto faceButtons=isolatedFaceButtons(faceLayouts,
             {boolean(face[0],hands[1]),boolean(face[1],hands[1]),boolean(face[2],hands[0]),boolean(face[3],hands[0])},
@@ -449,18 +498,47 @@ struct Session {
             boolean(thumbClick,hands[1])?1.f:0.f,ls,rs,lt,rt};
         physical.leftStick={l.x,l.y};physical.rightStick={rr.x,rr.y};
         reloadControls(physical,now);
+        controllerFrame.frontEnd=title||loading;
+        controllerFrame.loading=loading;
+        controllerFrame.avatarEditor=avatarEditor;
+        controllerFrame.scriptedDemo=scriptedDemo;
+        controllerFrame.authoredCamera=(title&&!spatialTitle)||avatarEditor||scriptedDemo;
+        controllerFrame.openingBackend=openingBackend;
+        controllerFrame.cabinPlay=cabinPlay;
+        const bool titleCabin=spatialTitle&&openingCabinEnabled()&&nativeTitleMenuOpen();
+        if(titleCabin)openingFrame=openingSelector.update(true,openingAssetsReady,false,head,controllerFrame.hands,now,
+            headCamera().openingTrackingOrigin(now));
+        else if(cabinPlay)openingFrame=openingSelector.updateCabin(true,head,controllerFrame.hands,now);
+        else {openingSelector.reset();openingFrame={};}
+        controllerFrame.openingSelector=titleCabin&&openingFrame.active;
+        controllerFrame.cabinMove=(controllerFrame.openingSelector||cabinPlay)
+            ?std::array<float,2>{l.x,l.y}:std::array<float,2>{};
+        controllerFrame.openingSelection=controllerFrame.openingSelector?openingFrame.selection:-1;
+        controllerFrame.openingOrigin=(controllerFrame.openingSelector||cabinPlay)?openingFrame.origin:Pose{};
+        if(openingFrame.pulse==OpeningPulse::confirm&&openingFrame.selection>=0
+           &&static_cast<size_t>(openingFrame.selection)<openingTapeLabels.size())
+            log("Opening tape confirmed native title action: "+std::string(openingTapeLabels[openingFrame.selection]));
+        if(openingFrame.blocked&&openingFrame.selection>=0
+           &&static_cast<size_t>(openingFrame.selection)<openingTapeLabels.size())
+            log("Opening tape blocked by native safety policy: "+std::string(openingTapeLabels[openingFrame.selection]));
         // Label/geometry changes belong to this same input publication.
         controllerFrame.equipmentLabels=equipmentLabels;
         controllerFrame.wristSurfaceLift=controls.setting("settings.wrist_surface_lift_cm")*.01f;
         controllerFrame.wristSelectorHeight=controls.setting("settings.wrist_selector_height_cm")*.01f;
         controllerFrame.wristPickerWidth=controls.setting("settings.wrist_picker_width_cm")*.01f;
+        controllerFrame.idroidScreenWidth=controls.setting("settings.idroid_screen_width_cm")*.01f;
         controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         controllerFrame.binocularAutoMark=controls.setting("settings.binocular_auto_mark")>=.5f;
         controllerFrame.binocularActorGlow=controls.setting("settings.binocular_actor_glow")>=.5f;
         controllerFrame.binocularMarkDwellMs=static_cast<uint64_t>(controls.setting("settings.binocular_mark_dwell_ms"));
-        const bool gameplayContext=controllerRigEnabled()&&mode!=TravelMode::unknown&&!title
+        const bool cabinControlsReady=cabinPlay&&!loading;
+        const bool gameplayContext=controllerRigEnabled()&&(cabinControlsReady||detectedMode!=TravelMode::unknown)&&!title&&!loading&&!avatarEditor&&!scriptedDemo
             &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
+        // Scripted prologue/cinematic gameplay may have no tracked player rig.
+        // Preserve native holds and BOTH sticks instead of routing movement
+        // through menu navigation while that camera adapter is unavailable.
+        const bool sceneFallback=controllerRigEnabled()&&!gameplayContext&&!title&&!loading&&!avatarEditor&&!scriptedDemo&&!nativeStatus.nativeMenuOpen;
         const auto controlContext=nativeControls.selected()?ControlContext::nativeButtons:!gameplayContext?ControlContext::menus:
             commandsControls.active()?ControlContext::commands:
             rigControls.equipmentPhase()!=0?ControlContext::equipment:
@@ -478,15 +556,18 @@ struct Session {
         if(!liveIdroid||nativeInput.exclusive)requestNativeIdroidClose(false);
         const bool manualToggle=headCamera().available()&&activeControl("system.toggle_vr");
         if(manualToggle||nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)automaticEntryDone=true;
-        if(loading&&!title&&(nativeStatus.active||nativeStatus.pending)){
-            headCamera().cancel();automaticEntryDone=manualScreenSelected;nativeStatus=headCamera().status();
+        if(loading&&(nativeStatus.active||nativeStatus.pending)){
+            // Native loading tips include the actionable Start Mission prompt.
+            // Publish its live pixels while preserving the requested VR mode.
+            headCamera().awaitScene();
+            nativeStatus=headCamera().status();
         }
-        if(!automaticEntryDone&&!loading&&stereoTracked&&right&&(mode!=TravelMode::unknown||title)
+        if(!automaticEntryDone&&!startupScreen&&!loading&&stereoTracked&&(detectedMode!=TravelMode::unknown||title||avatarEditor||scriptedDemo)
            &&nativeStatus.enabled&&headCamera().available()&&!nativeStatus.nativeMenuOpen){
             automaticEntryDone=true;headCamera().toggle();nativeStatus=headCamera().status();
             log(title?"Tracked VR entered for the native Title menu":"Tracked VR entered automatically on the first playable character");
         }
-        const bool rigInput=controllerRigEnabled()&&mode!=TravelMode::unknown&&!title
+        const bool rigInput=controllerRigEnabled()&&(cabinControlsReady||detectedMode!=TravelMode::unknown)&&!title&&!loading&&!avatarEditor&&!scriptedDemo
             &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
         const bool menuPressed=activeControl("system.idroid")||activeControl("system.pause");
         const bool equipmentHeld=controls.value(mode==TravelMode::vehicle?"vehicle.equipment_open":"equipment.open")
@@ -596,18 +677,11 @@ struct Session {
         if(nativeInput.exclusive){
             pad=nativeInput.gamepad;move={};navigation={};
         }else if(!rigInput){
-            mappedButton("menus.confirm",XINPUT_GAMEPAD_A);mappedButton("menus.back",XINPUT_GAMEPAD_B);
-            mappedButton("menus.action_x",XINPUT_GAMEPAD_X);mappedButton("menus.action_y",XINPUT_GAMEPAD_Y);
-            mappedButton("menus.previous_tab",XINPUT_GAMEPAD_LEFT_SHOULDER);mappedButton("menus.next_tab",XINPUT_GAMEPAD_RIGHT_SHOULDER);
-            mappedButton("menus.left_click",XINPUT_GAMEPAD_LEFT_THUMB);mappedButton("menus.right_click",XINPUT_GAMEPAD_RIGHT_THUMB);
-            mappedButton("menus.dpad_up",XINPUT_GAMEPAD_DPAD_UP);mappedButton("menus.dpad_down",XINPUT_GAMEPAD_DPAD_DOWN);
-            mappedButton("menus.dpad_left",XINPUT_GAMEPAD_DPAD_LEFT);mappedButton("menus.dpad_right",XINPUT_GAMEPAD_DPAD_RIGHT);
-            pad.leftTrigger=triggerValue("menus.left_trigger");pad.rightTrigger=triggerValue("menus.right_trigger");
-            // The live iDroid uses the right stick for its map/navigation axis
-            // while the left stick remains the normal on-foot movement axis.
-            // Other native menus retain their ordinary left-stick navigation.
-            move=controls.axis(liveIdroid?"axes.move":"axes.menu",physical);
-            navigation=controls.axis("axes.map",physical);
+            const auto fallbackMode=scriptedDemo?NativeMenuInput::cinematic:
+                sceneFallback?NativeMenuInput::scriptedScene:liveIdroid?NativeMenuInput::liveIdroid:NativeMenuInput::menu;
+            pad=nativeMenuGamepad(controls,physical,fallbackMode);
+            move={float(pad.leftX)/32767.f,float(pad.leftY)/32767.f};
+            navigation={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
         }else if(mode==TravelMode::vehicle){
             mappedButton("vehicle.native_a",XINPUT_GAMEPAD_A);mappedButton("vehicle.native_b",XINPUT_GAMEPAD_B);
             mappedButton("vehicle.weapon_or_call",XINPUT_GAMEPAD_X);mappedButton("vehicle.interact",XINPUT_GAMEPAD_Y);
@@ -640,6 +714,10 @@ struct Session {
             pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
             pad.rightX=static_cast<int16_t>(navigation[0]*32767);pad.rightY=static_cast<int16_t>(navigation[1]*32767);
         }
+        // A native demo owns character movement and camera motion. Keep its
+        // authored stereo scene and native face buttons, but never feed either
+        // physical stick to the game while the cutscene flag is active.
+        if(scriptedDemo){pad.leftX=pad.leftY=pad.rightX=pad.rightY=0;move={};navigation={};}
         if(utilityCenter||headToggle)pad={};
         bool stickNavigation=false;
         bool locomotionAvailable=false;
@@ -997,18 +1075,24 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         // noninteractive surfaces live in front of the last accepted stereo
         // surroundings. Keep their original eye poses: this is an explicitly
         // frozen scene, not an old frame relabeled as current gameplay.
-        if(!mayRetainStereoSurround(cameraStatus)){
+        const bool plannedLoading=session.controllerFrame.loading&&cameraStatus.reason==HeadCameraStop::sceneUnavailable;
+        if(session.manualScreenSelected
+           ||(!mayRetainStereoSurround(cameraStatus)&&!plannedLoading)){
             if(surroundTransition)screenPose=recenteredScreen(trackedHead,config.distanceMeters);
             haveSurround=false;surroundFrames={};surroundTransition=false;
         }
         if(session.manualScreenSelected)surroundTransition=false;
         else if(haveSurround&&!cameraStatus.active&&!surroundTransition){
-            surroundTransition=true;screenPose=recenteredScreen(trackedHead,1.3f);
+            surroundTransition=true;screenPose=recenteredScreen(trackedHead,config.distanceMeters);
         }
         if(cameraStatus.awaitingPlayer)menuReturnPending=true;
         else if(!cameraStatus.active&&!cameraStatus.pending)menuReturnPending=false;
         if(frame.shouldRender&&consumer.frame().sequence){
-            if(!cameraStatus.active&&!cameraStatus.pending){screen.upload(consumer.texture(),consumer.frame());eyeFrames={};}
+            // A pending activation has no accepted scene camera yet. Keep the
+            // live native startup/menu pixels visible until the first camera
+            // is accepted; boot can report an on-foot player before any scene
+            // is drawn. An active camera still owns tracking-loss recovery.
+            if(!cameraStatus.active){screen.upload(consumer.texture(),consumer.frame());eyeFrames={};}
             else if(cameraStatus.active&&!cameraStatus.suspended){
                 const auto metadata=consumer.eyes();
                 if(readyEyePair(metadata,cameraStatus.activation,steadyMilliseconds())){
@@ -1035,8 +1119,10 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         quad.space=session.local;quad.eyeVisibility=XR_EYE_VISIBILITY_BOTH;quad.pose=toXr(screenPose);
         quad.subImage.swapchain=screen.handle;
         quad.subImage.imageRect.extent={static_cast<int32_t>(screen.width),static_cast<int32_t>(screen.height)};
-        const float panelWidth=surroundTransition?1.6f:config.widthMeters;
-        quad.size={panelWidth,screen.width?panelWidth*static_cast<float>(screen.height)/static_cast<float>(screen.width):1};
+        // Keep startup/loading pixels on the configured world screen. Native
+        // menu-state flags must not resize it or bring a logo toward the eyes.
+        const float sourceAspect=screen.height?static_cast<float>(screen.width)/screen.height:16.f/9.f;
+        quad.size={config.widthMeters,config.widthMeters/sourceAspect};
         const auto* layer=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad);
         std::array<XrCompositionLayerProjectionView,2> projectionViews{{{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW},{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW}}};
         XrCompositionLayerProjection projection{XR_TYPE_COMPOSITION_LAYER_PROJECTION};projection.space=session.local;
@@ -1067,7 +1153,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             if(surroundTransition&&haveSurround&&regionsValid&&leftEye.ready&&rightEye.ready){
                 end.layerCount=screen.ready?2u:1u;end.layers=transitionLayers.data();
                 ++projectionFrames;++retainedStereoFrames;
-            }else if(cameraStatus.active||cameraStatus.pending){
+            }else if(cameraStatus.active){
                 // Runtime wait/end calls can stall beyond the native tracking
                 // freshness window. Reproject the last ACCEPTED complete pair
                 // for at most 500 ms while current headset tracking is valid.

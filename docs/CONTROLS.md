@@ -29,9 +29,10 @@ appear only in the binocular scene while the device is aligned with an eye.
 Holding binoculars down does not enable them, and firearm scopes do not reveal
 recon cues. `full` explicitly enables world cues in normal VR too; `off` hides them.
 An existing file with `hud_mode = full` retains that preference until you edit it.
-In tracked first-person VR, the general gameplay caption/HUD layer is
-suppressed rather than placed on the camera. Wrist controls, equipment, and
-weapon/status layers remain available on their authored forearm surfaces.
+In the current development build, recognized gameplay caption/HUD layers are
+routed above the left wrist; weapon/status stays flat on the left forearm.
+Native equipment categories and descriptions have passed a SIM motion check.
+Not every notification or caption has been visually checked.
 `binocular_actor_glow = 0` disables the native glowing body effect while keeping
 target acquisition and labels. `1` permits it within the selected recon view;
 it does not force the game's native glow to activate for every person.
@@ -129,7 +130,7 @@ needs a separate review.
 | Lower the gun while keeping it in hand | Keep right grip held and lower your hand |
 | Put the weapon away | Release right grip; the game performs its native stow animation |
 | Add the support hand | Squeeze left grip near the weapon's support socket and hold briefly |
-| Free the left hand | Release left grip, pull away, or turn the wrist HUD toward your eyes |
+| Free the left hand | Release left grip or pull away from the support contact |
 | Reload | **Tap left grip + B**; the native reload moves the support hand, then releases it |
 | Pick up a dropped weapon / carry a person | **Hold B** at the native prompt; bare B remains a native hold |
 | Switch weapon while aiming | **Right grip + right-stick click** while ready; the longer chord consumes Dive |
@@ -169,8 +170,8 @@ The firing hand alone owns aim in a close cup, so almost-touching controllers
 cannot twist the sights. Weapon changes clear the previous weapon's acquired grip.
 Clenching left grip in empty space only animates the free fingers; support also
 requires contact at the weapon. Releasing it or lowering the weapon clears contact.
-Wrist inspection also releases a foregrip; release left grip to inspect while
-using a close pistol cup. Selection
+Wrist rotation retains an acquired support contact; release left grip or
+withdraw from the socket to free the hand. Selection
 does not leave a sticky support latch. The corrective headset run received
 positive feedback; complete reach and pose coverage remains open.
 
@@ -181,8 +182,13 @@ moves you**, so you can select while walking. Use the **right stick** to browse,
 then **release left trigger** to confirm and close. Gameplay does not pause.
 
 `settings.wrist_picker_width_cm` enlarges the unfolded native cards and text
-(75 cm by default, 42–100 cm). The complete layout stays inside both eye views;
+(42 cm by default, 42–100 cm). The layout stays above the rendered forearm;
 the small ammunition HUD keeps its own size on the wrist.
+
+`settings.idroid_screen_width_cm` controls the hand-carried iDroid display
+(30 cm by default, 20–60 cm). Its height is derived from the native 16:9
+source, so changing the width cannot stretch the map. Keep the value near the
+default first; larger values improve legibility but occupy more of the view.
 
 | Right stick with left trigger held | Action |
 | --- | --- |
@@ -207,7 +213,7 @@ facing you; the small status display stays flat along the rendered left forearm.
 Its canvas preserves the native aspect before the stereo eye replay; changing
 the picker does not change that mount. `wrist_surface_lift_cm` is currently
 reserved and does not move the status surface. `wrist_selector_height_cm`
-sets the picker height (default: 12 cm). Raise that
+sets the picker height (default: 15 cm, clearing the bottom card from the arm). Raise that
 wrist into view to read the selection. Right-stick turning is consumed while
 the picker is open and until the stick returns to neutral after closing. A held
 fire trigger must be released before it can fire after selection.
@@ -302,7 +308,7 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Action | Control |
 | --- | --- |
 | Move, including during wrist selection | Left stick; on foot, forward follows your view heading |
-| Turn | Right stick left/right: 30° snap on foot, or configurable native smooth turn; mounted view/turret uses both axes |
+| Turn | Right stick left/right: native smooth turn by default; enable optional 30° snap in controls. Mounted view/turret uses both axes |
 | Sprint / run | Left-stick click; with binoculars, right-stick up also runs |
 | Crouch / stand / prone | Tap **A** for crouch/stand; hold **A** for prone. The weapon lowers for the stance action |
 | Quick dive | Right-stick click on foot, including with binoculars equipped. No face-button duplicate |
@@ -319,9 +325,11 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Recenter the large screen | Left grip + left Menu |
 | Recenter in game, including while holding binoculars | Hold left grip and tap left Menu; keeps your current facing and brings the body under your head |
 
-In the development build, opening iDroid or Pause during tracked gameplay puts
-the native menu on a floating panel in the stereo world. Head movement keeps
-working during Pause. The iDroid terminal is a live overlay: its left stick
+In the development build, iDroid targets the cupped right palm and Pause targets
+the left wrist. **Current SIM failures:** Pause freezes the visible arm, its
+panel is oversized/partly off-screen, and zoomed map geometry escapes the iDroid
+canvas. These menus are not yet ready for a physical-headset handoff.
+Head movement keeps working during Pause. The iDroid terminal is a live overlay: its left stick
 continues on-foot movement while the right stick handles map navigation, so the
 world and combat are not paused by the VR adapter. The deliberate Pause screen
 retains the game's blocking behavior. The iDroid handset remains attached to the

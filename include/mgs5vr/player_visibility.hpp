@@ -3,6 +3,11 @@
 #include <cstdint>
 
 namespace mgs5vr {
+// Keep the native body visible for scripted scenes, even while immersive
+// presentation is active; ordinary first-person gameplay still hides it.
+constexpr bool hidePlayerInFirstPerson(bool immersiveActive,bool scriptedDemo) noexcept {
+    return immersiveActive&&!scriptedDemo;
+}
 void initializePlayerVisibility(uintptr_t moduleBase) noexcept;
 // Called on the native player camera publication thread, after the player has
 // updated its appearance. Only verified models owned by this player are changed.

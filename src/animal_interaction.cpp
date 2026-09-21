@@ -1,9 +1,11 @@
 #include "mgs5vr/animal_interaction.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
+#include "mgs5vr/opening_selector.hpp"
 #include <windows.h>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <mutex>
@@ -13,6 +15,9 @@ namespace mgs5vr {
 namespace {
 struct Hands {HeadCameraSample frame;std::array<Pose,2> palms;HandContacts contacts;};
 std::mutex publicationMutex,interactionMutex;
+std::mutex contactMutex;
+std::optional<AnimalContactCapsule> headContact;
+uint64_t contactAt{},contactActivation{};
 Hands latest;
 struct Stroke {
     Vec3 relative{},local{};
@@ -22,6 +27,8 @@ struct Stroke {
 };
 std::array<Stroke,2> strokes;
 uint64_t consumed{},lastReport{},nextResponseAt{},handActivation{};
+uint64_t lastRuntimeReport{};
+std::atomic_uint64_t physicalResponses{},physicalResponseAt{};
 void resetContact(Stroke& stroke){
     stroke.sampledAt=stroke.startedAt=0;stroke.travel=0;
 }
@@ -32,6 +39,11 @@ template<class T> T read(uintptr_t address){
     return size==sizeof(value)?value:T{};
 }
 float length(Vec3 p){return std::sqrt(dot(p,p));}
+bool cabinActor(const HeadCameraSample& frame,Vec3 point){
+    if(!frame.controllers.openingSelector&&!frame.controllers.cabinPlay)return true;
+    const auto& bounds=frame.controllers.cabinBounds;
+    return nativeRoomContains(bounds,nativeRoomLocal(bounds,point),.10f);
+}
 struct alignas(16) DogBones {
     uint64_t command{0xdb3413073cef},pad{};
     std::array<float,4> first{},second{};
@@ -67,6 +79,11 @@ bool respond(){
 }
 Hands hands(){std::lock_guard lock(publicationMutex);return latest;}
 }
+std::optional<AnimalContactCapsule> nativeDogHeadContact(uint64_t now,uint64_t activation){
+    std::lock_guard lock(contactMutex);
+    if(activation!=contactActivation||now<contactAt||now-contactAt>100)return {};
+    return headContact;
+}
 void publishAnimalHands(const HeadCameraSample& frame,const std::array<Pose,2>& palms,const HandContacts& contacts){
     std::lock_guard lock(publicationMutex);latest={frame,palms,contacts};
 }
@@ -74,10 +91,27 @@ void consumeAnimalTouch(){
     std::lock_guard lock(interactionMutex);
     const auto sample=hands();const auto& frame=sample.frame;
     const auto now=steadyMilliseconds();const auto status=headCamera().status();
+    const auto bones=dogBones();
+    {
+        std::lock_guard contactLock(contactMutex);headContact.reset();
+        if(bones&&status.active&&frame.applied&&frame.activation==status.activation
+           &&now>=frame.sampleTime&&now-frame.sampleTime<=100&&cabinActor(frame,(*bones)[0])){
+            const auto forward=(*bones)[0]-(*bones)[1];
+            const auto direction=forward*(1.f/std::max(length(forward),.001f));
+            headContact=AnimalContactCapsule{(*bones)[0]+direction*.20f,(*bones)[0]-direction*.10f,.16f};
+            contactAt=frame.sampleTime;contactActivation=frame.activation;
+        }
+    }
+    if(frame.controllers.cabinPlay&&now-lastRuntimeReport>=2000){
+        lastRuntimeReport=now;
+        log(std::string("Cabin native D-Dog runtime=")+(bones?"present":"absent")
+            +" hand_touch_enabled="+std::to_string(frame.controllers.allowAnimalTouch));
+    }
     if(!frame.controllers.allowAnimalTouch||!status.active||status.nativeMenuOpen||!frame.applied||frame.activation!=status.activation
        ||now<frame.sampleTime||now-frame.sampleTime>100||frame.controllers.weaponReady
        ||frame.controllers.vehicleControls||frame.controllers.optic.held||frame.controllers.commandControls
-       ||frame.controllers.equipmentOpen||frame.controllers.frontEnd){
+       ||frame.controllers.equipmentOpen||frame.controllers.avatarEditor
+       ||(frame.controllers.frontEnd&&!frame.controllers.cabinPlay&&!frame.controllers.openingSelector)){
         // A missed tracking frame may interrupt contact, but cannot re-arm
         // a hand that has already petted the buddy. It must withdraw first.
         for(auto& stroke:strokes)resetContact(stroke);
@@ -86,8 +120,13 @@ void consumeAnimalTouch(){
     if(frame.sampleTime<=consumed)return;
     consumed=frame.sampleTime;
     if(handActivation!=frame.activation){strokes={};handActivation=frame.activation;}
-    const auto bones=dogBones();
     if(!bones){for(auto& stroke:strokes)resetContact(stroke);return;}
+    if(!cabinActor(frame,(*bones)[0])){
+        // Gate the contact region, not the whole animal against six axial
+        // samples. The authored dog's hindquarters can extend past a bench
+        // ray while its head is visibly inside the reachable cabin.
+        for(auto& stroke:strokes)resetContact(stroke);return;
+    }
     const Vec3 skull=(*bones)[0],end=(*bones)[1];
     // Bone 5 is at the skull, behind the visible muzzle. Extend the contact
     // centerline along the animal's own head-to-body direction, so touching
@@ -132,6 +171,8 @@ void consumeAnimalTouch(){
                 // the cooldown even if tracking or the native pose pauses.
                 nextResponseAt=now+3500;
                 for(auto& other:strokes)other.latched=true;
+                ++physicalResponses;physicalResponseAt.store(now);
+                rumbleMailbox().publish({side?0.f:.35f,side?.35f:0.f,now});
                 log("Physical D-Dog stroke hand="+std::to_string(side)+" travel="+std::to_string(stroke.travel));
             }
             stroke.startedAt=frame.sampleTime;stroke.travel=0;
@@ -145,6 +186,11 @@ std::string inspectAnimalTouch(){
     const auto vector=[&](const char* key,Vec3 v){out<<",\""<<key<<"\":["<<v.x<<','<<v.y<<','<<v.z<<']';};
     if(bones){vector("bone5",(*bones)[0]);vector("bone26",(*bones)[1]);}
     vector("head",sample.frame.nativePose.position);
+    if(const auto anchor=headCamera().openingTrackingOrigin(steadyMilliseconds())){
+        vector("openingPosition",anchor->position);
+        const auto q=anchor->orientation;
+        out<<",\"openingOrientation\":["<<q.x<<','<<q.y<<','<<q.z<<','<<q.w<<']';
+    }
     vector("left",sample.palms[0].position);vector("right",sample.palms[1].position);
     vector("rightIndex",sample.contacts[1][2]);vector("rightMiddle",sample.contacts[1][3]);
     const auto orientation=sample.frame.nativePose.orientation;
@@ -155,7 +201,9 @@ std::string inspectAnimalTouch(){
        <<",\"applied\":"<<sample.frame.applied<<",\"activation\":"<<sample.frame.activation
        <<",\"currentActivation\":"<<status.activation<<",\"weapon\":"<<sample.frame.controllers.weaponReady
        <<",\"optic\":"<<sample.frame.controllers.optic.held<<",\"frontEnd\":"<<sample.frame.controllers.frontEnd
-       <<",\"squeeze\":"<<sample.frame.controllers.hands[1].squeeze<<'}';return out.str();
+       <<",\"squeeze\":"<<sample.frame.controllers.hands[1].squeeze
+       <<",\"physicalPetResponses\":"<<physicalResponses.load()
+       <<",\"lastPhysicalPetAt\":"<<physicalResponseAt.load()<<'}';return out.str();
 }
 std::string requestNativeDogResponse(){
     if(!dogBones())return "No active D-Dog";

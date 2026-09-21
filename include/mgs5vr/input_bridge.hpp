@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <deque>
 #include <mutex>
 #include <optional>
 #include "core.hpp"
@@ -207,14 +208,25 @@ private:
 class GamepadMailbox {
 public:
     void publish(GamepadSample sample,bool active,uint64_t steadyMilliseconds);
+    void publishExternal(GamepadSample sample,bool active,uint64_t steadyMilliseconds);
     std::optional<GamepadSample> read(uint64_t steadyMilliseconds, bool* freshActive = nullptr) const;
 private:
+    struct ExternalEvent {
+        GamepadSample sample{};
+        uint64_t timestamp{};
+        bool active{};
+    };
     mutable std::mutex mutex_;
     GamepadSample sample_{};
     uint64_t timestamp_{};
     bool connected_{},active_{};
+    mutable std::deque<ExternalEvent> externalQueue_;
+    mutable ExternalEvent externalCurrent_{};
+    mutable bool externalCurrentValid_{},externalCurrentDelivered_{};
 };
 GamepadMailbox& gamepadMailbox();
 uint64_t steadyMilliseconds();
 void installGamepadHook();
+void requestLoadingPromptConfirm() noexcept;
+bool consumeLoadingPromptConfirm() noexcept;
 }

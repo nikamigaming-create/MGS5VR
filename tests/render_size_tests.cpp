@@ -15,7 +15,7 @@ int main(){
         const auto suffix=std::to_wstring(GetCurrentProcessId())+L"-"+std::to_wstring(GetTickCount64());
         path=std::filesystem::temp_directory_path()/(L"mgs5vr-display-fixture-"+suffix+L".ini");
         require(!std::filesystem::exists(path),"Fixture path already exists");
-        {std::ofstream out(path);out<<"[display]\nenabled=1\nrender_width=2560\nrender_height=2560\nmirror_width=960\nmirror_height=540\n";}
+        {std::ofstream out(path);out<<"[display]\nenabled=1\nrender_width=4160\nrender_height=4160\nmirror_width=960\nmirror_height=540\n";}
         // Both windows remain hidden. No game, headset, or monitor mode changes.
         probeWindow=CreateWindowExW(0,L"STATIC",L"MGS5VR display test probe",WS_OVERLAPPEDWINDOW,0,0,32,32,nullptr,nullptr,nullptr,nullptr);
         gameWindow=CreateWindowExW(0,L"STATIC",L"METAL GEAR SOLID V: THE PHANTOM PAIN",WS_OVERLAPPEDWINDOW,0,0,100,100,nullptr,nullptr,nullptr,nullptr);
@@ -34,7 +34,7 @@ int main(){
         mgs5vr::observeRenderWindow(native.Get());
         RECT bootClient{};GetClientRect(gameWindow,&bootClient);
         require(bootClient.right!=960,"Do not shrink the bootstrap window before native resources have the requested size");
-        require(SUCCEEDED(native->ResizeBuffers(1,2560,2560,DXGI_FORMAT_R8G8B8A8_UNORM,0)),"Native engine may change render size");
+        require(SUCCEEDED(native->ResizeBuffers(1,4160,4160,DXGI_FORMAT_R8G8B8A8_UNORM,0)),"Native engine may change render size above 4K");
         mgs5vr::observeRenderWindow(native.Get());
         MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){TranslateMessage(&message);DispatchMessageW(&message);}
         for(int attempt=0;attempt<3;++attempt){
@@ -45,11 +45,11 @@ int main(){
             require(!(GetWindowLongPtrW(gameWindow,GWL_STYLE)&(WS_POPUP|WS_MAXIMIZE)),"Full-screen window style must not return");
         }
         require(!IsWindowVisible(gameWindow),"Test window must stay hidden");
-        require(SUCCEEDED(native->GetDesc(&desc))&&desc.BufferDesc.Width==2560&&desc.BufferDesc.Height==2560,"Engine-selected size must be retained");
+        require(SUCCEEDED(native->GetDesc(&desc))&&desc.BufferDesc.Width==4160&&desc.BufferDesc.Height==4160,"Engine-selected size must be retained");
         require(SUCCEEDED(native->SetFullscreenState(TRUE,nullptr)),"Exclusive request must be converted to windowed");
         BOOL fullscreen{};require(SUCCEEDED(native->GetFullscreenState(&fullscreen,nullptr))&&!fullscreen,"No monitor mode switch");
         native.Reset();probe.Reset();context.Reset();device.Reset();
-        std::cout<<"Native 2560x2560 buffer, fixed 960x540 hidden preview, repeated startup resize and no exclusive fullscreen: passed\n";result=0;
+        std::cout<<"Native 4160x4160 buffer, fixed 960x540 hidden preview, repeated startup resize and no exclusive fullscreen: passed\n";result=0;
     }catch(const std::exception& error){std::cerr<<error.what()<<'\n';}
     if(gameWindow)DestroyWindow(gameWindow);if(probeWindow)DestroyWindow(probeWindow);
     MH_Uninitialize();if(!path.empty())std::filesystem::remove(path);return result;

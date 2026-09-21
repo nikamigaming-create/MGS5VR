@@ -42,6 +42,11 @@ std::atomic_uint64_t equipmentPreviewRequestedAt{};
 void* equipmentPreviewOwner{}; // Accessed only on the native equipment update.
 std::atomic_uintptr_t titleMenu{};
 std::atomic_uint64_t titleUpdatedAt{};
+std::atomic_bool titleMode{};
+std::atomic_bool titleCabinMode{};
+std::atomic_bool cabinPlayMode{};
+std::atomic_bool avatarEditMode{};
+std::atomic_bool scriptedDemoMode{};
 uintptr_t base{};
 std::atomic_bool enabled{};
 struct Source {
@@ -49,15 +54,16 @@ struct Source {
     uintptr_t camera{};
     std::array<float,16> view{};
     Pose panel{},picker{};
-    bool panelTracked{},panelVisible{},choosingCategory{},itemsOpen{},commandsOpen{},menuOpen{};
+    bool panelTracked{},panelVisible{},choosingCategory{},itemsOpen{},commandsOpen{},menuOpen{},idroidMenu{};
     Pose menuPanel{};
-    bool frontEnd{};
+    bool frontEnd{},loading{},openingSelector{},openingBackend{},avatarEditor{};
     std::array<float,16> authoredView{},authoredProjection{};
-    float pickerWidth{.75f};
+    float pickerWidth{.42f},idroidScreenWidth{.30f};
     HudMode hudMode{HudMode::binocularsOnly};
     HudView hudView{HudView::world};
     std::array<float,16> projection{};
     bool equipmentOpen{};
+    bool menuPanelTracked{};
 };
 thread_local Source producing,executing;
 std::mutex mutex;
@@ -80,10 +86,6 @@ bool pauseReaderVerified{};
 std::atomic_int menuState{-1};
 std::atomic_uint64_t pickerDrawTime{};
 std::atomic_uint64_t commandsDrawTime{};
-// Opt-in isolation for native HUD-layer diagnosis. Never used by gameplay
-// defaults; refreshed by the bounded observer, not by every render-node call.
-std::atomic_int diagnosticHiddenOrder{-1};
-
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
 void equipmentUpdate(void* object){
@@ -218,11 +220,11 @@ __declspec(noinline) uintptr_t execute(void* renderer,void* info,void* task,uint
     return originalExecute(renderer,info,task,worker);
 }
 __declspec(noinline) uintptr_t node(void* state,void* item){
-    if(enabled.load()&&executing.eye.sourceSequence&&!executing.menuOpen&&!executing.frontEnd
-        &&diagnosticHiddenOrder.load()==static_cast<int>(field<uint32_t>(item,0x28)))return 0;
-    // Title's complete native menu is captured once and placed on a cabin
-    // surface after each eye. Its individual layers must not reappear here.
-    if(enabled.load()&&executing.eye.sourceSequence&&executing.frontEnd)return 0;
+    // Hide native title rows only when the physical cassette selector belongs
+    // to a verified helicopter title cabin. A fresh-start hospital backdrop
+    // can remain in TitleMode without that replacement surface; keep the
+    // native Start Game menu and its input path in that state.
+    if(enabled.load()&&executing.eye.sourceSequence&&executing.frontEnd&&executing.openingSelector)return 0;
     if(enabled.load()&&executing.eye.sourceSequence&&!executing.menuOpen){
         const auto order=field<uint32_t>(item,0x28);
         const auto camera=field<uintptr_t>(state,0x308);
@@ -263,10 +265,11 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                     log(message.str());
                 }
             }
-            if(executing.frontEnd){
+            if(executing.frontEnd||executing.avatarEditor){
                 uintptr_t type{};std::array<float,16> world{};
                 read(camera,&type,sizeof(type));read(camera+0x30,world.data(),sizeof(world));
-                std::ostringstream message;message<<"Title UI layer order="<<order<<" name="<<found->name
+                std::ostringstream message;message<<(executing.avatarEditor?"Avatar UI layer":"Title UI layer")
+                    <<" order="<<order<<" name="<<found->name
                     <<" camera=0x"<<std::hex<<camera<<" type_rva=0x"<<(type-base)<<std::dec
                     <<" source_camera="<<(camera==executing.camera)<<" panel_tracked="<<executing.panelTracked
                     <<" world=";for(const auto f:world)message<<f<<',';
@@ -294,25 +297,30 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             // 135 or 150. Preserve each camera's native clip coordinates and
             // flatten every menu layer onto the same world plane. Testing the
             // HUD transform here left the main map head-locked in both eyes.
-            const bool titleWorldUi=executing.frontEnd&&camera==executing.camera;
             const bool menuCamera=executing.menuOpen&&!executing.frontEnd&&camera!=executing.camera;
-            if(((executing.menuOpen||executing.frontEnd)&&(layoutCamera||menuCamera))||titleWorldUi){
+            const bool avatarLayout=executing.avatarEditor&&layoutCamera;
+            if((executing.menuOpen||executing.frontEnd||avatarLayout)&&(layoutCamera||menuCamera)){
+                if(executing.menuOpen&&!executing.frontEnd&&!avatarLayout&&!executing.menuPanelTracked){
+                    ++suppressedDraws;return 0;
+                }
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
-                const auto savedView=field<std::array<float,16>>(state,0x200);
-                const auto mapped=uiPanelProjection(titleWorldUi?executing.authoredProjection:saved,executing.view,executing.eye.view.fov,
-                    executing.menuPanel,executing.frontEnd?1.6f:idroidScreenWidth,
-                    (executing.frontEnd?1.6f:idroidScreenWidth)*9.f/16.f);
+                const auto layout=selectSpatialUiLayout(executing.frontEnd,executing.avatarEditor,
+                    executing.menuOpen,executing.idroidMenu,true);
+                const auto canvas=layoutCamera?nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection):saved;
+                const auto panelProjection=spatialUiProjection(canvas,layout);
+                const auto mapped=uiPanelProjection(panelProjection,executing.view,executing.eye.view.fov,
+                    executing.menuPanel,(executing.frontEnd||executing.avatarEditor)?1.6f:executing.idroidScreenWidth,
+                    ((executing.frontEnd||executing.avatarEditor)?1.6f:executing.idroidScreenWidth)*9.f/16.f,
+                    spatialUiPlaneCenterX(layout));
                 if(!mapped){++suppressedDraws;return 0;}
                 auto* output=static_cast<unsigned char*>(state)+0x1c0;
-                if(titleWorldUi)std::memcpy(static_cast<unsigned char*>(state)+0x200,executing.authoredView.data(),sizeof(executing.authoredView));
                 std::memcpy(output,mapped->data(),sizeof(*mapped));
                 constexpr std::array<float,16> identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
                 const auto bounds=uiPanelProjection(identity,executing.view,executing.eye.view.fov,
-                    executing.menuPanel,executing.frontEnd?1.6f:idroidScreenWidth,
-                    (executing.frontEnd?1.6f:idroidScreenWidth)*9.f/16.f);
+                    executing.menuPanel,(executing.frontEnd||executing.avatarEditor)?1.6f:executing.idroidScreenWidth,
+                    ((executing.frontEnd||executing.avatarEditor)?1.6f:executing.idroidScreenWidth)*9.f/16.f);
                 UiClipScope clip(bounds.value_or(std::array<float,16>{}));
                 const auto result=originalNode(state,item);
-                if(titleWorldUi)std::memcpy(static_cast<unsigned char*>(state)+0x200,savedView.data(),sizeof(savedView));
                 std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
                 if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
                 return result;
@@ -325,9 +333,11 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             const bool nativeFourWay=executing.equipmentOpen&&!executing.frontEnd
                 &&layoutCamera&&order>=133&&order<=139;
             if(nativeFourWay){
+                if(!executing.panelTracked){++suppressedDraws;return 0;}
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto savedView=field<std::array<float,16>>(state,0x200);
-                const auto mapped=uiPanelProjection(nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection),executing.view,executing.eye.view.fov,
+                const auto canvas=nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection);
+                const auto mapped=uiPanelProjection(canvas,executing.view,executing.eye.view.fov,
                     executing.picker,executing.pickerWidth,executing.pickerWidth*9.f/16.f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
@@ -374,28 +384,26 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 // The initial trigger-held screen is the game's native
                 // four-way selector. Keep its pixels on the same unfolded
                 // wrist pose as the later native item cards.
-                const bool expanded=equipmentPicker||commandsPicker;
                 const bool general=layer==HudLayer::general;
+                const bool expanded=equipmentPicker||commandsPicker||general||contextAction;
                 // Layer 50 contains preprojected desktop labels. It cannot
                 // follow head motion on a face panel. Acquired people and
                 // waypoints are instead drawn from native world positions.
-                // General gameplay HUD is intentionally suppressed in tracked
-                // first-person VR. It must never fall back to a head-locked
-                // panel when a weapon is drawn. The remaining layers are
-                // limited to the authored forearm/picker poses.
-                if(layer==HudLayer::worldLabels||general
-                    ||(!executing.panelTracked||(!expanded&&!executing.panelVisible))){
+                // All personal HUD belongs to this source forearm. Losing the
+                // wrist cannot promote prompts or menus into the player's face.
+                if(layer==HudLayer::worldLabels
+                    ||!executing.panelTracked||(!expanded&&!executing.panelVisible)){
                     ++suppressedDraws;
                     if((contextAction||equipmentPicker||(order>=146&&order<=148))&&executing.eye.eye<2)++hiddenPanelByEye[executing.eye.eye];
                     return 0;
                 }
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
-                const auto panel=expanded?executing.picker:
-                    contextAction?compose(executing.panel,Pose{{},{0,.075f,.001f}}):executing.panel;
-                const float layoutWidth=commandsPicker?.6f:equipmentPicker?executing.pickerWidth:1.2f;
-                const auto mapped=uiPanelProjection(nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection),executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
-                    expanded?0.f:contextAction?.04f:.72f,
-                    expanded?0.f:contextAction?-.52f:-.70f);
+                const auto panel=expanded?executing.picker:executing.panel;
+                const float layoutWidth=expanded?executing.pickerWidth:1.2f;
+                const auto canvas=nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection);
+                const auto mapped=uiPanelProjection(canvas,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
+                    contextAction?.04f:expanded?0.f:.72f,
+                    contextAction?-.52f:expanded?0.f:-.70f);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));
@@ -416,9 +424,26 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 ++suppressedDraws;return 0;
             }
             if(layoutCamera){
-                // Captions, notices, and other non-authored layout-camera
-                // elements are general HUD. Suppress them in tracked
-                // first-person VR instead of projecting them onto the face.
+                // Animated notification/caption cameras use the same wrist
+                // popup as fixed-camera messages. Keep their native pixels.
+                if(!executing.panelTracked||order==50){++suppressedDraws;return 0;}
+                const auto saved=field<std::array<float,16>>(state,0x1c0);
+                const auto canvas=nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection);
+                const auto mapped=uiPanelProjection(canvas,executing.view,executing.eye.view.fov,
+                    executing.picker,executing.pickerWidth,executing.pickerWidth*9.f/16.f);
+                if(!mapped){++suppressedDraws;return 0;}
+                auto* output=static_cast<unsigned char*>(state)+0x1c0;
+                std::memcpy(output,mapped->data(),sizeof(*mapped));
+                const auto result=originalNode(state,item);
+                std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
+                if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
+                return result;
+            }
+        }else{
+            // A stale joined UI job may be dropped, but cannot revert to a
+            // desktop HUD in the eye image while its wrist pose is unavailable.
+            const auto camera=field<uintptr_t>(state,0x308);uintptr_t cameraType{};
+            if(camera!=executing.camera&&read(camera,&cameraType,sizeof(cameraType))&&cameraType==base+0x20f08c8){
                 ++suppressedDraws;return 0;
             }
         }
@@ -496,7 +521,7 @@ void installUiRenderer(uintptr_t moduleBase){
     enabled.store(true);log("Native UI worker lineage installed; experimental left-forearm weapon HUD="+std::to_string(spatialEnabled));
 }
 bool nativeTitleMenuOpen() noexcept {
-    if(!enabled.load())return false;
+    if(!enabled.load()||!titleMode.load())return false;
     const auto object=titleMenu.load();uintptr_t type{};
     // The reset callback and state zero also occur during entry. Only a
     // current native update establishes that this menu owns the front end.
@@ -504,6 +529,16 @@ bool nativeTitleMenuOpen() noexcept {
     return updated&&now>=updated&&now-updated<=250
         &&object&&read(object,&type,sizeof(type))&&type==base+0x23d7e58;
 }
+void publishNativeAvatarEdit(bool active) noexcept {avatarEditMode.store(active);}
+bool nativeAvatarEditActive() noexcept {return avatarEditMode.load();}
+void publishNativeScriptedDemo(bool active) noexcept {scriptedDemoMode.store(active);}
+bool nativeScriptedDemoActive() noexcept {return scriptedDemoMode.load();}
+void publishNativeTitleMode(bool active) noexcept {titleMode.store(active);}
+bool nativeTitleModeActive() noexcept {return titleMode.load();}
+void publishNativeTitleCabinMode(bool active) noexcept {titleCabinMode.store(active);}
+bool nativeTitleCabinMode() noexcept {return titleCabinMode.load();}
+void publishNativeCabinPlay(bool active) noexcept {cabinPlayMode.store(active);}
+bool nativeCabinPlay() noexcept {return cabinPlayMode.load();}
 bool nativeLoadingTipsOpen() noexcept {
     if(!enabled.load()||!menuReaderVerified)return false;
     // IsEndLoadingTips obtains this UiSystem and its loading-tip terminal.
@@ -553,18 +588,10 @@ bool nativeIdroidOpen() noexcept {
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
 void requestNativeEquipmentPreview(bool visible) noexcept {equipmentPreviewRequestedAt.store(visible?steadyMilliseconds():0);}
 uint64_t nativeCommandsDrawTime() noexcept {return enabled.load()?commandsDrawTime.load():0;}
-Pose wristPickerPose(const HeadCameraSample& rig) noexcept{
+std::optional<Pose> wristPickerPose(const HeadCameraSample& rig) noexcept{
+    if(!rig.wristPanelTracked)return {};
     const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
-    // Unfold the real cards above their forearm anchor. Fit the complete native
-    // panel into both eyes instead of clipping its text at close wrist range.
-    const auto anchor=rig.wristPanel.position+rotate(head.orientation,{0,rig.controllers.wristSelectorHeight,0});
-    // Frustum fitting uses tracked -Z-forward poses. Native camera poses are
-    // +Z-forward and make every corner appear behind the eye, forcing fallback.
-    const std::array<EyeView,2> eyes{{
-        {nativeTrackedPose(rig.nativePose,rig.headPose,rig.views[0].pose),rig.views[0].fov},
-        {nativeTrackedPose(rig.nativePose,rig.headPose,rig.views[1].pose),rig.views[1].fov}}};
-    const auto width=rig.controllers.wristPickerWidth;
-    return fitWristPanel(head,anchor,eyes,width,width*9.f/16.f).value_or(Pose{head.orientation,anchor});
+    return wristPopupPose(rig.wristPanel,head,rig.controllers.wristSelectorHeight);
 }
 void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<float,16>& view,const std::array<float,16>& projection,const HeadCameraSample& rig,
     const std::array<float,16>& authoredView,const std::array<float,16>& authoredProjection,HudView hudView){
@@ -574,17 +601,24 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     // same wrist origin. The iDroid gets its own tracked screen pose.
     const auto picker=wristPickerPose(rig);
     const auto idroid=trackedIdroidPose(rig);
-    const auto menuPanel=rig.menuOpen&&idroid?idroid->screen:
-        rig.menuOpen?picker:rig.menuPanel;
-    producing={eye,camera,view,rig.wristPanel,picker,rig.wristPanelTracked,
+    const bool handMenu=rig.menuOpen&&rig.menuIdroid&&idroid.has_value();
+    const bool startup=rig.controllers.frontEnd||rig.controllers.avatarEditor;
+    const auto menuPanel=startup?rig.menuPanel:handMenu?idroid->screen:picker.value_or(Pose{});
+    producing={eye,camera,view,rig.wristPanel,picker.value_or(Pose{}),picker.has_value(),
                rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),
                rig.controllers.equipmentOpen&&!rig.controllers.equipmentCategory,
                rig.controllers.equipmentCategory==4,rig.controllers.commandControls,
-               rig.menuOpen,menuPanel,rig.controllers.frontEnd,authoredView,authoredProjection,rig.controllers.wristPickerWidth};
+                      rig.menuOpen,rig.menuIdroid,menuPanel,rig.controllers.frontEnd,rig.controllers.loading,
+                      rig.controllers.openingSelector,rig.controllers.openingBackend,rig.controllers.avatarEditor,
+                      authoredView,authoredProjection,
+                rig.controllers.wristPickerWidth,handMenu?rig.controllers.idroidScreenWidth:rig.controllers.wristPickerWidth};
+    producing.loading=rig.controllers.loading;
+    producing.openingSelector=rig.controllers.openingSelector;
     producing.hudMode=rig.controllers.hudMode;
     producing.hudView=hudView;
     producing.projection=projection;
     producing.equipmentOpen=rig.controllers.equipmentOpen;
+    producing.menuPanelTracked=startup||(rig.menuIdroid?handMenu:picker.has_value());
 }
 void clearUiRenderSource() noexcept {producing={};}
 ReconModelVisibilityScope::ReconModelVisibilityScope(HudMode mode,HudView view,bool glow) noexcept {
@@ -637,15 +671,6 @@ bool applyUiEyeProjection(float* output) noexcept {
     // GrCamera at +0x308 and the view used for this UI draw at +0x200.
     const auto* state=reinterpret_cast<const unsigned char*>(output)-0x1c0;
     if(field<uintptr_t>(state,0x308)!=executing.camera){++cameraMismatch;return false;}
-    if(executing.frontEnd){
-        // Title choices and their shading are authored in the scene camera's
-        // world space. Recover their native clip layout before placing that
-        // complete layout on the spatial panel. Using an eye camera here leaves the
-        // title backdrop crossing the cabin and its text outside the view.
-        std::memcpy(reinterpret_cast<unsigned char*>(output)-0x1c0+0x200,executing.authoredView.data(),sizeof(executing.authoredView));
-        std::memcpy(output,executing.authoredProjection.data(),sizeof(executing.authoredProjection));
-        return true;
-    }
     // The job belongs to this exact scene/eye and camera, but the shared native
     // GrCamera may already have been restored (or changed to the other eye)
     // before its worker runs. Publish the immutable view captured at enqueue.
@@ -661,8 +686,6 @@ bool applyUiEyeProjection(float* output) noexcept {
     std::memcpy(output,executing.projection.data(),sizeof(executing.projection));++patched;return true;
 }
 void reportUiRenderer(std::ostream& out){
-    const auto hidden=static_cast<int>(GetPrivateProfileIntW(L"diagnostics",L"ui_hide_order",-1,settings.c_str()));
-    diagnosticHiddenOrder.store(hidden>=0&&hidden<=255?hidden:-1);
     std::lock_guard lock(mutex);
     out<<"{\"event\":\"native_ui_renderer\",\"queued\":"<<queued.load()<<",\"executions\":"<<executions.load()
        <<",\"joined\":"<<joined.load()<<",\"projection_patched\":"<<patched.load()<<",\"camera_mismatch\":"<<cameraMismatch.load()

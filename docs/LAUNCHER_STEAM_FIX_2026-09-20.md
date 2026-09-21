@@ -20,4 +20,6 @@ This establishes successful startup, not headset gameplay acceptance.
 The headset-launcher and launcher-display tests passed on Windows PowerShell 5.1.
 They cover absent or wrong inherited Steam identities, restoration after failure,
 runtime isolation, and the launcher button's path into the headset launch script.
-The VR DLL is unchanged from v12. Push and publication remain on hold for testing.
+The VR DLL is unchanged from v12. The user subsequently reported the candidate
+good to go and approved packaging. See [the release note](RELEASE_2026-09-20.md)
+for scope and remaining issues; this is not an exhaustive headset coverage claim.

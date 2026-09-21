@@ -64,10 +64,12 @@ showcase. Separate two-eye captures cover recovery and submenu navigation.
 The earlier native-texture recording is diagnostic only: it does not contain the
 complete recovery-notice sequence and is not final compositor footage.
 
-Physical headset acceptance of this hotfix is pending. Existing v11 issues remain,
+The user reported the candidate good to go and approved packaging after the
+launcher fix. This is user-reported acceptance, not an exhaustive physical
+headset test record. Existing v11 issues remain,
 including Pause arm freezing/menu fit, some notifications away from the wrist,
 and incomplete weapon/item/guard/vehicle coverage. See `PLAYTEST_V11_2026-09-20.md`.
-This candidate is a local beta, not a claim that every game feature is validated.
+This candidate is an experimental beta, not a claim that every game feature is validated.
 
 Use `Launch-Headset.cmd` after closing the simulator session. It selects the physical
 OpenXR runtime for the game process and uses the TPP location saved by the launcher.
