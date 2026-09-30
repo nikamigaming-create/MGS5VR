@@ -1,6 +1,9 @@
 """Evidence must describe the encoded video, not just native capture timestamps."""
 import importlib.util
+import hashlib
+import json
 from pathlib import Path
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +13,66 @@ spec.loader.exec_module(desk)
 audit_spec = importlib.util.spec_from_file_location('numeric_audit', ROOT / 'tools/field-guide/audit_numeric_tuning.py')
 audit = importlib.util.module_from_spec(audit_spec)
 audit_spec.loader.exec_module(audit)
+community_spec = importlib.util.spec_from_file_location('community_bundle', ROOT / 'tools/community_verification.py')
+community = importlib.util.module_from_spec(community_spec)
+community_spec.loader.exec_module(community)
+
+
+class CleanSourceEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.source = self.root / 'ledger.json'
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def bundle(self, item):
+        reports = [{'id': f'R{i:02}', 'claims': [{'id': f'C{i:02}',
+                    'status': 'verified_automated', 'evidence': [item]}]} for i in range(1, 56)]
+        self.source.write_text(json.dumps({'reports': reports}), encoding='utf-8')
+        return community.bundle(self.root, self.source, self.root / 'output')
+
+    def test_missing_private_evidence_preserves_historical_claim_without_proof_url(self):
+        data = self.bundle({'path': 'artifacts/native-result.txt', 'sha256': 'a' * 64})
+        self.assertEqual(len(data['reports']), 55)
+        for report in data['reports']:
+            claim = report['claims'][0]
+            self.assertEqual(claim['status'], 'verified_automated')
+            self.assertIs(claim['evidence'][0]['available'], False)
+            self.assertNotIn('url', claim['evidence'][0])
+        self.assertEqual(data['bundled_evidence'], {'files': 0, 'bytes': 0, 'unavailable_files': 1})
+
+    def test_present_reviewed_evidence_is_bundled_once_with_valid_bytes(self):
+        raw = b'actual native observation'
+        (self.root / 'result.txt').write_bytes(raw)
+        sha = hashlib.sha256(raw).hexdigest()
+        data = self.bundle({'path': 'result.txt', 'sha256': sha})
+        item = data['reports'][0]['claims'][0]['evidence'][0]
+        self.assertIs(item['available'], True)
+        self.assertEqual((self.root / 'output' / item['url']).read_bytes(), raw)
+        self.assertEqual(data['bundled_evidence']['files'], 1)
+
+    def test_changed_present_evidence_still_rejects_build(self):
+        (self.root / 'result.txt').write_bytes(b'changed evidence')
+        with self.assertRaisesRegex(ValueError, 'has changed'):
+            self.bundle({'path': 'result.txt', 'sha256': 'a' * 64})
+
+    def test_missing_file_does_not_bypass_path_or_identity_validation(self):
+        for item in ({'path': '../outside.txt', 'sha256': 'a' * 64},
+                     {'path': 'missing.txt', 'sha256': 'invalid'}):
+            with self.subTest(item=item), self.assertRaisesRegex(ValueError, 'Invalid evidence'):
+                self.bundle(item)
+
+    def test_review_keeps_only_explicit_capture_reference_when_it_is_missing(self):
+        raw = json.dumps({'captures': [{'path': 'capture.png', 'sha256': 'b' * 64}]}).encode()
+        (self.root / 'visual-review.json').write_bytes(raw)
+        data = self.bundle({'path': 'visual-review.json', 'sha256': hashlib.sha256(raw).hexdigest()})
+        item = data['reports'][0]['claims'][0]['evidence'][0]
+        self.assertIs(item['available'], True)
+        self.assertIs(item['related'][0]['available'], False)
+        self.assertNotIn('url', item['related'][0])
+        self.assertEqual(data['bundled_evidence']['unavailable_files'], 1)
 
 
 class EncodedCoverageTests(unittest.TestCase):

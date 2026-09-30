@@ -144,7 +144,7 @@ update rolls back changed files. Failed tests do not promote a build.
 For an explicitly requested GitHub release, commit the public source, run the
 same build/checks, then use `python tools/package-release.py --tag experimental-YYYY-MM-DD`.
 The packager verifies the checked play tree and public defaults, includes the
-committed source and per-file hashes, and writes to the fixed `build/release/`
+committed source and per-file hashes, and writes to the fixed `build/github-release/`
 directory. Private game data and simulator dependencies are rejected. Publishing
 a prerelease does not close the remaining gameplay/headset acceptance queue.
 

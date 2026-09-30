@@ -10,7 +10,7 @@ function summary(claims){const n=counts(claims);return [
  [(n.verified_automated||0)+(n.verified_simulator||0),'passed'],[n.failed,'failed'],
  [n.not_tested,'not tested'],[n.needs_headset,'need headset'],[n.not_implemented,'not built']
  ].filter(([count])=>count).map(([count,label])=>`${count} ${label}`).join(' · ')}
-function evidenceLink(e){const index=proofs.push(e)-1;return `<button class="proof-link" data-proof="${index}">${escape(e.path.split(/[\\/]/).at(-1))}</button>`}
+function evidenceLink(e){const name=escape(e.path.split(/[\\/]/).at(-1));if(e.available===false)return `<span class="help">${name} — Evidence not included in this build</span>`;const index=proofs.push(e)-1;return `<button class="proof-link" data-proof="${index}">${name}</button>`}
 export async function paintCommunity(query,filter){
  const d=await communityLedger();proofs=[];
  const all=d.reports.flatMap(r=>r.claims),n=counts(all);
@@ -27,7 +27,7 @@ export async function paintCommunity(query,filter){
  return `<article class="claim" data-result="${escape(c.status)}"><div class="claim-title"><h3>${escape(c.title)}</h3><span class="result-badge">${labels[c.status]}</span></div><p>${escape(c.finding)}</p>${c.next_action?`<p class="next-check"><b>Next check:</b> ${escape(c.next_action)}</p>`:''}${builds.length?`<p class="help">Tested build${builds.length>1?'s':''}: ${builds.map(b=>`<code>${escape(b.slice(0,16))}</code>${b!==d.candidate.dll_sha256?' (earlier build)':''}`).join(', ')}</p>`:''}${c.evidence.length?`<details class="claim-proof"><summary>Evidence (${c.evidence.length} records)</summary><div class="proof-list">${c.evidence.map(e=>evidenceLink(e)+(e.related?.length?`<div class="related-proof">${e.related.map(evidenceLink).join('')}</div>`:'')).join('')}</div></details>`:''}</article>`}).join('')}</details>`).join('');
 }
 export async function openCommunityProof(index){
- const e=proofs[index];if(!e)throw Error('Evidence selection is no longer available.');
+ const e=proofs[index];if(!e||e.available===false||!e.url)throw Error('Evidence selection is no longer available.');
  const dialog=document.getElementById('proof-dialog'),body=document.getElementById('proof-content');
  document.getElementById('proof-title').textContent=e.path.split(/[\\/]/).at(-1);
  document.getElementById('proof-identity').textContent=`${e.path}\nSHA-256: ${e.sha256}${e.build_sha256?'\nBuild: '+e.build_sha256:''}`;

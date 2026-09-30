@@ -21,6 +21,7 @@ def bundle(root, source, output):
     folder = output / 'evidence'
     folder.mkdir(parents=True, exist_ok=True)
     copied = {}
+    missing = set()
 
     def evidence(item, related=True):
         path = (root / item['path']).resolve()
@@ -28,6 +29,11 @@ def bundle(root, source, output):
         if (not path.is_relative_to(root) or path.suffix.lower() not in SUFFIXES
                 or not re.fullmatch('[a-f0-9]{64}', expected)):
             raise ValueError('Invalid evidence path or hash: ' + item['path'])
+        # Clean source builds do not contain private scratch captures. Keep the
+        # historical identity/result, but never manufacture a bundled proof URL.
+        if not path.exists():
+            missing.add(item['path'])
+            return {**item, 'available': False}
         if path.stat().st_size > 16 * 1024 * 1024:
             raise ValueError('Evidence file is too large: ' + item['path'])
         raw = path.read_bytes()
@@ -37,7 +43,7 @@ def bundle(root, source, output):
         if name not in copied:
             shutil.copy2(path, folder / name)
             copied[name] = len(raw)
-        result = {**item, 'url': 'evidence/' + name,
+        result = {**item, 'available': True, 'url': 'evidence/' + name,
                   'kind': 'image' if path.suffix.lower() in {'.png', '.jpg'} else 'text'}
         # A review binds exactly these captures. Include them for direct viewing,
         # never discover arbitrary sibling screenshots and call them reviewed.
@@ -56,6 +62,7 @@ def bundle(root, source, output):
             if claim['status'].startswith('verified_') and not claim['evidence']:
                 raise ValueError('Verified claim has no evidence: ' + claim['id'])
             claim['evidence'] = [evidence(x) for x in claim['evidence']]
-    data['bundled_evidence'] = {'files': len(copied), 'bytes': sum(copied.values())}
+    data['bundled_evidence'] = {'files': len(copied), 'bytes': sum(copied.values()),
+                              'unavailable_files': len(missing)}
     (output / 'community-verification.json').write_text(json.dumps(data, indent=2), encoding='utf-8')
     return data

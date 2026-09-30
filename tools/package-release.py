@@ -30,6 +30,8 @@ def package(tag, output):
     if not re.fullmatch(r"experimental-\d{4}-\d{2}-\d{2}(?:\.\d+)?", tag):
         raise ValueError("Use an experimental date tag, e.g. experimental-2026-09-30")
     output = safe_tree(output, ROOT / "build")
+    if output.resolve() == (ROOT / "build/Release").resolve():
+        raise ValueError("Keep release archives separate from compiler output; use build/github-release")
     safe_tree(PLAY, ROOT)
     build = read_json(PLAY / "BUILD.json")
     source = source_identity()
@@ -108,6 +110,6 @@ def package(tag, output):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tag", required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "build/release")
+    parser.add_argument("--output", type=Path, default=ROOT / "build/github-release")
     args = parser.parse_args()
     package(args.tag, args.output)
