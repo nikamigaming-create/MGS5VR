@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "description": "Bounded pause open/close from normal field play. No checkpoint confirmation or save action.",
+  "cases": [
+    {"id":"pause-open", "before":{"scene":"gameplay","menu":false,"idroid":false}, "steps":[{"op":"action","name":"system.pause"}], "after":{"scene":"menu","idroid":false}},
+    {"id":"pause-close", "before":{"scene":"menu","idroid":false}, "steps":[{"op":"action","name":"menus.back"}], "after":{"scene":"gameplay","menu":false,"idroid":false}}
+  ]
+}

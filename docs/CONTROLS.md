@@ -20,6 +20,8 @@ Save, release all buttons/grips/triggers and center both sticks for about two
 seconds. Changes apply live; no restart is needed. Invalid edits keep the last
 working layout, and deleting an override restores its default. This applies to
 bindings, axes, turning mode, HUD mode and the wrist/binocular adjustments.
+If a thumb-rest sensor is bound in either layout, lift that thumb too. Unbound
+thumb-rest contact does not delay applying an edit.
 The installed file is the one the game reads;
 the repository copy is a template. Every supported button action is listed,
 with separate gameplay, binocular, wrist, menu, horse and vehicle sections.
@@ -29,6 +31,20 @@ iDroid width/depth, paused panel size/distance/tilt, wrist placement, weapon smo
 radii and relaxed/touched finger curl. Missing settings show their defaults.
 Saving checks ranges, preserves other settings and creates an exact backup.
 Runtime settings in `mgs5vr.ini` require restarting the game.
+
+Capacitive touches can be mapped independently: `a_touch`, `b_touch`,
+`x_touch`, `y_touch`, `left_stick_touch`, `right_stick_touch`,
+`left_trigger_touch`, `right_trigger_touch`, `left_thumbrest` and
+`right_thumbrest`. Touch does not imply a click or squeeze. Available sensors
+depend on the active controller profile; unsupported sensors remain inactive.
+For example, `interact = press(x_touch + right_stick_touch)` runs that action
+once when both contacts begin. Touches have no default actions. Release any
+touch used by the current or proposed layout before applying a live edit.
+
+`settings.weapon_smoothing_ms` controls complete weapon and scope stabilization:
+`0` disables it; `100` strongly damps small aim shakes. Deliberate aim changes
+catch up quickly, and headset motion stays immediate. The hand, gun, sight and
+firing ray use the same adjusted pose.
 
 For a window-free workflow, run `MGS5VR-Launcher.exe --headless -Action Settings
 -GameExe "D:\Games\MGS_TPP\mgsvtpp.exe"`. Actions `Set` and `Validate` use the
@@ -64,6 +80,11 @@ pushing it downward. A plain input stays active while held. `press(a)`,
 Use `press(left_grip + x)` for a combination, `press(a) | press(x)` for either
 input, or `disabled` to remove a binding. Tap/hold pairs use the same duration.
 The longer chord consumes the simpler input; release held buttons after changing modes.
+
+`left_thumbrest` and `right_thumbrest` bind the left and right thumb-rest touch
+sensors on Oculus Touch and Meta Touch Plus profiles. Other profiles do not get
+a synthesized touch input; when the runtime does not expose that path, the token
+stays inactive. These are touch sensors, not finger tracking.
 
 The normal VR layout follows the native Action Type prompts where practical:
 **A** is stance, bare **B** is pickup/carry, **Y** is context, and **X** opens
@@ -217,10 +238,25 @@ then **release left trigger** to confirm and close. Gameplay does not pause.
 (42 cm by default, 42–100 cm). The layout stays above the rendered forearm;
 the small ammunition HUD keeps its own size on the wrist.
 
+`settings.weapon_hud_setback_cm` moves only the compact weapon/ammo readout
+toward the elbow. Default: 6 cm; supported range: 0–15 cm. The equipment popup,
+Pause panel and iDroid retain their separate positions. Save and release all
+controls for two seconds to apply the adjustment.
+
 `settings.idroid_screen_width_cm` controls the hand-carried iDroid display
-(30 cm by default, 20–60 cm). Its height is derived from the native 16:9
+(45 cm by default, 20–60 cm). Its height is derived from the native 16:9
 source, so changing the width cannot stretch the map. Keep the value near the
 default first; larger values improve legibility but occupy more of the view.
+
+For handheld iDroid, **VR Settings** also exposes `idroid_screen_depth_cm`
+(8 cm by default, 0–20), `idroid_screen_x_cm` / `idroid_screen_y_cm`
+(sideways/up, −20–20 cm), and `idroid_screen_pitch_degrees`,
+`idroid_screen_yaw_degrees`, `idroid_screen_roll_degrees` (−90–90).
+Zero side/height offsets center the screen on its mount. Angle and size pivot
+around that center and do not rotate the hand. Depth moves the projection
+toward you along the neutral display axis. Save and release the controls to
+apply the fit live. The relaxed VR grip is the default display orientation;
+physical gamepad mode retains the game's authored handset pose.
 
 | Right stick with left trigger held | Action |
 | --- | --- |
@@ -241,7 +277,9 @@ trigger stays held. Native equip/stow transitions can delay opening; navigation
 is blocked until the expanded menu has rendered.
 
 The cards and descriptions use real game data and unfold above the **left wrist**,
-facing you; the small status display stays flat along the rendered left forearm.
+facing you; the small status display sits just behind the rendered wrist joint,
+about 1.5 cm toward the elbow, instead of partway up the forearm. Both tracked
+controllers and native gamepad hands use that same wrist mount.
 Its canvas preserves the native aspect before the stereo eye replay; changing
 the picker does not change that mount. `wrist_surface_lift_cm` is currently
 reserved and does not move the status surface. `wrist_selector_height_cm`
@@ -282,6 +320,9 @@ no person is targeted. A short rumble confirms marking. Tap B to stow.
 **Tap A** to remove the waypoint or acquired person under the
 crosshair. Empty space clears nothing. Right-stick down remains the binocular
 stance gesture, because A owns clear in this mode.
+**Tap X** while looking through the lens to request intel about an enabled
+native radio target under the sight. The game's availability and radio-busy
+rules still apply. Acquiring an intel target gives a light right-hand pulse.
 Bring the left hand to the opposite side and squeeze
 **left grip** to cup it for support; release the grip or pull away to let go.
 Zoom does not require support contact. Zoom starts at **2×** and each
@@ -292,8 +333,9 @@ The device renders its own narrow-angle scene through its physical lens while
 the surrounding world retains normal stereo. The lens stays on its physical
 aperture at all distances; it never expands into a full-screen zoom. Its image
 keeps the same left/right orientation as the unzoomed world. Waypoint letters and acquired-person distances are
-drawn inside this view. Automatic identification by dwelling on a person and
-intel analysis are not implemented; marking currently requires the trigger.
+drawn inside this view. With `binocular_auto_mark = 1`, holding the sight on a
+visible person acquires their native marker after the configured dwell. Intel
+radio remains an explicit X action.
 The default `binocular_pitch_degrees = -90` tilts the device down 90° around the
 right palm position. Both palms face the housing sides, with the fingers curling
 over its top, not pointing back at the eye. Housing, lens, aiming ray and cupped
@@ -362,17 +404,26 @@ ability. Later powered arms are not verified on the 1% checkpoint.
 | Recenter the large screen | Left grip + left Menu |
 | Recenter in game, including while holding binoculars | Hold left grip and tap left Menu; keeps your current facing and brings the body under your head |
 
-By default, **iDroid and Pause use a stable tilted panel in the 3D scene**.
-Gameplay pauses while iDroid is open. Head tracking and stereo stay active;
-the panel stays where it opened, rather than following your face or hand.
-It defaults to 1.2 metres wide, 1.3 metres away, slightly below eye level and
-tilted up by 10 degrees. Width, distance and tilt are editable in VR Settings.
-Closing the menu releases only the mod's own pause; other native pauses remain.
+The hospital's two early look-direction lessons require the native look stick
+(right stick by default, configurable as `axes.native_look`). Follow the shown
+direction; moving only your headset does not supply that stick input. Those
+lessons retain head tracking and their authored camera. Pause keeps its normal
+menu navigation while a cutscene is active.
 
-Set **`settings.handheld_menus = 1`** to opt into the live handheld iDroid and
-wrist Pause panel. The handset and projection then follow the cupped right
-palm, and iDroid leaves the world running. This experimental mode still needs
-headset feedback. Equipment and Commands remain on the left wrist in both modes.
+**Pause always opens a large panel in the middle of your view**, anchored where
+you opened it. The world pauses and Snake stays still; stereo, head tracking,
+hand tracking and menu controls stay active. It defaults to 1.2 metres wide and
+1.3 metres away. Width, distance and tilt are editable in VR Settings.
+
+By default, iDroid also uses a world panel, slightly below eye level. Gameplay
+pauses while that mode is open. Closing it releases only the mod's own pause;
+other native pauses remain.
+
+Set **`settings.handheld_menus = 1`** to hold iDroid and its projection in the
+cupped right palm. Snake stays stationary while the sticks navigate iDroid;
+the surrounding world keeps running. This experimental mode still needs
+headset feedback. Pause stays in front of you in both modes. Equipment and
+Commands remain on the left wrist.
 
 **Left stick** selects menu rows; **A** confirms and **B** goes back.
 The **right stick** moves the live map. **Left/right grip** change tabs as

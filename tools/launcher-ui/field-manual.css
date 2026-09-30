@@ -1,0 +1,195 @@
+/* The original illustrated field card supplies the identity. Keep text and
+   current controls in the DOM; never reuse the card's historical mappings. */
+:root {
+  --paper:#f2efe5; --ink:#252625; --muted:#61615a;
+  --red:#af2624; --line:#bcb8aa; --panel:#f7f3e9;
+  font-family:'Segoe UI',Arial,sans-serif;
+}
+body {
+  background-color:var(--paper);
+  background-image:url('paper-grain.svg');
+}
+button {font-size:12px; border-color:#aaa699; padding:10px 14px}
+button:hover {background:#e5dfcf; border-color:var(--ink)}
+.primary {background:var(--red); color:#fff9e9; border-color:var(--red)}
+.primary:hover {background:#8e211f; border-color:#8e211f}
+button:focus-visible,input:focus-visible,select:focus-visible,
+canvas:focus-visible,summary:focus-visible {outline-color:var(--red)}
+.masthead {
+  display:block; height:auto; padding:0 26px; border:0;
+  position:relative; background:transparent;
+}
+.masthead-art {display:block; width:100%; max-width:1388px; margin:0 auto; mix-blend-mode:multiply}
+.terminal-strip {
+  min-height:40px; padding:0 26px; margin:0 -26px;
+  display:flex; align-items:center; justify-content:space-between; gap:20px;
+  background:var(--ink); color:var(--paper); border-left:7px solid var(--red);
+}
+.terminal-name {font:11px Consolas,monospace; letter-spacing:1.3px}
+.terminal-name i {color:#d66e62; padding:0 9px; font-style:normal}
+.top-info {gap:18px; font:10px Consolas,monospace; letter-spacing:.5px}
+.top-info>span::before {color:#d26a58}
+.top-info button {padding:7px 10px; border:0; border-left:1px solid #696962; color:var(--paper); font-size:11px}
+.top-info button:hover {background:#41413c}
+body:not([data-page=home]) .masthead-art {width:640px; margin:0 auto 0 0}
+body:not([data-page=home]) .masthead::after {
+  content:'MGS5VR / FIELD KIT'; position:absolute; right:28px; top:52px;
+  border-block:1px solid #858076; padding:12px 0;
+  font:11px Consolas,monospace; letter-spacing:2px; color:var(--muted);
+}
+.shell {grid-template-columns:185px minmax(0,1fr); min-height:calc(100vh - 239px)}
+body[data-page=home] .shell {min-height:0}
+nav {padding:24px 12px 14px; border-right:1px solid #ada99c; gap:3px}
+.nav-label {font:10px Consolas,monospace; color:var(--muted); letter-spacing:2px; padding:0 9px 15px}
+nav button {font-size:12px; padding:13px 9px; border-left:3px solid transparent}
+nav i {font:10px Consolas,monospace; margin-right:10px}
+nav button[aria-selected=true] {background:var(--ink); border-left-color:var(--red)}
+nav button[aria-selected=true] i {color:#ed9588}
+.nav-foot {padding:24px 0 0; line-height:1.4; color:var(--ink)}
+.snake-support {width:100%; height:auto; display:block; mix-blend-mode:multiply}
+.nav-foot span {margin:8px 0 0; padding:9px 0; border-top:1px solid var(--ink); color:var(--ink); text-align:center; font:9px Consolas,monospace; letter-spacing:1px}
+.nav-foot b {display:inline; font:inherit; color:var(--red)}
+main {padding:26px 30px 30px; background:transparent}
+.eyebrow {font:10px Consolas,monospace; letter-spacing:1.2px; color:var(--muted)}
+h1,h2,h3 {font-family:Impact,'Arial Narrow',sans-serif; font-weight:400; letter-spacing:.3px}
+h1 {font-size:46px; text-transform:uppercase; line-height:1.02; margin:12px 0 22px}
+h2 {font-size:29px; line-height:1.12}
+h3 {font-size:23px}
+p {font-size:13px; line-height:1.6}
+.deploy-grid {grid-template-columns:minmax(0,1.42fr) minmax(300px,1fr); align-items:stretch; gap:30px; margin:0}
+.archive-panel {min-width:0; display:flex; flex-direction:column}
+.archive-heading {display:flex; align-items:center; justify-content:space-between; gap:16px}
+.archive-heading h1 {font-size:39px; color:var(--paper); background:var(--red); display:inline-block; padding:7px 12px 8px; margin:9px 0 0; transform:rotate(-.45deg)}
+.archive-heading .eyebrow {display:block}
+.archive-index {text-align:right; border-left:1px solid var(--line); padding-left:18px}
+.archive-index b {font:35px Impact,'Arial Narrow',sans-serif}
+.archive-index small {display:block; font:9px Consolas,monospace; margin-top:4px; color:var(--muted)}
+.cassette-stage {height:269px; margin:0; flex:1; min-height:245px}
+.cassette-stage::before {content:''; position:absolute; pointer-events:none; bottom:31px; left:18%; width:66%; height:16px; border-radius:50%; background:#4d443326; filter:blur(13px)}
+.canvas-caption {bottom:0; padding-top:10px; font:9px Consolas,monospace; letter-spacing:0; border-color:#a5a195}
+.archive-copy {display:flex; align-items:center; justify-content:space-between; gap:20px; padding-top:16px; margin-top:12px}
+.archive-copy p {margin:0; color:#53534c; max-width:350px; font-size:12px}
+.archive-copy button {flex-shrink:0; border:0; border-bottom:2px solid var(--red); padding:8px 0; font-weight:600}
+.deploy-card {position:relative; padding:22px 24px 17px; border:1px solid #b1ab9c; border-top:4px solid var(--ink); background:#f7f3e999; box-shadow:3px 3px 0 #d5cfc080}
+.deploy-card h2 {font-size:34px; margin:13px 0 10px; text-transform:uppercase}
+.deploy-card p#game-path {min-height:30px; font:10px/1.5 Consolas,monospace; margin-bottom:15px}
+.deploy-card label {margin-top:12px; font-size:12px; font-weight:600}
+.deploy-card .help {margin:8px 0; font-size:11px}
+.deploy-card .primary {font-family:Impact,'Arial Narrow',sans-serif; font-weight:400; letter-spacing:1px; text-transform:uppercase; font-size:24px; padding:13px 16px; margin-top:12px}
+.deploy-card .fine {margin-top:12px; font-size:10px}
+.launch-note {border-top:1px solid var(--line); padding-top:13px; margin-top:16px}
+.launch-note span {font:9px Consolas,monospace; letter-spacing:.7px; color:var(--red)}
+.launch-note p {font-size:11px; color:var(--muted); margin:6px 0 0}
+label {font-size:12px}
+select,input[type=text],input[type=search],input:not([type]) {background:#fbf8ef; border-color:#b4ae9e; padding:10px; font-size:12px}
+input[type=number] {font-size:12px}
+.help,.fine {font-size:11px}
+.section-head {border-bottom:3px solid var(--ink); margin-bottom:18px}
+.section-head h1,#instruction-title {font-size:42px; margin:9px 0 15px}
+.section-head>button {margin-bottom:8px}
+.section-head input {margin-bottom:12px}
+.tape-list {padding:0 0 18px; gap:7px; scrollbar-width:thin}
+.tape-list button {background:#e8e3d7; min-height:62px; border-color:#b8b0a0; border-top:3px solid #34352f; font-size:12px; flex-basis:161px}
+.tape-list small {font-size:9px; margin-bottom:7px}
+.tape-list button[aria-selected=true] {background:#e8e3d7; border:1px solid var(--red); border-top:3px solid var(--red); border-bottom:3px solid var(--red)}
+.instruction-grid {grid-template-columns:minmax(0,1.13fr) minmax(290px,1fr); gap:24px}
+.video-frame {outline:1px solid #42423a; outline-offset:4px; margin-top:4px}
+.transport {margin-top:5px; border-color:#ada696}
+.lesson-copy {padding-top:19px}
+.lesson-copy h2 {font-size:29px}
+.lesson-copy p {color:#55554d; margin:10px 0 15px}
+.lesson-copy .eyebrow {color:var(--red)}
+.controller-panel {background:#ede8dc88; border:1px solid #a9a394; border-top:4px solid var(--ink); padding:18px; box-shadow:none}
+.controller-panel>.eyebrow {border-bottom:1px solid #bcb6a8; padding-bottom:12px; color:var(--ink); font-size:9px}
+.controller-viewport {height:287px; position:relative}
+.controller-viewport::after {content:''; pointer-events:none; position:absolute; inset:17px 0; border-left:1px solid #bdb6a4; border-right:1px solid #bdb6a4; opacity:.4}
+.controller-tools {gap:5px}
+.controller-tools button {font-size:10px; padding:8px}
+.binding-readout {padding-top:15px; margin-top:18px; border-top:2px solid var(--ink)}
+.binding-readout span {font:9px Consolas,monospace; letter-spacing:1px}
+.binding-readout strong {font:22px/1.3 'Bahnschrift SemiCondensed','Arial Narrow',sans-serif; color:var(--red)}
+.controller-panel>.help {font-size:11px; margin-top:17px}
+.mode-cards {gap:9px; margin:0 0 23px; grid-template-columns:repeat(4,minmax(0,1fr))}
+.mode-cards button {background:#ede7d9; border-color:#b7af9f; border-top:3px solid #868277; padding:11px 12px}
+.mode-cards button[aria-selected=true] {background:var(--ink); border-top-color:var(--red)}
+.mode-cards b {font:20px/1.2 Impact,'Arial Narrow',sans-serif; letter-spacing:.2px; margin:9px 0 5px}
+.mode-cards small {font-size:9px; opacity:.8}
+.mode-cards span {font-size:10px; opacity:.8}
+.mode-action>button {padding:13px 2px}
+.mode-action>button b {font-size:12px}
+.mode-action>button span {font-size:10px}
+#mode-title {margin:10px 0}
+#mode-actions {max-height:390px}
+.mode-action-detail {background:#e3dccb}
+#training[data-kind=modes] .controller-viewport {height:255px}
+.setting-tabs {border-color:#a8a292; gap:8px}
+.setting-tabs button {font-size:12px}
+.setting-tabs button[aria-selected=true] {border-bottom-color:var(--red); font-weight:600}
+#settings-grid {gap:14px; margin-top:16px}
+.setting-group {font:22px Impact,'Arial Narrow',sans-serif; color:var(--ink); letter-spacing:.3px; border-bottom:2px solid var(--ink); padding:15px 0 8px}
+.setting-card {background:#f8f4ea99; border-color:#c0b8a8; padding:18px}
+.setting-card .setting-title label {font-size:13px; font-weight:600}
+.setting-description {font-size:11px}
+.setting-limits {font-size:9px}
+.note-counts {border-block:1px solid var(--line); padding:18px 0; margin:22px 0}
+.note-counts b {font:36px Impact,'Arial Narrow',sans-serif}
+.note-row summary {font-size:13px}
+footer {min-height:54px; background:#e7e1d5f7; backdrop-filter:none; border-color:#a7a191; padding:12px 26px}
+#status {font-size:11px}
+#save-bar button {font-size:12px}
+@media (min-width:1600px) {.masthead-art {max-width:1400px}}
+@media (max-width:1180px) {
+  .masthead {padding:0 18px}
+  .terminal-strip {padding:0 18px; margin:0 -18px}
+  .terminal-name {font-size:10px; letter-spacing:.4px}
+  .top-info {font-size:9px; gap:10px}
+  .shell {grid-template-columns:165px minmax(0,1fr)}
+  main {padding:22px}
+  nav {padding:22px 9px 12px}
+  nav button {font-size:11px; padding:13px 7px}
+  nav i {margin-right:7px}
+  .deploy-grid {grid-template-columns:minmax(0,1fr) minmax(290px,.95fr); gap:22px}
+  .deploy-card {padding:20px 18px 16px}
+  .deploy-card h2 {font-size:30px}
+  .archive-heading h1 {font-size:31px; padding-inline:9px}
+  .archive-index {padding-left:10px}
+  .archive-index b {font-size:29px}
+  .archive-index small {font-size:8px}
+  .archive-copy {display:block; padding-top:14px}
+  .archive-copy button {margin-top:8px}
+  .cassette-stage {min-height:235px}
+  body:not([data-page=home]) .masthead-art {width:570px}
+  body:not([data-page=home]) .masthead::after {font-size:9px; letter-spacing:1px; top:45px}
+  .instruction-grid {gap:18px; grid-template-columns:minmax(0,1fr) minmax(278px,.95fr)}
+  .section-head h1,#instruction-title {font-size:35px}
+  .controller-panel {padding:14px}
+  .controller-viewport {height:255px}
+  .mode-cards b {font-size:17px}
+  .mode-cards button {padding:9px}
+  .mode-cards small {font-size:8px}
+}
+@media(prefers-reduced-motion:reduce) { .archive-heading h1 {transform:none} }
+.note-counts {flex-wrap:wrap}
+.verification-scope {max-width:80ch;line-height:1.5}
+#report-filter {width:auto;max-width:100%;margin:14px 0}
+.note-row summary {gap:12px}
+.note-row summary small {flex-shrink:0;max-width:42%;text-align:right}
+.report-kind {font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.claim {padding:16px 0;border-top:1px solid var(--line,#bab6a7)}
+.claim-title {display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+.claim-title h3 {margin:0;font-size:15px;line-height:1.35}
+.claim p {font-size:13px;line-height:1.55}
+.result-badge {flex-shrink:0;font-size:11px;padding:5px 7px;background:#ddd8c8;color:#424438}
+[data-result=failed] .result-badge {background:#823627;color:#fff3dd}
+[data-result^=verified_] .result-badge {background:#3d5141;color:#fff3dd}
+.claim-proof summary {font-size:12px;cursor:pointer;padding:8px 0}
+.proof-list {display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.proof-link {font-size:11px;text-align:left;word-break:break-all;padding:6px 8px;max-width:100%}
+.related-proof {display:flex;flex-wrap:wrap;gap:5px;padding:4px 0 8px 12px}
+#proof-dialog {width:min(1160px,92vw);max-height:92vh;background:#e9e5d5;color:#292e26;border:1px solid #767967;padding:20px;box-sizing:border-box}
+#proof-dialog::backdrop {background:#101810d9}
+.proof-heading {display:flex;align-items:center;justify-content:space-between;gap:20px}
+#proof-title {font-size:18px;overflow-wrap:anywhere}
+#proof-identity {white-space:pre-wrap;word-break:break-all;font:11px/1.5 Consolas,monospace}
+#proof-content img {display:block;width:auto;max-width:100%;max-height:65vh;margin:auto}
+#proof-content pre {white-space:pre-wrap;overflow-wrap:anywhere;max-height:60vh;overflow:auto;font:12px/1.5 Consolas,monospace}

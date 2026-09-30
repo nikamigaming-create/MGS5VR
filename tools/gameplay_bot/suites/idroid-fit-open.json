@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "description": "Open the handheld iDroid from a relaxed grip; leave it open for fit and menu navigation checks.",
+  "required_settings": {"settings.handheld_menus": 1},
+  "cases": [
+    {
+      "id": "relaxed-hand-idroid-open",
+      "before": {"scene": "gameplay", "idroid": false, "camera_active": true},
+      "setup": [
+        {"op": "pose", "hand": "left", "position": [-0.3, -0.3, -0.555], "orientation": [0, 0, 0, 1]},
+        {"op": "pose", "hand": "right", "position": [0.12, -0.18, -0.55], "orientation": [0, 0, 0, 1]}
+      ],
+      "steps": [{"op": "action", "name": "system.idroid"}],
+      "after": {"idroid": true, "idroid_menu_input_ready": true},
+      "timeout": 5
+    }
+  ]
+}

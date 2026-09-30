@@ -4,7 +4,8 @@ param(
     [ValidateSet('Current','Headset','Custom')][string]$Preset='Current',
     [ValidateRange(50,150)][int]$Scale=100,
     [int]$Width=0,[int]$Height=0,
-    [string]$GraphicsConfig
+    [string]$GraphicsConfig,
+    [string]$RuntimeManifest
 )
 $ErrorActionPreference='Stop'
 Import-Module Microsoft.PowerShell.Utility
@@ -21,7 +22,7 @@ function Read-HeadsetSize {
     if (-not (Test-Path -LiteralPath $mgsProbe -PathType Leaf)) { $mgsProbe=Join-Path $mgsPackage 'build\Release\mgs5vr_probe.exe' }
     if (-not (Test-Path -LiteralPath $mgsProbe -PathType Leaf)) { throw 'Extract the complete launcher package; mgs5vr_probe.exe is missing.' }
     # No XR session, game launch, runtime switch, Steam restart or desktop change.
-    $mgsProbeOutput=& (Join-Path $PSScriptRoot 'launch-headset.ps1') -Probe
+    $mgsProbeOutput=& (Join-Path $PSScriptRoot 'launch-headset.ps1') -Probe -RuntimeManifest $RuntimeManifest
     $mgsResult=($mgsProbeOutput -join '') | ConvertFrom-Json
     if (-not $mgsResult.headset_available -or $mgsResult.recommended_width -lt 1 -or $mgsResult.recommended_height -lt 1) {
         throw ('OpenXR did not provide a stereo resolution: '+$mgsResult.error)
@@ -96,7 +97,7 @@ if ($Preset -ne 'Current') {
         Write-Output ('Previous graphics settings: '+$mgsBackup)
     }
     $mgsDisplayPath=Join-Path ([IO.Path]::GetDirectoryName($mgsExe)) 'mgs5vr-display.ini'
-    $mgsDisplay="; MGS5VR process-local VR rendering / small desktop preview.`r`n; No Windows resolution, DSR, runtime or Steam settings are changed.`r`n[display]`r`nenabled=1`r`nrender_width=$Width`r`nrender_height=$Height`r`nmirror_width=960`r`nmirror_height=540`r`n"
+    $mgsDisplay="; MGS5VR process-local VR rendering / 720p desktop preview.`r`n; No Windows resolution, DSR, runtime or Steam settings are changed.`r`n[display]`r`nenabled=1`r`nrender_width=$Width`r`nrender_height=$Height`r`nmirror_width=1280`r`nmirror_height=720`r`n"
     if (Test-Path -LiteralPath $mgsDisplayPath) {
         $mgsDisplayBackup=$mgsDisplayPath+'.'+[guid]::NewGuid().ToString('N')+'.backup'
         Copy-Item -LiteralPath $mgsDisplayPath -Destination $mgsDisplayBackup -ErrorAction Stop
@@ -104,7 +105,7 @@ if ($Preset -ne 'Current') {
     }
     [IO.File]::WriteAllText($mgsDisplayPath,$mgsDisplay,[Text.UTF8Encoding]::new($false))
     Write-Output ('Requested native render size: {0} x {1} PER EYE (before the headset FOV crop). Windowed; Windows resolution unchanged.' -f $Width,$Height)
-    Write-Output 'Depth of field OFF. Motion blur OFF. PC preview: 960 x 540 with the matching DLL. Check ACTUAL after launch.'
+    Write-Output 'Depth of field OFF. Motion blur OFF. PC preview: 1280 x 720 with the matching DLL. Check ACTUAL after launch.'
 } else { Write-Output 'Keeping existing game graphics settings.' }
 if ($Mode -eq 'Launch') {
     if ($mgsTpp) {

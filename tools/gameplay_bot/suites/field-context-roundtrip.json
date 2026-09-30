@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "description": "Continuous immersive field-feature round trips. Each transition uses effective controls and observed state; recorded outcomes remain unverified until the suite actually runs.",
+  "required_settings": {
+    "settings.handheld_menus": 1
+  },
+  "recording_note": "Use gameplay-bot.py session --record with this suite. Native source-eye/audio recording and final-compositor paired stills are separate evidence sources.",
+  "continue_after_outcome_failure": true,
+  "cases": [
+    {
+      "id": "equipment-picker-open-release",
+      "before": {
+        "scene": "gameplay",
+        "camera_active": true,
+        "controls.context": "gameplay"
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "equipment.open",
+          "seconds": 0.8
+        }
+      ],
+      "during": {
+        "camera_active": true,
+        "controls.context": "equipment"
+      },
+      "after": {
+        "scene": "gameplay",
+        "camera_active": true,
+        "controls.context": "gameplay"
+      },
+      "timeout": 8
+    },
+    {
+      "id": "commands-held-open-release",
+      "before": {
+        "scene": "gameplay",
+        "camera_active": true,
+        "controls.context": "gameplay"
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "commands.keep_open",
+          "seconds": 0.8
+        }
+      ],
+      "during": {
+        "camera_active": true,
+        "controls.context": "commands"
+      },
+      "after": {
+        "scene": "gameplay",
+        "camera_active": true,
+        "controls.context": "gameplay"
+      },
+      "timeout": 8
+    },
+    {
+      "id": "vr-binocular-latch-enter",
+      "before": {
+        "scene": "gameplay",
+        "camera_active": true,
+        "controls.context": "gameplay"
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "gameplay.equip_binoculars",
+          "seconds": 0.8
+        }
+      ],
+      "during": {
+        "camera_active": true,
+        "controls.context": "binoculars"
+      },
+      "after": {
+        "camera_active": true,
+        "controls.context": "binoculars"
+      },
+      "timeout": 8,
+      "interpretation": "Proves the configured VR optic latch/context only; it does not prove retail PlayerStatus.BINOCLE."
+    },
+    {
+      "id": "vr-binocular-latch-stow",
+      "depends_on": [
+        "vr-binocular-latch-enter"
+      ],
+      "before": {
+        "scene": "gameplay",
+        "camera_active": true,
+        "controls.context": "binoculars"
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "binoculars.stow",
+          "seconds": 0.15
+        }
+      ],
+      "after": {
+        "scene": "gameplay",
+        "camera_active": true,
+        "controls.context": "gameplay"
+      },
+      "timeout": 8
+    },
+    {
+      "id": "pause-open",
+      "before": {
+        "scene": "gameplay",
+        "camera_active": true,
+        "controls.context": "gameplay",
+        "menu": false
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.pause",
+          "seconds": 0.8
+        }
+      ],
+      "during": {
+        "camera_active": true,
+        "controls.context": "menus",
+        "menu": true
+      },
+      "after": {
+        "camera_active": true,
+        "controls.context": "menus",
+        "menu": true
+      },
+      "timeout": 8
+    },
+    {
+      "id": "pause-close",
+      "depends_on": [
+        "pause-open"
+      ],
+      "before": {
+        "camera_active": true,
+        "controls.context": "menus",
+        "menu": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "seconds": 0.15
+        }
+      ],
+      "after": {
+        "scene": "gameplay",
+        "camera_active": true,
+        "controls.context": "gameplay",
+        "menu": false
+      },
+      "timeout": 8
+    }
+  ]
+}

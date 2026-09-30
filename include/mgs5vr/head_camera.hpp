@@ -4,11 +4,25 @@
 #include "room_bounds.hpp"
 #include "stereo.hpp"
 #include "hud.hpp"
+#include "stale_demo_recovery.hpp"
+#include "native_demo_state.hpp"
 #include <mutex>
 
 namespace mgs5vr {
-enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch, sceneUnavailable };
-struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{},nativeIdroidOpen{}; };
+enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch, sceneUnavailable, staleRig };
+struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{},nativeIdroidOpen{}; uint32_t rigRejectFlags{}; uint64_t rigAgeMs{}; uint64_t sceneTransitionActivation{}; };
+// New pixels require a currently accepted camera publication. Suspended
+// sources can retain only an image that was admitted before the suspension.
+constexpr bool mayAcceptNewStereoPair(HeadCameraStatus status) noexcept {
+    return status.active&&!status.suspended;
+}
+// This only permits reprojecting an image already admitted with its exact rig
+// and eye poses. A rejected or delayed source rig is never published as new pixels.
+constexpr bool mayReprojectAcceptedStereo(HeadCameraStatus status) noexcept {
+    return status.active&&(!status.suspended||status.reason==HeadCameraStop::staleTracking
+        ||status.reason==HeadCameraStop::playerHeadUnavailable||status.reason==HeadCameraStop::staleRig
+        ||(status.reason==HeadCameraStop::rigFrameMismatch&&status.rigRejectFlags==10&&status.rigAgeMs>150));
+}
 // A planned native menu/loading transition may retain explicitly frozen
 // surroundings. A failed camera/pose transaction must not become that scene.
 constexpr bool mayRetainStereoSurround(HeadCameraStatus status) noexcept {
@@ -38,11 +52,16 @@ struct ControllerFrame {
     unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
     std::array<std::array<char,96>,4> equipmentLabels{};
     float wristSurfaceLift{.02f},wristSelectorHeight{.15f},wristPickerWidth{.42f};
+    float weaponHudSetback{.06f}; // Compact readout only, toward the elbow.
+    float wristTextScale{1.5f}; // Native arm text size; equipment card geometry is independent.
     // Native iDroid display width; height remains 16:9 so the map never
     // stretches when the user chooses a more comfortable panel size.
-    float idroidScreenWidth{.30f};
-    float idroidScreenDepth{},playerHeightOffset{};
-    bool handheldMenus{}; // Opt-in: iDroid on the palm and Pause on the wrist.
+    float idroidScreenWidth{.45f};
+    float idroidScreenDepth{.08f},playerHeightOffset{};
+    // Display fit relative to the native hologram socket, not the hand rig.
+    Vec3 idroidScreenOffset{};
+    Quat idroidScreenRotation{};
+    bool handheldMenus{}; // Opt-in: native handheld iDroid. Pause always uses the world panel.
     float menuQuadWidth{1.2f},menuQuadDistance{1.3f},menuQuadTilt{-10.f};
     float supportGripRadius{.10f},supportDetachRadius{.30f};
     float handRestCurl{.08f},handTouchCurl{.20f};
@@ -55,6 +74,7 @@ struct ControllerFrame {
     OpticSample optic{};
     uint64_t opticMarkSequence{};
     uint64_t opticClearSequence{};
+    uint64_t opticIntelSequence{};
     bool binocularAutoMark{true};
     bool binocularActorGlow{true};
     uint64_t binocularMarkDwellMs{650};
@@ -62,8 +82,9 @@ struct ControllerFrame {
     bool frontEnd{}; // Native Title/loading backdrop and floating menu.
     bool loading{}; // Native loading/help terminal owns a live, actionable screen.
     bool avatarEditor{}; // Native name/appearance layout belongs on a quad over the retained hospital view.
-    bool scriptedDemo{}; // Native demo state; keep the first world viewpoint while rendering the full 3D scene.
-    bool authoredCamera{}; // Use the native camera for authored 3D scenes outside a held scripted demo.
+    bool scriptedDemo{}; // Native demo state; accept its authored camera without a player-head publication.
+    bool scriptedLook{}; // Hospital look lessons retain their interactive native pitch/roll.
+    bool authoredCamera{}; // Follow the current native shot, including its position, pitch and roll.
     bool openingSelector{}; // Physical title tape rack owns a native pulse.
     bool openingBackend{}; // Actual title only; never suppress loading/prologue UI.
     bool cabinPlay{}; // Post-loading helicopter cabin sandbox owns tracked interaction.
@@ -101,13 +122,19 @@ struct HeadCameraSample {
     bool wristPanelTracked{};
     bool menuOpen{};
     bool menuIdroid{};
+    bool menuWorldQuad{}; // Independent of wrist tracking and the handheld iDroid preference.
     Pose menuPanel{};
     WeaponScopeSample weaponScope{}; // Same solved weapon/skin publication as this eye pair.
+    bool nativeFirearmActive{}; // Native weapon class, excludes throwables/placement and mounted weapons.
+    Pose weaponSupportGrip{}; // Authored native support contact in this exact LOCAL rig frame.
+    bool weaponSupportGripTracked{},weaponSupportAttached{};
     // Final native anatomical palm frames from the published first-person
     // skin. Handheld devices use these instead of guessing a palm side from
     // the controller grip alone.
     std::array<Pose,2> renderedPalms{};
     std::array<bool,2> renderedPalmTracked{};
+    Pose idroidDevice{}; // Native device root from this solved wrist/socket transaction, WORLD space.
+    bool idroidDeviceTracked{};
 };
 // Native listener adapters consume the center-head pose from the camera's
 // existing publication, never a newer tracking sample or an individual eye.
@@ -133,7 +160,8 @@ public:
     // Present can continue while a native loading screen publishes no camera.
     // Keep the user's VR choice but expose mono menu pixels until that exact
     // camera resumes; this is not permission to adopt a different owner.
-    void awaitScene();
+    // A publisher timeout alone is not a loading/menu transition.
+    void awaitScene(bool nativeLoading);
     void cancel(HeadCameraStop reason=HeadCameraStop::manual);
     HeadCameraSample resolve(uintptr_t camera,Pose nativePose,uint64_t milliseconds);
     // Samples the steady clock while holding the same lock as the tracked pose.
@@ -146,17 +174,22 @@ public:
     bool available() const;
     bool active() const;
     HeadCameraStatus status() const;
+    bool staleDemoRecoveryReady() const;
+    // Read-only diagnostics of the last accepted render-camera publication.
+    // This does not resolve a newer pose or claim a submitted final-eye frame.
+    std::optional<HeadCameraSample> publishedView() const;
 private:
     HeadCameraSample resolveLocked(uintptr_t camera,Pose nativePose,uint64_t milliseconds,bool useRig=true);
+    Pose followCinematicLocked(Pose nativePose,uint64_t milliseconds,bool advance);
     void cancelLocked(HeadCameraStop reason);
     void suspendLocked(HeadCameraStop reason);
     void awaitPlayerLocked();
     mutable std::mutex mutex_;
     Pose head_{}, origin_{},frontEndOrigin_{},frontEndPanel_{};
     Pose lastTitleSource_{},avatarEditorBackdrop_{};
-    Pose scriptedCameraAnchor_{};
     uintptr_t camera_{},playerOwner_{};
     uint64_t time_{},sequence_{},activation_{};
+    uint64_t sceneTransitionActivation_{},sceneTransitionAt_{}; // Intentional native shot/control handoffs only.
     uint64_t trackingEpoch_{};
     float units_{1};
     float snapYaw_{};
@@ -169,15 +202,26 @@ private:
     bool nativeIdroidOpen_{};
     bool awaitingScene_{};
     HeadCameraSample lastView_{};
+    uint64_t cameraRenderTime_{}; // Source liveness survives invalidating a previous scene's pixels.
     Pose menuNative_{},menuHead_{},menuPanel_{};
     bool menuAnchored_{};
     bool recenterPending_{};
     bool lastTitleSourceValid_{},avatarEditorBackdropValid_{};
-    bool scriptedCameraAnchorValid_{},scriptedDemoActive_{};
+    bool scriptedDemoActive_{};
+    struct CinematicFollowState {
+        Pose pose{};
+        Vec3 rawPosition{};
+        float rawYaw{};
+        uintptr_t camera{};
+        uint64_t time{},activation{};
+        bool valid{};
+    } cinematicFollow_;
     std::array<EyeView,2> views_{};
     ControllerFrame controllers_{};
     struct RigFrame { uintptr_t camera{},owner{}; Pose sourceCamera{}; HeadCameraSample sample{}; } rig_;
     uint64_t rigSequence_{};
+    uint32_t rigRejectFlags_{};
+    uint64_t rigAgeMs_{};
     HeadCameraStop reason_{};
     uint64_t cancellations_{};
     struct PlayerHead {
@@ -188,6 +232,8 @@ private:
     };
     std::array<PlayerHead,8> playerHeads_{};
     uint64_t playerSequence_{},ownerHeadTime_{};
+    StaleDemoRecoveryDwell staleDemoRecoveryDwell_;
+    uint64_t recoveryPlayerSequence_{};
     bool requirePlayerHead_{};
 };
 HeadCamera& headCamera();

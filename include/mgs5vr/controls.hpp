@@ -17,10 +17,29 @@ std::array<bool,4> isolatedFaceButtons(const std::array<ControllerFaceLayout,2>&
     const std::array<bool,4>& face,const std::array<bool,2>& select,const std::array<bool,2>& back);
 struct PhysicalControls {
     // a,b,x,y,menu,L3,R3,left grip,right grip,left trigger,right trigger;
-    // the last eight entries are derived stick directions, not caller input.
-    std::array<float,19> buttons{};
+    // indices 11..18 are derived stick directions; 19..20 are left/right
+    // thumb-rest touch; 21..24 are A/B/X/Y touch, 25..26 stick touch,
+    // 27..28 trigger touch. Appending sensors preserves existing indices.
+    std::array<float,29> buttons{};
     std::array<float,2> leftStick{},rightStick{};
 };
+struct ControlInputAudit {
+    ControlContext context{};
+    PhysicalControls physical{};
+    uint64_t time{};
+    uint16_t nativeButtons{};
+    bool rigInput{};
+    int travelMode{};
+};
+void publishControlInputAudit(ControlInputAudit sample);
+// Copy before reading the observation clock, so a newer XR publication cannot
+// appear to come from the future halfway through building diagnostics.
+ControlInputAudit controlInputSnapshot();
+constexpr bool freshControlInputAudit(const ControlInputAudit& sample,uint64_t now) noexcept {
+    return sample.time&&now>=sample.time&&now-sample.time<=250;
+}
+std::optional<ControlInputAudit> controlInputAudit(uint64_t now);
+std::string_view controlContextName(ControlContext context);
 struct ControlDefinition {std::string_view name,binding;uint32_t contexts{};bool modifier{};};
 const std::vector<ControlDefinition>& controlDefinitions();
 struct SettingDefinition {std::string_view name;float value{},minimum{},maximum{};};
@@ -40,9 +59,13 @@ public:
     void suspend();
     float value(std::string_view action) const;
     bool active(std::string_view action) const {return value(action)>.5f;}
+    bool hasBindingInput(std::string_view input) const;
     std::array<float,2> axis(std::string_view name,const PhysicalControls& input) const;
     float setting(std::string_view name) const;
     std::string label(std::string_view action) const;
+    // Effective parsed bindings, including overrides and timing. Used by the
+    // test bot and generated instructions; never reconstruct this from labels.
+    std::string bindingsJson() const;
 private:
     enum class Gesture { level,press,release,tap,hold };
     struct Binding {uint32_t mask{};Gesture gesture{};uint64_t milliseconds{300};};

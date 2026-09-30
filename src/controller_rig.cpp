@@ -1,7 +1,10 @@
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/cabin_walk.hpp"
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/paused_rig.hpp"
+#include "mgs5vr/paused_parts.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/motion_melee.hpp"
@@ -33,6 +36,7 @@ struct PoseRestore {
     uint16_t count{};
     std::array<Quat,512> q{};
     std::array<Vector4,512> p{};
+    PausedRigOwner owner{};
     ~PoseRestore(){
         if(count){
             std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
@@ -51,9 +55,27 @@ std::atomic_uintptr_t playerOwner{};
 std::atomic_bool enabled{};
 bool groundQueryVerified{};
 bool scopeQueryVerified{};
+bool modelTransformVerified{};
 bool scopeTrace{};
 WeaponScopeZoom scopeZoom;
 std::mutex rigMutex;
+// A native skin call may recursively publish an attached model. Keep the
+// player's solved channels installed until that complete publication returns.
+std::recursive_mutex skinPublicationMutex;
+struct PausedSkin {
+    PausedRigOwner owner{};
+    uintptr_t driver{},binding{},skeleton{},model{},matrices{},parents{};
+    uint16_t count{};
+} pausedSkin;
+struct PausedPart {
+    uintptr_t model{},matrices{},namesAddress{},parentsAddress{};
+    uint16_t count{};
+    std::array<uint32_t,512> names{};
+    std::array<int32_t,512> parents{};
+    std::array<Pose,512> frozen{};
+};
+std::array<PausedPart,4> pausedParts;
+uint64_t pausedSkinRefreshes{};
 uintptr_t boundOwner{};
 uintptr_t boundModel{};
 uint64_t activation{},updates{};
@@ -71,6 +93,8 @@ Pose heldSupportOffset{};
 uint64_t supportWeapon{};
 bool heldCloseSupport{};
 uint64_t supportAt{};
+std::array<HandPresentationCache,2> handPresentation;
+StationaryBodyState stationaryBody;
 struct ShotRig {
     uintptr_t owner{},character{},camera{},model{};
     Pose sourceCamera{},wristWorld{};
@@ -82,6 +106,103 @@ template<class T> bool read(uintptr_t address,T& out){
     SIZE_T count{};return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&out,sizeof(out),&count)&&count==sizeof(out);
 }
 template<class T> T get(uintptr_t address){T out{};read(address,out);return out;}
+uint32_t refreshPausedArmParts(const PausedSkin& body,uintptr_t character){
+    // Retail's prosthetic is a separate, player-owned modular model. Its
+    // named forearm/wrist/finger matrices normally match the body's palette;
+    // the native parts update stops during Pause even when body skin is fresh.
+    constexpr uint32_t armGroup=0x4e74fd8c,leftForearm=0x31e2de16,leftWrist=0x3e2d77e5;
+    const auto parts=get<uintptr_t>(character+0x610);
+    if(get<uintptr_t>(parts)!=base+0x22e56c0||get<uintptr_t>(parts+0x38)!=character)return 0;
+    const auto list=get<uintptr_t>(parts+0x48);
+    if(get<uintptr_t>(list)!=base+0x2215c78)return 0;
+    const auto records=get<uintptr_t>(list+8);const auto count=get<uint32_t>(list+0x10);
+    // The animation skeleton and render palette have different counts (178
+    // versus 132 for the observed player). The modular model is joined by
+    // render-palette names, so its source span must use the model's count.
+    const auto sourceCount=get<uint16_t>(body.model+0xf8);
+    if(!records||!count||count>32||!sourceCount||sourceCount>512
+       ||(get<uint8_t>(body.model+0xfa)&1)==0)return 0;
+    std::array<uint32_t,512> sourceNames{};
+    std::array<Pose,512> source{};
+    const auto nameData=get<uintptr_t>(body.model+0xe8);
+    if(!nameData||!body.matrices)return 0;
+    for(size_t i=0;i<sourceCount;++i){
+        std::array<float,16> matrix{};
+        if(!read(nameData+i*4,sourceNames[i])||!read(body.matrices+i*64,matrix))return 0;
+        // Unrelated hidden mounts deliberately collapse their matrix. Retain
+        // an invalid sentinel so a part referencing that joint is rejected,
+        // without blocking the prosthetic on a holstered weapon's transform.
+        const auto pose=nativeAffinePose(matrix);
+        source[i]=pose?*pose:Pose{{0,0,0,0},{}};
+    }
+    const auto hasSource=[&](uint32_t name){return std::find(sourceNames.begin(),sourceNames.begin()+sourceCount,name)!=sourceNames.begin()+sourceCount;};
+    if(!hasSource(leftForearm)||!hasSource(leftWrist))return 0;
+    const auto bodyRoot=nativeAffinePose(get<std::array<float,16>>(body.model+0x40));
+    if(!bodyRoot)return 0;
+    uint32_t refreshed{};
+    for(uint32_t entry=0;entry<count;++entry){
+        const auto record=get<uintptr_t>(records+entry*8),renderer=get<uintptr_t>(record);
+        if(get<uintptr_t>(renderer)!=base+0x20f9460)continue;
+        const auto model=get<uintptr_t>(renderer+0x40);
+        if(model==body.model||get<uintptr_t>(model)!=base+0x20f4d90)continue;
+        const auto groupCount=get<uint16_t>(model+0x1e8);
+        const auto groups=get<uintptr_t>(model+0x180);
+        if(!groupCount||groupCount>128||!groups)continue;
+        bool arm=false;
+        for(size_t g=0;g<groupCount;++g)if(get<uint32_t>(groups+g*4)==armGroup)arm=true;
+        const auto boneCount=get<uint16_t>(model+0xf8);
+        if(!arm||!boneCount||boneCount>512||(get<uint8_t>(model+0xfa)&1)==0)continue;
+        alignas(16) const auto root=get<std::array<float,16>>(model+0x40);
+        const auto partRoot=nativeAffinePose(root);if(!partRoot)continue;
+        const auto delta=partRoot->position-bodyRoot->position;
+        const auto a=partRoot->orientation,b=bodyRoot->orientation;
+        if(dot(delta,delta)>.001f*.001f||std::abs(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w)<.99999f)continue;
+        const auto matrices=get<uintptr_t>(model+0xe0),names=get<uintptr_t>(model+0xe8),parents=get<uintptr_t>(model+0xf0);
+        if(!matrices||!names||!parents)continue;
+        auto cached=std::find_if(pausedParts.begin(),pausedParts.end(),[&](const auto& p){return p.model==model;});
+        if(cached==pausedParts.end())cached=std::find_if(pausedParts.begin(),pausedParts.end(),[](const auto& p){return !p.model;});
+        if(cached==pausedParts.end())continue;
+        if(cached->model&&(cached->matrices!=matrices||cached->namesAddress!=names||cached->parentsAddress!=parents||cached->count!=boneCount))*cached={};
+        bool consistent=true;
+        for(size_t i=0;i<boneCount;++i){
+            const auto name=get<uint32_t>(names+i*4);const auto parent=get<int32_t>(parents+i*0x20);
+            if(cached->model){if(cached->names[i]!=name||cached->parents[i]!=parent){consistent=false;break;}}
+            else {
+                const auto pose=nativeAffinePose(get<std::array<float,16>>(matrices+i*64));
+                if(!pose){consistent=false;break;}
+                cached->names[i]=name;cached->parents[i]=parent;cached->frozen[i]=*pose;
+            }
+        }
+        if(!consistent){*cached={};continue;}
+        const auto hasPart=[&](uint32_t name){return std::find(cached->names.begin(),cached->names.begin()+boneCount,name)!=cached->names.begin()+boneCount;};
+        if(!hasPart(leftForearm)||!hasPart(leftWrist)){*cached={};continue;}
+        cached->model=model;cached->matrices=matrices;cached->namesAddress=names;cached->parentsAddress=parents;cached->count=boneCount;
+        std::array<Pose,512> solved{};
+        if(!retargetPausedPart({sourceNames.data(),sourceCount},{source.data(),sourceCount},
+            {cached->names.data(),boneCount},{cached->frozen.data(),boneCount},
+            {cached->parents.data(),boneCount},{solved.data(),boneCount}))continue;
+        using SetTransform=void(*)(void*,const float*);
+        reinterpret_cast<SetTransform>(base+0x1ce7f0)(reinterpret_cast<void*>(model),root.data());
+        for(size_t i=0;i<boneCount;++i){
+            const auto& p=solved[i];const auto x=rotate(p.orientation,{1,0,0}),y=rotate(p.orientation,{0,1,0}),z=rotate(p.orientation,{0,0,1});
+            const std::array<float,16> matrix{x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,p.position.x,p.position.y,p.position.z,1};
+            std::memcpy(reinterpret_cast<void*>(matrices+i*64),matrix.data(),sizeof(matrix));
+        }
+        ++refreshed;
+    }
+    return refreshed;
+}
+bool ownsSkinTarget(void* context,void* binding){
+    const auto owner=playerOwner.load();
+    if(!owner||get<uintptr_t>(owner)!=base+0x23b8218)return false;
+    const auto character=get<uintptr_t>(owner+0x370);
+    if(get<uintptr_t>(character)!=base+0x2295210)return false;
+    const auto component=get<uintptr_t>(character+0x10),holder=get<uintptr_t>(component+0x10);
+    const auto model=get<uintptr_t>(holder+0x68);
+    return model&&get<uintptr_t>(model)==base+0x20f4d90
+        &&reinterpret_cast<uintptr_t>(binding)==model+0xa0
+        &&get<uintptr_t>(holder+0x70)==reinterpret_cast<uintptr_t>(context);
+}
 std::optional<ArmSurface> groundSurface(Vec3 point,float ceiling,float clearance){
     // TPP 1.0.15.4 HumanGroundIk uses this synchronous, internally read-locked
     // query. The 0x800 inclusion layer is set by the player IK factory. Query
@@ -192,6 +313,22 @@ NativeRoomBounds measureNativeCabin(Pose origin,uint64_t generation,NativeRoomSa
     return nativeRoomBoundsFromSamples(roomOrigin,generation,samples,reach);
 }
 Pose bone(const std::array<Quat,512>& q,const std::array<Vector4,512>& p,size_t i){return {q[i],{p[i].x,p[i].y,p[i].z}};}
+std::optional<Pose> nativeIdroidMount(uintptr_t driver){
+    // Live retail comparison: idr0_main0_def's root equals this animated
+    // right-hand CNP in wrist space (not the anatomical palm). The asset's
+    // CNP_CONNECTOR is a separate grip contact; its hologram is another socket.
+    const auto count=get<uint32_t>(driver+0x38);
+    const auto points=get<uintptr_t>(driver+0x40);
+    if(!points||!count||count>128)return {};
+    for(uint32_t i=0;i<count;++i){
+        const auto point=get<uintptr_t>(points+i*8);
+        if(get<uintptr_t>(point)!=base+0x24c37e8
+           ||!matchesNativeIdroidMount(get<uint64_t>(point+0x10),get<uint64_t>(point+0xa0),get<uint16_t>(point+0xa8)))continue;
+        std::array<float,16> matrix{};
+        if(read(point+0x20,matrix))return nativeAffinePose(matrix);
+    }
+    return {};
+}
 void replace(std::array<Quat,512>& q,std::array<Vector4,512>& p,size_t i,Pose value){
     q[i]=value.orientation;p[i].x=value.position.x;p[i].y=value.position.y;p[i].z=value.position.z;
 }
@@ -218,7 +355,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const auto component=get<uintptr_t>(character+0x10),holder=get<uintptr_t>(component+0x10),model=get<uintptr_t>(holder+0x68);
     if(!component||!holder||!model||get<uintptr_t>(model)!=base+0x20f4d90||reinterpret_cast<uintptr_t>(binding)!=model+0xa0)return false;
     const auto driver=reinterpret_cast<uintptr_t>(context),skeleton=get<uintptr_t>(driver+0x10);
-    if(get<uintptr_t>(driver)!=base+0x24c1988||!skeleton)return false;
+    if(get<uintptr_t>(holder+0x70)!=driver||get<uintptr_t>(driver)!=base+0x24c1988||!skeleton)return false;
     const auto count=get<uint16_t>(skeleton+0x48);
     if(count<53||count>512||get<int16_t>(skeleton+0x4a)!=0||get<uint32_t>(skeleton+0x60)!=0)return false;
     const auto qo=get<uint32_t>(skeleton+0x58),po=get<uint32_t>(skeleton+0x5c);
@@ -252,7 +389,17 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // right controller must not publish an unshifted camera for one frame and
     // snap back to the walking offset when its tracking returns.
     publishNativeCabinBounds(frame);
-    if(frame.controllers.nativeGamepad||!frame.controllers.hands[1].gripTracked){
+    const auto idroidMount=frame.menuIdroid?nativeIdroidMount(driver):std::nullopt;
+    std::lock_guard lock(rigMutex);
+    const RigContinuityKey continuity{owner,model,frame.activation,frame.controllers.referenceEpoch};
+    std::array<std::optional<Pose>,2> presentationGrips;
+    if(frame.controllers.nativeGamepad){
+        for(auto& cache:handPresentation)cache.reset();
+        stationaryBody.reset();
+    }else for(size_t side=0;side<2;++side)
+        presentationGrips[side]=handPresentation[side].update(frame.controllers.hands[side].grip,
+            frame.controllers.hands[side].gripTracked,frame.sampleTime,continuity);
+    if(frame.controllers.nativeGamepad||!presentationGrips[1]){
         // Controller occlusion does not invalidate a tracked headset. Publish
         // this unchanged native skin with its actual camera transaction; no
         // stale tracked weapon, palm, scope or wrist UI may accompany it.
@@ -266,8 +413,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 if(palm){frame.renderedPalms[side]=compose(*root,*palm);frame.renderedPalmTracked[side]=true;}
             }
             const auto elbow=compose(*root,bone(q,p,7)),wrist=compose(*root,bone(q,p,8));
-            if(const auto panel=forearmPanel(elbow,wrist,rotate(wrist.orientation,{0,1,0}))){
+            if(const auto panel=forearmPanel(elbow,wrist,rotate(wrist.orientation,{0,1,0}),frame.controllers.wristSurfaceLift)){
                 frame.wristPanel=*panel;frame.wristPanelTracked=true;
+            }
+            if(idroidMount){
+                frame.idroidDevice=compose(*root,compose(bone(q,p,12),*idroidMount));
+                frame.idroidDeviceTracked=valid(frame.idroidDevice);
             }
         }
         return headCamera().publishRigFrame(camera,owner,nativeCamera,frame);
@@ -275,8 +426,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const auto renderedHead=compose(*root,bone(q,p,4)).position;
     const auto originalQ=q;const auto originalP=p;
     std::array<Pose,2> grips{};
-    for(size_t i=0;i<2;++i)if(frame.controllers.hands[i].gripTracked)
-        grips[i]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.hands[i].grip));
+    for(size_t i=0;i<2;++i)if(presentationGrips[i])
+        grips[i]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,*presentationGrips[i]));
     if(frame.controllers.optic.held&&frame.controllers.optic.pose.tracked){
         // Acquire the housing's authored PALM contact. Reusing a gun-like raw
         // controller grip leaves the fingers pointing along the tube instead
@@ -284,7 +435,6 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const auto safe=binocularFaceSafeGrip(frame.headPose,frame.controllers.optic.pose.primaryGrip,frame.controllers.optic.pose);
         grips[1]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,safe));
     }
-    std::lock_guard lock(rigMutex);
     const auto rootInverse=inverse(*root);
     const float groundCeiling=frame.nativePose.position.y+.05f;
     unsigned groundContacts{};
@@ -369,13 +519,40 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
         if(lift>0){torsoDelta->position=torsoDelta->position+rotate(rootInverse.orientation,{0,lift,0});++groundContacts;}
         for(const size_t i:{1,2,5,6,7,8,9,10,11,12})replace(q,p,i,compose(*torsoDelta,bone(q,p,i)));
+        // Coco's stationary pelvis counter-pivot is a render-pose correction.
+        // Never move the native actor/root, change collision, or apply it to
+        // a horse, vehicle, menu, authored movie or prone player.
+        const bool canAlign=count>20&&parent[1]==0&&parent[13]==0&&parent[14]==13
+            &&parent[17]==0&&parent[18]==17&&!frame.menuOpen&&!frame.controllers.cabinPlay
+            &&!frame.controllers.scriptedDemo&&!frame.controllers.authoredCamera
+            &&nativeTravelMode()==TravelMode::onFoot&&bone(originalQ,originalP,4).position.y>.6f;
+        if(stationaryBody.update(canAlign,root->position,frame.sampleTime,continuity)){
+            const StationaryBodyPose body{bone(originalQ,originalP,0).position,
+                bone(originalQ,originalP,13).position,bone(originalQ,originalP,17).position,
+                bone(originalQ,originalP,6).position,bone(originalQ,originalP,10).position,bone(originalQ,originalP,2)};
+            if(const auto lower=stationaryLowerBodyDelta(body,*torsoDelta))for(size_t i=0;i<count;++i){
+                if(i==1||i==53)continue;
+                bool lowerBone=i==0;
+                for(int32_t ancestor=parent[i];!lowerBone&&ancestor>=0;ancestor=parent[ancestor]){
+                    if(ancestor==1)break;
+                    if(ancestor==0)lowerBone=true;
+                }
+                if(lowerBone)replace(q,p,i,compose(*lower,bone(q,p,i)));
+            }
+        }
         for(size_t side=0;side<2;++side){
             // Stable down/out bias; a transient native crouch/reload bend must
             // not leave the elbow trapped above the head in later frames.
             bendHistory[side]=rotate(inverse(*root).orientation,rotate(torso,{side?-.25f:.25f,-1.f,-.15f}));
         }
     }
-    auto rightTarget=clearWrist(compose(grips[1],gripFromWrist[1]));
+    // In handheld iDroid mode, the controller holds its authored connector.
+    // Solve that same native wrist instead of requiring the player to twist
+    // an anatomical palm to turn a separately mounted display upright.
+    const auto idroidBody=frame.controllers.handheldMenus&&idroidMount?idroidBodyFromConnector(grips[1]):std::nullopt;
+    const auto wristTarget=idroidBody
+        ?compose(*idroidBody,inverse(*idroidMount)):compose(grips[1],gripFromWrist[1]);
+    auto rightTarget=clearWrist(wristTarget);
     const ArmPose rightAnimatedArm{bone(q,p,10),bone(q,p,11),bone(q,p,12)};
     auto right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
     if(!right)return false;
@@ -593,7 +770,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             }
         }
     }
-    if(frame.controllers.hands[0].gripTracked||support){
+    if(presentationGrips[0]||support){
         // Preserve the game's animated support-hand contact while the native
         // support is requested or a native reload/bolt cycle is running.
         auto target=attached;
@@ -602,7 +779,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             // tracked; it must not be pulled toward the firearm support
             // offset merely because the controller is visible.
             target=clearWrist(compose(grips[0],gripFromWrist[0]));
-        }else if(frame.controllers.hands[0].gripTracked&&supportBlend<1){
+        }else if(presentationGrips[0]&&supportBlend<1){
             const auto tracked=compose(grips[0],gripFromWrist[0]);
             target.position=tracked.position+(attached.position-tracked.position)*supportBlend;
             target.orientation=blendRotation(tracked.orientation,attached.orientation,supportBlend);
@@ -694,7 +871,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // binocular is a VR-only physical item, so its tracked hands still
         // need the authored curl pass at full contact or they remain open and
         // appear to float behind the housing.
-        if(!hand.gripTracked||frame.controllers.vehicleControls||(contact>=1&&!binocularHeld))continue;
+        if(!presentationGrips[side]||frame.controllers.vehicleControls||(contact>=1&&!binocularHeld))continue;
         for(size_t finger=0;finger<5;++finger)for(size_t joint=0;joint<3;++joint){
             const auto i=fingers[side][finger]+joint;
             const auto anchor=joint?i-1:(finger>=3?(side?46u:30u):wrists[side]);
@@ -735,6 +912,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         renderedPalmTracked[side]=frame.controllers.hands[side].gripTracked&&valid(renderedPalms[side]);
     }
     frame.renderedPalms=renderedPalms;frame.renderedPalmTracked=renderedPalmTracked;
+    if(idroidMount){
+        frame.idroidDevice=compose(*root,compose(bone(q,p,12),*idroidMount));
+        frame.idroidDeviceTracked=frame.controllers.hands[1].gripTracked&&valid(frame.idroidDevice);
+    }
     frame.playerHead=renderedHead;
     if(frame.controllers.hands[0].gripTracked&&renderedPalmTracked[0]){
         const auto wrist=compose(*root,bone(q,p,8));
@@ -744,8 +925,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // wrist bone's authored Y is not that surface after the grip solve.
         // Project the dorsal direction across the solved forearm segment so
         // the text lies along the skin instead of standing above it.
-        if(auto panel=forearmPanel(elbow,wrist,rotate(renderedPalms[0].orientation,{-1,0,0}))){
-            panel->position=panel->position+(elbow.position-wrist.position)*.1f;
+        if(const auto panel=forearmPanel(elbow,wrist,rotate(renderedPalms[0].orientation,{-1,0,0}),frame.controllers.wristSurfaceLift)){
             frame.wristPanel=*panel;
             frame.wristPanelTracked=true;
         }
@@ -756,6 +936,15 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // source transaction, so the housing, lens camera and marking ray
         // cannot continue independently at the unconstrained input position.
         if(!attachBinocular())return false;
+    }
+    frame.nativeFirearmActive=firearmActive&&!binocularHeld;
+    frame.weaponSupportGripTracked=frame.nativeFirearmActive&&frame.controllers.weaponReady;
+    frame.weaponSupportAttached=frame.weaponSupportGripTracked&&nearSupport;
+    if(frame.weaponSupportGripTracked){
+        const auto supportPalm=compose(*root,compose(right->pose.wrist,
+            compose(presentedSupport,inverse(gripFromWrist[0]))));
+        frame.weaponSupportGrip=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},
+            compose(inverse(frame.nativePose),supportPalm)));
     }
     if(scopeInWrist&&!frame.menuOpen){
         // Use the completed skin, including support/reach/collision solve.
@@ -805,6 +994,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // native publication consumes our solved pose; never feed it back into the
     // animation cache and compound garment transforms on subsequent updates.
     restore.rotations=rotations;restore.positions=positions;restore.q=originalQ;restore.p=originalP;restore.count=count;
+    restore.owner={camera,owner,frame.activation,frame.controllers.referenceEpoch,now};
     // SKL_300_ASRROOT is the authored hip holster, independent of the held
     // weapon's wrist socket. Suppress only its published render scale in VR.
     // The native animation channels and held-weapon transform remain intact.
@@ -813,8 +1003,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
     std::memcpy(reinterpret_cast<void*>(positions),p.data(),count*16u);
     shotRig={owner,character,camera,model,nativeCamera,compose(*root,right->pose.wrist),frame.trackingSequence};
+    if(!frame.controllers.hands[1].gripTracked)shotRig={};
     const auto& throwingHand=frame.controllers.hands[1];
-    if(throwableActive&&frame.controllers.weaponReady&&!frame.controllers.vehicleControls&&throwingHand.aimTracked){
+    if(shotRig.owner&&throwableActive&&frame.controllers.weaponReady&&!frame.controllers.vehicleControls&&throwingHand.aimTracked){
         shotRig.palmWorld=compose(shotRig.wristWorld,inverse(gripFromWrist[1]));
         shotRig.gripFromAim=compose(inverse(throwingHand.grip),throwingHand.aim);
         shotRig.throwTracked=true;
@@ -843,8 +1034,28 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     return true;
 }
 void update(void* context,void* binding){
+    // Other skins never acquire the player lock, including work reached by the
+    // native player publication. The verified skin path only builds matrices
+    // and attachment transforms; it does not dispatch/wait for animation jobs.
+    if(!enabled.load()||!headCamera().active()||!ownsSkinTarget(context,binding)){
+        applySmallAnimalSkin(reinterpret_cast<uintptr_t>(binding));
+        original(context,binding);
+        return;
+    }
+    std::unique_lock publicationLock(skinPublicationMutex);
     PoseRestore restore;
     if(enabled.load()&&headCamera().active())try{apply(context,binding,restore);}catch(...){}
+    if(restore.count){
+        const auto driver=reinterpret_cast<uintptr_t>(context),target=reinterpret_cast<uintptr_t>(binding);
+        const auto model=target-0xa0;
+        pausedSkin={restore.owner,driver,target,get<uintptr_t>(driver+0x10),model,
+            get<uintptr_t>(target+0x40),get<uintptr_t>(model+0xf0),restore.count};
+        pausedParts={};
+    }else{
+        // Unrelated NPC and attachment publications do not hold the player
+        // lock over their native work or replace the accepted player target.
+        publicationLock.unlock();
+    }
     applySmallAnimalSkin(reinterpret_cast<uintptr_t>(binding));
     original(context,binding);
     if(restore.stowedMount){
@@ -996,6 +1207,55 @@ void throwVelocity(void* context,void* state,uint32_t index,Vector4* velocity){
 }
 }
 namespace mgs5vr {
+bool refreshPausedControllerRig(uintptr_t camera,Pose nativeCamera) noexcept {
+    if(!enabled.load()||!modelTransformVerified||!headCamera().status().nativeMenuOpen)return false;
+    try{
+        std::unique_lock publicationLock(skinPublicationMutex,std::try_to_lock);
+        if(!publicationLock.owns_lock()||!enabled.load())return false;
+        const auto target=pausedSkin;
+        const auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera);
+        if(!mayRefreshPausedRig(target.owner,camera,frame,steadyMilliseconds())
+           ||playerOwner.load()!=target.owner.player)return false;
+        // Revalidate the complete target chain on every menu frame. A load,
+        // model replacement, retired driver or changed palette cannot reuse
+        // the cached addresses even if its old allocation is still readable.
+        const auto owner=target.owner.player;
+        if(get<uintptr_t>(owner)!=base+0x23b8218||get<uintptr_t>(owner+0x380)!=camera)return false;
+        const auto character=get<uintptr_t>(owner+0x370);
+        if(get<uintptr_t>(character)!=base+0x2295210)return false;
+        const auto component=get<uintptr_t>(character+0x10),holder=get<uintptr_t>(component+0x10);
+        if(get<uintptr_t>(holder+0x68)!=target.model||get<uintptr_t>(holder+0x70)!=target.driver
+           ||get<uintptr_t>(target.model)!=base+0x20f4d90
+           ||target.binding!=target.model+0xa0||get<uintptr_t>(target.driver)!=base+0x24c1988
+           ||get<uintptr_t>(target.driver+0x10)!=target.skeleton
+           ||get<uintptr_t>(target.binding+0x40)!=target.matrices
+           ||get<uintptr_t>(target.model+0xf0)!=target.parents
+           ||get<uint16_t>(target.skeleton+0x48)!=target.count)return false;
+        // apply rechecks the skeleton layout and solves from restored native
+        // animation channels. original publishes matrices/attachment transforms
+        // only (verified 1.0.15.4 skin routine); it does not run animation time.
+        PoseRestore restore;
+        if(!apply(reinterpret_cast<void*>(target.driver),reinterpret_cast<void*>(target.binding),restore)||!restore.count)return false;
+        // Matrix publication alone leaves the paused renderer's model copy
+        // unchanged. Re-submit the same root through the native transform
+        // setter, which marks the model dirty without advancing animation.
+        alignas(16) std::array<float,16> root{};
+        if(!read(target.model+0x40,root)||!nativeAffinePose(root))return false;
+        using SetTransform=void(*)(void*,const float*);
+        reinterpret_cast<SetTransform>(base+0x1ce7f0)(reinterpret_cast<void*>(target.model),root.data());
+        original(reinterpret_cast<void*>(target.driver),reinterpret_cast<void*>(target.binding));
+        const auto armParts=refreshPausedArmParts(target,character);
+        if(restore.stowedMount){
+            auto matrix=get<std::array<float,16>>(restore.stowedMount);
+            if(nativeAffinePose(matrix)){
+                std::fill_n(matrix.begin(),12,0.f);
+                std::memcpy(reinterpret_cast<void*>(restore.stowedMount),matrix.data(),sizeof(matrix));
+            }
+        }
+        if(++pausedSkinRefreshes%300==1)log("Paused controller skin refreshed from tracked camera publication count="+std::to_string(pausedSkinRefreshes)+" modular_arms="+std::to_string(armParts));
+        return true;
+    }catch(...){return false;}
+}
 bool controllerThrowReady() noexcept {
     if(!enabled.load()||!headCamera().active())return false;
     std::lock_guard lock(rigMutex);
@@ -1008,6 +1268,8 @@ void installControllerRig(uintptr_t imageBase){
     const auto matches=[&]<size_t N>(uintptr_t rva,const std::array<unsigned char,N>& bytes){
         std::array<unsigned char,N> actual{};return read(base+rva,actual)&&actual==bytes;
     };
+    modelTransformVerified=matches(0x1ce7f0,std::array<unsigned char,12>{
+        0x40,0x53,0x48,0x83,0xec,0x20,0x0f,0x28,0x02,0x48,0x8b,0xd9});
     scopeQueryVerified=matches(0xdbdc50,std::array<unsigned char,17>{
         0x4c,0x89,0x4c,0x24,0x20,0x44,0x89,0x44,0x24,0x18,0x55,0x53,0x57,0x48,0x8d,0x6c,0x24});
     log(scopeQueryVerified?"Native named sight-point adapter enabled":"Native sight-point signature differs; weapon scopes disabled");
@@ -1049,8 +1311,19 @@ void installControllerRig(uintptr_t imageBase){
     installSmallAnimalInteraction(base);
     enabled.store(true);log("Experimental controller rig installed at verified skin publication RVA 0x1a6caa0 and shot solver 0x1044ff0");
 }
-void observeControllerRigOwner(uintptr_t owner) noexcept{playerOwner.store(owner);}
-void stopControllerRig() noexcept{stopSmallAnimalInteraction();stopMotionMelee();enabled.store(false);playerOwner.store(0);}
+void observeControllerRigOwner(uintptr_t owner) noexcept{
+    if(playerOwner.load()==owner)return;
+    std::lock_guard publicationLock(skinPublicationMutex);
+    playerOwner.store(owner);pausedSkin={};pausedParts={};
+}
+void stopControllerRig() noexcept{
+    {
+        std::lock_guard publicationLock(skinPublicationMutex);
+        enabled.store(false);playerOwner.store(0);pausedSkin={};pausedParts={};
+    }
+    stopSmallAnimalInteraction();stopMotionMelee();
+    {std::lock_guard lock(rigMutex);for(auto& cache:handPresentation)cache.reset();stationaryBody.reset();}
+}
 bool controllerRigEnabled() noexcept{return enabled.load();}
 void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
     static bool cacheActive{};

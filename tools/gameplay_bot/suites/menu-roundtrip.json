@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "description": "Observed native menu transitions on one warm session. Eye images still need visual review.",
+  "cases": [
+    {
+      "id": "pause-open",
+      "before": {
+        "scene": "gameplay"
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.pause"
+        }
+      ],
+      "after": {
+        "scene": "menu",
+        "idroid": false
+      }
+    },
+    {
+      "id": "pause-close",
+      "before": {
+        "scene": "menu",
+        "idroid": false
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back"
+        }
+      ],
+      "after": {
+        "scene": "gameplay"
+      }
+    },
+    {
+      "id": "idroid-open",
+      "before": {
+        "scene": "gameplay"
+      },
+      "setup": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.12,
+            -0.18,
+            -0.5
+          ],
+          "orientation": [
+            0,
+            0,
+            0,
+            1
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid"
+        }
+      ],
+      "after": {
+        "idroid": true
+      }
+    },
+    {
+      "id": "idroid-close",
+      "before": {
+        "idroid": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back"
+        }
+      ],
+      "after": {
+        "scene": "gameplay",
+        "idroid": false
+      }
+    }
+  ]
+}

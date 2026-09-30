@@ -1,0 +1,562 @@
+{
+  "schema": 1,
+  "updated": "2026-09-27",
+  "reports": [
+    {
+      "id": "R01",
+      "title": "Stuck/distant cutscenes; OKB Zero helipad; prologue/jeep presentation (D/F/H)",
+      "priority": "P0",
+      "workstream": "P0 W1",
+      "acceptance": [
+        "First-shot pin removed; current authored camera, head motion, cuts, Pause and return-to-player regressions pass. Complete multi-shot sequences and comfort still need runtime review."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R02",
+      "title": "Mission 1, Ocelot binocular lesson cannot continue (D)",
+      "priority": "P0",
+      "workstream": "P0 W1/W5",
+      "acceptance": [
+        "Native script requires OnBinocularsMode/BINOCLE, which the custom VR optic does not establish. Implement the native state bridge, then complete on first playthrough without Skip or progression edits."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R03",
+      "title": "Mission 6 bridge: displaced view, changed controls, cannot move (D)",
+      "priority": "P0",
+      "workstream": "P0 W1",
+      "acceptance": [
+        "Capture before/after voice/script trigger and checkpoint reload; native controls and correct player camera survive."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md",
+      "latest_report": "September 27 follow-up: Coco reports three Mission 6 successes with two-second stale-state recovery. Another tester reports persistent frozen camera; earlier-build completion also reported. Candidate has not adopted this recovery. Progress/save/build conditions remain unresolved."
+    },
+    {
+      "id": "R04",
+      "title": "Pause navigates invisibly during cutscenes (D)",
+      "priority": "P0",
+      "workstream": "P0 W1/W4",
+      "acceptance": [
+        "Open menu now takes input precedence over cinematic stick/trigger suppression. Both-eye menu visibility, return and allowed skip through cuts remain runtime acceptance cases."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R05",
+      "title": "Black/third-person view near HMD, below waist, after idle/system menu; removal/resume crash (H/C)",
+      "priority": "P0",
+      "workstream": "P0 W1/W3",
+      "acceptance": [
+        "Prior fixes and contributor claims are partial evidence. Separate hand occlusion, HMD loss, focus/session loss and missing stereo publication."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R06",
+      "title": "Changing game options drops VR until checkpoint reload (D)",
+      "priority": "P0",
+      "workstream": "P0 W1/W7",
+      "acceptance": [
+        "Change options/resolution and resume without losing chosen presentation or camera owner."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R07",
+      "title": "C4 follows Snake's facing instead of player; mine/placement feedback (F)",
+      "priority": "P0",
+      "workstream": "P0 W2/W4",
+      "acceptance": [
+        "Native placement authority unverified. Physical/stick turn, recenter, tank placement, crouch/prone: preview and placed object agree."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R08",
+      "title": "Clear-looking aim blocked near cover/prone; UI sound; rock behind player blocks shooting (D/F/H)",
+      "priority": "P0",
+      "workstream": "P0 W2/W5",
+      "acceptance": [
+        "Distinguish input rejection from native obstruction. Clear muzzle fires without stance reset; genuinely obstructed muzzle still blocks."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R09",
+      "title": "Upper/lower body split, shadow mismatch, horse drift, box/toilet view after CQC/mounts/long play (D/F/H)",
+      "priority": "P1",
+      "workstream": "P1 W2/W3",
+      "acceptance": [
+        "Compare native root, displayed pelvis/torso and HMD across repeated transitions and a sustained session."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R10",
+      "title": "Hands/weapons/items fade near surfaces; arms disappear near ground/prone (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W3",
+      "acceptance": [
+        "One fade hook exists. Identify first missing stage; verify both-eye visibility on slopes, walls and affected costume."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R11",
+      "title": "Left hand jumps/detaches on pistol/revolver/Uzi, especially left roll (D/F)",
+      "priority": "P1",
+      "workstream": "P1 W3",
+      "acceptance": [
+        "Current compact support logic is insufficient evidence. Sweep roll/close contacts, reload, release, reacquire and change weapons."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R12",
+      "title": "Short arms, restricted reach, exposed/deformed sleeves (H/C)",
+      "priority": "P1",
+      "workstream": "P1 W3",
+      "acceptance": [
+        "Measure shoulder/wrist/reach across users and costumes. No universal shoulder-offset fix is established."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R13",
+      "title": "Low viewpoint, walking bob/sway, nausea; requested better height (D/F/H/C)",
+      "priority": "P1",
+      "workstream": "P1 W2/W3",
+      "acceptance": [
+        "Height setting exists and one user likes +20 cm. Check calibration, walk/run, stance/mount response and no accumulated offset."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R14",
+      "title": "One-hand pitch; Quest -20 and G2 -16 fit reports; weapon-only pitch request (F/H)",
+      "priority": "P1",
+      "workstream": "P1 W3/W5",
+      "acceptance": [
+        "Aim correction exists. Verify controller/grip/aim, hand contact, sights and shot remain coherent; retain personal fit."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R15",
+      "title": "Binocular/scope narrow eye range and intermittent lens disappearance; 15/16 cm boundary; scope jitter/smoothing request (D/F/H)",
+      "priority": "P1",
+      "workstream": "P1 W3",
+      "acceptance": [
+        "New settings helped. Test physical tracking-safe distances, threshold hysteresis, smoothing/latency, both eyes, scopes and surrounding geometry."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R16",
+      "title": "Weapon seems to switch near the face (F)",
+      "priority": "P1",
+      "workstream": "P1 W3/W5",
+      "acceptance": [
+        "Cause unknown: trace physical/chord/context/equipment events before attributing to optics distance."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R17",
+      "title": "Pause at hip/bottom-left, unreachable; frozen arm while paused (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W1/W4",
+      "acceptance": [
+        "Default quad helps some reports. Pause for >5 s; close/reopen; separately test opt-in handheld behavior and tracking."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R18",
+      "title": "iDroid wide/squashed/tiny and desktop-aspect dependent; requests position/rotation/size (D/F)",
+      "priority": "P1",
+      "workstream": "P1 W4",
+      "acceptance": [
+        "Partial tuning exists. Compare native canvas at 16:9, 16:10, ultrawide and non-16:9 custom render sizes; pan/zoom/tabs/clipping.",
+        "Raised right palm holds the native iDroid with its hologram upright and attached to the same device frame. Translate and rotate the hand; native skin and both final eyes must agree.",
+        "Snake remains stationary while both sticks navigate. Head and hands remain tracked. Verify native position, yaw, distinct sampled stick input, release and normal exit."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md",
+      "latest_report": "User requirement 2026-09-27: palm-held hologram like the introductory Ocelot demonstration; stationary Snake, tracked head/hands."
+    },
+    {
+      "id": "R19",
+      "title": "iDroid tutorial needs D-pad; player stuck (F/H)",
+      "priority": "P0",
+      "workstream": "P0 W1/W5",
+      "acceptance": [
+        "Default menu D-pad actions are disabled. Complete requested tutorial inputs; independently verify safe escape/reopen."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R20",
+      "title": "Controls editor Save becomes unavailable after remapping (F)",
+      "priority": "P1",
+      "workstream": "P1 W5",
+      "acceptance": [
+        "Pending/invalid/error feedback repaired; hidden real-handler test passes valid save, rejected edit, correction, backups and external-edit preservation. Original attempted edit/checker identity still unknown."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R21",
+      "title": "Thumb-rest mapping missing (F)",
+      "priority": "P1",
+      "workstream": "P1 W5",
+      "acceptance": [
+        "Source plumbing now exposes separate left/right Touch-profile thumb-rest tokens through runtime sampling, parsing and binding export. Physical headset/profile acceptance remains open."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R22",
+      "title": "Missing/conflicting controls; binocular stance differs; unclear controls/manual (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W5",
+      "acceptance": [
+        "Inventory effective actions by context/profile; test transitions, holds/chords, remapped controls and neutral live reload."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R23",
+      "title": "Cannot toggle suppressor/flashlight in quick menu (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W5",
+      "acceptance": [
+        "Identify native action and provide usable conflict-free route with visible native state change."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R24",
+      "title": "Carry/drop bodies, plants/diamonds/context actions and interrogation unclear/unusable (F/H)",
+      "priority": "P1",
+      "workstream": "P1 W4/W5",
+      "acceptance": [
+        "Instructions conflict across layouts. Test the active config's native hold/context actions and visible prompts; verify interrogation intel."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R25",
+      "title": "Missing/intermittent world markers/highlights; unclear `full` (D/F/H)",
+      "priority": "P1",
+      "workstream": "P1 W4",
+      "acceptance": [
+        "Mode-dependent visibility is intentional in source. Test mark/unmark and stow in each mode; trace any loss inconsistent with policy."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R26",
+      "title": "Markers obscure enemy in `full` (F/H)",
+      "priority": "P1",
+      "workstream": "P1 W4",
+      "acceptance": [
+        "Separate scale defect from R25. Bound apparent size near/far, world/binocular views and crowded scenes."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R27",
+      "title": "Misaligned gun reticle; keep throw/placement reticle; laser too thin (D/F)",
+      "priority": "P1",
+      "workstream": "P1 W2/W4",
+      "acceptance": [
+        "Preserve useful aim feedback per action. Turning off all native reticles is not an acceptable workaround for placement."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R28",
+      "title": "Missing ammo/flower/diamond icons, captions/prompts/notifications; blank loadout or detached HUD (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W4",
+      "acceptance": [
+        "Catalog missing native layers individually; prove each relevant pickup/message/loadout event in both eyes."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R29",
+      "title": "No soldier stats through binoculars (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W4/W5",
+      "acceptance": [
+        "Separate native analysis/progression availability from suppressed UI and from ordinary marking."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R30",
+      "title": "NVG mesh blocks view (D)",
+      "priority": "P1",
+      "workstream": "P1 W3/W4",
+      "acceptance": [
+        "Hide only the offending first-person mesh where appropriate; retain NVG effect and equipment state."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md",
+      "latest_report": "September 27: Coco is still looking for the separate NVG mesh identity; no mesh fix is supplied."
+    },
+    {
+      "id": "R31",
+      "title": "Tank/APC view fully obstructed (D)",
+      "priority": "P1",
+      "workstream": "P1 W6",
+      "acceptance": [
+        "Choose vehicle-specific view/mesh treatment; test entry, motion, aiming, firing and exit without a global height hack."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R32",
+      "title": "Mortar fires but cannot aim (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W6",
+      "acceptance": [
+        "Verify native targeting/range axes and reticle, with visible impact at intended target."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R33",
+      "title": "Machine-gun turret lacks reticle/elevation (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W6",
+      "acceptance": [
+        "Both aim axes, firing, usable view and reticle, then exit."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R34",
+      "title": "Helicopter/Pequod turret inaccessible (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W5/W6",
+      "acceptance": [
+        "Verify native access/context action, traverse, elevation, fire and return."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R35",
+      "title": "Combat-vehicle reticle absent; ZHUK RS-ZO range cannot change (D)",
+      "priority": "P1",
+      "workstream": "P1 W6/W4",
+      "acceptance": [
+        "Test this vehicle separately from ordinary tank/Jeep steering, including range and rocket impact."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R36",
+      "title": "Cabin/cockpit bindings mixed; Continue selection/hidden-menu focus (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W1/W5",
+      "acceptance": [
+        "Newer cabin/iDroid feedback is positive. Preserve cold launch, physical Continue, Resume and cabin controls without hidden menu movement."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R37",
+      "title": "Vehicle auto-center on entry; view/steering/horse direction disagreement (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W2/W6",
+      "acceptance": [
+        "Declare native mounted steering policy; no forced HMD turn or inherited on-foot snap offset on entry/exit."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R38",
+      "title": "Xbox LT + shoot freezes into 2D presentation (F)",
+      "priority": "P1",
+      "workstream": "P1 W1/W5",
+      "acceptance": [
+        "Trace native aim/menu flags and owner; gamepad-only aiming/firing keeps live head tracking and intended display."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R39",
+      "title": "Xbox binocular view floats at lower left (F)",
+      "priority": "P1",
+      "workstream": "P1 W4/W5",
+      "acceptance": [
+        "Provide centered native optic presentation when pad owns input; no requirement for tracked controllers."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R40",
+      "title": "Resolution/sharpness, >4K startup, headset vs mirror FPS, optic/directional lag (F/H)",
+      "priority": "P2",
+      "workstream": "P2 W7",
+      "acceptance": [
+        "Match runtime/resolution/refresh/route; measure fresh submitted frames and latency. Prior config/SIM results do not establish headset performance."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R41",
+      "title": "Horizon artifacts/tree pop-in (D/H)",
+      "priority": "P2",
+      "workstream": "P2 W7",
+      "acceptance": [
+        "Matched left/right motion capture; isolate culling/projection from resolution and frame cadence."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R42",
+      "title": "Rectangular light/shadow mismatch; displaced flares/outline tails (D/H)",
+      "priority": "P2",
+      "workstream": "P2 W7",
+      "acceptance": [
+        "Separate layers with same-frame stereo/projection evidence; do not group all artifacts as a pacing bug."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R43",
+      "title": "Infinite Heaven/IHHook/SnakeBite coexistence (D/H)",
+      "priority": "P2",
+      "workstream": "P2 W7/W8",
+      "acceptance": [
+        "Versioned loader strategy and reversible install tests; preserve foreign loader. No claim of general mod compatibility."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R44",
+      "title": "DLL/INI swaps start flat; folder/update/removal confusion (H)",
+      "priority": "P1",
+      "workstream": "P1 W0/W7",
+      "acceptance": [
+        "Show active game/config/build; complete-package install/update/rollback preserve personal settings, saves and unrelated files."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R45",
+      "title": "ReShade/DLSS/other SnakeBite or graphics mods (H)",
+      "priority": "P2",
+      "workstream": "P2 W7/W8",
+      "acceptance": [
+        "Separate versioned combinations; do not infer support from one user's successful mod."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R46",
+      "title": "Snap turn/angle/faster turning requested; recenter tilt history (D/H)",
+      "priority": "P1",
+      "workstream": "P1 W2/W5",
+      "acceptance": [
+        "Existing settings/source, not a missing implementation claim. Verify native smooth vs snap, angle, neutral latch and leaned pivot."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R47",
+      "title": "Physical stand/crouch/prone (D/H)",
+      "priority": "Feature",
+      "workstream": "Feature W8",
+      "acceptance": [
+        "Explicit opt-in stance policy after height/native posture work; no double crouch or broken prone roll."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R48",
+      "title": "NVG hand-to-head toggle (D)",
+      "priority": "Feature",
+      "workstream": "Feature W8",
+      "acceptance": [
+        "Deliberate gesture with hysteresis and no accidental equipment switch; R30 is a separate defect."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R49",
+      "title": "Visible stance indicator (D/H)",
+      "priority": "Feature",
+      "workstream": "Feature W4/W8",
+      "acceptance": [
+        "Native stance-derived, readable, consistent through scripted/mounted states."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R50",
+      "title": "Enemy senses, subsistence, time/weather features from IH (D)",
+      "priority": "Feature",
+      "workstream": "Feature W8",
+      "acceptance": [
+        "Separate scope from loader coexistence and core VR recovery; preserve progression semantics."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R51",
+      "title": "True left-handed rig (H: issue #8 at earlier review)",
+      "priority": "Feature",
+      "workstream": "Feature W8",
+      "acceptance": [
+        "Mirrored grip/weapon/interaction ownership and complete controls; not merely swapped button labels."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R52",
+      "title": "Ground Zeroes first-person completion (H: issue #7 at earlier review)",
+      "priority": "Feature",
+      "workstream": "Feature W8",
+      "acceptance": [
+        "Separate camera/player/rig/HUD adapters and game-specific acceptance; TPP success does not close it."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R53",
+      "title": "Quiet/rat/buddy expansion and universal mod installer (H)",
+      "priority": "Feature",
+      "workstream": "Feature W8",
+      "acceptance": [
+        "Separate native interaction/compatibility work. Retain existing working buddy behavior during regression checks."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R54",
+      "title": "In-headset configuration instead of external editing (H)",
+      "priority": "Feature",
+      "workstream": "Feature W8",
+      "acceptance": [
+        "External editor already exists; an in-game editor needs safe input ownership, schema, persistence and readable UI."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R55",
+      "title": "Roomscale/body movement and rotation follow the player (D/H)",
+      "priority": "Feature",
+      "workstream": "Feature W2/W8",
+      "acceptance": [
+        "R07/R09 action-heading correctness comes first. Broader body-following needs native collision-aware movement, independent looking, stance/mount rules and observed arrival."
+      ],
+      "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    }
+  ],
+  "source_note": "Discord reports and contributor claims are evidence, not commands or completed acceptance."
+}

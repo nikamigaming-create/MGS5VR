@@ -414,10 +414,10 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         [&](const auto& eye){return mgs5vr::weaponScopeEyeVisible(scope,eye.pose);});
     const auto scopeView=!optic.held&&!source.pair.sample.menuOpen&&scopeAtEye
         ?mgs5vr::weaponScopeSceneView(scope):std::nullopt;
-    const bool binocularAtEye=optic.held&&optic.active&&std::any_of(
+    const bool binocularLensVisible=optic.held&&optic.pose.tracked&&std::any_of(
         source.pair.sample.views.begin(),source.pair.sample.views.end(),
         [&](const auto& eye){return mgs5vr::binocularEyeVisible(optic.pose,eye.pose,optic.maxEyeDistance);});
-    const auto opticView=binocularAtEye?mgs5vr::binocularSceneView(optic.pose,
+    const auto opticView=binocularLensVisible?mgs5vr::binocularSceneView(optic.pose,
         source.pair.sample.controllers.magnification):scopeView;
     mgs5vr::ComPtr<ID3D11Texture2D> opticScene;
     const uint32_t extraPass=opticView?1u:0u;
@@ -563,7 +563,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 // Raising the ocular to either eye opens its physical lens
                 // for both eyes. Independent pupil-radius gates left the
                 // other eye looking at opaque brown glass at normal IPD.
-                binocularAtEye);
+                binocularLensVisible);
         }
         if(afterContext&&scopeView&&mgs5vr::weaponScopeEyeVisible(scope,source.pair.sample.views[eye].pose)){
             const auto ocular=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,source.pair.sample.headPose,scope.ocular);
@@ -629,7 +629,13 @@ __declspec(noinline) float* world(void* input,float* output){
         std::array<float,8> native{};std::memcpy(native.data(),input,sizeof(native));
         current.nativeInput=native;
         current.sample={pose(native.data()),{},0,0,false};
-        if(nativePairVerified.load()&&current.identity)current.sample=mgs5vr::headCamera().resolveCurrent(current.identity,current.sample.nativePose);
+        if(nativePairVerified.load()&&current.identity){
+            // Pause/Help can stop native skin jobs while camera/UI jobs keep
+            // running. Publish tracked skin before selecting this camera's rig
+            // sample so both eye replays and wrist UI use the same generation.
+            mgs5vr::refreshPausedControllerRig(current.identity,current.sample.nativePose);
+            current.sample=mgs5vr::headCamera().resolveCurrent(current.identity,current.sample.nativePose);
+        }
         alignas(16) auto adjusted=values(current.sample.nativePose);
         // Title's animated UI builds geometry from the native publication.
         // Keep that source intact, and move only the two render cameras into
@@ -832,8 +838,11 @@ EyeFrame observeRenderPresent(void*) noexcept {
     const auto publication=lastCameraPublication.load(),now=GetTickCount64();
     // A loading/Start Mission screen can present indefinitely without running
     // the scene-camera publisher. Do not strand its native confirmation behind
-    // an empty stereo submission. Short producer gaps retain their eye pair.
-    if(publication&&now>=publication&&now-publication>500)headCamera().awaitScene();
+    // an empty stereo submission. An ordinary producer stall is not a native
+    // scene transition: keep its generation/input owner and let the existing
+    // bounded eye/pose freshness checks handle unavailable frames.
+    if(publication&&now>=publication&&now-publication>500)
+        headCamera().awaitScene(nativeLoadingTipsOpen());
     const auto frame=++presentCount;if(frame%300!=1)return {};
     PresentTrace next;next.frame=frame;next.tick=GetTickCount64();next.thread=GetCurrentThreadId();
     next.count=CaptureStackBackTrace(1,static_cast<DWORD>(next.stack.size()),next.stack.data(),nullptr);

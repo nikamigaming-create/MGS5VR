@@ -9,6 +9,9 @@ void observeControllerRigOwner(uintptr_t owner) noexcept;
 void stopControllerRig() noexcept;
 bool controllerRigEnabled() noexcept;
 TravelMode nativeTravelMode() noexcept;
+// Called only at the native camera-publication boundary, before either eye.
+// Republishes the owned paused skin and its attachments without a game tick.
+bool refreshPausedControllerRig(uintptr_t camera,Pose nativeCamera) noexcept;
 
 // Retain the sampled actor envelope; move the cabin camera against native
 // swept clearance and floor queries. No player or actor transform is written.

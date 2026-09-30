@@ -1,0 +1,997 @@
+{
+  "lessons": [
+    {
+      "id": "equipment-picker-open-release",
+      "action": "equipment.open",
+      "source_sha256": "3ee30a1c96c82004b5ad6feca5fee4a0932fb08031fdac8892f43c8bb121941c",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 0.1725978,
+      "end": 4.0221351,
+      "duration": 3.8495373,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "unreviewed",
+      "title": "Open the equipment picker",
+      "description": "Hold the equipment button to open the picker. Release it to close.",
+      "visual_finding": "",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/source-showcase-06/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "equipment.open",
+          "start": 1.2797807,
+          "end": 2.1365386
+        }
+      ]
+    },
+    {
+      "id": "commands-held-open-release",
+      "action": "commands.keep_open",
+      "source_sha256": "3ee30a1c96c82004b5ad6feca5fee4a0932fb08031fdac8892f43c8bb121941c",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 3.224656,
+      "end": 7.0424501,
+      "duration": 3.8177941,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "unreviewed",
+      "title": "Open buddy commands",
+      "description": "Hold the command button to open the orders menu. Release it to close.",
+      "visual_finding": "",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/source-showcase-06/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "commands.keep_open",
+          "start": 1.2301135,
+          "end": 2.1417892
+        }
+      ]
+    },
+    {
+      "id": "vr-binocular-latch-enter",
+      "action": "gameplay.equip_binoculars",
+      "source_sha256": "3ee30a1c96c82004b5ad6feca5fee4a0932fb08031fdac8892f43c8bb121941c",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 6.2452251,
+      "end": 10.0243674,
+      "duration": 3.7791423,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "unreviewed",
+      "title": "Equip binoculars",
+      "description": "Equip the binoculars, then raise them to your eyes.",
+      "visual_finding": "",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/source-showcase-06/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "gameplay.equip_binoculars",
+          "start": 1.2285024,
+          "end": 2.144953
+        }
+      ]
+    },
+    {
+      "id": "vr-binocular-latch-stow",
+      "action": "binoculars.stow",
+      "source_sha256": "3ee30a1c96c82004b5ad6feca5fee4a0932fb08031fdac8892f43c8bb121941c",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 9.2271863,
+      "end": 12.1834731,
+      "duration": 2.9562868,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "unreviewed",
+      "title": "Put binoculars away",
+      "description": "Put the binoculars away with the controls shown here.",
+      "visual_finding": "",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/source-showcase-06/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "binoculars.stow",
+          "start": 1.190592,
+          "end": 1.3520858
+        }
+      ]
+    },
+    {
+      "id": "pause-open",
+      "action": "system.pause",
+      "source_sha256": "3ee30a1c96c82004b5ad6feca5fee4a0932fb08031fdac8892f43c8bb121941c",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 11.3870675,
+      "end": 15.2252241,
+      "duration": 3.8381566,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "issue_open",
+      "title": "Open Pause",
+      "description": "Open the Pause menu. You can still look around and move your hands.",
+      "visual_finding": "In the captured simulated pose, the Pause panel is visible and contained in the left eye, but is substantially clipped beyond the left edge of the right eye. Native Pause open/close predicates passed; the right-eye visibility failure remains open. This image alone does not establish a renderer-math defect.",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/source-showcase-06/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "system.pause",
+          "start": 1.3080097,
+          "end": 2.2111914
+        }
+      ]
+    },
+    {
+      "id": "pause-close",
+      "action": "menus.back",
+      "source_sha256": "3ee30a1c96c82004b5ad6feca5fee4a0932fb08031fdac8892f43c8bb121941c",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 14.428096,
+      "end": 17.4768024,
+      "duration": 3.0487064,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "unreviewed",
+      "title": "Close Pause",
+      "description": "Close the Pause menu to resume the game.",
+      "visual_finding": "",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/source-showcase-06/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "menus.back",
+          "start": 1.1673464,
+          "end": 1.3271265
+        }
+      ]
+    },
+    {
+      "id": "standing-to-crouched",
+      "action": "gameplay.stance",
+      "source_sha256": "52d8fa1ea62c5334dffb4e39506a0984f95c332f0d98375985df57f4ece9130b",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 0.2321701,
+      "end": 3.5496719,
+      "duration": 3.3175018,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "unreviewed",
+      "title": "Crouch",
+      "description": "Change from standing to a crouch.",
+      "visual_finding": "",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/stance-finish-01/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "gameplay.stance",
+          "start": 1.3328919,
+          "end": 1.5062799
+        }
+      ]
+    },
+    {
+      "id": "crouched-to-prone",
+      "action": "gameplay.stance",
+      "source_sha256": "3ee30a1c96c82004b5ad6feca5fee4a0932fb08031fdac8892f43c8bb121941c",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 19.0940678,
+      "end": 23.0231545,
+      "duration": 3.9290867,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "unreviewed",
+      "title": "Go prone",
+      "description": "Go prone from a crouch.",
+      "visual_finding": "",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/source-showcase-06/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "gameplay.stance",
+          "start": 1.1897347,
+          "end": 2.1616982
+        }
+      ]
+    },
+    {
+      "id": "prone-to-crouched",
+      "action": "gameplay.stance",
+      "source_sha256": "3ee30a1c96c82004b5ad6feca5fee4a0932fb08031fdac8892f43c8bb121941c",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 22.2289027,
+      "end": 25.4020473,
+      "duration": 3.1731446,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "unreviewed",
+      "title": "Rise to a crouch",
+      "description": "Rise from prone into a crouch.",
+      "visual_finding": "",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/source-showcase-06/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "gameplay.stance",
+          "start": 1.2844004,
+          "end": 1.4455516
+        }
+      ]
+    },
+    {
+      "id": "crouched-to-standing",
+      "action": "gameplay.stance",
+      "source_sha256": "52d8fa1ea62c5334dffb4e39506a0984f95c332f0d98375985df57f4ece9130b",
+      "source_width": 1920,
+      "source_height": 1080,
+      "crop": {
+        "width": 1246,
+        "height": 1080,
+        "x": 336,
+        "y": 0
+      },
+      "start": 2.7511737,
+      "end": 5.9823845,
+      "duration": 3.2312108,
+      "source_eye": "right",
+      "native_status": "observed_pass",
+      "visual_status": "unreviewed",
+      "title": "Stand up",
+      "description": "Stand up from a crouch.",
+      "visual_finding": "",
+      "dll_sha256": "f529307d01143f73aa80b11424c00b5fd3c0ae24e2a422364338c99a547885da",
+      "source": "artifacts/bot-20260927/stance-finish-01/recording/segment-0000-av.mp4",
+      "cues": [
+        {
+          "action": "gameplay.stance",
+          "start": 1.3521114,
+          "end": 1.5123258
+        }
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "HISTORY.STEREO",
+      "title": "Native tracked stereo, head movement and rendering continuity",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.HAND_RIG",
+      "title": "Both tracked hands, attached forearms and full body during motion",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.FINGERS",
+      "title": "Tracked touch and trigger/grip finger poses",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.WPN_GRIP",
+      "title": "One-hand and two-hand weapon grip across pistol and long-gun families",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.WRIST",
+      "title": "Attached wrist menu, equipment selector and readable native pixels",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.IDROID",
+      "title": "Palm-carried iDroid projector and floating menu mode",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.CONTINUE",
+      "title": "Native helicopter cabin and physical Continue tape",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.BINOCULARS",
+      "title": "Binocular equip, align, zoom, mark, analyse and stow",
+      "status": "partial_native_evidence",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.SCOPES",
+      "title": "Weapon optics, variable magnification and support grip",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.LOCOMOTION",
+      "title": "Walking, running, stance changes, prone roll, lean and roomscale limits",
+      "status": "partial_native_evidence",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.TURN_RECENTER",
+      "title": "Native smooth turn, optional snap turn and recenter",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.FIRE_RELOAD",
+      "title": "Each weapon family: fire, visible impact, ammo, reload and switch",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.THROW_PLACE",
+      "title": "Throwables and placement: grenades, magazines, C4, mines, decoys",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.EQUIPMENT",
+      "title": "Equipment picker, category selection, use and cancellation",
+      "status": "partial_native_evidence",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.CQC",
+      "title": "Contextual melee, hold-up, CQC, interrogation and release",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.CARRY_FULTON",
+      "title": "Pickup, carrying, setdown and Fulton recovery",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.BUDDY_COMMANDS",
+      "title": "Buddy command menu and actual buddy responses",
+      "status": "partial_native_evidence",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.DOG_PET",
+      "title": "Legitimate D-Dog petting through tracked hand contact",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.RAT_PICKUP",
+      "title": "Legitimate rat pickup and release through native interaction",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.HORSE",
+      "title": "Horse mount, ride, weapon use, commands and dismount",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.VEHICLES",
+      "title": "Light vehicles, armor, helicopter seats and mounted weapons",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.PROSTHETICS",
+      "title": "Supported prosthetic actions and remote camera return",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.HUD",
+      "title": "Markers, reticles, prompts, notifications and binocular analysis",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.CONTROLS_EDITOR",
+      "title": "Effective binding editor, remapping, reload and user settings",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.GAMEPAD",
+      "title": "Native Xbox ownership and transitions to/from motion controllers",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.GZ_PREVIEW",
+      "title": "Ground Zeroes historical third-person stereo actions; first-person adapter separate",
+      "status": "unproven",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    }
+  ],
+  "reports": [
+    {
+      "id": "R01",
+      "title": "Stuck/distant cutscenes; OKB Zero helipad; prologue/jeep presentation (D/F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "First-shot pin removed; current authored camera, head motion, cuts, Pause and return-to-player regressions pass. Complete multi-shot sequences and comfort still need runtime review."
+      ]
+    },
+    {
+      "id": "R02",
+      "title": "Mission 1, Ocelot binocular lesson cannot continue (D)",
+      "status": "unproven",
+      "acceptance": [
+        "Native script requires OnBinocularsMode/BINOCLE, which the custom VR optic does not establish. Implement the native state bridge, then complete on first playthrough without Skip or progression edits."
+      ]
+    },
+    {
+      "id": "R03",
+      "title": "Mission 6 bridge: displaced view, changed controls, cannot move (D)",
+      "status": "unproven",
+      "acceptance": [
+        "Capture before/after voice/script trigger and checkpoint reload; native controls and correct player camera survive."
+      ],
+      "latest_report": "September 27 follow-up: Coco reports three Mission 6 successes with two-second stale-state recovery. Another tester reports persistent frozen camera; earlier-build completion also reported. Candidate has not adopted this recovery. Progress/save/build conditions remain unresolved."
+    },
+    {
+      "id": "R04",
+      "title": "Pause navigates invisibly during cutscenes (D)",
+      "status": "unproven",
+      "acceptance": [
+        "Open menu now takes input precedence over cinematic stick/trigger suppression. Both-eye menu visibility, return and allowed skip through cuts remain runtime acceptance cases."
+      ]
+    },
+    {
+      "id": "R05",
+      "title": "Black/third-person view near HMD, below waist, after idle/system menu; removal/resume crash (H/C)",
+      "status": "unproven",
+      "acceptance": [
+        "Prior fixes and contributor claims are partial evidence. Separate hand occlusion, HMD loss, focus/session loss and missing stereo publication."
+      ]
+    },
+    {
+      "id": "R06",
+      "title": "Changing game options drops VR until checkpoint reload (D)",
+      "status": "unproven",
+      "acceptance": [
+        "Change options/resolution and resume without losing chosen presentation or camera owner."
+      ]
+    },
+    {
+      "id": "R07",
+      "title": "C4 follows Snake's facing instead of player; mine/placement feedback (F)",
+      "status": "unproven",
+      "acceptance": [
+        "Native placement authority unverified. Physical/stick turn, recenter, tank placement, crouch/prone: preview and placed object agree."
+      ]
+    },
+    {
+      "id": "R08",
+      "title": "Clear-looking aim blocked near cover/prone; UI sound; rock behind player blocks shooting (D/F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Distinguish input rejection from native obstruction. Clear muzzle fires without stance reset; genuinely obstructed muzzle still blocks."
+      ]
+    },
+    {
+      "id": "R09",
+      "title": "Upper/lower body split, shadow mismatch, horse drift, box/toilet view after CQC/mounts/long play (D/F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Compare native root, displayed pelvis/torso and HMD across repeated transitions and a sustained session."
+      ]
+    },
+    {
+      "id": "R10",
+      "title": "Hands/weapons/items fade near surfaces; arms disappear near ground/prone (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "One fade hook exists. Identify first missing stage; verify both-eye visibility on slopes, walls and affected costume."
+      ]
+    },
+    {
+      "id": "R11",
+      "title": "Left hand jumps/detaches on pistol/revolver/Uzi, especially left roll (D/F)",
+      "status": "unproven",
+      "acceptance": [
+        "Current compact support logic is insufficient evidence. Sweep roll/close contacts, reload, release, reacquire and change weapons."
+      ]
+    },
+    {
+      "id": "R12",
+      "title": "Short arms, restricted reach, exposed/deformed sleeves (H/C)",
+      "status": "unproven",
+      "acceptance": [
+        "Measure shoulder/wrist/reach across users and costumes. No universal shoulder-offset fix is established."
+      ]
+    },
+    {
+      "id": "R13",
+      "title": "Low viewpoint, walking bob/sway, nausea; requested better height (D/F/H/C)",
+      "status": "unproven",
+      "acceptance": [
+        "Height setting exists and one user likes +20 cm. Check calibration, walk/run, stance/mount response and no accumulated offset."
+      ]
+    },
+    {
+      "id": "R14",
+      "title": "One-hand pitch; Quest -20 and G2 -16 fit reports; weapon-only pitch request (F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Aim correction exists. Verify controller/grip/aim, hand contact, sights and shot remain coherent; retain personal fit."
+      ]
+    },
+    {
+      "id": "R15",
+      "title": "Binocular/scope narrow eye range and intermittent lens disappearance; 15/16 cm boundary; scope jitter/smoothing request (D/F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "New settings helped. Test physical tracking-safe distances, threshold hysteresis, smoothing/latency, both eyes, scopes and surrounding geometry."
+      ]
+    },
+    {
+      "id": "R16",
+      "title": "Weapon seems to switch near the face (F)",
+      "status": "unproven",
+      "acceptance": [
+        "Cause unknown: trace physical/chord/context/equipment events before attributing to optics distance."
+      ]
+    },
+    {
+      "id": "R17",
+      "title": "Pause at hip/bottom-left, unreachable; frozen arm while paused (D/H)",
+      "status": "failure_observed",
+      "acceptance": [
+        "Default quad helps some reports. Pause for >5 s; close/reopen; separately test opt-in handheld behavior and tracking."
+      ]
+    },
+    {
+      "id": "R18",
+      "title": "iDroid wide/squashed/tiny and desktop-aspect dependent; requests position/rotation/size (D/F)",
+      "status": "unproven",
+      "acceptance": [
+        "Partial tuning exists. Compare native canvas at 16:9, 16:10, ultrawide and non-16:9 custom render sizes; pan/zoom/tabs/clipping.",
+        "Raised right palm holds the native iDroid with its hologram upright and attached to the same device frame. Translate and rotate the hand; native skin and both final eyes must agree.",
+        "Snake remains stationary while both sticks navigate. Head and hands remain tracked. Verify native position, yaw, distinct sampled stick input, release and normal exit."
+      ],
+      "latest_report": "User requirement 2026-09-27: palm-held hologram like the introductory Ocelot demonstration; stationary Snake, tracked head/hands."
+    },
+    {
+      "id": "R19",
+      "title": "iDroid tutorial needs D-pad; player stuck (F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Default menu D-pad actions are disabled. Complete requested tutorial inputs; independently verify safe escape/reopen."
+      ]
+    },
+    {
+      "id": "R20",
+      "title": "Controls editor Save becomes unavailable after remapping (F)",
+      "status": "unproven",
+      "acceptance": [
+        "Pending/invalid/error feedback repaired; hidden real-handler test passes valid save, rejected edit, correction, backups and external-edit preservation. Original attempted edit/checker identity still unknown."
+      ]
+    },
+    {
+      "id": "R21",
+      "title": "Thumb-rest mapping missing (F)",
+      "status": "unproven",
+      "acceptance": [
+        "Source plumbing now exposes separate left/right Touch-profile thumb-rest tokens through runtime sampling, parsing and binding export. Physical headset/profile acceptance remains open."
+      ]
+    },
+    {
+      "id": "R22",
+      "title": "Missing/conflicting controls; binocular stance differs; unclear controls/manual (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Inventory effective actions by context/profile; test transitions, holds/chords, remapped controls and neutral live reload."
+      ]
+    },
+    {
+      "id": "R23",
+      "title": "Cannot toggle suppressor/flashlight in quick menu (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Identify native action and provide usable conflict-free route with visible native state change."
+      ]
+    },
+    {
+      "id": "R24",
+      "title": "Carry/drop bodies, plants/diamonds/context actions and interrogation unclear/unusable (F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Instructions conflict across layouts. Test the active config's native hold/context actions and visible prompts; verify interrogation intel."
+      ]
+    },
+    {
+      "id": "R25",
+      "title": "Missing/intermittent world markers/highlights; unclear `full` (D/F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Mode-dependent visibility is intentional in source. Test mark/unmark and stow in each mode; trace any loss inconsistent with policy."
+      ]
+    },
+    {
+      "id": "R26",
+      "title": "Markers obscure enemy in `full` (F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Separate scale defect from R25. Bound apparent size near/far, world/binocular views and crowded scenes."
+      ]
+    },
+    {
+      "id": "R27",
+      "title": "Misaligned gun reticle; keep throw/placement reticle; laser too thin (D/F)",
+      "status": "unproven",
+      "acceptance": [
+        "Preserve useful aim feedback per action. Turning off all native reticles is not an acceptable workaround for placement."
+      ]
+    },
+    {
+      "id": "R28",
+      "title": "Missing ammo/flower/diamond icons, captions/prompts/notifications; blank loadout or detached HUD (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Catalog missing native layers individually; prove each relevant pickup/message/loadout event in both eyes."
+      ]
+    },
+    {
+      "id": "R29",
+      "title": "No soldier stats through binoculars (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Separate native analysis/progression availability from suppressed UI and from ordinary marking."
+      ]
+    },
+    {
+      "id": "R30",
+      "title": "NVG mesh blocks view (D)",
+      "status": "unproven",
+      "acceptance": [
+        "Hide only the offending first-person mesh where appropriate; retain NVG effect and equipment state."
+      ],
+      "latest_report": "September 27: Coco is still looking for the separate NVG mesh identity; no mesh fix is supplied."
+    },
+    {
+      "id": "R31",
+      "title": "Tank/APC view fully obstructed (D)",
+      "status": "unproven",
+      "acceptance": [
+        "Choose vehicle-specific view/mesh treatment; test entry, motion, aiming, firing and exit without a global height hack."
+      ]
+    },
+    {
+      "id": "R32",
+      "title": "Mortar fires but cannot aim (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Verify native targeting/range axes and reticle, with visible impact at intended target."
+      ]
+    },
+    {
+      "id": "R33",
+      "title": "Machine-gun turret lacks reticle/elevation (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Both aim axes, firing, usable view and reticle, then exit."
+      ]
+    },
+    {
+      "id": "R34",
+      "title": "Helicopter/Pequod turret inaccessible (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Verify native access/context action, traverse, elevation, fire and return."
+      ]
+    },
+    {
+      "id": "R35",
+      "title": "Combat-vehicle reticle absent; ZHUK RS-ZO range cannot change (D)",
+      "status": "unproven",
+      "acceptance": [
+        "Test this vehicle separately from ordinary tank/Jeep steering, including range and rocket impact."
+      ]
+    },
+    {
+      "id": "R36",
+      "title": "Cabin/cockpit bindings mixed; Continue selection/hidden-menu focus (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Newer cabin/iDroid feedback is positive. Preserve cold launch, physical Continue, Resume and cabin controls without hidden menu movement."
+      ]
+    },
+    {
+      "id": "R37",
+      "title": "Vehicle auto-center on entry; view/steering/horse direction disagreement (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Declare native mounted steering policy; no forced HMD turn or inherited on-foot snap offset on entry/exit."
+      ]
+    },
+    {
+      "id": "R38",
+      "title": "Xbox LT + shoot freezes into 2D presentation (F)",
+      "status": "unproven",
+      "acceptance": [
+        "Trace native aim/menu flags and owner; gamepad-only aiming/firing keeps live head tracking and intended display."
+      ]
+    },
+    {
+      "id": "R39",
+      "title": "Xbox binocular view floats at lower left (F)",
+      "status": "unproven",
+      "acceptance": [
+        "Provide centered native optic presentation when pad owns input; no requirement for tracked controllers."
+      ]
+    },
+    {
+      "id": "R40",
+      "title": "Resolution/sharpness, >4K startup, headset vs mirror FPS, optic/directional lag (F/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Match runtime/resolution/refresh/route; measure fresh submitted frames and latency. Prior config/SIM results do not establish headset performance."
+      ]
+    },
+    {
+      "id": "R41",
+      "title": "Horizon artifacts/tree pop-in (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Matched left/right motion capture; isolate culling/projection from resolution and frame cadence."
+      ]
+    },
+    {
+      "id": "R42",
+      "title": "Rectangular light/shadow mismatch; displaced flares/outline tails (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Separate layers with same-frame stereo/projection evidence; do not group all artifacts as a pacing bug."
+      ]
+    },
+    {
+      "id": "R43",
+      "title": "Infinite Heaven/IHHook/SnakeBite coexistence (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Versioned loader strategy and reversible install tests; preserve foreign loader. No claim of general mod compatibility."
+      ]
+    },
+    {
+      "id": "R44",
+      "title": "DLL/INI swaps start flat; folder/update/removal confusion (H)",
+      "status": "unproven",
+      "acceptance": [
+        "Show active game/config/build; complete-package install/update/rollback preserve personal settings, saves and unrelated files."
+      ]
+    },
+    {
+      "id": "R45",
+      "title": "ReShade/DLSS/other SnakeBite or graphics mods (H)",
+      "status": "unproven",
+      "acceptance": [
+        "Separate versioned combinations; do not infer support from one user's successful mod."
+      ]
+    },
+    {
+      "id": "R46",
+      "title": "Snap turn/angle/faster turning requested; recenter tilt history (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Existing settings/source, not a missing implementation claim. Verify native smooth vs snap, angle, neutral latch and leaned pivot."
+      ]
+    },
+    {
+      "id": "R47",
+      "title": "Physical stand/crouch/prone (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Explicit opt-in stance policy after height/native posture work; no double crouch or broken prone roll."
+      ]
+    },
+    {
+      "id": "R48",
+      "title": "NVG hand-to-head toggle (D)",
+      "status": "unproven",
+      "acceptance": [
+        "Deliberate gesture with hysteresis and no accidental equipment switch; R30 is a separate defect."
+      ]
+    },
+    {
+      "id": "R49",
+      "title": "Visible stance indicator (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "Native stance-derived, readable, consistent through scripted/mounted states."
+      ]
+    },
+    {
+      "id": "R50",
+      "title": "Enemy senses, subsistence, time/weather features from IH (D)",
+      "status": "unproven",
+      "acceptance": [
+        "Separate scope from loader coexistence and core VR recovery; preserve progression semantics."
+      ]
+    },
+    {
+      "id": "R51",
+      "title": "True left-handed rig (H: issue #8 at earlier review)",
+      "status": "unproven",
+      "acceptance": [
+        "Mirrored grip/weapon/interaction ownership and complete controls; not merely swapped button labels."
+      ]
+    },
+    {
+      "id": "R52",
+      "title": "Ground Zeroes first-person completion (H: issue #7 at earlier review)",
+      "status": "unproven",
+      "acceptance": [
+        "Separate camera/player/rig/HUD adapters and game-specific acceptance; TPP success does not close it."
+      ]
+    },
+    {
+      "id": "R53",
+      "title": "Quiet/rat/buddy expansion and universal mod installer (H)",
+      "status": "unproven",
+      "acceptance": [
+        "Separate native interaction/compatibility work. Retain existing working buddy behavior during regression checks."
+      ]
+    },
+    {
+      "id": "R54",
+      "title": "In-headset configuration instead of external editing (H)",
+      "status": "unproven",
+      "acceptance": [
+        "External editor already exists; an in-game editor needs safe input ownership, schema, persistence and readable UI."
+      ]
+    },
+    {
+      "id": "R55",
+      "title": "Roomscale/body movement and rotation follow the player (D/H)",
+      "status": "unproven",
+      "acceptance": [
+        "R07/R09 action-heading correctness comes first. Broader body-following needs native collision-aware movement, independent looking, stance/mount rules and observed arrival."
+      ]
+    }
+  ]
+}

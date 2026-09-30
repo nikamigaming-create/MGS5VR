@@ -1,0 +1,192 @@
+{
+  "catalog_version": 1,
+  "target": "Metal Gear Solid V: The Phantom Pain",
+  "purpose": "Bounded map of source-backed native state, inventory, and control families for offline scenario planning.",
+  "claim_rules": [
+    "An exposed inventory ID or input packet proves observability or delivery only; it does not prove an in-game action succeeded.",
+    "A candidate exercise is not a pass until the native before/after fields show the requested state and restoration.",
+    "Weapon variants and upgrades are grouped by family; this catalog does not count untested variants as coverage."
+  ],
+  "denominators": {
+    "loadout_positions": {
+      "count": 19,
+      "definition": "3 primary/secondary weapon positions + 8 support-weapon positions + 8 item positions.",
+      "groups": [
+        { "name": "weapon", "count": 3, "indices": [0, 1, 2], "names": ["PRIMARY_HIP", "PRIMARY_BACK", "SECONDARY"] },
+        { "name": "support_weapon", "count": 8, "indices": [0, 1, 2, 3, 4, 5, 6, 7] },
+        { "name": "item", "count": 8, "indices": [0, 1, 2, 3, 4, 5, 6, 7] }
+      ],
+      "current_observer_coverage": "The observer now emits a named query for all 19 positions. A missing API/entry is serialized as unavailable; an empty slot is the game's numeric EQP_None value. Field presence is not proof that any item is selectable or usable.",
+      "source_refs": [
+        "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppDefine.lua:74",
+        "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:432-445",
+        "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:463-467",
+        "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppDebug.lua:306-310",
+        "tools/scenario-state.lua:63-90"
+      ]
+    },
+    "equipment_taxonomy": {
+      "count": 11,
+      "definition": "Eight developed weapon families plus enemy weapon, support weapon, and equipment groups in the retail debug taxonomy. This is a class denominator, not proof that each class is VR-tested.",
+      "families": ["handgun", "submachinegun", "assault_rifle", "shotgun", "grenade_launcher", "sniper_rifle", "machine_gun", "missile", "enemy_weapon", "support_weapon", "equipment"],
+      "source_ref": "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppDebug.lua:338"
+    },
+    "state_families": {
+      "count": 13,
+      "definition": "The explicit families tracked in this catalog; mission-specific actions and NPC states are outside this bounded denominator.",
+      "families": ["posture", "carry", "binocular_mode", "weapon_inventory", "weapon_selection", "weapon_ready_or_aim", "fire_or_reload", "cqc", "cover_or_stealth", "horse_ride", "ground_vehicle_ride", "helicopter_ride", "item_selection_or_use"],
+      "currently_observable_families": 4,
+      "currently_observable_note": "Four families directly expose named native status or inventory-ID readbacks: posture, carry, binocular status, and loadout inventory (now all 19 positions). Ammo counters, item cursor candidate, disable-action flag, and vehicle classifiers are also emitted as partial telemetry; none proves an action transition or test pass."
+    }
+  },
+  "current_control_preset_evidence": {
+    "tpp_readback": "No current TPP control-preset or button-layout getter was found in the inspected owned Lua API surface. Pad.GetDeviceType() reports device family only; the inspected pad-config function receives padType as an argument rather than reading it back. TppPadOperatorUtility.lua exposes registration, masks, and stick-rate setters, not an assignment getter.",
+    "read_only_candidate": "Pad.GetDeviceType() may be recorded as controller-device metadata, but it cannot disambiguate the active TPP preset or button assignment.",
+    "nearest_owned_mapping_is_not_tpp_proof": {
+      "path": "artifacts/dual-game-sim-20260912/gz-owned/Assets/tpp/level_asset/chara/player/TppPlayerPadConfig.lua",
+      "detail": "This Ground Zeroes-owned file routes PL_SUB_CAMERA to sysR1 and selects default/FPS and CQC-button variants via padType 0..3 and CqcButtonConfig. Its X360 branch leaves sysR1 as PAD_R1; PS3 remaps sysR1 to PAD_R2. The repository has no corresponding extracted TPP file, so this is adjacent evidence only and does not establish the user's installed TPP mapping.",
+      "source_refs": [
+        "artifacts/dual-game-sim-20260912/gz-owned/Assets/tpp/level_asset/chara/player/TppPlayerPadConfig.lua:20-49",
+        "artifacts/dual-game-sim-20260912/gz-owned/Assets/tpp/level_asset/chara/player/TppPlayerPadConfig.lua:186-212",
+        "artifacts/dual-game-sim-20260912/gz-owned/Assets/tpp/level_asset/chara/player/TppPlayerPadConfig.lua:217-226",
+        "artifacts/fox-unpack/data1_dat/Tpp/Scripts/Classes/TppPadOperatorUtility.lua:1-4"
+      ]
+    },
+    "vr_transport_boundary": {
+      "detail": "The VR native-button table maps right_grip to the Xbox right-shoulder bit 0x0200 in native-button mode. The gameplay foot route binds right_grip to gameplay.ready_weapon and disables gameplay.native_right_shoulder. This identifies the mod's effective input routes, not the TPP action assigned to that Xbox bit.",
+      "source_refs": ["src/controls.cpp:55-85", "src/controls.cpp:71-73"]
+    }
+  },
+  "effective_default_routes": [
+    { "action": "gameplay.ready_weapon", "control": "right_grip", "context": "foot|horse|commands", "evidence": "VR default binding; not a native ready/aim state readback" },
+    { "action": "gameplay.fire_or_cqc", "control": "right_trigger", "context": "foot|horse|commands", "evidence": "VR default binding; action depends on game state/target" },
+    { "action": "gameplay.reload", "control": "tap(left_grip + b,300)", "context": "foot", "evidence": "VR default binding; reload completion/ammo change is not asserted by this route" },
+    { "action": "gameplay.switch_weapon", "control": "press(right_grip + right_stick_click)", "context": "foot", "evidence": "VR default binding; selected native slot is not currently observed" },
+    { "action": "gameplay.equip_binoculars", "control": "hold(left_grip + y,300)", "context": "foot", "evidence": "VR default binding" },
+    { "action": "binoculars.stow", "control": "press(b)", "context": "optic", "evidence": "VR default binding" },
+    { "action": "equipment.open", "control": "left_trigger", "context": "foot|wrist|commands|optic|horse", "evidence": "VR default binding" },
+    { "action": "equipment.primary|secondary|support|items", "control": "right_stick_up|down|right|left", "context": "wrist", "evidence": "VR default binding; selection outcome needs native inventory/UI evidence" },
+    { "action": "horse.gallop|interact|stance|reload", "control": "x|y|a|b", "context": "horse", "evidence": "VR default bindings; exact TPP mount state is not currently in observer" },
+    { "action": "vehicle.accelerate|brake_reverse|interact|weapon_or_call", "control": "right_trigger|left_trigger|y|x", "context": "vehicle", "evidence": "VR default bindings; exact TPP vehicle state is not currently in observer" },
+    { "action": "native.right_shoulder", "control": "right_grip; XInput mask 0x0200", "context": "native button mode", "evidence": "VR input mapping only; installed TPP preset/action mapping remains unknown" }
+  ],
+  "runtime_binding_policy": "The route rows above are source defaults. Before using a route in a scenario, resolve its action ID against that run's effective binding export so user overrides or disabled routes are respected; see docs/NATIVE_CONTEXT_COVERAGE.json:12 and docs/NATIVE_CONTEXT_COVERAGE.md:7.",
+  "read_only_native_fields": [
+    {
+      "group": "status",
+      "expression": "PlayerInfo.AndCheckStatus{PlayerStatus.<name>} or PlayerInfo.OrCheckStatus{PlayerStatus.<name>}",
+      "safe": true,
+      "existing_observer_fields": ["status_STAND", "status_SQUAT", "status_CRAWL", "status_CARRY", "status_NORMAL_ACTION", "status_PARTS_ACTIVE", "status_BINOCLE"],
+      "notes": "Use a single status value per field. STAND/SQUAT/CRAWL and CARRY are used by owned retail Lua. BINOCLE is queried by the current observer. NORMAL_ACTION and PARTS_ACTIVE are broad statuses, not precise aim/CQC/cover states.",
+      "source_refs": ["tools/scenario-state.lua:33-56", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:783-787", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:936-939"]
+    },
+    {
+      "group": "inventory_ids",
+      "expression": "vars.weapons[TppDefine.WEAPONSLOT.<slot>], vars.supportWeapons[0..7], vars.items[0..7]",
+      "safe": true,
+      "existing_observer_fields": ["weapon_PRIMARY_HIP", "weapon_PRIMARY_BACK", "weapon_SECONDARY", "support_weapon_0..7", "item_0..7"],
+      "notes": "Reports equipped inventory IDs only. These arrays do not identify which weapon/item is currently selected or held. Do not report empty slots as usable equipment.",
+      "source_refs": ["artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppDefine.lua:74", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:432-445", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:463-467", "tools/scenario-state.lua:63-90"]
+    },
+    {
+      "group": "ammo_snapshot",
+      "expression": "vars.ammoInWeapons, vars.ammoSubInWeapons, vars.ammoStockIds, vars.ammoStockCounts",
+      "safe": true,
+      "status": "three core-slot arrays are now queried by WEAPONSLOT ID; selected-slot association remains unavailable",
+      "notes": "Could support before/after ammo deltas after indices are validated. A delta alone does not prove a reload animation or successful fire action.",
+      "source_refs": ["artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:512-519", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:423-426"]
+    },
+    {
+      "group": "vehicle_classification",
+      "expression": "vars.playerVehicleGameObjectId with Tpp.IsHorse(...), Tpp.IsVehicle(...), Tpp.IsHelicopter(...)",
+      "safe": true,
+      "status": "source-backed classifier fields are emitted; known-fixture behavior has not been sampled",
+      "notes": "Owned TPP scripts classify this variable as horse/helicopter/vehicle in mission and tutorial logic. It classifies the referenced vehicle object; it is not a camera-derived posture guess. Verify null-ID behavior before making false/true an acceptance predicate.",
+      "source_refs": ["artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/Tpp.lua:304-307", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppTutorial.lua:147-149", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:767-769", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppMission.lua:1884-1885"]
+    },
+    {
+      "group": "helicopter_passenger",
+      "expression": "TppHelicopter.IsInHelicopter(GameObject.GetGameObjectIdByIndex('TppPlayer2', PlayerInfo.GetLocalPlayerIndex()))",
+      "safe": true,
+      "status": "source-backed guarded read-only field is emitted; preserves an unavailable result if the passenger table is not initialized",
+      "notes": "The helper accepts a name or object ID and checks the support-helicopter passenger table. Preserve nil as unavailable; do not equate an absent/stale table with false.",
+      "source_refs": ["artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppHelicopter.lua:94-124", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:807-808"]
+    },
+    {
+      "group": "control_device",
+      "expression": "Pad.GetDeviceType()",
+      "safe": true,
+      "status": "device family only; no active control preset/button map readback found",
+      "source_refs": ["artifacts/dual-game-sim-20260912/gz-owned/Assets/tpp/level_asset/chara/player/TppPlayerPadConfig.lua:186-197"]
+    },
+    {
+      "group": "disable_action_flag",
+      "expression": "vars.playerDisableActionFlag and PlayerDisableAction.SUBJECTIVE_CAMERA",
+      "safe": true,
+      "status": "raw value and constant are emitted; do not assume the flag is an aim/subject state or bitmask",
+      "source_refs": ["tools/scenario-state.lua:136-148", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:26", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:662-682", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:762"]
+    }
+  ],
+  "state_coverage": [
+    { "family": "posture", "state_ids": ["PlayerStatus.STAND", "PlayerStatus.SQUAT", "PlayerStatus.CRAWL"], "observer": "direct fields exist", "evidence_level": "native status readback", "limit": "No transition is counted until before/after samples differ as expected.", "source_ref": "tools/scenario-state.lua:38-50" },
+    { "family": "carry", "state_ids": ["PlayerStatus.CARRY"], "observer": "direct field exists", "evidence_level": "native status readback", "limit": "Does not identify the carried actor or whether a safe drop/restore point exists.", "source_ref": "tools/scenario-state.lua:38-50" },
+    { "family": "binocular_mode", "state_ids": ["PlayerStatus.BINOCLE"], "observer": "direct field exists", "evidence_level": "native status readback", "limit": "A right-shoulder XInput packet is not proof of binocular mode; TPP's active button preset/action route is unknown.", "source_ref": "tools/scenario-state.lua:52-56" },
+    { "family": "weapon_inventory", "state_ids": ["vars.weapons[0..2]", "vars.supportWeapons[0..7]", "vars.items[0..7]"], "observer": "named fields query all 19 positions; per-entry availability is explicit", "evidence_level": "native inventory readback", "limit": "Inventory presence does not prove selection, readiness, aim, fire, or reload.", "source_refs": ["tools/scenario-state.lua:68-97", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppDebug.lua:306-310"] },
+    { "family": "weapon_selection", "state_ids": ["selected_weapon_slot", "item_cursor_candidate"], "observer": "selected_weapon_slot is explicitly unavailable; item_cursor_candidate is emitted but not semantically validated", "evidence_level": "unsupported for weapon; candidate for item", "limit": "Retail scripts expose Player.SetCurrentSlot and set currentItemIndex to 0 during mission setup, but no read-only current weapon slot getter was found in the inspected Lua. The candidate cursor must not be treated as a selected item until validated.", "source_refs": ["tools/scenario-state.lua:123-134", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:936", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:1077-1085"] },
+    { "family": "weapon_ready_or_aim", "state_ids": [], "observer": "no validated native aim/ready state field; raw playerDisableActionFlag is emitted as separate metadata; no PlayerStatus.SUBJECT use was found in inspected TPP Lua", "evidence_level": "unsupported", "limit": "gameplay.ready_weapon and controller aim are mod-side inputs/state, not proof that retail Snake is aiming or in a chosen optic mode. SUBJECTIVE_CAMERA is a PlayerDisableAction flag used to disable camera behavior, not an observed aim-state result.", "source_refs": ["src/controls.cpp:74-85", "tools/scenario-state.lua:138-148", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:662-682", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:762"] },
+    { "family": "fire_or_reload", "state_ids": ["ammo_in_weapon_*", "ammo_sub_in_weapon_*", "OnAmmoLessInMagazine", "OnAmmoStackEmpty", "PlayerHoldWeapon"], "observer": "per-slot magazine/sub-ammo counters are emitted for three core weapon slots; no action result field", "evidence_level": "partial and unvalidated", "limit": "Retail tutorial message handlers are events, not a persistent action outcome. Ammo deltas can be attributed only after selected-slot semantics are known; reload/fire may consume scarce ammunition.", "source_refs": ["tools/scenario-state.lua:98-119", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppTutorial.lua:24", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppTutorial.lua:182-211", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:512-519"] },
+    { "family": "cqc", "state_ids": [], "observer": "no validated CQC mode field", "evidence_level": "unsupported", "limit": "The effective VR trigger route is fire_or_cqc; that route cannot distinguish a shot from CQC outcome. GZ's configurable CQC assignment is not TPP mapping evidence.", "source_refs": ["src/controls.cpp:81-85", "artifacts/dual-game-sim-20260912/gz-owned/Assets/tpp/level_asset/chara/player/TppPlayerPadConfig.lua:217-226"] },
+    { "family": "cover_or_stealth", "state_ids": [], "observer": "no validated cover/lean field", "evidence_level": "unsupported", "limit": "Do not infer cover from camera pose, posture, or NORMAL_ACTION.", "source_ref": "tools/scenario-state.lua:33-38" },
+    { "family": "horse_ride", "state_ids": ["vars.playerVehicleGameObjectId", "Tpp.IsHorse"], "observer": "classifier fields emitted; known-fixture behavior not yet sampled", "evidence_level": "inferred until live field sampling", "limit": "A horse action context is not proof Snake is mounted.", "source_refs": ["tools/scenario-state.lua:151-158", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:767-769", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppMission.lua:1884-1885", "src/controls.cpp:108-109"] },
+    { "family": "ground_vehicle_ride", "state_ids": ["vars.playerVehicleGameObjectId", "Tpp.IsVehicle", "TppPlayerUtility.IsRidingVehicle"], "observer": "classifier fields emitted; known-fixture behavior not yet sampled", "evidence_level": "inferred until live field sampling", "limit": "Stryker-specific distinction is supported by the GZ-owned pad config only; don't promote it to current TPP acceptance.", "source_refs": ["tools/scenario-state.lua:151-158", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppTutorial.lua:255-256", "artifacts/dual-game-sim-20260912/gz-owned/Assets/tpp/level_asset/chara/player/TppPlayerPadConfig.lua:163-177", "src/controls.cpp:110-114"] },
+    { "family": "helicopter_ride", "state_ids": ["vars.playerVehicleGameObjectId", "Tpp.IsHelicopter", "TppHelicopter.IsInHelicopter"], "observer": "vehicle-type and support-helicopter passenger fields emitted; known-fixture behavior not yet sampled", "evidence_level": "inferred until live field sampling", "limit": "The passenger-table field is unavailable before initialization and covers the support-helicopter passenger table, not every airborne/mission camera state.", "source_refs": ["tools/scenario-state.lua:151-173", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppTutorial.lua:147-149", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppHelicopter.lua:94-124"] },
+    { "family": "item_selection_or_use", "state_ids": ["item_0..7", "item_cursor_candidate"], "observer": "inventory IDs emitted; cursor candidate emitted but semantics not validated", "evidence_level": "unsupported for current selection", "limit": "TppPlayer sets currentItemIndex to 0 during mission-start setup; that is not evidence it remains the live selected item index.", "source_refs": ["tools/scenario-state.lua:88-130", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:463-467", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua:1077-1085"] }
+  ],
+  "candidate_reversible_exercises": [
+    {
+      "id": "posture-roundtrip",
+      "setup": "Stable on-foot, non-demo, stationary mission state; record the initial posture.",
+      "exercise": "Visit STAND, SQUAT, CRAWL, then return to the initial posture using the configured gameplay bindings.",
+      "pass_rule": "Each requested PlayerStatus field changes to true with the others consistent, then the initial field returns true.",
+      "restore": "Return to recorded initial posture and verify it in native status samples.",
+      "risk": "Low when stationary; do not count a button press alone."
+    },
+    {
+      "id": "binocular-enter-stow",
+      "setup": "Stationary on-foot state with no open menu; record status_BINOCLE=false.",
+      "exercise": "Use the currently exported gameplay.equip_binoculars route; then use binoculars.stow.",
+      "pass_rule": "status_BINOCLE becomes true after entry and false after stow; report controller/preset metadata separately.",
+      "restore": "Stow binoculars and verify status_BINOCLE=false.",
+      "risk": "Low; the existing native-right-shoulder assay did not establish the TPP shoulder mapping."
+    },
+    {
+      "id": "loadout-inventory-snapshot",
+      "setup": "Read-only scenario-state poll before any control action.",
+      "exercise": "Enumerate the 3 weapon, 8 support-weapon, and 8 item ID positions and preserve null/empty values.",
+      "pass_rule": "All 19 positions parse as IDs or empty/unavailable without writing game state.",
+      "restore": "Not applicable; read-only.",
+      "risk": "None; counts inventory slots, not usable action coverage."
+    },
+    {
+      "id": "ride-mode-snapshot",
+      "setup": "Only when the game is already in a known safe mounted/ride state; do not initiate movement.",
+      "exercise": "Read vars.playerVehicleGameObjectId and the Tpp.IsHorse/IsVehicle/IsHelicopter classifiers; preserve query errors/null distinctly.",
+      "pass_rule": "Classifier agrees with an independently known fixture state and remains stable across two bounded read-only samples.",
+      "restore": "No state change.",
+      "risk": "None from the query; candidate classification is unverified until a live fixture."
+    }
+  ],
+  "observed_assay": {
+    "artifact": "artifacts/bot-20260926/live-binocle-assay-02/result.json",
+    "result": "The native-right-shoulder-binocle case failed its state deadline. Parent reports XInput right-shoulder mask 0x0200 was consumed for 1.4 seconds while 120 live status_BINOCLE samples stayed false.",
+    "interpretation": "Input delivery did not produce the observed native BINOCLE state in that run. This does not identify whether the cause is the TPP button preset, route/context, in-game eligibility, or another precondition; it is not evidence that 0x0200 is the correct TPP action mapping.",
+    "do_not_count_as": ["successful binocular entry", "proof of installed TPP right-shoulder assignment", "proof that every binocular entry path is broken"]
+  },
+  "known_unsupported_gaps": [
+    "Readback of the active TPP controller preset and per-action button map.",
+    "Current selected weapon slot and current selected item slot.",
+    "Retail aim/ready-to-fire state or PlayerStatus.SUBJECT readback, reload completion, fire result, CQC phase, and cover/lean state.",
+    "Known-fixture live validation of the source-backed vehicle/horse/helicopter classification fields now emitted by tools/scenario-state.lua.",
+    "Successful representative action coverage across the 11 equipment taxonomy groups."
+  ]
+}

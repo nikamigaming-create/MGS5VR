@@ -1,5 +1,12 @@
 # Final combined showcase
 
+September 26 continuation: the requested deliverable now includes a sustained,
+state-aware gameplay bot, complete contextual controls coverage, and synchronized
+controller close-ups/callouts with short video pop-ups. Use the
+[integrated bot and showcase specification](BOT_AND_SHOWCASE_PLAN.md) within the
+[community recovery plan](COMMUNITY_RECOVERY_PLAN.md). The material below remains
+the visual direction and historical capture record; it is not a completion claim.
+
 User direction, updated 12 September 2026: exercise the weapons and gadgets in
 both games, then complete the combined showcase. Ground Zeroes' tracked
 first-person camera and rig come last. Its current native third-person stereo
@@ -10,6 +17,16 @@ Use the visual language of our instructions: warm off-white, charcoal, restraine
 red rules, strong condensed headings, generous readable caption spacing. Use
 Snake's likeness in chapter/title overlays, with enough contrast that text never
 competes with his face or the gameplay. Native gameplay and audio stay primary.
+
+September 26 controller direction: use Quest 3 Touch Plus controllers. The
+generic procedural controller was rejected. Use the official model and actual
+button geometry for the animated controller inset, with ImageGen artwork as a
+material/lighting reference only. Show the full handle and relevant button/grip,
+then a thin leader and readable action label. The inset floats over dominant
+gameplay without covering the action. Hand orientation examples must match the
+lesson; an illustrative product orbit is not a measured runtime pose. The first
+lesson teaches left Grip + Y to equip binoculars; that take does not demonstrate
+raising them to the eye, zooming, or marking.
 
 Alternate matched-action TPP/GZ side-by-side sequences with deliberate wipes into
 full-screen TPP or full-screen GZ. Show both games actually doing the actions;

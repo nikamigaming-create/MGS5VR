@@ -1,0 +1,23 @@
+{
+  "left_menu": {
+    "gltf_world_position": [
+      -0.014128323644399643,
+      0.009486102499067783,
+      -0.017004631459712982
+    ],
+    "gltf_world_normal": [
+      -0.048996005207300186,
+      0.8012218475341797,
+      -0.5963581204414368
+    ],
+    "model_sha256": "41a35b80221398d37029cbfaa9e39084ccd43e0206be72a5e8460f52e7882cb4",
+    "atlas_image_sha256": "a1f4131402fee5228bceb254cf44b667eadb7b361f521aa77e47207595a15cd1",
+    "atlas_coordinate": [
+      0.374,
+      0.389
+    ],
+    "mesh": "controller_mesh",
+    "triangle": 2855,
+    "provenance": "Ray intersection of the visually verified Menu center in the pinned 1000x1000 atlas; Blender Z-up converted to glTF Y-up."
+  }
+}

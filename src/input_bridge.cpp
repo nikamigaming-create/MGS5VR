@@ -139,7 +139,8 @@ BinocularInput BinocularHold::update(bool available,bool pressed,uint64_t time){
     }
     return {selected_,time<nativeUntil_};
 }
-OpticsInput RigOptics::update(GamepadSample raw,bool available,bool held,bool /*atEye*/){
+OpticsInput RigOptics::update(GamepadSample raw,bool available,bool held,bool atEye){
+    (void)atEye;
     constexpr uint16_t click=0x0080,x=0x4000,menus=0x0030;
     if(!available){
         const bool wasActive=active_||releaseRequired_;

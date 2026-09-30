@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "description": "Declared held-Back escape; this does not pass or complete the native tutorial.",
+  "cases": [
+    {
+      "id": "idroid-held-back-escape",
+      "before": {
+        "idroid": true
+      },
+      "setup": [
+        {
+          "op": "pose",
+          "hand": "left",
+          "position": [
+            -0.02,
+            -0.3,
+            -0.38
+          ],
+          "orientation": [
+            -0.70710678,
+            0.70710678,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0,
+            -0.08,
+            -0.3
+          ],
+          "orientation": [
+            0,
+            0,
+            0,
+            1
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "seconds": 1.7
+        }
+      ],
+      "after": {
+        "scene": "gameplay",
+        "idroid": false
+      }
+    }
+  ]
+}

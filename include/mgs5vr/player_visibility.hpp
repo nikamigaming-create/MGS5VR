@@ -8,6 +8,13 @@ namespace mgs5vr {
 constexpr bool hidePlayerInFirstPerson(bool immersiveActive,bool scriptedDemo) noexcept {
     return immersiveActive&&!scriptedDemo;
 }
+// A short camera-publication gap is only permission to restore concealed
+// groups when current presentation policy also says concealment is no longer
+// wanted. An active stereo menu retains first-person concealment through Pause.
+constexpr bool shouldRestoreStalePlayerVisibility(uint64_t elapsedMs,bool immersiveActive,
+                                                   bool scriptedPresentation,bool stereoMenuOpen) noexcept {
+    return elapsedMs>=250&&(!immersiveActive||(scriptedPresentation&&!stereoMenuOpen));
+}
 void initializePlayerVisibility(uintptr_t moduleBase) noexcept;
 // Called on the native player camera publication thread, after the player has
 // updated its appearance. Only verified models owned by this player are changed.

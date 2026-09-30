@@ -5,8 +5,15 @@
 **The Phantom Pain in native stereo VR.** Tracked hands and weapons, physical
 binoculars and scopes, and equipment on your left wrist.
 
+**Current development status:** Coco's adaptations, physical binocular lesson
+integration and native A* navigation are retained. Full-game, weapon coverage,
+iDroid tutorial recovery and physical-headset acceptance remain open. Native
+handheld iDroid alignment passes scoped simulator checks. Local testing uses one
+fixed `play/` folder refreshed by `tools/build.ps1`.
+[Current build workflow, remaining reports and next tests](docs/CURRENT.md).
+
 **[Download the public build](https://github.com/nikamigaming-create/MGS5VR/releases)**
-· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-09-20.md)
+· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-09-30.md)
 · [Live native actions](docs/NATIVE_ACTIONS.md)
 
 Experimental Windows mod. Requires your own **TPP 1.0.15.4** and a PC-connected
@@ -23,8 +30,12 @@ other headsets are unverified. This is not a standalone Quest app.
    **Action Type** controls. `Launch-Headset.cmd` also launches the saved selection.
 4. Load **Continue → Resume Game**. Tracked VR enters automatically.
 
-The native C++ launcher has game selection, recoverable updates, a controls editor,
-and the illustrated field guide. No Electron, browser runtime, or launcher account.
+The field terminal has interactive 3D training cassettes, clean gameplay beside
+rotating controllers, a guide to all eight control modes, and a binding editor.
+Lessons resolve your current saved mapping; changing a binding does not change
+the recording. VR tuning uses sliders, switches and dropdowns. The embedded UI
+uses the installed Edge WebView2 runtime and requires no launcher account.
+`MGS5VR-Launcher.exe --classic` retains the original Win32 maintenance tools.
 [Launcher details](docs/LAUNCHER.md)
 
 Setup imports binocular assets from your own game. Game archives and saves stay
@@ -37,7 +48,7 @@ silently overwritten.
 ![Illustrated current default Touch controls](docs/images/controls-quick.svg)
 
 These are the defaults. Your **mgs5vr-controls.ini beside the game executable**
-is authoritative. Choose **Edit Controls** in the launcher, or **Edit-Controls.cmd**
+is authoritative. Choose **Controller lab** in the launcher, or **Edit-Controls.cmd**
 in older packages. The editor checks conflicts before saving and keeps a backup.
 
 Save, release all buttons/grips/triggers, and center both sticks for two seconds:
@@ -90,6 +101,7 @@ TPP is the priority. Missing captions and other HUD elements, blue enemy-outline
 tails, lens-flare alignment, some interactions, and complete weapon/gadget coverage
 are still being worked through. [Tester feedback](docs/QUEST3_TESTER_FEEDBACK.md)
 · [Current status](docs/STATUS.md) · [Latest rendering work](docs/RENDER_FIX_NOTES.md)
+· [Community recovery plan](docs/COMMUNITY_RECOVERY_PLAN.md)
 
 **Ground Zeroes 1.0.0.5 is not a finished first-person VR port.** Its independent
 native stereo experiment runs in SIM; tracked player anchoring, arms, wrist HUD,

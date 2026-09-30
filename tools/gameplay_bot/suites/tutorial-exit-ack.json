@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "description": "Root-reviewed visible Tutorials / Exit Tutorial / Suspending the tutorial for now / A Close acknowledgment. This is a suspension acknowledgment, never tutorial completion. Require that visible screen before use.",
+  "cases": [{
+    "id": "tutorial-exit-acknowledgment",
+    "before": {"scene": "menu", "idroid": false},
+    "steps": [{"op": "action", "name": "menus.confirm", "state_before": {"scene": "menu", "idroid": false}, "native_before": {"mission": 30010, "sequence": "Seq_Game_FreePlay", "title": false}}],
+    "after": {"scene": "gameplay", "idroid": false},
+    "timeout": 3
+  }]
+}

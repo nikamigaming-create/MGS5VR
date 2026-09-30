@@ -3,9 +3,11 @@
 #include <atomic>
 
 namespace mgs5vr {
-namespace {std::atomic_uint64_t idroidCloseRequestedAt{};std::atomic_bool handheldMenus{};}
+namespace {std::atomic_uint64_t idroidCloseRequestedAt{};std::atomic_bool handheldMenus{},handheldInputReady{};}
 void setHandheldMenus(bool enabled) noexcept {handheldMenus.store(enabled);}
 bool handheldMenusSelected() noexcept {return handheldMenus.load();}
+void setHandheldMenuInputReady(bool ready) noexcept {handheldInputReady.store(ready);}
+bool handheldMenuInputReady() noexcept {return handheldInputReady.load();}
 void requestNativeIdroidClose(bool requested) noexcept {
     idroidCloseRequestedAt.store(requested?steadyMilliseconds():0);
 }
@@ -28,6 +30,17 @@ GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool conf
     if(confirm)result.buttons=0x1000;
     return result;
 }
+NativeMenuInput nativeSceneInputMode(bool menuOpen,bool scriptedDemo,bool interactiveLook,
+    bool sceneFallback,bool handheldIdroid) noexcept {
+    if(menuOpen)return handheldIdroid?NativeMenuInput::liveIdroid:NativeMenuInput::menu;
+    if(scriptedDemo)return interactiveLook?NativeMenuInput::cinematicLook:NativeMenuInput::cinematic;
+    return sceneFallback?NativeMenuInput::scriptedScene:NativeMenuInput::menu;
+}
+void constrainCinematicInput(GamepadSample& sample,NativeMenuInput mode) noexcept {
+    if(mode!=NativeMenuInput::cinematic&&mode!=NativeMenuInput::cinematicLook)return;
+    sample.leftX=sample.leftY=0;sample.leftTrigger=sample.rightTrigger=0;
+    if(mode==NativeMenuInput::cinematic)sample.rightX=sample.rightY=0;
+}
 GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalControls& physical,NativeMenuInput mode){
     GamepadSample pad;
     struct Button {std::string_view name;uint16_t mask;};
@@ -36,16 +49,14 @@ GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalCo
         {"menus.previous_tab",0x100},{"menus.next_tab",0x200},{"menus.left_click",0x40},{"menus.right_click",0x80},
         {"menus.dpad_up",1},{"menus.dpad_down",2},{"menus.dpad_left",4},{"menus.dpad_right",8}};
     for(const auto& [name,mask]:buttons)if(bindings.active(name))pad.buttons|=mask;
-    if(mode!=NativeMenuInput::cinematic){
-        pad.leftTrigger=static_cast<uint8_t>(bindings.value("menus.left_trigger")*255);
-        pad.rightTrigger=static_cast<uint8_t>(bindings.value("menus.right_trigger")*255);
-    }
-    if(mode!=NativeMenuInput::cinematic){
-        const auto move=bindings.axis(mode==NativeMenuInput::menu?"axes.menu":"axes.move",physical);
-        const auto look=bindings.axis(mode==NativeMenuInput::scriptedScene?"axes.native_look":"axes.map",physical);
-        pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
-        pad.rightX=static_cast<int16_t>(look[0]*32767);pad.rightY=static_cast<int16_t>(look[1]*32767);
-    }
+    pad.leftTrigger=static_cast<uint8_t>(bindings.value("menus.left_trigger")*255);
+    pad.rightTrigger=static_cast<uint8_t>(bindings.value("menus.right_trigger")*255);
+    const bool menu=mode==NativeMenuInput::menu||mode==NativeMenuInput::liveIdroid;
+    const auto move=bindings.axis(menu?"axes.menu":"axes.move",physical);
+    const auto look=bindings.axis(mode==NativeMenuInput::scriptedScene||mode==NativeMenuInput::cinematicLook?"axes.native_look":"axes.map",physical);
+    pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
+    pad.rightX=static_cast<int16_t>(look[0]*32767);pad.rightY=static_cast<int16_t>(look[1]*32767);
+    constrainCinematicInput(pad,mode);
     return pad;
 }
 NativeControlSample NativeControls::update(const ControlBindings& bindings,const PhysicalControls& physical,bool screenMode){

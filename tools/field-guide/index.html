@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>MGS5VR Field Guide</title>
+  <link rel="stylesheet" href="guide.css">
+</head>
+<body>
+  <header class="masthead">
+    <a class="wordmark" href="#" aria-label="MGS5VR field guide home">
+      <span class="mark">M5</span><span>MGS5VR <b>FIELD GUIDE</b></span>
+    </a>
+    <div class="masthead-meta"><span class="live-dot"></span> LOCAL FIELD GUIDE <i></i> COVERAGE IN PROGRESS</div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">FIELD MANUAL / CONTROLS / 26·09</p>
+        <h1>Controls for<br><em>the field.</em></h1>
+        <p class="hero-lede">Choose what Snake is doing. See the inputs mapped for it, the action expected in the game, and any run or video notes available.</p>
+        <p class="hero-note">35 situations catalogued. Coverage is in progress; bindings and observations vary by situation.</p>
+      </div>
+      <div class="hero-index" aria-label="35 situations catalogued, coverage in progress">
+        <span class="index-kicker">SITUATIONS CATALOGUED</span>
+        <strong id="obligation-count">35</strong>
+        <span>SITUATIONS<br><b>10 FIELD MODES</b></span>
+        <div class="red-rule"></div>
+        <small>COVERAGE IN PROGRESS.<br>CHECK THE NOTES FOR EACH SITUATION.</small>
+      </div>
+    </section>
+
+    <section class="evidence-key" aria-label="Evidence key">
+      <div><span class="key-line key-config"></span><b>BINDING LISTED</b><span>shown in the selected controls file</span></div>
+      <div><span class="key-line key-native"></span><b>OBSERVED IN SIMULATOR</b><span>a recorded game outcome is available</span></div>
+      <div><span class="key-line key-visual"></span><b>VIDEO / STILL</b><span>availability and capture limits are stated</span></div>
+    </section>
+
+    <section class="workspace">
+      <aside class="rail">
+        <div class="rail-heading">CHOOSE A SITUATION <span>01 — 10</span></div>
+        <div id="mode-list" class="mode-list" role="list"></div>
+        <label class="search-label" for="search">SEARCH ACTION OR INPUT</label>
+        <div class="search-box"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="e.g. crouch, zoom, HOLD MENU…" autocomplete="off"></div>
+        <label class="search-label" for="game-filter">GAME</label>
+        <select id="game-filter" class="select-control">
+          <option value="all">TPP + GZ</option>
+          <option value="TPP">TPP only</option>
+          <option value="GZ">GZ only</option>
+        </select>
+        <label class="check-row"><input id="observed-filter" type="checkbox"><span>Observed in simulator</span></label>
+        <div class="rail-foot">
+          <span class="small-cap">FIELD REFERENCES</span>
+          <a href="../../docs/NATIVE_CONTEXT_COVERAGE.md">Context inventory ↗</a>
+          <a href="../../docs/CONTROLS.md">Controls reference ↗</a>
+          <a href="action-coverage-catalog.json">19-slot / 13-family TPP catalog ↗</a>
+          <a href="provenance.json">Build & source details ↗</a>
+          <p>Routes use the controls file named below. Detailed source notes and limits sit with each situation.</p>
+          <p class="config-source">CONTROLS FILE <b id="controls-source">—</b></p>
+          <details class="catalog-note">
+            <summary>About the separate TPP equipment catalog</summary>
+            <p id="catalog-summary"></p>
+          </details>
+        </div>
+      </aside>
+
+      <section class="record-column" aria-label="Field situations">
+        <div class="column-top">
+        <div><p class="eyebrow">FIELD INDEX</p><h2 id="list-heading">All situations</h2></div>
+          <span id="result-count" class="count-stamp">35 SITUATIONS</span>
+        </div>
+        <div id="record-list" class="record-list"></div>
+        <div id="empty-state" class="empty-state" hidden>No records match these filters.</div>
+      </section>
+
+      <article id="detail" class="detail" aria-live="polite"></article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>MGS5VR / FIELD GUIDE</span>
+    <span>Mapped controls, simulator notes, and video details are identified separately.</span>
+    <span id="build-stamp"></span>
+  </footer>
+
+  <div id="video-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="video-title">
+    <div class="modal-scrim" data-close-video></div>
+    <div class="modal-panel">
+      <div class="modal-head">
+        <div><p class="eyebrow">FIELD CLIP / DIAGNOSTIC</p><h2 id="video-title">Crouch transition</h2></div>
+        <button id="video-close" class="icon-button" type="button" data-close-video aria-label="Close video">×</button>
+      </div>
+      <div id="video-warning" class="video-warning"></div>
+      <video id="evidence-video" controls playsinline preload="metadata"></video>
+      <p id="video-caption" class="video-caption"></p>
+    </div>
+  </div>
+
+  <script src="guide-data.js"></script>
+  <script src="guide.js"></script>
+</body>
+</html>

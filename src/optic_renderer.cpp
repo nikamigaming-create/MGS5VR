@@ -1196,16 +1196,25 @@ void drawOpeningLabels(ID3D11DeviceContext* context,ID3D11RenderTargetView* targ
         // wrap the three long names so the 5x7 glyphs remain readable at the
         // eye-capture resolution. This is text on the physical prop, not a
         // replacement instruction card or a black backdrop.
-        std::array<std::string_view,2> lines{{label,{}}};
-        if(label=="DOWNLOAD MGSV: GZ SAVE DATA")lines={{"DOWNLOAD MGSV: GZ","SAVE DATA"}};
-        else if(label=="METAL GEAR ONLINE")lines={{"METAL GEAR","ONLINE"}};
-        else if(label=="DELETE SAVE DATA")lines={{"DELETE SAVE","DATA"}};
-        const float pixel=lines[1].empty() ? .0023f : .0019f;
+        std::array<std::string_view,3> lines{{label,{},{}}};
+        if(label=="DOWNLOAD MGSV: GZ SAVE DATA")lines={{"DOWNLOAD","MGSV: GZ","SAVE DATA"}};
+        else if(label=="METAL GEAR ONLINE")lines={{"METAL GEAR","ONLINE",{}}};
+        else if(label=="DELETE SAVE DATA")lines={{"DELETE","SAVE DATA",{}}};
+        size_t columns{};
+        for(const auto line:lines)columns=std::max(columns,line.size());
+        // Bound the glyphs by this cassette's physical column. A fixed NDC
+        // font made long captions collide when the rack was farther away.
+        const auto edge0=transformPoint(matrixProduct(worlds[i],vp),{-.055f,-.040f,0});
+        const auto edge1=transformPoint(matrixProduct(worlds[i],vp),{ .055f,-.040f,0});
+        if(edge0.w<=.01f||edge1.w<=.01f||!columns)continue;
+        const float columnWidth=std::abs(edge1.x/edge1.w-edge0.x/edge0.w);
+        const float pixel=std::min(.0023f,columnWidth/static_cast<float>(columns*6-1));
+        if(!std::isfinite(pixel)||pixel<=0)continue;
         const auto lineWidth=[&](std::string_view line){
             return line.empty()?0.f:static_cast<float>(line.size()*6-1)*pixel;
         };
-        const float width=std::max(lineWidth(lines[0]),lineWidth(lines[1]));
-        const float left=x-width*.5f,top=y+.018f;
+        const float width=static_cast<float>(columns*6-1)*pixel;
+        const float left=x-width*.5f,top=y+8*pixel;
         const auto color=selection==static_cast<int>(i-1)?amber:white;
         for(size_t lineIndex=0;lineIndex<lines.size();++lineIndex){
             const auto current=lines[lineIndex];
@@ -1222,9 +1231,10 @@ void drawOpeningLabels(ID3D11DeviceContext* context,ID3D11RenderTargetView* targ
                     }
             }
         }
-        if(selection==static_cast<int>(i-1))
-            quad(left,top-static_cast<float>(lines[1].empty()?8:16)*pixel,
-                left+width,top-static_cast<float>(lines[1].empty()?10:18)*pixel,amber);
+        if(selection==static_cast<int>(i-1)){
+            const float rows=lines[1].empty()?8.f:lines[2].empty()?16.f:24.f;
+            quad(left,top-rows*pixel,left+width,top-(rows+2)*pixel,amber);
+        }
     }
     if(vertices.empty())return;
     ID3D11ShaderResourceView* none=nullptr;context->PSSetShaderResources(0,1,&none);

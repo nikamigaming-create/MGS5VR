@@ -1,11 +1,13 @@
 #include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/ui_renderer.hpp"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
 #include <algorithm>
 #include <atomic>
+#include <mutex>
 
 namespace {
 uintptr_t base{};
@@ -14,14 +16,18 @@ GroupFn hideVisibleGroup{},showVisibleGroup{};
 using FadeUpdate=void(*)(void*);
 FadeUpdate originalFade{};
 std::atomic_uintptr_t fadeOwner{};
+std::mutex hiddenMutex;
+std::atomic_uint64_t lastFirstPersonUpdateMs{};
 constexpr uint32_t headName=0xa9e88501,bodyName=0x1a166b34,armName=0x4e74fd8c;
 template<class T> bool read(uintptr_t address,T& value){
     SIZE_T copied{};
     return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&value,sizeof(value),&copied)&&copied==sizeof(value);
 }
 template<class T> T get(uintptr_t address){T value{};read(address,value);return value;}
+void restoreStaleVisibilityIfAllowed() noexcept;
 void fadeUpdate(void* object){
     originalFade(object);
+    restoreStaleVisibilityIfAllowed();
     if(!mgs5vr::headCamera().active())return;
     const auto owner=fadeOwner.load();
     if(get<uintptr_t>(owner)!=base+0x23b8218)return;
@@ -125,6 +131,24 @@ void restore(Binding& b){
     }
     b={};
 }
+void restoreStaleVisibilityIfAllowed() noexcept {
+    const auto now=GetTickCount64();
+    const auto observedLast=lastFirstPersonUpdateMs.load();
+    if(!observedLast||now<observedLast||now-observedLast<250)return;
+    std::unique_lock lock(hiddenMutex,std::try_to_lock);
+    if(!lock.owns_lock())return;
+    const auto last=lastFirstPersonUpdateMs.load();
+    if(!last||now<last||now-last<250)return;
+    const auto elapsed=now-last;
+    const auto status=mgs5vr::headCamera().status();
+    const bool immersive=status.active||status.pending;
+    const bool stereoMenuOpen=immersive&&(status.nativeMenuOpen||status.nativeIdroidOpen);
+    if(!mgs5vr::shouldRestoreStalePlayerVisibility(elapsed,immersive,
+                                                   mgs5vr::nativeScriptedDemoActive(),stereoMenuOpen))return;
+    bool restored=false;
+    for(auto& binding:hidden)if(binding.model){restore(binding);restored=true;}
+    if(restored)mgs5vr::log("Restored owned first-person visibility after stale publication and confirmed presentation transition");
+}
 void conceal(Binding candidate){
     if(!hideVisibleGroup||!owned(candidate))return;
     auto slot=std::find_if(hidden.begin(),hidden.end(),[&](const auto& b){return b.model==candidate.model&&b.owner==candidate.owner;});
@@ -157,6 +181,7 @@ namespace mgs5vr {
 MenuCapturePlayerExclusion::MenuCapturePlayerExclusion(uintptr_t owner,bool preserveArms) noexcept
     :preserveArms_(preserveArms){
     if(!base||!hideVisibleGroup||!showVisibleGroup||get<uintptr_t>(owner)!=base+0x23b8218)return;
+    std::lock_guard lock(hiddenMutex);
     const auto character=get<uintptr_t>(owner+0x370);
     if(get<uintptr_t>(character)!=base+0x2295210)return;
     const auto component=get<uintptr_t>(character+0x10),parts=get<uintptr_t>(component+0x10);
@@ -174,6 +199,7 @@ MenuCapturePlayerExclusion::MenuCapturePlayerExclusion(uintptr_t owner,bool pres
     }
 }
 MenuCapturePlayerExclusion::~MenuCapturePlayerExclusion(){
+    std::lock_guard lock(hiddenMutex);
     const Binding candidate{owner_,character_,parts_,0,0,model_,true};
     if(!model_||!showVisibleGroup||!owned(candidate))return;
     std::array<bool,128> bodyConceal{};
@@ -206,6 +232,8 @@ void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
 void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms) noexcept {
     if(!base)return;
     fadeOwner.store(firstPerson&&!hideArms?owner:0);
+    std::lock_guard lock(hiddenMutex);
+    lastFirstPersonUpdateMs.store(firstPerson?GetTickCount64():0);
     for(auto& b:hidden)if(b.model&&(!firstPerson||b.owner!=owner||!owned(b)||(b.body&&b.hideArms!=hideArms)))restore(b);
     if(!firstPerson||get<uintptr_t>(owner)!=base+0x23b8218)return;
     const auto character=get<uintptr_t>(owner+0x370);

@@ -3,6 +3,23 @@
 #include <cmath>
 
 namespace mgs5vr {
+std::optional<float> fittedScreenWidth(float requested,float distance,float aspect,
+    const std::array<EyeFov,2>& fovs,float eyeRadius){
+    if(!std::isfinite(requested)||!std::isfinite(distance)||!std::isfinite(aspect)
+       ||!std::isfinite(eyeRadius)||requested<=0||distance<=0||aspect<=0
+       ||eyeRadius<0||eyeRadius>=distance)return {};
+    float width=requested;
+    for(const auto& f:fovs){
+        if(!valid(f)||f.left>=0||f.right<=0||f.down>=0||f.up<=0)return {};
+        const float horizontal=std::min(-std::tan(f.left),std::tan(f.right));
+        const float vertical=std::min(-std::tan(f.down),std::tan(f.up));
+        const float depth=distance-eyeRadius;
+        width=std::min({width,1.8f*(depth*horizontal-eyeRadius),
+            1.8f*(depth*vertical-eyeRadius)*aspect});
+    }
+    if(!std::isfinite(width)||width<=0)return {};
+    return width;
+}
 float trackedNearPlane(float nativeNear,float nativeFar){
     if(!std::isfinite(nativeNear)||!std::isfinite(nativeFar)||nativeNear<=0||nativeFar<=nativeNear)return nativeNear;
     return std::min(nativeNear,.02f);
@@ -46,16 +63,16 @@ std::optional<NativeProjectionScales> nativeProjectionScales(float focal,float a
     return result;
 }
 std::array<float,16> nativeUiCanvasProjection(const std::array<float,16>& uiProjection,
-    const std::array<float,16>& authoredProjection,const std::array<float,16>& eyeProjection) noexcept{
+    const std::array<float,16>& eyeProjection) noexcept{
     auto result=uiProjection;
-    const auto aspect=[](const auto& p){return -p[5]/p[0];};
-    if(authoredProjection[0]>=-.00001f||eyeProjection[0]>=-.00001f
-       ||authoredProjection[5]<=.00001f||eyeProjection[5]<=.00001f)return result;
-    const float correction=aspect(authoredProjection)/aspect(eyeProjection);
+    if(eyeProjection[0]>=-.00001f||eyeProjection[5]<=.00001f)return result;
+    constexpr float canvasAspect=128.f/72.f;
+    const float correction=canvasAspect/(-eyeProjection[5]/eyeProjection[0]);
     if(!std::isfinite(correction)||correction<=0)return result;
     // Native layout cameras inherit the scene viewport's aspect scalar.
-    // Replaying a wide eye changes that scalar, shrinking native HUD Y and
-    // moving its bottom-right anchor off the wrist even with correct bones.
+    // The authored canvas stays 128 x 72 even when the source render target
+    // is nearly square. Restoring the source camera's aspect would leave its
+    // bottom-right HUD anchor displaced from the physical forearm.
     for(const size_t index:{1u,5u,9u,13u})result[index]*=correction;
     return result;
 }
@@ -168,6 +185,26 @@ bool readyEyePair(const std::array<EyeFrame,2>& eyes,uint64_t activation,uint64_
             ||e.magnification<1||e.magnification>4||now<e.sampleTime||now-e.sampleTime>maximumAgeMs)return false;
     }
     return true;
+}
+bool AcceptedStereoFrame::accept(const std::array<EyeFrame,2>& eyes,uint64_t epoch,uint64_t activation,uint64_t now,uint64_t referenceEpoch){
+    if(!epoch||!readyEyePair(eyes,activation,now))return false;
+    eyes_=eyes;epoch_=epoch;referenceEpoch_=referenceEpoch;transitionAt_=0;transitionStarted_=false;return true;
+}
+bool AcceptedStereoFrame::presentable(uint64_t epoch,uint64_t activation,uint64_t now) const {
+    // Only accept() can populate this immutable pair. Do not re-admit old
+    // consumer metadata or replace its poses with the latest tracked poses.
+    return epoch_&&epoch_==epoch&&activation&&eyes_[0].activation==activation
+        &&eyes_[1].activation==activation&&now>=eyes_[0].sampleTime&&now>=eyes_[1].sampleTime;
+}
+bool AcceptedStereoFrame::transitionPresentable(uint64_t epoch,uint64_t activation,uint64_t authorizedActivation,
+    uint64_t referenceEpoch,uint64_t now){
+    if(!referenceEpoch||referenceEpoch!=referenceEpoch_||!authorizedActivation||activation!=authorizedActivation
+        ||activation<=eyes_[0].activation||!presentable(epoch,eyes_[0].activation,now))return false;
+    // Start at the handoff, not at image capture: FOX waits 500 ms before
+    // adopting a retired shot camera. Repeated calls or further activation
+    // changes cannot extend this deadline without admitting a new image.
+    if(!transitionStarted_){transitionStarted_=true;transitionAt_=now;}
+    return now>=transitionAt_&&now-transitionAt_<=250;
 }
 Pose nativeTrackedPose(Pose nativeHead,Pose sourceHead,Pose trackedPose,float units){
     auto relative=compose(inverse(sourceHead),trackedPose);relative.position=relative.position*units;

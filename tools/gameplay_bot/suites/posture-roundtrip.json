@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "description": "Native PlayerInfo outcome predicates, not camera-height guesses. Headset comfort/visual review separate.",
+  "cases": [
+    {"id":"standing-to-crouched", "before":{"scene":"gameplay","native.status_STAND":true}, "steps":[{"op":"action","name":"gameplay.stance","seconds":0.15}], "after":{"native.status_SQUAT":true}},
+    {"id":"crouched-to-prone", "before":{"scene":"gameplay","native.status_SQUAT":true}, "steps":[{"op":"action","name":"gameplay.stance","seconds":0.8}], "during":{"native.status_CRAWL":true}, "after":{"native.status_CRAWL":true}},
+    {"id":"prone-to-crouched", "before":{"scene":"gameplay","native.status_CRAWL":true}, "steps":[{"op":"action","name":"gameplay.stance","seconds":0.15}], "after":{"native.status_SQUAT":true}},
+    {"id":"crouched-to-standing", "before":{"scene":"gameplay","native.status_SQUAT":true}, "steps":[{"op":"action","name":"gameplay.stance","seconds":0.15}], "after":{"native.status_STAND":true}}
+  ]
+}

@@ -1,4 +1,4 @@
-param([string]$Path, [switch]$ValidateOnly, [string]$PreviewPath)
+param([string]$Path, [switch]$ValidateOnly, [string]$PreviewPath, [switch]$LifecycleTest)
 $ErrorActionPreference='Stop'
 $mgsRoot=Split-Path -Parent $PSScriptRoot
 $mgsChecker=Join-Path $mgsRoot 'mgs5vr_controls.exe'
@@ -27,7 +27,7 @@ foreach ($mgsHeight in @(105,0,145,42)) {
 }
 $mgsHelp=[Windows.Forms.Label]::new()
 $mgsHelp.Dock='Fill'; $mgsHelp.Padding=[Windows.Forms.Padding]::new(12)
-$mgsHelp.Text="Choose the controls file beside the GAME's dinput8.dll. Errors appear here while you edit; invalid changes cannot be saved.`r`nPlain button = native hold. press(a) = one press. tap(b,300) / hold(b,300) share the SAME threshold.`r`nLonger chords consume simpler actions in the same mode. Missing keys keep defaults: explicitly disable actions you replace.`r`nThis is an external editor. Save, then release every button/grip/trigger and center both sticks: changes apply LIVE."
+$mgsHelp.Text="Choose the controls file beside the GAME's dinput8.dll. Errors appear here while you edit; invalid changes cannot be saved.`r`nPlain button = native hold. press(a) = one press. tap(b,300) / hold(b,300) share the SAME threshold.`r`nLonger chords consume simpler actions in the same mode. Missing keys keep defaults: explicitly disable actions you replace.`r`nTouch inputs: a_touch/b_touch/x_touch/y_touch, left/right_stick_touch, left/right_trigger_touch and left/right_thumbrest. Available profile sensors only.`r`nThis is an external editor. Save, then release bound touches and every button/grip/trigger and center both sticks: changes apply LIVE."
 $mgsText=[Windows.Forms.TextBox]::new()
 $mgsText.Multiline=$true; $mgsText.AcceptsTab=$true; $mgsText.AcceptsReturn=$true
 $mgsText.WordWrap=$false; $mgsText.ScrollBars='Both'; $mgsText.Dock='Fill'
@@ -64,11 +64,23 @@ function Test-MgsDraft {
             $mgsOut=$mgsOutputTask.Result; $mgsError=$mgsErrorTask.Result
             $mgsValid=$mgsProcess.ExitCode -eq 0
         } finally { $mgsProcess.Dispose() }
-        $mgsErrors.Text=if ($mgsValid) { 'VALID - save, then release all controls for about two seconds. Current builds apply changes without restarting.' } else { $mgsError+$mgsOut }
-        $mgsErrors.ForeColor=if ($mgsValid) { [Drawing.Color]::DarkGreen } else { [Drawing.Color]::DarkRed }
-        $mgsSave.Enabled=$mgsValid -and [bool]$script:mgsLoadedPath
+        if ($mgsValid) {
+            $mgsErrors.Text='VALID - save, then release all controls for about two seconds. Current builds apply changes without restarting.'
+            $mgsErrors.ForeColor=[Drawing.Color]::DarkGreen
+        } else {
+            $mgsDetails=($mgsError+$mgsOut).Trim()
+            if (!$mgsDetails) { $mgsDetails='The controls checker rejected this draft without a diagnostic.' }
+            $mgsErrors.Text="INVALID - changes are not saved.`r`n$mgsDetails`r`nCorrect the reported binding, then wait for validation or choose Check now. Save activates only when the checker reports VALID."
+            $mgsErrors.ForeColor=[Drawing.Color]::DarkRed
+        }
+        $mgsSave.Enabled=$mgsValid -and [bool]$script:mgsLoadedPath -and $script:mgsDirty
         return $mgsValid
-    } catch { $mgsErrors.Text=$_.Exception.Message; return $false }
+    } catch {
+        $mgsSave.Enabled=$false
+        $mgsErrors.ForeColor=[Drawing.Color]::DarkRed
+        $mgsErrors.Text='CHECKER ERROR - no changes were saved.'+"`r`n"+$_.Exception.Message+"`r`nFix the problem and wait for validation or choose Check now."
+        return $false
+    }
     finally { if (Test-Path -LiteralPath $mgsTemporary) { Remove-Item -LiteralPath $mgsTemporary } }
 }
 function Open-MgsConfig([string]$MgsSelectedPath) {
@@ -79,7 +91,13 @@ function Open-MgsConfig([string]$MgsSelectedPath) {
     $mgsWindow.Text='MGS5VR Controls - '+$script:mgsLoadedPath
     [void](Test-MgsDraft)
 }
-$mgsText.Add_TextChanged({ $script:mgsDirty=$true; $mgsSave.Enabled=$false; $mgsTimer.Stop(); $mgsTimer.Start() })
+$mgsText.Add_TextChanged({
+    $script:mgsDirty=$true
+    $mgsSave.Enabled=$false
+    $mgsErrors.ForeColor=[Drawing.Color]::DarkGoldenrod
+    $mgsErrors.Text='CHECKING - your edit is not saved yet. Validation runs 600 ms after the last change; choose Check now to run it sooner.'
+    $mgsTimer.Stop(); $mgsTimer.Start()
+})
 $mgsTimer.Add_Tick({ [void](Test-MgsDraft) })
 $mgsCheck.Add_Click({ [void](Test-MgsDraft) })
 $mgsOpen.Add_Click({
@@ -92,7 +110,7 @@ $mgsOpen.Add_Click({
     finally { $mgsDialog.Dispose() }
 })
 $mgsSave.Add_Click({
-    if (!(Test-MgsDraft)) { return }
+    if (!$script:mgsDirty -or !(Test-MgsDraft)) { return }
     try {
         if ([IO.File]::ReadAllText($script:mgsLoadedPath) -cne $script:mgsLoadedText) { throw 'The file changed outside this editor. Reopen it before saving; your external changes were preserved.' }
         $mgsSuffix=[Guid]::NewGuid().ToString('N')
@@ -103,14 +121,27 @@ $mgsSave.Add_Click({
             [IO.File]::Replace($mgsPending,$script:mgsLoadedPath,$mgsBackup)
         } finally { if (Test-Path -LiteralPath $mgsPending) { Remove-Item -LiteralPath $mgsPending } }
         $script:mgsLoadedText=$mgsText.Text; $script:mgsDirty=$false
+        $mgsSave.Enabled=$false
+        $mgsErrors.ForeColor=[Drawing.Color]::DarkGreen
         $mgsErrors.Text="SAVED - release all buttons, grips and triggers; center both sticks for two seconds to apply LIVE. Older builds need a restart.`r`nPrevious layout preserved: $mgsBackup"
-    } catch { $mgsErrors.Text=$_.Exception.Message }
+    } catch {
+        $mgsSave.Enabled=$false
+        $mgsErrors.ForeColor=[Drawing.Color]::DarkRed
+        $mgsErrors.Text='SAVE FAILED - your current file was preserved.'+"`r`n"+$_.Exception.Message
+    }
 })
 $mgsWindow.Add_FormClosing({ param($mgsSender,$mgsEvent)
     if ($script:mgsDirty -and [Windows.Forms.MessageBox]::Show('Discard unsaved edits?','MGS5VR','YesNo') -ne 'Yes') { $mgsEvent.Cancel=$true }
 })
 try {
-    if ($Path) { Open-MgsConfig $Path } else { $mgsErrors.Text='Open your game controls file to begin. Nothing is changed until you save.' }
+    if ($LifecycleTest) {
+        # Test-only hidden hook. Dot-source the fixed test driver in this scope
+        # so it exercises the handlers registered above; never show the form.
+        $mgsLifecycleDriver=Join-Path $mgsRoot 'tests\edit_controls_lifecycle_tests.ps1'
+        . $mgsLifecycleDriver -EditorDriver
+        return
+    }
+    if ($Path) { Open-MgsConfig $Path } else { $mgsErrors.ForeColor=[Drawing.Color]::DimGray; $mgsErrors.Text='Open your game controls file to begin. Nothing is changed until you save.' }
     if ($PreviewPath) {
         # Render this editor's own controls, never a desktop screenshot. Keep
         # the native surface invisible while WinForms initializes child handles.

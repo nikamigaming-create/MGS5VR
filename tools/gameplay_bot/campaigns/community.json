@@ -1,0 +1,636 @@
+{
+  "schema": 1,
+  "description": "All community reports and contextual routes. Only explicit executable suites dispatch inputs. Missing adapters stay in the denominator.",
+  "suites": [
+    {
+      "id": "field-roundtrips",
+      "suite": "tools/gameplay_bot/suites/field-context-roundtrip.json",
+      "coverage_refs": [
+        "TPP.EQUIPMENT.PICKER_NAVIGATION",
+        "TPP.BUDDY.COMMANDS_ON_FOOT",
+        "TPP.OPTICS.BINOCULAR_MARKING",
+        "TPP.MENU.PAUSE_OPTIONS",
+        "HISTORY.EQUIPMENT",
+        "HISTORY.BUDDY_COMMANDS",
+        "HISTORY.BINOCULARS"
+      ]
+    },
+    {
+      "id": "posture-standing",
+      "suite": "tools/gameplay_bot/suites/posture-roundtrip.json",
+      "coverage_refs": [
+        "TPP.FOOT.POSTURE_LOCOMOTION",
+        "HISTORY.LOCOMOTION"
+      ]
+    },
+    {
+      "id": "posture-crouched",
+      "suite": "tools/gameplay_bot/suites/posture-crouched-roundtrip.json",
+      "coverage_refs": [
+        "TPP.FOOT.POSTURE_LOCOMOTION",
+        "HISTORY.LOCOMOTION"
+      ]
+    },
+    {
+      "id": "idroid-roundtrip",
+      "suite": "tools/gameplay_bot/suites/menu-roundtrip.json",
+      "coverage_refs": [
+        "TPP.MENU.IDROID_MAP_TABS",
+        "TPP.MENU.IDROID_TUTORIAL_ACK_ESCAPE",
+        "HISTORY.IDROID",
+        "R19"
+      ]
+    },
+    {
+      "id": "idroid-palm-motion",
+      "procedure": "idroid-palm-motion",
+      "before": {
+        "idroid": true,
+        "idroid_menu_input_ready": true
+      },
+      "required_settings": {
+        "settings.handheld_menus": 1
+      },
+      "coverage_refs": [
+        "R18",
+        "R19",
+        "HISTORY.IDROID",
+        "TPP.MENU.IDROID_MAP_TABS"
+      ]
+    },
+    {
+      "id": "report-R01",
+      "coverage_refs": [
+        "R01"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: First-shot pin removed; current authored camera, head motion, cuts, Pause and return-to-player regressions pass. Complete multi-shot sequences and comfort still need runtime review."
+    },
+    {
+      "id": "report-R02",
+      "coverage_refs": [
+        "R02"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Native script requires OnBinocularsMode/BINOCLE, which the custom VR optic does not establish. Implement the native state bridge, then complete on first playthrough without Skip or progression edits."
+    },
+    {
+      "id": "report-R03",
+      "coverage_refs": [
+        "R03"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Capture before/after voice/script trigger and checkpoint reload; native controls and correct player camera survive."
+    },
+    {
+      "id": "report-R04",
+      "coverage_refs": [
+        "R04"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Open menu now takes input precedence over cinematic stick/trigger suppression. Both-eye menu visibility, return and allowed skip through cuts remain runtime acceptance cases."
+    },
+    {
+      "id": "report-R05",
+      "coverage_refs": [
+        "R05"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Prior fixes and contributor claims are partial evidence. Separate hand occlusion, HMD loss, focus/session loss and missing stereo publication."
+    },
+    {
+      "id": "report-R06",
+      "coverage_refs": [
+        "R06"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Change options/resolution and resume without losing chosen presentation or camera owner."
+    },
+    {
+      "id": "report-R07",
+      "coverage_refs": [
+        "R07"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Native placement authority unverified. Physical/stick turn, recenter, tank placement, crouch/prone: preview and placed object agree."
+    },
+    {
+      "id": "report-R08",
+      "coverage_refs": [
+        "R08"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Distinguish input rejection from native obstruction. Clear muzzle fires without stance reset; genuinely obstructed muzzle still blocks."
+    },
+    {
+      "id": "report-R09",
+      "coverage_refs": [
+        "R09"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Compare native root, displayed pelvis/torso and HMD across repeated transitions and a sustained session."
+    },
+    {
+      "id": "report-R10",
+      "coverage_refs": [
+        "R10"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: One fade hook exists. Identify first missing stage; verify both-eye visibility on slopes, walls and affected costume."
+    },
+    {
+      "id": "report-R11",
+      "coverage_refs": [
+        "R11"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Current compact support logic is insufficient evidence. Sweep roll/close contacts, reload, release, reacquire and change weapons."
+    },
+    {
+      "id": "report-R12",
+      "coverage_refs": [
+        "R12"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Measure shoulder/wrist/reach across users and costumes. No universal shoulder-offset fix is established."
+    },
+    {
+      "id": "report-R13",
+      "coverage_refs": [
+        "R13"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Height setting exists and one user likes +20 cm. Check calibration, walk/run, stance/mount response and no accumulated offset."
+    },
+    {
+      "id": "report-R14",
+      "coverage_refs": [
+        "R14"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Aim correction exists. Verify controller/grip/aim, hand contact, sights and shot remain coherent; retain personal fit."
+    },
+    {
+      "id": "report-R15",
+      "coverage_refs": [
+        "R15"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: New settings helped. Test physical tracking-safe distances, threshold hysteresis, smoothing/latency, both eyes, scopes and surrounding geometry."
+    },
+    {
+      "id": "report-R16",
+      "coverage_refs": [
+        "R16"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Cause unknown: trace physical/chord/context/equipment events before attributing to optics distance."
+    },
+    {
+      "id": "report-R17",
+      "coverage_refs": [
+        "R17"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Default quad helps some reports. Pause for >5 s; close/reopen; separately test opt-in handheld behavior and tracking."
+    },
+    {
+      "id": "report-R18",
+      "coverage_refs": [
+        "R18"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Partial tuning exists. Compare native canvas at 16:9, 16:10, ultrawide and non-16:9 custom render sizes; pan/zoom/tabs/clipping."
+    },
+    {
+      "id": "report-R20",
+      "coverage_refs": [
+        "R20"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Pending/invalid/error feedback repaired; hidden real-handler test passes valid save, rejected edit, correction, backups and external-edit preservation. Original attempted edit/checker identity still unknown."
+    },
+    {
+      "id": "report-R21",
+      "coverage_refs": [
+        "R21"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Source plumbing now exposes separate left/right Touch-profile thumb-rest tokens through runtime sampling, parsing and binding export. Physical headset/profile acceptance remains open."
+    },
+    {
+      "id": "report-R22",
+      "coverage_refs": [
+        "R22"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Inventory effective actions by context/profile; test transitions, holds/chords, remapped controls and neutral live reload."
+    },
+    {
+      "id": "report-R23",
+      "coverage_refs": [
+        "R23"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Identify native action and provide usable conflict-free route with visible native state change."
+    },
+    {
+      "id": "report-R24",
+      "coverage_refs": [
+        "R24"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Instructions conflict across layouts. Test the active config's native hold/context actions and visible prompts; verify interrogation intel."
+    },
+    {
+      "id": "report-R25",
+      "coverage_refs": [
+        "R25"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Mode-dependent visibility is intentional in source. Test mark/unmark and stow in each mode; trace any loss inconsistent with policy."
+    },
+    {
+      "id": "report-R26",
+      "coverage_refs": [
+        "R26"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Separate scale defect from R25. Bound apparent size near/far, world/binocular views and crowded scenes."
+    },
+    {
+      "id": "report-R27",
+      "coverage_refs": [
+        "R27"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Preserve useful aim feedback per action. Turning off all native reticles is not an acceptable workaround for placement."
+    },
+    {
+      "id": "report-R28",
+      "coverage_refs": [
+        "R28"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Catalog missing native layers individually; prove each relevant pickup/message/loadout event in both eyes."
+    },
+    {
+      "id": "report-R29",
+      "coverage_refs": [
+        "R29"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Separate native analysis/progression availability from suppressed UI and from ordinary marking."
+    },
+    {
+      "id": "report-R30",
+      "coverage_refs": [
+        "R30"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Hide only the offending first-person mesh where appropriate; retain NVG effect and equipment state."
+    },
+    {
+      "id": "report-R31",
+      "coverage_refs": [
+        "R31"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Choose vehicle-specific view/mesh treatment; test entry, motion, aiming, firing and exit without a global height hack."
+    },
+    {
+      "id": "report-R32",
+      "coverage_refs": [
+        "R32"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Verify native targeting/range axes and reticle, with visible impact at intended target."
+    },
+    {
+      "id": "report-R33",
+      "coverage_refs": [
+        "R33"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Both aim axes, firing, usable view and reticle, then exit."
+    },
+    {
+      "id": "report-R34",
+      "coverage_refs": [
+        "R34"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Verify native access/context action, traverse, elevation, fire and return."
+    },
+    {
+      "id": "report-R35",
+      "coverage_refs": [
+        "R35"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Test this vehicle separately from ordinary tank/Jeep steering, including range and rocket impact."
+    },
+    {
+      "id": "report-R36",
+      "coverage_refs": [
+        "R36"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Newer cabin/iDroid feedback is positive. Preserve cold launch, physical Continue, Resume and cabin controls without hidden menu movement."
+    },
+    {
+      "id": "report-R37",
+      "coverage_refs": [
+        "R37"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Declare native mounted steering policy; no forced HMD turn or inherited on-foot snap offset on entry/exit."
+    },
+    {
+      "id": "report-R38",
+      "coverage_refs": [
+        "R38"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Trace native aim/menu flags and owner; gamepad-only aiming/firing keeps live head tracking and intended display."
+    },
+    {
+      "id": "report-R39",
+      "coverage_refs": [
+        "R39"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Provide centered native optic presentation when pad owns input; no requirement for tracked controllers."
+    },
+    {
+      "id": "report-R40",
+      "coverage_refs": [
+        "R40"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Match runtime/resolution/refresh/route; measure fresh submitted frames and latency. Prior config/SIM results do not establish headset performance."
+    },
+    {
+      "id": "report-R41",
+      "coverage_refs": [
+        "R41"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Matched left/right motion capture; isolate culling/projection from resolution and frame cadence."
+    },
+    {
+      "id": "report-R42",
+      "coverage_refs": [
+        "R42"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Separate layers with same-frame stereo/projection evidence; do not group all artifacts as a pacing bug."
+    },
+    {
+      "id": "report-R43",
+      "coverage_refs": [
+        "R43"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Versioned loader strategy and reversible install tests; preserve foreign loader. No claim of general mod compatibility."
+    },
+    {
+      "id": "report-R44",
+      "coverage_refs": [
+        "R44"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Show active game/config/build; complete-package install/update/rollback preserve personal settings, saves and unrelated files."
+    },
+    {
+      "id": "report-R45",
+      "coverage_refs": [
+        "R45"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Separate versioned combinations; do not infer support from one user's successful mod."
+    },
+    {
+      "id": "report-R46",
+      "coverage_refs": [
+        "R46"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Existing settings/source, not a missing implementation claim. Verify native smooth vs snap, angle, neutral latch and leaned pivot."
+    },
+    {
+      "id": "report-R47",
+      "coverage_refs": [
+        "R47"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Explicit opt-in stance policy after height/native posture work; no double crouch or broken prone roll."
+    },
+    {
+      "id": "report-R48",
+      "coverage_refs": [
+        "R48"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Deliberate gesture with hysteresis and no accidental equipment switch; R30 is a separate defect."
+    },
+    {
+      "id": "report-R49",
+      "coverage_refs": [
+        "R49"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Native stance-derived, readable, consistent through scripted/mounted states."
+    },
+    {
+      "id": "report-R50",
+      "coverage_refs": [
+        "R50"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Separate scope from loader coexistence and core VR recovery; preserve progression semantics."
+    },
+    {
+      "id": "report-R51",
+      "coverage_refs": [
+        "R51"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Mirrored grip/weapon/interaction ownership and complete controls; not merely swapped button labels."
+    },
+    {
+      "id": "report-R52",
+      "coverage_refs": [
+        "R52"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Separate camera/player/rig/HUD adapters and game-specific acceptance; TPP success does not close it."
+    },
+    {
+      "id": "report-R53",
+      "coverage_refs": [
+        "R53"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: Separate native interaction/compatibility work. Retain existing working buddy behavior during regression checks."
+    },
+    {
+      "id": "report-R54",
+      "coverage_refs": [
+        "R54"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: External editor already exists; an in-game editor needs safe input ownership, schema, persistence and readable UI."
+    },
+    {
+      "id": "report-R55",
+      "coverage_refs": [
+        "R55"
+      ],
+      "blocked_reason": "No complete executable acceptance scenario for this report yet. Required: R07/R09 action-heading correctness comes first. Broader body-following needs native collision-aware movement, independent looking, stance/mount rules and observed arrival."
+    },
+    {
+      "id": "context-TPP.TITLE.CABIN_CONTINUE",
+      "coverage_refs": [
+        "TPP.TITLE.CABIN_CONTINUE"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Title helicopter cabin, Continue cassette/rack focus, physical interaction, title exit and saved-game handoff."
+    },
+    {
+      "id": "context-TPP.DEPLOYMENT.LOADOUT_AND_SORTIE",
+      "coverage_refs": [
+        "TPP.DEPLOYMENT.LOADOUT_AND_SORTIE"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Mission selection, deployment/loadout, sortie preparation, launch and return-to-ACC transitions."
+    },
+    {
+      "id": "context-TPP.HELICOPTER.PASSENGER_TRANSPORT",
+      "coverage_refs": [
+        "TPP.HELICOPTER.PASSENGER_TRANSPORT"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Snake boards support helicopter, rides/transports, lands or exits, and returns control to field play."
+    },
+    {
+      "id": "context-TPP.MENU.RADIO_CASSETTE",
+      "coverage_refs": [
+        "TPP.MENU.RADIO_CASSETTE"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Radio/cassette playback and native text/voice overlays while field gameplay continues or pauses."
+    },
+    {
+      "id": "context-TPP.FOOT.WEAPON_READY_FIRE_RELOAD",
+      "coverage_refs": [
+        "TPP.FOOT.WEAPON_READY_FIRE_RELOAD"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. On-foot weapon ready/stow, aim, fire, scope zoom, reload, switch and weapon-specific attachments across eligible IDs."
+    },
+    {
+      "id": "context-TPP.FOOT.HIDE_COVER",
+      "coverage_refs": [
+        "TPP.FOOT.HIDE_COVER"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Contextual cover/lean, cardboard box and toilet hiding, enter/leave and re-acquire field view."
+    },
+    {
+      "id": "context-TPP.FOOT.TRAVERSE",
+      "coverage_refs": [
+        "TPP.FOOT.TRAVERSE"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Native traversal interactions such as climb, ladder, vault, dive and local obstacle crossing."
+    },
+    {
+      "id": "context-TPP.FOOT.PICKUP_COLLECTION",
+      "coverage_refs": [
+        "TPP.FOOT.PICKUP_COLLECTION"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Context pickups including plants, diamonds, cassettes and dropped weapons; preserve item-specific native prompt and result."
+    },
+    {
+      "id": "context-TPP.FOOT.FULTON_RECOVERY",
+      "coverage_refs": [
+        "TPP.FOOT.FULTON_RECOVERY"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Fulton launch/recovery for each eligible restrained person, animal, vehicle or cargo class, including campaign restrictions."
+    },
+    {
+      "id": "context-TPP.FOOT.CQC_HOLDUP",
+      "coverage_refs": [
+        "TPP.FOOT.CQC_HOLDUP"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Contextual CQC attack/grab, hold-up, restraint and release/stun/death outcomes on eligible targets."
+    },
+    {
+      "id": "context-TPP.FOOT.INTERROGATION_CHOICES",
+      "coverage_refs": [
+        "TPP.FOOT.INTERROGATION_CHOICES"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Eligible restrained guard interrogation, dynamically available native responses/orders and resulting intel/map updates."
+    },
+    {
+      "id": "context-TPP.FOOT.CARRY_SETDOWN",
+      "coverage_refs": [
+        "TPP.FOOT.CARRY_SETDOWN"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Pick up/carry restrained people or objects, move while carrying, set down/release, and return to ordinary posture."
+    },
+    {
+      "id": "context-TPP.EQUIPMENT.ITEM_EFFECTS_BY_ID",
+      "coverage_refs": [
+        "TPP.EQUIPMENT.ITEM_EFFECTS_BY_ID"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Each owned, mission-eligible equipment ID/grade and its primary, secondary, support or item-specific effects/alternate controls."
+    },
+    {
+      "id": "context-TPP.OPTICS.FIREARM_SCOPES",
+      "coverage_refs": [
+        "TPP.OPTICS.FIREARM_SCOPES"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Weapon-authored scope/optic per weapon ID, eye relief, magnification inputs and restoration to ordinary aim."
+    },
+    {
+      "id": "context-TPP.HORSE.MOUNTED_RIDER",
+      "coverage_refs": [
+        "TPP.HORSE.MOUNTED_RIDER"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. D-Horse prompt/mount, rider locomotion/turn/speed, weapon/actions and dismount; mounted buddy Commands are a separate role."
+    },
+    {
+      "id": "context-TPP.HORSE.MOUNTED_COMMANDS",
+      "coverage_refs": [
+        "TPP.HORSE.MOUNTED_COMMANDS"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. D-Horse mounted Call/Commands choices, including command-specific hold modifiers, while preserving rider control."
+    },
+    {
+      "id": "context-TPP.VEHICLE.LIGHT_DRIVER",
+      "coverage_refs": [
+        "TPP.VEHICLE.LIGHT_DRIVER"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Driver seat in each tested light truck/jeep/ordinary wheeled vehicle subtype; each native subtype is an independent case."
+    },
+    {
+      "id": "context-TPP.VEHICLE.TANK_APC_DRIVER",
+      "coverage_refs": [
+        "TPP.VEHICLE.TANK_APC_DRIVER"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Driver/control station for each supported tracked tank and APC class, including distinct camera, movement and exit behavior."
+    },
+    {
+      "id": "context-TPP.VEHICLE.ZHUK_COMBAT_WEAPON",
+      "coverage_refs": [
+        "TPP.VEHICLE.ZHUK_COMBAT_WEAPON"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. ZHUK RS-ZO combat vehicle weapon station, aiming/elevation/range selection and rocket impact."
+    },
+    {
+      "id": "context-TPP.MOUNTED.MACHINE_GUN_TURRET",
+      "coverage_refs": [
+        "TPP.MOUNTED.MACHINE_GUN_TURRET"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Each native machine-gun turret emplacement: access, view, traverse/elevation, reticle, fire and exit."
+    },
+    {
+      "id": "context-TPP.MOUNTED.MORTAR",
+      "coverage_refs": [
+        "TPP.MOUNTED.MORTAR"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Each native mortar emplacement: access, reticle, range/aim, fire, impact and exit."
+    },
+    {
+      "id": "context-TPP.WALKER_GEAR.D_WALKER_PILOT",
+      "coverage_refs": [
+        "TPP.WALKER_GEAR.D_WALKER_PILOT"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. D-Walker/Walker Gear pilot state, movement, weapon/alternate modes, camera transition and exit."
+    },
+    {
+      "id": "context-TPP.CINEMATIC.MULTI_SHOT_NONINTERACTIVE",
+      "coverage_refs": [
+        "TPP.CINEMATIC.MULTI_SHOT_NONINTERACTIVE"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Noninteractive multi-shot cinematic, including camera cuts, full-body/avatar presentation, Pause policy and return to play."
+    },
+    {
+      "id": "context-TPP.CINEMATIC.INTERACTIVE_TUTORIAL_DEMO",
+      "coverage_refs": [
+        "TPP.CINEMATIC.INTERACTIVE_TUTORIAL_DEMO"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Interactive first-playthrough demo/tutorial that suspends for a required player input, including Mission 1 Ocelot binocular lesson."
+    },
+    {
+      "id": "context-TPP.CINEMATIC.SCRIPTED_GAMEPLAY_CAMERA_TRANSITION",
+      "coverage_refs": [
+        "TPP.CINEMATIC.SCRIPTED_GAMEPLAY_CAMERA_TRANSITION"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Scripted in-game camera/player transition, voice-triggered checkpoint, cut to/from gameplay and control restoration; Mission 6 bridge is a named independent case."
+    },
+    {
+      "id": "context-TPP.CINEMATIC.SKULL_FACE_JEEP_RIDE",
+      "coverage_refs": [
+        "TPP.CINEMATIC.SKULL_FACE_JEEP_RIDE"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Skull Face jeep ride sequence: seated/player body, cinematic camera changes, any prompted input and exit to gameplay."
+    },
+    {
+      "id": "context-TPP.CINEMATIC.MISSION_CLEAR_ABORT_RETRY",
+      "coverage_refs": [
+        "TPP.CINEMATIC.MISSION_CLEAR_ABORT_RETRY"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Mission clear/abort/death camera, result screens, retry/return and mounted/on-foot state restoration."
+    },
+    {
+      "id": "context-GZ.NATIVE_BUTTONS.MENUS_AND_GAMEPLAY",
+      "coverage_refs": [
+        "GZ.NATIVE_BUTTONS.MENUS_AND_GAMEPLAY"
+      ],
+      "blocked_reason": "Native setup/outcome adapter remains incomplete. Limited native XInput/button passthrough for GZ menus and gameplay; tracked first-person VR presentation remains a separate unsupported adapter obligation."
+    }
+  ]
+}

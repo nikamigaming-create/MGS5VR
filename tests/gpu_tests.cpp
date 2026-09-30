@@ -1,5 +1,6 @@
 #include "mgs5vr/mailbox.hpp"
 #include "mgs5vr/gpu_timing.hpp"
+#include "mgs5vr/eye_resampler.hpp"
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -110,6 +111,28 @@ int main(){try{
     require(pixel(reader,consumer.texture(),47,23,0)==std::array<unsigned char,4>{255,0,0,255},"left array slice retains its own rendered pixels");
     require(pixel(reader,consumer.texture(),47,23,1)==std::array<unsigned char,4>{0,255,0,255},"right array slice is not a duplicated left image");
     require(consumer.eyes()[0].sourceSequence==100&&consumer.eyes()[1].sourceSequence==100&&consumer.eyes()[1].eye==1,"both image metadata records share the atomic publication");
+    EyeResampler resampler;auto output=texture(reader,24,12);
+    resampler.copy(reader.context.Get(),consumer.texture(),0,output.Get());
+    require(pixel(reader,output.Get(),23,11)==std::array<unsigned char,4>{255,0,0,255},
+        "stable XR output retains the full left eye including its last row and column");
+    resampler.copy(reader.context.Get(),consumer.texture(),1,output.Get());
+    require(pixel(reader,output.Get(),0,0)==std::array<unsigned char,4>{0,255,0,255},
+        "resampling the right eye cannot copy the left slice");
+    const std::array<unsigned char,16> checker{0,0,0,255,255,255,255,255,255,255,255,255,0,0,0,255};
+    D3D11_TEXTURE2D_DESC checkerDesc{};checkerDesc.Width=checkerDesc.Height=2;
+    checkerDesc.ArraySize=checkerDesc.MipLevels=1;checkerDesc.Format=DXGI_FORMAT_R8G8B8A8_UNORM;checkerDesc.SampleDesc.Count=1;
+    D3D11_SUBRESOURCE_DATA checkerData{checker.data(),8,16};ComPtr<ID3D11Texture2D> checkerSource;
+    checkHr(reader.device->CreateTexture2D(&checkerDesc,&checkerData,&checkerSource),"Create high-resolution contrast fixture");
+    auto onePixel=texture(reader,1,1);resampler.copy(reader.context.Get(),checkerSource.Get(),0,onePixel.Get());
+    const auto filtered=pixel(reader,onePixel.Get(),0,0);
+    require(filtered[0]>=186&&filtered[0]<=190&&filtered[1]==filtered[0]&&filtered[2]==filtered[0]&&filtered[3]==255,
+        "supersampled text contrast filters in linear light and returns display-encoded pixels");
+    checkerDesc.Width=checkerDesc.Height=1;checkerDesc.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;checkerDesc.BindFlags=D3D11_BIND_RENDER_TARGET;
+    ComPtr<ID3D11Texture2D> srgbOutput;checkHr(reader.device->CreateTexture2D(&checkerDesc,nullptr,&srgbOutput),"Create runtime sRGB output fixture");
+    resampler.copy(reader.context.Get(),checkerSource.Get(),0,srgbOutput.Get());
+    require(pixel(reader,srgbOutput.Get(),0,0)==filtered,"typed sRGB and UNORM runtime outputs preserve the same display bytes");
+    bool badSlice=false;try{resampler.copy(reader.context.Get(),checkerSource.Get(),1,srgbOutput.Get());}catch(const std::invalid_argument&){badSlice=true;}
+    require(badSlice,"a missing eye slice is rejected instead of presenting a duplicated eye");
     eyes[1].sourceSequence=101;bool rejected=false;
     try{mailbox.publishStereo({left.Get(),right.Get()},producer.context.Get(),eyes);}catch(const std::invalid_argument&){rejected=true;}
     require(rejected,"GPU publisher rejects alternate simulation frames before touching shared images");

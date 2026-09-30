@@ -1,5 +1,10 @@
 # September 20 community test candidate
 
+Historical candidate instructions and evidence. For current implementation
+priorities and acceptance gates, use the
+[community recovery plan](COMMUNITY_RECOVERY_PLAN.md). Results below do not
+establish the identity or behavior of a tester's currently installed DLL.
+
 Extract the complete package and open **MGS5VR-Launcher.exe**. Select your owned
 `mgsvtpp.exe`, choose **Update / Keep My Settings** (or Install VR), connect PC VR
 and Launch with Steam signed in. This is a local test candidate; the previous

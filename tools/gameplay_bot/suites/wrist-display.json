@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "description": "Inspect the existing left-forearm weapon display and wrist popups with the forearm facing the wearer. Keep the right hand free. No Pause, weapon selection or save action.",
+  "required_settings": {"settings.handheld_menus": 1},
+  "cases": [
+    {
+      "id": "left-wrist-equipment-popup",
+      "before": {"scene": "gameplay", "controls.context": "gameplay"},
+      "setup": [{"op": "pose", "hand": "left", "position": [-0.08, -0.18, -0.40], "orientation": [0, 0.70710678, 0, 0.70710678]}],
+      "steps": [{"op": "action", "name": "equipment.open", "seconds": 0.8}],
+      "during": {"camera_active": true, "controls.context": "equipment"},
+      "after": {"scene": "gameplay", "controls.context": "gameplay"}
+    },
+    {
+      "id": "left-wrist-command-popup",
+      "before": {"scene": "gameplay", "controls.context": "gameplay"},
+      "steps": [{"op": "action", "name": "commands.keep_open", "seconds": 0.8}],
+      "during": {"camera_active": true, "controls.context": "commands"},
+      "after": {"scene": "gameplay", "controls.context": "gameplay"}
+    }
+  ]
+}

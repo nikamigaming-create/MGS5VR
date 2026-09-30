@@ -36,10 +36,10 @@ if ($RuntimeManifest) {
 } else {
     $mgsRuntimeSettings=Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Khronos\OpenXR\1' -ErrorAction SilentlyContinue
     $mgsRuntime=Read-MgsRuntime $mgsRuntimeSettings.ActiveRuntime
-    if ($mgsRuntime -and $mgsRuntime.Simulator) {
+    if (-not $mgsRuntime -or $mgsRuntime.Simulator) {
         $mgsRuntime=Read-MgsRuntime $mgsRuntimeSettings.PreviousActiveRuntime
         if ($mgsRuntime -and -not $mgsRuntime.Simulator -and -not $Probe) {
-            Write-Output 'Simulator is selected globally; using the recorded previous headset runtime for MGSV only.'
+            Write-Output 'Active OpenXR runtime is unavailable or selects a simulator; using the recorded previous headset runtime for MGSV only.'
         }
     }
 }

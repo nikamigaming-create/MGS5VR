@@ -55,6 +55,10 @@ inline constexpr Vec3 binocularOcularCenter{-.032788f,-.000562f,.05512f};
 inline constexpr Vec3 binocularObjectiveCenter{-.032788f,-.000562f,-.0505f};
 inline constexpr float binocularOcularRadius=.0175f;
 inline constexpr float binocularEyeRelief=.10f;
+// Collision clearance is independent of the optical reference distance.
+// Permit the pupil to grow naturally as it approaches the eye, while keeping
+// the housing in front of the tracked 2 cm render near plane.
+inline constexpr float binocularFaceClearance=.03f;
 // Controller alignment tolerance is separate from the visible glass radius.
 // The image still occupies only the retail aperture, in either eligible eye.
 inline constexpr float binocularEyeBoxRadius=.045f;

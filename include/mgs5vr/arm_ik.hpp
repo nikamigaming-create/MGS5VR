@@ -3,6 +3,35 @@
 #include <span>
 
 namespace mgs5vr {
+struct RigContinuityKey {
+    uintptr_t owner{},model{};
+    uint64_t activation{},epoch{};
+    bool operator==(const RigContinuityKey&) const=default;
+};
+// Coco's occlusion continuity, limited to presentation. Raw tracking still
+// owns firing, throws, melee, animal contact and controller interaction.
+class HandPresentationCache {
+public:
+    std::optional<Pose> update(Pose grip,bool tracked,uint64_t time,RigContinuityKey key);
+    void reset(){*this={};}
+private:
+    RigContinuityKey key_{};
+    Pose last_{},recoveryFrom_{};
+    uint64_t sampleAt_{},trackedAt_{},recoveryAt_{};
+    bool valid_{},tracked_{};
+};
+class StationaryBodyState {
+public:
+    bool update(bool eligible,Vec3 root,uint64_t time,RigContinuityKey key);
+    void reset(){*this={};}
+private:
+    RigContinuityKey key_{};
+    Vec3 root_{};
+    uint64_t time_{},stoppedAt_{};
+    bool valid_{},moved_{},active_{};
+};
+struct StationaryBodyPose {Vec3 pelvis,leftHip,rightHip,leftShoulder,rightShoulder;Pose chest;};
+std::optional<Pose> stationaryLowerBodyDelta(const StationaryBodyPose& body,Pose torsoDelta);
 struct ArmPose { Pose shoulder,elbow,wrist; };
 struct ArmSolution { ArmPose pose; bool reachClamped{}; };
 // A contact returned by native world collision, in the arm solve's space.
@@ -26,7 +55,7 @@ inline constexpr std::array<int32_t,14> armHelperParents{5,6,6,7,7,7,8,9,10,10,1
 std::optional<std::array<size_t,14>> armHelperIndices(std::span<const uint32_t> names,
     std::span<const int32_t> parents);
 // Landscape display: +X runs elbow to wrist; +Z is the back of the forearm.
-std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal);
+std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal,float surfaceLift=.02f);
 // Support remains in front of the primary controller's unmodified aim. The
 // guided weapon cannot keep a withdrawn hand attached by rotating after it.
 bool withinSupportCone(Vec3 handSeparation,Vec3 primaryForward);

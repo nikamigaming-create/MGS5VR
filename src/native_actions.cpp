@@ -5,8 +5,10 @@
 #include "mgs5vr/small_animal.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/controls.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/opening_selector.hpp"
+#include "mgs5vr/optic_events.hpp"
 #include "native_cabin_script.hpp"
 #include "native_presentation_script.hpp"
 #include <windows.h>
@@ -24,6 +26,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <sstream>
 #include <thread>
 #include <unordered_set>
@@ -43,6 +46,7 @@ std::atomic_uint64_t traceUntil{};
 std::mutex traceMutex;
 std::unordered_set<uint64_t> traced;
 std::atomic_bool enabled{};
+std::atomic_bool nativeLuaReady{};
 std::mutex requestMutex;
 std::filesystem::path requestPath,resultPath,tracePath;
 bool externalCommands{};
@@ -52,6 +56,11 @@ constexpr wchar_t actionPipeName[]=L"\\\\.\\pipe\\MGS5VR.NativeActions";
 constexpr uint32_t maxPipeScript=1024*1024;
 constexpr size_t maxQueuedActions=256;
 constexpr size_t maxActionsPerTransaction=8;
+uint64_t candidateKey(const char* value,size_t length){
+    uint64_t hash=14695981039346656037ull;
+    for(size_t i=0;i<length;++i){hash^=static_cast<unsigned char>(value[i]);hash*=1099511628211ull;}
+    return hash?hash:1;
+}
 #pragma pack(push,1)
 struct PipeRequestHeader { uint64_t id{}; uint32_t length{}; };
 struct PipeResponseHeader {
@@ -232,9 +241,86 @@ bool luaReady(void* state){
     const int top=getTop(state);constexpr char check[]="return type(TppMain)=='table' and type(GameObject)=='table' and type(gvars)=='table' and type(vars)=='table' and type(TppMission)=='table' and type(TppBuddyService)=='table' and 'ready' or 'wait'";
     int status=load(state,check,sizeof(check)-1,"@mgs5vr-state-check");if(!status)status=original(state,0,1,0);
     size_t length{};const auto* value=getString(state,-1,&length);const bool ready=!status&&value&&length==5&&std::memcmp(value,"ready",5)==0;
-    setTop(state,top);return ready;
+    setTop(state,top);nativeLuaReady.store(ready);return ready;
 }
 bool publishFastInput(const std::string& request,std::string& result){
+    if(request=="inspect-bot-state"){
+        // Read-only transport/scene diagnostics must also work while Lua is
+        // suspended at title/loading/Pause. These are individually sampled
+        // publications, not a claimed coherent native simulation transaction.
+        const auto rendered=headCamera().publishedView();
+        const auto controlSample=controlInputSnapshot();
+        const auto now=steadyMilliseconds();
+        const auto camera=headCamera().status();
+        const auto menu=nativeMenuOpen();
+        std::ostringstream out;out<<std::boolalpha;
+        out<<"{\"schema\":1,\"now_ms\":"<<now
+           <<",\"lua_ready\":"<<nativeLuaReady.load()
+           <<",\"title\":"<<nativeTitleModeActive()<<",\"title_menu\":"<<nativeTitleMenuOpen()
+           <<",\"title_cabin\":"<<nativeTitleCabinMode()<<",\"cabin\":"<<nativeCabinPlay()
+           <<",\"loading\":"<<nativeLoadingTipsOpen()<<",\"demo\":"<<nativeScriptedDemoActive()
+           <<",\"demo_candidate\":"<<(nativeDemoMode()==NativeDemoMode::staleCandidate)
+           <<",\"demo_recovery_ready\":"<<headCamera().staleDemoRecoveryReady()
+           <<",\"demo_interactive_look\":"<<(nativeDemoMode()==NativeDemoMode::interactiveLook)
+           <<",\"menu\":"<<(menu?(*menu?"true":"false"):"null")
+           <<",\"idroid\":"<<nativeIdroidOpen()<<",\"gamepad\":"<<nativeGamepadActive()
+           <<",\"idroid_menu_input_ready\":"<<handheldMenuInputReady()
+           <<",\"camera_active\":"<<camera.active<<",\"camera_available\":"<<headCamera().available()
+           <<",\"camera_pending\":"<<camera.pending<<",\"camera_suspended\":"<<camera.suspended
+           <<",\"camera_awaiting_player\":"<<camera.awaitingPlayer
+           <<",\"camera_reason\":"<<static_cast<unsigned>(camera.reason)
+           <<",\"activation\":"<<camera.activation<<",\"opening_assets\":"<<openingPropsAvailable();
+        if(freshControlInputAudit(controlSample,now)){
+            const auto* audit=&controlSample;
+            out<<",\"controls\":{\"context\":\""<<controlContextName(audit->context)
+               <<"\",\"age_ms\":"<<now-audit->time<<",\"sample_ms\":"<<audit->time
+               <<",\"rig_input\":"<<audit->rigInput<<",\"travel_mode\":"<<audit->travelMode
+               <<",\"native_buttons\":"<<audit->nativeButtons<<",\"physical\":[";
+            for(size_t i=0;i<11;++i){if(i)out<<',';out<<audit->physical.buttons[i];}
+            out<<"],\"sticks\":["<<audit->physical.leftStick[0]<<','<<audit->physical.leftStick[1]
+               <<','<<audit->physical.rightStick[0]<<','<<audit->physical.rightStick[1]<<"],\"touches\":{";
+            constexpr std::array<const char*,10> touchNames{"left_thumbrest","right_thumbrest","a_touch","b_touch","x_touch","y_touch",
+                "left_stick_touch","right_stick_touch","left_trigger_touch","right_trigger_touch"};
+            for(size_t i=0;i<touchNames.size();++i){if(i)out<<',';out<<'"'<<touchNames[i]<<"\":"<<audit->physical.buttons[19+i];}
+            out<<"}}";
+        }else out<<",\"controls\":null";
+        if(rendered){
+            const auto& frame=*rendered;
+            out<<",\"rendered\":{\"source\":\"last_camera_publication\",\"tracking_sequence\":"<<frame.trackingSequence
+               <<",\"rig_sequence\":"<<frame.rigSequence<<",\"activation\":"<<frame.activation
+               <<",\"sample_ms\":"<<frame.sampleTime<<",\"left_palm_tracked\":"<<frame.renderedPalmTracked[0]
+               <<",\"right_palm_tracked\":"<<frame.renderedPalmTracked[1];
+            const auto pose=[&](const char* name,Pose value){
+                const auto p=value.position;const auto q=value.orientation;
+                out<<",\""<<name<<"\":{\"position\":["<<p.x<<','<<p.y<<','<<p.z
+                   <<"],\"orientation\":["<<q.x<<','<<q.y<<','<<q.z<<','<<q.w<<"]}";
+            };
+            pose("left_palm",frame.renderedPalms[0]);
+            pose("left_grip",frame.controllers.hands[0].grip);
+            pose("right_palm",frame.renderedPalms[1]);
+            pose("right_grip",frame.controllers.hands[1].grip);
+            pose("idroid_device",frame.idroidDevice);
+            pose("scope_ocular",frame.weaponScope.ocular);
+            pose("scope_objective",frame.weaponScope.objective);
+            pose("weapon_support_grip",frame.weaponSupportGrip);
+            pose("binocular_ocular",frame.controllers.optic.pose.rightEyepiece);
+            out<<",\"scope_tracked\":"<<frame.weaponScope.tracked
+               <<",\"idroid_device_tracked\":"<<frame.idroidDeviceTracked
+               <<",\"scope_magnification\":"<<frame.weaponScope.magnification
+               <<",\"scope_radius\":"<<frame.weaponScope.radius
+               <<",\"native_firearm\":"<<frame.nativeFirearmActive
+               <<",\"weapon_support_tracked\":"<<frame.weaponSupportGripTracked
+               <<",\"weapon_support_attached\":"<<frame.weaponSupportAttached
+               <<",\"binocular_held\":"<<frame.controllers.optic.held;
+            out<<'}';
+        }else out<<",\"rendered\":null";
+        if(const auto anchor=headCamera().openingTrackingOrigin(now)){
+            const auto p=anchor->position;const auto q=anchor->orientation;
+            out<<",\"opening_position\":["<<p.x<<','<<p.y<<','<<p.z
+               <<"],\"opening_orientation\":["<<q.x<<','<<q.y<<','<<q.z<<','<<q.w<<']';
+        }
+        out<<'}';result=out.str();return true;
+    }
     constexpr std::string_view prefix="input:";
     if(request.rfind(prefix,0)!=0)return false;
     const auto key=request.substr(prefix.size());GamepadSample sample{};
@@ -287,6 +373,51 @@ void pump(void* state){
     checkedAt=now;
     if(controllerRigEnabled()&&luaReady(state)){
         const int top=getTop(state);
+        const auto cameraStatus=headCamera().status();
+        if(cameraStatus.active&&!cameraStatus.suspended&&!cameraStatus.nativeMenuOpen){
+            while(const auto event=takeOpticEvent(steadyMilliseconds(),cameraStatus.activation)){
+                std::ostringstream script;
+                script.precision(9);
+                // The retail queue owns delivery and resend generations.
+                // Calling TppMain.OnMessage directly loses a RESEND result.
+                script<<"if type(Mission.SendMessageToSubscribers)=='function' and TppSequence.IsMissionPrepareFinished() then "
+                    <<"Mission.SendMessageToSubscribers('Player','"
+                    <<(event->kind==OpticEventKind::raised?"OnBinocularsMode":"PutMarkerWithBinocle")<<"'";
+                if(event->kind==OpticEventKind::waypoint)
+                    script<<','<<event->position.x<<','<<event->position.y<<','<<event->position.z;
+                script<<");return 'queued' end return 'unavailable'";
+                const auto text=script.str();
+                int status=load(state,text.data(),text.size(),"@mgs5vr-physical-optic-event");
+                if(!status)status=original(state,0,1,0);
+                size_t length{};const auto* value=getString(state,-1,&length);
+                if(!status&&value&&std::string_view(value,length)=="queued")acknowledgeOpticUse(*event);
+                log("Physical optic player notification kind="+std::to_string(static_cast<int>(event->kind))
+                    +" status="+std::to_string(status)+" result="+(value?std::string(value,std::min(length,size_t{180})):"no result"));
+                setTop(state,top);
+            }
+        }
+        // The retail game's named player-pad exclusion blocks character
+        // actions without pausing skin, animation or terminal updates. Own a
+        // separate registration so another tutorial's exclusion is preserved.
+        static bool idroidPadRegistered{};
+        static void* idroidPadState{};
+        if(idroidPadState!=state){idroidPadRegistered=false;idroidPadState=state;}
+        const bool guardIdroid=nativeIdroidOpen()&&handheldMenusSelected();
+        if(guardIdroid!=idroidPadRegistered){
+            const std::string script=std::string("if type(TppGameStatus)=='table' and type(TppGameStatus.")
+                +(guardIdroid?"Set":"Reset")+")== 'function' then TppGameStatus."
+                +(guardIdroid?"Set":"Reset")+"('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD'); return 'ok' end return 'unavailable'";
+            int padStatus=load(state,script.data(),script.size(),"@mgs5vr-idroid-player-pad");
+            if(!padStatus)padStatus=original(state,0,1,0);
+            size_t length{};const auto* result=getString(state,-1,&length);
+            if(!padStatus&&result&&length==2&&std::memcmp(result,"ok",2)==0){
+                idroidPadRegistered=guardIdroid;
+                log(guardIdroid?"Handheld iDroid: player pad excluded; hand and UI updates retained"
+                    :"Handheld iDroid: owned player-pad exclusion released");
+            }
+            setTop(state,top);
+        }
+        setHandheldMenuInputReady(guardIdroid&&idroidPadRegistered);
         // This is the retail pause API used by TppMain and TppException.
         // Own one named registration and release only that registration;
         // another menu, loading transition or script may also hold a pause.
@@ -338,17 +469,42 @@ void pump(void* state){
             &&std::memcmp(presentationValue,"title-cabin",11)==0;
         const bool scriptedDemoTitleActive=!presentationStatus&&presentationValue&&presentationLength==19
             &&std::memcmp(presentationValue,"scripted-demo-title",19)==0;
-        const bool titleActive=titleCabinActive||scriptedDemoTitleActive||(!presentationStatus&&presentationValue&&presentationLength==5
+        constexpr std::string_view staleCandidatePrefix="stale-demo-candidate:";
+        const bool staleDemoCandidate=!presentationStatus&&presentationValue
+            &&presentationLength>staleCandidatePrefix.size()
+            &&std::memcmp(presentationValue,staleCandidatePrefix.data(),staleCandidatePrefix.size())==0;
+        const auto staleCandidateIdentity=staleDemoCandidate
+            ?candidateKey(presentationValue+staleCandidatePrefix.size(),presentationLength-staleCandidatePrefix.size()):0;
+        const bool scriptedLookTitleActive=!presentationStatus&&presentationValue&&presentationLength==19
+            &&std::memcmp(presentationValue,"scripted-look-title",19)==0;
+        const bool scriptedLookActive=scriptedLookTitleActive||(!presentationStatus&&presentationValue&&presentationLength==13
+            &&std::memcmp(presentationValue,"scripted-look",13)==0);
+        const bool titleActive=titleCabinActive||scriptedDemoTitleActive||scriptedLookTitleActive||(!presentationStatus&&presentationValue&&presentationLength==5
             &&std::memcmp(presentationValue,"title",5)==0);
         const bool cabinActive=!presentationStatus&&presentationValue&&presentationLength==5
             &&std::memcmp(presentationValue,"cabin",5)==0;
+        const bool sceneMenuActive=!presentationStatus&&presentationValue
+            &&((presentationLength==10&&std::memcmp(presentationValue,"cabin-menu",10)==0)
+                ||(presentationLength==9&&std::memcmp(presentationValue,"game-over",9)==0));
         const bool scriptedDemoActive=scriptedDemoTitleActive||(!presentationStatus&&presentationValue&&presentationLength==13
             &&std::memcmp(presentationValue,"scripted-demo",13)==0);
         publishNativeAvatarEdit(avatarEditorActive);
-        publishNativeScriptedDemo(scriptedDemoActive);
+        const bool knownDemoPresentation=scriptedLookActive||scriptedDemoActive||staleDemoCandidate
+            ||(presentationValue&&((presentationLength==5&&std::memcmp(presentationValue,"title",5)==0)
+                ||(presentationLength==5&&std::memcmp(presentationValue,"cabin",5)==0)
+                ||(presentationLength==6&&std::memcmp(presentationValue,"closed",6)==0)
+                ||avatarEditorActive||titleCabinActive||sceneMenuActive));
+        // A failed or malformed Lua query is not a negative demo signal. Keep
+        // the previous conservative mode; its candidate heartbeat expires.
+        if(!presentationStatus&&knownDemoPresentation)
+            publishNativeDemoMode(scriptedLookActive?NativeDemoMode::interactiveLook:
+                scriptedDemoActive?NativeDemoMode::cinematic:
+                staleDemoCandidate?NativeDemoMode::staleCandidate:NativeDemoMode::none,
+                staleCandidateIdentity);
         publishNativeTitleMode(titleActive);
         publishNativeTitleCabinMode(titleCabinActive);
         publishNativeCabinPlay(cabinActive);
+        publishNativeSceneMenu(sceneMenuActive);
         setTop(state,top);
         const bool requested=openingCabinEnabled()&&nativeTitleMenuOpen()&&headCamera().status().active;
         const std::string script=std::string("local requested=")+(requested?"true\n":"false\n")+std::string(nativeCabinScript);

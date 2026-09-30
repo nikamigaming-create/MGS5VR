@@ -100,6 +100,45 @@ std::filesystem::path modulePath(HMODULE module){
     if(!count||count>=path.size())throw std::runtime_error("Cannot resolve module path");
     return path.data();
 }
+void configureLocalRuntime(const std::filesystem::path& folder){
+    // Steam can launch the game without inheriting a helper's environment.
+    // An explicit per-game override keeps simulator selection out of the
+    // global OpenXR registry and out of other running games.
+    const auto path=folder/L"mgs5vr-runtime.ini";
+    if(GetPrivateProfileIntW(L"runtime",L"enabled",0,path.c_str())!=1)return;
+    // A headset/direct launcher explicitly selects its own child runtime.
+    // That selection takes priority over a saved Steam-only override.
+    if(GetEnvironmentVariableW(L"XR_RUNTIME_JSON",nullptr,0))return;
+    const auto value=[&](const wchar_t* key){
+        std::array<wchar_t,32768> buffer{};
+        const auto size=GetPrivateProfileStringW(L"runtime",key,L"",buffer.data(),
+            static_cast<DWORD>(buffer.size()),path.c_str());
+        if(size>=buffer.size()-1)throw std::runtime_error("Per-game XR setting is too long");
+        return std::wstring(buffer.data(),size);
+    };
+    const auto manifest=value(L"manifest");
+    if(manifest.empty()||!std::filesystem::path(manifest).is_absolute()
+       ||!std::filesystem::is_regular_file(manifest))
+        throw std::runtime_error("Per-game XR runtime manifest is missing or not absolute");
+    const auto layerPath=value(L"api_layer_path"),layers=value(L"api_layers");
+    if(!layerPath.empty()&&(!std::filesystem::path(layerPath).is_absolute()
+       ||!std::filesystem::is_directory(layerPath)))
+        throw std::runtime_error("Per-game XR API layer directory is missing or not absolute");
+    if(layers.empty()!=layerPath.empty())
+        throw std::runtime_error("Per-game XR layer name and directory must be specified together");
+    const auto dataDir=value(L"data_dir");
+    if(!dataDir.empty()&&(!std::filesystem::path(dataDir).is_absolute()
+       ||!std::filesystem::is_directory(dataDir)))
+        throw std::runtime_error("Per-game simulator data directory is missing or not absolute");
+    if(!SetEnvironmentVariableW(L"XR_RUNTIME_JSON",manifest.c_str())
+       ||!SetEnvironmentVariableW(L"XR_API_LAYER_PATH",layerPath.empty()?nullptr:layerPath.c_str())
+       ||!SetEnvironmentVariableW(L"XR_ENABLE_API_LAYERS",layers.empty()?nullptr:layers.c_str())
+       ||!SetEnvironmentVariableW(L"MGS5VR_SIM_DATA_DIR",dataDir.empty()?nullptr:dataDir.c_str())
+       ||!SetEnvironmentVariableW(L"OPENXR_SIMULATOR_HEADLESS",
+            GetPrivateProfileIntW(L"runtime",L"headless",0,path.c_str())==1?L"1":nullptr))
+        throw std::runtime_error("Cannot apply per-game XR runtime environment");
+    mgs5vr::log("Applied explicit mgs5vr-runtime.ini override to this game process only");
+}
 std::string sha256(const std::filesystem::path& path){
     struct Provider {BCRYPT_ALG_HANDLE h{};~Provider(){if(h)BCryptCloseAlgorithmProvider(h,0);}} provider;
     struct Hash {BCRYPT_HASH_HANDLE h{};~Hash(){if(h)BCryptDestroyHash(h);}} hash;
@@ -128,6 +167,7 @@ DWORD WINAPI initialize(void*){
         if(!target){
             log("Unrecognized executable. Capture disabled; no game patches applied.");return 0;
         }
+        configureLocalRuntime(folder);
         log("Game target: "+std::string(target->name)+" / "+std::string(target->id));
         if(!target->nativeAdapter)log("Ground Zeroes target: independent native scene experiment available; TPP player, weapon and UI hooks remain disabled.");
         // All code/hooks and the compositor have process lifetime. Never unload live detours.

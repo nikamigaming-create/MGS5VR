@@ -57,6 +57,21 @@ try {
     $mgsLaunch=$mgsLaunches[1]
     Assert ($mgsLaunch.appid -eq '287700' -and $mgsLaunch.gameid -eq '287700') 'Another game identity reached TPP.'
     Assert ($env:SteamAppId -eq '892970' -and $env:SteamGameId -eq '892970') 'Parent game identity was not restored.'
+    # An uninstalled simulator can leave a registry path that no longer exists.
+    # The recorded physical runtime must still work without changing the registry.
+    $mgsPresentSim=$mgsSim; $mgsSim=Join-Path $mgsFixture 'missing-simulator.json'
+    $mgsBeforeMissing=$mgsLaunches.Count
+    & $mgsTool -CheckOnly
+    Assert ($mgsLaunches.Count -eq $mgsBeforeMissing) 'Missing-runtime dry run launched a process.'
+    & $mgsTool
+    Assert ($mgsLaunches.Count -eq ($mgsBeforeMissing+1)) 'Stale active runtime blocked the physical launch.'
+    Assert ($mgsLaunches[$mgsBeforeMissing].runtime -eq $mgsPhysical) 'Stale active runtime did not select the recorded headset.'
+    Assert ($env:XR_RUNTIME_JSON -eq $mgsPresentSim) 'Stale-runtime recovery changed the caller environment.'
+    Refuses { & $mgsTool -RuntimeManifest $mgsSim } '*Select your physical headset OpenXR runtime*'
+    $mgsPresentPhysical=$mgsPhysical; $mgsPhysical=Join-Path $mgsFixture 'missing-physical.json'
+    Refuses { & $mgsTool } '*Select your physical headset OpenXR runtime*'
+    Assert ($mgsLaunches.Count -eq ($mgsBeforeMissing+1)) 'No valid headset runtime still launched the game.'
+    $mgsPhysical=$mgsPresentPhysical; $mgsSim=$mgsPresentSim
     Refuses { & $mgsTool -RuntimeManifest $mgsSim } '*simulator is not a headset runtime*'
     $mgsRunning=$true
     Refuses { & $mgsTool } '*Close the current MGSV session*'
@@ -64,7 +79,7 @@ try {
     Refuses { & $mgsTool -RuntimeManifest $mgsPhysical } '*Authored launch failure*'
     Assert ($env:XR_RUNTIME_JSON -eq $mgsSim -and $env:XR_ENABLE_API_LAYERS -eq 'XR_APILAYER_METAX_operator;XR_APILAYER_other') 'Failure did not restore the calling environment.'
     Assert ($env:SteamAppId -eq '892970' -and $env:SteamGameId -eq '892970') 'Failed launch did not restore Steam identity.'
-    Write-Output 'Headset launcher: simulator isolation, runtime selection, Steam identity isolation, unrelated layers, dry run, live-game refusal and failure cleanup passed.'
+    Write-Output 'Headset launcher: simulator isolation, missing-runtime fallback, explicit-runtime refusal, Steam identity isolation, unrelated layers, dry run, live-game refusal and failure cleanup passed.'
 } finally {
     foreach ($mgsName in $mgsNames) { [Environment]::SetEnvironmentVariable($mgsName,$mgsOriginal[$mgsName],'Process') }
     $mgsResolved=[IO.Path]::GetFullPath($mgsFixture); $mgsTemp=[IO.Path]::GetFullPath([IO.Path]::GetTempPath())

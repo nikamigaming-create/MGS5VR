@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MGS5VR · Release field kit</title><link rel="stylesheet" href="release-desk.css">
+<script type="importmap">{"imports":{"three":"./vendor/three-r180/build/three.module.js"}}</script></head>
+<body><header><a href="#">MGS5VR <span>/ FIELD KIT</span></a><span class="stamp">RELEASE ACCEPTANCE IN PROGRESS</span></header>
+<main><div class="eyebrow">OPERATIONS / THE PHANTOM PAIN</div><h1>Every action.<br>Visible proof.</h1>
+<p class="intro">Open an issue, inspect its evidence, or play an action lesson. Recorded input lights the matching control on the 3D controller. Unfinished checks stay visible.</p>
+<div id="counts" class="counts"></div><nav id="tabs" aria-label="Field kit sections"></nav>
+<section id="overview"><div class="section-line"><h2>Release sequence</h2><span>Fix → verify → explain → package</span></div><div id="plan" class="plan"></div>
+<div class="section-line"><h2>Recorded action lessons</h2><span id="lesson-count"></span></div><div id="lessons" class="lesson-grid"></div></section>
+<section id="catalog" hidden><div class="filters"><input id="search" type="search" placeholder="Search issue, feature, control or source…" aria-label="Search field kit"><select id="filter" aria-label="Filter category"></select></div><p id="row-count"></p><div id="rows"></div></section>
+<footer id="identity"></footer></main>
+<dialog id="lesson-dialog"><button id="close-lesson" class="close" aria-label="Close lesson">×</button><div class="eyebrow">FIELD INSTRUCTION / RECORDED ACTION</div><h2 id="lesson-title"></h2><p id="instruction"></p>
+<div class="lesson-layout"><div class="game-stage"><div id="game-frame"><video id="game-video" preload="metadata" playsinline></video><div id="control-preview" hidden><div class="eyebrow">CONTROL REFERENCE</div><h3 id="preview-binding"></h3><p id="preview-context"></p><p>This is a control demonstration. A matching gameplay recording is still required to prove the feature.</p><div id="preview-alternatives"></div></div></div><div class="detail-inset"><div class="inset-label">CONTROL CLOSE-UP</div><canvas id="detail-canvas"></canvas></div><div id="cue" class="cue">Ready</div></div><div class="controller-stage"><canvas id="controller-canvas"></canvas><div id="controller-labels"></div><p>Quest Touch Plus · drag to rotate · scroll to zoom</p><div class="views"><button data-view="front">Face buttons</button><button data-view="left">Left grip / trigger</button><button data-view="right">Right grip / trigger</button></div></div></div>
+<div class="playback"><button id="play">Play lesson</button><button id="replay">Replay</button><input id="seek" type="range" min="0" max="1" step="0.001" value="0" aria-label="Lesson playback position"><output id="clock">0:00</output><select id="speed" aria-label="Playback speed"><option value="1">1×</option><option value="0.5">½ speed</option><option value="0.25">¼ speed</option></select></div>
+<div id="media-status" role="status"></div><details class="proof"><summary>Evidence, build and recording details</summary><div id="lesson-proof"></div></details></dialog>
+<script src="data.js"></script><script type="module" src="release-desk.js"></script></body></html>

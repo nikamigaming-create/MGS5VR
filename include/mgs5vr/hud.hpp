@@ -36,4 +36,16 @@ constexpr bool reconModelVisible(HudMode mode,HudView view,bool glow) noexcept {
 constexpr bool nativeReconLayer(uint32_t order,bool sceneCamera,bool layoutCamera) noexcept {
     return (sceneCamera&&(order==2||order==3))||(layoutCamera&&order==23);
 }
+// Retail status/ammo uses the Z=135 layout. iDroid's own animated map cameras
+// reuse priorities, so only this observed layout stays on the personal HUD.
+constexpr bool idroidPersonalStatus(uint32_t order,float cameraDepth,bool idroid) noexcept {
+    return idroid&&cameraDepth==135&&order>=146&&order<=148;
+}
+// Owned TPP UiDrawPriorityTable: RETICLE_LOW/RETICLE/RETICLE_HIGH (53..57)
+// and SIGHT_RETICLE/SIGHT_RETICLE_ADD/SIGHT_STRONG (130..132). These desktop
+// aiming layers must not be mapped onto the forearm beside a physical gun.
+// Placement/throwing and mounted aiming keep their native feedback.
+constexpr bool suppressFlatFirearmReticle(uint32_t order,float cameraDepth,bool firearm) noexcept {
+    return firearm&&cameraDepth==100&&((order>=53&&order<=57)||(order>=130&&order<=132));
+}
 }

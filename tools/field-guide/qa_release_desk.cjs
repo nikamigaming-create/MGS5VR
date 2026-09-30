@@ -1,0 +1,46 @@
+const {chromium}=require('playwright');
+const path=require('path');
+const fs=require('fs');
+(async()=>{
+ const output=path.resolve(process.argv[2]||'artifacts/field-guide-20260927/release-desk-qa');fs.mkdirSync(output,{recursive:true});
+ const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ try{
+  const page=await browser.newPage({viewport:{width:1500,height:1050}});const errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('http://127.0.0.1:8766/artifacts/field-guide-20260927/release-desk/',{waitUntil:'networkidle'});
+  const cards=await page.locator('.lesson-card').count();if(cards<1)throw Error('No action lessons');
+  await page.screenshot({path:path.join(output,'overview.png'),fullPage:true});
+  await page.getByRole('button',{name:'55 issues',exact:true}).click();
+  const pauseIssue=page.locator('#rows details').filter({has:page.getByText('R17',{exact:true})});
+  await pauseIssue.locator('summary').click();
+  const pauseIssueText=await pauseIssue.innerText();
+  if(!pauseIssueText.includes('failure observed')||!pauseIssueText.includes('Visual review: issue_open'))throw Error('Pause visual failure is missing from its issue drill-down');
+  await page.screenshot({path:path.join(output,'pause-issue.png')});
+  await page.getByRole('button',{name:'Controls',exact:true}).click();
+  const referenceButtons=await page.locator('#rows [data-control]').count();if(referenceButtons!==96)throw Error('Not every action has a visible control drill-down');
+  await page.locator('#rows details').first().locator('summary').click();
+  await page.locator('#rows [data-control]').first().click();
+  await page.waitForFunction(()=>window.fieldKit.ready);
+  await page.getByRole('button',{name:'Close lesson'}).click();
+  await page.evaluate(()=>window.fieldKit.openLesson('vr-binocular-latch-enter'));
+  await page.waitForFunction(()=>window.fieldKit.ready&&document.querySelector('video').readyState>=2);
+  const midpoint=await page.evaluate(()=>{const l=window.fieldKit.lesson;return (Math.max(...l.intervals.map(i=>i.start))+Math.min(...l.intervals.map(i=>i.end)))/2});
+  const highlighted=await page.evaluate(t=>window.fieldKit.seek(t),midpoint);
+  console.log(JSON.stringify({midpoint,highlighted,errors}));
+  await page.screenshot({path:path.join(output,'binocular-controls.png')});
+  if(!highlighted.controls.includes('y')||!highlighted.controls.includes('left_grip'))throw Error('Expected binocular chord not lit');
+  await page.screenshot({path:path.join(output,'binocular-controls.png')});
+  await page.evaluate(()=>window.fieldKit.openLesson('pause-open'));
+  await page.waitForFunction(()=>document.querySelector('video').readyState>=2);
+  const pauseTime=await page.evaluate(()=>{const i=window.fieldKit.lesson.intervals[0];return (i.start+i.end)/2});
+  const paused=await page.evaluate(t=>window.fieldKit.seek(t),pauseTime);
+  await page.screenshot({path:path.join(output,'pause-controls.png')});
+  const controlReferences=await page.evaluate(async()=>{const results=[];for(const action of window.RELEASE_DESK_DATA.bindings.actions){for(let i=0;i<Math.max(1,action.bindings.length);i++)results.push(await window.fieldKit.openControl(action.name,i));}return results});
+  const unmapped=controlReferences.filter(r=>r.missing.length);if(unmapped.length)throw Error('Unmapped controller locations: '+JSON.stringify(unmapped));
+  await page.evaluate(()=>window.fieldKit.openControl('system.idroid'));
+  await page.screenshot({path:path.join(output,'control-reference.png')});
+  if(errors.length)throw Error(errors.join('\n'));
+  fs.writeFileSync(path.join(output,'qa.json'),JSON.stringify({cards,referenceButtons,pause_issue_failure_visible:true,highlighted,paused,controlReferences,page_errors:errors},null,2));
+  console.log(JSON.stringify({output,cards,highlighted:highlighted.controls,paused:paused.controls,controls_checked:controlReferences.length,page_errors:errors}));
+ }finally{await browser.close()}
+})().catch(e=>{console.error(e);process.exitCode=1});

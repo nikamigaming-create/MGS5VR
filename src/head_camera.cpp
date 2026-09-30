@@ -32,15 +32,17 @@ struct CameraStabilizationState {
     Vec3 headLocalOffset{};
     bool valid{};
     uint64_t time{};
+    bool followingPosture{};
 };
 std::mutex playerRootMutex;
 std::unordered_map<uintptr_t,PlayerRootSample> playerRoots;
 std::mutex stabilizationMutex;
 std::unordered_map<const HeadCamera*,CameraStabilizationState> stabilization;
-constexpr float headStabilizationTau=.14f;
-constexpr float headBobDeadbandY=.075f;
-constexpr float cameraBackwardOffset=.16f;
-constexpr float cameraHeightOffset=.05f;
+// Coco's tested head/shoulder fit and bob suppression settings.
+constexpr float headStabilizationTau=.20f;
+constexpr float headBobDeadbandY=.15f;
+constexpr float cameraBackwardOffset=.35f;
+constexpr float cameraHeightOffset=.25f;
 float smoothingAlpha(float dt,float tau){
     if(!std::isfinite(dt)||dt<=0||!std::isfinite(tau)||tau<=0)return 1;
     return 1-std::exp(-dt/tau);
@@ -100,32 +102,62 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     if(!std::isfinite(units)||units<=0)throw std::invalid_argument("Camera scale must be finite and positive");
     std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=awaitingPlayer_=false;camera_=playerOwner_=0;reason_=HeadCameraStop::none;
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=ownerHeadTime_=0;suspended_=false;
-    controllers_={};rig_={};nativeMenuOpen_=false;nativeIdroidOpen_=false;awaitingScene_=false;lastView_={};menuAnchored_=false;trackingEpoch_=0;
+    controllers_={};rig_={};nativeMenuOpen_=false;nativeIdroidOpen_=false;awaitingScene_=false;lastView_={};cameraRenderTime_=0;menuAnchored_=false;trackingEpoch_=0;
+    staleDemoRecoveryDwell_.reset();
     lastTitleSource_={};avatarEditorBackdrop_={};lastTitleSourceValid_=avatarEditorBackdropValid_=false;
-    scriptedCameraAnchor_={};scriptedCameraAnchorValid_=scriptedDemoActive_=false;
+    scriptedDemoActive_=false;cinematicFollow_={};sceneTransitionActivation_=0;
     snapYaw_=0;snapTranslation_={};recenterPending_=false;
     clearPlayerRootSamples();
     resetStabilization(this);
 }
+Pose HeadCamera::followCinematicLocked(Pose nativePose,uint64_t time,bool advance){
+    auto& s=cinematicFollow_;
+    const float rawYaw=horizontalYaw(nativePose.orientation);
+    if(!s.valid||s.camera!=camera_||s.activation!=activation_||time<s.time||time-s.time>500){
+        s={uprightOrigin(nativePose),nativePose.position,rawYaw,camera_,time,activation_,true};
+    }else if(advance&&time>s.time){
+        const float dt=std::min(.1f,float(time-s.time)*.001f);
+        const auto jump=nativePose.position-s.rawPosition;
+        const auto wrap=[](float a){return std::remainder(a,6.283185307f);};
+        float yaw=horizontalYaw(s.pose.orientation);
+        if(dot(jump,jump)>16.f||std::abs(wrap(rawYaw-s.rawYaw))>.9f){
+            s.pose.position=nativePose.position;yaw=rawYaw;
+        }else{
+            s.pose.position=s.pose.position+(nativePose.position-s.pose.position)*smoothingAlpha(dt,.25f);
+            const float requested=wrap(rawYaw-yaw)*smoothingAlpha(dt,.45f);
+            yaw=wrap(yaw+std::clamp(requested,-1.2f*dt,1.2f*dt));
+        }
+        s.pose.orientation=yawRotation(yaw);s.rawPosition=nativePose.position;s.rawYaw=rawYaw;s.time=time;
+    }
+    return s.pose;
+}
 bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
                                   const std::array<float,16>& root,const std::array<float,16>& head,uint64_t time){
+    const auto reject=[&]{
+        std::lock_guard lock(mutex_);
+        if(camera==camera_&&(!playerOwner_||owner==playerOwner_))staleDemoRecoveryDwell_.reset();
+        return false;
+    };
     const auto position=playerHeadPosition(root,head);
-    if(!camera||!owner||!valid(sourceCamera)||!position)return false;
+    if(!camera||!owner||!valid(sourceCamera)||!position)return reject();
     const Vec3 rootPosition{root[12],root[13],root[14]};
-    if(!std::isfinite(rootPosition.x)||!std::isfinite(rootPosition.y)||!std::isfinite(rootPosition.z))return false;
+    if(!std::isfinite(rootPosition.x)||!std::isfinite(rootPosition.y)||!std::isfinite(rootPosition.z))return reject();
     const Vec3 rootForward{root[8],root[9],root[10]};
     if(!std::isfinite(rootForward.x)||!std::isfinite(rootForward.y)||!std::isfinite(rootForward.z)
-       ||rootForward.x*rootForward.x+rootForward.z*rootForward.z<.0001f)return false;
+       ||rootForward.x*rootForward.x+rootForward.z*rootForward.z<.0001f)return reject();
     const auto rootYaw=yawRotation(std::atan2(rootForward.x,rootForward.z));
     const auto boom=sourceCamera.position-*position;
-    if(dot(boom,boom)>144)return false;
+    if(dot(boom,boom)>144)return reject();
     std::lock_guard lock(mutex_);
     if(!enabled_||!requirePlayerHead_)return false;
     if(camera==camera_&&owner==playerOwner_&&time>=ownerHeadTime_)ownerHeadTime_=time;
     auto found=std::find_if(playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){return p.camera==camera;});
     if(found==playerHeads_.end())found=std::find_if(playerHeads_.begin(),playerHeads_.end(),[](const auto& p){return !p.camera;});
     if(found==playerHeads_.end())found=std::min_element(playerHeads_.begin(),playerHeads_.end(),[](const auto& a,const auto& b){return a.time<b.time;});
-    if(found->camera==camera&&time<found->time)return false;
+    if(found->camera==camera&&time<found->time){
+        if(camera==camera_)staleDemoRecoveryDwell_.reset();
+        return false;
+    }
     const auto sequence=++playerSequence_;
     *found={camera,owner,sourceCamera,*position,time,sequence};
     {
@@ -163,16 +195,14 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
         }
         const bool authoredCameraChanged=controllers.authoredCamera!=controllers_.authoredCamera;
         const bool scriptedDemoChanged=controllers.scriptedDemo!=scriptedDemoActive_;
-        if(scriptedDemoChanged){
-            scriptedDemoActive_=controllers.scriptedDemo;
-            scriptedCameraAnchorValid_=false;
-        }
+        scriptedDemoActive_=controllers.scriptedDemo;
         if(active_&&(authoredCameraChanged||scriptedDemoChanged||controllers.avatarEditor!=controllers_.avatarEditor)){
             // A cinematic/gameplay handoff cannot reuse the preceding rig or
             // eye images even when FOX keeps the same camera object. Preserve
             // the last source view across AvatarEdit->demo so a new authored
             // shot camera can be adopted after its old source retires.
             rig_={};if(authoredCameraChanged)lastView_={};++activation_;resetStabilization(this);
+            if(authoredCameraChanged||scriptedDemoChanged){sceneTransitionActivation_=activation_;sceneTransitionAt_=time;}
         }
         if(trackingEpoch_&&controllers.referenceEpoch&&controllers.referenceEpoch!=trackingEpoch_&&(active_||pending_||awaitingPlayer_)){
             if(active_&&lastView_.applied){
@@ -214,14 +244,17 @@ void HeadCamera::setNativeMenuOpen(bool open,bool idroid){
     if(open==nativeMenuOpen_&&nextIdroid==nativeIdroidOpen_)return;
     const bool retainMenuAnchor=open&&nativeMenuOpen_&&menuAnchored_;
     nativeMenuOpen_=open;nativeIdroidOpen_=nextIdroid;rig_={};
+    if(open)staleDemoRecoveryDwell_.reset();
     if(open){
+        sceneTransitionActivation_=0;
         menuAnchored_=retainMenuAnchor||(active_&&!suspended_&&lastView_.applied&&lastView_.activation==activation_);
         if(menuAnchored_&&!retainMenuAnchor){
             menuNative_=lastView_.nativePose;menuHead_=lastView_.headPose;
-            const auto head=uprightOrigin(nativeTrackedPose(menuNative_,menuHead_,menuHead_));
+            const auto trackedHead=nativeTrackedPose(menuNative_,menuHead_,menuHead_);
+            const auto head=nextIdroid?uprightOrigin(trackedHead):trackedHead;
             const float tilt=controllers_.menuQuadTilt*.00872664626f;
             menuPanel_=compose(head,Pose{{std::sin(tilt),0,0,std::cos(tilt)},
-                {0,-.20f,-controllers_.menuQuadDistance}});
+                {0,nextIdroid?-.20f:0.f,-controllers_.menuQuadDistance}});
         }
     }else{
         menuAnchored_=false;
@@ -233,9 +266,10 @@ void HeadCamera::setNativeMenuOpen(bool open,bool idroid){
 void HeadCamera::cancelLocked(HeadCameraStop reason){
     if(active_||pending_||awaitingPlayer_){reason_=reason;++cancellations_;}
     const auto oldCamera=camera_;
-    active_=pending_=suspended_=awaitingPlayer_=awaitingScene_=false;camera_=playerOwner_=0;rig_={};lastView_={};menuAnchored_=false;
+    active_=pending_=suspended_=awaitingPlayer_=awaitingScene_=false;camera_=playerOwner_=0;rig_={};lastView_={};cameraRenderTime_=0;menuAnchored_=false;
     avatarEditorBackdropValid_=false;avatarEditorBackdrop_={};
-    scriptedCameraAnchorValid_=false;scriptedDemoActive_=false;scriptedCameraAnchor_={};
+    scriptedDemoActive_=false;cinematicFollow_={};sceneTransitionActivation_=0;
+    staleDemoRecoveryDwell_.reset();
     snapYaw_=0;snapTranslation_={};recenterPending_=false;
     resetStabilization(this);
     clearPlayerRootSample(oldCamera);
@@ -246,21 +280,38 @@ void HeadCamera::awaitPlayerLocked(){
     // VR request. Resume only the exact camera/owner previously accepted.
     if(active_||pending_||awaitingPlayer_){
         awaitingPlayer_=true;active_=pending_=suspended_=false;rig_={};
+        staleDemoRecoveryDwell_.reset();
         resetStabilization(this);
         reason_=HeadCameraStop::playerHeadUnavailable;
     }
 }
 void HeadCamera::suspendLocked(HeadCameraStop reason){
-    if(active_||pending_){suspended_=true;reason_=reason;}
+    if(active_||pending_){suspended_=true;reason_=reason;staleDemoRecoveryDwell_.reset();}
 }
 void HeadCamera::cancel(HeadCameraStop reason){std::lock_guard lock(mutex_);cancelLocked(reason);}
-void HeadCamera::awaitScene(){
+void HeadCamera::awaitScene(bool nativeLoading){
+    if(!nativeLoading)return;
     std::lock_guard lock(mutex_);
-    if(active_&&!awaitingScene_){awaitingScene_=true;rig_={};resetStabilization(this);}
+    if(active_&&!awaitingScene_){awaitingScene_=true;rig_={};sceneTransitionActivation_=0;staleDemoRecoveryDwell_.reset();resetStabilization(this);}
 }
 bool HeadCamera::available() const {std::lock_guard lock(mutex_);return enabled_;}
 bool HeadCamera::active() const {std::lock_guard lock(mutex_);return active_&&!awaitingScene_;}
-HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_&&!awaitingScene_,pending_,awaitingScene_?HeadCameraStop::sceneUnavailable:reason_,cancellations_,activation_,suspended_,awaitingPlayer_||awaitingScene_,nativeMenuOpen_,nativeIdroidOpen_};}
+HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_&&!awaitingScene_,pending_,awaitingScene_?HeadCameraStop::sceneUnavailable:reason_,cancellations_,activation_,suspended_,awaitingPlayer_||awaitingScene_,nativeMenuOpen_,nativeIdroidOpen_,rigRejectFlags_,rigAgeMs_,sceneTransitionActivation_};}
+bool HeadCamera::staleDemoRecoveryReady() const {
+    const auto candidate=nativeDemoSnapshot();
+    if(candidate.mode!=NativeDemoMode::staleCandidate||!candidate.candidateKey)return false;
+    std::lock_guard lock(mutex_);
+    if(!enabled_||!active_||suspended_||awaitingScene_||!camera_
+       ||!staleDemoRecoveryDwell_.matchesCamera(camera_,playerOwner_))return false;
+    return staleDemoRecoveryDwell_.ready(steadyMilliseconds(),candidate.candidateKey,candidate.generation,
+                                         candidate.publishedAtMs,
+                                         nativeMenuOpen_||nativeIdroidOpen_);
+}
+std::optional<HeadCameraSample> HeadCamera::publishedView() const {
+    std::lock_guard lock(mutex_);
+    if(!active_||!lastView_.applied||lastView_.activation!=activation_)return {};
+    return lastView_;
+}
 HeadCameraSample HeadCamera::resolve(uintptr_t camera,Pose nativePose,uint64_t time){
     std::lock_guard lock(mutex_);
     return resolveLocked(camera,nativePose,time);
@@ -318,8 +369,12 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             if(!useRig)return result;
             camera_=camera;playerOwner_=0;rig_={};lastView_={};++activation_;
         }else{
-            if(!useRig||!lastView_.applied||time<lastView_.sampleTime||time-lastView_.sampleTime<=500)return result;
+            // Entering an authored scene invalidates lastView_'s gameplay
+            // pixels. Its source retirement time must remain available or a
+            // different movie camera is rejected for the entire cutscene.
+            if(!useRig||!cameraRenderTime_||time<cameraRenderTime_||time-cameraRenderTime_<=500)return result;
             camera_=camera;playerOwner_=0;rig_={};lastView_={};++activation_;
+            sceneTransitionActivation_=activation_;sceneTransitionAt_=time;
         }
     }
     // Loading can still publish its decorative character/camera. It must not
@@ -333,6 +388,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         // tracking. Only the opt-in handheld iDroid follows live locomotion.
         if(!nativeIdroidOpen_||!controllers_.handheldMenus)nativePose=menuNative_;
         result.menuOpen=true;result.menuIdroid=nativeIdroidOpen_;result.menuPanel=menuPanel_;
+        result.menuWorldQuad=!nativeIdroidOpen_||!controllers_.handheldMenus;
         result.playerOwner=playerOwner_;result.playerHead=lastView_.playerHead;
         result.playerSequence=lastView_.playerSequence;
         // Paused native menus keep the last skin on screen. Keep its palm
@@ -352,6 +408,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             frontEndPanel_=compose(nativeTrackedPose(frontEndOrigin_,head_,head_),Pose{{},{0,-.05f,-1.3f}});
         }
         playerOwner_=0;rig_={};awaitingPlayer_=pending_=false;active_=true;++activation_;
+        sceneTransitionActivation_=activation_;sceneTransitionAt_=time;
     }else if(requirePlayerHead_&&(!authoredScene||(!camera_&&!controllers_.scriptedDemo))
        &&(pending_||active_||awaitingPlayer_)){
         const auto same=[](Pose a,Pose b){
@@ -383,6 +440,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             // The scripted shot had no player owner. A fresh matching player
             // publication can take over immediately when control returns.
             playerOwner_=found->owner;rig_={};lastView_={};++activation_;
+            sceneTransitionActivation_=activation_;sceneTransitionAt_=time;
             resetStabilization(this);
         }
         if(camera_&&(camera_!=camera||playerOwner_!=found->owner)){
@@ -392,8 +450,14 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             // fresh player-head publication matching this rendered camera.
             // Retained ACC eyes, rig and menu anchors must not survive travel.
             if(time<ownerHeadTime_||time-ownerHeadTime_<=1000)return result;
+            // A movie can retire its shot camera and create a different
+            // player camera. This fresh native join completes that explicit
+            // handoff; ordinary travel still has no retained-image authority.
+            const bool returningFromShot=sceneTransitionActivation_==activation_
+                &&time>=sceneTransitionAt_&&time-sceneTransitionAt_<=250;
             camera_=playerOwner_=0;rig_={};lastView_={};menuAnchored_=false;
             active_=pending_=false;awaitingPlayer_=true;awaitingScene_=false;
+            if(!returningFromShot)sceneTransitionActivation_=0;
             snapYaw_=controllers_.snapYaw;snapTranslation_={};recenterPending_=false;
             resetStabilization(this);
             clearPlayerRootSample(camera);
@@ -406,7 +470,10 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 frontEndPanel_=compose(nativeTrackedPose(frontEndOrigin_,head_,head_),Pose{{},{0,-.05f,-1.3f}});
             }
             camera_=camera;playerOwner_=found->owner;awaitingPlayer_=false;active_=true;
+            const bool returningFromShot=sceneTransitionActivation_==activation_
+                &&time>=sceneTransitionAt_&&time-sceneTransitionAt_<=250;
             ++activation_; // No eye image from before the menu may be reused.
+            if(returningFromShot)sceneTransitionActivation_=activation_;
         }
         // A scripted character can be scenery rather than the player's
         // viewpoint. In the hospital-bed setup flow, keep the authored camera
@@ -423,20 +490,39 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     }
     if(!active_)return result;
     if(camera_!=camera){cancelLocked(HeadCameraStop::cameraChanged);return result;}
+    // A scripted shot can have no player owner. Observe recovery only when a
+    // fresh, verified player publication joins this exact accepted render
+    // camera and source pose; assigning a gameplay owner before this join
+    // would either strand an ownerless shot or accept a decorative actor.
+    const auto candidate=nativeDemoSnapshot();
+    if(candidate.mode==NativeDemoMode::staleCandidate&&!spatialMenu&&!controllers_.loading
+       &&!controllers_.frontEnd&&!controllers_.avatarEditor){
+        const auto same=[](Pose a,Pose b){
+            return a.position.x==b.position.x&&a.position.y==b.position.y&&a.position.z==b.position.z
+                &&a.orientation.x==b.orientation.x&&a.orientation.y==b.orientation.y
+                &&a.orientation.z==b.orientation.z&&a.orientation.w==b.orientation.w;
+        };
+        const auto found=std::find_if(playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){
+            return p.camera==camera&&p.owner&&(!playerOwner_||p.owner==playerOwner_)
+                &&p.sequence&&time>=p.time&&time-p.time<=150&&same(p.sourceCamera,sourceCamera);
+        });
+        if(found==playerHeads_.end()){staleDemoRecoveryDwell_.reset();recoveryPlayerSequence_=0;}
+        else if(found->sequence!=recoveryPlayerSequence_){
+            staleDemoRecoveryDwell_.observe(true,candidate.candidateKey,candidate.generation,
+                camera,found->owner,found->time,candidate.publishedAtMs,false);
+            recoveryPlayerSequence_=found->sequence;
+        }
+    }else{staleDemoRecoveryDwell_.reset();recoveryPlayerSequence_=0;}
     if(awaitingScene_){awaitingScene_=false;++activation_;}
     if(controllers_.frontEnd)result.menuPanel=controllers_.authoredCamera
         ?compose(nativeTrackedPose(nativePose,head_,head_),Pose{{},{0,-.05f,-1.3f}}):frontEndPanel_;
     else if(controllers_.avatarEditor)
         result.menuPanel=compose(nativeTrackedPose(nativePose,head_,head_),Pose{{},{0,-.05f,-1.3f}});
-    // A scripted demo animates its authored camera in world space. Keep the
-    // first accepted pose as the viewer's world anchor for the full demo, even
-    // across native camera cuts. The scene and actors remain native 3D, while
-    // the tracked HMD still moves and turns relative to this fixed viewpoint.
-    // Native camera motion resumes as soon as the demo state ends.
-    if(controllers_.scriptedDemo){
-        if(!scriptedCameraAnchorValid_){scriptedCameraAnchor_=nativePose;scriptedCameraAnchorValid_=true;}
-        nativePose=scriptedCameraAnchor_;
-    }
+    // Coco's cinematic follow keeps current shot motion while filtering its
+    // shake and roll. Cuts snap to the new source; physical head motion is
+    // applied afterwards without filtering. Pause owns its separate anchor.
+    if(!spatialMenu&&controllers_.scriptedDemo&&!controllers_.scriptedLook)nativePose=followCinematicLocked(nativePose,time,useRig);
+    else if(useRig&&(!controllers_.scriptedDemo||controllers_.scriptedLook))cinematicFollow_={};
     // The native camera can look down, lean, recoil or bank. Its yaw supplies
     // gameplay heading; gravity and physical HMD pitch/roll supply the VR view.
     // A full native/activation rotation tilts the tracking space when turning.
@@ -456,16 +542,26 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             &&p.orientation.x==sourceCamera.orientation.x&&p.orientation.y==sourceCamera.orientation.y
             &&p.orientation.z==sourceCamera.orientation.z&&p.orientation.w==sourceCamera.orientation.w;
         const bool sameOwner=rig_.camera==camera&&rig_.owner==result.playerOwner&&s.activation==activation_;
-        const bool freshRig=sameOwner&&same&&time>=s.sampleTime&&time-s.sampleTime<=150;
+        const bool clockValid=time>=s.sampleTime;
+        rigAgeMs_=clockValid?time-s.sampleTime:0;
+        rigRejectFlags_=(!sameOwner?1u:0u)|(!same?2u:0u)|(!clockValid?4u:0u)
+            |(clockValid&&rigAgeMs_>150?8u:0u);
+        const bool freshRig=rigRejectFlags_==0;
         if(freshRig){
             const auto playerPublication=result.playerSequence;
-            result=s;result.playerSequence=playerPublication;suspended_=false;reason_=HeadCameraStop::none;lastView_=result;return result;
+            result=s;result.playerSequence=playerPublication;suspended_=false;reason_=HeadCameraStop::none;lastView_=result;cameraRenderTime_=time;return result;
         }
         // Native Pause/Help stops skin updates while its camera and UI keep
         // drawing. A cached rig must not poison every subsequent menu frame
         // after 150 ms. Resolve fresh tracked eyes from this accepted menu
         // anchor without relabeling the old hand publication as current.
-        if(!spatialMenu||!sameOwner){suspendLocked(HeadCameraStop::rigFrameMismatch);return result;}
+        if(!spatialMenu||!sameOwner){
+            // An aged rig from the same camera/owner is a producer delay,
+            // not a broken pose join. Do not publish it as a new frame; let
+            // the compositor retain only its previously accepted image.
+            suspendLocked(rigRejectFlags_==8?HeadCameraStop::staleRig:HeadCameraStop::rigFrameMismatch);
+            return result;
+        }
         rig_={};
     }
     suspended_=false;reason_=HeadCameraStop::none;
@@ -489,12 +585,21 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 const float deltaY=targetHeadLocalOffset.y-state.headLocalOffset.y;
                 if(std::abs(deltaY)>headBobDeadbandY)
                     state.headLocalOffset.y+=deltaY*smoothingAlpha(dt,headStabilizationTau);
-                // Filter animation bob without freezing the old stance/mount
-                // offset for the rest of the session. The anchor must follow
-                // a seated, prone or otherwise repositioned native head.
-                const float alpha=smoothingAlpha(dt,headStabilizationTau);
-                state.headLocalOffset.x+=(targetHeadLocalOffset.x-state.headLocalOffset.x)*alpha;
-                state.headLocalOffset.z+=(targetHeadLocalOffset.z-state.headLocalOffset.z)*alpha;
+                // Lock Coco's horizontal anchor through ordinary gait bob.
+                // A real posture/mount change still needs a new anchor; ease
+                // that transition rather than retaining the previous stance.
+                const auto delta=targetHeadLocalOffset-state.headLocalOffset;
+                const float horizontal=std::hypot(delta.x,delta.z);
+                if(horizontal>.25f||std::abs(deltaY)>headBobDeadbandY)state.followingPosture=true;
+                if(state.followingPosture){
+                    const float alpha=smoothingAlpha(dt,headStabilizationTau);
+                    state.headLocalOffset.x+=delta.x*alpha;
+                    state.headLocalOffset.z+=delta.z*alpha;
+                    if(horizontal<.001f&&std::abs(deltaY)<=headBobDeadbandY){
+                        state.headLocalOffset.x=targetHeadLocalOffset.x;state.headLocalOffset.z=targetHeadLocalOffset.z;
+                        state.followingPosture=false;
+                    }
+                }
             }
             state.time=time;
             auto cameraAnchor=rootSample.position+rotate(rootSample.orientation,state.headLocalOffset);
@@ -547,7 +652,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         // a demo renders from another camera. Only the render publication may
         // advance the accepted view used for camera liveness and handoffs.
         if(useRig){
-            lastView_=result;
+            lastView_=result;cameraRenderTime_=time;
             if(controllers_.frontEnd&&!controllers_.loading){lastTitleSource_=sourceCamera;lastTitleSourceValid_=true;}
         }
     }

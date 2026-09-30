@@ -72,6 +72,29 @@ int main(){
     const auto direct=smooth.update(head,target,true,0,130,1);expect(near(direct.position.x,target.position.x),"zero smoothing is immediate");
     smooth.update(head,start,true,50,200,1);
     expect(near(smooth.update(head,target,true,50,400,1).position.x,target.position.x),"tracking gaps reset smoothing without dragging a stale weapon");
+    smooth.reset();smooth.update(head,start,true,100,1000,2);
+    float rawEnergy{},steadyEnergy{};
+    for(uint64_t n=1;n<=180;++n){
+        const float angle=.01047198f*std::sin(float(n)*.418879f);
+        Pose shake{{0,std::sin(angle*.5f),0,std::cos(angle*.5f)},
+            {start.position.x+.002f*std::sin(float(n)*.418879f),0,start.position.z}};
+        const auto stable=smooth.update(head,shake,true,100,1000+n*11,2);
+        if(n>90){rawEnergy+=angle*angle;const auto forward=rotate(stable.orientation,{0,0,-1});
+            const float heldAngle=std::atan2(-forward.x,-forward.z);steadyEnergy+=heldAngle*heldAngle;}
+    }
+    expect(steadyEnergy<rawEnergy*.09f,"strong stabilization removes at least seventy percent of six-hertz scope shake");
+    const Pose movedHead{{0,.1305262f,0,.9914449f},{.1f,.03f,0}};
+    const auto prior=smooth.update(head,start,true,100,3000,2);
+    const auto followed=smooth.update(movedHead,compose(movedHead,start),true,100,3011,2);
+    expect(near(followed.position.x,compose(movedHead,prior).position.x),
+        "scope stabilization leaves headset motion immediate");
+    const Pose deliberate{{0,.258819f,0,.9659258f},{.05f,0,-.4f}};
+    const auto turned=smooth.update(movedHead,compose(movedHead,deliberate),true,100,3033,2);
+    const auto turnLocal=compose(inverse(movedHead),turned);
+    expect(turnLocal.position.x>.04f&&std::abs(turnLocal.orientation.y)>.20f,
+        "deliberate aiming catches up promptly despite strong scope stabilization");
+    expect(near(smooth.update(head,target,true,100,3044,3).position.x,target.position.x),
+        "recenter resets scope stabilization instead of retaining the old aiming space");
     HeadCamera camera;camera.configure(true);
     const std::array<EyeView,2> eyes{{{Pose{{},{-.032f,0,0}},{-.7f,.7f,.7f,-.7f}},{Pose{{},{.032f,0,0}},{-.7f,.7f,.7f,-.7f}}}};
     ControllerFrame frame;frame.predictedXrTime=1;frame.referenceEpoch=1;frame.authoredCamera=true;frame.frontEnd=true;
@@ -89,12 +112,14 @@ int main(){
     height.trackStereo({},eyes,true,110,fit);const auto again=height.resolve(1,{},110);
     expect(raised.applied&&again.applied&&near(raised.nativePose.position.y,.12f)&&near(again.nativePose.position.y,.12f),"height offset applies once without accumulating");
     HeadCameraSample menu;menu.applied=menu.stereoTracked=true;menu.activation=1;menu.controllers.hands[1].gripTracked=true;
-    menu.controllers.hands[1].grip.position={0,0,-.4f};const auto close=trackedIdroidPose(menu);
+    menu.controllers.hands[1].grip.position={0,0,-.4f};
+    menu.idroidDeviceTracked=true;menu.idroidDevice={{},{.1f,0,-.4f}};
+    menu.controllers.idroidScreenDepth=0;const auto close=trackedIdroidPose(menu);
     menu.controllers.idroidScreenDepth=.08f;const auto projected=trackedIdroidPose(menu);
     expect(close&&projected&&near(dot(projected->screen.position-close->screen.position,rotate(close->screen.orientation,{0,0,1})),.08f)
-        &&near(projected->body.position.z,close->body.position.z),"iDroid depth moves projection while handset stays in palm");
+        &&near(projected->body.position.z,close->body.position.z),"iDroid depth moves projection while the native device stays attached");
     menu.controllers.hands={};menu.controllers.nativeGamepad=true;menu.renderedPalmTracked[1]=true;menu.renderedPalms[1]={{},{.1f,0,-.4f}};
-    expect(trackedIdroidPose(menu).has_value(),"physical gamepad iDroid remains on the native animated palm without wands");
+    expect(trackedIdroidPose(menu).has_value(),"physical gamepad iDroid uses its native device mount without wands");
     HeadCamera panelCamera;panelCamera.configure(true);ControllerFrame panelInput;
     panelCamera.trackStereo({},eyes,true,100,panelInput);panelCamera.toggle();panelCamera.resolve(1,{},100);
     panelCamera.setNativeMenuOpen(true,true);const auto panelBefore=panelCamera.resolve(1,{},101);
@@ -113,5 +138,26 @@ int main(){
     const auto handheldBefore=panelCamera.resolve(1,{},121),handheldAfter=panelCamera.resolve(1,{{},{.2f,0,0}},122);
     expect(handheldBefore.applied&&handheldAfter.applied&&near(handheldAfter.nativePose.position.x-handheldBefore.nativePose.position.x,.2f),
         "opt-in handheld mode retains the live native camera");
+    expect(!handheldBefore.menuWorldQuad,"handheld iDroid keeps its separate palm display");
+    panelCamera.setNativeMenuOpen(false);
+    const Pose pauseHead{{.17364818f,0,0,.98480775f},{.1f,.05f,0}};
+    panelCamera.trackStereo(pauseHead,eyes,true,130,panelInput);
+    const auto pauseEntry=panelCamera.resolve(1,{},130);
+    panelCamera.setNativeMenuOpen(true,false);
+    const auto pauseBefore=panelCamera.resolve(1,{},131);
+    const auto openingHead=nativeTrackedPose(pauseEntry.nativePose,pauseEntry.headPose,pauseEntry.headPose);
+    const auto expectedCenter=openingHead.position+rotate(openingHead.orientation,{0,0,-panelInput.menuQuadDistance});
+    const auto samePosition=[](Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);};
+    expect(pauseBefore.menuWorldQuad&&samePosition(pauseBefore.menuPanel.position,expectedCenter),
+        "Pause opens centered in the current view even with handheld iDroid enabled and no tracked wrist");
+    const auto pauseNativeMoved=panelCamera.resolve(1,{{},{2,0,0}},132);
+    expect(samePosition(pauseNativeMoved.nativePose.position,pauseBefore.nativePose.position),
+        "Pause keeps the native world camera still in handheld mode");
+    panelCamera.trackStereo({pauseHead.orientation,{.2f,.05f,0}},eyes,true,140,panelInput);
+    const auto pauseHeadMoved=panelCamera.resolve(1,{{},{2,0,0}},140);
+    expect(pauseHeadMoved.applied&&pauseHeadMoved.menuWorldQuad
+        &&samePosition(pauseHeadMoved.menuPanel.position,pauseBefore.menuPanel.position)
+        &&!near(pauseHeadMoved.nativePose.position.x,pauseBefore.nativePose.position.x),
+        "Pause keeps fresh head tracking around its stable world panel");
     std::cout<<checks<<" community checks; "<<failures<<" failures\n";return failures?1:0;
 }

@@ -10,6 +10,7 @@
 #include "mgs5vr/native_video.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/cabin_walk.hpp"
+#include "mgs5vr/eye_resampler.hpp"
 #include <Xinput.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
@@ -90,9 +91,10 @@ struct Session {
     XrSpace local{XR_NULL_HANDLE}, view{XR_NULL_HANDLE};
     XrActionSet actions{XR_NULL_HANDLE};
     XrAction grip{XR_NULL_HANDLE},aim{XR_NULL_HANDLE},recenter{XR_NULL_HANDLE};
-    XrAction sticks{},triggers{},squeezes{},thumbClick{},triggerTouch{},thumbTouch{},menu{};
+    XrAction sticks{},triggers{},squeezes{},thumbClick{},triggerTouch{},thumbTouch{},thumbRestTouch{},stickTouch{},menu{};
     XrAction vibration{};
     std::array<XrAction,4> face{}; // Native Xbox A, B, X, Y.
+    std::array<XrAction,4> faceTouch{};
     XrAction fallbackSelect{},fallbackBack{};
     std::array<ControllerFaceLayout,2> faceLayouts{};
     std::array<XrSpace,2> gripSpaces{},aimSpaces{};
@@ -133,6 +135,8 @@ struct Session {
     std::array<std::array<char,96>,4> equipmentLabels{};
     uint64_t opticMarkSequence{};
     uint64_t opticClearSequence{};
+    uint64_t opticIntelSequence{};
+    bool opticIntelPressed{};
     RigCommands commandsControls;
     float reportedMagnification{1};
     uint64_t hapticAt{};
@@ -260,6 +264,8 @@ struct Session {
         thumbClick=action("thumb_click","Native gamepad stick clicks",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         triggerTouch=action("trigger_touch","Index finger contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         thumbTouch=action("thumb_touch","Thumb contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
+        thumbRestTouch=action("thumb_rest_touch","Thumb-rest contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
+        stickTouch=action("stick_touch","Thumbstick contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true);
         vibration=action("vibration","Native feedback and wheel contact",XR_ACTION_TYPE_VIBRATION_OUTPUT,true);
         menu=action("menu","Tap iDroid; hold Pause",XR_ACTION_TYPE_BOOLEAN_INPUT);
         // Read each face button through its owning hand. An unscoped read can
@@ -267,6 +273,10 @@ struct Session {
         // in an operator override, making left X also press Cancel.
         face={action("a","Native gamepad A",XR_ACTION_TYPE_BOOLEAN_INPUT,true),action("b","Native gamepad B",XR_ACTION_TYPE_BOOLEAN_INPUT,true),
             action("x","Native gamepad X",XR_ACTION_TYPE_BOOLEAN_INPUT,true),action("y","Native gamepad Y",XR_ACTION_TYPE_BOOLEAN_INPUT,true)};
+        faceTouch={action("a_touch","A button contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true),
+            action("b_touch","B button contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true),
+            action("x_touch","X button contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true),
+            action("y_touch","Y button contact",XR_ACTION_TYPE_BOOLEAN_INPUT,true)};
         // Do not bind Vive/WMR trigger-to-confirm or simple-controller select
         // to the Touch face actions. The operator can override every suggested
         // source, even when its profile is not the active physical controller.
@@ -299,10 +309,16 @@ struct Session {
                 if(p.layout<=1){
                     bind(triggerTouch,h+"trigger/touch");
                     bind(thumbTouch,h+"thumbstick/touch");
-                    if(p.layout==0)bind(thumbTouch,h+"thumbrest/touch");
+                    bind(stickTouch,h+"thumbstick/touch");
+                    if(p.layout==0){
+                        bind(thumbTouch,h+"thumbrest/touch");
+                        bind(thumbRestTouch,h+"thumbrest/touch");
+                    }
                     const bool leftHand=h=="/user/hand/left/input/";
                     bind(thumbTouch,h+(p.layout==0&&leftHand?"x/touch":"a/touch"));
                     bind(thumbTouch,h+(p.layout==0&&leftHand?"y/touch":"b/touch"));
+                    bind(faceTouch[leftHand?2:0],h+(p.layout==0&&leftHand?"x/touch":"a/touch"));
+                    bind(faceTouch[leftHand?3:1],h+(p.layout==0&&leftHand?"y/touch":"b/touch"));
                 }
             }
             if(p.layout<=1){
@@ -387,6 +403,7 @@ struct Session {
     }
     WeaponGripSmoothing weaponSmoothing;
     void suspendInput(XrTime time){
+        publishControlInputAudit({});
         controllerFrame=passiveControllerFrame(controllerFrame,time,referenceEpoch);
         idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();
         snapControls.reset();smoothControls.reset();cabinTurn.reset();rigControls.suspend();controls.suspend();
@@ -435,7 +452,11 @@ struct Session {
         const bool spatialTitle=title&&nativeTitleCabinMode()&&!manualScreenSelected&&!nativeGamepadActive();
         const bool loading=controllerRigEnabled()&&nativeLoadingTipsOpen();
         const bool avatarEditor=controllerRigEnabled()&&nativeAvatarEditActive();
-        const bool scriptedDemo=controllerRigEnabled()&&nativeScriptedDemoActive();
+        const auto publishedDemoMode=controllerRigEnabled()?nativeDemoMode():NativeDemoMode::none;
+        const auto demoMode=publishedDemoMode==NativeDemoMode::staleCandidate
+            &&headCamera().staleDemoRecoveryReady()?NativeDemoMode::none:publishedDemoMode;
+        const bool scriptedDemo=demoMode!=NativeDemoMode::none;
+        const bool interactiveLook=demoMode==NativeDemoMode::interactiveLook;
         // Continue can close the title widget while TPP remains in its native
         // 40050 helicopter scene. Enter cabin play only after the Lua reader
         // confirms that mission and TitleMode is off; loading stays front-end.
@@ -467,6 +488,7 @@ struct Session {
         controllerFrame.loading=loading;
         controllerFrame.avatarEditor=avatarEditor;
         controllerFrame.scriptedDemo=scriptedDemo;
+        controllerFrame.scriptedLook=interactiveLook;
         controllerFrame.authoredCamera=(title&&!spatialTitle)||avatarEditor||scriptedDemo;
         controllerFrame.openingBackend=openingBackend;
         controllerFrame.cabinPlay=cabinPlay;
@@ -507,6 +529,17 @@ struct Session {
             faceButtons[2]?1.f:0.f,faceButtons[3]?1.f:0.f,
             boolean(menu)?1.f:0.f,boolean(thumbClick,hands[0])?1.f:0.f,
             boolean(thumbClick,hands[1])?1.f:0.f,ls,rs,lt,rt};
+        // These controls are bound only on Touch interaction profiles with an
+        // exposed thumb-rest path. Unbound profiles report an inactive action.
+        physical.buttons[19]=boolean(thumbRestTouch,hands[0])?1.f:0.f;
+        physical.buttons[20]=boolean(thumbRestTouch,hands[1])?1.f:0.f;
+        // Touch is independent of a click and of optical pose tracking. Read
+        // each face through its owning hand; unsupported profiles stay idle.
+        for(size_t n=0;n<4;++n)physical.buttons[21+n]=boolean(faceTouch[n],hands[n<2?1:0])?1.f:0.f;
+        for(size_t n=0;n<2;++n){
+            physical.buttons[25+n]=boolean(stickTouch,hands[n])?1.f:0.f;
+            physical.buttons[27+n]=boolean(triggerTouch,hands[n])?1.f:0.f;
+        }
         physical.leftStick={l.x,l.y};physical.rightStick={rr.x,rr.y};
         reloadControls(physical,now);
         setHandheldMenus(controls.setting("settings.handheld_menus")>=.5f);
@@ -525,6 +558,7 @@ struct Session {
         controllerFrame.loading=loading;
         controllerFrame.avatarEditor=avatarEditor;
         controllerFrame.scriptedDemo=scriptedDemo;
+        controllerFrame.scriptedLook=interactiveLook;
         controllerFrame.authoredCamera=(title&&!spatialTitle)||avatarEditor||scriptedDemo;
         controllerFrame.openingBackend=openingBackend;
         controllerFrame.cabinPlay=cabinPlay;
@@ -548,10 +582,16 @@ struct Session {
         controllerFrame.equipmentLabels=equipmentLabels;
         controllerFrame.nativeGamepad=nativeGamepadActive();
         controllerFrame.wristSurfaceLift=controls.setting("settings.wrist_surface_lift_cm")*.01f;
+        controllerFrame.weaponHudSetback=controls.setting("settings.weapon_hud_setback_cm")*.01f;
+        controllerFrame.wristTextScale=controls.setting("settings.wrist_text_scale");
         controllerFrame.wristSelectorHeight=controls.setting("settings.wrist_selector_height_cm")*.01f;
         controllerFrame.wristPickerWidth=controls.setting("settings.wrist_picker_width_cm")*.01f;
         controllerFrame.idroidScreenWidth=controls.setting("settings.idroid_screen_width_cm")*.01f;
         controllerFrame.idroidScreenDepth=controls.setting("settings.idroid_screen_depth_cm")*.01f;
+        controllerFrame.idroidScreenOffset={controls.setting("settings.idroid_screen_x_cm")*.01f,
+            controls.setting("settings.idroid_screen_y_cm")*.01f,0};
+        controllerFrame.idroidScreenRotation=binocularGripRotation(controls.setting("settings.idroid_screen_pitch_degrees"),
+            controls.setting("settings.idroid_screen_yaw_degrees"),controls.setting("settings.idroid_screen_roll_degrees"));
         controllerFrame.handheldMenus=handheldMenusSelected();
         controllerFrame.menuQuadWidth=controls.setting("settings.menu_quad_width_cm")*.01f;
         controllerFrame.menuQuadDistance=controls.setting("settings.menu_quad_distance_cm")*.01f;
@@ -593,7 +633,7 @@ struct Session {
         if(loading&&(nativeStatus.active||nativeStatus.pending)){
             // Native loading tips include the actionable Start Mission prompt.
             // Publish its live pixels while preserving the requested VR mode.
-            headCamera().awaitScene();
+            headCamera().awaitScene(loading);
             nativeStatus=headCamera().status();
         }
         if(!automaticEntryDone&&!manualScreenSelected&&!startupScreen&&!loading&&stereoTracked&&(detectedMode!=TravelMode::unknown||title||avatarEditor||scriptedDemo)
@@ -610,7 +650,8 @@ struct Session {
         // for a frame while the Touch face buttons are still available through
         // the isolated fallback bindings. Do not let that profile blip clear
         // an already selected optic or strand a held B equip action.
-        const bool binocularAvailable=rigInput&&!nativeInput.exclusive&&mode==TravelMode::onFoot
+        const bool binocularMode=mode==TravelMode::onFoot||mode==TravelMode::horse;
+        const bool binocularAvailable=rigInput&&!nativeInput.exclusive&&binocularMode
             &&!manualToggle&&!menuPressed&&!commandsControls.active()
             &&!equipmentHeld&&rigControls.equipmentPhase()==0;
         const bool wasBinocularSelected=binocularSelected;
@@ -629,7 +670,7 @@ struct Session {
             if(binocularSelected)log("Physical binoculars equipped by configured input; selection latched independently of tracking");
             else log(std::string("Physical binoculars stowed: ")+(activeControl("binoculars.stow")?"configured stow input":
                 equipmentHeld||rigControls.equipmentPhase()?"equipment selection":commandsControls.active()?"Commands":
-                menuPressed?"menu input":mode!=TravelMode::onFoot?"left on-foot mode":"left gameplay"));
+                menuPressed?"menu input":!binocularMode?"left binocular-capable travel mode":"left gameplay"));
         }
         // Recenter is its own configured action; R3 remains available for zoom.
         // A binocular equip/stow interaction must never also recenter the
@@ -645,7 +686,7 @@ struct Session {
         const auto binocularRotation=binocularGripRotation(controls.setting("settings.binocular_pitch_degrees"),
             controls.setting("settings.binocular_yaw_degrees"),controls.setting("settings.binocular_roll_degrees"));
         const float binocularMaxEyeDistance=controls.setting("settings.binocular_max_eye_distance_cm")*.01f;
-        const bool opticAvailable=rigInput&&mode==TravelMode::onFoot&&right
+        const bool opticAvailable=rigInput&&binocularMode&&right
             &&binocularSelected
             &&!commandsControls.active()&&!headToggle
             &&(opticGate.active()||!centerChord)&&stereoTracked;
@@ -705,6 +746,8 @@ struct Session {
         if(priorFocused&&center&&!priorRecenter){recenterRequested=true;headCamera().recenter();}
         if(priorFocused&&center&&!priorRecenter)log("OpenXR recenter chord accepted");
         GamepadSample pad{};
+        const auto fallbackMode=nativeSceneInputMode(nativeStatus.nativeMenuOpen,scriptedDemo,interactiveLook,
+            sceneFallback,liveIdroid&&controllerFrame.handheldMenus);
         const auto bit=[&](bool enabled,WORD mask){if(enabled)pad.buttons|=mask;};
         const auto mappedButton=[&](std::string_view name,WORD mask){bit(activeControl(name),mask);};
         const auto triggerValue=[&](std::string_view name){return static_cast<uint8_t>(controls.value(name)*255);};
@@ -713,8 +756,6 @@ struct Session {
         if(nativeInput.exclusive){
             pad=nativeInput.gamepad;move={};navigation={};
         }else if(!rigInput){
-            const auto fallbackMode=scriptedDemo?NativeMenuInput::cinematic:
-                sceneFallback?NativeMenuInput::scriptedScene:liveIdroid&&controllerFrame.handheldMenus?NativeMenuInput::liveIdroid:NativeMenuInput::menu;
             pad=nativeMenuGamepad(controls,physical,fallbackMode);
             move={float(pad.leftX)/32767.f,float(pad.leftY)/32767.f};
             navigation={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
@@ -750,10 +791,15 @@ struct Session {
             pad.leftX=static_cast<int16_t>(move[0]*32767);pad.leftY=static_cast<int16_t>(move[1]*32767);
             pad.rightX=static_cast<int16_t>(navigation[0]*32767);pad.rightY=static_cast<int16_t>(navigation[1]*32767);
         }
-        // A native demo owns character movement and camera motion. Keep its
-        // authored stereo scene and native face buttons, but never feed either
-        // physical stick to the game while the cutscene flag is active.
-        if(scriptedDemo){pad.leftX=pad.leftY=pad.rightX=pad.rightY=0;move={};navigation={};}
+        // Genuine movies suppress locomotion/combat. Authored look lessons
+        // retain their required right stick, and Pause retains menu navigation.
+        // Apply this to native-button mode too, without suppressing a menu just
+        // because its underlying cutscene is still active.
+        if(scriptedDemo){
+            constrainCinematicInput(pad,fallbackMode);
+            move={float(pad.leftX)/32767.f,float(pad.leftY)/32767.f};
+            navigation={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
+        }
         if(utilityCenter||headToggle)pad={};
         bool stickNavigation=false;
         bool locomotionAvailable=false;
@@ -773,12 +819,17 @@ struct Session {
             if(activeControl("binoculars.zoom"))opticPad.buttons|=XINPUT_GAMEPAD_RIGHT_THUMB;
             if(activeControl("binoculars.mark"))opticPad.buttons|=XINPUT_GAMEPAD_X;
             if(activeControl("binoculars.clear_mark"))opticPad.rightY=-32767;
-            const auto optical=opticsControls.update(binocularSelected?opticPad:pad,mode==TravelMode::onFoot&&!commandsControls.active()&&!center&&!headToggle,
+            const auto optical=opticsControls.update(binocularSelected?opticPad:pad,binocularMode&&!commandsControls.active()&&!center&&!headToggle,
                 binocularSelected,controllerFrame.optic.active);
             if(optical.markRequested&&controllerFrame.optic.pose.ray.tracked)++opticMarkSequence;
             if(optical.clearRequested&&controllerFrame.optic.pose.ray.tracked)++opticClearSequence;
             controllerFrame.opticMarkSequence=opticMarkSequence;
             controllerFrame.opticClearSequence=opticClearSequence;
+            const bool intelPressed=binocularSelected&&controllerFrame.optic.active
+                &&controllerFrame.optic.pose.ray.tracked&&activeControl("binoculars.intel");
+            if(intelPressed&&!opticIntelPressed)++opticIntelSequence;
+            opticIntelPressed=intelPressed;
+            controllerFrame.opticIntelSequence=opticIntelSequence;
             const auto wasCommands=commandsControls.active();
             GamepadSample commandPad{menuBits,triggerValue(mode==TravelMode::horse?"commands.mounted_keep_open":"commands.keep_open"),
                 static_cast<uint8_t>(activeControl("commands.confirm")?255:0),pad.leftX,pad.leftY};
@@ -834,8 +885,6 @@ struct Session {
         else {rigControls.reset();opticsControls.reset();opticGate.reset();commandsControls.suspend();}
         requestNativeEquipmentPreview(controllerFrame.equipmentOpen&&!controllerFrame.equipmentCategory
             &&rigInput&&!nativeInput.exclusive&&!nativeStatus.nativeMenuOpen);
-        if(liveIdroid&&!nativeInput.exclusive)
-            locomotionAvailable=mode==TravelMode::onFoot&&!center&&!headToggle&&!utilityCenter;
         if(locomotionAvailable){
             const bool loweringAction=activeControl("gameplay.dive")||activeControl("binoculars.dive")
                 ||activeControl("gameplay.stance")||activeControl("binoculars.stance")||activeControl("gameplay.pickup_carry");
@@ -891,11 +940,16 @@ struct Session {
         // axes and moves native focus while the user walks around the cabin.
         pad=cabinTitleGamepad(pad,controllerFrame.openingSelector,
             openingFrame.pulse==OpeningPulse::confirm&&!utilityCenter&&!headToggle);
+        if(liveIdroid&&controllerFrame.handheldMenus&&!handheldMenuInputReady())
+            pad.leftX=pad.leftY=0;
         bool xrIntent=false;
         for(size_t n=0;n<11;++n)xrIntent=xrIntent||physical.buttons[n]>.25f;
+        xrIntent=xrIntent||(physical.buttons[19]>.25f&&controls.hasBindingInput("left_thumbrest"))
+            ||(physical.buttons[20]>.25f&&controls.hasBindingInput("right_thumbrest"));
         for(const auto stick:{physical.leftStick,physical.rightStick})
             xrIntent=xrIntent||std::abs(stick[0])>.25f||std::abs(stick[1])>.25f;
         gamepadMailbox().publish(pad,true,steadyMilliseconds(),xrIntent);
+        publishControlInputAudit({controlContext,physical,steadyMilliseconds(),pad.buttons,rigInput,static_cast<int>(mode)});
         const auto hapticNow=steadyMilliseconds();
         const auto wheel=wheelMailbox().read(hapticNow);
         const bool holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped&&controllerFrame.wheelGrip;
@@ -944,18 +998,22 @@ struct Screen {
     XrSwapchain handle{XR_NULL_HANDLE};
     std::vector<XrSwapchainImageD3D11KHR> images;
     uint32_t width{},height{},pendingIndex{};
+    uint32_t sourceWidth{},sourceHeight{},fixedWidth{},fixedHeight{};
     DXGI_FORMAT sourceFormat{DXGI_FORMAT_UNKNOWN};
     bool pending{},waited{},ready{};
+    NativeVideoRecorder uploadProof{L"mgs5vr-xr-recording.txt"};
+    EyeResampler resampler;
     FrameId copied{};
-    explicit Screen(Session& s):session(s){}
+    explicit Screen(Session& s,uint32_t outputWidth=0,uint32_t outputHeight=0):session(s),fixedWidth(outputWidth),fixedHeight(outputHeight){}
     ~Screen(){reset();}
-    void reset(){if(handle)xrDestroySwapchain(handle);handle=XR_NULL_HANDLE;images.clear();pending=waited=ready=false;copied={};}
+    void reset(){resampler.reset();if(handle)xrDestroySwapchain(handle);handle=XR_NULL_HANDLE;images.clear();pending=waited=ready=false;copied={};}
     void create(D3D11_TEXTURE2D_DESC desc){
         reset();
-        if(desc.Width>session.instance.properties.graphicsProperties.maxSwapchainImageWidth
-            ||desc.Height>session.instance.properties.graphicsProperties.maxSwapchainImageHeight)
+        width=fixedWidth?fixedWidth:desc.Width;height=fixedHeight?fixedHeight:desc.Height;
+        if(width>session.instance.properties.graphicsProperties.maxSwapchainImageWidth
+            ||height>session.instance.properties.graphicsProperties.maxSwapchainImageHeight)
             throw std::runtime_error("Game resolution exceeds the OpenXR swapchain limit; reduce game resolution");
-        width=desc.Width;height=desc.Height;sourceFormat=desc.Format;
+        sourceWidth=desc.Width;sourceHeight=desc.Height;sourceFormat=desc.Format;
         uint32_t count=0;xrCheck(xrEnumerateSwapchainFormats(session.handle,0,&count,nullptr),"Enumerate XR formats");
         std::vector<int64_t> formats(count);xrCheck(xrEnumerateSwapchainFormats(session.handle,count,&count,formats.data()),"Read XR formats");
         const bool bgra=sourceFormat==DXGI_FORMAT_B8G8R8A8_UNORM||sourceFormat==DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
@@ -971,13 +1029,24 @@ struct Screen {
         xrCheck(xrEnumerateSwapchainImages(handle,0,&count,nullptr),"Count XR images");
         images.assign(count,{XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR});
         xrCheck(xrEnumerateSwapchainImages(handle,count,&count,reinterpret_cast<XrSwapchainImageBaseHeader*>(images.data())),"Get XR D3D11 textures");
+        for(const auto& image:images){
+            D3D11_TEXTURE2D_DESC actual{};image.texture->GetDesc(&actual);
+            log("XR allocated image "+std::to_string(actual.Width)+"x"+std::to_string(actual.Height)
+                +" format="+std::to_string(actual.Format)+" source_format="+std::to_string(sourceFormat)
+                +" samples="+std::to_string(actual.SampleDesc.Count)+" mip="+std::to_string(actual.MipLevels)
+                +" array="+std::to_string(actual.ArraySize));
+        }
         log("Theatre swapchain "+std::to_string(width)+"x"+std::to_string(height));
     }
     bool prepare(ID3D11Texture2D* source,FrameId id,uint32_t sourceSlice=0){
         if(!source||!id.sequence)return false;
         D3D11_TEXTURE2D_DESC desc{};source->GetDesc(&desc);
         if(sourceSlice>=desc.ArraySize)throw std::invalid_argument("Missing native eye texture slice");
-        if(!handle||desc.Width!=width||desc.Height!=height||desc.Format!=sourceFormat||(copied.epoch!=id.epoch&&ready))create(desc);
+        // A new mailbox epoch changes source identity, not the compatible XR
+        // texture allocation. copied includes that epoch, so the new source
+        // is still copied while the previous complete pair remains available.
+        if(!handle||(!fixedWidth&&(desc.Width!=width||desc.Height!=height))||desc.Format!=sourceFormat)create(desc);
+        sourceWidth=desc.Width;sourceHeight=desc.Height;
         if(ready&&copied==id)return true;
         if(!pending){
             XrSwapchainImageAcquireInfo ai{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
@@ -996,7 +1065,12 @@ struct Screen {
     void publishPrepared(ID3D11Texture2D* source,FrameId id,uint32_t sourceSlice=0){
         if(ready&&copied==id)return;
         if(!pending||!waited)throw std::logic_error("XR image publication requires a waited acquisition");
-        session.context->CopySubresourceRegion(images.at(pendingIndex).texture,0,0,0,0,source,sourceSlice,nullptr);
+        if(sourceWidth==width&&sourceHeight==height)
+            session.context->CopySubresourceRegion(images.at(pendingIndex).texture,0,0,0,0,source,sourceSlice,nullptr);
+        else resampler.copy(session.context.Get(),source,sourceSlice,images.at(pendingIndex).texture);
+        // Optional private proof of the runtime-owned image while this app
+        // still owns its acquired slot. This is separate from the source take.
+        if(sourceSlice==1)uploadProof.frame(session.device.Get(),session.context.Get(),images.at(pendingIndex).texture,0);
         session.context->Flush();
         checkHr(session.device->GetDeviceRemovedReason(),"XR device health");
         XrSwapchainImageReleaseInfo release{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
@@ -1056,13 +1130,37 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
     }
     session.initialize();
     log("OpenXR runtime="+instance.runtime+" headset="+instance.properties.systemName);
-    TextureConsumer consumer(session.device.Get());Screen screen(session),leftEye(session),rightEye(session);RuntimeStats stats;
+    std::array<XrViewConfigurationView,2> outputViews{{{XR_TYPE_VIEW_CONFIGURATION_VIEW},{XR_TYPE_VIEW_CONFIGURATION_VIEW}}};
+    if(instance.runtime=="Meta XR Simulator"){
+        uint32_t count{};
+        xrCheck(xrEnumerateViewConfigurationViews(instance.handle,instance.system,XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+            2,&count,outputViews.data()),"Read stable simulator eye output");
+        if(count!=2||!outputViews[0].recommendedImageRectWidth||!outputViews[0].recommendedImageRectHeight
+            ||!outputViews[1].recommendedImageRectWidth||!outputViews[1].recommendedImageRectHeight)
+            throw std::runtime_error("Simulator stereo output recommendation is unavailable");
+        // The simulator's capture path freezes when its compositor output
+        // buffers grow on the first projection layer. Keep its output at the
+        // declared eye size; native source rendering can still supersample.
+        log("Stable simulator eye output "+std::to_string(outputViews[0].recommendedImageRectWidth)+"x"
+            +std::to_string(outputViews[0].recommendedImageRectHeight)+"; native render resolution remains independent");
+    }
+    TextureConsumer consumer(session.device.Get());Screen screen(session,
+        outputViews[0].recommendedImageRectWidth,outputViews[0].recommendedImageRectHeight),
+        leftEye(session,outputViews[0].recommendedImageRectWidth,outputViews[0].recommendedImageRectHeight),
+        rightEye(session,outputViews[1].recommendedImageRectWidth,outputViews[1].recommendedImageRectHeight);RuntimeStats stats;
     NativeVideoRecorder video;
     const std::array<Screen*,2> eyeScreens{&leftEye,&rightEye};
-    std::array<EyeFrame,2> eyeFrames{},surroundFrames{};
-    bool haveSurround{},surroundTransition{};
+    AcceptedStereoFrame acceptedStereo;
+    const auto& eyeFrames=acceptedStereo.eyes();
+    std::array<EyeFrame,2> surroundFrames{};
+    FrameId surroundImage{};
+    bool haveSurround{},surroundTransition{},surroundWithScreen{true},priorNativeMenuOpen{};
     uint64_t eyeEpoch{},projectionFrames{},emptyStereoFrames{},retainedStereoFrames{};
     uint64_t performanceAt{},windowSubmissions{},windowNewPairs{},windowEmpty{},lastProjectionSource{};
+    uint64_t windowFrames{},windowNoRender{},windowNoTracking{},windowNoLayers{},windowSlowSubmit{};
+    uint64_t windowLongRetention{},windowMaxImageAge{},windowCameraTransitions{};
+    uint64_t lastEmptyLog{};
+    bool priorNoLayers{};
     bool priorEmptyStereo{},layoutLogged{};
     Pose screenPose{};bool anchored=false,menuReturnPending=false;
     const auto start=std::chrono::steady_clock::now();
@@ -1124,8 +1222,10 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         const bool fresh=consumer.consume(channel);
         const auto consumeDone=steadyMilliseconds();
         if(fresh)++stats.sourceFrames;
-        if(eyeEpoch!=consumer.frame().epoch){eyeFrames={};eyeEpoch=consumer.frame().epoch;layoutLogged=false;}
+        if(eyeEpoch!=consumer.frame().epoch){acceptedStereo.clear();eyeEpoch=consumer.frame().epoch;layoutLogged=false;}
         const auto cameraStatus=headCamera().status();
+        const bool leavingMenu=priorNativeMenuOpen&&!cameraStatus.nativeMenuOpen;
+        priorNativeMenuOpen=cameraStatus.nativeMenuOpen;
         // Once the player has entered stereo, native loading screens and
         // noninteractive surfaces live in front of the last accepted stereo
         // surroundings. Keep their original eye poses: this is an explicitly
@@ -1137,9 +1237,16 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             haveSurround=false;surroundFrames={};surroundTransition=false;
         }
         if(session.manualScreenSelected)surroundTransition=false;
-        else if(haveSurround&&!cameraStatus.active&&!surroundTransition){
-            surroundTransition=true;screenPose=recenteredScreen(trackedHead,config.distanceMeters);
+        else if(leavingMenu&&haveSurround){
+            // Closing Pause can rebind the source epoch/camera between XR
+            // samples. Retain its last stereo image until the new gameplay
+            // pair arrives, without overlaying an old loading-screen quad.
+            surroundTransition=true;surroundWithScreen=false;
         }
+        else if(haveSurround&&!cameraStatus.active&&!surroundTransition){
+            surroundTransition=true;surroundWithScreen=true;screenPose=recenteredScreen(trackedHead,config.distanceMeters);
+        }
+        if(surroundTransition&&plannedLoading)surroundWithScreen=true;
         if(cameraStatus.awaitingPlayer)menuReturnPending=true;
         else if(!cameraStatus.active&&!cameraStatus.pending)menuReturnPending=false;
         if(frame.shouldRender&&consumer.frame().sequence){
@@ -1147,8 +1254,14 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             // live native startup/menu pixels visible until the first camera
             // is accepted; boot can report an on-foot player before any scene
             // is drawn. An active camera still owns tracking-loss recovery.
-            if(!cameraStatus.active){screen.upload(consumer.texture(),consumer.frame());eyeFrames={};}
-            else if(cameraStatus.active&&!cameraStatus.suspended){
+            if(!cameraStatus.active){
+                screen.upload(consumer.texture(),consumer.frame());acceptedStereo.clear();
+                // The first title/cabin activation also starts on this screen.
+                // Keep it until the first complete stereo pair is submitted;
+                // awaitingPlayer alone only covered returns from native menus.
+                menuReturnPending=screen.ready;
+            }
+            else if(mayAcceptNewStereoPair(cameraStatus)){
                 const auto metadata=consumer.eyes();
                 if(readyEyePair(metadata,cameraStatus.activation,steadyMilliseconds())){
                     // Acquire/wait BOTH eyes before releasing either new image.
@@ -1156,28 +1269,43 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
                     // of advancing one swapchain and invalidating that pair.
                     const bool leftReady=leftEye.prepare(consumer.texture(),consumer.frame(),0);
                     const bool rightReady=rightEye.prepare(consumer.texture(),consumer.frame(),1);
-                    if(leftReady&&rightReady){
+                    if(leftReady&&rightReady&&acceptedStereo.accept(metadata,consumer.frame().epoch,cameraStatus.activation,steadyMilliseconds(),session.referenceEpoch)){
                         for(size_t n=0;n<2;++n)eyeScreens[n]->publishPrepared(consumer.texture(),consumer.frame(),static_cast<uint32_t>(n));
-                        eyeFrames=metadata;
                         // The loading panel moved nearer while the frozen scene
                         // was retained. Restore its normal distance before
                         // clearing that state, or a later menu uses theatre
                         // dimensions on the old near plane and crops its edges.
                         if(surroundTransition)screenPose=recenteredScreen(trackedHead,config.distanceMeters);
-                        surroundFrames=metadata;haveSurround=true;surroundTransition=false;
+                        surroundFrames=metadata;surroundImage=consumer.frame();haveSurround=true;surroundTransition=false;
                     }
                 }
             }
         }
         const auto uploadDone=steadyMilliseconds();
+        const bool cameraTransition=!session.manualScreenSelected&&anchored&&tracking&&stereoTracked
+            &&cameraStatus.active&&!cameraStatus.suspended&&!cameraStatus.nativeMenuOpen
+            &&mayRetainStereoSurround(cameraStatus)
+            &&acceptedStereo.transitionPresentable(consumer.frame().epoch,cameraStatus.activation,
+                cameraStatus.sceneTransitionActivation,session.referenceEpoch,uploadDone);
         XrCompositionLayerQuad quad{XR_TYPE_COMPOSITION_LAYER_QUAD};
         quad.space=session.local;quad.eyeVisibility=XR_EYE_VISIBILITY_BOTH;quad.pose=toXr(screenPose);
         quad.subImage.swapchain=screen.handle;
         quad.subImage.imageRect.extent={static_cast<int32_t>(screen.width),static_cast<int32_t>(screen.height)};
-        // Keep startup/loading pixels on the configured world screen. Native
-        // menu-state flags must not resize it or bring a logo toward the eyes.
-        const float sourceAspect=screen.height?static_cast<float>(screen.width)/screen.height:16.f/9.f;
-        quad.size={config.widthMeters,config.widthMeters/sourceAspect};
+        // Keep the configured distance, but fit automatic native panels into
+        // BOTH asymmetric eye frusta. A theatre-wide quad cropped loading
+        // prompts even at neutral gaze. Manual screen mode keeps its sizing.
+        const float sourceAspect=screen.sourceHeight?static_cast<float>(screen.sourceWidth)/screen.sourceHeight:16.f/9.f;
+        float screenWidth=config.widthMeters;
+        if(!session.manualScreenSelected&&(session.controllerFrame.frontEnd||menuReturnPending)){
+            float eyeRadius{};
+            for(const auto& eye:trackedViews){
+                const auto offset=eye.pose.position-trackedHead.position;
+                eyeRadius=std::max(eyeRadius,std::sqrt(dot(offset,offset)));
+            }
+            if(const auto fitted=fittedScreenWidth(screenWidth,config.distanceMeters,sourceAspect,
+                {trackedViews[0].fov,trackedViews[1].fov},eyeRadius))screenWidth=*fitted;
+        }
+        quad.size={screenWidth,screenWidth/sourceAspect};
         const auto* layer=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad);
         std::array<XrCompositionLayerProjectionView,2> projectionViews{{{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW},{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW}}};
         XrCompositionLayerProjection projection{XR_TYPE_COMPOSITION_LAYER_PROJECTION};projection.space=session.local;
@@ -1205,19 +1333,20 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection),
             reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad)};
         if(frame.shouldRender&&tracking){
-            if(surroundTransition&&haveSurround&&regionsValid&&leftEye.ready&&rightEye.ready){
-                end.layerCount=screen.ready?2u:1u;end.layers=transitionLayers.data();
+            if((surroundTransition||cameraTransition)&&haveSurround&&regionsValid&&leftEye.ready&&rightEye.ready
+               &&leftEye.copied==surroundImage&&rightEye.copied==surroundImage){
+                // A cinematic cut carries only the already uploaded stereo
+                // image and its original poses. It never adds a native quad.
+                end.layerCount=surroundTransition&&surroundWithScreen&&screen.ready?2u:1u;end.layers=transitionLayers.data();
                 ++projectionFrames;++retainedStereoFrames;
+                if(cameraTransition&&!surroundTransition)++windowCameraTransitions;
             }else if(cameraStatus.active){
-                // Runtime wait/end calls can stall beyond the native tracking
-                // freshness window. Reproject the last ACCEPTED complete pair
-                // for at most 500 ms while current headset tracking is valid.
-                // Keep its original poses/FOVs; never relabel old pixels with
-                // current tracking or use this allowance to accept new sources.
-                const bool recoverable=!cameraStatus.suspended||cameraStatus.reason==HeadCameraStop::staleTracking
-                    ||cameraStatus.reason==HeadCameraStop::playerHeadUnavailable;
+                // A runtime/producer stall freezes the last accepted scene;
+                // it must not alternate that scene with black every 500 ms.
+                // Reproject its ORIGINAL poses/FOVs while ownership is valid.
+                // New source admission still requires freshness above.
                 const bool freshEyes=readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds());
-                if(cameraStatus.active&&recoverable&&regionsValid&&readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds(),500)){
+                if(mayReprojectAcceptedStereo(cameraStatus)&&regionsValid&&acceptedStereo.presentable(consumer.frame().epoch,cameraStatus.activation,steadyMilliseconds())){
                     layer=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);end.layerCount=1;end.layers=&layer;++projectionFrames;
                     if(!freshEyes||cameraStatus.suspended)++retainedStereoFrames;
                     menuReturnPending=false;
@@ -1230,15 +1359,49 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             }else if(anchored&&screen.ready){end.layerCount=1;end.layers=&layer;++stats.submittedScreens;}
         }
         xrCheck(xrEndFrame(session.handle,&end),"Submit XR frame");guard.ended=true;
+        const auto submitDone=steadyMilliseconds();
         const bool recordedStereo=end.layerCount&&layer==reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);
         const bool recordable=!surroundTransition&&(recordedStereo?consumer.frame().sequence&&consumer.eyes()[1].sourceSequence==eyeFrames[1].sourceSequence
             :end.layerCount&&consumer.frame().sequence&&!cameraStatus.active&&!cameraStatus.pending);
         video.frame(session.device.Get(),session.context.Get(),recordable?consumer.texture():nullptr,recordedStereo?1u:0u,
             recordedStereo?&consumer.eyes()[1]:nullptr);
         const auto cycleEnd=steadyMilliseconds();
+        ++windowFrames;
+        if(!frame.shouldRender)++windowNoRender;
+        else if(!tracking)++windowNoTracking;
+        const bool noLayers=frame.shouldRender&&!end.layerCount;
+        if(noLayers)++windowNoLayers;
+        if(submitDone-uploadDone>100)++windowSlowSubmit;
+        if(recordedStereo&&uploadDone>=eyeFrames[0].sampleTime){
+            const auto age=uploadDone-eyeFrames[0].sampleTime;
+            windowMaxImageAge=std::max(windowMaxImageAge,age);
+            if(age>500)++windowLongRetention;
+        }
+        // Cover every presentation mode, including Pause/loading and tracking
+        // loss. The stereo-only counter below cannot see those blank frames.
+        // Record the transition, with a bounded reminder during a long gap.
+        if(noLayers&&(!priorNoLayers||submitDone-lastEmptyLog>=1000)){
+            lastEmptyLog=submitDone;
+            const auto& selected=surroundTransition?surroundFrames:eyeFrames;
+            log("XR no layers frame="+std::to_string(stats.frames)
+                +" head_flags="+std::to_string(head.locationFlags)+" view_flags="+std::to_string(viewState.viewStateFlags)
+                +" active="+std::to_string(cameraStatus.active)+" pending="+std::to_string(cameraStatus.pending)
+                +" suspended="+std::to_string(cameraStatus.suspended)+" reason="+std::to_string(static_cast<int>(cameraStatus.reason))
+                +" rig_reject="+std::to_string(cameraStatus.rigRejectFlags)+" rig_age_ms="+std::to_string(cameraStatus.rigAgeMs)
+                +" anchored="+std::to_string(anchored)+" screen="+std::to_string(screen.ready)
+                +" surround="+std::to_string(haveSurround)+","+std::to_string(surroundTransition)
+                +" regions="+std::to_string(regionsValid)+" eyes="+std::to_string(leftEye.ready)+","+std::to_string(rightEye.ready)
+                +" source="+std::to_string(selected[0].sourceSequence)+","+std::to_string(selected[1].sourceSequence)
+                +" age_before_submit_ms="+std::to_string(uploadDone>=selected[0].sampleTime?uploadDone-selected[0].sampleTime:0)
+                +" epoch="+std::to_string(eyeEpoch)+" activation="+std::to_string(cameraStatus.activation)
+                +" source_activation="+std::to_string(selected[0].activation)
+                +" scene_transition="+std::to_string(cameraStatus.sceneTransitionActivation));
+        }
+        priorNoLayers=noLayers;
         if(cycleEnd-cycleStart>100)log("XR slow frame ms: wait="+std::to_string(waitDone-cycleStart)
             +" tracking="+std::to_string(trackingDone-waitDone)+" consume="+std::to_string(consumeDone-trackingDone)
-            +" upload="+std::to_string(uploadDone-consumeDone)+" submit="+std::to_string(cycleEnd-uploadDone));
+            +" upload="+std::to_string(uploadDone-consumeDone)+" submit="+std::to_string(submitDone-uploadDone)
+            +" recording="+std::to_string(cycleEnd-submitDone));
         const bool emptyStereo=frame.shouldRender&&tracking&&cameraStatus.active&&!end.layerCount;
         if(!performanceAt)performanceAt=cycleEnd;
         if(cameraStatus.active&&frame.shouldRender){
@@ -1249,11 +1412,18 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         }
         if(cycleEnd-performanceAt>=5000){
             const double seconds=static_cast<double>(cycleEnd-performanceAt)/1000.0;
+            log("XR presentation frames="+std::to_string(windowFrames)+" no_render="+std::to_string(windowNoRender)
+                +" no_tracking="+std::to_string(windowNoTracking)+" no_layers="+std::to_string(windowNoLayers)
+                +" slow_submit="+std::to_string(windowSlowSubmit)+" retained_over_500ms="+std::to_string(windowLongRetention)
+                +" max_image_age_ms="+std::to_string(windowMaxImageAge)
+                +" camera_transition_frames="+std::to_string(windowCameraTransitions));
             if(windowSubmissions)log("XR performance runtime_hz="+std::to_string(frame.predictedDisplayPeriod>0?1e9/static_cast<double>(frame.predictedDisplayPeriod):0)
                 +" submissions_fps="+std::to_string(static_cast<double>(windowSubmissions)/seconds)
                 +" new_pairs_fps="+std::to_string(static_cast<double>(windowNewPairs)/seconds)
                 +" repeated_or_empty="+std::to_string(windowSubmissions-windowNewPairs)+" empty="+std::to_string(windowEmpty));
             performanceAt=cycleEnd;windowSubmissions=windowNewPairs=windowEmpty=0;
+            windowFrames=windowNoRender=windowNoTracking=windowNoLayers=windowSlowSubmit=0;
+            windowLongRetention=windowMaxImageAge=windowCameraTransitions=0;
         }
         if(emptyStereo){
             ++emptyStereoFrames;

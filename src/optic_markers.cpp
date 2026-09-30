@@ -2,6 +2,8 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/recon.hpp"
+#include "mgs5vr/optic_events.hpp"
+#include "mgs5vr/optic_radio.hpp"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
@@ -16,13 +18,24 @@ namespace {
 using namespace mgs5vr;
 using Update=void(*)(void*,void*,const void*);
 Update original{};
+using RadioCommit=void(*)(void*);
+RadioCommit originalRadioCommit{};
 uintptr_t base{};
 std::atomic_bool enabled{};
 std::mutex mutex;
 HeadCameraSample latest;
 OpticWaypoints waypoints;
 uint64_t consumed{},consumedClear{};
+uint64_t consumedIntel{};
 ReconDwell reconDwell;
+OpticUseEdge opticUseEdge;
+OpticEventQueue opticEvents;
+OpticEvent queuedUse;
+void publishEvent(OpticEvent event){
+    std::lock_guard lock(mutex);
+    if(event.kind==OpticEventKind::raised)queuedUse={};
+    opticEvents.push(event);
+}
 struct alignas(16) Vector {float x{},y{},z{},w{};};
 
 template<class T> T read(uintptr_t address){
@@ -147,6 +160,101 @@ bool markPerson(uintptr_t services,const PersonTarget& target,bool acquire){
     return marked==acquire;
 }
 
+struct RadioTarget {uint16_t id{0xffff};float distance{};};
+std::optional<RadioTarget> radioTarget(uintptr_t system,uintptr_t markers,
+                                     const HeadCameraSample& frame,const std::optional<Vector>& hit){
+    const auto sight=nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.optic.pose.rightEyepiece);
+    const auto forward=rotate(sight.orientation,{0,0,-1});
+    const float visible=hit?dot(Vec3{hit->x,hit->y,hit->z}-sight.position,forward):1500.f;
+    const auto groups=read<uintptr_t>(system+0x30),instances=read<uintptr_t>(system+0x48);
+    std::optional<RadioTarget> best;
+    for(uint32_t i=0;groups&&instances&&i<50;++i){
+        const auto instance=instances+i*0x10;
+        const auto group=read<uint8_t>(instance+8);
+        if(group>=50||!(read<uint8_t>(instance+9)&2))continue;
+        const auto parameter=groups+group*0x18;
+        if((read<uint8_t>(parameter+0x14)&3)!=3)continue;
+        const auto geometry=read<uintptr_t>(instance);
+        if(!geometry)continue;
+        const Pose volume{read<Quat>(geometry+0x20),read<Vec3>(geometry)};
+        const auto distance=opticRadioBoxHit(sight,volume,read<Vec3>(geometry+0x10),
+            read<float>(parameter+8),read<float>(parameter+0xc));
+        if(!distance||*distance>visible+.35f||(best&&best->distance<=*distance))continue;
+        best=RadioTarget{static_cast<uint16_t>(0x9000+group),*distance};
+    }
+    // The ordinary native person pool remains the source for actor intel.
+    // Native radio availability decides whether this actor can be selected.
+    if(const auto person=personTarget(markers,frame,hit,true)){
+        const auto position=read<Vec3>(person->record+0x10);
+        const auto distance=dot(position-sight.position,forward);
+        using Available=bool(*)(void*,uint32_t);
+        if((!best||distance<best->distance)&&reinterpret_cast<Available>(base+0xdc8610)(reinterpret_cast<void*>(system),person->id))
+            best=RadioTarget{person->id,distance};
+    }
+    return best;
+}
+
+void commitRadio(void* object){
+    const auto system=reinterpret_cast<uintptr_t>(object)+0x40;
+    static uintptr_t ownedSystem{};
+    static uint16_t ownedTarget{0xffff};
+    static bool owned{};
+    if(!enabled.load()||read<uintptr_t>(system)!=base+0x234c330){originalRadioCommit(object);return;}
+    HeadCameraSample frame;bool requested{},useQueued{};
+    {std::lock_guard lock(mutex);frame=latest;
+        useQueued=queuedUse.sampleTime&&queuedUse.activation==frame.activation;
+        requested=frame.controllers.opticIntelSequence&&frame.controllers.opticIntelSequence!=consumedIntel;
+        if(requested)consumedIntel=frame.controllers.opticIntelSequence;
+    }
+    const auto now=steadyMilliseconds();const auto status=headCamera().status();
+    const auto& optic=frame.controllers.optic;
+    const bool usingOptic=frame.applied&&!frame.menuOpen&&status.active&&!status.suspended
+        &&frame.activation==status.activation&&now>=frame.sampleTime&&now-frame.sampleTime<=150
+        &&optic.active&&optic.held&&optic.pose.tracked&&optic.pose.ray.tracked&&optic.pose.kind==OpticKind::binocular;
+    std::optional<RadioTarget> target;
+    if(usingOptic&&useQueued){
+        using Services=uintptr_t(*)();
+        const auto services=reinterpret_cast<Services>(base+0xbff050)();
+        const auto ui=read<uintptr_t>(services+0x98),radio=read<uintptr_t>(ui+0x90);
+        const auto markers=read<uintptr_t>(ui+0x80);
+        if(read<uintptr_t>(radio+0x20)==system&&read<uintptr_t>(markers)==base+0x21addf0){
+            bool queryValid{};const auto hit=surface(frame,&queryValid);
+            if(queryValid)target=radioTarget(system,markers,frame,hit);
+        }
+    }
+    using Select=void(*)(void*,uint16_t);
+    const auto select=reinterpret_cast<Select>(base+0xdc8ca0);
+    const auto selectType=reinterpret_cast<Select>(base+0xdc8cb0);
+    if(usingOptic){
+        const uint16_t id=target?target->id:0xffff;
+        if(!owned||ownedSystem!=system||ownedTarget!=id){
+            log("Physical optic native intel candidate id="+std::to_string(id));
+            if(target)rumbleMailbox().publish({0,.12f,now});
+        }
+        select(reinterpret_cast<void*>(system),id);
+        selectType(reinterpret_cast<void*>(system),target?static_cast<uint16_t>(id>>9):0xffff);
+        owned=true;ownedSystem=system;ownedTarget=id;
+    }else if(owned){
+        // Relinquish only the candidate this physical sight published. An
+        // authored/native selection that has replaced it keeps ownership.
+        if(ownedSystem==system&&read<uint16_t>(system+0x80)==ownedTarget){
+            select(reinterpret_cast<void*>(system),0xffff);
+            selectType(reinterpret_cast<void*>(system),0xffff);
+        }
+        owned=false;
+    }
+    // The original commit emits the game's queued Candidate event and owns
+    // its selected target. Play uses its radio table, enable flags and busy
+    // checks, including MessageOnly targets in authored lessons.
+    originalRadioCommit(object);
+    if(requested&&usingOptic&&target){
+        using Play=bool(*)(void*);
+        const bool played=reinterpret_cast<Play>(base+0xdc8740)(reinterpret_cast<void*>(system));
+        log("Physical optic native intel request id="+std::to_string(target->id)+" accepted="+std::to_string(played));
+        if(played)rumbleMailbox().publish({0,.4f,now});
+    }
+}
+
 bool clearWaypoint(uintptr_t markers,const HeadCameraSample& frame){
     const auto camera=nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.optic.pose.rightEyepiece);
     const auto forward=rotate(camera.orientation,{0,0,-1});
@@ -187,7 +295,7 @@ void update(void* job,void* input,const void* output){
     }
     const auto status=headCamera().status();const auto now=steadyMilliseconds();
     if(!frame.applied||frame.menuOpen||!status.active||frame.activation!=status.activation
-       ||now<frame.sampleTime||now-frame.sampleTime>150){reconDwell.reset();return;}
+       ||now<frame.sampleTime||now-frame.sampleTime>150){reconDwell.reset();opticUseEdge.reset();return;}
     using Services=uintptr_t(*)();
     const auto services=reinterpret_cast<Services>(base+0xbff050)();
     const auto ui=read<uintptr_t>(services+0x98);
@@ -195,7 +303,9 @@ void update(void* job,void* input,const void* output){
     if(read<uintptr_t>(markers)!=base+0x21addf0){reconDwell.reset();return;}
     snapshot(markers,now,status.activation);
     const auto& optic=frame.controllers.optic;
-    if(!optic.held||!optic.pose.tracked||!optic.pose.ray.tracked||optic.pose.kind!=OpticKind::binocular){reconDwell.reset();return;}
+    if(!optic.held||!optic.pose.tracked||!optic.pose.ray.tracked||optic.pose.kind!=OpticKind::binocular){reconDwell.reset();opticUseEdge.reset();return;}
+    if(opticUseEdge.update(optic.active,frame.sampleTime,frame.activation))
+        publishEvent({OpticEventKind::raised,{},frame.sampleTime,frame.activation});
     const bool automatic=optic.active&&frame.controllers.binocularAutoMark;
     if(!automatic)reconDwell.reset();
     if(!automatic&&!requested&&!clearRequested)return;
@@ -235,6 +345,17 @@ void update(void* job,void* input,const void* output){
     using Place=void(*)(void*,const Vector*);
     reinterpret_cast<Place>(base+0x5c53a0)(reinterpret_cast<void*>(markers),&*hit);
     snapshot(markers,now,status.activation);
+    // Notify the ordinary player-message dispatcher only after the native
+    // marker pool contains the point. Mission scripts retain their own
+    // location and action rules; this adapter never selects a next sequence.
+    const auto placed=opticWaypoints();
+    const Vec3 position{hit->x,hit->y,hit->z};
+    for(size_t i=0;i<placed.count;++i){
+        const auto delta=placed.points[i].position-position;
+        if(placed.points[i].letter&&dot(delta,delta)<.0001f){
+            publishEvent({OpticEventKind::waypoint,position,frame.sampleTime,frame.activation});break;
+        }
+    }
     rumbleMailbox().publish({0,.35f,now});
     std::ostringstream message;message<<"Physical optic native waypoint sequence="<<consumed
         <<" position="<<hit->x<<','<<hit->y<<','<<hit->z
@@ -251,6 +372,9 @@ void installOpticMarkers(uintptr_t moduleBase){
     constexpr std::array<unsigned char,9> initEntry{0x48,0x89,0x4c,0x24,0x08,0x48,0x83,0xec,0x18};
     constexpr std::array<unsigned char,10> rayEntry{0x48,0x83,0xec,0x38,0xf3,0x0f,0x10,0x44,0x24,0x60};
     constexpr std::array<unsigned char,10> positionEntry{0x4c,0x8b,0xdc,0x48,0x81,0xec,0x98,0,0,0};
+    constexpr std::array<unsigned char,14> radioCommitEntry{0x40,0x57,0x48,0x83,0xec,0x20,0x0f,0xb7,0x81,0xc0,0,0,0,0x48};
+    constexpr std::array<unsigned char,8> radioSelectEntry{0x66,0x89,0x91,0x80,0,0,0,0xc3};
+    constexpr std::array<unsigned char,8> radioSelectTypeEntry{0x66,0x89,0x91,0x82,0,0,0,0xc3};
     if(!matches(moduleBase+0x930710,updateEntry)||!matches(moduleBase+0x5c53a0,placeEntry)
        ||!matches(moduleBase+0x5c6250,removeEntry)
        ||!matches(moduleBase+0xa0fb50,initEntry)||!matches(moduleBase+0x1b9b130,rayEntry)
@@ -264,8 +388,32 @@ void installOpticMarkers(uintptr_t moduleBase){
     if(created!=MH_OK)throw std::runtime_error(MH_StatusToString(created));
     if(MH_EnableHook(address)!=MH_OK)throw std::runtime_error("Cannot enable native optic markers");
     enabled.store(true);log("Physical optic trigger connected to native waypoint placement");
+    if(!matches(moduleBase+0xdc8fb0,radioCommitEntry)
+       ||!matches(moduleBase+0xdc8ca0,radioSelectEntry)||!matches(moduleBase+0xdc8cb0,radioSelectTypeEntry)
+       ||read<uintptr_t>(moduleBase+0x234c340)!=moduleBase+0xdc8740
+       ||read<uintptr_t>(moduleBase+0x234c3f8)!=moduleBase+0xdc8610){
+        log("Physical optic intel unavailable: native signature mismatch");return;
+    }
+    const auto radioAddress=reinterpret_cast<void*>(base+0xdc8fb0);
+    const auto radioCreated=MH_CreateHook(radioAddress,reinterpret_cast<void*>(&commitRadio),reinterpret_cast<void**>(&originalRadioCommit));
+    if(radioCreated!=MH_OK)throw std::runtime_error(MH_StatusToString(radioCreated));
+    if(MH_EnableHook(radioAddress)!=MH_OK)throw std::runtime_error("Cannot enable physical optic intel");
+    log("Physical optic hand ray connected to native intel selection and radio");
 }
-void publishOpticMarkerFrame(const HeadCameraSample& frame){std::lock_guard lock(mutex);latest=frame;}
+void publishOpticMarkerFrame(const HeadCameraSample& frame){
+    std::lock_guard lock(mutex);
+    if(!frame.applied||frame.menuOpen||!frame.controllers.optic.active||frame.activation!=latest.activation)queuedUse={};
+    latest=frame;
+}
 OpticWaypoints opticWaypoints(){std::lock_guard lock(mutex);return waypoints;}
+std::optional<OpticEvent> takeOpticEvent(uint64_t now,uint64_t activation){
+    std::lock_guard lock(mutex);
+    return opticEvents.take(now,activation);
+}
+void acknowledgeOpticUse(const OpticEvent& event){
+    if(event.kind!=OpticEventKind::raised)return;
+    std::lock_guard lock(mutex);
+    if(event.activation==latest.activation&&latest.controllers.optic.active)queuedUse=event;
+}
 void stopOpticMarkers() noexcept {enabled.store(false);}
 }

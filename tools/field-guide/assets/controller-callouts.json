@@ -1,0 +1,12 @@
+{
+  "left-face.png": {
+    "image_sha256": "a1f4131402fee5228bceb254cf44b667eadb7b361f521aa77e47207595a15cd1",
+    "anchors": {
+      "7": {
+        "x": 0.374,
+        "y": 0.389,
+        "provenance": "Visually verified center of the recessed three-line Menu button in this exact 1000x1000 source-model rendering. This button is baked into controller_mesh, not a named node."
+      }
+    }
+  }
+}

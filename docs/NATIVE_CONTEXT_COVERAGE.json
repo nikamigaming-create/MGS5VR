@@ -1,0 +1,565 @@
+{
+  "schema_version": 1,
+  "inventory_id": "mgs5vr.native-context-coverage",
+  "updated": "2026-09-26",
+  "scope": {
+    "games": ["TPP", "GZ-limited-native-button-path"],
+    "completeness": "initial_finite_obligation_set_incomplete",
+    "execution_policy": "Coverage obligations are not executable scenarios. A broad identity predicate alone never admits an action. An authored scenario must supply and verify all required native subcontext, target, eligibility, outcome and exit guards before execution; unresolved identity fields stay blocked for that scenario.",
+    "description": "A bounded starting denominator for state-aware bot cases and later control teaching material. Each listed variant must be audited independently; this inventory does not assert that every native mode has been discovered.",
+    "binding_export": {
+      "command": "build/Release/mgs5vr_controls.exe --bindings-json",
+      "configuration": "No user configuration file was passed; the executable exported current default effective bindings. Resolve listed IDs against each run's effective export so custom/disabled bindings are respected.",
+      "dispatch_contexts": ["gameplay", "equipment", "commands", "binoculars", "menus", "horse", "vehicle", "nativeButtons"],
+      "warning": "These eight coarse resolver categories are input dispatch contexts, not a complete list of native game modes or interaction states. CONTROL_SCHEMA.json is human-authored guidance, not runtime proof."
+    },
+    "verification_limit": "The September 26 prototype has bounded observations for Continue, Pause open/close, iDroid open and one tutorial acknowledgment, plus a recorded posture failure. No full-context or physical-headset pass is claimed.",
+    "status_vocabulary": {
+      "identity_predicate_format": "predicate is null when no executable observation predicate is currently supported. Otherwise, all is a set of strict dot-path equals checks against the bot observation (all must match), and any is a list of strict equals-check sets where at least one set must match. Missing/stale fields fail the case. These are obligation predicates; native-only fields require the optional Lua scenario snapshot and must be added to the bot case explicitly.",
+      "binding_status": {
+        "implemented": "The referenced semantic action/axis exists in the current source export; this does not certify that its dispatch context matches the native situation.",
+        "partial": "Some required inputs exist, while an input path is disabled, absent, or only covers a subset of the obligation.",
+        "unknown": "The current source and export do not establish a usable route."
+      },
+      "identity_status": {
+        "available_in_current_telemetry": "The listed predicate uses fields exposed by the current fast bot observer; unlisted subcontext fields can still be missing.",
+        "partial": "Only a broad scene/status cue or optional Lua snapshot is available; it does not uniquely identify the native subcontext.",
+        "unknown": "No current predicate can identify this native subcontext."
+      },
+      "native_outcome_status": {
+        "verified_bounded": "A bounded native transition was observed in the September 26 prototype; it is not a complete context pass.",
+        "partial_observation": "Some native response was observed, with required substate or return behavior still open.",
+        "observed_failure": "An attempted action failed its native state predicate in the recorded prototype run.",
+        "unverified": "No matching end-to-end outcome was verified for the current prototype.",
+        "unknown": "No meaningful native identity or outcome is exposed by the current telemetry."
+      }
+    },
+    "instrumentation_gaps": [
+      {
+        "id": "gap.menu_focus",
+        "missing": "Exact focused menu item, enabled native choices, nested menu owner, and tutorial/acknowledgment mask.",
+        "available": "The fast observer exposes title/menu/iDroid open flags; it does not expose focus or selected option.",
+        "references": ["src/native_actions.cpp::publishFastInput", "tools/gameplay_bot/core.py::scene"]
+      },
+      {
+        "id": "gap.player_mode",
+        "missing": "Fresh mounted/seat/emplacement role, on-foot subcontext, aim/weapon readiness, cover/hide, target eligibility, and action acceptance in one correlated native observation.",
+        "available": "The optional Lua scenario query records mission/sequence, selected player status bits, buddy and a few weapon slots; the fast control audit records one coarse resolver category and sampled inputs.",
+        "references": ["tools/scenario-state.lua", "src/native_actions.cpp::publishFastInput"]
+      },
+      {
+        "id": "gap.target_interaction",
+        "missing": "Target identity/range/eligibility, prompt kind, current CQC/hold-up/interrogation option, and resulting intel or target-state delta.",
+        "available": "No target-action contract is published in the bot snapshot; native script source describes dispatch paths but not current scene eligibility.",
+        "references": ["tools/scenario-state.lua", "docs/SYSTEMS_ACCESS.md"]
+      },
+      {
+        "id": "gap.cinematic_class",
+        "missing": "Interactive versus noninteractive demo class, camera-cut generation, per-step input lock, permitted skip/cancel, and re-acquired player control.",
+        "available": "The current scene classifier sees one demo boolean and labels it cinematic.",
+        "references": ["tools/scenario-state.lua", "tools/gameplay_bot/core.py::scene", "docs/COMMUNITY_RECOVERY_PLAN.md::R01-R04"]
+      },
+      {
+        "id": "gap.equipment_result",
+        "missing": "Selected native equipment ID/grade, availability reason, effect-specific state delta, and item-specific cancel behavior across all owned eligible IDs.",
+        "available": "The fast snapshot does not enumerate the full native equipment catalog or validate item effects.",
+        "references": ["docs/BOT_AND_SHOWCASE_PLAN.md::B3-B5", "docs/SYSTEMS_ACCESS.md"]
+      },
+      {
+        "id": "gap.helicopter_vehicle_role",
+        "missing": "Native helicopter passenger/seat/weapon role, vehicle subtype, mount identity, control handoff, and exit readiness.",
+        "available": "The scenario query reports sequence and player statuses but does not publish native helicopter or emplacement role identity.",
+        "references": ["tools/scenario-state.lua", "docs/COMMUNITY_RECOVERY_PLAN.md::R31-R37"]
+      },
+      {
+        "id": "gap.native_action_result",
+        "missing": "Game-consumed action result, rejection reason, and matching visible native effect.",
+        "available": "Input sampling and XR-published gamepad bits establish delivery only; they do not establish game acceptance.",
+        "references": ["tools/gameplay_bot/live.py::held_input_evidence", "docs/BOT_AND_SHOWCASE_PLAN.md::Implementation checkpoint, September 26"]
+      }
+    ]
+  },
+  "records": [
+    {
+      "id": "TPP.TITLE.CABIN_CONTINUE",
+      "family": "title_and_cabin",
+      "game": "TPP",
+      "context": "Title helicopter cabin, Continue cassette/rack focus, physical interaction, title exit and saved-game handoff.",
+      "identity": {
+        "status": "partial",
+        "predicate": {"all": {"title": true, "title_cabin": true, "title_menu": true, "opening_assets": true}},
+        "missing": ["focused cassette/item", "physical prompt/interact eligibility", "title cleanup complete"],
+        "references": ["src/native_actions.cpp::publishFastInput", "tools/gameplay-bot.py::continue_game", "docs/CABIN_NATIVE_STATUS.md::Acceptance remains incomplete"]
+      },
+      "required_actions": [
+        {"intent": "Enter and traverse the real cabin; identify the Continue cassette by native focus/prompt before interacting.", "binding_refs": {"actions": [], "axes": ["axes.move", "axes.turn"]}, "outcome": "Visible intended Continue selection is proven before input."},
+        {"intent": "Squeeze the right-hand controller Trigger once at the verified physical rack target; do not use a blind menu confirm.", "binding_refs": {"actions": [], "axes": []}, "direct_route": {"type": "bot_raw_controller_input", "controller": "right", "component": "Trigger", "value": 1.0, "duration_seconds": 0.18, "semantic_label": "opening.continue", "source": "tools/gameplay-bot.py::continue_game", "in_effective_binding_export": false}, "outcome": "One native title-to-loading transition."},
+        {"intent": "Wait for the actual Resume/confirm phase when the native loader requests it.", "binding_refs": {"actions": ["menus.confirm"], "axes": []}, "outcome": "Loading completes and the expected saved gameplay session is observed."}
+      ],
+      "exit_or_cancel": {"intent": "Abort on changed scene/focus or missing native rack; never send a guessed back/confirm action or repeat an ambiguous input. Neutralize and record the safe stop.", "binding_refs": {"actions": [], "axes": []}, "outcome": "Neutral input and a recorded safe stop or one verified gameplay arrival."},
+      "community_report_ids": ["R36"],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::continue-02", "docs/CABIN_NATIVE_STATUS.md::Spatial Continue into saved gameplay", "src/native_actions.cpp::publishFastInput"],
+      "binding_status": "partial",
+      "native_outcome_status": "verified_bounded"
+    },
+    {
+      "id": "TPP.DEPLOYMENT.LOADOUT_AND_SORTIE",
+      "family": "title_and_cabin",
+      "game": "TPP",
+      "context": "Mission selection, deployment/loadout, sortie preparation, launch and return-to-ACC transitions.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["native screen/submenu identity", "selected mission and loadout", "sortie-ready/return state"], "references": ["docs/COMMUNITY_ISSUES_2026-09-20.md::deployment/loadout", "tools/scenario-state.lua"]},
+      "required_actions": [
+        {"intent": "Enumerate the visible native menu choices and select an eligible mission/loadout without assuming catalog options.", "binding_refs": {"actions": ["menus.confirm", "menus.back", "menus.previous_tab", "menus.next_tab"], "axes": ["axes.menu"]}, "outcome": "Selected sortie identity, gear and actual mission launch are independently observed."}
+      ],
+      "exit_or_cancel": {"intent": "Exercise native back/cancel at each preparation layer and verify whether it returns to the previous menu, ACC or gameplay.", "binding_refs": {"actions": ["menus.back"], "axes": []}, "outcome": "Known prior state restored; no menu-focus guess."},
+      "community_report_ids": ["R28", "R36"],
+      "evidence_refs": ["docs/COMMUNITY_ISSUES_2026-09-20.md::Issue inventory", "docs/COMMUNITY_RECOVERY_PLAN.md::R28/R36", "docs/BOT_AND_SHOWCASE_PLAN.md::B3-B5"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.HELICOPTER.PASSENGER_TRANSPORT",
+      "family": "helicopter_transport",
+      "game": "TPP",
+      "context": "Snake boards support helicopter, rides/transports, lands or exits, and returns control to field play.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["helicopter passenger state", "flight/landing phase", "seat and control owner", "field-control reacquisition"], "references": ["artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppHelicopter.lua::IsInHelicopter/GetPassengerlist", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua::SetHelicopterInsideAction", "tools/scenario-state.lua"]},
+      "required_actions": [
+        {"intent": "Observe a native boarding prompt, board once, follow the transport phase, and verify field-control handoff after landing/exiting.", "binding_refs": {"actions": ["gameplay.interact", "vehicle.interact"], "axes": ["axes.move", "axes.turn"]}, "outcome": "Correct passenger role, camera, native transition and post-transport player control are observed."}
+      ],
+      "exit_or_cancel": {"intent": "Record each native exit/landing/cancel path exposed in the actual helicopter state; do not assume a generic vehicle exit.", "binding_refs": {"actions": ["vehicle.interact", "menus.back"], "axes": []}, "outcome": "Native helicopter state ends and Snake's expected gameplay mode is restored."},
+      "community_report_ids": ["R34", "R36"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::Support and progression", "docs/COMMUNITY_RECOVERY_PLAN.md::R34/R36", "docs/COMMUNITY_RECOVERY_PLAN.md::W6 mounted/pad gate"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.MENU.PAUSE_OPTIONS",
+      "family": "menus",
+      "game": "TPP",
+      "context": "Pause open, native navigation/options, allowed actions across camera cuts, close and return.",
+      "identity": {"status": "available_in_current_telemetry", "predicate": {"all": {"menu": true, "idroid": false}}, "missing": ["focused item", "visible selection movement", "input lock/allowance during cinematic transitions"], "references": ["src/native_actions.cpp::publishFastInput", "tools/gameplay_bot/suites/menu-roundtrip.json"]},
+      "required_actions": [
+        {"intent": "Open Pause and verify its native open flag and both-eye menu pixels.", "binding_refs": {"actions": ["system.pause"], "axes": []}, "outcome": "menu=true, idroid=false and visible Pause UI."},
+        {"intent": "Navigate one native menu item and change an eligible option only in a declared test case.", "binding_refs": {"actions": ["menus.confirm", "menus.dpad_up", "menus.dpad_down", "menus.dpad_left", "menus.dpad_right"], "axes": ["axes.menu"]}, "outcome": "Native focus and selected value change are observed; disabled default D-pad actions are reported as unavailable."}
+      ],
+      "exit_or_cancel": {"intent": "Close Pause with native back and verify gameplay camera/input ownership returns.", "binding_refs": {"actions": ["menus.back"], "axes": []}, "outcome": "menu=false and live gameplay presentation resumes."},
+      "community_report_ids": ["R04", "R17", "R19"],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::menu-01", "docs/COMMUNITY_ISSUES_2026-09-20.md::Pause >5 s", "docs/COMMUNITY_RECOVERY_PLAN.md::R04/R17/R19"],
+      "binding_status": "partial",
+      "native_outcome_status": "partial_observation"
+    },
+    {
+      "id": "TPP.MENU.IDROID_MAP_TABS",
+      "family": "menus",
+      "game": "TPP",
+      "context": "iDroid open, map pan/zoom, native tabs/submenus and safe close/reopen.",
+      "identity": {"status": "available_in_current_telemetry", "predicate": {"all": {"idroid": true}}, "missing": ["active tab", "focused control", "map selection/waypoint", "tutorial pause mask"], "references": ["src/native_actions.cpp::publishFastInput", "docs/CONTROLS.md::iDroid/map"]},
+      "required_actions": [
+        {"intent": "Open the iDroid and verify the native screen and its tracked/handheld presentation.", "binding_refs": {"actions": ["system.idroid"], "axes": []}, "outcome": "idroid=true and visible native iDroid UI."},
+        {"intent": "Pan/zoom the map and visit available tabs; do not treat UI input delivery as a selected-map result.", "binding_refs": {"actions": ["menus.previous_tab", "menus.next_tab", "menus.left_trigger", "menus.right_trigger"], "axes": ["axes.map"]}, "outcome": "Map/tabs visibly change and selected item is recorded."}
+      ],
+      "exit_or_cancel": {"intent": "Use the observed native back path, then verify gameplay; reopen once only after close is confirmed.", "binding_refs": {"actions": ["menus.back"], "axes": []}, "outcome": "idroid=false with gameplay active; any nested tutorial acknowledgment is handled as its own state."},
+      "community_report_ids": ["R18", "R19"],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::idroid-recovery-01", "docs/BOT_AND_SHOWCASE_PLAN.md::tutorial-ack-01", "docs/COMMUNITY_ISSUES_2026-09-20.md::iDroid map", "docs/COMMUNITY_RECOVERY_PLAN.md::R18/R19"],
+      "binding_status": "implemented",
+      "native_outcome_status": "partial_observation"
+    },
+    {
+      "id": "TPP.MENU.IDROID_TUTORIAL_ACK_ESCAPE",
+      "family": "menus",
+      "game": "TPP",
+      "context": "Nested iDroid/Mother Base tutorial acknowledgment, D-pad navigation, escape, gameplay return and reopen.",
+      "identity": {"status": "partial", "predicate": {"all": {"idroid": true}}, "missing": ["tutorial mask and current tutorial page", "focused acknowledgment", "whether B/back is safe in each page"], "references": ["src/native_actions.cpp::MGS5VR_iDroid pause registration", "docs/COMMUNITY_RECOVERY_PLAN.md::R19"]},
+      "required_actions": [
+        {"intent": "Discover each required native tutorial response from its visible prompt; never synthesize a choice from remembered layouts.", "binding_refs": {"actions": ["menus.confirm", "menus.dpad_up", "menus.dpad_down", "menus.dpad_left", "menus.dpad_right"], "axes": ["axes.menu"]}, "outcome": "Tutorial progression/acknowledgment is native and visible."}
+      ],
+      "exit_or_cancel": {"intent": "Verify a safe escape, gameplay resume, then reopen the iDroid without leaving a held pause/tutorial state.", "binding_refs": {"actions": ["menus.back", "system.idroid"], "axes": []}, "outcome": "Fresh gameplay observation and a successful second open/close cycle."},
+      "community_report_ids": ["R19", "R24"],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::tutorial-ack-01", "docs/COMMUNITY_RECOVERY_PLAN.md::R19", "src/native_actions.cpp::native iDroid pause registration"],
+      "binding_status": "partial",
+      "native_outcome_status": "partial_observation"
+    },
+    {
+      "id": "TPP.MENU.RADIO_CASSETTE",
+      "family": "menus",
+      "game": "TPP",
+      "context": "Radio/cassette playback and native text/voice overlays while field gameplay continues or pauses.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["radio/cassette overlay identity", "playback selection", "whether the active mission owns the input", "dismiss state"], "references": ["artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppCassette.lua", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppRadio.lua"]},
+      "required_actions": [{"intent": "Exercise available cassette/radio selection and playback only after the native screen/choice is identified.", "binding_refs": {"actions": ["menus.confirm", "menus.back"], "axes": ["axes.menu"]}, "outcome": "Correct native track/message begins and input ownership is understood."}],
+      "exit_or_cancel": {"intent": "Use the visible native close/back action and verify gameplay input resumes.", "binding_refs": {"actions": ["menus.back"], "axes": []}, "outcome": "Overlay ends and ordinary play resumes."},
+      "community_report_ids": [],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::B3 contextual action coverage", "docs/CONTROLS.md::Complete native-button mode"],
+      "binding_status": "partial",
+      "native_outcome_status": "unknown"
+    },
+    {
+      "id": "TPP.FOOT.POSTURE_LOCOMOTION",
+      "family": "on_foot",
+      "game": "TPP",
+      "context": "On-foot standing, squat/crouch, crawl/prone, movement, sprint, dive/roll and transitions among stances.",
+      "identity": {"status": "partial", "predicate": {"all": {"scene": "gameplay"}, "any": [{"native.status_STAND": true}, {"native.status_SQUAT": true}, {"native.status_CRAWL": true}]}, "missing": ["continuous fresh stance/body state in the fast observer", "roll/dive state", "support-floor/collision identity"], "references": ["tools/scenario-state.lua::PlayerStatus", "docs/BOT_AND_SHOWCASE_PLAN.md::posture-01/posture-hold-01"]},
+      "required_actions": [
+        {"intent": "For each native stance, verify enter, hold, movement, turn, exit and repeat transitions separately.", "binding_refs": {"actions": ["gameplay.stance", "gameplay.run", "gameplay.dive"], "axes": ["axes.move", "axes.turn"]}, "outcome": "Native status changes to the requested posture and player/camera remain aligned."}
+      ],
+      "exit_or_cancel": {"intent": "Return to a known stance with a fresh native state check; neutralize controls after a timeout.", "binding_refs": {"actions": ["gameplay.stance"], "axes": []}, "outcome": "Requested status is observed; failed action is recorded without counting input delivery as success."},
+      "community_report_ids": ["R09", "R13", "R47", "R49"],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::posture-01/posture-hold-01", "docs/COMMUNITY_RECOVERY_PLAN.md::R09/R13/R47/R49", "tools/scenario-state.lua::PlayerStatus"],
+      "binding_status": "implemented",
+      "native_outcome_status": "observed_failure"
+    },
+    {
+      "id": "TPP.FOOT.WEAPON_READY_FIRE_RELOAD",
+      "family": "on_foot",
+      "game": "TPP",
+      "context": "On-foot weapon ready/stow, aim, fire, scope zoom, reload, switch and weapon-specific attachments across eligible IDs.",
+      "identity": {"status": "partial", "predicate": {"all": {"scene": "gameplay"}}, "missing": ["current weapon ID/grade and native ready/aim state in the fast observer", "ammo/reload/result delta", "obstruction and target state"], "references": ["tools/scenario-state.lua::weapon_PRIMARY_HIP/PRIMARY_BACK/SECONDARY", "docs/CONTROLS.md::Weapons and hands"]},
+      "required_actions": [
+        {"intent": "Enumerate each owned eligible weapon and attachment independently; ready, aim, fire only at an eligible target, reload, change weapon and verify state deltas.", "binding_refs": {"actions": ["gameplay.ready_weapon", "gameplay.fire_or_cqc", "gameplay.reload", "gameplay.switch_weapon", "gameplay.zoom"], "axes": ["axes.turn"]}, "outcome": "Correct weapon/action, ammunition and native/visible result are observed; obstruction remains native."}
+      ],
+      "exit_or_cancel": {"intent": "Stow by releasing weapon-ready input; stop firing on scene or ownership changes.", "binding_refs": {"actions": ["gameplay.ready_weapon"], "axes": []}, "outcome": "Weapon is native-stowed and input is neutral."},
+      "community_report_ids": ["R08", "R11", "R14", "R15", "R16", "R27"],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::B3-B5", "docs/CONTROLS.md::Weapons and hands", "docs/COMMUNITY_RECOVERY_PLAN.md::R08/R11/R14-R16/R27", "tools/scenario-state.lua::weapon slots"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.FOOT.HIDE_COVER",
+      "family": "on_foot",
+      "game": "TPP",
+      "context": "Contextual cover/lean, cardboard box and toilet hiding, enter/leave and re-acquire field view.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["native hiding/cover mode and exact hideable target", "prompt availability", "camera/player ownership while hidden"], "references": ["docs/COMMUNITY_RECOVERY_PLAN.md::R09/R55", "tools/scenario-state.lua"]},
+      "required_actions": [{"intent": "Approach one eligible cover/hide object, use the actual prompt, observe native hide/cover state, and test view/control without assuming all surfaces share a route.", "binding_refs": {"actions": ["gameplay.interact", "gameplay.stance"], "axes": ["axes.move"]}, "outcome": "Correct hide/cover state enters and camera remains aligned."}],
+      "exit_or_cancel": {"intent": "Use the native exit route for that object, then verify on-foot posture and movement.", "binding_refs": {"actions": ["gameplay.interact", "gameplay.stance"], "axes": []}, "outcome": "Hide state clears and field control returns."},
+      "community_report_ids": ["R09", "R55"],
+      "evidence_refs": ["docs/COMMUNITY_RECOVERY_PLAN.md::R09/R55", "docs/BOT_AND_SHOWCASE_PLAN.md::B2 navigation and interaction edges"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.FOOT.TRAVERSE",
+      "family": "on_foot",
+      "game": "TPP",
+      "context": "Native traversal interactions such as climb, ladder, vault, dive and local obstacle crossing.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["traversal type/edge", "valid start/end support floor", "completion or rejection state"], "references": ["docs/BOT_AND_SHOWCASE_PLAN.md::Navigation that stops thrashing", "tools/scenario-state.lua"]},
+      "required_actions": [{"intent": "Create one case per native traversal prompt/edge and verify the destination, floor and player status; no timed input counts as arrival.", "binding_refs": {"actions": ["gameplay.interact", "gameplay.dive", "gameplay.stance"], "axes": ["axes.move"]}, "outcome": "Native transition completes at the expected supported destination."}],
+      "exit_or_cancel": {"intent": "Use only an observed cancel/withdraw path where available and record an unrecoverable edge as blocked.", "binding_refs": {"actions": ["gameplay.interact"], "axes": []}, "outcome": "Known source state restored or explicit blocked result."},
+      "community_report_ids": ["R55"],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::B2 real navigation", "docs/BOT_AND_SHOWCASE_PLAN.md::navigation acceptance", "docs/COMMUNITY_RECOVERY_PLAN.md::R55"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.FOOT.PICKUP_COLLECTION",
+      "family": "on_foot",
+      "game": "TPP",
+      "context": "Context pickups including plants, diamonds, cassettes and dropped weapons; preserve item-specific native prompt and result.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["object identity/range", "prompt and eligibility", "inventory/collection result"], "references": ["artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua::OnPickUpCollection/OnPickUpWeapon", "docs/COMMUNITY_RECOVERY_PLAN.md::R24/R28"]},
+      "required_actions": [{"intent": "For each object class, read the actual prompt, perform its native context or hold action once, and check the inventory/collection delta.", "binding_refs": {"actions": ["gameplay.interact", "gameplay.pickup_carry"], "axes": []}, "outcome": "Expected native item is acquired exactly once."}],
+      "exit_or_cancel": {"intent": "Release held input and leave the prompt range; verify no duplicate pickup or stuck carry state.", "binding_refs": {"actions": ["gameplay.interact", "gameplay.pickup_carry"], "axes": []}, "outcome": "Input neutral and inventory result stable."},
+      "community_report_ids": ["R24", "R28"],
+      "evidence_refs": ["docs/COMMUNITY_ISSUES_2026-09-20.md::pickups/plants/diamonds", "docs/COMMUNITY_RECOVERY_PLAN.md::R24/R28", "docs/CONTROLS.md::Weapons and hands"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.FOOT.FULTON_RECOVERY",
+      "family": "on_foot",
+      "game": "TPP",
+      "context": "Fulton launch/recovery for each eligible restrained person, animal, vehicle or cargo class, including campaign restrictions.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["target class/eligibility and extraction success ratio", "launch prompt", "recovery count/result"], "references": ["artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua::OnPlayerFulton/MakeFultonRecoverSucceedRatio", "docs/SYSTEMS_ACCESS.md::Stealth and recovery"]},
+      "required_actions": [{"intent": "Probe eligibility per target class, use the visible native prompt, and verify launch plus mission/recovery result without treating input delivery as extraction.", "binding_refs": {"actions": ["gameplay.interact"], "axes": []}, "outcome": "Target is accepted and the expected native recovery state/result occurs."}],
+      "exit_or_cancel": {"intent": "Use the current prompt's native cancel path if launch has not begun; after launch, observe the irreversible outcome before any retry.", "binding_refs": {"actions": ["menus.back"], "axes": []}, "outcome": "One confirmed extraction or a recorded eligibility/rejection result."},
+      "community_report_ids": ["R24"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::Stealth and recovery", "docs/COMMUNITY_RECOVERY_PLAN.md::R24", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua::Fulton result functions"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.FOOT.CQC_HOLDUP",
+      "family": "on_foot",
+      "game": "TPP",
+      "context": "Contextual CQC attack/grab, hold-up, restraint and release/stun/death outcomes on eligible targets.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["target identity/range/awareness", "native CQC substate", "hold-up eligibility and outcome"], "references": ["docs/SYSTEMS_ACCESS.md::Ordinary CQC and Physical melee contract", "docs/BOT_AND_SHOWCASE_PLAN.md::B3 contextual action coverage"]},
+      "required_actions": [{"intent": "Approach a legal target state, use the contextual native CQC route, and verify the exact attack/grab/restraint response before continuing.", "binding_refs": {"actions": ["gameplay.fire_or_cqc", "gameplay.interact", "gameplay.ready_weapon"], "axes": []}, "outcome": "Native target status/reaction matches the intended contextual action."}],
+      "exit_or_cancel": {"intent": "Release attack input; use a target-specific release/setdown route only when the current native prompt establishes it.", "binding_refs": {"actions": ["gameplay.pickup_carry", "gameplay.interact"], "axes": []}, "outcome": "No held button remains and target state is known."},
+      "community_report_ids": ["R24"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::Ordinary CQC", "docs/SYSTEMS_ACCESS.md::Physical melee contract", "docs/BOT_AND_SHOWCASE_PLAN.md::interrogation vertical slice", "docs/COMMUNITY_RECOVERY_PLAN.md::R24"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.FOOT.INTERROGATION_CHOICES",
+      "family": "on_foot",
+      "game": "TPP",
+      "context": "Eligible restrained guard interrogation, dynamically available native responses/orders and resulting intel/map updates.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["current interrogated target", "native option list and enabled choice", "response accepted", "intel/map delta"], "references": ["artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppInterrogation.lua::Messages/_OnInterrogation/_SelectInterrogation", "tools/scenario-state.lua"]},
+      "required_actions": [{"intent": "Discover choices from the current native interrogation prompt, then determine its matching input route from the prompt and current effective export. No buddy-Commands route or fixed response is assumed. Correlate the result with voice, target and intel/map state.", "binding_refs": {"actions": ["gameplay.fire_or_cqc", "gameplay.interact"], "axes": []}, "outcome": "The target acknowledges the selected response and the expected native reveal/order result is visible and observed."}],
+      "exit_or_cancel": {"intent": "Use the option presented by the current native interaction to end/release; verify the guard and player are no longer in the interrogation state.", "binding_refs": {"actions": ["gameplay.interact"], "axes": []}, "outcome": "Interaction ends cleanly and gameplay resumes."},
+      "community_report_ids": ["R24"],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::B3 contextual action coverage", "docs/BOT_AND_SHOWCASE_PLAN.md::first interrogation route", "docs/SYSTEMS_ACCESS.md::contextual interrogation", "docs/COMMUNITY_RECOVERY_PLAN.md::R24", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppInterrogation.lua::selection/assignment functions"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.FOOT.CARRY_SETDOWN",
+      "family": "on_foot",
+      "game": "TPP",
+      "context": "Pick up/carry restrained people or objects, move while carrying, set down/release, and return to ordinary posture.",
+      "identity": {"status": "partial", "predicate": {"all": {"scene": "gameplay", "native.status_CARRY": true}}, "missing": ["carried target class/identity", "native setdown prompt/state", "carry position/collision"], "references": ["tools/scenario-state.lua::PlayerStatus.CARRY", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua::EndCarryAction"]},
+      "required_actions": [{"intent": "Use a visible eligible pickup/carry prompt, move a bounded route, and verify native carried state and target association.", "binding_refs": {"actions": ["gameplay.pickup_carry"], "axes": ["axes.move"]}, "outcome": "Native carry status and target follow behavior are observed."}],
+      "exit_or_cancel": {"intent": "Use the current target's native setdown/release action and verify status_CARRY clears.", "binding_refs": {"actions": ["gameplay.pickup_carry", "gameplay.interact"], "axes": []}, "outcome": "Target is safely set down/released; Snake returns to a known on-foot state."},
+      "community_report_ids": ["R24"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::Stealth and recovery", "docs/CONTROLS.md::Pick up/carry", "tools/scenario-state.lua::PlayerStatus.CARRY", "docs/COMMUNITY_RECOVERY_PLAN.md::R24"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.EQUIPMENT.PICKER_NAVIGATION",
+      "family": "equipment",
+      "game": "TPP",
+      "context": "Wrist picker open, primary/secondary/support/item categories, browse, back, selection and explicit Use prompts.",
+      "identity": {"status": "partial", "predicate": {"all": {"controls.context": "equipment"}}, "missing": ["native picker visible/open state", "focused category/card", "selection result and availability reason"], "references": ["include/mgs5vr/controls.hpp::ControlContext", "docs/CONTROLS.md::Equipment selection", "docs/BOT_AND_SHOWCASE_PLAN.md::effective bindings"]},
+      "required_actions": [{"intent": "Open while verifying the native overview, center between choices, browse each available category/card, and confirm only an eligible visible selection.", "binding_refs": {"actions": ["equipment.open", "equipment.primary", "equipment.secondary", "equipment.support", "equipment.items", "equipment.use"], "axes": ["axes.equipment"]}, "outcome": "Native selected ID/slot changes to the intended available item; explicit Use produces its own result."}],
+      "exit_or_cancel": {"intent": "Use native back or release the picker modifier as appropriate; verify normal play and controls context return.", "binding_refs": {"actions": ["equipment.back", "equipment.open"], "axes": []}, "outcome": "Picker closes with a known selected item and no held input."},
+      "community_report_ids": ["R22", "R23"],
+      "evidence_refs": ["docs/CONTROLS.md::Equipment selection", "docs/COMMUNITY_RECOVERY_PLAN.md::R22/R23", "docs/BOT_AND_SHOWCASE_PLAN.md::B3/B5"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.EQUIPMENT.ITEM_EFFECTS_BY_ID",
+      "family": "equipment",
+      "game": "TPP",
+      "context": "Each owned, mission-eligible equipment ID/grade and its primary, secondary, support or item-specific effects/alternate controls.",
+      "identity": {"status": "partial", "predicate": {"all": {"scene": "gameplay"}}, "missing": ["complete eligible native ID catalog", "current selected ID/grade/count", "item-specific effect state and completion"], "references": ["docs/BOT_AND_SHOWCASE_PLAN.md::B3-B5", "docs/SYSTEMS_ACCESS.md::Special equipment", "tools/scenario-state.lua::weapon slots"]},
+      "required_actions": [{"intent": "Generate one case per owned eligible item ID/grade, execute its native primary/alternate/use path, and verify its documented effect and recovery. Do not count selection as execution.", "binding_refs": {"actions": ["equipment.use", "gameplay.interact", "gameplay.fire_or_cqc", "gameplay.ready_weapon"], "axes": ["axes.equipment"]}, "outcome": "Item-specific native world/state delta is verified and tied to the exact ID/config export."}],
+      "exit_or_cancel": {"intent": "Use item-specific stow, cancel or safe native timeout and confirm selected/equipped state; avoid retry after an ambiguous one-shot use.", "binding_refs": {"actions": ["equipment.back", "equipment.open"], "axes": []}, "outcome": "Known item state and no duplicate use."},
+      "community_report_ids": ["R23", "R24", "R30"],
+      "evidence_refs": ["docs/BOT_AND_SHOWCASE_PLAN.md::B3/B5", "docs/SYSTEMS_ACCESS.md::Special equipment", "docs/COMMUNITY_RECOVERY_PLAN.md::R23/R24/R30"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.OPTICS.BINOCULAR_MARKING",
+      "family": "optics",
+      "game": "TPP",
+      "context": "Raise/stow binoculars, zoom, run/stance, native target marking/unmarking, intel/analysis and waypoint behavior.",
+      "identity": {"status": "partial", "predicate": {"all": {"controls.context": "binoculars"}}, "missing": ["native binocular state and eye alignment", "target eligibility/mark acquisition", "native analysis progression result"], "references": ["include/mgs5vr/controls.hpp::ControlContext", "docs/SYSTEMS_ACCESS.md::Reconnaissance and important missing abilities", "docs/COMMUNITY_RECOVERY_PLAN.md::R25-R29"]},
+      "required_actions": [{"intent": "Equip, compare both-eye world/optic view, zoom, acquire/unmark one eligible visible target, and check native map/intel progression separately.", "binding_refs": {"actions": ["gameplay.equip_binoculars", "binoculars.stow", "binoculars.zoom", "binoculars.mark", "binoculars.clear_mark", "binoculars.run", "binoculars.stance"], "axes": ["axes.turn"]}, "outcome": "Native optic state, target mark, analysis and visible result are separately established."}],
+      "exit_or_cancel": {"intent": "Stow with the explicit binocular action and verify surrounding scene, weapon state and gameplay dispatch return.", "binding_refs": {"actions": ["binoculars.stow"], "axes": []}, "outcome": "Optic is stowed and gameplay resumes."},
+      "community_report_ids": ["R15", "R25", "R26", "R29", "R39"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::Binoculars/scopes", "docs/SYSTEMS_ACCESS.md::Reconnaissance", "docs/COMMUNITY_RECOVERY_PLAN.md::R15/R25-R29/R39"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.OPTICS.FIREARM_SCOPES",
+      "family": "optics",
+      "game": "TPP",
+      "context": "Weapon-authored scope/optic per weapon ID, eye relief, magnification inputs and restoration to ordinary aim.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["weapon ID and authored optic", "native scoped aim/zoom state", "eye visibility/alignment and exit"], "references": ["docs/CONTROLS.md::Weapons and hands", "docs/WEAPON_SCOPES.md"]},
+      "required_actions": [{"intent": "Test each scoped weapon independently at supported eye distances and its authored magnification; do not infer scope behavior from binocular zoom or another rifle.", "binding_refs": {"actions": ["gameplay.ready_weapon", "gameplay.zoom", "gameplay.fire_or_cqc"], "axes": []}, "outcome": "Correct weapon scope view/zoom and shot alignment are visible in both eyes."}],
+      "exit_or_cancel": {"intent": "Lower/stow weapon and verify optic scene closes without changing the selected weapon unexpectedly.", "binding_refs": {"actions": ["gameplay.ready_weapon"], "axes": []}, "outcome": "Normal stereo world and native selected weapon restored."},
+      "community_report_ids": ["R15", "R16"],
+      "evidence_refs": ["docs/CONTROLS.md::Weapons and hands", "docs/WEAPON_SCOPES.md", "docs/COMMUNITY_RECOVERY_PLAN.md::R15/R16"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.BUDDY.COMMANDS_ON_FOOT",
+      "family": "buddy_and_mounts",
+      "game": "TPP",
+      "context": "On-foot Call/Commands menu; choices differ by active buddy, ability, progression and current native situation.",
+      "identity": {"status": "partial", "predicate": {"all": {"scene": "gameplay", "native.buddy_loading": false}}, "missing": ["native command menu open/choice list", "active buddy command eligibility", "choice result"], "references": ["tools/scenario-state.lua::active_buddy/buddy_loading", "docs/SYSTEMS_ACCESS.md::Commands and optics"]},
+      "required_actions": [{"intent": "Open only when the observed native menu is available, read current choices, select one available order and verify the buddy response.", "binding_refs": {"actions": ["commands.open", "commands.keep_open", "commands.confirm", "commands.back"], "axes": ["axes.commands"]}, "outcome": "Correct active buddy/ability acknowledges the native order."}],
+      "exit_or_cancel": {"intent": "Use native back or release the open modifier, then verify gameplay input ownership resumes.", "binding_refs": {"actions": ["commands.back", "commands.keep_open"], "axes": []}, "outcome": "Commands closes and no stick input leaks into movement/camera."},
+      "community_report_ids": ["R24", "R53"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::Commands and optics", "docs/COMMUNITY_RECOVERY_PLAN.md::R24/R53", "tools/scenario-state.lua::buddy fields"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.HORSE.MOUNTED_RIDER",
+      "family": "buddy_and_mounts",
+      "game": "TPP",
+      "context": "D-Horse prompt/mount, rider locomotion/turn/speed, weapon/actions and dismount; mounted buddy Commands are a separate role.",
+      "identity": {"status": "partial", "predicate": {"all": {"controls.context": "horse"}}, "missing": ["native mounted/seat state", "active horse identity and prompt", "rider movement/turn owner"], "references": ["docs/CONTROLS.md::horse/Y mount prompt", "docs/SYSTEMS_ACCESS.md::Nearby D-Horse", "docs/COMMUNITY_RECOVERY_PLAN.md::R37"]},
+      "required_actions": [{"intent": "At a real D-Horse prompt, mount; verify mounted status, ride/steer/speed, lower weapon as needed and repeat through dismount.", "binding_refs": {"actions": ["horse.interact", "horse.gallop", "horse.stance", "horse.reload", "gameplay.ready_weapon", "turn.left", "turn.right"], "axes": ["axes.move", "axes.turn"]}, "outcome": "Native horse/rider motion, camera and player root agree in both travel directions."}],
+      "exit_or_cancel": {"intent": "Use the observed dismount route and verify return to the original on-foot stance/camera owner.", "binding_refs": {"actions": ["horse.interact"], "axes": []}, "outcome": "Native horse mount state clears and ordinary gameplay dispatch returns."},
+      "community_report_ids": ["R09", "R37", "R53"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::Nearby D-Horse", "docs/COMMUNITY_RECOVERY_PLAN.md::R09/R37/R53", "docs/CONTROLS.md::native mount prompt"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.HORSE.MOUNTED_COMMANDS",
+      "family": "buddy_and_mounts",
+      "game": "TPP",
+      "context": "D-Horse mounted Call/Commands choices, including command-specific hold modifiers, while preserving rider control.",
+      "identity": {"status": "partial", "predicate": {"all": {"controls.context": "horse"}}, "missing": ["mounted call-menu open state", "native option eligibility", "rider command ownership"], "references": ["docs/SYSTEMS_ACCESS.md::Wrist Commands", "include/mgs5vr/controls.hpp::ControlContext"]},
+      "required_actions": [{"intent": "Open with the mounted chord and keep the required modifier held only for the menu lifetime; identify and select an available order.", "binding_refs": {"actions": ["commands.mounted_open", "commands.mounted_keep_open", "commands.confirm", "commands.back"], "axes": ["axes.commands"]}, "outcome": "Native buddy order occurs without confusing the chord with gallop or steering."}],
+      "exit_or_cancel": {"intent": "Close/back out, release modifier and confirm rider movement remains available.", "binding_refs": {"actions": ["commands.back", "commands.mounted_keep_open"], "axes": []}, "outcome": "Commands context clears and horse route remains active."},
+      "community_report_ids": ["R37", "R53"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::Wrist Commands", "docs/COMMUNITY_RECOVERY_PLAN.md::R37/R53"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.VEHICLE.LIGHT_DRIVER",
+      "family": "mounted_vehicle_roles",
+      "game": "TPP",
+      "context": "Driver seat in each tested light truck/jeep/ordinary wheeled vehicle subtype; each native subtype is an independent case.",
+      "identity": {"status": "partial", "predicate": {"all": {"controls.context": "vehicle"}}, "missing": ["native vehicle type/seat", "driver role", "wheel/control ownership", "gear/brake/result telemetry"], "references": ["docs/SYSTEMS_ACCESS.md::Vehicles", "docs/COMMUNITY_RECOVERY_PLAN.md::R35-R37", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua::VEHICLE_MISSION_ABORT_CAMERA"]},
+      "required_actions": [{"intent": "For each named subtype, enter, steer both directions, accelerate, brake/reverse, test permitted weapon/call controls and observe real displacement.", "binding_refs": {"actions": ["vehicle.interact", "vehicle.accelerate", "vehicle.brake_reverse", "vehicle.weapon_or_call", "turn.left", "turn.right"], "axes": ["axes.vehicle_steering"]}, "outcome": "Vehicle-specific motion and input role are verified; an entry in one vehicle does not pass another."}],
+      "exit_or_cancel": {"intent": "Use the vehicle's native exit prompt and verify on-foot placement, view and control context.", "binding_refs": {"actions": ["vehicle.interact"], "axes": []}, "outcome": "Native seat clears and on-foot control resumes."},
+      "community_report_ids": ["R35", "R37"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::Vehicles", "docs/COMMUNITY_RECOVERY_PLAN.md::R35/R37", "docs/BOT_AND_SHOWCASE_PLAN.md::field navigation/mounted profiles"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.VEHICLE.TANK_APC_DRIVER",
+      "family": "mounted_vehicle_roles",
+      "game": "TPP",
+      "context": "Driver/control station for each supported tracked tank and APC class, including distinct camera, movement and exit behavior.",
+      "identity": {"status": "partial", "predicate": {"all": {"controls.context": "vehicle"}}, "missing": ["tank/APC native type and seat", "separate driver/gunner station", "native steering/traverse axes"], "references": ["docs/COMMUNITY_RECOVERY_PLAN.md::R31/R37", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua::VEHICLE_MISSION_ABORT_CAMERA"]},
+      "required_actions": [{"intent": "Create distinct tank and APC cases; enter, move, steer, brake and test each available station/weapon route independently.", "binding_refs": {"actions": ["vehicle.interact", "vehicle.accelerate", "vehicle.brake_reverse", "vehicle.weapon_or_call"], "axes": ["axes.vehicle_steering", "axes.native_look"]}, "outcome": "Subtype-specific view, movement, station ownership and intended native effect are observed."}],
+      "exit_or_cancel": {"intent": "Exit using the native station route; confirm correct on-foot state and no inherited camera offset.", "binding_refs": {"actions": ["vehicle.interact"], "axes": []}, "outcome": "Vehicle role ends and ordinary gameplay resumes."},
+      "community_report_ids": ["R31", "R37"],
+      "evidence_refs": ["docs/COMMUNITY_RECOVERY_PLAN.md::R31/R37", "docs/COMMUNITY_ISSUES_2026-09-20.md::tank/APC view", "docs/SYSTEMS_ACCESS.md::Transport"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.VEHICLE.ZHUK_COMBAT_WEAPON",
+      "family": "mounted_vehicle_roles",
+      "game": "TPP",
+      "context": "ZHUK RS-ZO combat vehicle weapon station, aiming/elevation/range selection and rocket impact.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["ZHUK subtype/station identity", "range control state", "aim/elevation and projectile result"], "references": ["docs/COMMUNITY_RECOVERY_PLAN.md::R35", "docs/COMMUNITY_ISSUES_2026-09-20.md::combat-vehicle reticle/range"]},
+      "required_actions": [{"intent": "Enter this weapon station as its own native mode, aim, adjust the authored range where available, fire once and verify impact.", "binding_refs": {"actions": ["vehicle.interact", "vehicle.weapon_or_call", "vehicle.native_a", "vehicle.native_b"], "axes": ["axes.native_look"]}, "outcome": "Range and aim correspond to the intended visible target and rocket impact."}],
+      "exit_or_cancel": {"intent": "Use native exit and verify station/camera return.", "binding_refs": {"actions": ["vehicle.interact"], "axes": []}, "outcome": "On-foot/player state is restored."},
+      "community_report_ids": ["R35"],
+      "evidence_refs": ["docs/COMMUNITY_RECOVERY_PLAN.md::R35", "docs/SYSTEMS_ACCESS.md::Vehicle controls"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.MOUNTED.MACHINE_GUN_TURRET",
+      "family": "mounted_vehicle_roles",
+      "game": "TPP",
+      "context": "Each native machine-gun turret emplacement: access, view, traverse/elevation, reticle, fire and exit.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["emplacement identity", "mounted weapon role/axes", "reticle and firing result"], "references": ["docs/COMMUNITY_RECOVERY_PLAN.md::R33", "docs/COMMUNITY_ISSUES_2026-09-20.md::turrets/mortars"]},
+      "required_actions": [{"intent": "For each emplacement instance/class, enter, aim on both axes, confirm visible reticle, fire at a safe target and verify result.", "binding_refs": {"actions": ["vehicle.interact", "vehicle.weapon_or_call", "vehicle.accelerate"], "axes": ["axes.native_look"]}, "outcome": "Aim, elevation, reticle and native firing outcome match the selected emplacement."}],
+      "exit_or_cancel": {"intent": "Use the emplacement's native exit and check field camera/input ownership.", "binding_refs": {"actions": ["vehicle.interact"], "axes": []}, "outcome": "Mounted weapon role clears and gameplay resumes."},
+      "community_report_ids": ["R33"],
+      "evidence_refs": ["docs/COMMUNITY_RECOVERY_PLAN.md::R33", "docs/COMMUNITY_ISSUES_2026-09-20.md::turrets/mortars", "docs/BOT_AND_SHOWCASE_PLAN.md::W6 acceptance"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.MOUNTED.MORTAR",
+      "family": "mounted_vehicle_roles",
+      "game": "TPP",
+      "context": "Each native mortar emplacement: access, reticle, range/aim, fire, impact and exit.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["mortar instance/role identity", "native range and aim state", "projectile impact"], "references": ["docs/COMMUNITY_RECOVERY_PLAN.md::R32", "docs/COMMUNITY_ISSUES_2026-09-20.md::turrets/mortars"]},
+      "required_actions": [{"intent": "Enter one mortar, establish its native targeting/range behavior, fire at a safe visible target and verify impact independently of machine-gun turrets.", "binding_refs": {"actions": ["vehicle.interact", "vehicle.weapon_or_call", "vehicle.accelerate"], "axes": ["axes.native_look"]}, "outcome": "Intended targeting/range results in a visible native impact."}],
+      "exit_or_cancel": {"intent": "Use the native mortar exit and verify return to the correct gameplay mode.", "binding_refs": {"actions": ["vehicle.interact"], "axes": []}, "outcome": "Mortar role ends and player control resumes."},
+      "community_report_ids": ["R32"],
+      "evidence_refs": ["docs/COMMUNITY_RECOVERY_PLAN.md::R32", "docs/COMMUNITY_ISSUES_2026-09-20.md::turrets/mortars", "docs/BOT_AND_SHOWCASE_PLAN.md::W6 acceptance"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.WALKER_GEAR.D_WALKER_PILOT",
+      "family": "mounted_vehicle_roles",
+      "game": "TPP",
+      "context": "D-Walker/Walker Gear pilot state, movement, weapon/alternate modes, camera transition and exit.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["active mount versus merely obtained buddy", "pilot/weapon station", "D-Walker native mode and current effect"], "references": ["tools/scenario-state.lua::buddy_type/buddy_WALKER_GEAR", "docs/SYSTEMS_ACCESS.md::UAVs and remote weapons"]},
+      "required_actions": [{"intent": "Establish an available D-Walker pilot context; exercise movement and each native weapon/alternate route independently from horse, truck or turret controls.", "binding_refs": {"actions": ["vehicle.interact", "vehicle.weapon_or_call", "vehicle.native_a", "vehicle.native_b"], "axes": ["axes.native_move", "axes.native_look"]}, "outcome": "Native D-Walker motion/effect and camera are confirmed for the active unlocked configuration."}],
+      "exit_or_cancel": {"intent": "Use native dismount/exit, then verify Snake's on-foot status and camera ownership.", "binding_refs": {"actions": ["vehicle.interact"], "axes": []}, "outcome": "D-Walker mode ends and on-foot play resumes."},
+      "community_report_ids": ["R53"],
+      "evidence_refs": ["docs/SYSTEMS_ACCESS.md::UAVs and remote weapons", "docs/COMMUNITY_RECOVERY_PLAN.md::R53", "tools/scenario-state.lua::buddy fields"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.CINEMATIC.MULTI_SHOT_NONINTERACTIVE",
+      "family": "cinematic_and_interactive_sequences",
+      "game": "TPP",
+      "context": "Noninteractive multi-shot cinematic, including camera cuts, full-body/avatar presentation, Pause policy and return to play.",
+      "identity": {"status": "partial", "predicate": {"all": {"scene": "cinematic", "demo": true}}, "missing": ["noninteractive demo subtype", "shot/camera generation", "native input lock and allowed skip", "player camera reacquisition"], "references": ["tools/gameplay_bot/core.py::scene", "tools/scenario-state.lua::demo", "docs/COMMUNITY_RECOVERY_PLAN.md::R01/R04"]},
+      "required_actions": [{"intent": "Observe the full native cinematic through each camera cut; attempt only controls permitted by the live native prompt and inspect both eyes/avatar presentation.", "binding_refs": {"actions": ["system.pause", "menus.confirm", "menus.back", "menus.dpad_up", "menus.dpad_down"], "axes": ["axes.menu"]}, "outcome": "Camera/body remain valid across cuts; permitted Pause/navigation/skip visibly works and returns to play."}],
+      "exit_or_cancel": {"intent": "Honor the sequence's native completion or explicitly offered skip only; verify player camera and gameplay dispatch are reacquired.", "binding_refs": {"actions": ["menus.confirm", "menus.back"], "axes": []}, "outcome": "Native demo clears and expected player state returns."},
+      "community_report_ids": ["R01", "R04"],
+      "evidence_refs": ["docs/COMMUNITY_RECOVERY_PLAN.md::R01/R04", "docs/COMMUNITY_RECOVERY_PLAN.md::scene/ownership gate", "tools/gameplay_bot/core.py::scene"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.CINEMATIC.INTERACTIVE_TUTORIAL_DEMO",
+      "family": "cinematic_and_interactive_sequences",
+      "game": "TPP",
+      "context": "Interactive first-playthrough demo/tutorial that suspends for a required player input, including Mission 1 Ocelot binocular lesson.",
+      "identity": {"status": "partial", "predicate": {"all": {"demo": true}}, "missing": ["interactive-demo subtype", "specific expected input and tutorial page", "progression completion flag"], "references": ["tools/scenario-state.lua::demo/mission/sequence", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppDemo.lua::demo play/skip handlers", "docs/COMMUNITY_RECOVERY_PLAN.md::R02"]},
+      "required_actions": [{"intent": "Identify the current visible instruction, provide its requested native input, and verify the next tutorial step; never classify every demo as noninteractive or blindly skip.", "binding_refs": {"actions": ["native.a", "native.b", "native.x", "native.y", "native.left_trigger", "native.right_trigger", "native.dpad_up", "native.dpad_down", "native.dpad_left", "native.dpad_right"], "axes": ["axes.native_move", "axes.native_look"]}, "outcome": "The requested tutorial step advances and its native completion/progression state is observed."}],
+      "exit_or_cancel": {"intent": "Use only the currently displayed tutorial skip/cancel/acknowledgment control when offered; preserve first-playthrough completion path.", "binding_refs": {"actions": ["native.a", "native.b", "native.x", "native.y"], "axes": []}, "outcome": "Tutorial exits through native rules and gameplay returns without skipping required progression."},
+      "community_report_ids": ["R02"],
+      "evidence_refs": ["docs/COMMUNITY_RECOVERY_PLAN.md::R02", "docs/COMMUNITY_RECOVERY_PLAN.md::interactive sequence routing", "docs/BOT_AND_SHOWCASE_PLAN.md::B3 unknown choices"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.CINEMATIC.SCRIPTED_GAMEPLAY_CAMERA_TRANSITION",
+      "family": "cinematic_and_interactive_sequences",
+      "game": "TPP",
+      "context": "Scripted in-game camera/player transition, voice-triggered checkpoint, cut to/from gameplay and control restoration; Mission 6 bridge is a named independent case.",
+      "identity": {"status": "partial", "predicate": null, "missing": ["specific native event/trigger and mission/sequence value", "camera generation/owner", "input remap and actor root before/after"], "references": ["tools/scenario-state.lua::mission/sequence/story", "docs/COMMUNITY_RECOVERY_PLAN.md::R03"]},
+      "required_actions": [{"intent": "Run the named transition at its native trigger; record status, camera/player generation, input owner and before/after action mapping; resume only after player control is proven.", "binding_refs": {"actions": ["gameplay.interact", "system.pause", "menus.confirm", "menus.back"], "axes": ["axes.move", "axes.turn"]}, "outcome": "Expected player camera/control resumes with the same intended native controls."}],
+      "exit_or_cancel": {"intent": "Follow the native checkpoint/transition recovery if movement remains locked; do not inject guessed movement through a cinematic lock.", "binding_refs": {"actions": ["menus.back"], "axes": []}, "outcome": "Known gameplay or known recovery checkpoint is reached and logged."},
+      "community_report_ids": ["R03", "R05"],
+      "evidence_refs": ["docs/COMMUNITY_RECOVERY_PLAN.md::R03/R05", "docs/COMMUNITY_RECOVERY_PLAN.md::scene/ownership gate", "tools/scenario-state.lua::mission/sequence"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.CINEMATIC.SKULL_FACE_JEEP_RIDE",
+      "family": "cinematic_and_interactive_sequences",
+      "game": "TPP",
+      "context": "Skull Face jeep ride sequence: seated/player body, cinematic camera changes, any prompted input and exit to gameplay.",
+      "identity": {"status": "partial", "predicate": {"all": {"demo": true}}, "missing": ["mission/sequence value identifying this ride", "vehicle seat versus scripted attachment", "interactive steps and camera cuts"], "references": ["tools/scenario-state.lua::mission/sequence/demo", "docs/COMMUNITY_RECOVERY_PLAN.md::R01"]},
+      "required_actions": [{"intent": "Treat this as a separate scripted ride sequence; inspect each cut and respond only to observed native prompts, verifying Snake/body and seated view.", "binding_refs": {"actions": ["native.a", "native.b", "native.x", "native.y", "system.pause"], "axes": ["axes.native_look"]}, "outcome": "Player/body remain correctly presented and each permitted input/transition reaches the native next step."}],
+      "exit_or_cancel": {"intent": "Wait for native sequence completion or use an explicit offered skip, then verify gameplay camera and controls resume.", "binding_refs": {"actions": ["native.a", "native.b", "menus.back"], "axes": []}, "outcome": "Expected next mission/gameplay state and control owner are confirmed."},
+      "community_report_ids": ["R01"],
+      "evidence_refs": ["docs/COMMUNITY_RECOVERY_PLAN.md::R01", "docs/COMMUNITY_ISSUES_2026-09-20.md::Prologue cutscenes and jeep sequence"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "TPP.CINEMATIC.MISSION_CLEAR_ABORT_RETRY",
+      "family": "cinematic_and_interactive_sequences",
+      "game": "TPP",
+      "context": "Mission clear/abort/death camera, result screens, retry/return and mounted/on-foot state restoration.",
+      "identity": {"status": "partial", "predicate": null, "missing": ["mission clear versus abort/death result subtype", "mounted target camera class", "retry/return choice and next checkpoint"], "references": ["tools/scenario-state.lua::player_life/game_over/mission", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua::PlayMissionAbortCamera/PlayFallDeadCamera"]},
+      "required_actions": [{"intent": "For clear, abort and death separately, observe native end camera/results, select only a visible legal retry/return route, and verify the next mission state.", "binding_refs": {"actions": ["menus.confirm", "menus.back", "menus.dpad_up", "menus.dpad_down"], "axes": ["axes.menu"]}, "outcome": "Result reason and selected next state are confirmed; camera/player mode matches on-foot or mounted source."}],
+      "exit_or_cancel": {"intent": "Do not retry an ambiguous confirm; use the visible native back/return action and observe save/loading before continuing.", "binding_refs": {"actions": ["menus.back", "menus.confirm"], "axes": []}, "outcome": "A fresh known menu/title/gameplay state follows the transition."},
+      "community_report_ids": ["R01", "R05"],
+      "evidence_refs": ["tools/scenario-state.lua::mission/player_life/game_over", "docs/BOT_AND_SHOWCASE_PLAN.md::startup/recovery", "docs/COMMUNITY_RECOVERY_PLAN.md::R01/R05", "artifacts/fox-unpack/data1_dat/Assets/tpp/script/lib/TppPlayer.lua::mission end camera functions"],
+      "binding_status": "partial",
+      "native_outcome_status": "unverified"
+    },
+    {
+      "id": "GZ.NATIVE_BUTTONS.MENUS_AND_GAMEPLAY",
+      "family": "game_adapter_boundary",
+      "game": "GZ",
+      "context": "Limited native XInput/button passthrough for GZ menus and gameplay; tracked first-person VR presentation remains a separate unsupported adapter obligation.",
+      "identity": {"status": "unknown", "predicate": null, "missing": ["GZ scene/menu identity in current fast observer", "native action result and GZ-specific presentation state"], "references": ["docs/CONTROLS.md::Complete native-button mode", "docs/COMMUNITY_RECOVERY_PLAN.md::R52"]},
+      "required_actions": [{"intent": "Exercise native-button bindings in each declared GZ menu/gameplay context and verify the game's actual action result.", "binding_refs": {"actions": ["system.native_buttons", "native.a", "native.b", "native.x", "native.y", "native.left_trigger", "native.right_trigger", "native.left_shoulder", "native.right_shoulder", "native.left_click", "native.right_click", "native.start", "native.back", "native.dpad_up", "native.dpad_down", "native.dpad_left", "native.dpad_right"], "axes": ["axes.native_move", "axes.native_look"]}, "outcome": "Native GZ control response is verified per tested context; this does not claim tracked first-person VR."}],
+      "exit_or_cancel": {"intent": "Switch out of native-button mode with the documented profile chord and verify intended presentation/input profile.", "binding_refs": {"actions": ["system.native_buttons"], "axes": []}, "outcome": "Expected control profile and mode return."},
+      "community_report_ids": ["R52"],
+      "evidence_refs": ["docs/CONTROLS.md::Complete native-button mode", "docs/COMMUNITY_RECOVERY_PLAN.md::R52"],
+      "binding_status": "implemented",
+      "native_outcome_status": "unverified"
+    }
+  ],
+  "guide_and_bot_use": "The bot should turn every record into state-predicated cases with action, native outcome, and exit checks. A tutorial/field-kit clip can be generated only from a case whose effective binding export and current native outcome evidence are joined; this inventory itself is not a completed guide or film."
+}

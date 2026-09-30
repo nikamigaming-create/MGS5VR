@@ -45,8 +45,8 @@ std::atomic_uint64_t titleUpdatedAt{};
 std::atomic_bool titleMode{};
 std::atomic_bool titleCabinMode{};
 std::atomic_bool cabinPlayMode{};
+std::atomic_bool sceneMenuMode{};
 std::atomic_bool avatarEditMode{};
-std::atomic_bool scriptedDemoMode{};
 uintptr_t base{};
 std::atomic_bool enabled{};
 struct Source {
@@ -58,12 +58,15 @@ struct Source {
     Pose menuPanel{};
     bool frontEnd{},loading{},openingSelector{},openingBackend{},avatarEditor{};
     std::array<float,16> authoredView{},authoredProjection{};
-    float pickerWidth{.42f},idroidScreenWidth{.30f};
+    float pickerWidth{.42f},idroidScreenWidth{.45f};
     HudMode hudMode{HudMode::binocularsOnly};
     HudView hudView{HudView::world};
     std::array<float,16> projection{};
     bool equipmentOpen{};
     bool menuPanelTracked{};
+    float weaponHudSetback{.06f};
+    bool firearmReticle{};
+    float wristTextScale{1.5f};
 };
 thread_local Source producing,executing;
 std::mutex mutex;
@@ -80,7 +83,7 @@ std::atomic_uint64_t spatialDraws{};
 std::atomic_uint64_t suppressedDraws{};
 std::array<std::atomic_uint64_t,2> spatialByEye{},hiddenPanelByEye{};
 std::filesystem::path settings;
-bool spatialEnabled{};
+bool wristHudEnabled{};
 bool menuReaderVerified{};
 bool idroidCloseReaderVerified{};
 bool pauseReaderVerified{};
@@ -91,7 +94,7 @@ template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&val
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
 void equipmentUpdate(void* object){
     const auto requested=equipmentPreviewRequestedAt.load(),now=steadyMilliseconds();
-    const bool preview=enabled.load()&&spatialEnabled&&requested&&now>=requested&&now-requested<250
+    const bool preview=enabled.load()&&requested&&now>=requested&&now-requested<250
         &&headCamera().active()&&menuState.load()==0;
     // Never retain a pointer across native object replacement. A previous
     // scene's owner may already have been destroyed.
@@ -232,6 +235,11 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
         uintptr_t cameraType{};
         const bool sceneCamera=camera==executing.camera;
         const bool layoutCamera=!sceneCamera&&read(camera,&cameraType,sizeof(cameraType))&&cameraType==base+0x20f08c8;
+        std::array<float,16> layoutWorld{};
+        if(layoutCamera&&read(camera+0x30,layoutWorld.data(),sizeof(layoutWorld))
+            &&suppressFlatFirearmReticle(order,layoutWorld[14],executing.firearmReticle)){
+            ++suppressedDraws;return 0;
+        }
         const bool worldIntel=nativeReconLayer(order,sceneCamera,layoutCamera);
         // Native scene-camera target cues follow the device view. Flat HUD
         // labels are replaced by native world-position labels in the lens.
@@ -285,7 +293,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
         }
         if(found!=nodes.end()){++found->calls;found->source=executing.eye.sourceSequence;found->eye=executing.eye.eye;}
     }catch(...){}
-    if(enabled.load()&&spatialEnabled&&executing.eye.sourceSequence){
+    if(enabled.load()&&executing.eye.sourceSequence){
         const auto status=headCamera().status();const auto now=steadyMilliseconds();
         if(status.active&&status.activation==executing.eye.activation&&now>=executing.eye.sampleTime&&now-executing.eye.sampleTime<=150){
             const auto camera=field<uintptr_t>(state,0x308);
@@ -300,14 +308,17 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             // HUD transform here left the main map head-locked in both eyes.
             const bool menuCamera=executing.menuOpen&&!executing.frontEnd&&camera!=executing.camera;
             const bool avatarLayout=executing.avatarEditor&&layoutCamera;
-            if((executing.menuOpen||executing.frontEnd||avatarLayout)&&(layoutCamera||menuCamera)){
+            const auto order=field<uint32_t>(item,0x28);
+            const bool personalStatus=layoutCamera&&read(camera+0x30,world.data(),sizeof(world))
+                &&idroidPersonalStatus(order,world[14],executing.idroidMenu);
+            if((executing.menuOpen||executing.frontEnd||avatarLayout)&&(layoutCamera||menuCamera)&&!personalStatus){
                 if(executing.menuOpen&&!executing.frontEnd&&!avatarLayout&&!executing.menuPanelTracked){
                     ++suppressedDraws;return 0;
                 }
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto layout=selectSpatialUiLayout(executing.frontEnd,executing.avatarEditor,
                     executing.menuOpen,executing.idroidMenu,true);
-                const auto canvas=layoutCamera?nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection):saved;
+                const auto canvas=layoutCamera?nativeUiCanvasProjection(saved,executing.projection):saved;
                 const auto panelProjection=spatialUiProjection(canvas,layout);
                 const auto mapped=uiPanelProjection(panelProjection,executing.view,executing.eye.view.fov,
                     executing.menuPanel,(executing.frontEnd||executing.avatarEditor)?1.6f:executing.idroidScreenWidth,
@@ -326,7 +337,6 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
                 return result;
             }
-            const auto order=field<uint32_t>(item,0x28);
             // The game's initial equipment selector uses the verified Z=100
             // layout camera. Route those native four-way pixels through the
             // same wrist plane so the trigger reveals the real tiles and
@@ -337,7 +347,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 if(!executing.panelTracked){++suppressedDraws;return 0;}
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto savedView=field<std::array<float,16>>(state,0x200);
-                const auto canvas=nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection);
+                const auto canvas=nativeUiCanvasProjection(saved,executing.projection);
                 const auto mapped=uiPanelProjection(canvas,executing.view,executing.eye.view.fov,
                     executing.picker,executing.pickerWidth,executing.pickerWidth*9.f/16.f);
                 if(mapped){
@@ -400,11 +410,27 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 }
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto panel=expanded?executing.picker:executing.panel;
-                const float layoutWidth=expanded?executing.pickerWidth:1.2f;
-                const auto canvas=nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection);
+                // Native bottom-right HUD canvas, kept at its authored aspect.
+                constexpr float statusCanvasCenterX=.72f,statusCanvasCenterY=-.70f;
+                const float statusCanvasWidth=1.2f*executing.wristTextScale;
+                const float layoutWidth=expanded?executing.pickerWidth*((general||contextAction)?executing.wristTextScale:1.f):statusCanvasWidth;
+                const auto canvas=nativeUiCanvasProjection(saved,executing.projection);
+                if(layer==HudLayer::status&&executing.eye.eye==0){
+                    static std::atomic_bool reported{};
+                    if(!reported.exchange(true)){
+                        std::ostringstream message;message<<"Native forearm status canvas eye_aspect="<<-executing.projection[5]/executing.projection[0]
+                            <<" native_xy="<<saved[0]<<','<<saved[5]<<" canvas_xy="<<canvas[0]<<','<<canvas[5]
+                            <<" center="<<statusCanvasCenterX<<','<<statusCanvasCenterY
+                            <<" panel="<<panel.position.x<<','<<panel.position.y<<','<<panel.position.z;
+                        log(message.str());
+                    }
+                }
+                // Positive setback moves only the compact readout toward the
+                // elbow. Convert meters to canvas coordinates without moving
+                // the shared forearm anchor or any expanded popup.
                 const auto mapped=uiPanelProjection(canvas,executing.view,executing.eye.view.fov,panel,layoutWidth,layoutWidth*9.f/16.f,
-                    contextAction?.04f:expanded?0.f:.72f,
-                    contextAction?-.52f:expanded?0.f:-.70f);
+                    contextAction?.04f:expanded?0.f:statusCanvasCenterX+executing.weaponHudSetback/(statusCanvasWidth*.5f),
+                    contextAction?-.52f:expanded?0.f:statusCanvasCenterY);
                 if(mapped){
                     auto* output=static_cast<unsigned char*>(state)+0x1c0;
                     std::memcpy(output,mapped->data(),sizeof(*mapped));
@@ -429,9 +455,9 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 // popup as fixed-camera messages. Keep their native pixels.
                 if(!executing.panelTracked||order==50){++suppressedDraws;return 0;}
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
-                const auto canvas=nativeUiCanvasProjection(saved,executing.authoredProjection,executing.projection);
+                const auto canvas=nativeUiCanvasProjection(saved,executing.projection);
                 const auto mapped=uiPanelProjection(canvas,executing.view,executing.eye.view.fov,
-                    executing.picker,executing.pickerWidth,executing.pickerWidth*9.f/16.f);
+                    executing.picker,executing.pickerWidth*executing.wristTextScale,executing.pickerWidth*executing.wristTextScale*9.f/16.f);
                 if(!mapped){++suppressedDraws;return 0;}
                 auto* output=static_cast<unsigned char*>(state)+0x1c0;
                 std::memcpy(output,mapped->data(),sizeof(*mapped));
@@ -516,7 +542,7 @@ void installUiRenderer(uintptr_t moduleBase){
     std::array<wchar_t,32768> executable{};
     if(GetModuleFileNameW(nullptr,executable.data(),static_cast<DWORD>(executable.size()))){
         settings=std::filesystem::path(executable.data()).parent_path()/L"mgs5vr.ini";
-        spatialEnabled=GetPrivateProfileIntW(L"diagnostics",L"wrist_hud_experiment",0,settings.c_str())==1;
+        wristHudEnabled=GetPrivateProfileIntW(L"diagnostics",L"wrist_hud_experiment",0,settings.c_str())==1;
     }
     for(const auto& hook:hooks){const auto result=MH_CreateHook(reinterpret_cast<void*>(base+hook.rva),hook.wrapper,hook.original);
         if(result!=MH_OK)throw std::runtime_error(std::string("Native UI hook: ")+MH_StatusToString(result));
@@ -525,7 +551,7 @@ void installUiRenderer(uintptr_t moduleBase){
         for(const auto& installed:hooks)MH_DisableHook(reinterpret_cast<void*>(base+installed.rva));
         throw std::runtime_error("Cannot enable native UI hooks");
     }
-    enabled.store(true);log("Native UI worker lineage installed; experimental left-forearm weapon HUD="+std::to_string(spatialEnabled));
+    enabled.store(true);log("Native UI worker lineage installed; left-forearm HUD="+std::to_string(wristHudEnabled)+"; menus remain spatial");
 }
 bool nativeTitleMenuOpen() noexcept {
     if(!enabled.load()||!titleMode.load())return false;
@@ -538,14 +564,24 @@ bool nativeTitleMenuOpen() noexcept {
 }
 void publishNativeAvatarEdit(bool active) noexcept {avatarEditMode.store(active);}
 bool nativeAvatarEditActive() noexcept {return avatarEditMode.load();}
-void publishNativeScriptedDemo(bool active) noexcept {scriptedDemoMode.store(active);}
-bool nativeScriptedDemoActive() noexcept {return scriptedDemoMode.load();}
+void publishNativeDemoMode(NativeDemoMode mode,uint64_t candidateKey) noexcept {
+    publishNativeDemoSnapshot(mode,candidateKey,steadyMilliseconds());
+}
+NativeDemoMode nativeDemoMode() noexcept {return nativeDemoSnapshot().mode;}
+uint64_t nativeDemoCandidateKey() noexcept {return nativeDemoSnapshot().candidateKey;}
+uint64_t nativeDemoCandidateGeneration() noexcept {return nativeDemoSnapshot().generation;}
+bool nativeScriptedDemoActive() noexcept {
+    const auto mode=nativeDemoSnapshot().mode;
+    return mode==NativeDemoMode::cinematic||mode==NativeDemoMode::interactiveLook
+        ||(mode==NativeDemoMode::staleCandidate&&!headCamera().staleDemoRecoveryReady());
+}
 void publishNativeTitleMode(bool active) noexcept {titleMode.store(active);}
 bool nativeTitleModeActive() noexcept {return titleMode.load();}
 void publishNativeTitleCabinMode(bool active) noexcept {titleCabinMode.store(active);}
 bool nativeTitleCabinMode() noexcept {return titleCabinMode.load();}
 void publishNativeCabinPlay(bool active) noexcept {cabinPlayMode.store(active);}
 bool nativeCabinPlay() noexcept {return cabinPlayMode.load();}
+void publishNativeSceneMenu(bool active) noexcept {sceneMenuMode.store(active);}
 bool nativeLoadingTipsOpen() noexcept {
     if(!enabled.load()||!menuReaderVerified)return false;
     // IsEndLoadingTips obtains this UiSystem and its loading-tip terminal.
@@ -584,8 +620,8 @@ std::optional<bool> nativeMenuOpen() noexcept {
             }
         }
     }
-    const int next=(open?1:0)|(paused?2:0);
-    if(menuState.exchange(next)!=next)try{log("Native menu state="+std::to_string(next)+" (iDroid=1, pause=2)");}catch(...){}
+    const int next=(open?1:0)|(paused?2:0)|(sceneMenuMode.load()?4:0);
+    if(menuState.exchange(next)!=next)try{log("Native menu state="+std::to_string(next)+" (iDroid=1, pause=2, scene menu=4)");}catch(...){}
     return next!=0;
 }
 bool nativeIdroidOpen() noexcept {
@@ -619,7 +655,7 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     const auto picker=wristPickerPose(rig);
     const auto idroid=trackedIdroidPose(rig);
     const bool handMenu=rig.menuOpen&&rig.menuIdroid&&rig.controllers.handheldMenus&&idroid.has_value();
-    const bool quadMenu=rig.menuOpen&&!rig.controllers.handheldMenus;
+    const bool quadMenu=rig.menuOpen&&rig.menuWorldQuad;
     const bool startup=rig.controllers.frontEnd||rig.controllers.avatarEditor;
     const auto menuPanel=(startup||quadMenu)?rig.menuPanel:handMenu?idroid->screen:picker.value_or(Pose{});
     producing={eye,camera,view,rig.wristPanel,picker.value_or(Pose{}),picker.has_value(),
@@ -636,7 +672,21 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     producing.hudView=hudView;
     producing.projection=projection;
     producing.equipmentOpen=rig.controllers.equipmentOpen;
+    producing.weaponHudSetback=rig.controllers.weaponHudSetback;
+    producing.wristTextScale=rig.controllers.wristTextScale;
+    producing.firearmReticle=rig.nativeFirearmActive&&rig.controllers.weaponReady;
     producing.menuPanelTracked=startup||quadMenu||(rig.menuIdroid?handMenu:picker.has_value());
+    if(!wristHudEnabled){
+        // An explicit off-wrist preference changes the HUD mount, never the
+        // stereo routing or the independent right-hand iDroid screen.
+        const auto head=nativeTrackedPose(rig.nativePose,rig.headPose,rig.headPose);
+        const float tilt=rig.controllers.menuQuadTilt*.00872664626f;
+        const auto panel=compose(head,Pose{{std::sin(tilt),0,0,std::cos(tilt)},
+            {0,0,-rig.controllers.menuQuadDistance}});
+        producing.panel=producing.picker=panel;
+        producing.panelTracked=producing.panelVisible=valid(panel);
+        producing.pickerWidth=rig.controllers.menuQuadWidth;
+    }
 }
 void clearUiRenderSource() noexcept {producing={};}
 ReconModelVisibilityScope::ReconModelVisibilityScope(HudMode mode,HudView view,bool glow) noexcept {

@@ -382,6 +382,20 @@ bool selfTest(){
 int WINAPI wWinMain(HINSTANCE current,HINSTANCE,PWSTR,int show){
     // Same scripts as the visible buttons, with inherited output and no UI.
     int cliCount{};auto** cliArgs=CommandLineToArgvW(GetCommandLineW(),&cliCount);
+    const bool fieldKitRequest=cliCount==1||(cliCount>=2&&!wcscmp(cliArgs[1],L"--3d"))
+        ||(cliCount==3&&!wcscmp(cliArgs[1],L"--page"));
+    if(fieldKitRequest){
+        const auto terminal=exePath().parent_path()/L"MGS5VR-FieldKit.exe";
+        if(file(terminal)){
+            auto command=quote(terminal.wstring());
+            const int first=cliCount>=2&&!wcscmp(cliArgs[1],L"--3d")?2:1;
+            for(int i=first;i<cliCount;++i)command+=L" "+quote(cliArgs[i]);
+            STARTUPINFOW si{sizeof(si)};PROCESS_INFORMATION pi{};
+            if(CreateProcessW(terminal.c_str(),command.data(),nullptr,nullptr,FALSE,0,nullptr,terminal.parent_path().c_str(),&si,&pi)){
+                CloseHandle(pi.hThread);CloseHandle(pi.hProcess);LocalFree(cliArgs);return 0;
+            }
+        }
+    }
     if(cliCount>=2&&!wcscmp(cliArgs[1],L"--headless")){
         headless=true;package=exePath().parent_path();
         if(!file(package/L"tools/launcher-cli.ps1"))package=package.parent_path().parent_path();

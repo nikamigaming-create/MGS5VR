@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cctype>
 #include <set>
+#include <sstream>
+#include <mutex>
 #include <stdexcept>
 
 namespace mgs5vr {
@@ -19,9 +21,24 @@ std::string trim(std::string text){
 }
 std::string lower(std::string text){for(auto& c:text)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));return text;}
 bool commandContinuation(std::string_view name){return name=="gameplay.ready_weapon"||name=="gameplay.fire_or_cqc";}
-constexpr std::array<std::string_view,19> names{"a","b","x","y","menu","left_stick_click","right_stick_click",
+constexpr std::array<std::string_view,29> names{"a","b","x","y","menu","left_stick_click","right_stick_click",
     "left_grip","right_grip","left_trigger","right_trigger","left_stick_up","left_stick_down","left_stick_left","left_stick_right",
-    "right_stick_up","right_stick_down","right_stick_left","right_stick_right"};
+    "right_stick_up","right_stick_down","right_stick_left","right_stick_right","left_thumbrest","right_thumbrest",
+    "a_touch","b_touch","x_touch","y_touch","left_stick_touch","right_stick_touch","left_trigger_touch","right_trigger_touch"};
+std::mutex auditMutex;
+ControlInputAudit audit;
+}
+void publishControlInputAudit(ControlInputAudit sample){std::lock_guard lock(auditMutex);audit=sample;}
+ControlInputAudit controlInputSnapshot(){std::lock_guard lock(auditMutex);return audit;}
+std::optional<ControlInputAudit> controlInputAudit(uint64_t now){
+    const auto sample=controlInputSnapshot();
+    if(!freshControlInputAudit(sample,now))return {};
+    return sample;
+}
+std::string_view controlContextName(ControlContext context){
+    constexpr std::array<std::string_view,8> values{"gameplay","equipment","commands","binoculars","menus","horse","vehicle","nativeButtons"};
+    const auto index=static_cast<size_t>(context);
+    return index<values.size()?values[index]:"unknown";
 }
 ControllerFaceLayout controllerFaceLayout(std::string_view profile){
     if(profile=="/interaction_profiles/khr/simple_controller")return ControllerFaceLayout::simple;
@@ -63,7 +80,7 @@ const std::vector<ControlDefinition>& controlDefinitions(){
         {"gameplay.support_grip","left_grip",foot|horse,true},
         {"gameplay.switch_weapon","press(right_grip + right_stick_click)",foot},
         {"gameplay.zoom","press(right_stick_up)",foot},
-        {"gameplay.fire_or_cqc","right_trigger",foot|horse|commands},{"gameplay.equip_binoculars","hold(left_grip + y,300)",foot},
+        {"gameplay.fire_or_cqc","right_trigger",foot|horse|commands},{"gameplay.equip_binoculars","hold(left_grip + y,300)",foot|horse},
         {"gameplay.native_a","disabled",foot},{"gameplay.native_x","disabled",foot},
         {"gameplay.native_left_shoulder","disabled",foot},{"gameplay.native_right_shoulder","disabled",foot},
         {"gameplay.native_right_click","disabled",foot},
@@ -81,6 +98,7 @@ const std::vector<ControlDefinition>& controlDefinitions(){
         {"commands.back","press(b)",commands},
         {"binoculars.stow","press(b)",optic},{"binoculars.zoom","press(left_stick_click)",optic},
         {"binoculars.mark","press(right_trigger)",optic},{"binoculars.clear_mark","press(a)",optic},
+        {"binoculars.intel","press(x)",optic},
         {"binoculars.support_grip","left_grip",optic,true},
         {"binoculars.run","right_stick_up",optic},{"binoculars.dive","press(right_stick_click)",optic},
         {"binoculars.stance","right_stick_down",optic},
@@ -156,8 +174,13 @@ const std::vector<SettingDefinition>& settingDefinitions(){
     static const std::vector<SettingDefinition> definitions{
         {"settings.snap_turn_degrees",30,5,90},{"settings.motion_melee",1,0,1},{"settings.animal_touch",1,0,1},
         {"settings.wrist_surface_lift_cm",2,0,10},{"settings.wrist_selector_height_cm",15,5,30},
-        {"settings.wrist_picker_width_cm",42,42,100},{"settings.idroid_screen_width_cm",30,20,60},
-        {"settings.idroid_screen_depth_cm",0,0,20},
+        {"settings.weapon_hud_setback_cm",6,0,15},
+        {"settings.wrist_text_scale",1.5f,.75f,2.f},
+        {"settings.wrist_picker_width_cm",42,42,100},{"settings.idroid_screen_width_cm",45,20,60},
+        {"settings.idroid_screen_depth_cm",8,0,20},
+        {"settings.idroid_screen_x_cm",0,-20,20},{"settings.idroid_screen_y_cm",0,-20,20},
+        {"settings.idroid_screen_pitch_degrees",0,-90,90},{"settings.idroid_screen_yaw_degrees",0,-90,90},
+        {"settings.idroid_screen_roll_degrees",0,-90,90},
         {"settings.handheld_menus",0,0,1},{"settings.menu_quad_width_cm",120,60,240},
         {"settings.menu_quad_distance_cm",130,75,300},{"settings.menu_quad_tilt_degrees",-10,-30,30},
         {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",1,0,2},{"settings.hud_mode",1,0,2},
@@ -260,6 +283,11 @@ bool LiveControls::apply(ControlBindings& destination,const PhysicalControls& ph
     if(!pending_)return false;
     for(size_t n=0;n<11;++n)
         if(!std::isfinite(physical.buttons[n])||std::abs(physical.buttons[n])>.09f)return false;
+    for(size_t n=19;n<physical.buttons.size();++n){
+        const auto input=names[n];
+        if((destination.hasBindingInput(input)||pending_->hasBindingInput(input))
+            &&(!std::isfinite(physical.buttons[n])||std::abs(physical.buttons[n])>.09f))return false;
+    }
     for(const auto& stick:{physical.leftStick,physical.rightStick})
         for(const auto axis:stick)if(!std::isfinite(axis)||std::abs(axis)>=.18f)return false;
     destination=std::move(*pending_);pending_.reset();destination.suspend();
@@ -318,6 +346,14 @@ float ControlBindings::value(std::string_view action) const{
     const auto it=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.name==action;});
     return it==entries_.end()?0:it->value;
 }
+bool ControlBindings::hasBindingInput(std::string_view input) const{
+    const auto token=std::find(names.begin(),names.end(),input);
+    if(token==names.end())return false;
+    const auto bit=1u<<static_cast<unsigned>(token-names.begin());
+    return std::any_of(entries_.begin(),entries_.end(),[&](const auto& entry){
+        return std::any_of(entry.bindings.begin(),entry.bindings.end(),[&](const auto& binding){return binding.mask&bit;});
+    });
+}
 std::array<float,2> ControlBindings::axis(std::string_view name,const PhysicalControls& input) const{
     const auto it=std::find_if(axes_.begin(),axes_.end(),[&](const auto& e){return e.name==name;});
     if(it==axes_.end()||it->source<0)return {};
@@ -332,8 +368,10 @@ float ControlBindings::setting(std::string_view name) const{
 std::string ControlBindings::label(std::string_view action) const{
     const auto entry=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.name==action;});
     if(entry==entries_.end()||entry->bindings.empty())return "UNBOUND";
-    constexpr std::array<std::string_view,19> labels{"A","B","X","Y","MENU","L CLICK","R CLICK","L GRIP","R GRIP","L TRIGGER","R TRIGGER",
-        "L STICK UP","L STICK DOWN","L STICK LEFT","L STICK RIGHT","R STICK UP","R STICK DOWN","R STICK LEFT","R STICK RIGHT"};
+    constexpr std::array<std::string_view,29> labels{"A","B","X","Y","MENU","L CLICK","R CLICK","L GRIP","R GRIP","L TRIGGER","R TRIGGER",
+        "L STICK UP","L STICK DOWN","L STICK LEFT","L STICK RIGHT","R STICK UP","R STICK DOWN","R STICK LEFT","R STICK RIGHT",
+        "L THUMBREST","R THUMBREST","TOUCH A","TOUCH B","TOUCH X","TOUCH Y",
+        "L STICK TOUCH","R STICK TOUCH","L TRIGGER TOUCH","R TRIGGER TOUCH"};
     std::string text;
     for(const auto& binding:entry->bindings){
         if(!text.empty())text+=" / ";
@@ -346,5 +384,46 @@ std::string ControlBindings::label(std::string_view action) const{
         }
     }
     return text;
+}
+std::string ControlBindings::bindingsJson() const{
+    constexpr std::array<std::string_view,8> contexts{"gameplay","equipment","commands","binoculars","menus","horse","vehicle","nativeButtons"};
+    constexpr std::array<std::string_view,5> gestures{"level","press","release","tap","hold"};
+    std::ostringstream out;
+    out<<"{\"schema\":1,\"actions\":[";
+    bool firstEntry=true;
+    for(const auto& entry:entries_){
+        if(!firstEntry)out<<',';firstEntry=false;
+        out<<"{\"name\":\""<<entry.name<<"\",\"label\":\""<<label(entry.name)
+           <<"\",\"modifier\":"<<(entry.modifier?"true":"false")<<",\"contexts\":[";
+        bool first=true;
+        for(unsigned i=0;i<contexts.size();++i)if(entry.contexts&(1u<<i)){
+            if(!first)out<<',';first=false;out<<'"'<<contexts[i]<<'"';
+        }
+        out<<"],\"bindings\":[";first=true;
+        for(const auto& binding:entry.bindings){
+            if(!first)out<<',';first=false;
+            out<<"{\"gesture\":\""<<gestures[static_cast<size_t>(binding.gesture)]
+               <<"\",\"milliseconds\":"<<binding.milliseconds<<",\"inputs\":[";
+            bool firstInput=true;
+            for(unsigned bit=0;bit<names.size();++bit)if(binding.mask&(1u<<bit)){
+                if(!firstInput)out<<',';firstInput=false;out<<'"'<<names[bit]<<'"';
+            }
+            out<<"]}";
+        }
+        out<<"]}";
+    }
+    out<<"],\"axes\":[";bool first=true;
+    constexpr std::array<std::string_view,3> sources{"disabled","left_stick","right_stick"};
+    for(const auto& axis:axes_){
+        if(!first)out<<',';first=false;
+        out<<"{\"name\":\""<<axis.name<<"\",\"source\":\""<<sources[static_cast<size_t>(axis.source+1)]<<"\"}";
+    }
+    out<<"],\"settings\":[";first=true;
+    for(const auto& setting:settings_){
+        if(!first)out<<',';first=false;
+        out<<"{\"name\":\""<<setting.name<<"\",\"value\":"<<setting.value<<'}';
+    }
+    out<<"]}";
+    return out.str();
 }
 }

@@ -40,13 +40,18 @@ $mgsGraphics = $mgsGraphicsText | ConvertFrom-Json
 if ($mgsGraphics.project -ne 'tpp' -or -not $mgsGraphics.graphics.videoout_setting) { throw 'Not a TPP graphics configuration.' }
 # These are native render dimensions: both eye images are drawn at this size.
 # Upscaling the XR swapchain or the capture cannot recover lost HUD detail.
-if ($mgsGraphics.graphics.videoout_setting.window_mode -ne 'Windowed' -or
+# Preserve the arbitrary-size native path selected by launcher-display. Changing
+# FlexibleWindowed back to Windowed makes FOX validate against monitor modes and
+# silently replaces tall per-eye resolutions with the desktop resolution.
+if ($mgsGraphics.graphics.videoout_setting.window_mode -notin @('Windowed','FlexibleWindowed') -or
     ($RenderWidth -and ($mgsGraphics.graphics.videoout_setting.width -ne $RenderWidth -or $mgsGraphics.graphics.videoout_setting.height -ne $RenderHeight))) {
     $mgsArtifacts = Join-Path $mgsRoot 'artifacts'
     New-Item -ItemType Directory -Path $mgsArtifacts -Force | Out-Null
     $mgsBackup = Join-Path $mgsArtifacts ('TPP_GRAPHICS_CONFIG.'+[DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffff')+'.backup')
     Copy-Item -LiteralPath $mgsGraphicsPath -Destination $mgsBackup -ErrorAction Stop
-    $mgsGraphics.graphics.videoout_setting.window_mode = 'Windowed'
+    if ($mgsGraphics.graphics.videoout_setting.window_mode -notin @('Windowed','FlexibleWindowed')) {
+        $mgsGraphics.graphics.videoout_setting.window_mode = 'Windowed'
+    }
     if ($RenderWidth) {
         $mgsGraphics.graphics.videoout_setting.width = $RenderWidth
         $mgsGraphics.graphics.videoout_setting.height = $RenderHeight

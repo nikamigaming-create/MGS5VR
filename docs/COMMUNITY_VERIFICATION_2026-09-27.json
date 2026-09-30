@@ -1,0 +1,2095 @@
+{
+  "schema": 1,
+  "date": "2026-09-27",
+  "candidate": {
+    "game": "MGS TPP",
+    "dll_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e",
+    "simulator": "Meta XR Simulator v207",
+    "headset_acceptance": "not_run",
+    "evidence_scope": "RC5 passes the actual physical Mission 1 binocular lessons and Miller explanation/return, plus Mission 6 bridge activation, player-view continuity, natural event end and subsequent VR movement. All historical evidence retains its actual DLL identity. Full-mission completion, remaining issue coverage and headset acceptance are not claimed."
+  },
+  "catalog": {
+    "path": "tools/gameplay_bot/catalogs/community-issues.json",
+    "sha256": "1b5faf77a2ac06c9e495c6dd6171acfe4f647e2edfde64cd2a588d8a41498fdd"
+  },
+  "status_vocabulary": [
+    "verified_automated",
+    "verified_simulator",
+    "failed",
+    "needs_headset",
+    "not_tested",
+    "not_implemented"
+  ],
+  "report_status_rule": "A report receives the least-complete status among its claims, with failed/not_implemented/not_tested/needs_headset taking precedence over a verified claim. Mixed reports retain all claim statuses.",
+  "reports": [
+    {
+      "id": "R01",
+      "title": "Stuck/distant cutscenes; OKB Zero helipad; prologue/jeep presentation (D/F/H)",
+      "type": "defect",
+      "priority": "P0",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R01-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/rc2-core-tests.txt",
+              "sha256": "68dea9ab27fefeb90dee21e88bd77eea8ae4ff7c5b03862057e117c4f4c04583",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-ctest.txt",
+              "sha256": "5eaf7646567c194277c17235079b47a4d94ee8c7b031103b494a66a6fff2abab",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/rc3-core-tests.txt",
+              "sha256": "a028c0ada5c9f6526c12448dfd2885754c8fcb821f14519b5028d711a585b510",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/rc3-ctest.txt",
+              "sha256": "28a380b043bee784f785be9b0fcda3c0d0b35d0f0f71610ac40af6e22de08382",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-intro/visual-review.json",
+              "sha256": "353a9fc384ed9880fb47933f5f4ac229a5a24a614b63c5d325ef662777d66066",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-intro/presentation-review.json",
+              "sha256": "8af5ee19a82a35f52f6b84672f5c0430ed003b3c09a8f8b2b7aef3086fab6912",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            }
+          ],
+          "finding": "RC3 retains the Coco cinematic follow and passes the complete native Mission 1 intro and return to player control. This is one real scene; OKB Zero, prologue, jeep and full headset comfort remain unaccepted.",
+          "next_action": "Verify the other reported cinematics and physical comfort; retain the separate Mission 1 evidence."
+        }
+      ]
+    },
+    {
+      "id": "R02",
+      "title": "Mission 1, Ocelot binocular lesson cannot continue (D)",
+      "type": "defect",
+      "priority": "P0",
+      "status": "verified_simulator",
+      "claims": [
+        {
+          "id": "R02-C1",
+          "title": "Acceptance evidence",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260928/mounted-binocular-lesson-after-speech/result.json",
+              "sha256": "2b5bab172f36596a0a74675235817e8b4f8936486c7da5eef6a7d4e6b3a2bdd0",
+              "build_sha256": "1b19dac0e86b021e4f14d876eb48150460a47a3f80cedf021e73fa91cee029dd"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/mounted-binocular-lesson-after-speech/visual-review.json",
+              "sha256": "018bae4526b6d25a4e518b1ee316c6000ca98c48807c440d96c8c8446e059161",
+              "build_sha256": "1b19dac0e86b021e4f14d876eb48150460a47a3f80cedf021e73fa91cee029dd"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission1-clock-fixed-intel/result.json",
+              "sha256": "7010e6fc6883b5cf32340f4b025bf8c986f32862f9bb913a5a6d11c60ea2a6de",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission1-clock-fixed-intel/visual-review.json",
+              "sha256": "59198046ec7aed02eb1701f209d3d63748642cd70a060d7e853aa2c9452a7e8b",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission1-clock-fixed-intel/movie-pixel-audit.json",
+              "sha256": "33fcf2f6b5cd9846dc65c6d7f96c69406a70c613bac3801a65cb6a2f227dae0a",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission1-clock-fixed-intel/identity.json",
+              "sha256": "056764b62aaf1a5f390fc6187a1ca8dfe700e340e2631fd4b639e03e92ba33e7",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            }
+          ],
+          "finding": "On c69b75c6, real physical binocular raise, zoom, hand-aimed VR intel request and waypoint advance the actual Mission 1 lessons, play the complete Miller explanation, and return to RescueMiller. No Skip, timer expiry, sequence writes, or native binocular camera was used. Three separate 45-second left-eye takes contain 477 nonblack frames; both final eyes were reviewed. Earlier RC4 failures remain retained.",
+          "next_action": "Retain the VR behavior; complete physical-headset acceptance separately. This scoped tutorial result does not certify the entire mission."
+        },
+        {
+          "id": "R02-C2",
+          "title": "Existing physical binoculars usable while riding",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260928/mounted-binocular-freeplay/result.json",
+              "sha256": "0739200ecb3a8f45851ddf0f2ccc609246e12a4b32bdb8da4fdd136dd77527a5",
+              "build_sha256": "1b19dac0e86b021e4f14d876eb48150460a47a3f80cedf021e73fa91cee029dd"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/mounted-binocular-lesson-after-speech/visual-review.json",
+              "sha256": "018bae4526b6d25a4e518b1ee316c6000ca98c48807c440d96c8c8446e059161",
+              "build_sha256": "1b19dac0e86b021e4f14d876eb48150460a47a3f80cedf021e73fa91cee029dd"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/rc4-vr-optic-runtime.txt",
+              "sha256": "01d6c1a39faab93ecd0554887e13751bd9af0ba3c2933408f5a6aab1867b8822",
+              "build_sha256": "1b19dac0e86b021e4f14d876eb48150460a47a3f80cedf021e73fa91cee029dd"
+            }
+          ],
+          "finding": "The existing equip chord was rejected in horse mode before the fix. RC4 allows that same gesture while riding; both free gameplay and the actual lesson equip, zoom 2x/4x, place a physical-ray waypoint and stow. Existing personal controls were preserved.",
+          "next_action": "Retain this behavior while fixing mission recognition; separately test automatic acquisition against a visible enemy and physical headset fit."
+        }
+      ]
+    },
+    {
+      "id": "R03",
+      "title": "Mission 6 bridge: displaced view, changed controls, cannot move (D)",
+      "type": "defect",
+      "priority": "P0",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R03-C1",
+          "title": "Native Mission 6 bridge event and return to VR movement",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/release-validation-20260928/mission6-native-bridge-watch/result.json",
+              "sha256": "ce7f373c1349350b15d37f7d000e06129089523adc1487da03b34cc96c7d7602",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission6-native-bridge-watch/visual-review.json",
+              "sha256": "032f5d68b151b18d9fa8131223a663fc0ee9bd4978a99e7fd3f3b44f7c6a458e",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission6-native-bridge-watch/movie-pixel-audit.json",
+              "sha256": "653bf41b774e1859e670249e67570d7dcb88d82ad4eba2ce60fe0db51517ebda",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission6-native-bridge-watch/identity.json",
+              "sha256": "094d84effab6c5c788d44bc4cc26e46a17f62103b5d09bb0deed1810b0350840",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission6-native-astar-04/result.json",
+              "sha256": "8320183b323759fd6cb52b8620913d3a25a2aa45100adc7d56b59b2e9cae7385",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission6-playable-bridge-movement/result.json",
+              "sha256": "dd7f5ab55e350678a172310c0c37b7a681d977355fee0e9eb5414756b7f37620",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission6-playable-bridge-movement/identity.json",
+              "sha256": "e480e2c6e2025ca79c1f10004274973a6899d779cb896d97398ca97629830656",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            }
+          ],
+          "finding": "On c69b75c6, ordinary native-map traversal triggers p31_020020_000 at full health without alert. The actual playable bridge event keeps the VR camera active and gameplay controls throughout 190 observations, ends normally at event sequence 2, and subsequent VR stick input moves the player 6.717 native units. All 699 frames in five separate 45-second left-eye takes are nonblack; both trigger and return eyes were reviewed.",
+          "next_action": "Retain this scoped bridge result. Full Mission 6 completion, actual movement during the active event, checkpoint recovery and headset comfort remain separate."
+        },
+        {
+          "id": "R03-C2",
+          "title": "Conservative stale-camera recovery guards",
+          "status": "verified_automated",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/recovery-native-tests.txt",
+              "sha256": "0b0c1085c58c971194b2a1b50184081697ec98376a38ea9e842b53c38eacbbaa",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/camera-lua-tests.txt",
+              "sha256": "48a67a59933450b5886b201b3c7f25ccbf50f3bc0b23cde2f8016433f65e516e",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-core-tests.txt",
+              "sha256": "68dea9ab27fefeb90dee21e88bd77eea8ae4ff7c5b03862057e117c4f4c04583",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-ctest.txt",
+              "sha256": "5eaf7646567c194277c17235079b47a4d94ee8c7b031103b494a66a6fff2abab",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Eight selected native test groups and 64 native Lua presentation checks pass. HeadCamera integration accepts fresh matching ownerless-shot publications after two seconds; wrong-camera and active-demo cases remain blocked.",
+          "next_action": "Complete Mission 6 bridge trigger/reload with final-eye proof; these contract tests do not close R03-C1."
+        },
+        {
+          "id": "R03-C3",
+          "title": "Bridge checkpoint reload recovery",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "The real bridge encounter and control return passed; no checkpoint reload at this encounter was exercised in this run.",
+          "next_action": "Repeat the bridge checkpoint through the normal VR menu and verify camera, controls and scene continuity."
+        }
+      ]
+    },
+    {
+      "id": "R04",
+      "title": "Pause navigates invisibly during cutscenes (D)",
+      "type": "defect",
+      "priority": "P0",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R04-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Open menu now takes input precedence over cinematic stick/trigger suppression. Both-eye menu visibility, return and allowed skip through cuts remain runtime acceptance cases."
+        }
+      ]
+    },
+    {
+      "id": "R05",
+      "title": "Black/third-person view near HMD, below waist, after idle/system menu; removal/resume crash (H/C)",
+      "type": "defect",
+      "priority": "P0",
+      "status": "failed",
+      "claims": [
+        {
+          "id": "R05-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/rc2-core-tests.txt",
+              "sha256": "68dea9ab27fefeb90dee21e88bd77eea8ae4ff7c5b03862057e117c4f4c04583",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-ctest.txt",
+              "sha256": "5eaf7646567c194277c17235079b47a4d94ee8c7b031103b494a66a6fff2abab",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/rc3-core-tests.txt",
+              "sha256": "a028c0ada5c9f6526c12448dfd2885754c8fcb821f14519b5028d711a585b510",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/rc3-ctest.txt",
+              "sha256": "28a380b043bee784f785be9b0fcda3c0d0b35d0f0f71610ac40af6e22de08382",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            }
+          ],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Prior fixes and contributor claims are partial evidence. Separate hand occlusion, HMD loss, focus/session loss and missing stereo publication."
+        },
+        {
+          "id": "R05-C2",
+          "title": "Repeated stereo dropouts during field gameplay",
+          "status": "failed",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/flicker-observation-01/runtime-window.txt",
+              "sha256": "efe4c3fcb3fdf3d81af85d1da674b0e2aecb29819bdecb5c7313c2770802ed51",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-c61b-resource-pressure-video/presentation-summary.json",
+              "sha256": "a5a8ccb0559b7128c520ed8558ca6796134dca1f7e4d84a2631a8d9b4f61ef55",
+              "build_sha256": "c61b6693952dec9f7393c7ef7a090af08d78cdaa9b5886c788fe594bad1e0b4e"
+            }
+          ],
+          "finding": "Earlier live runs failed: C61B recorded 19 missing-layer frames under runtime/GPU stalls. Candidate 853e fixes startup/Pause handoffs, accepted-image expiry and delayed matching-rig classification. Its bounded 620.978-second run recorded 0 missing layers across 49,974 frame cycles; see the separately scoped regression claim. Whole-report headset/idle/resume acceptance remains open.",
+          "next_action": "Repeat sustained natural field/dropout routes and headset playback; the specific Mission 1 activation handoff is now verified in R05-C4."
+        },
+        {
+          "id": "R05-C3",
+          "title": "No empty submission through startup, Continue/loading, Pause and producer delay",
+          "status": "not_tested",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-final-eye-video/presentation-summary.json",
+              "sha256": "104697356a38936cdea83ea6a941786c3bb7c76c22e2297bb6459dc32f3482fa",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-final-eye-video/runtime-current-session.log",
+              "sha256": "dff16f87824b78f1f1f2af36e767aa04d8523c4fcdcc753ae963172e0194c2ce",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-continue-03/visual-review.json",
+              "sha256": "89439bef7247cfc0b984a64428e467b4d2a7b24c625aa5b613ee16bcba22d2e6",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-stall-800ms/result.json",
+              "sha256": "e6ef59a9aea6c96616eafd0272285abd4c7380caa27ea13ff8ada14a29aef74c",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-stall-800ms/visual-review.json",
+              "sha256": "a9a54238da6a4227d49f0cfd630d6fcc06160a2860fac2e290aee9fb9a1438be",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-pause/visual-review.json",
+              "sha256": "9d8fbb6f6ed0faf35f42608b2fc46f7568c680b77506248540118b4f6cbf36e9",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-final-eye-video/video-review.json",
+              "sha256": "738f1305e33aad2007c1b3f062f242316181ae41ca510edf0ea8a0a22fbf6787",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-regressions.txt",
+              "sha256": "67997c49b5829de34d91e7206c35d4f3af168f5af65e1940528ea114143fd320",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-controls-stall/visual-review.json",
+              "sha256": "fe2ccc2378fddce6a5f73eb28aaf27e12646558399e4ed27979522b3bf67b319",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-controls-stall/presentation-review.json",
+              "sha256": "fc2e12009c6aa1f1028666885ada63ed9264ba7ee19affdaf8b80736dbe9d9a9",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-controls-stall/identity.json",
+              "sha256": "f0236333988679cbe428e7e254a68127eebcddbf9fbca80f54a1d08392d9390c",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-field/visual-review.json",
+              "sha256": "919779a967b091791da7f649aca7ecd931a649df108417cf0955b97172c530b2",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-field/presentation-review.json",
+              "sha256": "abaf05c2ed639af4d740da9fefd2c568b6334712536fd0f7b77b454b247a40f3",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-field/identity.json",
+              "sha256": "835083eb77cab7fb8705c6b60545bada9af5055dc57faa4d0655962cc7e6c499",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-session.log",
+              "sha256": "8de9ac97ae9851cad803960952934ff238b990975056a7bb2da8aa0b0ab36bb9",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/rc3-core-tests.txt",
+              "sha256": "a028c0ada5c9f6526c12448dfd2885754c8fcb821f14519b5028d711a585b510",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/rc3-ctest.txt",
+              "sha256": "28a380b043bee784f785be9b0fcda3c0d0b35d0f0f71610ac40af6e22de08382",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            }
+          ],
+          "finding": "The RC2 cinematic failure is corrected in RC3 and accepted separately in R05-C4. The complete combined startup/Continue/Pause/producer-delay case has not been rerun on RC3. Earlier field and induced-stall evidence retains its original DLL identity.",
+          "next_action": "Repeat the combined field Pause and producer-delay route on RC3, then physical headset acceptance."
+        },
+        {
+          "id": "R05-C4",
+          "title": "Native Mission 1 cinematic cuts and return to player control retain a submitted scene",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260928/dc49-intro/visual-review.json",
+              "sha256": "353a9fc384ed9880fb47933f5f4ac229a5a24a614b63c5d325ef662777d66066",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-intro/identity.json",
+              "sha256": "e80258b326367ef18503768007766dd02da45f2324fb3e7842a74e0bab4899ad",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-intro/result.json",
+              "sha256": "ef6334396d885e6fbf229ffac4a7016f7ac0a9bbf9de37ab57da5f936c7d26d8",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-intro/presentation-review.json",
+              "sha256": "8af5ee19a82a35f52f6b84672f5c0430ed003b3c09a8f8b2b7aef3086fab6912",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-intro/video-review.json",
+              "sha256": "a56de7abbe9c57b53528d5a358206deffe27ededf45cab140237e55955700463",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/rc3-core-tests.txt",
+              "sha256": "a028c0ada5c9f6526c12448dfd2885754c8fcb821f14519b5028d711a585b510",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/rc3-ctest.txt",
+              "sha256": "28a380b043bee784f785be9b0fcda3c0d0b35d0f0f71610ac40af6e22de08382",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission1-clock-fixed-intel/result.json",
+              "sha256": "7010e6fc6883b5cf32340f4b025bf8c986f32862f9bb913a5a6d11c60ea2a6de",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission1-clock-fixed-intel/visual-review.json",
+              "sha256": "59198046ec7aed02eb1701f209d3d63748642cd70a060d7e853aa2c9452a7e8b",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission1-clock-fixed-intel/movie-pixel-audit.json",
+              "sha256": "33fcf2f6b5cd9846dc65c6d7f96c69406a70c613bac3801a65cb6a2f227dae0a",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            },
+            {
+              "path": "artifacts/release-validation-20260928/mission1-clock-fixed-intel/identity.json",
+              "sha256": "056764b62aaf1a5f390fc6187a1ca8dfe700e340e2631fd4b639e03e92ba33e7",
+              "build_sha256": "c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e"
+            }
+          ],
+          "finding": "RC3 DC49 completed the real 128.516-second intro through Seq_Game_IDroidTutorial. The startup/Continue/intro window measured 17,035 frame cycles, zero missing layers, zero invalid tracking and seven explicitly retained camera-handoff frames. One startup cycle was requested non-rendering by the runtime. Both-eye samples and two sampled compositor takes show the scene without an added quad. Final c69b75c6 additionally completes the actual Miller explanation and return after fixing the reproduced retired-image handoff deadlock: 477 nonblack frames across three separate 45-second takes, both return eyes reviewed. Capture cadence is 3.2-3.8 fps; this does not certify headset smoothness.",
+          "next_action": "Physical-headset acceptance and other cinematic/field routes remain separate."
+        }
+      ]
+    },
+    {
+      "id": "R06",
+      "title": "Changing game options drops VR until checkpoint reload (D)",
+      "type": "defect",
+      "priority": "P0",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R06-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Change options/resolution and resume without losing chosen presentation or camera owner."
+        }
+      ]
+    },
+    {
+      "id": "R07",
+      "title": "C4 follows Snake's facing instead of player; mine/placement feedback (F)",
+      "type": "defect",
+      "priority": "P0",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R07-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Native placement authority unverified. Physical/stick turn, recenter, tank placement, crouch/prone: preview and placed object agree."
+        }
+      ]
+    },
+    {
+      "id": "R08",
+      "title": "Clear-looking aim blocked near cover/prone; UI sound; rock behind player blocks shooting (D/F/H)",
+      "type": "defect",
+      "priority": "P0",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R08-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Distinguish input rejection from native obstruction. Clear muzzle fires without stance reset; genuinely obstructed muzzle still blocks."
+        }
+      ]
+    },
+    {
+      "id": "R09",
+      "title": "Upper/lower body split, shadow mismatch, horse drift, box/toilet view after CQC/mounts/long play (D/F/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R09-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/rc2-core-tests.txt",
+              "sha256": "68dea9ab27fefeb90dee21e88bd77eea8ae4ff7c5b03862057e117c4f4c04583",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-ctest.txt",
+              "sha256": "5eaf7646567c194277c17235079b47a4d94ee8c7b031103b494a66a6fff2abab",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Coco stationary lower-body correction is integrated with bounded horizontal shift, no vertical shift and native actor/collision unchanged. Native geometry/state contracts pass; the full visible-body, horse and sustained-session report is not accepted.",
+          "next_action": "Compare native root, displayed pelvis/torso and HMD across repeated transitions and a sustained session."
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "title": "Hands/weapons/items fade near surfaces; arms disappear near ground/prone (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R10-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "One fade hook exists. Identify first missing stage; verify both-eye visibility on slopes, walls and affected costume."
+        }
+      ]
+    },
+    {
+      "id": "R11",
+      "title": "Left hand jumps/detaches on pistol/revolver/Uzi, especially left roll (D/F)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R11-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Current compact support logic is insufficient evidence. Sweep roll/close contacts, reload, release, reacquire and change weapons."
+        }
+      ]
+    },
+    {
+      "id": "R12",
+      "title": "Short arms, restricted reach, exposed/deformed sleeves (H/C)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "needs_headset",
+      "claims": [
+        {
+          "id": "R12-C1",
+          "title": "Acceptance evidence",
+          "status": "needs_headset",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/rc2-core-tests.txt",
+              "sha256": "68dea9ab27fefeb90dee21e88bd77eea8ae4ff7c5b03862057e117c4f4c04583",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-ctest.txt",
+              "sha256": "5eaf7646567c194277c17235079b47a4d94ee8c7b031103b494a66a6fff2abab",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Coco shoulder offset {0,-0.23,-0.04} is integrated and contract-tested. Sampled arms remain visible; user-specific reach, costumes and comfort require headset checks.",
+          "next_action": "Measure shoulder/wrist/reach across users and costumes. No universal shoulder-offset fix is established."
+        }
+      ]
+    },
+    {
+      "id": "R13",
+      "title": "Low viewpoint, walking bob/sway, nausea; requested better height (D/F/H/C)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R13-C1",
+          "title": "Height adjustment exists",
+          "status": "not_tested",
+          "evidence": [
+            {
+              "path": "artifacts/launcher-3d-qa/numeric-audit.json",
+              "sha256": "01bc9bfddbc17a4364e759332e5d9e29453431b28015406a7c517fee288ff321"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-core-tests.txt",
+              "sha256": "68dea9ab27fefeb90dee21e88bd77eea8ae4ff7c5b03862057e117c4f4c04583",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-ctest.txt",
+              "sha256": "5eaf7646567c194277c17235079b47a4d94ee8c7b031103b494a66a6fff2abab",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Coco bob suppression and camera offsets are integrated. Native tests cover gait oscillation, posture re-anchoring and unfiltered physical-head motion. Fresh field walk/stop and stance controls pass; physical comfort remains unverified.",
+          "next_action": "Verify calibrated height through walk/run, stance and mount transitions with different users."
+        }
+      ]
+    },
+    {
+      "id": "R14",
+      "title": "One-hand pitch; Quest -20 and G2 -16 fit reports; weapon-only pitch request (F/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "needs_headset",
+      "claims": [
+        {
+          "id": "R14-C1",
+          "title": "Acceptance evidence",
+          "status": "needs_headset",
+          "evidence": [],
+          "finding": "The one-hand pitch correction exists in source, but physical controller/grip/aim, contact, sights and shot coherence need headset acceptance.",
+          "next_action": "Aim correction exists. Verify controller/grip/aim, hand contact, sights and shot remain coherent; retain personal fit."
+        }
+      ]
+    },
+    {
+      "id": "R15",
+      "title": "Binocular/scope narrow eye range and intermittent lens disappearance; 15/16 cm boundary; scope jitter/smoothing request (D/F/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "needs_headset",
+      "claims": [
+        {
+          "id": "R15-C1",
+          "title": "Acceptance evidence",
+          "status": "needs_headset",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-coco-accepted/visual-review.json",
+              "sha256": "7c894b8d04758b856d0d11d93bb16e33a0ba570c8ed62c57bb033fba6e071477",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-coco-accepted/result.json",
+              "sha256": "c11716655c8c0530531a24ea00bcf284a87e31c24efd7fa0e40f4ed6a92281f3",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Tuning changes are present, but physical tracking-safe distance, hysteresis, latency and both-eye scope behavior have not been accepted on headset.",
+          "next_action": "New settings helped. Test physical tracking-safe distances, threshold hysteresis, smoothing/latency, both eyes, scopes and surrounding geometry."
+        }
+      ]
+    },
+    {
+      "id": "R16",
+      "title": "Weapon seems to switch near the face (F)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R16-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Cause unknown: trace physical/chord/context/equipment events before attributing to optics distance."
+        }
+      ]
+    },
+    {
+      "id": "R17",
+      "title": "Pause at hip/bottom-left, unreachable; frozen arm while paused (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "needs_headset",
+      "claims": [
+        {
+          "id": "R17-C1",
+          "title": "Right glove/forearm follows sampled paused controller poses",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/bot-20260927/pause-hands-after-02/visual-review.json",
+              "sha256": "4f6d49c0e5e7e59bf73d17f88d7abf63f950823f8b2bc8126d237ddb87ce77b9",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/bot-20260927/pause-hands-after-02/identity.json",
+              "sha256": "abab9d87dc54cff65e2d2cfd9da38d1be2bf472e202a14b323edec4c9eedf103",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-motion-01/result.json",
+              "sha256": "631342445696eb09a46af4df2bd17cee015c021d510c142d1f38745ed588c914",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-motion-01/paused-palm-0-1790531314325854900-left.png",
+              "sha256": "aba4c2630754534c2f21c4479800997ccbb48b5392f4caa9a1d07b34c9fc6d9e",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-motion-01/paused-palm-2-1790531315883069400-left.png",
+              "sha256": "64f12ec09fc4dca5eaf3192d33b7825ff7bc50dae5583972aafc837f73ec25fc",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-motion-01/visual-review.json",
+              "sha256": "bc38112a570cfaa4245d6d82418f69a68befb557db866605ead57b21b49e3b86",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-recovery-01/visual-review.json",
+              "sha256": "c00e117119145ab2fabb4e1b7b6c443307f0e446df4eab7042d6e21f9e0bd991",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-recovery-01/result.json",
+              "sha256": "2a5d457b7e8ba85557a39d1cae390b8d76c3e90ab4f10820d1a4220e1b1d7065",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-pause/visual-review.json",
+              "sha256": "9d8fbb6f6ed0faf35f42608b2fc46f7568c680b77506248540118b4f6cbf36e9",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-pause/result.json",
+              "sha256": "569b1438d4d1f6bfe14a2991e80dff8ed14989549bc7e3358579c73ec32ca871",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/visual-review.json",
+              "sha256": "4504527d4e1306e9e586c20614404641563ea8bcf1209379bfd3541a42cf32b6",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/identity.json",
+              "sha256": "853becf16c0f486241759c7717ad88fb27333383842c60f6c6a17d13dde24980",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/result.json",
+              "sha256": "44c1089cfe972d3e6097ef34991615fc406b49d005db326f15b7c71083992767",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/visual-review.json",
+              "sha256": "ba79ba02f5331dba9f7497524660b0686a04fb95be4846cfd8c2f8b7ec59dcde",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/identity.json",
+              "sha256": "c432c31a1b395b5927805f36076a44237568a6ab406a99871f9cdc3f7f38d446",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/result.json",
+              "sha256": "a1557a2db0a72341f47b02b6122f0a45edca362521f5e4d47fbb1d34ec2df088",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-test-state-correction.json",
+              "sha256": "e88bc5cf414da1f03185a75a44638402caad5b529bcd7bd1052cce640b990ecd",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Right glove/forearm changes pose in both sampled eyes with the actual field Pause page on CD91.",
+          "next_action": "Repeat on physical headset after the left prosthetic correction."
+        },
+        {
+          "id": "R17-C2",
+          "title": "Centered Pause canvas fits both eyes",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/bot-20260927/pause-hands-after-02/visual-review.json",
+              "sha256": "4f6d49c0e5e7e59bf73d17f88d7abf63f950823f8b2bc8126d237ddb87ce77b9",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-motion-01/result.json",
+              "sha256": "631342445696eb09a46af4df2bd17cee015c021d510c142d1f38745ed588c914",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-motion-01/paused-palm-0-1790531314642480000-right.png",
+              "sha256": "166d5310dc482ea028def896dda93d9b6b0d6a4c34ca8e32eed559c79b7179af",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-motion-01/visual-review.json",
+              "sha256": "bc38112a570cfaa4245d6d82418f69a68befb557db866605ead57b21b49e3b86",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-recovery-01/visual-review.json",
+              "sha256": "c00e117119145ab2fabb4e1b7b6c443307f0e446df4eab7042d6e21f9e0bd991",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-recovery-01/result.json",
+              "sha256": "2a5d457b7e8ba85557a39d1cae390b8d76c3e90ab4f10820d1a4220e1b1d7065",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-pause/visual-review.json",
+              "sha256": "9d8fbb6f6ed0faf35f42608b2fc46f7568c680b77506248540118b4f6cbf36e9",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-pause/result.json",
+              "sha256": "569b1438d4d1f6bfe14a2991e80dff8ed14989549bc7e3358579c73ec32ca871",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/visual-review.json",
+              "sha256": "4504527d4e1306e9e586c20614404641563ea8bcf1209379bfd3541a42cf32b6",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/identity.json",
+              "sha256": "853becf16c0f486241759c7717ad88fb27333383842c60f6c6a17d13dde24980",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/result.json",
+              "sha256": "44c1089cfe972d3e6097ef34991615fc406b49d005db326f15b7c71083992767",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/visual-review.json",
+              "sha256": "ba79ba02f5331dba9f7497524660b0686a04fb95be4846cfd8c2f8b7ec59dcde",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/identity.json",
+              "sha256": "c432c31a1b395b5927805f36076a44237568a6ab406a99871f9cdc3f7f38d446",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/result.json",
+              "sha256": "a1557a2db0a72341f47b02b6122f0a45edca362521f5e4d47fbb1d34ec2df088",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-test-state-correction.json",
+              "sha256": "e88bc5cf414da1f03185a75a44638402caad5b529bcd7bd1052cce640b990ecd",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "The ordinary field Pause page fits both CD91 eye views. A contaminated tutorial-menu test was rejected and rerun after documented cleanup.",
+          "next_action": "Check readability, scale and placement on Quest Link."
+        },
+        {
+          "id": "R17-C3",
+          "title": "Pause hand/panel acceptance on a physical headset",
+          "status": "needs_headset",
+          "evidence": [],
+          "finding": "The candidate evidence is from simulator final eyes; no physical headset fit or hand tracking acceptance was run.",
+          "next_action": "Verify tracking, reach and full panel visibility in both eyes on headset for representative poses."
+        },
+        {
+          "id": "R17-C4",
+          "title": "Left prosthetic follows controller while paused",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/pause-recovery-01/visual-review.json",
+              "sha256": "c00e117119145ab2fabb4e1b7b6c443307f0e446df4eab7042d6e21f9e0bd991",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-recovery-01/result.json",
+              "sha256": "2a5d457b7e8ba85557a39d1cae390b8d76c3e90ab4f10820d1a4220e1b1d7065",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-pause/visual-review.json",
+              "sha256": "9d8fbb6f6ed0faf35f42608b2fc46f7568c680b77506248540118b4f6cbf36e9",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-pause/result.json",
+              "sha256": "569b1438d4d1f6bfe14a2991e80dff8ed14989549bc7e3358579c73ec32ca871",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/visual-review.json",
+              "sha256": "4504527d4e1306e9e586c20614404641563ea8bcf1209379bfd3541a42cf32b6",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/identity.json",
+              "sha256": "853becf16c0f486241759c7717ad88fb27333383842c60f6c6a17d13dde24980",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/result.json",
+              "sha256": "44c1089cfe972d3e6097ef34991615fc406b49d005db326f15b7c71083992767",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/visual-review.json",
+              "sha256": "ba79ba02f5331dba9f7497524660b0686a04fb95be4846cfd8c2f8b7ec59dcde",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/identity.json",
+              "sha256": "c432c31a1b395b5927805f36076a44237568a6ab406a99871f9cdc3f7f38d446",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/result.json",
+              "sha256": "a1557a2db0a72341f47b02b6122f0a45edca362521f5e4d47fbb1d34ec2df088",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-test-state-correction.json",
+              "sha256": "e88bc5cf414da1f03185a75a44638402caad5b529bcd7bd1052cce640b990ecd",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "The modular prosthetic moves in both sampled eyes while the ordinary field Pause menu is open on CD91.",
+          "next_action": "Physical-headset left prosthetic and Pause motion acceptance."
+        },
+        {
+          "id": "R17-C5",
+          "title": "Pause navigation keeps Snake stationary",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/pause-recovery-01/visual-review.json",
+              "sha256": "c00e117119145ab2fabb4e1b7b6c443307f0e446df4eab7042d6e21f9e0bd991",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/pause-recovery-01/result.json",
+              "sha256": "2a5d457b7e8ba85557a39d1cae390b8d76c3e90ab4f10820d1a4220e1b1d7065",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-pause/visual-review.json",
+              "sha256": "9d8fbb6f6ed0faf35f42608b2fc46f7568c680b77506248540118b4f6cbf36e9",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-pause/result.json",
+              "sha256": "569b1438d4d1f6bfe14a2991e80dff8ed14989549bc7e3358579c73ec32ca871",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/visual-review.json",
+              "sha256": "4504527d4e1306e9e586c20614404641563ea8bcf1209379bfd3541a42cf32b6",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/identity.json",
+              "sha256": "853becf16c0f486241759c7717ad88fb27333383842c60f6c6a17d13dde24980",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-field-regressions/result.json",
+              "sha256": "44c1089cfe972d3e6097ef34991615fc406b49d005db326f15b7c71083992767",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/visual-review.json",
+              "sha256": "ba79ba02f5331dba9f7497524660b0686a04fb95be4846cfd8c2f8b7ec59dcde",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/identity.json",
+              "sha256": "c432c31a1b395b5927805f36076a44237568a6ab406a99871f9cdc3f7f38d446",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-real-pause/result.json",
+              "sha256": "a1557a2db0a72341f47b02b6122f0a45edca362521f5e4d47fbb1d34ec2df088",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-test-state-correction.json",
+              "sha256": "e88bc5cf414da1f03185a75a44638402caad5b529bcd7bd1052cce640b990ecd",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Fresh ordinary field Pause navigation on CD91 produces 0 m player displacement and 0 degrees yaw.",
+          "next_action": "Physical headset acceptance remains open."
+        }
+      ]
+    },
+    {
+      "id": "R18",
+      "title": "iDroid wide/squashed/tiny and desktop-aspect dependent; requests position/rotation/size (D/F)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "failed",
+      "claims": [
+        {
+          "id": "R18-C1",
+          "title": "Native hand motion and stationary stick navigation in the iDroid",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/result.json",
+              "sha256": "a336023e2f0fced8c88554261bbd8066f7bd80ff2443cbb1086a123e397c25c7",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/idroid-palm-0-1790531367717263700-left.png",
+              "sha256": "50df9cba888a053bfdd9ed28817d3615fbb17e06c0714a73ba327dd12dbccab5",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/idroid-palm-0-1790531368020135500-right.png",
+              "sha256": "ee7d95ac94903ee0b4c021850a39b25e64d6248ff252cff1fd6baab16b0a41d6",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/visual-review.json",
+              "sha256": "7af15b720ce4449d9f4fb27305e801a05343e7fe2fef79c9a2824708ec01e858",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-idroid/visual-review.json",
+              "sha256": "15227b078dc609708c4b364f6d4e127ce9239b1843b46b2ece8c6b53f95658de",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-idroid/identity.json",
+              "sha256": "7347c9729fc7e2056448d9deb0ffcbaf85e1f0e8ffdaf5ad47da685138ce93f5",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-idroid/result.json",
+              "sha256": "c099011c8cb576652e32b8cd188369545a64bc1f1628d68bae064458a5f52771",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Current-build native telemetry records six sampled palm poses and stationary navigation as observed_pass; paired visual review confirms the Mother Base screen content renders. The left-eye screen clipping is tracked separately in R18-C5.",
+          "next_action": "Review the paired final-eye pose sequence for hologram orientation, placement, scale and hand attachment; then repeat in headset."
+        },
+        {
+          "id": "R18-C2",
+          "title": "iDroid hologram aspect, placement and clipping across displays",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No current display-size matrix or visual review for aspect, clipping, pan/zoom and tabs was located.",
+          "next_action": "Compare native canvas at 16:9, 16:10, ultrawide and custom render sizes; exercise pan, zoom and tabs in both eyes."
+        },
+        {
+          "id": "R18-C3",
+          "title": "Back closes iDroid in the tested current session",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/result.json",
+              "sha256": "a336023e2f0fced8c88554261bbd8066f7bd80ff2443cbb1086a123e397c25c7",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/visual-review.json",
+              "sha256": "7af15b720ce4449d9f4fb27305e801a05343e7fe2fef79c9a2824708ec01e858",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-idroid/visual-review.json",
+              "sha256": "15227b078dc609708c4b364f6d4e127ce9239b1843b46b2ece8c6b53f95658de",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-idroid/identity.json",
+              "sha256": "7347c9729fc7e2056448d9deb0ffcbaf85e1f0e8ffdaf5ad47da685138ce93f5",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-idroid/result.json",
+              "sha256": "c099011c8cb576652e32b8cd188369545a64bc1f1628d68bae064458a5f52771",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-device-lesson/visual-review.json",
+              "sha256": "db1344d3137db173d9983286bb4cbc3a40866f28d13db68fd93142db6ae8236e",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-device-lesson/identity.json",
+              "sha256": "75fac76401c6c728799eef257f3eadb627a8c42a690d363275c9d6ac52778413",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-device-lesson/result.json",
+              "sha256": "d08759635de369d93aca4c722998b6b66954eb80b013452482d17e3b79851d7f",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            }
+          ],
+          "finding": "Normal Back closes iDroid in the RC3 Mission 1 device lesson after Ocelot releases the native input restriction, and the real mission advances to Seq_Game_BinocularsTutorial. The harness previously used the wrong close action; this is fresh validation, not a new device runtime fix. Earlier normal-field Back evidence is CD91.",
+          "next_action": "Verify physical headset close/reopen and the separate forced FOB tutorial in R19."
+        },
+        {
+          "id": "R18-C4",
+          "title": "iDroid hand tracking and hologram fit on headset",
+          "status": "needs_headset",
+          "evidence": [],
+          "finding": "All current proof is simulator/native telemetry; physical hand tracking, reach and readability remain open.",
+          "next_action": "Repeat pose, navigation and exit tests on headset with a matched native and both-eye capture."
+        },
+        {
+          "id": "R18-C5",
+          "title": "Native iDroid screen content and stereo fit during hand pose",
+          "status": "failed",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/result.json",
+              "sha256": "a336023e2f0fced8c88554261bbd8066f7bd80ff2443cbb1086a123e397c25c7",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/idroid-palm-0-1790531367717263700-left.png",
+              "sha256": "50df9cba888a053bfdd9ed28817d3615fbb17e06c0714a73ba327dd12dbccab5",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/idroid-palm-0-1790531368020135500-right.png",
+              "sha256": "ee7d95ac94903ee0b4c021850a39b25e64d6248ff252cff1fd6baab16b0a41d6",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-01/visual-review.json",
+              "sha256": "7af15b720ce4449d9f4fb27305e801a05343e7fe2fef79c9a2824708ec01e858",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-idroid/visual-review.json",
+              "sha256": "15227b078dc609708c4b364f6d4e127ce9239b1843b46b2ece8c6b53f95658de",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-idroid/identity.json",
+              "sha256": "7347c9729fc7e2056448d9deb0ffcbaf85e1f0e8ffdaf5ad47da685138ce93f5",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-idroid/result.json",
+              "sha256": "c099011c8cb576652e32b8cd188369545a64bc1f1628d68bae064458a5f52771",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260928/dc49-device-lesson/visual-review.json",
+              "sha256": "db1344d3137db173d9983286bb4cbc3a40866f28d13db68fd93142db6ae8236e",
+              "build_sha256": "dc4934e32394e0e8a8ae5beb4fdaa29da3de0b55c2fecab3442f779969119c3a"
+            }
+          ],
+          "finding": "RC3 still crops the right edge of the held map in the left-eye sample at the tested palm pose. Map content and normal Back work; screen-fit acceptance remains failed.",
+          "next_action": "Correct placement while retaining hand/device attachment, then repeat scale, rotation, aspect and tab checks in both eyes."
+        }
+      ]
+    },
+    {
+      "id": "R19",
+      "title": "iDroid tutorial needs D-pad; player stuck (F/H)",
+      "type": "defect",
+      "priority": "P0",
+      "status": "failed",
+      "claims": [
+        {
+          "id": "R19-C1",
+          "title": "Complete tutorial-required D-pad inputs",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No current-build completion of the requested iDroid tutorial sequence was located. The default D-pad actions are disabled in the known binding configuration.",
+          "next_action": "Run the full tutorial from a clean authorized save path, resolve every visible prompt, and prove tutorial completion without progression edits."
+        },
+        {
+          "id": "R19-C2",
+          "title": "Safe escape and reopen from the tutorial/forced menu",
+          "status": "failed",
+          "evidence": [
+            {
+              "path": "artifacts/bot-20260927/polish-idroid-01/result.json",
+              "sha256": "9ec32928ec8e80fb83dd053537f9a6e8248d65a97c77d59e7765f8d0a9691cdd",
+              "build_sha256": "2c84c4b045cb4a8eafedde43cd5c9973ddd4071a0ab362174e8fa0cd7b5dae20"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-escape-01/result.json",
+              "sha256": "4a47edc1e63f60c62cc5f76b1ab85f972270edd7118689229a7f02822a9eafd1",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-escape-01/idroid-held-back-escape-failure-1790531492574989400-left.png",
+              "sha256": "57515df9947a4bbfc3cdd9aa320e66cbf8fd5beabcb08eecbb45706b98749d63",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-escape-01/visual-review.json",
+              "sha256": "bed314d5a7601f92ee87bedbccecf0859ca58b8f591e5615f38438dcc6d575d7",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            }
+          ],
+          "finding": "In the forced-tutorial path, held Back reached a visible \u201cExit Tutorial / Suspending the tutorial for now / A Close\u201d page. That is evidence for a suspension escape route, not tutorial completion. A different current normal-map close timed out as recorded in R18-C3.",
+          "next_action": "Separate normal-map close from forced tutorial recovery; add a guarded path only for a freshly captured known prompt, then verify reopen and tutorial completion independently."
+        },
+        {
+          "id": "R19-C3",
+          "title": "Guarded A Close on the exact tutorial-suspension page",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/idroid-ack-02/result.json",
+              "sha256": "bf4f888ac6202eb1c3f6510a5a8ab10d2117dc1e60e1d80404e2714fee1e0561",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-ack-02/tutorial-exit-acknowledgment-after-1790531615200783300-left.png",
+              "sha256": "8c268349ea2f6db9b94e2be911611b847e3529f80b3e09475da4211fb1881fb0",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-ack-02/tutorial-exit-acknowledgment-after-1790531615496604300-right.png",
+              "sha256": "ec86112a40d54544357443edefeb02d321563edaf3e7f93d84f79e0b7ab23ba4",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-ack-02/visual-review.json",
+              "sha256": "b57c6e1bf1e421fb43f45ef36857c72bddbdfe400c68e430c8f4e206cafb2972",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            }
+          ],
+          "finding": "The exact visible A Close acknowledgment was accepted; the menu UI closed and native state returned to gameplay. This is a guarded escape from the tutorial-suspension page, not tutorial completion.",
+          "next_action": "Verify the native handset lifecycle and safe reopen after acknowledgment; this action does not complete the tutorial."
+        },
+        {
+          "id": "R19-C4",
+          "title": "Handset stows after tutorial-suspension acknowledgment",
+          "status": "failed",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/idroid-ack-02/result.json",
+              "sha256": "bf4f888ac6202eb1c3f6510a5a8ab10d2117dc1e60e1d80404e2714fee1e0561",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-ack-02/tutorial-exit-acknowledgment-after-1790531615496604300-right.png",
+              "sha256": "ec86112a40d54544357443edefeb02d321563edaf3e7f93d84f79e0b7ab23ba4",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/idroid-ack-02/visual-review.json",
+              "sha256": "b57c6e1bf1e421fb43f45ef36857c72bddbdfe400c68e430c8f4e206cafb2972",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            }
+          ],
+          "finding": "After A Close, the UI closed but the handset remained held in the right-eye review, exposing a separate device lifecycle defect.",
+          "next_action": "Resolve native stowed/held state after the acknowledgment, then prove safe close and reopen."
+        }
+      ]
+    },
+    {
+      "id": "R20",
+      "title": "Controls editor Save becomes unavailable after remapping (F)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "verified_automated",
+      "claims": [
+        {
+          "id": "R20-C1",
+          "title": "Save remains available and reports valid remaps in the settings UI",
+          "status": "verified_automated",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/editor-checks-01/result.json",
+              "sha256": "07b7419032022d1fef555bfabe15f417ad935706a603453743d7ad38a99c3ac5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/editor-checks-01/edit_controls_lifecycle_tests.stdout.txt",
+              "sha256": "27ce565477dc28754550f7c4ebfd7030d6ffd09f43e349cdd39b28da11e884b1"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/editor-checks-01/launcher_bridge_tests.stdout.txt",
+              "sha256": "38db8c77fab8e41f9fcf49c75f91b62adee073ad6d312ac6ef4a5803b970c0e9"
+            },
+            {
+              "path": "artifacts/launcher-3d-qa/browser/result.json",
+              "sha256": "8ffc7feca0f21391c99d19bcdb42fd78fd53d692f68237b520be4f9835cc5869"
+            }
+          ],
+          "finding": "The hidden real-handler lifecycle test verifies valid edit/save, invalid diagnostic, correction, backup, and external-edit protection; embedded browser QA separately exercises remapping. Bridge fixture tests also pass. Scope is the tested editor/launcher build, not the original unknown personal edit.",
+          "next_action": "Repeat with a copy of a user configuration and verify restart/reload preserves the selected bindings."
+        },
+        {
+          "id": "R20-C2",
+          "title": "Valid save, backup, invalid/conflicting edit and stale revision handling",
+          "status": "verified_automated",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/editor-checks-01/result.json",
+              "sha256": "07b7419032022d1fef555bfabe15f417ad935706a603453743d7ad38a99c3ac5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/editor-checks-01/launcher_bridge_tests.stdout.txt",
+              "sha256": "38db8c77fab8e41f9fcf49c75f91b62adee073ad6d312ac6ef4a5803b970c0e9"
+            }
+          ],
+          "finding": "Disposable-fixture regression checks cover valid fractional save, backup, rejected invalid/conflicting edits without mutation, stale revision and runtime rejection. This verifies bridge behavior, not the original unknown personal edit.",
+          "next_action": "Retain the fixture regression and verify one clean external-config save/reload on the packaged launcher."
+        }
+      ]
+    },
+    {
+      "id": "R21",
+      "title": "Thumb-rest mapping missing (F)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R21-C1",
+          "title": "Separate left/right thumb-rest tokens flow through profile sampling and binding export",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "Source plumbing is present, but no hashed run/test artifact proving the separate profile tokens was found in this audit.",
+          "next_action": "Add a durable automated profile test covering left/right sampling, parse and binding export."
+        },
+        {
+          "id": "R21-C2",
+          "title": "Physical headset profile emits distinct thumb-rest inputs",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "Source plumbing is present, but no hashed run/test artifact proving the separate profile tokens was found in this audit.",
+          "next_action": "Verify each thumb-rest independently on the supported Touch profile and confirm no unintended action fires."
+        }
+      ]
+    },
+    {
+      "id": "R22",
+      "title": "Missing/conflicting controls; binocular stance differs; unclear controls/manual (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R22-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-field/result.json",
+              "sha256": "3a17ae9fd81d746736af05d9782daed2a806d0f83b4368bcf9d499046025585a",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-coco-accepted/result.json",
+              "sha256": "c11716655c8c0530531a24ea00bcf284a87e31c24efd7fa0e40f4ed6a92281f3",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/rc2-test-state-correction.json",
+              "sha256": "e88bc5cf414da1f03185a75a44638402caad5b529bcd7bd1052cce640b990ecd",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Inventory effective actions by context/profile; test transitions, holds/chords, remapped controls and neutral live reload."
+        }
+      ]
+    },
+    {
+      "id": "R23",
+      "title": "Cannot toggle suppressor/flashlight in quick menu (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R23-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Identify native action and provide usable conflict-free route with visible native state change."
+        }
+      ]
+    },
+    {
+      "id": "R24",
+      "title": "Carry/drop bodies, plants/diamonds/context actions and interrogation unclear/unusable (F/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R24-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Instructions conflict across layouts. Test the active config's native hold/context actions and visible prompts; verify interrogation intel."
+        }
+      ]
+    },
+    {
+      "id": "R25",
+      "title": "Missing/intermittent world markers/highlights; unclear `full` (D/F/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R25-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Mode-dependent visibility is intentional in source. Test mark/unmark and stow in each mode; trace any loss inconsistent with policy."
+        }
+      ]
+    },
+    {
+      "id": "R26",
+      "title": "Markers obscure enemy in `full` (F/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R26-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Separate scale defect from R25. Bound apparent size near/far, world/binocular views and crowded scenes."
+        }
+      ]
+    },
+    {
+      "id": "R27",
+      "title": "Misaligned gun reticle; keep throw/placement reticle; laser too thin (D/F)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R27-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Preserve useful aim feedback per action. Turning off all native reticles is not an acceptable workaround for placement."
+        }
+      ]
+    },
+    {
+      "id": "R28",
+      "title": "Missing ammo/flower/diamond icons, captions/prompts/notifications; blank loadout or detached HUD (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R28-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Catalog missing native layers individually; prove each relevant pickup/message/loadout event in both eyes."
+        },
+        {
+          "id": "R28-C2",
+          "title": "Helicopter title tape labels and loading-quad fit",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-continue-03/visual-review.json",
+              "sha256": "89439bef7247cfc0b984a64428e467b4d2a7b24c625aa5b613ee16bcba22d2e6",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-startup/visual-review.json",
+              "sha256": "483b2a7ca605256b7bb174d930bc1e57fff4f93cebb8bf49bab546fcdca27243",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-sortie-native-off/visual-review.json",
+              "sha256": "9e4be31ec30f7d829930cc5180eb50147f1d627d9cbb2cd7b0c4198b210eb76c",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-54af-startup/identity.json",
+              "sha256": "246d29529a15b6fea28e8909bf7d06dc4699f7c90eff69ccabd184efe3ab53fd",
+              "build_sha256": "54afcffe62317e8ef05eda744b24232176fec561083bf03f0f42473846eea253"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-startup/visual-review.json",
+              "sha256": "5ee7b98db4106556f725472ad7a9969a2a9161e3afa544b0d572389b9d118d30",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-startup/identity.json",
+              "sha256": "a1ef6b2c79aad49c0841e6ad1fadf8a746cc183545780f6aa74c0a24532fba6a",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Fresh CD91 title/Continue/loading samples fit both eyes and preserve separate cassette columns. Captions are small; props remain beneath loading.",
+          "next_action": "Physical-headset readability, then loading transition prop cleanup."
+        }
+      ]
+    },
+    {
+      "id": "R29",
+      "title": "No soldier stats through binoculars (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R29-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Separate native analysis/progression availability from suppressed UI and from ordinary marking."
+        }
+      ]
+    },
+    {
+      "id": "R30",
+      "title": "NVG mesh blocks view (D)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R30-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Hide only the offending first-person mesh where appropriate; retain NVG effect and equipment state."
+        }
+      ]
+    },
+    {
+      "id": "R31",
+      "title": "Tank/APC view fully obstructed (D)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R31-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Choose vehicle-specific view/mesh treatment; test entry, motion, aiming, firing and exit without a global height hack."
+        }
+      ]
+    },
+    {
+      "id": "R32",
+      "title": "Mortar fires but cannot aim (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R32-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Verify native targeting/range axes and reticle, with visible impact at intended target."
+        }
+      ]
+    },
+    {
+      "id": "R33",
+      "title": "Machine-gun turret lacks reticle/elevation (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R33-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Both aim axes, firing, usable view and reticle, then exit."
+        }
+      ]
+    },
+    {
+      "id": "R34",
+      "title": "Helicopter/Pequod turret inaccessible (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R34-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Verify native access/context action, traverse, elevation, fire and return."
+        }
+      ]
+    },
+    {
+      "id": "R35",
+      "title": "Combat-vehicle reticle absent; ZHUK RS-ZO range cannot change (D)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R35-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Test this vehicle separately from ordinary tank/Jeep steering, including range and rocket impact."
+        }
+      ]
+    },
+    {
+      "id": "R36",
+      "title": "Cabin/cockpit bindings mixed; Continue selection/hidden-menu focus (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R36-C1",
+          "title": "Physical Continue from the title rack reaches gameplay",
+          "status": "verified_simulator",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/continue-01/result.json",
+              "sha256": "52d63761f7bb5c6a6dded2d070e72986824a775276751e0e948d23f6f3330991",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/continue-01/identity.json",
+              "sha256": "a944f15b28548d694ab02305b28dfd2641a47950015d9eb0fd5c4af552fa0f12",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/continue-01/gameplay-arrival-1790531258936179200-left.png",
+              "sha256": "7a136a9402b5a90bc2fda2820d9af7237974b2ff8d0c557a3584bf6c9de93bd3",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/continue-01/gameplay-arrival-1790531259282266000-right.png",
+              "sha256": "806f9184801b5a0e59ffefdab53958195910318d4b7706149de2fcd5c5d03d61",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/continue-01/visual-review.json",
+              "sha256": "5c05685ae3e1e7eb7e57ad4be8db2678926163083aeae1bd0b99034ddb65b4ce",
+              "build_sha256": "13497aef40b6d36f407d7ee5f770fe4ad35826412fe8a908db61f63705d523e5"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/continue-recovery-01/visual-review.json",
+              "sha256": "bc8050396d441d0b7f27e9fa0a97b9cf0da9b24afa8d21d742f70957f341a332",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/continue-recovery-01/result.json",
+              "sha256": "67b535a84a575589c59ef014cf2e1cf5487e4890d5630dae1976d96464e2330f",
+              "build_sha256": "75efffffbbf598bece065d810546ef16e19788aa99325bdaaa9481998a0d2d0c"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-startup/result.json",
+              "sha256": "511f0b70782e681cd0e59a8dfc73a6c090712c107146e083c22e19ba6374f77f",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/meta-cd91-startup/visual-review.json",
+              "sha256": "5ee7b98db4106556f725472ad7a9969a2a9161e3afa544b0d572389b9d118d30",
+              "build_sha256": "cd91d99e5a892cc216bb444e7706670b14a742083214fe90ef97a33b4375c06b"
+            }
+          ],
+          "finding": "Fresh physical Continue reaches native field gameplay and both final eyes show world/hands on DLL 75efffffbbf5. Controller pose restored. This run's short recording failed cadence validation and is excluded from video acceptance.",
+          "next_action": "Repeat cold launch and Resume from saved gameplay; capture both-eye rack focus and headset behavior."
+        },
+        {
+          "id": "R36-C2",
+          "title": "Cabin controls and hidden-menu focus across cold launch and Resume",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "The fresh run proves Continue arrival but does not cover the full cabin binding set or Resume/cold-launch focus matrix.",
+          "next_action": "Exercise each cabin action and Resume across a cold launch; verify no hidden menu navigation in both eyes."
+        },
+        {
+          "id": "R36-C3",
+          "title": "Cabin usability and Continue on headset",
+          "status": "needs_headset",
+          "evidence": [],
+          "finding": "The fresh title-to-gameplay handoff was performed in the simulator; physical rack reach, focus and menu discoverability are not established.",
+          "next_action": "Verify title rack reach, focus and Resume behavior on headset."
+        }
+      ]
+    },
+    {
+      "id": "R37",
+      "title": "Vehicle auto-center on entry; view/steering/horse direction disagreement (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R37-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Declare native mounted steering policy; no forced HMD turn or inherited on-foot snap offset on entry/exit."
+        }
+      ]
+    },
+    {
+      "id": "R38",
+      "title": "Xbox LT + shoot freezes into 2D presentation (F)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R38-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Trace native aim/menu flags and owner; gamepad-only aiming/firing keeps live head tracking and intended display."
+        }
+      ]
+    },
+    {
+      "id": "R39",
+      "title": "Xbox binocular view floats at lower left (F)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R39-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Provide centered native optic presentation when pad owns input; no requirement for tracked controllers."
+        }
+      ]
+    },
+    {
+      "id": "R40",
+      "title": "Resolution/sharpness, >4K startup, headset vs mirror FPS, optic/directional lag (F/H)",
+      "type": "defect",
+      "priority": "P2",
+      "status": "needs_headset",
+      "claims": [
+        {
+          "id": "R40-C1",
+          "title": "Acceptance evidence",
+          "status": "needs_headset",
+          "evidence": [],
+          "finding": "No matched headset runtime/resolution/refresh/route performance measurement was located; simulator and configuration results are insufficient.",
+          "next_action": "Match runtime/resolution/refresh/route; measure fresh submitted frames and latency. Prior config/SIM results do not establish headset performance."
+        }
+      ]
+    },
+    {
+      "id": "R41",
+      "title": "Horizon artifacts/tree pop-in (D/H)",
+      "type": "defect",
+      "priority": "P2",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R41-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Matched left/right motion capture; isolate culling/projection from resolution and frame cadence."
+        }
+      ]
+    },
+    {
+      "id": "R42",
+      "title": "Rectangular light/shadow mismatch; displaced flares/outline tails (D/H)",
+      "type": "defect",
+      "priority": "P2",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R42-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Separate layers with same-frame stereo/projection evidence; do not group all artifacts as a pacing bug."
+        }
+      ]
+    },
+    {
+      "id": "R43",
+      "title": "Infinite Heaven/IHHook/SnakeBite coexistence (D/H)",
+      "type": "defect",
+      "priority": "P2",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R43-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Versioned loader strategy and reversible install tests; preserve foreign loader. No claim of general mod compatibility."
+        }
+      ]
+    },
+    {
+      "id": "R44",
+      "title": "DLL/INI swaps start flat; folder/update/removal confusion (H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "verified_automated",
+      "claims": [
+        {
+          "id": "R44-C1",
+          "title": "Launcher identifies build and provides configuration controls",
+          "status": "verified_automated",
+          "evidence": [
+            {
+              "path": "artifacts/launcher-3d-qa/host-final/host.json",
+              "sha256": "3b24d245f57f4217547d5c1135e852b5859250062571906069c45dbade704034"
+            },
+            {
+              "path": "artifacts/launcher-3d-qa/browser/result.json",
+              "sha256": "8ffc7feca0f21391c99d19bcdb42fd78fd53d692f68237b520be4f9835cc5869"
+            }
+          ],
+          "finding": "The packaged launcher QA records build/config identification and tested settings editing. This covers the launcher flow, not complete install, update and rollback preservation.",
+          "next_action": "Run complete-package install/update/rollback fixtures and verify personal settings, saves and unrelated files survive."
+        }
+      ]
+    },
+    {
+      "id": "R45",
+      "title": "ReShade/DLSS/other SnakeBite or graphics mods (H)",
+      "type": "defect",
+      "priority": "P2",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R45-C1",
+          "title": "Acceptance evidence",
+          "status": "not_tested",
+          "evidence": [],
+          "finding": "No qualifying current-build evidence for this acceptance slice was located during this audit.",
+          "next_action": "Separate versioned combinations; do not infer support from one user's successful mod."
+        }
+      ]
+    },
+    {
+      "id": "R46",
+      "title": "Snap turn/angle/faster turning requested; recenter tilt history (D/H)",
+      "type": "defect",
+      "priority": "P1",
+      "status": "not_tested",
+      "claims": [
+        {
+          "id": "R46-C1",
+          "title": "Snap-turn settings and source behavior",
+          "status": "not_tested",
+          "evidence": [
+            {
+              "path": "artifacts/community-verification-20260927/source-snapshots-853e/core_tests.cpp",
+              "sha256": "2d62fc11bcade77e75fb0c5796098014bcad47c427f37725256bea517c80cfd7",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            },
+            {
+              "path": "artifacts/community-verification-20260927/flicker-853e-regressions.txt",
+              "sha256": "67997c49b5829de34d91e7206c35d4f3af168f5af65e1940528ea114143fd320",
+              "build_sha256": "853e63eb1758561a44f27673c6cde517585e382d6e0f61a541ce019c620016f0"
+            }
+          ],
+          "finding": "Current immutable source snapshot and the completed core suite cover neutral latch and leaned snap-pivot contracts. Simulator and headset behavior has not been accepted; this runtime claim stays open.",
+          "next_action": "In simulator and headset, test smooth vs snap, angle, neutral latch and leaned pivot.",
+          "superseded_source_references": [
+            {
+              "path": "tests/core_tests.cpp",
+              "sha256": "097ec3f15657a664de3cc9798e76a3abefb078e369e3ad5048d5ecab340450f7",
+              "reason": "Original evidence pointed to mutable source. Source changed during this fix; its old bytes were not recovered. This reference confers no pass."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R47",
+      "title": "Physical stand/crouch/prone (D/H)",
+      "type": "feature",
+      "priority": "Feature",
+      "status": "not_implemented",
+      "claims": [
+        {
+          "id": "R47-C1",
+          "title": "Opt-in physical body movement drives native standing, crouch and prone",
+          "status": "not_implemented",
+          "evidence": [],
+          "finding": "No implementation or acceptance evidence for physical head-height stance policy was located; existing controller-driven stance roundtrips do not prove this feature.",
+          "next_action": "Implement opt-in posture inference after height calibration, then verify no double crouch or broken prone roll."
+        }
+      ]
+    },
+    {
+      "id": "R48",
+      "title": "NVG hand-to-head toggle (D)",
+      "type": "feature",
+      "priority": "Feature",
+      "status": "not_implemented",
+      "claims": [
+        {
+          "id": "R48-C1",
+          "title": "Deliberate hand-to-head NVG gesture with hysteresis",
+          "status": "not_implemented",
+          "evidence": [],
+          "finding": "No hand-to-head NVG gesture implementation or test was located.",
+          "next_action": "Implement a deliberate gesture with hysteresis and prove it never switches equipment accidentally; keep R30 mesh handling separate."
+        }
+      ]
+    },
+    {
+      "id": "R49",
+      "title": "Visible stance indicator (D/H)",
+      "type": "feature",
+      "priority": "Feature",
+      "status": "not_implemented",
+      "claims": [
+        {
+          "id": "R49-C1",
+          "title": "Readable native stance indicator",
+          "status": "not_implemented",
+          "evidence": [],
+          "finding": "No stance indicator implementation or runtime evidence was located.",
+          "next_action": "Add an indicator driven by native stance state and verify readability through scripted and mounted states."
+        }
+      ]
+    },
+    {
+      "id": "R50",
+      "title": "Enemy senses, subsistence, time/weather features from IH (D)",
+      "type": "feature",
+      "priority": "Feature",
+      "status": "not_implemented",
+      "claims": [
+        {
+          "id": "R50-C1",
+          "title": "Infinite Heaven enemy-sense, subsistence and time/weather feature set",
+          "status": "not_implemented",
+          "evidence": [],
+          "finding": "These requested gameplay features are outside the verified VR runtime and no implementation evidence was located.",
+          "next_action": "Scope each feature separately, preserving native progression semantics and existing loader compatibility."
+        }
+      ]
+    },
+    {
+      "id": "R51",
+      "title": "True left-handed rig (H: issue #8 at earlier review)",
+      "type": "feature",
+      "priority": "Feature",
+      "status": "not_implemented",
+      "claims": [
+        {
+          "id": "R51-C1",
+          "title": "Complete left-handed rig and interaction ownership",
+          "status": "not_implemented",
+          "evidence": [],
+          "finding": "No complete mirrored weapon, grip and interaction implementation was located; button-label swapping would not satisfy the request.",
+          "next_action": "Implement a mirrored hand/weapon/interaction profile and verify controls and native contacts on headset."
+        }
+      ]
+    },
+    {
+      "id": "R52",
+      "title": "Ground Zeroes first-person completion (H: issue #7 at earlier review)",
+      "type": "feature",
+      "priority": "Feature",
+      "status": "not_implemented",
+      "claims": [
+        {
+          "id": "R52-C1",
+          "title": "Ground Zeroes first-person game adapter and completion",
+          "status": "not_implemented",
+          "evidence": [],
+          "finding": "Current evidence and candidate target TPP; no GZ-specific camera/player/rig/HUD adapter or completion proof was located.",
+          "next_action": "Build separate GZ adapters and acceptance; do not infer completion from TPP results."
+        }
+      ]
+    },
+    {
+      "id": "R53",
+      "title": "Quiet/rat/buddy expansion and universal mod installer (H)",
+      "type": "feature",
+      "priority": "Feature",
+      "status": "not_implemented",
+      "claims": [
+        {
+          "id": "R53-C1",
+          "title": "Quiet, rat and buddy expansion plus universal mod installer",
+          "status": "not_implemented",
+          "evidence": [],
+          "finding": "No complete new actor-interaction set or universal mod-installer support was proven by this audit.",
+          "next_action": "Implement and verify each native interaction and installer compatibility separately while regression-testing current buddy behavior."
+        }
+      ]
+    },
+    {
+      "id": "R54",
+      "title": "In-headset configuration instead of external editing (H)",
+      "type": "feature",
+      "priority": "Feature",
+      "status": "not_implemented",
+      "claims": [
+        {
+          "id": "R54-C1",
+          "title": "In-headset settings editor",
+          "status": "not_implemented",
+          "evidence": [
+            {
+              "path": "artifacts/launcher-3d-qa/browser/result.json",
+              "sha256": "8ffc7feca0f21391c99d19bcdb42fd78fd53d692f68237b520be4f9835cc5869"
+            }
+          ],
+          "finding": "An external/desktop 3D launcher settings editor is verified, but no in-headset editor was located.",
+          "next_action": "Design an in-game editor with safe input ownership, schema-backed values, persistent save and readable headset UI."
+        }
+      ]
+    },
+    {
+      "id": "R55",
+      "title": "Roomscale/body movement and rotation follow the player (D/H)",
+      "type": "feature",
+      "priority": "Feature",
+      "status": "not_implemented",
+      "claims": [
+        {
+          "id": "R55-C1",
+          "title": "Roomscale body movement and rotation follows the player",
+          "status": "not_implemented",
+          "evidence": [],
+          "finding": "No collision-aware roomscale/body-follow implementation or arrival proof was located.",
+          "next_action": "First prove R07 action heading and R09 root/pelvis alignment, then implement collision-aware body movement with independent look, stance/mount rules and observed arrival."
+        }
+      ]
+    }
+  ]
+}

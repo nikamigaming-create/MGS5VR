@@ -11,7 +11,7 @@ namespace mgs5vr {
 // Changing projection or texture dimensions also finalizes the current take.
 class NativeVideoRecorder {
 public:
-    NativeVideoRecorder();
+    explicit NativeVideoRecorder(const wchar_t* requestName=L"mgs5vr-recording.txt");
     ~NativeVideoRecorder();
     void frame(ID3D11Device* device,ID3D11DeviceContext* context,
                ID3D11Texture2D* source,uint32_t slice,const EyeFrame* eye=nullptr) noexcept;

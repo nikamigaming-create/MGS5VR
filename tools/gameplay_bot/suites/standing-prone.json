@@ -1,0 +1,1 @@
+{"schema":1,"description":"Native held-stance variant, independently checked from the short stance tap.","cases":[{"id":"standing-to-prone-hold","before":{"scene":"gameplay","native.status_STAND":true},"steps":[{"op":"action","name":"gameplay.stance","seconds":0.85}],"after":{"native.status_CRAWL":true}}]}

@@ -41,6 +41,9 @@ try {
     $mgsChanged=[IO.File]::ReadAllText($mgsConfig) | ConvertFrom-Json
     Assert ($mgsChanged.graphics.videoout_setting.width -eq 2560 -and $mgsChanged.graphics.videoout_setting.height -eq 2560) 'Custom dimensions were not applied.'
     Assert ($mgsChanged.graphics.videoout_setting.window_mode -eq 'FlexibleWindowed') 'Native arbitrary-size windowed mode must be used.'
+    $mgsDisplay=[IO.File]::ReadAllText((Join-Path $mgsFixture 'mgs5vr-display.ini'))
+    Assert ($mgsDisplay.Contains('render_width=2560') -and $mgsDisplay.Contains('render_height=2560') -and
+        $mgsDisplay.Contains('mirror_width=1280') -and $mgsDisplay.Contains('mirror_height=720')) '720p preview must remain independent of the per-eye VR size.'
     Assert ($mgsChanged.graphics.quality_setting.depth_of_field -eq 'Disable' -and $mgsChanged.graphics.quality_setting.motion_blur_amount -eq 'Off' -and $mgsChanged.graphics.quality_setting.ssao -eq 'Off') 'Native graphics fallback / blur regression.'
     Assert ($mgsChanged.as -eq 'keep-me' -and $mgsChanged.graphics.quality_setting.texture -eq 'ExtraHigh' -and $mgsChanged.graphics.videoout_setting.display_index -eq 2) 'Unrelated graphics settings changed.'
     $mgsBackups=@(Get-ChildItem -LiteralPath $mgsFixture -Filter '*.backup')
@@ -66,6 +69,15 @@ try {
     & $mgsTool -Mode Launch -GameExe $mgsExe -Preset Current
     Assert ($mgsLaunches.Count -eq 1) 'Launch did not use the physical headset launcher.'
     Assert ([IO.File]::ReadAllText($mgsConfig) -ceq $mgsSaved) 'Current preset edited graphics.'
+    # Exercise the simulator wrapper too: it previously replaced FlexibleWindowed
+    # with Windowed after Apply succeeded, silently losing the requested canvas.
+    $mgsSimTools=Join-Path $mgsFixture 'tools'
+    New-Item -ItemType Directory -Path $mgsSimTools | Out-Null
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $mgsTool) 'launch-simulator.ps1') -Destination $mgsSimTools
+    [IO.File]::WriteAllText((Join-Path $mgsSimTools 'launch-steam-simulator.ps1'),
+        'param($RuntimeManifest,$OperatorDir,[switch]$Headless,[switch]$RestartSteam); Write-Output "Fixture launch only"')
+    & (Join-Path $mgsSimTools 'launch-simulator.ps1') -GameDir $mgsFixture -RuntimeManifest (Join-Path $mgsFixture 'headset.json') -GraphicsConfig $mgsConfig
+    Assert ([IO.File]::ReadAllText($mgsConfig) -ceq $mgsSaved) 'SIM launch replaced the selected arbitrary-size render mode.'
     [IO.File]::WriteAllText($mgsFixtureDll,'Authored mismatched DLL fixture; not executable.')
     Refuses { & $mgsTool -Mode Apply -GameExe $mgsExe -Preset Custom -Width 1280 -Height 720 -GraphicsConfig $mgsConfig } '*before applying a resolution*'
     Assert ([IO.File]::ReadAllText($mgsConfig) -ceq $mgsSaved) 'Mismatched DLL must not change graphics settings.'

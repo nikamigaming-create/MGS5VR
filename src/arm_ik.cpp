@@ -17,6 +17,63 @@ std::optional<std::array<size_t,14>> armHelperIndices(std::span<const uint32_t> 
     }
     return result;
 }
+std::optional<Pose> HandPresentationCache::update(Pose grip,bool tracked,uint64_t time,RigContinuityKey key){
+    if(!key.owner||!key.model||!key.activation||!key.epoch||!time){reset();return {};}
+    if(key!=key_||time<sampleAt_||time-sampleAt_>250){reset();key_=key;}
+    sampleAt_=time;
+    if(tracked&&valid(grip)){
+        if(!tracked_&&valid_&&time>=trackedAt_&&time-trackedAt_<=250){recoveryFrom_=last_;recoveryAt_=time;}
+        if(recoveryAt_){
+            const float t=std::min(1.f,float(time-recoveryAt_)/100.f);
+            auto q=grip.orientation;const auto from=recoveryFrom_.orientation;
+            if(from.x*q.x+from.y*q.y+from.z*q.z+from.w*q.w<0)q={-q.x,-q.y,-q.z,-q.w};
+            q={from.x+(q.x-from.x)*t,from.y+(q.y-from.y)*t,from.z+(q.z-from.z)*t,from.w+(q.w-from.w)*t};
+            const float n=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
+            grip={Quat{q.x/n,q.y/n,q.z/n,q.w/n},recoveryFrom_.position+(grip.position-recoveryFrom_.position)*t};
+            if(t==1)recoveryAt_=0;
+        }
+        last_=grip;trackedAt_=time;valid_=tracked_=true;return last_;
+    }
+    tracked_=false;recoveryAt_=0;
+    if(valid_&&time>=trackedAt_&&time-trackedAt_<=250)return last_;
+    valid_=false;return {};
+}
+bool StationaryBodyState::update(bool eligible,Vec3 root,uint64_t time,RigContinuityKey key){
+    if(!eligible||!valid(Pose{{},root})||!key.owner||!key.model||!key.activation||!key.epoch){reset();return false;}
+    if(key!=key_||time<time_||time-time_>250){reset();key_=key;}
+    if(valid_&&time>time_){
+        const float dt=float(time-time_)*.001f;
+        const float speed=std::hypot(root.x-root_.x,root.z-root_.z)/dt;
+        if(speed>.30f){moved_=true;active_=false;stoppedAt_=0;}
+        else if(speed<.10f){
+            if(!stoppedAt_)stoppedAt_=time;
+            if(moved_&&time-stoppedAt_>=100)active_=true;
+        }else stoppedAt_=0;
+    }
+    root_=root;time_=time;valid_=true;return active_;
+}
+std::optional<Pose> stationaryLowerBodyDelta(const StationaryBodyPose& b,Pose torsoDelta){
+    for(const auto p:{b.pelvis,b.leftHip,b.rightHip,b.leftShoulder,b.rightShoulder})if(!valid(Pose{{},p}))return {};
+    if(!valid(b.chest)||!valid(torsoDelta))return {};
+    const auto turned=rotate(torsoDelta.orientation,{0,0,1});
+    const auto hips=b.leftHip-b.rightHip,shoulders=b.leftShoulder-b.rightShoulder;
+    if(turned.x*turned.x+turned.z*turned.z<.0001f||hips.x*hips.x+hips.z*hips.z<.0025f
+        ||shoulders.x*shoulders.x+shoulders.z*shoulders.z<.0025f)return {};
+    const auto wrap=[](float angle){return std::remainder(angle,6.283185307f);};
+    const float pelvisYaw=std::atan2(-hips.z,hips.x),shoulderYaw=std::atan2(-shoulders.z,shoulders.x);
+    const float torsoTurn=std::atan2(turned.x,turned.z);
+    const float stance=std::clamp(wrap(pelvisYaw-shoulderYaw),-.1745f,.1745f);
+    const float delta=wrap(shoulderYaw+torsoTurn+stance-pelvisYaw);
+    const Quat yaw{0,std::sin(delta*.5f),0,std::cos(delta*.5f)};
+    const Vec3 pivot{b.pelvis.x,0,b.pelvis.z};
+    const auto chestAfter=compose(torsoDelta,b.chest);
+    const Quat torsoYaw{0,std::sin(torsoTurn*.5f),0,std::cos(torsoTurn*.5f)};
+    const auto offset=rotate(torsoYaw,Vec3{b.chest.position.x-b.pelvis.x,0,b.chest.position.z-b.pelvis.z});
+    Vec3 shift{chestAfter.position.x-offset.x-b.pelvis.x,0,chestAfter.position.z-offset.z-b.pelvis.z};
+    const float distance=std::hypot(shift.x,shift.z);
+    if(distance>.50f)shift=shift*(.50f/distance);
+    return Pose{yaw,pivot-rotate(yaw,pivot)+shift};
+}
 namespace {
 Vec3 cross(Vec3 a,Vec3 b){return {a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};}
 float length(Vec3 v){return std::sqrt(dot(v,v));}
@@ -93,9 +150,8 @@ std::optional<Quat> fingerJointRotation(bool right,unsigned finger,unsigned join
 }
 std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprightHead){
     if(!valid(chest)||!valid(uprightHead)||!valid(Pose{{},shoulderCenter}))return {};
-    // Place the shoulder line behind the eyes. The former 6 cm setback exposed
-    // the open shoulder ends of the native shirt when the elbows were bent.
-    const auto target=compose(uprightHead,Pose{{},{0,-.18f,-.16f}});
+    // Coco's fitted shoulder line: lower, with less backward displacement.
+    const auto target=compose(uprightHead,Pose{{},{0,-.23f,-.04f}});
     return compose(target,inverse(Pose{chest.orientation,shoulderCenter}));
 }
 std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const ArmBasis* basis,const ArmSurface* surface){
@@ -165,15 +221,19 @@ std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Qu
     return {twist(clavicle,2,-1),twist(upper,0,right?-.75f:-.70f),twist(upper,0,-.45f),
         twist(elbow,1,-.55f),twist(wrist,0,.35f),twist(wrist,0,.75f),twist(wrist,1,-.55f)};
 }
-std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal){
-    if(!valid(elbow)||!valid(wrist)||!valid(Pose{{},dorsal}))return {};
+std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal,float surfaceLift){
+    if(!valid(elbow)||!valid(wrist)||!valid(Pose{{},dorsal})
+       ||!std::isfinite(surfaceLift)||surfaceLift<0||surfaceLift>.1f)return {};
     const auto segment=wrist.position-elbow.position;
     if(length(segment)<0.05f||length(segment)>0.7f)return {};
     const auto x=unit(segment);
     auto z=dorsal-x*dot(dorsal,x);
     if(length(z)<0.1f)return {};
     z=unit(z);const auto y=cross(z,x);
-    const auto p=wrist.position-segment*0.35f+z*0.025f;
+    // The mount sits immediately behind the hand, not partway up the sleeve.
+    // A fixed setback keeps the wrist location consistent across arm lengths.
+    constexpr float wristSetback=.015f,baseSurfaceClearance=.005f;
+    const auto p=wrist.position-x*wristSetback+z*(baseSurfaceClearance+surfaceLift);
     return nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,p.x,p.y,p.z,1});
 }
 bool withinSupportCone(Vec3 separation,Vec3 forward){

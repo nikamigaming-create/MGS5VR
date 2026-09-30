@@ -1,76 +1,31 @@
 #include "mgs5vr/idroid_rig.hpp"
-#include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/stereo.hpp"
 #include <cmath>
 
 namespace mgs5vr {
-namespace {
-Vec3 cross(Vec3 a,Vec3 b){return {a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};}
-std::optional<Vec3> unit(Vec3 value){
-    const float squared=dot(value,value);
-    if(!std::isfinite(squared)||squared<.000001f)return {};
-    const float scale=1.f/std::sqrt(squared);
-    return value*scale;
-}
+std::optional<Pose> idroidBodyFromConnector(Pose connector) noexcept {
+    if(!valid(connector))return {};
+    const auto body=compose(connector,inverse(idroidConnectorInBody));
+    return valid(body)?std::optional<Pose>{body}:std::nullopt;
 }
 
 std::optional<IdroidPose> trackedIdroidPose(const HeadCameraSample& frame) noexcept{
-    const bool nativePalm=frame.controllers.nativeGamepad&&frame.renderedPalmTracked[1]&&valid(frame.renderedPalms[1]);
-    if(!frame.applied||!frame.stereoTracked||!frame.activation||(!frame.controllers.hands[1].gripTracked&&!nativePalm)
-       ||!valid(frame.nativePose)||!valid(frame.headPose)||!valid(frame.controllers.hands[1].grip))return {};
-    const auto head=nativeTrackedPose(frame.nativePose,frame.headPose,frame.headPose);
-    const auto grip=nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.hands[1].grip);
-    if(!valid(head)||!valid(grip))return {};
-    const bool palmTracked=frame.renderedPalmTracked[1]&&valid(frame.renderedPalms[1]);
-    const auto attachment=palmTracked?frame.renderedPalms[1]:grip;
-    if(!valid(attachment))return {};
-
-    // The screen is on the anatomical palm side: the verified right-hand
-    // palm frame points into the palm on +X, so its outward display normal is
-    // -X. Anatomical +Y points toward the wrist, so screen up is -Y
-    // (toward the fingers) and screen right is -Z. Keep these device axes
-    // in the same frame instead of replacing the
-    // hand's palm side with a head-facing billboard. The raw-grip path remains
-    // a safe readable fallback before the final skin publication is available.
-    std::optional<Vec3> normal;
-    Vec3 xDirection{};
-    if(palmTracked){
-        normal=unit(rotate(attachment.orientation,{-1,0,0}));
-        xDirection=rotate(attachment.orientation,{0,0,-1});
-    }else{
-        normal=unit(head.position-attachment.position);
-        xDirection=rotate(attachment.orientation,{1,0,0});
-    }
-    if(!normal)return {};
-    xDirection=xDirection-*normal*dot(xDirection,*normal);
-    auto x=unit(xDirection);
-    if(!x){
-        xDirection=rotate(palmTracked?attachment.orientation:head.orientation,{0,1,0});
-        xDirection=xDirection-*normal*dot(xDirection,*normal);
-        x=unit(xDirection);
-    }
-    if(!x)return {};
-    const auto y=unit(cross(*normal,*x));
-    if(!y)return {};
-    const auto z=cross(*x,*y);
-    const std::array<float,16> axes{
-        x->x,x->y,x->z,0,
-        y->x,y->y,y->z,0,
-        z.x,z.y,z.z,0,
-        0,0,0,1};
-    const auto orientation=nativeAffinePose(axes);
-    if(!orientation)return {};
-    const auto attachmentOrientation=orientation->orientation;
-    // With the fingers up and palm facing the viewer, these axes give an
-    // upright display without adding a camera-dependent rotation.
-    const auto displayOrientation=attachmentOrientation;
-    const auto displayNormal=rotate(displayOrientation,{0,0,1});
-    const auto attachmentUp=rotate(attachmentOrientation,{0,1,0});
-    const auto body=Pose{displayOrientation,attachment.position+displayNormal*(palmTracked?.012f:.035f)};
-    if(!std::isfinite(frame.controllers.idroidScreenDepth)||frame.controllers.idroidScreenDepth<0||frame.controllers.idroidScreenDepth>.20f)return {};
-    const auto screen=Pose{body.orientation,body.position+displayNormal*((palmTracked?.012f:.022f)+frame.controllers.idroidScreenDepth)
-        +(palmTracked?attachmentUp*.045f:Vec3{})};
-    if(!valid(body)||!valid(screen))return {};
+    if(!frame.applied||!frame.stereoTracked||!frame.activation
+       ||!frame.idroidDeviceTracked||!valid(frame.idroidDevice)
+       ||!valid(frame.nativePose)||!valid(frame.headPose))return {};
+    const auto body=frame.idroidDevice;
+    const auto mount=compose(body,idroidHologramInBody);
+    if(!std::isfinite(frame.controllers.idroidScreenDepth)
+       ||frame.controllers.idroidScreenDepth<0||frame.controllers.idroidScreenDepth>.20f)return {};
+    const auto offset=frame.controllers.idroidScreenOffset;
+    if(!valid(Pose{frame.controllers.idroidScreenRotation,offset})
+       ||std::abs(offset.x)>.20f||std::abs(offset.y)>.20f||offset.z!=0)return {};
+    // Native device axes define right, up and the readable face. Fit controls
+    // pivot at the projected center; the hand, body and emitter stay attached.
+    // Never substitute a newer raw grip or an anatomical palm for this mount.
+    const auto screen=compose(mount,Pose{frame.controllers.idroidScreenRotation,
+        {offset.x,offset.y,frame.controllers.idroidScreenDepth}});
+    if(!valid(screen))return {};
     return IdroidPose{body,screen};
 }
 

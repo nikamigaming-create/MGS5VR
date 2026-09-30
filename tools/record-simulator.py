@@ -45,11 +45,11 @@ class Operator:
         self.process.stdin.write(json.dumps(message, separators=(",", ":")) + "\n")
         self.process.stdin.flush()
 
-    def request(self, method, params):
+    def request(self, method, params, timeout=15.):
         self.sequence += 1
         request_id = self.sequence
         self.send({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params})
-        deadline = time.monotonic() + 15
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             try:
                 response = self.messages.get(timeout=max(.01, deadline - time.monotonic()))
@@ -64,8 +64,8 @@ class Operator:
             return response["result"]
         raise TimeoutError(method)
 
-    def call(self, name, arguments):
-        result = self.request("tools/call", {"name": name, "arguments": arguments})
+    def call(self, name, arguments, timeout=15.):
+        result = self.request("tools/call", {"name": name, "arguments": arguments}, timeout=timeout)
         if result.get("isError"):
             raise RuntimeError(result)
         # Some operator versions return textual errors without MCP isError.
@@ -264,6 +264,12 @@ def run_sequence(proxy, sequence, status):
                 arguments = {"hand": step["hand"], "component": step["component"], "value": step["value"]}
                 arguments.update(step.get("args", {}))
                 row["result"] = client.call("openxr_set_controller_input", arguments)
+            elif op == "head_pose":
+                row["result"] = client.call("openxr_set_head_pose", {
+                    "base_space": step.get("space", "local"), "position": step["position"],
+                    "orientation": step.get("orientation", [0, 0, 0, 1]),
+                    **({"duration_seconds": step["duration_seconds"]}
+                       if "duration_seconds" in step else {})})
             elif op == "pose":
                 row["result"] = client.call("openxr_set_controller_pose", {
                     "hand": step["hand"], "pose_type": step.get("kind", "grip"),

@@ -3,8 +3,12 @@
 #include "input_bridge.hpp"
 
 namespace mgs5vr {
-enum class NativeMenuInput { menu, liveIdroid, scriptedScene, cinematic };
+enum class NativeMenuInput { menu, liveIdroid, scriptedScene, cinematic, cinematicLook };
+// A visible native menu always owns navigation, including during a cutscene.
+NativeMenuInput nativeSceneInputMode(bool menuOpen,bool scriptedDemo,bool interactiveLook,
+    bool sceneFallback,bool handheldIdroid) noexcept;
 GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalControls& physical,NativeMenuInput mode);
+void constrainCinematicInput(GamepadSample& sample,NativeMenuInput mode) noexcept;
 // A spatial rack owns title selection. Sticks, grips and face buttons must not
 // also navigate its hidden native menu; only a selected tape confirms it.
 GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept;
@@ -24,6 +28,10 @@ bool takeNativeIdroidClose() noexcept;
 // The native Lua job owns the pause registration; XR only publishes the mode.
 void setHandheldMenus(bool enabled) noexcept;
 bool handheldMenusSelected() noexcept;
+// The native Lua job acknowledges its own player-pad exclusion. Until then,
+// handheld menu sticks must not leak into character locomotion.
+void setHandheldMenuInputReady(bool ready) noexcept;
+bool handheldMenuInputReady() noexcept;
 struct NativeControlSample {
     GamepadSample gamepad{};
     bool selected{},exclusive{},changed{};

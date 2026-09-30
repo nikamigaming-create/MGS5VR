@@ -44,6 +44,16 @@ struct NativeFixture {
 }
 int main(int argc,char** argv){
     {
+        Fixture f;f.mode=ControlContext::horse;f.tick();
+        f.input.buttons[7]=1;f.tick();f.input.buttons[3]=1;f.tick();
+        expect(!f.active("horse.interact"),"mounted binocular chord consumes Y before it can dismount the player");
+        f.tick(350);
+        expect(f.active("gameplay.equip_binoculars")&&!f.active("horse.interact"),
+            "the existing VR binocular equip gesture also works while riding");
+        f.input={};f.tick();f.input.buttons[3]=1;f.tick();
+        expect(f.active("horse.interact"),"ordinary mounted interaction survives binocular equip support");
+    }
+    {
         IdroidBackRecovery recovery;
         expect(!recovery.update(true,true,true,100)&&!recovery.update(true,true,true,1000),
             "held Back at menu entry cannot dismiss a newly opened iDroid");
@@ -98,6 +108,31 @@ int main(int argc,char** argv){
         expect(cinematic.leftX==0&&cinematic.leftY==0&&cinematic.rightX==0&&cinematic.rightY==0
             &&cinematic.leftTrigger==0&&cinematic.rightTrigger==0&&(cinematic.buttons&0x1000),
             "native cutscenes preserve confirm while suppressing movement, look, and action triggers");
+        const auto lessonMode=nativeSceneInputMode(false,true,true,false,false);
+        const auto lesson=nativeMenuGamepad(bindings,input,lessonMode);
+        expect(lessonMode==NativeMenuInput::cinematicLook&&lesson.rightX<0&&lesson.rightY>0
+            &&lesson.leftX==0&&lesson.leftY==0&&lesson.leftTrigger==0&&lesson.rightTrigger==0,
+            "hospital look lessons retain the native right stick without enabling movement or combat");
+        const auto pauseMode=nativeSceneInputMode(true,true,false,false,false);
+        const auto paused=nativeMenuGamepad(bindings,input,pauseMode);
+        expect(pauseMode==NativeMenuInput::menu&&paused.leftY>20000&&paused.rightX<0
+            &&paused.leftTrigger==255&&paused.rightTrigger==255,
+            "Pause during a cutscene retains the visible menu's navigation and triggers");
+        ControlBindings handheldBindings;
+        std::istringstream distinctMenuAxes("[axes]\nmove=right_stick\nmenu=left_stick\n");
+        expect(handheldBindings.load(distinctMenuAxes).empty(),"handheld menu axis fixture is valid");
+        const auto handheld=nativeMenuGamepad(handheldBindings,input,NativeMenuInput::liveIdroid);
+        expect(handheld.leftX>0&&handheld.leftY>0,
+            "handheld iDroid uses the configured menu axis even when gameplay movement is remapped");
+        auto nativeLesson=fallback;constrainCinematicInput(nativeLesson,lessonMode);
+        expect(nativeLesson.rightX==fallback.rightX&&nativeLesson.rightY==fallback.rightY
+            &&nativeLesson.leftX==0&&nativeLesson.leftY==0&&nativeLesson.leftTrigger==0&&nativeLesson.rightTrigger==0,
+            "native-button mode obeys the same look-lesson restrictions");
+        auto nativePause=fallback;constrainCinematicInput(nativePause,pauseMode);
+        expect(nativePause==fallback,"a cinematic cannot erase a native-button menu navigation sample");
+        expect(nativeSceneInputMode(false,true,false,false,false)==NativeMenuInput::cinematic
+            &&nativeSceneInputMode(false,false,false,true,false)==NativeMenuInput::scriptedScene,
+            "movies and ordinary scripted gameplay retain distinct input policies");
         input={};bindings.update(input,ControlContext::menus,160);
         input.buttons[4]=1;bindings.update(input,ControlContext::menus,180);
         bindings.update(input,ControlContext::menus,740);
@@ -310,14 +345,19 @@ int main(int argc,char** argv){
         expect(f.controls.setting("settings.wrist_picker_width_cm")==100,"maximum picker width is retained");
         expect(!f.load("[settings]\nwrist_picker_width_cm=101\n")&&!f.load("[settings]\nwrist_picker_width_cm=41\n"),
             "picker dimensions cannot escape their fitted envelope limits");
-        expect(f.controls.setting("settings.idroid_screen_width_cm")==30,
-            "iDroid keeps a readable 30 cm default width");
+        expect(f.controls.setting("settings.idroid_screen_width_cm")==45,
+            "iDroid defaults to a large 45 cm display");
         expect(f.load("[settings]\nidroid_screen_width_cm=45\n")
             &&f.controls.setting("settings.idroid_screen_width_cm")==45,
             "iDroid screen width is configurable without changing its aspect ratio");
         expect(!f.load("[settings]\nidroid_screen_width_cm=61\n")
             &&!f.load("[settings]\nidroid_screen_width_cm=19\n"),
             "iDroid screen width stays inside a bounded readable range");
+        expect(f.load("[settings]\nidroid_screen_pitch_degrees=35\nidroid_screen_yaw_degrees=-20\nidroid_screen_roll_degrees=10\nidroid_screen_depth_cm=12\nidroid_screen_x_cm=6\nidroid_screen_y_cm=-3\n"),
+            "iDroid size, angle and projection position can be fitted without changing controller calibration");
+        expect(!f.load("[settings]\nidroid_screen_pitch_degrees=91\n")
+            &&!f.load("[settings]\nidroid_screen_x_cm=21\n")&&!f.load("[settings]\nidroid_screen_depth_cm=21\n"),
+            "iDroid fitting rejects unbounded angles and offsets");
     }
     {
         const auto touch=controllerFaceLayout("/interaction_profiles/meta/touch_controller_plus");
@@ -553,9 +593,135 @@ int main(int argc,char** argv){
         expect(f.active("binoculars.dive")&&!f.active("binoculars.zoom"),"binocular right click only dives");
         f.input={};f.tick(101);f.input.buttons[0]=1;f.tick();
         expect(f.active("binoculars.clear_mark")&&!f.active("binoculars.mark"),"binocular A clears, never marks");
+        f.input={};f.tick(101);f.input.buttons[2]=1;f.tick();
+        expect(f.active("binoculars.intel")&&!f.active("binoculars.mark")&&!f.active("commands.open")
+            &&!f.active("horse.gallop"),"binocular X requests intel without marking, Commands or gallop");
         f.input={};f.mode=ControlContext::horse;f.tick();
         f.input.buttons[9]=1;f.tick();f.input.buttons[2]=1;f.tick();
         expect(f.active("commands.mounted_open")&&!f.active("horse.gallop"),"mounted command chord consumes gallop");
+    }
+    {
+        Fixture defaults;
+        expect(!defaults.controls.hasBindingInput("left_thumbrest")&&!defaults.controls.hasBindingInput("right_thumbrest"),
+            "thumb-rest inputs have no default action bindings");
+        defaults.input.buttons[19]=defaults.input.buttons[20]=1;defaults.tick();
+        expect(!defaults.active("gameplay.interact"),"thumb-rest sensors leave existing default actions unchanged until mapped");
+        defaults.input={};defaults.tick();defaults.input.buttons[3]=1;defaults.tick();
+        expect(defaults.active("gameplay.interact"),"the existing Y interaction default remains active");
+    }
+    {
+        ControlBindings controls;LiveControls live;PhysicalControls physical;
+        std::istringstream settings("[settings]\nturn_mode=snap\n");
+        expect(live.stage(settings).empty(),"settings-only edit stages with thumb-rests unused");
+        physical.buttons[19]=1;
+        expect(live.apply(controls,physical)&&controls.setting("settings.turn_mode")==0,
+            "unbound thumb-rest touch does not block a settings edit");
+    }
+    {
+        ControlBindings controls;LiveControls live;PhysicalControls physical;
+        std::istringstream candidate("[gameplay]\ninteract=left_thumbrest\n[settings]\nturn_mode=snap\n");
+        expect(live.stage(candidate).empty(),"new thumb-rest binding stages");
+        physical.buttons[19]=1;
+        expect(!live.apply(controls,physical)&&controls.setting("settings.turn_mode")==1,
+            "newly bound held thumb-rest waits for release before applying");
+        physical={};
+        expect(live.apply(controls,physical)&&controls.hasBindingInput("left_thumbrest"),
+            "new thumb-rest binding applies after the touch is released");
+    }
+    {
+        ControlBindings controls;LiveControls live;PhysicalControls physical;
+        std::istringstream current("[gameplay]\ninteract=left_thumbrest\n");
+        expect(controls.load(current).empty()&&controls.hasBindingInput("left_thumbrest"),
+            "existing thumb-rest binding loads before removal edit");
+        std::istringstream candidate("[settings]\nturn_mode=snap\n");
+        expect(live.stage(candidate).empty(),"thumb-rest removal edit stages");
+        physical.buttons[19]=1;
+        expect(!live.apply(controls,physical)&&controls.hasBindingInput("left_thumbrest"),
+            "removing a held thumb-rest binding waits for release");
+        physical={};
+        expect(live.apply(controls,physical)&&!controls.hasBindingInput("left_thumbrest"),
+            "thumb-rest removal applies once the touch is released");
+    }
+    {
+        Fixture f;
+        expect(f.load("[gameplay]\ninteract=left_thumbrest | right_thumbrest\n"),
+            "both thumb-rest touch tokens parse as alternatives");
+        expect(f.controls.hasBindingInput("left_thumbrest")&&f.controls.hasBindingInput("right_thumbrest"),
+            "active bindings report the added physical input tokens");
+        f.tick(); // load() suspends bindings until one neutral sample has passed
+        const auto exported=f.controls.bindingsJson();
+        expect(exported.find("\"left_thumbrest\"")!=std::string::npos
+            &&exported.find("\"right_thumbrest\"")!=std::string::npos
+            &&exported.find("L THUMBREST / R THUMBREST")!=std::string::npos,
+            "effective binding export includes both tokens and readable editor labels");
+        f.input.buttons[19]=1;f.tick();
+        expect(f.active("gameplay.interact"),"left thumb-rest mapping reaches the configured action");
+        f.input={};f.tick();f.input.buttons[20]=1;f.tick();
+        expect(f.active("gameplay.interact"),"right thumb-rest mapping reaches the configured action");
+    }
+    {
+        Fixture f;
+        expect(f.load("[gameplay]\ndive=press(left_thumbrest + b)\n"),
+            "thumb-rest input composes with a face-button chord");
+        const auto exported=f.controls.bindingsJson();
+        expect(exported.find("\"inputs\":[\"b\",\"left_thumbrest\"]")!=std::string::npos
+            &&exported.find("\"gesture\":\"press\"")!=std::string::npos
+            &&exported.find("\"label\":\"B + L THUMBREST\"")!=std::string::npos,
+            "effective export keeps thumb-rest chord tokens and their label");
+        f.tick(); // load() suspends bindings until one neutral sample has passed
+        f.input.buttons[1]=1;f.tick();
+        expect(f.active("gameplay.pickup_carry")&&!f.active("gameplay.dive"),
+            "a simpler face binding stays available before the touch chord is complete");
+        f.input.buttons[19]=1;f.tick();
+        expect(f.active("gameplay.dive")&&!f.active("gameplay.pickup_carry"),
+            "completed thumb-rest chord fires and consumes its simpler face binding");
+    }
+    {
+        ControlInputAudit sample;sample.context=ControlContext::menus;sample.time=1000;
+        sample.physical.buttons[0]=1;sample.nativeButtons=0x1000;publishControlInputAudit(sample);
+        const auto current=controlInputAudit(1100);
+        expect(current&&current->nativeButtons==0x1000&&current->physical.buttons[0]==1,
+            "diagnostics join sampled physical input and final mapping without consuming the gamepad queue");
+        expect(!controlInputAudit(999)&&!controlInputAudit(1251),"input diagnostics reject future and stale samples");
+        const auto observed=controlInputSnapshot();
+        sample.time=1110;sample.physical.buttons[0]=0;publishControlInputAudit(sample);
+        expect(freshControlInputAudit(observed,1100)&&observed.physical.buttons[0]==1,
+            "an XR publication arriving after the diagnostic copy cannot replace or invalidate that sample");
+        expect(!freshControlInputAudit(observed,1251)&&!freshControlInputAudit(observed,999),
+            "copied diagnostic samples retain the same age and clock-order limits");
+        publishControlInputAudit({});expect(!controlInputAudit(1100),"focus suspension invalidates input diagnostics");
+    }
+    {
+        constexpr std::array<std::string_view,8> touches{"a_touch","b_touch","x_touch","y_touch",
+            "left_stick_touch","right_stick_touch","left_trigger_touch","right_trigger_touch"};
+        for(size_t n=0;n<touches.size();++n){
+            Fixture f;
+            expect(!f.controls.hasBindingInput(touches[n]),"new touches leave established default bindings unchanged");
+            const auto source="[gameplay]\ninteract=press("+std::string(touches[n])+")\n";
+            expect(f.load(source.c_str()),"individual capacitive contact can be mapped");f.tick();
+            f.input.buttons[21+n]=1;f.tick();
+            expect(f.active("gameplay.interact"),"light contact reaches a mapped action without any button press");
+            expect(f.input.buttons[0]==0&&f.input.buttons[5]==0&&f.input.buttons[9]==0,
+                "contact does not synthesize a face press, stick click or trigger squeeze");
+            f.tick(120);expect(!f.active("gameplay.interact"),"touch press expires after the native sampling pulse");
+            f.tick(120);expect(!f.active("gameplay.interact"),"held contact cannot repeat a press gesture");
+            f.input={};f.tick();f.input.buttons[21+n]=1;f.tick();
+            expect(f.active("gameplay.interact"),"lifting and retouching rearms the mapped touch");
+            expect(f.controls.bindingsJson().find(touches[n])!=std::string::npos,
+                "effective bindings export preserves each touch input");
+        }
+        Fixture f;expect(f.load("[gameplay]\ninteract=press(a_touch + left_stick_touch)\n"),
+            "capacitive contacts compose into controller chords");f.tick();
+        f.input.buttons[21]=1;f.tick();expect(!f.active("gameplay.interact"),"partial touch chord remains idle");
+        f.input.buttons[25]=1;f.tick();expect(f.active("gameplay.interact"),"complete touch chord activates exactly once");
+        LiveControls live;ControlBindings current;PhysicalControls resting;resting.buttons[25]=1;
+        std::istringstream settingsOnly("[settings]\nweapon_smoothing_ms=100\n");
+        expect(live.stage(settingsOnly).empty()&&live.apply(current,resting),
+            "an unbound resting thumb does not prevent applying settings");
+        std::istringstream mapped("[gameplay]\ninteract=left_stick_touch\n");
+        expect(live.stage(mapped).empty()&&!live.apply(current,resting),
+            "newly bound held stick touch waits for release before applying");
+        resting={};expect(live.apply(current,resting),"new touch mapping applies after the physical contact is released");
     }
     std::cout<<checks<<" controls checks, "<<failures<<" failures\n";return failures?1:0;
 }

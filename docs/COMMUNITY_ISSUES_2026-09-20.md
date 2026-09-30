@@ -1,9 +1,14 @@
 # September 20 beta finish and community reports
 
+The [community recovery plan](COMMUNITY_RECOVERY_PLAN.md), updated September 26,
+is the current engineering plan and includes the later supplied reports and
+contribution review. The text below preserves the September 20 triage and evidence;
+its release/candidate labels are historical, not an installed-build identification.
+
 This consolidates the September 13–20 reports supplied by the user. Reports
 describe different builds and personal configurations. A source correction or
 unit-test pass is not a headset gameplay pass. Older rescue/handoff documents
-are historical; this is the current triage plan.
+are historical; the triage below also remains as a historical record.
 
 ## Current release: September 20 experimental
 

@@ -1,0 +1,244 @@
+{
+  "schema": 1,
+  "inventory_complete": false,
+  "limits": [
+    "Recovered feature families; historical claims require fresh candidate evidence.",
+    "Per-ID equipment matrix and all effective control actions remain separate denominators."
+  ],
+  "features": [
+    {
+      "id": "HISTORY.STEREO",
+      "title": "Native tracked stereo, head movement and rendering continuity",
+      "source": "README.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.HAND_RIG",
+      "title": "Both tracked hands, attached forearms and full body during motion",
+      "source": "src/controller_rig.cpp",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.FINGERS",
+      "title": "Tracked touch and trigger/grip finger poses",
+      "source": "src/controller_rig.cpp",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.WPN_GRIP",
+      "title": "One-hand and two-hand weapon grip across pistol and long-gun families",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.WRIST",
+      "title": "Attached wrist menu, equipment selector and readable native pixels",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.IDROID",
+      "title": "Palm-carried iDroid projector and floating menu mode",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.CONTINUE",
+      "title": "Native helicopter cabin and physical Continue tape",
+      "source": "docs/CABIN_NATIVE_STATUS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.BINOCULARS",
+      "title": "Binocular equip, align, zoom, mark, analyse and stow",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.SCOPES",
+      "title": "Weapon optics, variable magnification and support grip",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.LOCOMOTION",
+      "title": "Walking, running, stance changes, prone roll, lean and roomscale limits",
+      "source": "docs/CONTROLS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.TURN_RECENTER",
+      "title": "Native smooth turn, optional snap turn and recenter",
+      "source": "docs/CONTROLS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.FIRE_RELOAD",
+      "title": "Each weapon family: fire, visible impact, ammo, reload and switch",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.THROW_PLACE",
+      "title": "Throwables and placement: grenades, magazines, C4, mines, decoys",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.EQUIPMENT",
+      "title": "Equipment picker, category selection, use and cancellation",
+      "source": "docs/CONTROLS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.CQC",
+      "title": "Contextual melee, hold-up, CQC, interrogation and release",
+      "source": "docs/SYSTEMS_ACCESS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.CARRY_FULTON",
+      "title": "Pickup, carrying, setdown and Fulton recovery",
+      "source": "docs/SYSTEMS_ACCESS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.BUDDY_COMMANDS",
+      "title": "Buddy command menu and actual buddy responses",
+      "source": "docs/CONTROLS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.DOG_PET",
+      "title": "Legitimate D-Dog petting through tracked hand contact",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.RAT_PICKUP",
+      "title": "Legitimate rat pickup and release through native interaction",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.HORSE",
+      "title": "Horse mount, ride, weapon use, commands and dismount",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.VEHICLES",
+      "title": "Light vehicles, armor, helicopter seats and mounted weapons",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.PROSTHETICS",
+      "title": "Supported prosthetic actions and remote camera return",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.HUD",
+      "title": "Markers, reticles, prompts, notifications and binocular analysis",
+      "source": "docs/CONTROLS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.CONTROLS_EDITOR",
+      "title": "Effective binding editor, remapping, reload and user settings",
+      "source": "docs/CONTROLS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.GAMEPAD",
+      "title": "Native Xbox ownership and transitions to/from motion controllers",
+      "source": "docs/CONTROLS.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    },
+    {
+      "id": "HISTORY.GZ_PREVIEW",
+      "title": "Ground Zeroes historical third-person stereo actions; first-person adapter separate",
+      "source": "docs/SHOWCASE_DIRECTION.md",
+      "acceptance": [
+        "Repeat the documented feature with current DLL/configuration, correlated native outcome and both-eye motion evidence.",
+        "Produce a teaching clip with effective controls and visible outcome; retain historical build labels."
+      ]
+    }
+  ]
+}

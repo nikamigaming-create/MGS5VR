@@ -29,11 +29,10 @@ std::optional<EyeView> weaponScopeSceneView(const WeaponScopeSample& scope){
 bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye){
     if(!weaponScopeSceneView(scope)||!finitePose(eye))return false;
     const auto local=compose(inverse(scope.ocular),eye).position;
-    // Eye relief belongs to the physical scope. Lowering/rolling the rifle
-    // never expands the image over the world or reveals it through the back.
-    if(local.z<std::max(.025f,scope.eyeRelief*.5f)||local.z>scope.eyeRelief*2.f)return false;
-    const float lateral=local.x*local.x+local.y*local.y;
-    return lateral<=scope.radius*scope.radius&&facing(scope.ocular,eye)>.75f;
+    // The image lives on the glass, so distance/lateral pupil gates only
+    // make it blink while the player moves the gun. Keep the ocular live
+    // from its viewing side; projection and housing own the visible aperture.
+    return local.z>.002f;
 }
 
 std::optional<WeaponScopeGeometry> nativeWeaponScopeGeometry(Pose rear,Pose front,
@@ -200,11 +199,11 @@ Pose binocularFaceSafeGrip(Pose head,Pose primary,const OpticPose& optic){
         low={std::min(low.x,p.x),std::min(low.y,p.y),std::min(low.z,p.z)};
         high={std::max(high.x,p.x),std::max(high.y,p.y),std::max(high.z,p.z)};
     }
-    // Stop at the device's authored eye relief. At 4.5 cm the broad housing
-    // fills most of the HMD view even though the pupil itself is very small.
+    // Eye relief defines the optical power, not a wall holding the hand away
+    // from the face. Correct only a housing that intersects face clearance.
     // Translate the entire hand/device contact; never fade either mesh.
-    if(low.x<.075f&&high.x>-.075f&&low.y<.075f&&high.y>-.06f&&low.z<.10f&&high.z>-binocularEyeRelief)
-        primary.position=primary.position+rotate(head.orientation,{0,0,-binocularEyeRelief-high.z});
+    if(low.x<.075f&&high.x>-.075f&&low.y<.075f&&high.y>-.06f&&low.z<.10f&&high.z>-binocularFaceClearance)
+        primary.position=primary.position+rotate(head.orientation,{0,0,-binocularFaceClearance-high.z});
     return primary;
 }
 
@@ -244,10 +243,15 @@ Pose WeaponGripSmoothing::update(Pose head,Pose grip,bool available,float millis
     if(!ready_||epoch!=epoch_||time<=time_||time-time_>150||distance(local.position,filtered_.position)>.25f){
         filtered_=local;ready_=true;time_=time;epoch_=epoch;return grip;
     }
-    const float alpha=1.f-std::exp(-static_cast<float>(time-time_)/milliseconds);time_=time;
     auto target=local.orientation;const auto prior=filtered_.orientation;
-    if(prior.x*target.x+prior.y*target.y+prior.z*target.z+prior.w*target.w<0)
-        target={-target.x,-target.y,-target.z,-target.w};
+    float alignment=prior.x*target.x+prior.y*target.y+prior.z*target.z+prior.w*target.w;
+    if(alignment<0){target={-target.x,-target.y,-target.z,-target.w};alignment=-alignment;}
+    const float angle=2.f*std::acos(std::clamp(alignment,0.f,1.f));
+    const float travel=distance(filtered_.position,local.position);
+    // Damp small involuntary movements at the configured strength, but let a
+    // deliberate aim correction or lowering the gun follow promptly.
+    const float tau=travel>.02f||angle>.05236f?std::min(milliseconds,12.f):milliseconds;
+    const float alpha=1.f-std::exp(-static_cast<float>(time-time_)/tau);time_=time;
     Quat q{prior.x+(target.x-prior.x)*alpha,prior.y+(target.y-prior.y)*alpha,
         prior.z+(target.z-prior.z)*alpha,prior.w+(target.w-prior.w)*alpha};
     const float norm=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
@@ -276,9 +280,9 @@ bool binocularEyeVisible(const OpticPose& optic,Pose eye,float maxEyeDistance){
     if(!binocularSceneView(optic,1.f)||!finitePose(eye)||!std::isfinite(maxEyeDistance)
        ||maxEyeDistance<.15f||maxEyeDistance>.50f)return false;
     const auto local=compose(inverse(optic.rightEyepiece),eye).position;
-    if(local.z<.04f||local.z>maxEyeDistance)return false;
-    return local.x*local.x+local.y*local.y<=binocularEyeBoxRadius*binocularEyeBoxRadius
-        &&facing(optic.rightEyepiece,eye)>.6f;
+    // Presentation remains live while carried. The separate interaction
+    // gate still reports bringing binoculars to the eye to mission scripts.
+    return local.z>.002f;
 }
 
 bool validateBinocularViews(const OpticSample& optic,const Pose& head,

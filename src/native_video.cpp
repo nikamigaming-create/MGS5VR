@@ -43,10 +43,10 @@ struct NativeVideoRecorder::State {
     struct Slot {ComPtr<ID3D11Texture2D> texture;int64_t clock{};};
     std::array<Slot,3> slots;
     std::mutex mutex;std::condition_variable wake;std::deque<VideoFrame> queue;std::thread encoder;
-    State(){
+    explicit State(const wchar_t* requestName){
         std::array<wchar_t,32768> exe{};
         if(GetModuleFileNameW(nullptr,exe.data(),static_cast<DWORD>(exe.size())))
-            request=std::filesystem::path(exe.data()).parent_path()/L"mgs5vr-recording.txt";
+            request=std::filesystem::path(exe.data()).parent_path()/requestName;
     }
     ~State(){stop();if(encoder.joinable())encoder.join();}
     void stop(){
@@ -88,6 +88,9 @@ struct NativeVideoRecorder::State {
                 sample->SetSampleTime(frame.clock-first);sample->SetSampleDuration(10000000/30);
                 checkHr(writer->WriteSample(stream,sample.Get()),"Encode native eye");
                 last=frame.clock;++frames;
+                // Let capture clients admit their first action only after an
+                // actual source frame has reached the encoder for this take.
+                if(frames==1)log("Native video first frame encoded "+path.string()+" qpc_100ns="+std::to_string(first));
             }
             checkHr(writer->Finalize(),"Finish MP4");
         }catch(const std::exception& e){error=e.what();log("Native video stopped: "+error);}
@@ -136,8 +139,8 @@ struct NativeVideoRecorder::State {
     void frame(ID3D11Device* device,ID3D11DeviceContext* context,ID3D11Texture2D* source,uint32_t slice,const EyeFrame* eye){
         poll();if(path.empty()||!source||!context||!device)return;
         D3D11_TEXTURE2D_DESC desc{};source->GetDesc(&desc);
-        const bool rgba=desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM||desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-        const bool bgra=desc.Format==DXGI_FORMAT_B8G8R8A8_UNORM||desc.Format==DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+        const bool rgba=desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM||desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB||desc.Format==DXGI_FORMAT_R8G8B8A8_TYPELESS;
+        const bool bgra=desc.Format==DXGI_FORMAT_B8G8R8A8_UNORM||desc.Format==DXGI_FORMAT_B8G8R8A8_UNORM_SRGB||desc.Format==DXGI_FORMAT_B8G8R8A8_TYPELESS;
         if((!rgba&&!bgra)||slice>=desc.ArraySize||desc.SampleDesc.Count!=1)return;
         const bool projected=eye&&eye->projected&&valid(eye->view.fov)&&valid(eye->displayFov);
         if(!slots[0].texture){
@@ -191,7 +194,7 @@ struct NativeVideoRecorder::State {
         {std::lock_guard lock(mutex);++dropped;}
     }
 };
-NativeVideoRecorder::NativeVideoRecorder():state_(std::make_unique<State>()){}
+NativeVideoRecorder::NativeVideoRecorder(const wchar_t* requestName):state_(std::make_unique<State>(requestName)){}
 NativeVideoRecorder::~NativeVideoRecorder()=default;
 void NativeVideoRecorder::frame(ID3D11Device* device,ID3D11DeviceContext* context,ID3D11Texture2D* source,uint32_t slice,const EyeFrame* eye) noexcept {
     try{state_->frame(device,context,source,slice,eye);}catch(const std::exception& e){state_->stop();log(std::string("Native capture unavailable: ")+e.what());}

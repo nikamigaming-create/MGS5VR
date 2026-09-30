@@ -1,6 +1,7 @@
 #pragma once
 #include "stereo.hpp"
 #include "head_camera.hpp"
+#include "native_demo_state.hpp"
 #include <array>
 #include <cstdint>
 #include <iosfwd>
@@ -19,7 +20,11 @@ bool nativeIdroidClosing() noexcept;
 bool nativeTitleMenuOpen() noexcept;
 void publishNativeAvatarEdit(bool active) noexcept;
 bool nativeAvatarEditActive() noexcept;
-void publishNativeScriptedDemo(bool active) noexcept;
+// NativeDemoMode is defined with the dependency-free shared snapshot.
+void publishNativeDemoMode(NativeDemoMode mode,uint64_t candidateKey=0) noexcept;
+NativeDemoMode nativeDemoMode() noexcept;
+uint64_t nativeDemoCandidateKey() noexcept;
+uint64_t nativeDemoCandidateGeneration() noexcept;
 bool nativeScriptedDemoActive() noexcept;
 // Published on the native Lua transaction thread. A still-updating terminal
 // must not resurrect cassette geometry after ClearTitleMode has run.
@@ -34,6 +39,8 @@ bool nativeTitleCabinMode() noexcept;
 // player rig. Keep that verified cabin scene alive until the field scene loads.
 void publishNativeCabinPlay(bool active) noexcept;
 bool nativeCabinPlay() noexcept;
+// Retail sortie/customization and game-over screens have no iDroid open bit.
+void publishNativeSceneMenu(bool active) noexcept;
 bool nativeLoadingTipsOpen() noexcept;
 // Source time of the latest expanded native equipment-description draw.
 uint64_t nativeEquipmentPickerDrawTime() noexcept;

@@ -12,10 +12,22 @@ struct IdroidPose {
     Pose screen{};
 };
 
-// A readable hand-held hologram, still 16:9 and centered on the native palm
-// attachment. The aim-ray mapping uses these same dimensions.
-constexpr float idroidScreenWidth = .30f;
-constexpr float idroidScreenHeight = .16875f;
+// Measured from the supported retail idr0_main0_def FCNP. Both named sockets
+// belong to SKL_000_ROOT; the hand connector is not the projection center.
+constexpr Pose idroidConnectorInBody{{},{.0000056f,-.092196204f,-.000741f}};
+constexpr Pose idroidHologramInBody{{},{0,.043378498f,.012349601f}};
+std::optional<Pose> idroidBodyFromConnector(Pose connector) noexcept;
+// The native CNP stores its anchor hash in the low word and variant in the
+// top 16 bits. Keeping the observed packed value here guards that layout.
+constexpr bool matchesNativeIdroidMount(uint64_t name,uint64_t anchor,uint16_t bone) noexcept {
+    return name==0x1c68632c5c53ull&&uint32_t(anchor)==0x38b1433c
+        &&uint16_t(anchor>>48)==4&&bone==12;
+}
+
+// A readable 16:9 hologram centered on the authored projection socket.
+// The aim-ray mapping uses these same dimensions.
+constexpr float idroidScreenWidth = .45f;
+constexpr float idroidScreenHeight = idroidScreenWidth*9.f/16.f;
 constexpr uint32_t idroidScreenPixelWidth = 1280;
 constexpr uint32_t idroidScreenPixelHeight = 720;
 constexpr float idroidRayMaxDistance = 2.f;
