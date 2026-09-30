@@ -358,6 +358,13 @@ int main(int argc,char** argv){
         expect(!f.load("[settings]\nidroid_screen_pitch_degrees=91\n")
             &&!f.load("[settings]\nidroid_screen_x_cm=21\n")&&!f.load("[settings]\nidroid_screen_depth_cm=21\n"),
             "iDroid fitting rejects unbounded angles and offsets");
+        expect(f.load("[settings]\nidroid_grip_x_cm=2.5\nidroid_grip_y_cm=-3\nidroid_grip_z_cm=4\nidroid_grip_pitch_degrees=35\nidroid_grip_yaw_degrees=-20\nidroid_grip_roll_degrees=10\n")
+            &&f.controls.setting("settings.idroid_grip_x_cm")==2.5f
+            &&f.controls.setting("settings.idroid_grip_roll_degrees")==10,
+            "iDroid-specific hand contact supports independent position and rotation calibration");
+        expect(!f.load("[settings]\nidroid_grip_x_cm=16\n")
+            &&!f.load("[settings]\nidroid_grip_roll_degrees=91\n"),
+            "iDroid hand calibration rejects excessive reach and wrist rotation");
     }
     {
         const auto touch=controllerFaceLayout("/interaction_profiles/meta/touch_controller_plus");

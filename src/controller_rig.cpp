@@ -546,12 +546,21 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             bendHistory[side]=rotate(inverse(*root).orientation,rotate(torso,{side?-.25f:.25f,-1.f,-.15f}));
         }
     }
-    // In handheld iDroid mode, the controller holds its authored connector.
-    // Solve that same native wrist instead of requiring the player to twist
-    // an anatomical palm to turn a separately mounted display upright.
-    const auto idroidBody=frame.controllers.handheldMenus&&idroidMount?idroidBodyFromConnector(grips[1]):std::nullopt;
-    const auto wristTarget=idroidBody
-        ?compose(*idroidBody,inverse(*idroidMount)):compose(grips[1],gripFromWrist[1]);
+    auto wristTarget=compose(grips[1],gripFromWrist[1]);
+    if(frame.controllers.handheldMenus&&idroidMount){
+        // Native device axes are not anatomical palm axes. Hold the connector
+        // at the tracked grip, using this controller's same-frame pointing
+        // basis rather than imposing the simulator's grip cant on every user.
+        const auto& hand=frame.controllers.hands[1];
+        if(!hand.aimTracked)return false;
+        const auto aim=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,hand.aim));
+        const auto contact=idroidGripContact(grips[1],aim,
+            Pose{frame.controllers.idroidGripRotation,frame.controllers.idroidGripOffset});
+        if(!contact)return false;
+        const auto body=idroidBodyFromConnector(*contact);
+        if(!body)return false;
+        wristTarget=compose(*body,inverse(*idroidMount));
+    }
     auto rightTarget=clearWrist(wristTarget);
     const ArmPose rightAnimatedArm{bone(q,p,10),bone(q,p,11),bone(q,p,12)};
     auto right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);

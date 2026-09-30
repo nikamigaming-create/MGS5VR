@@ -61,6 +61,10 @@ struct ControllerFrame {
     // Display fit relative to the native hologram socket, not the hand rig.
     Vec3 idroidScreenOffset{};
     Quat idroidScreenRotation{};
+    // iDroid-only controller contact calibration. The native wrist/socket and
+    // cupped fingers move together; ordinary weapon and left-arm fits are separate.
+    Vec3 idroidGripOffset{};
+    Quat idroidGripRotation{};
     bool handheldMenus{}; // Opt-in: native handheld iDroid. Pause always uses the world panel.
     float menuQuadWidth{1.2f},menuQuadDistance{1.3f},menuQuadTilt{-10.f};
     float supportGripRadius{.10f},supportDetachRadius{.30f};

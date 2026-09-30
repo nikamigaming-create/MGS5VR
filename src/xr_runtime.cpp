@@ -592,6 +592,10 @@ struct Session {
             controls.setting("settings.idroid_screen_y_cm")*.01f,0};
         controllerFrame.idroidScreenRotation=binocularGripRotation(controls.setting("settings.idroid_screen_pitch_degrees"),
             controls.setting("settings.idroid_screen_yaw_degrees"),controls.setting("settings.idroid_screen_roll_degrees"));
+        controllerFrame.idroidGripOffset={controls.setting("settings.idroid_grip_x_cm")*.01f,
+            controls.setting("settings.idroid_grip_y_cm")*.01f,controls.setting("settings.idroid_grip_z_cm")*.01f};
+        controllerFrame.idroidGripRotation=binocularGripRotation(controls.setting("settings.idroid_grip_pitch_degrees"),
+            controls.setting("settings.idroid_grip_yaw_degrees"),controls.setting("settings.idroid_grip_roll_degrees"));
         controllerFrame.handheldMenus=handheldMenusSelected();
         controllerFrame.menuQuadWidth=controls.setting("settings.menu_quad_width_cm")*.01f;
         controllerFrame.menuQuadDistance=controls.setting("settings.menu_quad_distance_cm")*.01f;

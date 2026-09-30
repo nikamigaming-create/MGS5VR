@@ -183,6 +183,9 @@ class Behaviors:
         case_id = case["id"]
         if not case.get("steps") or not case.get("before") or not case.get("after"):
             raise BotFault(f"{case_id}: steps, before and after predicates are required")
+        after_stable = case.get("after_stable_samples", 2)
+        if type(after_stable) is not int or not 1 <= after_stable <= 20:
+            raise BotFault("Outcome stability must be 1..20 observed samples")
         self.events.emit("case_started", case_id=case_id, case=case)
         result = {"id": case_id, "status": "failed", "visual_acceptance": "pending"}
         phase = "entry"
@@ -215,7 +218,7 @@ class Behaviors:
                     self.adapter.execute(step)
             phase = "outcome"
             after = self.wait_for(case["after"], case.get("timeout", 8), case_id + ":outcome",
-                                  milestones=case.get("milestones", ()))
+                                  milestones=case.get("milestones", ()), stable=after_stable)
             phase = "capture"
             captures = self.adapter.capture(case_id + "-after")
             result.update(status="observed_pass", before=before, after=after, captures=captures)

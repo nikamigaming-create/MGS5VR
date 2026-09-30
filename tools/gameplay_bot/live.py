@@ -635,18 +635,27 @@ class Live:
             return self.equipment_select(step)
         if step["op"] == "pose":
             hand, position, orientation = step["hand"], step["position"], step["orientation"]
-            if hand not in ("left", "right") or len(position) != 3 or len(orientation) != 4:
+            if hand not in ("left", "right"):
                 raise BotFault("Invalid hand pose")
-            if not all(math.isfinite(v) for v in position + orientation) or max(abs(v) for v in position) > 2:
-                raise BotFault("Pose exceeds the local demonstration envelope")
-            length = math.sqrt(sum(v*v for v in orientation))
-            if not .99 < length < 1.01:
-                raise BotFault("Pose quaternion is not normalized")
-            for kind in ("grip", "aim"):
+            poses = (("grip", position, orientation),
+                     ("aim", step.get("aim_position", position), step.get("aim_orientation", orientation)))
+            # Validate BOTH poses before changing either one. Real controllers
+            # have different grip and pointing bases; equating them concealed
+            # the reported ergonomic iDroid failure in previous simulator runs.
+            for kind, point, attitude in poses:
+                if not isinstance(point, list) or not isinstance(attitude, list) or len(point) != 3 or len(attitude) != 4:
+                    raise BotFault("Invalid " + kind + " pose")
+                if not all(type(v) in (int, float) and math.isfinite(v) for v in point + attitude) or max(abs(v) for v in point) > 2:
+                    raise BotFault("Pose exceeds the local demonstration envelope")
+                length = math.sqrt(sum(v*v for v in attitude))
+                if not .99 < length < 1.01:
+                    raise BotFault("Pose quaternion is not normalized")
+            for kind, point, attitude in poses:
                 self.call("set_controller_pose", {"hand": hand, "pose_type": kind, "base_space": "view",
-                                                    "position": position, "orientation": orientation})
+                                                    "position": point, "orientation": attitude})
             self.events.emit("controller_pose_set", hand=hand, base_space="view",
-                             position=position, orientation=orientation)
+                             position=position, orientation=orientation,
+                             aim_position=poses[1][1], aim_orientation=poses[1][2])
             if self.pose_recording:
                 self.pose_snapshot("pose-after")
             return

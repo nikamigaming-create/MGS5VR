@@ -13,6 +13,26 @@ or Steam shutdown is needed by the local workflow.
 The release is **not accepted from start to finish**. Keep this list separate
 from build passes and from older scene evidence.
 
+The current local work adds a shared live 3D settings editor and revises the
+iDroid holding frame. All 53 VR adjustments have a fitting view; hand/device
+position and rotation, screen width/distance/origin/rotation, left-arm HUD,
+optics and spatial menus update immediately in the reference preview. Resetting
+a fit preserves bindings and interaction modes. See VR_FIT_SETTINGS.md.
+
+The local fit build, identified in `play/BUILD.json`, uses controller grip position with the same-frame
+pointing orientation, retaining the native right-wrist CNP and cupped fingers.
+The hologram now rises from a lower-edge anchor above the projector. The first
+anatomical-palm attempt made it edge-on in game and was rejected. The revised
+default and configured-fit runs each pass seven native cases, including
+distinct grip/pointing bases, inspection and ordinary immediate reopening.
+The retail light cone still fails to retarget to every nonzero screen
+offset/rotation. That defect, forced tutorial stow and physical ergonomic
+acceptance remain open. The September 30 GitHub prerelease is unchanged.
+The editor passed 33 headless fixture checks, including complete save/reload,
+discard, orbit/zoom, accurate fractional text scale and reset preserving
+handheld mode. The retained controller guide still resolves 98 action locations
+across eight contexts. The focused bot contracts now have 96 checks.
+
 | Request | Current result |
 | --- | --- |
 | One checkout and one stable playable folder | Implemented: this checkout, fixed play/, Play.cmd, automatic verified local synchronization. |
@@ -32,24 +52,26 @@ from build passes and from older scene evidence.
 | Repair silent other long gun's support hand | Open. Native wrist selection identifies the other long gun as FAKEL (SLEEP). Native support-socket telemetry is installed; reproduce the bad two-hand contact before changing grip behavior. |
 | Map capacitive face-button, stick, trigger and thumb-rest contacts independently | Implemented and installed: ten separate inputs, parser checks and fresh simulator runtime initialization pass. Physical sensor acceptance remains open because the simulator operator cannot synthesize capacitive contact. |
 | Show the actual mappings and a quick video in the launcher | Installed in the fixed play tree: saved mappings, alternatives, one-hand/two-hand chords, ten amber contact surfaces and red pressed surfaces. 98 UI actions and eight settings-bridge contexts checked; 44-second personal mapping video available at artifacts/dev/controller-mapping.mp4. |
+| Live rotatable 3D previews for the settings | Installed: all 53 controls settings have a reference fitting view, with live edits, drag/orbit/zoom, front/side/top/back, filtering, save/reload, discard and numeric-fit reset. Runtime theatre dimensions are also previewed. Reference geometry is separate from native projection-effect and headset acceptance. |
 | Audit one-hand/two-hand control chords | Effective personal binding audit retained; no unsolicited remapping. Headset usability and crouch/prone community report remain open. |
-| Align right-hand iDroid with its native emitter/cutscene and survive forced stow/reopen | Native attachment repaired and installed. Normal upright controller grip, centred screen, opposing 65-degree side views and ordinary immediate reopening pass scoped simulator review in both eyes. Forced tutorial stow and physical headset acceptance remain open. |
+| Align right-hand iDroid with its native emitter/cutscene and survive forced stow/reopen | Native attachment retained; natural holding frame and lower-edge screen anchor revised. Default and custom fitting controls pass scoped simulator motion/reopening checks. Native light-cone retargeting at custom offsets/rotations, forced tutorial stow and physical headset acceptance remain open. |
 | Preserve Coco's fixes; burn down community reports; all weapons/missions/game completion | Coco's supplied changes retained. Community ledger and full-game acceptance remain open; an A* bridge route does not certify missions or combat. |
 | Publish the new build on GitHub | September 30 experimental prerelease packages the tested local DLL and committed source; see RELEASE_2026-09-30.md. Full-game and headset acceptance remain open. |
 
-The next work is FAKEL (SLEEP) support-hand reproduction, cover camera ownership,
-mounted weapon aim/reticles and binocular native lighting, followed by forced
-iDroid tutorial stow, current-build mission regression and physical testing.
+The next iDroid work is native light-cone retargeting and forced tutorial stow,
+then physical fitting/readability. FAKEL (SLEEP) support-hand reproduction,
+cover camera ownership, mounted weapon aim/reticles, binocular native lighting
+and full mission regression remain on the existing release queue.
 
-The current installed DLL is `edc6960890a4b45f`. It retains the left-arm display,
+The September 30 released DLL is `edc6960890a4b45f`. It retains the left-arm display,
 binocular clearance, scope stabilization, touch inputs and launcher tour. The
 iDroid repair replaces the guessed anatomical palm mount with the measured
 native right-wrist attachment and the device's named connector/hologram sockets.
-A normal controller grip now holds the device upright; the projection inherits
+That build's upright simulator grip holds the device upright; the projection inherits
 the final rendered device pose. The authored native mount and screen stay
 together during hand motion. See `docs/IDROID_ALIGNMENT.md`.
 
-All 38 automated checks and installer transactions pass. The focused bot suite
+The released build's 38 automated checks and installer transactions pass. Its focused bot suite
 has 93 passing checks, including safe input cleanup and explicit numeric pose
 tolerances. Native Continue reached Mission 6; all 11 selected iDroid/menu cases
 passed on this DLL. Both final eyes were reviewed at normal and opposing side

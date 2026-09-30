@@ -17,6 +17,10 @@ struct IdroidPose {
 constexpr Pose idroidConnectorInBody{{},{.0000056f,-.092196204f,-.000741f}};
 constexpr Pose idroidHologramInBody{{},{0,.043378498f,.012349601f}};
 std::optional<Pose> idroidBodyFromConnector(Pose connector) noexcept;
+// Keep contact at the grip position, orient the device with the controller's
+// own pointing basis. This accommodates runtime grip/aim cant without forcing
+// the player to twist their wrist. Both poses must be from the same frame.
+std::optional<Pose> idroidGripContact(Pose grip,Pose aim,Pose fit={}) noexcept;
 // The native CNP stores its anchor hash in the low word and variant in the
 // top 16 bits. Keeping the observed packed value here guards that layout.
 constexpr bool matchesNativeIdroidMount(uint64_t name,uint64_t anchor,uint16_t bone) noexcept {
@@ -24,7 +28,7 @@ constexpr bool matchesNativeIdroidMount(uint64_t name,uint64_t anchor,uint16_t b
         &&uint16_t(anchor>>48)==4&&bone==12;
 }
 
-// A readable 16:9 hologram centered on the authored projection socket.
+// A readable 16:9 hologram rising from the authored projection socket.
 // The aim-ray mapping uses these same dimensions.
 constexpr float idroidScreenWidth = .45f;
 constexpr float idroidScreenHeight = idroidScreenWidth*9.f/16.f;

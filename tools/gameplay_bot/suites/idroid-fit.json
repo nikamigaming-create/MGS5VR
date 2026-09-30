@@ -1,0 +1,261 @@
+{
+  "schema": 1,
+  "description": "Right-hand iDroid fit with a distinct runtime grip/pointing basis, physical inspection and ordinary immediate reopening. Both final eyes still require review; this does not certify headset ergonomics or forced tutorial stow.",
+  "required_settings": {
+    "settings.handheld_menus": 1
+  },
+  "cases": [
+    {
+      "id": "idroid-natural-grip",
+      "before": {
+        "scene": "gameplay",
+        "idroid": false
+      },
+      "setup": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.02,
+            -0.22,
+            -0.53
+          ],
+          "orientation": [
+            0.49999999999999994,
+            0.0,
+            0.0,
+            0.8660254037844387
+          ],
+          "aim_orientation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid"
+        }
+      ],
+      "after": {
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true
+      },
+      "timeout": 8,
+      "after_stable_samples": 12
+    },
+    {
+      "id": "idroid-flat-inspection",
+      "before": {
+        "idroid": true
+      },
+      "steps": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.02,
+            -0.22,
+            -0.53
+          ],
+          "orientation": [
+            0.25881904510252074,
+            0.0,
+            0.0,
+            0.9659258262890683
+          ],
+          "aim_orientation": [
+            -0.25881904510252074,
+            0.0,
+            0.0,
+            0.9659258262890683
+          ]
+        }
+      ],
+      "after": {
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "rendered.right_grip.orientation": {
+          "near": [
+            0.25881904510252074,
+            0.0,
+            0.0,
+            0.9659258262890683
+          ],
+          "tolerance": 0.0002
+        }
+      },
+      "timeout": 6
+    },
+    {
+      "id": "idroid-side-right",
+      "before": {
+        "idroid": true
+      },
+      "steps": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.12,
+            -0.15,
+            -0.52
+          ],
+          "orientation": [
+            0.4216957229064428,
+            0.46531511027177885,
+            -0.26864980417341183,
+            0.7303984174084459
+          ],
+          "aim_orientation": [
+            0.0,
+            0.5372996083468238,
+            0.0,
+            0.8433914458128857
+          ]
+        }
+      ],
+      "after": {
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "rendered.right_grip.orientation": {
+          "near": [
+            0.4216957229064428,
+            0.46531511027177885,
+            -0.26864980417341183,
+            0.7303984174084459
+          ],
+          "tolerance": 0.0002
+        }
+      },
+      "timeout": 6
+    },
+    {
+      "id": "idroid-side-left",
+      "before": {
+        "idroid": true
+      },
+      "steps": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            -0.02,
+            -0.15,
+            -0.52
+          ],
+          "orientation": [
+            0.4216957229064428,
+            -0.46531511027177885,
+            0.26864980417341183,
+            0.7303984174084459
+          ],
+          "aim_orientation": [
+            0.0,
+            -0.5372996083468238,
+            0.0,
+            0.8433914458128857
+          ]
+        }
+      ],
+      "after": {
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "rendered.right_grip.orientation": {
+          "near": [
+            0.4216957229064428,
+            -0.46531511027177885,
+            0.26864980417341183,
+            0.7303984174084459
+          ],
+          "tolerance": 0.0002
+        }
+      },
+      "timeout": 6
+    },
+    {
+      "id": "idroid-fit-close",
+      "before": {
+        "idroid": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back"
+        }
+      ],
+      "after": {
+        "idroid": false,
+        "scene": "gameplay"
+      },
+      "timeout": 5
+    },
+    {
+      "id": "idroid-fit-immediate-reopen",
+      "before": {
+        "idroid": false,
+        "scene": "gameplay"
+      },
+      "setup": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.02,
+            -0.22,
+            -0.53
+          ],
+          "orientation": [
+            0.49999999999999994,
+            0.0,
+            0.0,
+            0.8660254037844387
+          ],
+          "aim_orientation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid"
+        }
+      ],
+      "after": {
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true
+      },
+      "timeout": 8,
+      "after_stable_samples": 12
+    },
+    {
+      "id": "idroid-fit-clean-exit",
+      "before": {
+        "idroid": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back"
+        }
+      ],
+      "after": {
+        "idroid": false,
+        "scene": "gameplay"
+      },
+      "timeout": 5
+    }
+  ]
+}

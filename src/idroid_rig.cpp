@@ -9,6 +9,14 @@ std::optional<Pose> idroidBodyFromConnector(Pose connector) noexcept {
     return valid(body)?std::optional<Pose>{body}:std::nullopt;
 }
 
+std::optional<Pose> idroidGripContact(Pose grip,Pose aim,Pose fit) noexcept {
+    if(!valid(grip)||!valid(aim)||!valid(fit))return {};
+    const auto position=compose(grip,fit).position;
+    const auto orientation=compose(Pose{aim.orientation,{}},Pose{fit.orientation,{}}).orientation;
+    const Pose contact{orientation,position};
+    return valid(contact)?std::optional<Pose>{contact}:std::nullopt;
+}
+
 std::optional<IdroidPose> trackedIdroidPose(const HeadCameraSample& frame) noexcept{
     if(!frame.applied||!frame.stereoTracked||!frame.activation
        ||!frame.idroidDeviceTracked||!valid(frame.idroidDevice)
@@ -20,11 +28,16 @@ std::optional<IdroidPose> trackedIdroidPose(const HeadCameraSample& frame) noexc
     const auto offset=frame.controllers.idroidScreenOffset;
     if(!valid(Pose{frame.controllers.idroidScreenRotation,offset})
        ||std::abs(offset.x)>.20f||std::abs(offset.y)>.20f||offset.z!=0)return {};
-    // Native device axes define right, up and the readable face. Fit controls
-    // pivot at the projected center; the hand, body and emitter stay attached.
+    const float width=frame.controllers.idroidScreenWidth;
+    if(!std::isfinite(width)||width<.20f||width>.60f)return {};
+    // The native introductory hologram rises ABOVE the projector. Its lower
+    // edge, not its centre, anchors relative to the emitter. Keeping the centre at socket
+    // height put half the menu through the hand and left the light above it.
+    // Size/angle pivot at that lower edge; the emitter remains on the housing.
     // Never substitute a newer raw grip or an anatomical palm for this mount.
-    const auto screen=compose(mount,Pose{frame.controllers.idroidScreenRotation,
+    const auto bottom=compose(mount,Pose{frame.controllers.idroidScreenRotation,
         {offset.x,offset.y,frame.controllers.idroidScreenDepth}});
+    const auto screen=compose(bottom,Pose{{},{0,width*9.f/32.f,0}});
     if(!valid(screen))return {};
     return IdroidPose{body,screen};
 }

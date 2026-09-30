@@ -2467,12 +2467,25 @@ int main(){
         expect(body&&near(body->position.y,-.087803796f)&&near(body->position.z,.500741f),
             "device root retains the measured retail connector offset instead of using the palm center");
         expect(!idroidBodyFromConnector(Pose{{0,0,0,0},{}}),"invalid native connector cannot place a device");
+        const Pose cantedGrip{{.5f,0,0,.8660254f},{.1f,-.2f,-.5f}};
+        const Pose pointing{{},{.3f,.4f,.5f}};
+        const auto naturalContact=idroidGripContact(cantedGrip,pointing);
+        expect(naturalContact&&same(naturalContact->position,cantedGrip.position)
+            &&same(rotate(naturalContact->orientation,{0,0,-1}),{0,0,-1}),
+            "runtime grip cant cannot force an awkward device tilt or substitute the aim origin");
+        const Pose gripFit{binocularGripRotation(10,-15,20),{.03f,-.02f,.04f}};
+        const auto fittedContact=idroidGripContact(cantedGrip,pointing,gripFit);
+        expect(fittedContact&&same(fittedContact->position,compose(cantedGrip,gripFit).position)
+            &&same(rotate(fittedContact->orientation,{0,1,0}),rotate(gripFit.orientation,{0,1,0})),
+            "iDroid contact fit translates in grip space and rotates in the runtime pointing basis");
+        expect(!idroidGripContact(cantedGrip,Pose{{0,0,0,0},{}}),
+            "lost controller aim cannot invent a native device holding frame");
         frame.idroidDeviceTracked=true;frame.idroidDevice=body?*body:Pose{};
         const auto idroid=trackedIdroidPose(frame);
-        expect(idroid&&same(idroid->screen.position,{.1199944f,-.044425298f,.593090601f})
+        expect(idroid&&same(idroid->screen.position,{.1199944f,.082137202f,.593090601f})
             &&same(rotate(idroid->screen.orientation,{0,1,0}),{0,1,0})
             &&same(rotate(idroid->screen.orientation,{0,0,1}),{0,0,1}),
-            "upright iDroid projects from the authored hologram socket with eight centimeters of clearance");
+            "iDroid lower edge meets the projector height instead of centering the menu through the hand");
         const Pose nativeFromLocal{{0,1,0,0},{}};
         if(idroid)right.aim=compose(inverse(nativeFromLocal),compose(idroid->screen,Pose{{},{0,0,.25f}}));
         const auto idroidHit=trackedIdroidRay(frame);
@@ -2501,15 +2514,22 @@ int main(){
         frame.controllers.idroidScreenWidth=.6f;
         frame.controllers.idroidScreenRotation=binocularGripRotation(35,-20,10);
         const auto fittedDisplay=trackedIdroidPose(frame);
+        const auto lowerEdge=[](const IdroidPose& display,float width){
+            return compose(display.screen,Pose{{},{0,-width*9.f/32.f,0}}).position;
+        };
         expect(fittedDisplay&&movedDisplay&&same(fittedDisplay->body.position,movedDisplay->body.position)
-            &&same(fittedDisplay->screen.position,movedDisplay->screen.position),
-            "resizing or tilting iDroid pivots at its projection center without moving the device");
+            &&same(lowerEdge(*fittedDisplay,.6f),lowerEdge(*movedDisplay,.45f)),
+            "resizing or tilting iDroid preserves its lower emitter attachment and native device");
         frame.controllers.idroidScreenOffset={.06f,-.03f,0};
         const auto shiftedDisplay=trackedIdroidPose(frame);
         const auto mount=compose(frame.idroidDevice,idroidHologramInBody);
         expect(shiftedDisplay&&fittedDisplay&&same(shiftedDisplay->body.position,fittedDisplay->body.position)
-            &&same(compose(inverse(mount),shiftedDisplay->screen).position,Vec3{.06f,-.03f,.08f}),
+            &&same(compose(inverse(mount),shiftedDisplay->screen).position,
+                Vec3{.06f,-.03f,.08f}+rotate(frame.controllers.idroidScreenRotation,{0,.6f*9.f/32.f,0})),
             "fit adjustments operate in the native hologram socket frame");
+        frame.controllers.idroidScreenWidth=std::numeric_limits<float>::infinity();
+        expect(!trackedIdroidPose(frame),"invalid projection size cannot publish a detached or infinite display");
+        frame.controllers.idroidScreenWidth=.6f;
         frame.controllers.idroidScreenOffset.x=std::numeric_limits<float>::quiet_NaN();
         expect(!trackedIdroidPose(frame),"invalid iDroid fit cannot publish a broken display transform");
         frame.controllers.idroidScreenOffset={};frame.idroidDeviceTracked=false;

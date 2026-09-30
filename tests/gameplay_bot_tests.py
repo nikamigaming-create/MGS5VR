@@ -24,6 +24,45 @@ class Clock:
         self.now += duration
 
 
+class ControllerFitPoseTests(unittest.TestCase):
+    def make_live(self):
+        live = Live.__new__(Live)
+        live.call = mock.Mock()
+        live.events = mock.Mock()
+        live.pose_recording = False
+        return live
+
+    def test_distinct_controller_grip_and_pointing_bases_reach_operator(self):
+        live = self.make_live()
+        live.execute({"op": "pose", "hand": "right", "position": [0, -.2, -.5],
+                      "orientation": [.5, 0, 0, .8660254], "aim_orientation": [0, 0, 0, 1]})
+        calls = live.call.call_args_list
+        self.assertEqual(calls[0].args[1]["orientation"], [.5, 0, 0, .8660254])
+        self.assertEqual(calls[1].args[1]["orientation"], [0, 0, 0, 1])
+        self.assertEqual(calls[1].args[1]["pose_type"], "aim")
+
+    def test_invalid_aim_cannot_partially_move_the_grip(self):
+        for aim in ([0, 0, 0, 0], [0, 0, 0, float('nan')], [True, 0, 0, 1], [0, 0, 1]):
+            live = self.make_live()
+            with self.assertRaises(BotFault):
+                live.execute({"op": "pose", "hand": "right", "position": [0, -.2, -.5],
+                              "orientation": [0, 0, 0, 1], "aim_orientation": aim})
+            live.call.assert_not_called()
+
+    def test_opening_outcome_must_remain_stable_before_visual_capture(self):
+        closed = {"scene": "gameplay", "idroid": False}
+        opened = {"scene": "menu", "idroid": True}
+        adapter = Adapter([closed]*2 + [opened]*6 + [closed] + [opened]*12)
+        clock = Clock()
+        with tempfile.TemporaryDirectory() as directory:
+            behavior = Behaviors(adapter, Events(directory, {}, clock), clock, clock.sleep)
+            result = behavior.case({"id": "settled-open", "before": {"scene": "gameplay"},
+                                    "steps": [{"op": "action", "name": "system.idroid"}],
+                                    "after": {"idroid": True}, "after_stable_samples": 12, "timeout": 4})
+        self.assertEqual(result["status"], "observed_pass")
+        self.assertGreater(clock.now, 1.8)
+
+
 class Adapter:
     def __init__(self, states, error=None):
         self.states, self.error = iter(states), error
