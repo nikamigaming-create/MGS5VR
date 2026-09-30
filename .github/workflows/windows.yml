@@ -28,7 +28,9 @@ jobs:
       - name: Fetch pinned open-source dependencies
         run: ./tools/bootstrap.ps1
       - name: Configure Windows x64
-        run: cmake --preset windows-x64
+        run: |
+          $mgsPython = (Get-Command python).Source
+          cmake --preset windows-x64 "-DPython3_EXECUTABLE=$mgsPython"
       - name: Build all targets
         run: cmake --build --preset release --parallel
       - name: Run tests that do not require a GPU or headset

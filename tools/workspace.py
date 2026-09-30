@@ -280,7 +280,7 @@ def refresh(args):
         raise ValueError("Close MGSV before building and synchronizing the test installation")
     known_old = {name: digest(ROOT / "build/Release" / name) for name in BINARIES
                  if (ROOT / "build/Release" / name).exists()}
-    run(["cmake", "--preset", "windows-x64"])
+    run(["cmake", "--preset", "windows-x64", f"-DPython3_EXECUTABLE={sys.executable}"])
     run(["cmake", "--build", "--preset", "release", "--parallel"])
     run(["ctest", "--preset", "release", "--output-junit", ROOT / "build/current-tests.xml"])
     stage = ROOT / "build/play-stage"
