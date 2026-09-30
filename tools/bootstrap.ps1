@@ -1,5 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $mgsRoot = Split-Path -Parent $PSScriptRoot
+& python -m pip install --disable-pip-version-check --requirement (Join-Path $PSScriptRoot 'test-requirements.txt')
+if ($LASTEXITCODE -ne 0) { throw 'Python test dependency installation failed.' }
 $mgsDeps = Join-Path $mgsRoot '.deps'
 New-Item -ItemType Directory -Force -Path $mgsDeps | Out-Null
 $mgsSources = @(
@@ -17,4 +19,4 @@ foreach ($mgsSource in $mgsSources) {
         throw "Unexpected dependency revision in $mgsDestination. Existing files were preserved."
     }
 }
-Write-Output 'Pinned build dependencies are ready.'
+Write-Output 'Pinned build and Python test dependencies are ready.'

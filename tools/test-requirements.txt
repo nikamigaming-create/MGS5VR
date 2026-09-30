@@ -1,0 +1,2 @@
+# Decode actual compositor PNGs in the presentation tests and local bot.
+Pillow==12.2.0

@@ -15,7 +15,9 @@ class WorkspaceTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        # Hosted Windows runners can return an 8.3 TEMP alias. Deployment
+        # resolves its paths; the fault-injection fixture must use that identity.
+        self.root = Path(self.temporary.name).resolve()
         self.game = self.root / "game"
         self.play = self.root / "play"
         self.game.mkdir()
