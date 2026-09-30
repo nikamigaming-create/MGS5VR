@@ -666,8 +666,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // for each controller profile's pointing angle. Swing the common wrist
     // owner using the native muzzle socket before solving support contact;
     // changing only the weapon would detach its grip, sights and shot path.
-    if(barrelInGrip&&frame.controllers.hands[1].aimTracked){
-        const auto aim=compose(rootInverse,nativeTrackedPose(frame.nativePose,frame.headPose,frame.controllers.hands[1].aim));
+    const auto calibratedWeaponAim=frame.controllers.hands[1].aimTracked
+        ?weaponAimWithPitch(frame.controllers.hands[1].aim,frame.controllers.weaponAimPitch):std::nullopt;
+    if(barrelInGrip&&calibratedWeaponAim){
+        const auto aim=compose(rootInverse,nativeTrackedPose(frame.nativePose,frame.headPose,*calibratedWeaponAim));
         if(const auto aimed=aimedWeaponGrip(grips[1],aim,*barrelInGrip)){
             grips[1]=*aimed;
             rightTarget=clearWrist(compose(grips[1],gripFromWrist[1]));
@@ -718,9 +720,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const bool inspecting=dot(towardHead,towardHead)<0.49f
         &&dot(dorsal,towardHead)>0.5f*std::sqrt(dot(towardHead,towardHead));
     const auto& primaryHand=frame.controllers.hands[1];
-    const bool forwardSupport=primaryHand.aimTracked&&withinSupportCone(
+    const bool forwardSupport=calibratedWeaponAim&&withinSupportCone(
         frame.controllers.hands[0].grip.position-primaryHand.grip.position,
-        rotate(primaryHand.aim.orientation,{0,0,-1}));
+        rotate(calibratedWeaponAim->orientation,{0,0,-1}));
     // The configured support grip owns contact, but still requires proximity
     // to the authored socket. Release, inspection and pulling away free the
     // hand. A one-handed reload must not grab a distant tracked controller.

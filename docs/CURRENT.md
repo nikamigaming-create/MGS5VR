@@ -14,7 +14,7 @@ The release is **not accepted from start to finish**. Keep this list separate
 from build passes and from older scene evidence.
 
 The current local work adds a shared live 3D settings editor and revises the
-iDroid holding frame. All 53 VR adjustments have a fitting view; hand/device
+iDroid holding frame. All 54 VR adjustments have a fitting view; hand/device
 position and rotation, screen width/distance/origin/rotation, left-arm HUD,
 optics and spatial menus update immediately in the reference preview. Resetting
 a fit preserves bindings and interaction modes. See VR_FIT_SETTINGS.md.
@@ -28,10 +28,49 @@ distinct grip/pointing bases, inspection and ordinary immediate reopening.
 The retail light cone still fails to retarget to every nonzero screen
 offset/rotation. That defect, forced tutorial stow and physical ergonomic
 acceptance remain open. The September 30 GitHub prerelease is unchanged.
-The editor passed 33 headless fixture checks, including complete save/reload,
+The editor passed 38 headless fixture checks, including complete save/reload,
 discard, orbit/zoom, accurate fractional text scale and reset preserving
 handheld mode. The retained controller guide still resolves 98 action locations
-across eight contexts. The focused bot contracts now have 96 checks.
+across eight contexts. The focused bot contracts now have 104 checks.
+
+The local weapon fit adds a separate **One-hand weapon tilt**, default -30
+degrees, applied through the common native firing wrist. Gun, hand, physical
+sight and muzzle retain one owner. Binoculars, iDroid, menu pointers and the
+left-arm display do not receive that trim. Older personal INIs with a nonzero
+general right-hand pitch receive zero additional automatic trim; explicit
+firearm-pitch values remain authoritative. See VR_FIT_SETTINGS.md.
+
+The current-loadout inspection covers FAKEL (SLEEP), AM MRS-71 and URAGAN-5
+AIR-S. Both scoped guns publish a barrel/optic axis at the requested -30
+degrees in the stationary one-hand case. This does not certify impacts,
+reloads, support contact, weapon transitions or physical headset comfort.
+The final retained run `artifacts/bot/runs/20260930T213627283000Z` on local DLL
+`4173f9187821` passes 19 scoped cases: the three one-hand loadout inspections,
+support acquisition on both long guns, seven iDroid fit/ordinary-reopen cases,
+and seven helicopter-list navigation/Back cases. Both-eye support contact was
+reviewed, but the reported FAKEL grip feel and every reload/transition remain
+open; acquisition alone does not certify a perfect grip.
+The owned equipment worklist contains 418 firearm definitions across 83 model
+entries, including eligibility and variant questions; those are a coverage
+queue, not 418 passing weapon tests. See WEAPON_FIT_AUDIT.md.
+
+The helicopter development lock-up is a new open report. The native
+Mother Base -> Development -> Helicopter list loads and Back closes it in
+the retained baseline. Item/upgrade confirmation, purchase completion and
+the user's exact failing state require separate reproduction. The currently
+selected helicopter grades are already developed, so Confirm does not open a
+purchase dialog. ACC customization is a separate path that has not been
+reproduced here. The list can
+take several seconds to populate. A test that sent an extra Back after an
+already-developed item did nothing has been retained as a test failure,
+not a reproduced game lock-up.
+
+The cutscene's exact hologram distance and scale have **not** been recovered.
+The current 8 cm default is approximate. The native device sockets, parts
+attachments and matching cutscene animation/UI package are recovered, but
+their raw canvas units and effect offsets are not a measured screen fit.
+Do not replace this remaining native projection work with another guessed
+default or describe the present fit as an exact cutscene match.
 
 | Request | Current result |
 | --- | --- |
@@ -52,13 +91,15 @@ across eight contexts. The focused bot contracts now have 96 checks.
 | Repair silent other long gun's support hand | Open. Native wrist selection identifies the other long gun as FAKEL (SLEEP). Native support-socket telemetry is installed; reproduce the bad two-hand contact before changing grip behavior. |
 | Map capacitive face-button, stick, trigger and thumb-rest contacts independently | Implemented and installed: ten separate inputs, parser checks and fresh simulator runtime initialization pass. Physical sensor acceptance remains open because the simulator operator cannot synthesize capacitive contact. |
 | Show the actual mappings and a quick video in the launcher | Installed in the fixed play tree: saved mappings, alternatives, one-hand/two-hand chords, ten amber contact surfaces and red pressed surfaces. 98 UI actions and eight settings-bridge contexts checked; 44-second personal mapping video available at artifacts/dev/controller-mapping.mp4. |
-| Live rotatable 3D previews for the settings | Installed: all 53 controls settings have a reference fitting view, with live edits, drag/orbit/zoom, front/side/top/back, filtering, save/reload, discard and numeric-fit reset. Runtime theatre dimensions are also previewed. Reference geometry is separate from native projection-effect and headset acceptance. |
+| Live rotatable 3D previews for the settings | Installed: all 54 controls settings have a reference fitting view, with live edits, drag/orbit/zoom, front/side/top/back, filtering, save/reload, discard and numeric-fit reset. Runtime theatre dimensions are also previewed. Reference geometry is separate from native projection-effect and headset acceptance. |
+| Default -30 degree weapon tilt and check the arsenal | Firearm-only fit implemented, configurable and installed; current-loadout one-hand scope direction inspected. All-weapon, impact, reload, support-contact and headset coverage remains open. |
+| Stuck in helicopter upgrade menu | Open report. Native list navigation and Back pass; exact upgrade/confirmation state and purchase-completion reproduction remain open. |
 | Audit one-hand/two-hand control chords | Effective personal binding audit retained; no unsolicited remapping. Headset usability and crouch/prone community report remain open. |
 | Align right-hand iDroid with its native emitter/cutscene and survive forced stow/reopen | Native attachment retained; natural holding frame and lower-edge screen anchor revised. Default and custom fitting controls pass scoped simulator motion/reopening checks. Native light-cone retargeting at custom offsets/rotations, forced tutorial stow and physical headset acceptance remain open. |
 | Preserve Coco's fixes; burn down community reports; all weapons/missions/game completion | Coco's supplied changes retained. Community ledger and full-game acceptance remain open; an A* bridge route does not certify missions or combat. |
 | Publish the new build on GitHub | September 30 experimental prerelease packages the tested local DLL and committed source; see RELEASE_2026-09-30.md. Full-game and headset acceptance remain open. |
 
-The next iDroid work is native light-cone retargeting and forced tutorial stow,
+The next iDroid work is exact authored screen fitting, native light-cone retargeting and forced tutorial stow,
 then physical fitting/readability. FAKEL (SLEEP) support-hand reproduction,
 cover camera ownership, mounted weapon aim/reticles, binocular native lighting
 and full mission regression remain on the existing release queue.

@@ -27,7 +27,7 @@ async function bridge(method,payload){
   const edit=async(key,value)=>{const input=page.locator(`[data-number="settings.${key}"]`);await input.fill(String(value));await input.dispatchEvent('input');};
   const baseline=await snap();assert(baseline.context==='idroid','3D fitting view opens on right-hand iDroid');
   assert(Number(await page.locator('[data-setting="settings.wrist_text_scale"]').inputValue())===1.5,'Fractional arm text scale is shown accurately by its slider');
-  assert(await page.evaluate(()=>window.launcherQA.state.settings.every(r=>window.launcherQA.fitContext(r.name))),'All 53 VR adjustment rows belong to a 3D preview');
+  assert(await page.evaluate(()=>window.launcherQA.state.settings.every(r=>window.launcherQA.fitContext(r.name))),'All 54 VR adjustment rows belong to a 3D preview');
   await page.locator('[data-fit-context="idroid"]').click();await page.locator('#fit-filter').click();
   assert(await page.locator('[data-number*="idroid_grip_"]').count()===6,'All grip positions and rotations are surfaced');
   await page.locator('[data-setting="settings.handheld_menus"]').check();
@@ -59,11 +59,21 @@ async function bridge(method,payload){
   for(const context of contexts){await page.locator(`[data-fit-context="${context}"]`).click();assert(await page.locator('#settings-grid .setting-card').count()>0,context+' has fitting controls');views[context]=await snap();await page.screenshot({path:path.join(output,context+'.png'),fullPage:false});}
   await page.locator('[data-fit-context="wrist"]').click();const left=await snap();await edit('weapon_hud_setback_cm',9);const arm=await snap();assert(!near(arm.status,left.status)&&near(arm.device,left.device),'Weapon info adjustment affects LEFT forearm and preserves iDroid fit');
   await page.locator('#discard').click();await page.waitForFunction(()=>document.querySelector('#save-bar').hidden);
-  await page.locator('[data-fit-context="optics"]').click();const optic=await snap();await edit('scope_eye_relief_cm',15);assert(Math.abs((await snap()).scopeEye[2]-optic.scopeEye[2]-.05)<1e-6,'Scope eye distance updates physical clearance preview');
+  await page.locator('[data-fit-context="hands"]').click();const weapon=await snap();
+  assert(near(weapon.weaponRotation,[-Math.sin(Math.PI/12),0,0,Math.cos(Math.PI/12)]),'Default firearm tilt is minus 30 degrees');
+  const weaponPixels=hash(await canvas.screenshot());await edit('weapon_aim_pitch_degrees',0);const level=await snap();
+  assert(near(level.weaponRotation,[0,0,0,1])&&near(level.scopeRotation,[0,0,0,1]),'Zero firearm tilt levels gun and physical scope together');
+  assert(near(level.deviceRotation,weapon.deviceRotation)&&near(level.hand,weapon.hand)&&near(level.screen,weapon.screen)&&near(level.binocularRotation,weapon.binocularRotation)&&near(level.binocularHand,weapon.binocularHand),'Firearm tilt preserves iDroid and binocular fitting');
+  assert(hash(await canvas.screenshot())!==weaponPixels,'Unsaved firearm tilt redraws the held gun');
+  await edit('right_hand_pitch_degrees',15);const calibrated=await snap();
+  assert(near(calibrated.weaponRotation,calibrated.scopeRotation)&&near(calibrated.scopeRotation,[Math.sin(Math.PI/24),0,0,Math.cos(Math.PI/24)]),'General hand calibration also rotates the physical scope preview');
+  await page.locator('#discard').click();await page.waitForFunction(()=>document.querySelector('#save-bar').hidden);
+  await page.locator('[data-fit-context="optics"]').click();const optic=await snap();await edit('scope_eye_relief_cm',15);const eye=await snap();
+  assert(near(eye.scopeEye.map((v,i)=>v-optic.scopeEye[i]),[0,.025,.05*Math.cos(Math.PI/6)]),'Scope eye distance follows the tilted physical scope axis');
   await page.locator('#discard').click();await page.waitForFunction(()=>document.querySelector('#save-bar').hidden);
   await page.locator('[data-fit-context="movement"]').click();await edit('player_height_offset_cm',25);assert(Math.abs((await snap()).eyeHeight-1.65)<1e-6,'Height adjustment moves the eye without scaling the world');
   await page.locator('#discard').click();await page.waitForFunction(()=>document.querySelector('#save-bar').hidden);
-  await page.locator('#fit-filter').click();assert(await page.locator('#settings-grid .setting-card').count()===53,'Show all restores every adjustment');
+  await page.locator('#fit-filter').click();assert(await page.locator('#settings-grid .setting-card').count()===54,'Show all restores every adjustment');
   await page.locator('[data-settings="runtime"]').click();await page.locator('[data-fit-context="menus"]').click();assert(await page.locator('[data-number="theatre.width_cm"]').count()===1,'Runtime theatre fit is surfaced');
   await page.locator('[data-setting="diagnostics.wrist_hud_experiment"]').uncheck();assert((await snap()).offWrist,'Explicit off-wrist preference previews a spatial panel');
   await page.locator('#discard').click();await page.waitForFunction(()=>document.querySelector('#save-bar').hidden);assert(!(await snap()).offWrist,'Discard restores left-arm presentation');

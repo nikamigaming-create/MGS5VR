@@ -104,6 +104,11 @@ std::optional<Vec3> outsideArmSurface(Vec3 point,const ArmSurface& surface){
        ||!std::isfinite(surface.clearance)||surface.clearance<0||surface.clearance>.15f)return {};
     return point+surface.normal*std::max(0.f,surface.clearance-dot(point-surface.point,surface.normal));
 }
+std::optional<Pose> weaponAimWithPitch(Pose aim,float pitchDegrees){
+    if(!valid(aim)||!std::isfinite(pitchDegrees)||std::abs(pitchDegrees)>90.f)return {};
+    const float half=pitchDegrees*3.14159265358979323846f/360.f;
+    return compose(aim,Pose{{std::sin(half),0,0,std::cos(half)}, {}});
+}
 std::optional<Pose> aimedWeaponGrip(Pose primary,Pose aim,Vec3 forwardInPrimary){
     if(!valid(primary)||!valid(aim)||!valid(Pose{{},forwardInPrimary}))return {};
     const float axisLength=length(forwardInPrimary);

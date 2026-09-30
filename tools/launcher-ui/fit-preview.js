@@ -18,7 +18,7 @@ export function fitContext(name){
  if(/wrist|weapon_hud|hud_mode/.test(name))return 'wrist';
  if(/binocular|scope/.test(name))return 'optics';
  if(/menu_quad|theatre\./.test(name))return 'menus';
- if(/hand_|support_|smoothing|controller_rig/.test(name))return 'hands';
+ if(/hand_|support_|smoothing|weapon_aim|controller_rig/.test(name))return 'hands';
  if(/height|turn|melee|animal_touch|head_camera/.test(name))return 'movement';
  return null;
 }
@@ -135,13 +135,15 @@ export class FitPreview {
   this.hud.position.set(0,.038+lift,.17);this.hud.scale.set(.16*text,.09*text,1);this.hud.visible=this.armDisplay==='hud'&&this.values['settings.hud_mode']!=='off';this.status.visible=this.armDisplay==='status';this.picker.visible=this.armDisplay==='picker';
   this.picker.position.set(0,.02+lift+this.value('wrist_selector_height_cm',15)*.01,.07);const pickerWidth=this.value('wrist_picker_width_cm',42)*.01;this.picker.scale.set(pickerWidth,pickerWidth*9/16,1);
   this.hands.forEach((hand,index)=>{this.fit(hand,(index?'right':'left')+'_hand_',V(index?.14:-.14,0,0));this.curl(hand,this.value(this.touch?'hand_touch_curl_percent':'hand_rest_curl_percent',this.touch?20:8));});
+  this.hands[1].quaternion.multiply(rotation(this.value('weapon_aim_pitch_degrees',-30),0,0));
   this.rightHandFit=this.hands[1].quaternion.clone();
   this.support.scale.setScalar(this.value('support_grip_radius_cm',10)/10);this.detach.scale.setScalar(this.value('support_detach_radius_cm',30)/30);
   this.fit(this.opticGrip,'right_hand_');this.binocular.quaternion.copy(rotation(this.value('binocular_pitch_degrees',-90),this.value('binocular_yaw_degrees'),this.value('binocular_roll_degrees')));
   const opticOrientation=this.opticGrip.quaternion.clone().multiply(this.binocular.quaternion);
   const ocular=V(-.0328,-.0006,.0551+this.value('binocular_max_eye_distance_cm',30)*.01).applyQuaternion(opticOrientation).add(this.opticGrip.position);
   this.eyeRing.position.copy(ocular);this.eyeRing.quaternion.copy(opticOrientation);
-  this.scopeEye.position.set(-.16,.04,.02+this.value('scope_eye_relief_cm',10)*.01);
+  this.scope.quaternion.copy(this.rightHandFit);
+  this.scopeEye.position.copy(V(0,0,this.value('scope_eye_relief_cm',10)*.01).applyQuaternion(this.scope.quaternion).add(this.scope.position));this.scopeEye.quaternion.copy(this.scope.quaternion);
   this.worldPanel.scale.set(this.value('menu_quad_width_cm',120)*.01,this.value('menu_quad_width_cm',120)*.01*9/16,1);
   this.worldPanel.position.z=-this.value('menu_quad_distance_cm',130)*.01;this.worldPanel.quaternion.copy(rotation(this.value('menu_quad_tilt_degrees',-10)));
   const offWrist=String(this.values['diagnostics.wrist_hud_experiment'])==='0';this.offWristPanel.visible=offWrist;this.offWristPanel.position.copy(this.worldPanel.position);this.offWristPanel.scale.copy(this.worldPanel.scale);this.offWristPanel.quaternion.copy(this.worldPanel.quaternion);
@@ -180,7 +182,7 @@ export class FitPreview {
   const d=distance*this.zoom;this.camera.position.copy(target).add(V(Math.sin(this.azimuth)*Math.cos(this.pitch)*d,Math.sin(this.pitch)*d,Math.cos(this.azimuth)*Math.cos(this.pitch)*d));this.camera.lookAt(target);this.renderer.render(this.scene,this.camera);
  }
  snapshot(){
-  this.root.updateMatrixWorld(true);const world=object=>object.getWorldPosition(V()).toArray();
-  return {context:this.context,azimuth:this.azimuth,pitch:this.pitch,zoom:this.zoom,touch:this.touch,motion:this.motion,armDisplay:this.armDisplay,offWrist:this.offWristPanel.visible,device:world(this.device),emitter:this.device.localToWorld(this.emitter.clone()).toArray(),screen:world(this.idroidScreen),lowerEdge:world(this.screenPivot),screenSize:[this.idroidScreen.scale.x,this.idroidScreen.scale.y],screenRotation:this.screenPivot.quaternion.toArray(),hand:world(this.idroidHand),status:world(this.status),pickerSize:this.picker.scale.toArray(),scopeEye:world(this.scopeEye),eyeHeight:this.heightEye.position.y};
+  this.root.updateMatrixWorld(true);const world=object=>object.getWorldPosition(V()).toArray(),orientation=object=>object.getWorldQuaternion(new THREE.Quaternion()).toArray();
+  return {context:this.context,azimuth:this.azimuth,pitch:this.pitch,zoom:this.zoom,touch:this.touch,motion:this.motion,armDisplay:this.armDisplay,offWrist:this.offWristPanel.visible,device:world(this.device),deviceRotation:orientation(this.device),emitter:this.device.localToWorld(this.emitter.clone()).toArray(),screen:world(this.idroidScreen),lowerEdge:world(this.screenPivot),screenSize:[this.idroidScreen.scale.x,this.idroidScreen.scale.y],screenRotation:this.screenPivot.quaternion.toArray(),hand:world(this.idroidHand),status:world(this.status),pickerSize:this.picker.scale.toArray(),weaponRotation:orientation(this.weapon),binocularRotation:orientation(this.binocular),binocularHand:world(this.opticHand),scopeRotation:orientation(this.scope),scopeEye:world(this.scopeEye),eyeHeight:this.heightEye.position.y};
  }
 }

@@ -13,6 +13,7 @@ from gameplay_bot.recording import Recording, after_verified_arrival, mux_timeli
 from gameplay_bot.session import run_suite
 from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack
 from gameplay_bot.startup_evidence import StartupEvidence
+from gameplay_bot.menus import navigate as navigate_menu, observe as observe_menu
 
 
 class Clock:
@@ -61,6 +62,102 @@ class ControllerFitPoseTests(unittest.TestCase):
                                     "after": {"idroid": True}, "after_stable_samples": 12, "timeout": 4})
         self.assertEqual(result["status"], "observed_pass")
         self.assertGreater(clock.now, 1.8)
+
+
+class MenuNavigationTests(unittest.TestCase):
+    def fixture(self, source="left_stick", fault=None):
+        clock = Clock()
+        live = mock.Mock()
+        live.bindings = {"axes": [{"name": "axes.menu", "source": source}]}
+        active = []
+        def release():
+            active.clear()
+        def input_(values, seconds, **kwargs):
+            active[:] = values
+            if fault == "rpc":
+                raise TimeoutError("operator failure")
+        def state(native=False):
+            sticks = [0.] * 4
+            if active and fault != "unsampled":
+                value = active[0]
+                axis = (0 if value["hand"] == "left" else 2) + (value["sub_component"] == "Y")
+                sticks[axis] = value["value"]
+            if not active and fault == "stuck_release" and live.input.called:
+                sticks[1] = -.8
+            return {"idroid": fault != "owner", "idroid_menu_input_ready": True,
+                    "controls": {"context": "menus", "age_ms": 0,
+                                 "sample_ms": int(clock.now * 1000), "sticks": sticks,
+                                 "physical": [0.] * 11}}
+        live.input.side_effect = input_
+        live.release.side_effect = release
+        live.observe.side_effect = state
+        return live, clock, active
+
+    def test_effective_right_stick_moves_only_the_mapped_menu_axis(self):
+        live, clock, active = self.fixture("right_stick")
+        navigate_menu(live, {"direction": "down"}, clock=clock, sleep=clock.sleep)
+        payload, = live.input.call_args.args[0]
+        self.assertEqual(payload, {"hand": "right", "component": "Thumbstick", "sub_component": "Y", "value": -1.})
+        self.assertEqual(active, [])
+        self.assertGreaterEqual(clock.now, .28)
+        live.capture.assert_not_called()
+
+    def test_invalid_navigation_never_dispatches_input(self):
+        for step in ({"direction": "forward"}, {"direction": "down", "seconds": True},
+                     {"direction": "down", "seconds": float("nan")},
+                     {"direction": "down", "seconds": 1.}):
+            live, clock, _ = self.fixture()
+            with self.assertRaises(BotFault):
+                navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+            live.input.assert_not_called()
+
+    def test_missing_mapping_or_native_owner_never_dispatches_input(self):
+        for source, fault in (("disabled", None), ("left_stick", "owner")):
+            live, clock, _ = self.fixture(source, fault)
+            with self.assertRaises(BotFault):
+                navigate_menu(live, {"direction": "down"}, clock=clock, sleep=clock.sleep)
+            live.input.assert_not_called()
+
+    def test_unsampled_input_expires_and_releases(self):
+        live, clock, active = self.fixture(fault="unsampled")
+        with self.assertRaisesRegex(BotFault, "before expiry"):
+            navigate_menu(live, {"direction": "down"}, clock=clock, sleep=clock.sleep)
+        self.assertLess(clock.now, 2.1)
+        self.assertEqual(active, [])
+
+    def test_failed_input_rpc_still_releases(self):
+        live, clock, active = self.fixture(fault="rpc")
+        with self.assertRaises(TimeoutError):
+            navigate_menu(live, {"direction": "down"}, clock=clock, sleep=clock.sleep)
+        self.assertEqual(active, [])
+
+    def test_release_rpc_alone_does_not_prove_neutral_input(self):
+        live, clock, _ = self.fixture(fault="stuck_release")
+        with self.assertRaisesRegex(BotFault, "stayed held"):
+            navigate_menu(live, {"direction": "down"}, clock=clock, sleep=clock.sleep)
+
+    def test_idle_observation_dispatches_no_input_and_releases(self):
+        live, clock, active = self.fixture()
+        observe_menu(live, {"seconds": 1.}, clock=clock, sleep=clock.sleep)
+        live.input.assert_not_called()
+        self.assertEqual(active, [])
+        self.assertEqual(clock.now, 1.)
+
+    def test_idle_observation_rejects_missing_or_invalid_neutral_samples(self):
+        for field, invalid in (("sticks", []), ("sticks", [0.] * 3),
+                               ("sticks", [0., float("nan"), 0., 0.]),
+                               ("physical", []), ("physical", [False] * 11),
+                               ("physical", [1.] + [0.] * 10)):
+            with self.subTest(field=field, invalid=invalid):
+                live, clock, active = self.fixture()
+                state = live.observe()
+                state["controls"][field] = invalid
+                live.observe.side_effect = None
+                live.observe.return_value = state
+                with self.assertRaisesRegex(BotFault, "sampled neutral"):
+                    observe_menu(live, {"seconds": 1.}, clock=clock, sleep=clock.sleep)
+                live.input.assert_not_called()
+                self.assertEqual(active, [])
 
 
 class Adapter:

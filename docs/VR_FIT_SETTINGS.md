@@ -6,13 +6,13 @@ to rotate, scroll to zoom, or use Front, Side, Top and Back. Arrow keys rotate;
 plus/minus zoom and zero resets the view. Turning the preview never changes a
 setting. Each numeric setting has a slider and an exact value box.
 
-The shared fitting view covers all 53 controls settings:
+The shared fitting view covers all 54 controls settings:
 
 | View | What changes |
 | --- | --- |
 | iDroid | Right hand/device grip position and rotation; projected screen width, distance, horizontal/vertical offset and rotation. |
 | Left forearm | Weapon/ammo setback, surface clearance, text scale, HUD mode and equipment popup height/width. Choose Weapon/ammo, HUD popup or Equipment picker in the preview. |
-| Hands & weapons | Separate left/right hand fits, relaxed/touch finger curl, support acquisition/release radii and optional aim-shake demonstration. |
+| Hands & weapons | Separate left/right hand fits, firearm-only pointing pitch, relaxed/touch finger curl, support acquisition/release radii and optional aim-shake demonstration. |
 | Optics | Binocular rotation and viewing clearance, scope eye distance and marking/glow preferences. |
 | Spatial menus | Pause/off-wrist panel width, distance and tilt; theatre dimensions under Runtime & assets. |
 | Movement | Eye height without changing world scale, turning, physical melee and animal-touch preferences. |
@@ -36,6 +36,16 @@ keeps its 16:9 ratio, grows upward from its lower-edge anchor and pivots there
 when tilted. Grip translation is in controller grip space; grip rotation uses
 the controller's pointing basis. General hand calibration also affects held
 objects; iDroid grip calibration applies only while holding that device.
+
+**One-hand weapon tilt** defaults to −30 degrees following the community
+fitting report. It trims only firearm pointing, then solves the common native
+firing wrist so the gun, hand, sight and muzzle share that correction. Set it
+to zero to remove the trim. Two-hand aim follows the support grip. This control
+does not rotate the iDroid, binoculars, UI pointer or left forearm. Existing
+general hand fitting remains a separate controller calibration.
+An older INI with a nonzero right-hand pitch and no firearm-pitch entry receives
+zero additional firearm trim, preserving its existing correction. Explicitly
+saved values remain authoritative.
 
 The reference projection volume illustrates the intended emitter-to-screen
 connection. It does not certify the retail projection effect at every fitting

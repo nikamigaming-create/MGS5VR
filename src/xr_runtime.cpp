@@ -607,6 +607,7 @@ struct Session {
         controllerFrame.handTouchCurl=controls.setting("settings.hand_touch_curl_percent")*.01f;
         controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
+        controllerFrame.weaponAimPitch=controls.setting("settings.weapon_aim_pitch_degrees");
         controllerFrame.binocularAutoMark=controls.setting("settings.binocular_auto_mark")>=.5f;
         controllerFrame.binocularActorGlow=controls.setting("settings.binocular_actor_glow")>=.5f;
         controllerFrame.binocularMarkDwellMs=static_cast<uint64_t>(controls.setting("settings.binocular_mark_dwell_ms"));

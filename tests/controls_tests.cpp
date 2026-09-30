@@ -340,6 +340,23 @@ int main(int argc,char** argv){
     }
     {
         Fixture f;
+        expect(f.controls.setting("settings.weapon_aim_pitch_degrees")==-30
+            &&f.controls.setting("settings.right_hand_pitch_degrees")==0
+            &&f.controls.setting("settings.idroid_grip_pitch_degrees")==0,
+            "reported firearm tilt is independent of controller and iDroid calibration");
+        expect(f.load("[settings]\nweapon_aim_pitch_degrees=0\n")
+            &&f.controls.setting("settings.weapon_aim_pitch_degrees")==0,
+            "firearm pointing trim can be removed");
+        expect(!f.load("[settings]\nweapon_aim_pitch_degrees=-91\n"),
+            "firearm pitch rejects excessive rotations");
+        Fixture legacy;
+        expect(legacy.load("[settings]\nright_hand_pitch_degrees=-30\n")
+            &&legacy.controls.setting("settings.right_hand_pitch_degrees")==-30
+            &&legacy.controls.setting("settings.weapon_aim_pitch_degrees")==0,
+            "existing right-hand pitch does not receive a second automatic correction");
+        expect(legacy.load("[settings]\nright_hand_pitch_degrees=-10\nweapon_aim_pitch_degrees=-20\n")
+            &&legacy.controls.setting("settings.weapon_aim_pitch_degrees")==-20,
+            "explicit controller and firearm pitch adjustments retain their chosen values");
         expect(f.controls.setting("settings.wrist_picker_width_cm")==42,"native cards use the compact wrist width");
         expect(f.load("[settings]\nwrist_picker_width_cm=100\n"),"native picker width is configurable");
         expect(f.controls.setting("settings.wrist_picker_width_cm")==100,"maximum picker width is retained");

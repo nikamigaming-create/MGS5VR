@@ -631,6 +631,12 @@ class Live:
         return self.observe()
 
     def execute(self, step):
+        if step["op"] == "menu_observe":
+            from .menus import observe
+            return observe(self, step)
+        if step["op"] == "menu_navigate":
+            from .menus import navigate
+            return navigate(self, step)
         if step["op"] == "equipment_select":
             return self.equipment_select(step)
         if step["op"] == "pose":

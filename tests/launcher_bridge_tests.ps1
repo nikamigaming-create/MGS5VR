@@ -52,9 +52,9 @@ try {
     Assert ($loaded.state.gameExe -eq $game -and $loaded.state.writable -eq $true) 'load binds the snapshot to the fixture and marks its copied controls writable'
     Assert (@($loaded.state.bindings.actions).Count -gt 0 -and @($loaded.state.runtime.PSObject.Properties).Count -gt 0) 'load returns parsed bindings and runtime settings'
     $settingRows=@($loaded.state.settings)
-    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 53) 'serialized settings field is a flat array containing all 53 setting rows'
+    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 54) 'serialized settings field is a flat array containing all 54 setting rows'
     $rowsValid=$true
-    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 53) { $rowsValid=$false }
+    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 54) { $rowsValid=$false }
     else {
         foreach ($row in $settingRows) {
             $numbers=@($row.value,$row.min,$row.max)

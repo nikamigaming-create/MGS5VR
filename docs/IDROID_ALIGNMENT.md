@@ -46,6 +46,19 @@ pitch/yaw/roll. Its centre is one half-height above that anchor. Width remains
 16:9; resizing or rotating preserves the lower-edge pivot. Extracting the
 native SAND tracks is not a claim that every animation channel was decoded.
 
+The exact authored screen distance and scale are still unresolved. The default
+8 cm depth is an approximate, configurable fit, not a measured cutscene
+distance. The matching cutscene contains animated device channels as well as
+separate UI resources. Native canvas constants are 128 by 72; they are canvas
+units, not metres. Neither those constants nor uninterpreted UI-layout floats
+justify a new physical screen size.
+
+The recovered device parts bind the native light to `SKL_002_Kamera` and a
+lens-flare effect to `CNP_HOLOGRAM`. The flare's authored local offset is
+(-0.08, -0.07, 0.02). That is an effect attachment offset, not the projection's
+screen distance. Recover the UI/effect transform contract before retargeting
+the visible native projection or replacing the current approximate fit.
+
 The 16:9 source canvas, stereo projection, UI clipping and menu input routing
 remain unchanged. Missing native attachment data rejects the handheld mount.
 The overlay does not reuse a stowed device pose. Automated checks exercise the

@@ -198,6 +198,7 @@ const std::vector<SettingDefinition>& settingDefinitions(){
         {"settings.right_hand_x_cm",0,-15,15},{"settings.right_hand_y_cm",0,-15,15},{"settings.right_hand_z_cm",0,-15,15},
         {"settings.right_hand_pitch_degrees",0,-90,90},{"settings.right_hand_yaw_degrees",0,-90,90},{"settings.right_hand_roll_degrees",0,-90,90},
         {"settings.weapon_smoothing_ms",0,0,150},
+        {"settings.weapon_aim_pitch_degrees",-30,-90,90},
         {"settings.support_grip_radius_cm",10,3,30},{"settings.support_detach_radius_cm",30,5,60},
         {"settings.hand_rest_curl_percent",8,0,30},{"settings.hand_touch_curl_percent",20,0,60}};
     return definitions;
@@ -253,6 +254,15 @@ std::vector<std::string> ControlBindings::load(std::istream& input){
         }catch(const std::exception& e){errors.push_back("line "+std::to_string(number)+": "+e.what());}
     }
     if(input.bad())errors.push_back("could not read the complete controls file");
+    // Older players may already use right-hand pitch for this same correction.
+    // Preserve their chosen calibration instead of silently adding another trim.
+    if(!seen.contains("settings.weapon_aim_pitch_degrees")
+       &&seen.contains("settings.right_hand_pitch_degrees")
+       &&candidate.setting("settings.right_hand_pitch_degrees")!=0){
+        const auto pitch=std::find_if(candidate.settings_.begin(),candidate.settings_.end(),
+            [](const auto& e){return e.name=="settings.weapon_aim_pitch_degrees";});
+        if(pitch!=candidate.settings_.end())pitch->value=0;
+    }
     if(candidate.setting("settings.support_detach_radius_cm")<candidate.setting("settings.support_grip_radius_cm")+2)
         errors.push_back("support_detach_radius_cm must exceed support_grip_radius_cm by at least 2 cm");
     if(candidate.setting("settings.hand_touch_curl_percent")<candidate.setting("settings.hand_rest_curl_percent"))

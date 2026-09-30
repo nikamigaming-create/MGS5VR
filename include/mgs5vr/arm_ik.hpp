@@ -56,7 +56,7 @@ std::optional<std::array<size_t,14>> armHelperIndices(std::span<const uint32_t> 
     std::span<const int32_t> parents);
 // Landscape display: +X runs elbow to wrist; +Z is the back of the forearm.
 std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal,float surfaceLift=.02f);
-// Support remains in front of the primary controller's unmodified aim. The
+// Support remains in front of calibrated primary aim, before two-hand guidance.
 // guided weapon cannot keep a withdrawn hand attached by rotating after it.
 bool withinSupportCone(Vec3 handSeparation,Vec3 primaryForward);
 // Classify the native palm-to-palm contact, not the current controller gap.
@@ -88,6 +88,9 @@ private:
 // Unlike activation-pose calibration this is independent of the camera and of
 // where the user happened to hold the controller when enabling VR.
 std::optional<Pose> anatomicalGrip(Pose wrist,Vec3 indexKnuckle,Vec3 littleKnuckle);
+// Firearm-only local pointing pitch. Controller/device calibration remains
+// separate; the corrected direction is solved through the native firing wrist.
+std::optional<Pose> weaponAimWithPitch(Pose aim,float pitchDegrees);
 // Align the authored muzzle axis with runtime aim -Z at the tracked palm
 // pivot. The solved wrist still owns the hand, weapon, sights and shot socket.
 std::optional<Pose> aimedWeaponGrip(Pose primary,Pose aim,Vec3 forwardInPrimary);

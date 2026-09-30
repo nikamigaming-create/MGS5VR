@@ -2255,6 +2255,29 @@ int main(){
     }
     expect(!anatomicalGrip({},indexKnuckle,indexKnuckle)&&!anatomicalGrip({},Vec3{0,0,2},Vec3{0,1,2}),
            "degenerate or non-hand landmark geometry cannot steer the rig");
+    {
+        const Pose aim{{},{.2f,-.15f,-.4f}};
+        const auto tilted=weaponAimWithPitch(aim,-30);
+        expect(tilted&&same(tilted->position,aim.position)
+            &&same(rotate(tilted->orientation,{0,0,-1}),{0,-.5f,-.8660254f}),
+            "firearm pitch changes pointing around its existing origin");
+        for(const auto forward:std::array<Vec3,3>{{{0,0,-1},{0,1,0},{1,0,0}}}){
+            const auto wrist=aimedWeaponGrip(aim,*tilted,forward);
+            expect(wrist&&same(wrist->position,aim.position)
+                &&same(rotate(wrist->orientation,forward),rotate(tilted->orientation,{0,0,-1})),
+                "different authored barrel axes retain grip contact and the calibrated muzzle direction");
+        }
+        const auto neutral=weaponAimWithPitch(aim,0);
+        expect(neutral&&same(rotate(neutral->orientation,{0,0,-1}),{0,0,-1}),
+            "zero firearm pitch restores the runtime pointing direction");
+        const auto vertical=weaponAimWithPitch(aim,-90);
+        expect(vertical&&!withinSupportCone({0,-.25f,0},{0,0,-1})
+            &&withinSupportCone({0,-.25f,0},rotate(vertical->orientation,{0,0,-1}))
+            &&!withinSupportCone({0,.25f,0},rotate(vertical->orientation,{0,0,-1})),
+            "support admission uses calibrated primary aim without following a withdrawn hand");
+        expect(!weaponAimWithPitch(aim,91)&&!weaponAimWithPitch(aim,std::numeric_limits<float>::quiet_NaN()),
+            "invalid firearm pitch cannot steer a native wrist");
+    }
     RigEquipment equipment;
     uint64_t equipmentTime=1000;
     const auto equipmentStep=[&](GamepadSample sample,bool modifier,bool rendered=true,uint64_t elapsed=100){

@@ -211,6 +211,7 @@ const settingCopy={
  binocular_mark_dwell_ms:['Time before automatic marking','How long to keep a person in your sights before marking them.'],
  player_height_offset_cm:['Eye height adjustment','Raise or lower your viewpoint without changing the size of the world.'],
  weapon_smoothing_ms:['Weapon and scope stabilization','0 is off; 100 strongly steadies small shakes. Gun, sight and hands move together; deliberate aim changes follow quickly.'],
+ weapon_aim_pitch_degrees:['One-hand weapon tilt','Default −30°. Adjust firearm pointing up or down; the gun, hand, sight and muzzle move together. 0 removes this trim. Two-hand direction follows the support grip.'],
  support_grip_radius_cm:['Support grip distance','How close your free hand must be to take hold of the weapon.'],
  support_detach_radius_cm:['Support grip release distance','How far you can pull your support hand away before it lets go.'],
  hand_rest_curl_percent:['Relaxed finger curl','How much your fingers curl when they are not holding anything.'],
@@ -221,7 +222,7 @@ for(const side of ['left','right']) {
  for(const [axis,label,description] of [['x','left / right','Positive values move the hand right.'],['y','up / down','Positive values move the hand up.'],['z','forward / back','Positive values move the hand toward you.']]) settingCopy[side+'_hand_'+axis+'_cm']=[hand+': '+label,description+' Held objects and aim move with it.'];
  for(const [axis,label,description] of [['pitch','tilt','Tilt the hand up or down.'],['yaw','angle','Turn the hand left or right.'],['roll','roll','Rotate the hand around the grip.']]) settingCopy[side+'_hand_'+axis+'_degrees']=[hand+': '+label,description+' Held objects and aim rotate with it.'];
 }
-function settingGroup(name){if(/idroid|handheld|menu_quad/.test(name))return 'iDroid & menus';if(/wrist|weapon_hud|hud_mode/.test(name))return 'Wrist & HUD';if(/binocular|scope/.test(name))return 'Optics';if(/hand_|support_|smoothing/.test(name))return 'Hands & weapons';return 'Movement & interaction'}
+function settingGroup(name){if(/idroid|handheld|menu_quad/.test(name))return 'iDroid & menus';if(/wrist|weapon_hud|hud_mode/.test(name))return 'Wrist & HUD';if(/binocular|scope/.test(name))return 'Optics';if(/hand_|support_|smoothing|weapon_aim/.test(name))return 'Hands & weapons';return 'Movement & interaction'}
 function runtimeRows(){const ranges={'theatre.width_cm':[100,3000],'theatre.distance_cm':[100,3000]};return Object.keys(state.runtime).map(name=>{const bool=/enabled$|native_actions$|camera_observer$|experiment$|interactive_cabin$/.test(name);const [min,max]=ranges[name]|| (bool?[0,1]:[undefined,undefined]);return {name,value:state.runtime[name],min,max,default:catalog.runtimeDefaults?.[name]??state.runtime[name]}})}
 function paintSettings(){
  if(!state?.settings){$('settings-grid').innerHTML='<p>Choose your game installation to edit its settings.</p>';return;}
