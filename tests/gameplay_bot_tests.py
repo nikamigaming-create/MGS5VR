@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
-from gameplay_bot.core import Behaviors, BlankCompositorFrame, BotFault, Events, ProgressGuard, astar, atomic_json, matches, scene
+from gameplay_bot.core import ActionPrerequisiteChanged, Behaviors, BlankCompositorFrame, BotFault, Events, ProgressGuard, astar, atomic_json, matches, scene
 from gameplay_bot.live import Live, authoritative_context, channel, fresh_control_observation, held_input_evidence, require_presentation_transition, rotate, static_grip_capture_allowed
 from gameplay_bot.recording import Recording, after_verified_arrival, mux_timeline, validate_raw_video
 from gameplay_bot.session import run_suite
@@ -140,7 +140,7 @@ class MenuNavigationTests(unittest.TestCase):
                 sticks[axis] = value["value"]
             if not active and fault == "stuck_release" and live.input.called:
                 sticks[1] = -.8
-            return {"idroid": fault != "owner", "idroid_menu_input_ready": True,
+            return {"idroid": fault != "owner", "idroid_menu_input_ready": True, "pause":False,
                     "controls": {"context": "menus", "age_ms": 0,
                                  "sample_ms": int(clock.now * 1000), "sticks": sticks,
                                  "physical": [0.] * 11}}
@@ -157,6 +157,43 @@ class MenuNavigationTests(unittest.TestCase):
         self.assertEqual(active, [])
         self.assertGreaterEqual(clock.now, .28)
         live.capture.assert_not_called()
+
+    def test_idroid_native_guard_is_checked_before_dispatch(self):
+        live, clock, _ = self.fixture()
+        original = live.observe.side_effect
+        def state(native=False):
+            return {**original(native), "native":{"mission":10040,"popup":False}}
+        live.observe.side_effect = state
+        with self.assertRaisesRegex(BotFault, "native scene prerequisite"):
+            navigate_menu(live, {"direction":"down", "native_before":{"mission":40010}},
+                          clock=clock, sleep=clock.sleep)
+        live.input.assert_not_called()
+
+    def test_idroid_navigation_rejects_overlapping_or_unidentified_pause_owner(self):
+        for paused in (True, None):
+            live, clock, _ = self.fixture()
+            original = live.observe.side_effect
+            live.observe.side_effect = lambda native=False: {**original(native), "pause":paused}
+            with self.assertRaisesRegex(BotFault, "native input owner"):
+                navigate_menu(live, {"direction":"down"}, clock=clock, sleep=clock.sleep)
+            live.input.assert_not_called()
+
+    def test_idroid_native_guard_is_rechecked_after_release_without_held_lua_reads(self):
+        live, clock, active = self.fixture()
+        original = live.observe.side_effect
+        held_native_reads = []
+        def state(native=False):
+            if native and active:
+                held_native_reads.append(True)
+            value = original(native)
+            value["native"] = {"mission":10040 if live.input.called and not active else 40010}
+            return value
+        live.observe.side_effect = state
+        with self.assertRaisesRegex(BotFault, "native scene prerequisite"):
+            navigate_menu(live, {"direction":"down", "native_before":{"mission":40010}},
+                          clock=clock, sleep=clock.sleep)
+        self.assertEqual(held_native_reads, [])
+        self.assertEqual(active, [])
 
     def pause_fixture(self, change=None):
         live, clock, active = self.fixture("right_stick")
@@ -1486,6 +1523,64 @@ class SessionTests(unittest.TestCase):
                 behavior.case.assert_called_once()
 
 
+class MenuCleanupTests(unittest.TestCase):
+    @staticmethod
+    def fixture(depth, popup=False):
+        live = Live.__new__(Live)
+        live.opened_menu = "idroid"
+        live.release = mock.Mock()
+        live.events = mock.Mock()
+        remaining = [depth]
+        def state(native=False):
+            active = remaining[0] > 0
+            return {"menu":active,"idroid":active,"pause":False,
+                    "native":{"popup":popup,"tutorial_pause":False}}
+        live.observe = mock.Mock(side_effect=state)
+        def execute(step):
+            remaining[0] -= 1
+        live.execute = mock.Mock(side_effect=execute)
+        return live
+
+    def test_three_native_levels_unwind_with_ordinary_guarded_back(self):
+        live = self.fixture(3)
+        with mock.patch("gameplay_bot.live.time.sleep"):
+            live.cleanup_menus()
+        self.assertIsNone(live.opened_menu)
+        self.assertEqual(live.execute.call_count, 3)
+        for call in live.execute.call_args_list:
+            self.assertEqual(call.args[0]["name"], "menus.back")
+            self.assertEqual(call.args[0]["native_before"], {"popup":False,"tutorial_pause":False})
+
+    def test_cleanup_stops_at_unknown_prompt_and_is_bounded_on_nonresponsive_menu(self):
+        live = self.fixture(3, popup=True)
+        with self.assertRaisesRegex(BotFault, "needs review"):
+            live.cleanup_menus()
+        live.execute.assert_not_called()
+        live = self.fixture(10)
+        with mock.patch("gameplay_bot.live.time.sleep"), self.assertRaisesRegex(BotFault, "did not close"):
+            live.cleanup_menus()
+        self.assertEqual(live.execute.call_count, 4)
+
+    def test_close_after_cleanup_attempt_releases_without_replaying_navigation(self):
+        live = self.fixture(3)
+        live.cleanup_menus = mock.Mock(side_effect=BotFault("completion unknown"))
+        live.operator = mock.Mock()
+        live.process_handle = None
+        live.close(cleanup=False)
+        live.release.assert_called_once()
+        live.cleanup_menus.assert_not_called()
+        live.operator.close.assert_called_once()
+
+    def test_idroid_help_overlay_cannot_receive_automatic_cleanup_input(self):
+        live = self.fixture(3)
+        live.observe.return_value = {"menu":True,"idroid":True,"pause":True,
+                                   "native":{"popup":False,"tutorial_pause":False}}
+        live.observe.side_effect = None
+        with self.assertRaisesRegex(BotFault, "needs review"):
+            live.cleanup_menus()
+        live.execute.assert_not_called()
+
+
 class StartupTests(unittest.TestCase):
     @staticmethod
     def stage(sequence, popup=False, menu=False):
@@ -1510,6 +1605,52 @@ class StartupTests(unittest.TestCase):
         self.assertEqual(live.execute.call_args_list[-1].args[0]["state_before"],
                          {"title_menu": False, "press_start_ready": True})
         self.assertLess(clock.now, 1.)
+
+    def test_login_progress_and_results_complete_without_bot_confirmation(self):
+        login = {"scene": "cinematic", "title_menu": False,
+                 "native": {"mission": 1, "sequence": "Seq_Demo_LogInKonamiServer",
+                            "title": False, "popup": True}}
+        closed = {**login, "native": {**login["native"], "popup": False}}
+        menu = self.stage("Seq_Demo_StartHasTitleMission", menu=True)
+        live = Adapter([login, login, closed, login, login, menu])
+        live.events = mock.Mock(); live.capture = mock.Mock(); clock = Clock()
+        self.assertIs(advance_startup(live, clock=clock, sleep=clock.sleep), menu)
+        self.assertEqual(live.actions, 0)
+        live.capture.assert_not_called()
+
+    def test_login_popup_that_never_completes_stops_without_input(self):
+        for change in ({}, {"mission": 40010}, {"title": True}, {"mission": None}):
+            with self.subTest(change=change):
+                state = {"scene": "cinematic", "title_menu": False,
+                         "native": {"mission": 1, "sequence": "Seq_Demo_LogInKonamiServer",
+                                    "title": False, "popup": True, **change}}
+                live = Adapter([state]); live.events = mock.Mock(); clock = Clock()
+                with self.assertRaisesRegex(BotFault, "Native startup deadline"):
+                    advance_startup(live, timeout=2., clock=clock, sleep=clock.sleep)
+                self.assertEqual(live.actions, 0)
+
+    def test_popup_that_closes_during_capture_returns_to_observation_without_credit(self):
+        notice = self.stage("Seq_Demo_ConfirmAutoSave", popup=True)
+        login = {"scene": "cinematic", "title_menu": False,
+                 "native": {"mission": 1, "sequence": "Seq_Demo_LogInKonamiServer",
+                            "title": False, "popup": True}}
+        menu = self.stage("Seq_Demo_StartHasTitleMission", menu=True)
+        live = mock.Mock(); clock = Clock()
+        live.observe.side_effect = [notice, login, menu]
+        live.execute.side_effect = ActionPrerequisiteChanged("Native action prerequisite changed")
+        self.assertIs(advance_startup(live, clock=clock, sleep=clock.sleep), menu)
+        live.execute.assert_called_once()
+        emitted = [c for c in live.events.emit.call_args_list if c.args[0]=="startup_admission_changed"]
+        self.assertEqual(len(emitted), 1)
+
+    def test_startup_never_retries_a_transport_or_post_dispatch_failure(self):
+        notice = self.stage("Seq_Demo_ConfirmAutoSave", popup=True)
+        live = mock.Mock(); live.observe.return_value = notice
+        live.execute.side_effect = BotFault("operator completion unknown")
+        clock = Clock()
+        with self.assertRaisesRegex(BotFault, "completion unknown"):
+            advance_startup(live, clock=clock, sleep=clock.sleep)
+        live.execute.assert_called_once()
 
     def test_existing_selectable_menu_never_receives_start_confirm(self):
         menu = self.stage("Seq_Demo_StartHasTitleMission", menu=True)

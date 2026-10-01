@@ -89,8 +89,13 @@ The existing supervisor can review actual final-eye captures and dispatch bounde
 semantic VR actions; a broad menu flag cannot safely drive a whole menu tree.
 After repeatable simulator traversal, each group receives a physical-headset pass.
 
-The helicopter list/Back baseline is partial field Mission 6 evidence only. Its
-selected grades were already developed, so purchase completion remains open.
+The earlier helicopter list/Back baseline is partial field Mission 6 evidence.
+Native ACC Development and the Support Helicopter Armament list have now been
+reached and reviewed separately. ACC's first Mother Base row is Customize;
+Development is second. The old two-edge cleanup failed at the three-level leaf.
+The corrected bounded loop still needs its complete native exit/reopen regression.
+See ACC_MENU_REGRESSION.md for retained evidence and the cold ACC forced-menu
+failure. Selected field grades were already developed, so purchase completion remains open.
 Another player reported the upgrade lock-up in the ACC; the user did not
 personally experience it. The field baseline does not reproduce that report.
 Keep ACC iDroid development and ACC helicopter customization as separate

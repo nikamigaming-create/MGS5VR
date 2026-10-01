@@ -31,7 +31,7 @@ acceptance remain open. The September 30 GitHub prerelease is unchanged.
 The editor passed 38 headless fixture checks, including complete save/reload,
 discard, orbit/zoom, accurate fractional text scale and reset preserving
 handheld mode. The retained controller guide still resolves 98 action locations
-across eight contexts. The focused bot contracts now have 116 checks.
+across eight contexts. The focused bot contracts now have 127 checks.
 
 The local weapon fit adds a separate **One-hand weapon tilt**, default -30
 degrees, applied through the common native firing wrist. Gun, hand, physical
@@ -57,10 +57,16 @@ queue, not 418 passing weapon tests. See WEAPON_FIT_AUDIT.md.
 Another player reported the helicopter upgrade lock-up while in the ACC;
 the user did not personally experience it. The retained native
 Mother Base -> Development -> Helicopter list/Back pass was in field Mission 6,
-so it does not reproduce that ACC report. The exact ACC screen remains unknown:
-development through iDroid and ACC helicopter customization are separate
-candidate paths. Both require ACC reproduction and a verified isolated
-save/checkpoint fixture before a test changes progression. The field baseline's
+so it does not reproduce that ACC report. The exact reported ACC screen remains unknown. Native ACC iDroid development
+has now been reached through the existing VR bindings: Mother Base has Customize
+first and Development second, unlike the field recipe. The Support Helicopter
+Armament list opens, and its ordinary exit requires three Back edges. A prior
+run failed the old two-edge cleanup; the test loop now allows four guarded edges
+and never starts a second cleanup chain after an ambiguous failure. The separate
+helicopter customization selector and upgrade purchase remain untested.
+See ACC_MENU_REGRESSION.md for retained successes and the forced-menu failure.
+A verified disposable campaign is used; no save replacement or purchase was
+performed in the resumed session. The field baseline's
 selected helicopter grades were already developed, so Confirm did not open a
 purchase dialog. Item/upgrade confirmation and purchase completion remain open.
 The list can
@@ -90,17 +96,31 @@ the state planner compiles a route with a neutral return, and the existing
 native VR runner stops dependent steps on the first failure. Pause still
 requires an explicitly named Pause transition.
 
-September 30 planner replay is pending: the maintained test launch stopped
-before starting MGSV because Steam was not running. The source/build checks
-do not stand in for native state-route acceptance or ACC reproduction.
+The resumed native session reaches the ACC (mission 40010) by the real Pause
+Return to ACC confirmation and subsequent physical Continue. Steam stays running.
+The state-planner route command itself has not been replayed in game. The native
+Pause navigation/return result and ACC observations do not certify every graph
+transition, menu page or mission.
 
-The resumed September 30 session now starts the existing Steam client and
-uses the maintained simulator launcher. Fresh both-eye capture and physical
-Continue reach native Mission 6; the explicit Pause open/Back probe also passes.
-The runner now distinguishes native Pause ownership from iDroid/scene menus
-and can navigate an explicitly selected Pause scene with the effective menu
-stick. Missing ownership, changed scene prerequisites and unexpected popups
-reject dispatch. Native navigation and return-to-ACC acceptance remain pending.
+The live ACC also exposed a rendering bug: it drew the title-only cassette rack
+with Continue/Options/Delete/ Quit choices during ordinary cabin play. That
+extra render branch is removed; the real title rack and physical Continue still
+work. Both final eyes were reviewed at the title and in the native ACC cabin.
+
+The cold ACC iDroid can display a native Choose a Rival Help overlay. After
+closing the reviewed help card, tab/Back input still failed to change its page
+in the latest cold fixture. Held-Back's existing direct terminal stop closed
+its UI but left an overlapping Pause/player device state; immediate reopening
+failed. Deferred-close, cancellation-permission and ACC pad-exclusion experiments
+did not repair that failure and were reverted. Cleanup now refuses an overlapping
+iDroid/Help owner and closes only the exact owned test session on failure.
+Forced stow/reopen and the reported helicopter upgrade lock-up remain open.
+
+Startup testing also exposed a popup-admission race and a login result stall.
+A popup that closes during capture now returns to observation only when no
+input was dispatched. Unknown login dialogs receive no blind confirmation:
+two cold boots progressed naturally, while another stopped on Logged in to
+server. That result identity and reliable unattended cold startup remain open.
 
 The live Pause navigation run reproduced repeat overshoot: three sampled holds
 selected Options. The corrected Pause path uses a single fast sampled edge,
@@ -111,7 +131,7 @@ popup prerequisite and visual review before selecting any confirmation.
 The resumed supervisor also failed on a Windows status-file replacement conflict.
 Status writes now retry only the same atomic file transaction for at most 500 ms;
 the previous complete document remains readable. A real Windows reader-handle
-test passes. These repair the test loop; the ACC upgrade report remains open.
+test passes. These repair scoped test-loop defects; the ACC upgrade report remains open.
 
 The ACC exit trace confirms that helicopter customization uses the native
 `Customize_Abort`/End path and `CustomizeSelector` pad mask; held-Back iDroid
@@ -151,13 +171,13 @@ default or describe the present fit as an exact cutscene match.
 | Show the actual mappings and a quick video in the launcher | Installed in the fixed play tree: saved mappings, alternatives, one-hand/two-hand chords, ten amber contact surfaces and red pressed surfaces. 98 UI actions and eight settings-bridge contexts checked; 44-second personal mapping video available at artifacts/dev/controller-mapping.mp4. |
 | Live rotatable 3D previews for the settings | Installed: all 54 controls settings have a reference fitting view, with live edits, drag/orbit/zoom, front/side/top/back, filtering, save/reload, discard and numeric-fit reset. Runtime theatre dimensions are also previewed. Reference geometry is separate from native projection-effect and headset acceptance. |
 | Default -30 degree weapon tilt and check the arsenal | Firearm-only fit implemented, configurable and installed; current-loadout one-hand scope direction inspected. All-weapon, impact, reload, support-contact and headset coverage remains open. |
-| Helicopter upgrade menu coverage | Another player's lock-up was in the ACC. Field list/Back evidence does not cover it; exact ACC development/customization screen, confirmation and purchase completion remain open. |
+| Helicopter upgrade menu coverage | Native ACC Development -> Support Helicopter Armament list reached; three-level ordinary exit observed on a historical run. Corrected-loop regression, selector exit, confirmation/purchase and the reported lock-up remain open. |
 | Audit one-hand/two-hand control chords | Effective personal binding audit retained; no unsolicited remapping. Headset usability and crouch/prone community report remain open. |
 | Align right-hand iDroid with its native emitter/cutscene and survive forced stow/reopen | Native attachment retained; natural holding frame and lower-edge screen anchor revised. Default and custom fitting controls pass scoped simulator motion/reopening checks. Native light-cone retargeting at custom offsets/rotations, forced tutorial stow and physical headset acceptance remain open. |
 | Preserve Coco's fixes; burn down community reports; all weapons/missions/game completion | Coco's supplied changes retained. Community ledger and full-game acceptance remain open; an A* bridge route does not certify missions or combat. |
 | Publish the new build on GitHub | September 30 experimental prerelease packages the tested local DLL and committed source; see RELEASE_2026-09-30.md. Full-game and headset acceptance remain open. |
 
-The next iDroid work is exact authored screen fitting, native light-cone retargeting and forced tutorial stow,
+The next iDroid work is the reproduced cold-ACC menu/stow/reopen failure, exact authored screen fitting and native light-cone retargeting,
 then physical fitting/readability. FAKEL (SLEEP) support-hand reproduction,
 cover camera ownership, mounted weapon aim/reticles, binocular native lighting
 and full mission regression remain on the existing release queue.

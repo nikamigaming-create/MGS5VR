@@ -13,7 +13,7 @@ import re
 import subprocess
 import time
 
-from .core import BlankCompositorFrame, BotFault, matches, scene
+from .core import ActionPrerequisiteChanged, BlankCompositorFrame, BotFault, matches, scene
 from .startup_evidence import StartupEvidence
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -687,7 +687,7 @@ class Live:
         admission_sample_ms = state.get("now_ms", control_sample["sample_ms"])
         if step.get("native_before"):
             if not matches(state["native"], step["native_before"]):
-                raise BotFault("Native action prerequisite changed")
+                raise ActionPrerequisiteChanged("Native action prerequisite changed")
         if context not in action["contexts"]:
             raise BotFault(f"{name} is not available in observed {context}")
         binding = action["bindings"][0]
@@ -810,7 +810,10 @@ class Live:
         if not getattr(self, "opened_menu", None):
             return
         self.release()
-        for _ in range(2):
+        # The native ACC Development -> Helicopter path has three levels to
+        # unwind. Keep ordinary Back bounded, with fresh ownership before each
+        # edge; never force terminal closure or acknowledge an unknown popup.
+        for _ in range(4 if self.opened_menu == "idroid" else 2):
             state = self.observe(native=True)
             if state.get("menu") is False:
                 self.opened_menu = None
@@ -819,20 +822,24 @@ class Live:
             native = state.get("native", {})
             if (state.get("menu") is not True or native.get("popup") is not False
                     or native.get("tutorial_pause") is not False
-                    or state.get("idroid") is not (self.opened_menu == "idroid")):
+                    or state.get("idroid") is not (self.opened_menu == "idroid")
+                    or (self.opened_menu == "idroid" and state.get("pause") is not False)):
                 raise BotFault("Test menu cleanup needs review; refusing an unknown prompt or menu")
             self.execute({"op": "action", "name": "menus.back",
-                          "state_before": {"menu": True, "idroid": self.opened_menu == "idroid"}})
+                          "state_before": {"menu": True, "idroid": self.opened_menu == "idroid",
+                                           "pause": self.opened_menu != "idroid"},
+                          "native_before": {"popup": False, "tutorial_pause": False}})
             time.sleep(.3)
         if self.observe().get("menu") is not False:
             raise BotFault("Test-opened menu did not close")
         self.opened_menu = None
         self.events.emit("test_menu_cleanup", status="closed")
 
-    def close(self):
+    def close(self, *, cleanup=True):
         try:
             self.release()
-            self.cleanup_menus()
+            if cleanup:
+                self.cleanup_menus()
         finally:
             self.operator.close()
             if self.process_handle:

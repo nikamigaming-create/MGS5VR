@@ -276,7 +276,9 @@ def main():
                     except Exception as error:
                         result.update(status="failed", pose_restore_error=str(error))
                 try:
-                    live.close()
+                    # Cleanup has already been attempted above. A failed or
+                    # ambiguous unwind must not authorize another input chain.
+                    live.close(cleanup=False)
                 except Exception as error:
                     result.update(status="failed", cleanup_error=str(error))
             events.emit("run_finished", result=result)

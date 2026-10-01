@@ -71,8 +71,11 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
 
     def sample(state, *, check_native=True):
         if owner == "idroid":
-            if state.get("idroid") is not True or state.get("idroid_menu_input_ready") is not True:
+            if (state.get("idroid") is not True or state.get("idroid_menu_input_ready") is not True
+                    or state.get("pause") is not False):
                 raise BotFault("iDroid navigation lost its native input owner")
+            if check_native and native_guard and not matches(state.get("native", {}), native_guard):
+                raise BotFault("iDroid navigation lost its native scene prerequisite")
         else:
             native = state.get("native", {})
             if (state.get("scene") != "menu" or state.get("menu") is not True
@@ -90,7 +93,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
             raise BotFault("Fresh native menu stick samples are unavailable")
         return controls
 
-    initial, _ = fresh_control_observation(live.observe, native=native_sample)
+    initial, _ = fresh_control_observation(live.observe, native=native_sample or bool(native_guard))
     admitted = sample(initial)["sample_ms"]
     live.release()
     live.events.emit("semantic_menu_navigation", source=source, direction=direction, owner=owner,
@@ -130,7 +133,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     deadline = clock() + 1.
     neutral_since = None
     while clock() < deadline:
-        state, _ = fresh_control_observation(live.observe, native=native_sample, clock=clock, sleep=sleep)
+        state, _ = fresh_control_observation(live.observe, native=native_sample or bool(native_guard), clock=clock, sleep=sleep)
         current = sample(state)
         if all(abs(v) < .08 for v in current["sticks"]):
             neutral_since = current["sample_ms"] if neutral_since is None else neutral_since

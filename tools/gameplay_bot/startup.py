@@ -1,7 +1,7 @@
 """Advance observed native startup stages using the existing guarded inputs."""
 import time
 
-from .core import BlankCompositorFrame, BotFault
+from .core import ActionPrerequisiteChanged, BlankCompositorFrame, BotFault
 
 
 def capture_startup_baseline(live, timeout=15., clock=time.monotonic, sleep=time.sleep):
@@ -42,6 +42,10 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
         if state["scene"] == "title" and state.get("title_menu") is True:
             return state
 
+        # The retail login sequence owns its progress/result dialogs. Its
+        # popup bit does not identify which dialog is ready for confirmation;
+        # observe automatic completion instead of sending A into that sequence.
+
         action = None
         if native.get("sequence") == "Seq_Demo_ConfirmAutoSave" and native.get("popup") is True:
             action = ("autosave-notice", {"sequence": "Seq_Demo_ConfirmAutoSave", "popup": True})
@@ -63,8 +67,15 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
                     "native_before": guard}
             if label == "press-start":
                 step["state_before"] = {"title_menu": False, "press_start_ready": True}
-            live.execute(step)
-            acknowledged.add(label)
+            try:
+                live.execute(step)
+            except ActionPrerequisiteChanged as error:
+                # A native popup can close during capture. Admission sent no
+                # input, so return to fresh observation within the same deadline.
+                # Transport, sampling and post-dispatch faults still stop the run.
+                live.events.emit("startup_admission_changed", label=label, error=str(error))
+            else:
+                acknowledged.add(label)
         if clock() >= deadline:
             live.capture("startup-wait-failure")
             raise BotFault("Native startup deadline; last sequence=" + str(native.get("sequence")))

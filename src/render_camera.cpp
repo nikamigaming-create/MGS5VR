@@ -526,30 +526,6 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             mgs5vr::drawOpeningProps(afterContext,openingWorlds,eyeView,eyeProjection,
                  source.pair.sample.controllers.openingSelection);
         }
-        if(afterContext&&source.pair.sample.controllers.cabinPlay){
-            // Cabin play uses the full native scene replay. Do not replace it
-            // with the small retained title/loading panel; add animals to the
-            // same world frame after the helicopter scene is rendered.
-            const auto& cabin=source.pair.sample.controllers;
-            const auto cabinOrigin=cabin.openingWorldAnchored?cabin.openingWorldOrigin:
-                mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,source.pair.sample.headPose,cabin.openingOrigin);
-            const auto propWorld=[&](mgs5vr::Pose local,float scale){
-                const auto worldPose=mgs5vr::compose(cabinOrigin,local);
-                alignas(16) auto valuesAt=values(worldPose);std::array<float,16> world{};
-                originalWorld(valuesAt.data(),world.data());
-                for(size_t i=0;i<12;++i)world[i]*=scale;
-                return world;
-            };
-             const auto offsets=mgs5vr::openingPropOffsets();
-            const auto scales=mgs5vr::openingPropScales();
-            std::array<std::array<float,16>,7> openingWorlds{};
-            for(size_t i=0;i<openingWorlds.size();++i)
-                openingWorlds[i]=propWorld(mgs5vr::Pose{{},offsets[i]},scales[i]);
-             // Keep only the owned rack props.  Real cabin animals are
-             // rendered by the native scene; no fallback mesh may impersonate
-             // an absent actor.
-             mgs5vr::drawOpeningProps(afterContext,openingWorlds,eyeView,eyeProjection,-1);
-        }
         if(afterContext&&optic.held&&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular){
             const auto body=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,
                 source.pair.sample.headPose,optic.pose.renderBody);

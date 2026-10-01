@@ -15,6 +15,11 @@ class BotFault(RuntimeError):
     pass
 
 
+class ActionPrerequisiteChanged(BotFault):
+    """Fresh admission rejected an action before any input was dispatched."""
+    pass
+
+
 class BlankCompositorFrame(BotFault):
     def __init__(self, message, state=None):
         super().__init__(message)
