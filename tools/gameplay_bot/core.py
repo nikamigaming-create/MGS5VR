@@ -38,8 +38,21 @@ def atomic_json(path, value):
     path = pathlib.Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + "." + uuid.uuid4().hex + ".tmp")
-    temporary.write_text(json.dumps(value, indent=2, allow_nan=False), encoding="utf-8")
-    temporary.replace(path)
+    try:
+        temporary.write_text(json.dumps(value, indent=2, allow_nan=False), encoding="utf-8")
+        deadline = time.monotonic() + .5
+        while True:
+            try:
+                temporary.replace(path)
+                break
+            except OSError as error:
+                # Windows readers can briefly deny delete-sharing on the
+                # destination. Retry the same file transaction, never input.
+                if getattr(error, "winerror", None) not in (5, 32, 33) or time.monotonic() >= deadline:
+                    raise
+                time.sleep(.01)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def scene(state):
@@ -194,7 +207,7 @@ class Behaviors:
             during = case.get("during")
             before = self.wait_for(case["before"], case.get("entry_timeout", 8), case_id + ":entry",
                                    native=bool(during and any(key.startswith("native.") for key in during)))
-            if during and (case["steps"][-1].get("op") != "action" or matches(before, during)):
+            if during and (case["steps"][-1].get("op") not in ("action", "menu_navigate") or matches(before, during)):
                 raise BotFault("While-held case needs a final action and an initially unsatisfied during predicate")
             if not during and matches(before, case["after"]):
                 raise BotFault("Outcome already satisfied before action; no action effect proven")

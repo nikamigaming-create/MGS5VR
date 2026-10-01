@@ -57,6 +57,12 @@ unrecognized popup. Prefer a suite of observed field actions for teaching takes.
   with iDroid/title/loading absent and no popup. It uses the effective menu stick
   and stops/releases if ownership or prerequisites change. This does not select
   choices or certify the identity of every nested page.
+  Pause uses one fast sampled stick edge, avoiding repeats caused by paused Lua
+  queries. Full native guards are checked before input and after release.
+  `owner: "pause_popup"` additionally requires `native_before.popup: true` and a
+  reviewed known popup. A case can verify its sampled axis through `during`;
+  this records actual held controls and does not fabricate a held-eye capture.
+  Review the final menu selection before Confirm.
 - `observe --seconds <number>` samples without gameplay actions.
 - `move --distance .35` performs a short forward movement through the configured
   stick, reduces the value before the target, releases and checks settling.

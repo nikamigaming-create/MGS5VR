@@ -41,12 +41,19 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     from .live import authoritative_controls, channel, fresh_control_observation
     from .core import matches
     owner = step.get("owner", "idroid")
-    if owner not in ("idroid", "pause"):
+    if owner not in ("idroid", "pause", "pause_popup"):
         raise BotFault("Menu navigation requires an explicit supported owner")
     native_guard = step.get("native_before")
-    if owner == "pause" and (not isinstance(native_guard, dict) or not native_guard):
+    if owner in ("pause", "pause_popup") and (not isinstance(native_guard, dict) or not native_guard):
         raise BotFault("Pause navigation requires native scene prerequisites")
-    native_sample = owner == "pause"
+    if owner == "pause_popup" and native_guard.get("popup") is not True:
+        raise BotFault("Pause-popup navigation requires an explicit reviewed popup prerequisite")
+    native_sample = owner in ("pause", "pause_popup")
+    expected_popup = owner == "pause_popup"
+    during = step.get("while_held")
+    if during is not None and (not isinstance(during, dict) or not during
+                               or any(key.startswith("native.") for key in during)):
+        raise BotFault("Navigation held outcomes require fast control/ownership predicates")
     direction = step.get("direction")
     seconds = step.get("seconds", .16)
     if direction not in ("up", "down", "left", "right"):
@@ -62,7 +69,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     payload = channel(token)
     axis = (0 if source == "left_stick" else 2) + (1 if direction in ("up", "down") else 0)
 
-    def sample(state):
+    def sample(state, *, check_native=True):
         if owner == "idroid":
             if state.get("idroid") is not True or state.get("idroid_menu_input_ready") is not True:
                 raise BotFault("iDroid navigation lost its native input owner")
@@ -71,7 +78,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
             if (state.get("scene") != "menu" or state.get("menu") is not True
                     or state.get("pause") is not True or state.get("idroid") is not False
                     or state.get("title") is not False or state.get("loading") is not False
-                    or native.get("popup") is not False or not matches(native, native_guard)):
+                    or (check_native and (native.get("popup") is not expected_popup or not matches(native, native_guard)))):
                 raise BotFault("Pause navigation lost its native input owner or scene prerequisite")
         controls = authoritative_controls(state)
         if controls["context"] != "menus":
@@ -87,18 +94,27 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     admitted = sample(initial)["sample_ms"]
     live.release()
     live.events.emit("semantic_menu_navigation", source=source, direction=direction, owner=owner,
+                     mode="sampled_edge" if native_sample else "sampled_hold",
                      sampled_milliseconds=math.ceil(seconds * 1000))
     first = None
+    held_state = None
     deadline = clock() + 2.
     try:
         live.input([payload], seconds, lease_seconds=2.)
         while clock() < deadline:
-            state, _ = fresh_control_observation(live.observe, native=native_sample, clock=clock, sleep=sleep)
-            current = sample(state)
+            # A paused Lua query can extend a short pulse into several native
+            # UI repeats. Keep the held phase on the fast ownership publication;
+            # Pause uses one sampled edge. Recheck full scene/popup guards only
+            # after release. iDroid's established sampled-hold flow is unchanged.
+            state, _ = fresh_control_observation(live.observe, clock=clock, sleep=sleep)
+            current = sample(state, check_native=False)
             if current["sample_ms"] > admitted and abs(current["sticks"][axis] - payload["value"]) < .08:
                 first = current["sample_ms"] if first is None else first
                 elapsed = current["sample_ms"] - first
-                if elapsed >= math.ceil(seconds * 1000):
+                if native_sample or elapsed >= math.ceil(seconds * 1000):
+                    if during and not matches(state, during):
+                        raise BotFault("Requested navigation held outcome was not observed")
+                    held_state = state
                     live.events.emit("menu_navigation_sampled", source=source, direction=direction,
                                      first_sample_ms=first, last_sample_ms=current["sample_ms"],
                                      sampled_milliseconds=elapsed)
@@ -120,6 +136,10 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
             neutral_since = current["sample_ms"] if neutral_since is None else neutral_since
             if current["sample_ms"] - neutral_since >= 100:
                 live.events.emit("menu_navigation_released", sample_ms=current["sample_ms"])
+                if during:
+                    checkpoint = live.events.emit("held_visual_checkpoint", action="menu_navigate",
+                                                  source="native_control_sample", final_compositor_capture=False)
+                    return {"state":held_state, "captures":[], "visual_checkpoint":checkpoint}
                 return state
         else:
             neutral_since = None

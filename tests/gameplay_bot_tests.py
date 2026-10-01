@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
-from gameplay_bot.core import Behaviors, BlankCompositorFrame, BotFault, Events, ProgressGuard, astar, matches, scene
+from gameplay_bot.core import Behaviors, BlankCompositorFrame, BotFault, Events, ProgressGuard, astar, atomic_json, matches, scene
 from gameplay_bot.live import Live, authoritative_context, channel, fresh_control_observation, held_input_evidence, require_presentation_transition, rotate, static_grip_capture_allowed
 from gameplay_bot.recording import Recording, after_verified_arrival, mux_timeline, validate_raw_video
 from gameplay_bot.session import run_suite
@@ -24,6 +24,61 @@ class Clock:
         return self.now
     def sleep(self, duration):
         self.now += duration
+
+
+class AtomicStatusTests(unittest.TestCase):
+    def test_transient_windows_sharing_conflict_preserves_then_replaces_complete_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory)/"status.json"
+            atomic_json(path, {"generation":1})
+            replace = pathlib.Path.replace
+            failures = []
+            def sharing_conflict(source, destination):
+                if len(failures) < 2:
+                    self.assertEqual(json.loads(path.read_text()), {"generation":1})
+                    error = PermissionError("sharing conflict"); error.winerror = 5
+                    failures.append(error); raise error
+                return replace(source, destination)
+            with mock.patch.object(pathlib.Path, "replace", autospec=True, side_effect=sharing_conflict):
+                atomic_json(path, {"generation":2})
+            self.assertEqual(json.loads(path.read_text()), {"generation":2})
+            self.assertEqual(list(path.parent.glob("*.tmp")), [])
+
+    def test_persistent_status_failure_is_bounded_and_keeps_previous_document(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory)/"status.json"
+            atomic_json(path, {"generation":1})
+            error = PermissionError("still locked"); error.winerror = 32
+            with mock.patch.object(pathlib.Path, "replace", side_effect=error) as replace:
+                with mock.patch("gameplay_bot.core.time.monotonic", side_effect=[0.,.6]):
+                    with self.assertRaises(PermissionError):
+                        atomic_json(path, {"generation":2})
+            replace.assert_called_once()
+            self.assertEqual(json.loads(path.read_text()), {"generation":1})
+            self.assertEqual(list(path.parent.glob("*.tmp")), [])
+
+    @unittest.skipUnless(sys.platform == "win32", "Real Windows delete-sharing contract")
+    def test_real_windows_reader_does_not_abort_an_atomic_status_update(self):
+        import ctypes, threading, time
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateFileW.argtypes = [wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,
+                                      wintypes.LPVOID,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE]
+        kernel.CreateFileW.restype = wintypes.HANDLE
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory)/"status.json"
+            atomic_json(path, {"generation":1})
+            handle = kernel.CreateFileW(str(path),0x80000000,3,None,3,0x80,None)
+            self.assertNotEqual(handle, ctypes.c_void_p(-1).value)
+            timer = threading.Timer(.08, lambda: kernel.CloseHandle(handle))
+            timer.start()
+            try:
+                atomic_json(path, {"generation":2})
+            finally:
+                timer.join()
+            self.assertEqual(json.loads(path.read_text()), {"generation":2})
+            self.assertEqual(list(path.parent.glob("*.tmp")), [])
 
 
 class ControllerFitPoseTests(unittest.TestCase):
@@ -124,7 +179,53 @@ class MenuNavigationTests(unittest.TestCase):
         self.assertEqual(payload["hand"], "right")
         self.assertEqual(payload["component"], "Thumbstick")
         self.assertEqual(active, [])
-        self.assertTrue(all(call.kwargs.get("native") is True for call in live.observe.call_args_list))
+        self.assertTrue(live.observe.call_args_list[0].kwargs.get("native"))
+        self.assertTrue(live.observe.call_args_list[-1].kwargs.get("native"))
+        self.assertTrue(any(not call.kwargs.get("native") for call in live.observe.call_args_list))
+
+    def test_paused_lua_read_cannot_extend_the_held_menu_edge(self):
+        live, clock, active = self.pause_fixture()
+        original = live.observe.side_effect
+        held_native_reads = []
+        def state(native=False):
+            if native and active:
+                held_native_reads.append(True)
+                clock.sleep(.5)
+            return original(native)
+        live.observe.side_effect = state
+        navigate_menu(live, {"owner":"pause", "direction":"down",
+                            "native_before":{"mission":10040}}, clock=clock, sleep=clock.sleep)
+        self.assertEqual(held_native_reads, [])
+        self.assertEqual(active, [])
+
+    def test_reviewed_pause_popup_navigation_returns_the_real_held_axis_sample(self):
+        live, clock, active = self.pause_fixture(lambda state, held: state["native"].update(popup=True))
+        result = navigate_menu(live, {"owner":"pause_popup", "direction":"left",
+                                     "native_before":{"mission":10040,"popup":True},
+                                     "while_held":{"controls.sticks":[0.,0.,-1.,0.]}},
+                               clock=clock, sleep=clock.sleep)
+        self.assertEqual(result["state"]["controls"]["sticks"], [0.,0.,-1.,0.])
+        self.assertEqual(result["captures"], [])
+        self.assertEqual(active, [])
+
+    def test_popup_navigation_requires_explicit_popup_and_fast_held_predicates(self):
+        for guard, during in (({"mission":10040},None),
+                              ({"mission":10040,"popup":True},{"native.popup":True})):
+            live, clock, _ = self.pause_fixture(lambda state, held: state["native"].update(popup=True))
+            with self.assertRaises(BotFault):
+                navigate_menu(live, {"owner":"pause_popup", "direction":"left",
+                                    "native_before":guard, "while_held":during},
+                              clock=clock, sleep=clock.sleep)
+            live.input.assert_not_called()
+
+    def test_navigation_cannot_pass_a_different_held_axis_and_always_releases(self):
+        live, clock, active = self.pause_fixture()
+        with self.assertRaisesRegex(BotFault, "held outcome was not observed"):
+            navigate_menu(live, {"owner":"pause", "direction":"left",
+                                "native_before":{"mission":10040},
+                                "while_held":{"controls.sticks":[-1.,0.,0.,0.]}},
+                          clock=clock, sleep=clock.sleep)
+        self.assertEqual(active, [])
 
     def test_pause_navigation_rejects_unidentified_scene_popup_or_changed_mission(self):
         changes = [("pause",None),("pause",False),("idroid",True),("title",True),

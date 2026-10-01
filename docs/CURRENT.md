@@ -31,7 +31,7 @@ acceptance remain open. The September 30 GitHub prerelease is unchanged.
 The editor passed 38 headless fixture checks, including complete save/reload,
 discard, orbit/zoom, accurate fractional text scale and reset preserving
 handheld mode. The retained controller guide still resolves 98 action locations
-across eight contexts. The focused bot contracts now have 109 checks.
+across eight contexts. The focused bot contracts now have 116 checks.
 
 The local weapon fit adds a separate **One-hand weapon tilt**, default -30
 degrees, applied through the common native firing wrist. Gun, hand, physical
@@ -101,6 +101,17 @@ The runner now distinguishes native Pause ownership from iDroid/scene menus
 and can navigate an explicitly selected Pause scene with the effective menu
 stick. Missing ownership, changed scene prerequisites and unexpected popups
 reject dispatch. Native navigation and return-to-ACC acceptance remain pending.
+
+The live Pause navigation run reproduced repeat overshoot: three sampled holds
+selected Options. The corrected Pause path uses a single fast sampled edge,
+with full Lua prerequisites checked before input and after release; three edges
+now select the actual Return to ACC row in both eyes. iDroid's existing sampled
+hold is preserved. A separately selected `pause_popup` owner requires an explicit
+popup prerequisite and visual review before selecting any confirmation.
+The resumed supervisor also failed on a Windows status-file replacement conflict.
+Status writes now retry only the same atomic file transaction for at most 500 ms;
+the previous complete document remains readable. A real Windows reader-handle
+test passes. These repair the test loop; the ACC upgrade report remains open.
 
 The ACC exit trace confirms that helicopter customization uses the native
 `Customize_Abort`/End path and `CustomizeSelector` pad mask; held-Back iDroid
