@@ -1,4 +1,4 @@
-"""Bounded iDroid stick navigation through the player's effective VR mapping."""
+"""Bounded, owner-checked stick navigation through the effective VR mapping."""
 import math
 import time
 
@@ -39,6 +39,14 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     # Resolve and validate everything before dispatch. This operation only
     # moves the menu cursor; selection stays a separate semantic action.
     from .live import authoritative_controls, channel, fresh_control_observation
+    from .core import matches
+    owner = step.get("owner", "idroid")
+    if owner not in ("idroid", "pause"):
+        raise BotFault("Menu navigation requires an explicit supported owner")
+    native_guard = step.get("native_before")
+    if owner == "pause" and (not isinstance(native_guard, dict) or not native_guard):
+        raise BotFault("Pause navigation requires native scene prerequisites")
+    native_sample = owner == "pause"
     direction = step.get("direction")
     seconds = step.get("seconds", .16)
     if direction not in ("up", "down", "left", "right"):
@@ -55,11 +63,19 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     axis = (0 if source == "left_stick" else 2) + (1 if direction in ("up", "down") else 0)
 
     def sample(state):
-        if state.get("idroid") is not True or state.get("idroid_menu_input_ready") is not True:
-            raise BotFault("iDroid navigation lost its native input owner")
+        if owner == "idroid":
+            if state.get("idroid") is not True or state.get("idroid_menu_input_ready") is not True:
+                raise BotFault("iDroid navigation lost its native input owner")
+        else:
+            native = state.get("native", {})
+            if (state.get("scene") != "menu" or state.get("menu") is not True
+                    or state.get("pause") is not True or state.get("idroid") is not False
+                    or state.get("title") is not False or state.get("loading") is not False
+                    or native.get("popup") is not False or not matches(native, native_guard)):
+                raise BotFault("Pause navigation lost its native input owner or scene prerequisite")
         controls = authoritative_controls(state)
         if controls["context"] != "menus":
-            raise BotFault("iDroid navigation requires the current menu context")
+            raise BotFault("Navigation requires the current menu context")
         sticks = controls.get("sticks")
         if (not isinstance(sticks, list) or len(sticks) != 4
                 or any(isinstance(v, bool) or not isinstance(v, (int, float))
@@ -67,17 +83,17 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
             raise BotFault("Fresh native menu stick samples are unavailable")
         return controls
 
-    initial, _ = fresh_control_observation(live.observe)
+    initial, _ = fresh_control_observation(live.observe, native=native_sample)
     admitted = sample(initial)["sample_ms"]
     live.release()
-    live.events.emit("semantic_menu_navigation", source=source, direction=direction,
+    live.events.emit("semantic_menu_navigation", source=source, direction=direction, owner=owner,
                      sampled_milliseconds=math.ceil(seconds * 1000))
     first = None
     deadline = clock() + 2.
     try:
         live.input([payload], seconds, lease_seconds=2.)
         while clock() < deadline:
-            state, _ = fresh_control_observation(live.observe, clock=clock, sleep=sleep)
+            state, _ = fresh_control_observation(live.observe, native=native_sample, clock=clock, sleep=sleep)
             current = sample(state)
             if current["sample_ms"] > admitted and abs(current["sticks"][axis] - payload["value"]) < .08:
                 first = current["sample_ms"] if first is None else first
@@ -98,7 +114,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     deadline = clock() + 1.
     neutral_since = None
     while clock() < deadline:
-        state, _ = fresh_control_observation(live.observe, clock=clock, sleep=sleep)
+        state, _ = fresh_control_observation(live.observe, native=native_sample, clock=clock, sleep=sleep)
         current = sample(state)
         if all(abs(v) < .08 for v in current["sticks"]):
             neutral_since = current["sample_ms"] if neutral_since is None else neutral_since

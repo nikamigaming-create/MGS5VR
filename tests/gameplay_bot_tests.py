@@ -103,6 +103,54 @@ class MenuNavigationTests(unittest.TestCase):
         self.assertGreaterEqual(clock.now, .28)
         live.capture.assert_not_called()
 
+    def pause_fixture(self, change=None):
+        live, clock, active = self.fixture("right_stick")
+        original = live.observe.side_effect
+        def state(native=False):
+            value = original(native)
+            value.update(scene="menu", menu=True, pause=True, idroid=False,
+                         title=False, loading=False, native={"mission":10040, "popup":False})
+            if change:
+                change(value, bool(active))
+            return value
+        live.observe.side_effect = state
+        return live, clock, active
+
+    def test_pause_navigation_uses_effective_axis_and_checks_native_owner(self):
+        live, clock, active = self.pause_fixture()
+        navigate_menu(live, {"owner":"pause", "direction":"down",
+                            "native_before":{"mission":10040}}, clock=clock, sleep=clock.sleep)
+        payload, = live.input.call_args.args[0]
+        self.assertEqual(payload["hand"], "right")
+        self.assertEqual(payload["component"], "Thumbstick")
+        self.assertEqual(active, [])
+        self.assertTrue(all(call.kwargs.get("native") is True for call in live.observe.call_args_list))
+
+    def test_pause_navigation_rejects_unidentified_scene_popup_or_changed_mission(self):
+        changes = [("pause",None),("pause",False),("idroid",True),("title",True),
+                   ("loading",True),("menu",False),("scene","cabin"),
+                   ("native",{"mission":40060,"popup":False}),
+                   ("native",{"mission":10040,"popup":True})]
+        for field, value in changes:
+            with self.subTest(field=field, value=value):
+                live, clock, _ = self.pause_fixture(lambda state, held: state.update({field:value}))
+                with self.assertRaises(BotFault):
+                    navigate_menu(live, {"owner":"pause", "direction":"down",
+                                        "native_before":{"mission":10040}}, clock=clock, sleep=clock.sleep)
+                live.input.assert_not_called()
+        live, clock, _ = self.pause_fixture()
+        with self.assertRaisesRegex(BotFault, "native scene prerequisites"):
+            navigate_menu(live, {"owner":"pause", "direction":"down"}, clock=clock, sleep=clock.sleep)
+        live.input.assert_not_called()
+
+    def test_pause_navigation_releases_if_native_owner_changes_while_held(self):
+        live, clock, active = self.pause_fixture(lambda state, held: state.update(pause=not held))
+        with self.assertRaisesRegex(BotFault, "lost its native input owner"):
+            navigate_menu(live, {"owner":"pause", "direction":"down",
+                                "native_before":{"mission":10040}}, clock=clock, sleep=clock.sleep)
+        live.input.assert_called_once()
+        self.assertEqual(active, [])
+
     def test_invalid_navigation_never_dispatches_input(self):
         for step in ({"direction": "forward"}, {"direction": "down", "seconds": True},
                      {"direction": "down", "seconds": float("nan")},

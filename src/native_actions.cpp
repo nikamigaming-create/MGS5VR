@@ -263,6 +263,7 @@ bool publishFastInput(const std::string& request,std::string& result){
            <<",\"demo_recovery_ready\":"<<headCamera().staleDemoRecoveryReady()
            <<",\"demo_interactive_look\":"<<(nativeDemoMode()==NativeDemoMode::interactiveLook)
            <<",\"menu\":"<<(menu?(*menu?"true":"false"):"null")
+           <<",\"pause\":"<<(menu?(nativePauseMenuOpen()?"true":"false"):"null")
            <<",\"idroid\":"<<nativeIdroidOpen()<<",\"gamepad\":"<<nativeGamepadActive()
            <<",\"idroid_menu_input_ready\":"<<handheldMenuInputReady()
            <<",\"camera_active\":"<<camera.active<<",\"camera_available\":"<<headCamera().available()

@@ -52,6 +52,11 @@ unrecognized popup. Prefer a suite of observed field actions for teaching takes.
 
 - `continue` reaches gameplay without running a suite.
 - `run --suite <file>` starts a suite in the current scene.
+- `menu_navigate` defaults to iDroid. An explicitly selected `owner: "pause"`
+  requires nonempty `native_before` scene guards and fresh native Pause ownership,
+  with iDroid/title/loading absent and no popup. It uses the effective menu stick
+  and stops/releases if ownership or prerequisites change. This does not select
+  choices or certify the identity of every nested page.
 - `observe --seconds <number>` samples without gameplay actions.
 - `move --distance .35` performs a short forward movement through the configured
   stick, reduces the value before the target, releases and checks settling.

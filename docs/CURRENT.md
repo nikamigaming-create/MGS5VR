@@ -31,7 +31,7 @@ acceptance remain open. The September 30 GitHub prerelease is unchanged.
 The editor passed 38 headless fixture checks, including complete save/reload,
 discard, orbit/zoom, accurate fractional text scale and reset preserving
 handheld mode. The retained controller guide still resolves 98 action locations
-across eight contexts. The focused bot contracts now have 106 checks.
+across eight contexts. The focused bot contracts now have 109 checks.
 
 The local weapon fit adds a separate **One-hand weapon tilt**, default -30
 degrees, applied through the common native firing wrist. Gun, hand, physical
@@ -93,6 +93,14 @@ requires an explicitly named Pause transition.
 September 30 planner replay is pending: the maintained test launch stopped
 before starting MGSV because Steam was not running. The source/build checks
 do not stand in for native state-route acceptance or ACC reproduction.
+
+The resumed September 30 session now starts the existing Steam client and
+uses the maintained simulator launcher. Fresh both-eye capture and physical
+Continue reach native Mission 6; the explicit Pause open/Back probe also passes.
+The runner now distinguishes native Pause ownership from iDroid/scene menus
+and can navigate an explicitly selected Pause scene with the effective menu
+stick. Missing ownership, changed scene prerequisites and unexpected popups
+reject dispatch. Native navigation and return-to-ACC acceptance remain pending.
 
 The ACC exit trace confirms that helicopter customization uses the native
 `Customize_Abort`/End path and `CustomizeSelector` pad mask; held-Back iDroid

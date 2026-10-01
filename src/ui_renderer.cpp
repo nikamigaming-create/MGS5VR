@@ -628,6 +628,10 @@ bool nativeIdroidOpen() noexcept {
     const auto state=menuState.load();
     return state>=0&&(state&1)!=0;
 }
+bool nativePauseMenuOpen() noexcept {
+    const auto state=menuState.load();
+    return state>=0&&(state&2)!=0;
+}
 bool nativeIdroidClosing() noexcept {
     if(!enabled.load()||!idroidCloseReaderVerified)return true;
     uintptr_t system{},terminal{},type{};uint8_t closing{};
