@@ -1,5 +1,6 @@
 """Exercise real filesystem transactions and reject unsafe update/cleanup paths."""
 import importlib.util
+import argparse
 import json
 from pathlib import Path
 import tempfile
@@ -44,10 +45,10 @@ class WorkspaceTests(unittest.TestCase):
             mock.start()
             self.addCleanup(mock.stop)
         self.inventory = patch.object(workspace, "processes", return_value=[])
-        self.inventory.start()
+        self.inventory_mock = self.inventory.start()
         self.addCleanup(self.inventory.stop)
         self.checker = patch.object(workspace, "run")
-        self.checker.start()
+        self.checker_mock = self.checker.start()
         self.addCleanup(self.checker.stop)
 
     def test_update_preserves_personal_files_and_records_actual_binary(self):
@@ -173,6 +174,39 @@ class WorkspaceTests(unittest.TestCase):
         workspace.write_json(workspace.SCRATCH / "latest.json", {"path": str(latest)})
         workspace.prune_runs({"keep_runs": 0, "scratch_budget_bytes": 0})
         self.assertTrue(latest.is_dir())
+
+    def test_menu_coverage_uses_fixed_play_and_output_without_game_control(self):
+        with patch.object(workspace, "settings", return_value=self.value):
+            workspace.coverage(argparse.Namespace(menus=True, run=[]))
+        command = self.checker_mock.mock_calls[0].args[0]
+        self.assertIn("--menus-only", command)
+        self.assertEqual(command[command.index("--candidate-dll") + 1], self.play / "dinput8.dll")
+        self.assertEqual(command[command.index("--output") + 1], self.root / "artifacts/dev/coverage")
+        self.assertEqual(self.checker_mock.call_count, 1)
+        self.inventory_mock.assert_not_called()
+
+    def test_coverage_rejects_unpinned_scratch_before_running_report(self):
+        scratch = workspace.SCRATCH / "runs/unreviewed"
+        scratch.mkdir(parents=True)
+        with patch.object(workspace, "settings", return_value=self.value):
+            with self.assertRaisesRegex(ValueError, "Pin the reviewed run"):
+                workspace.coverage(argparse.Namespace(menus=True, run=[scratch]))
+        self.checker_mock.assert_not_called()
+
+    def test_coverage_accepts_only_retained_runs_inside_managed_folder(self):
+        retained = workspace.SCRATCH / "runs/retained"
+        retained.mkdir(parents=True)
+        for name in ("KEEP", "identity.json", "result.json"):
+            (retained / name).write_text("{}")
+        with patch.object(workspace, "settings", return_value=self.value):
+            workspace.coverage(argparse.Namespace(menus=True, run=[retained]))
+        command = self.checker_mock.mock_calls[0].args[0]
+        self.assertEqual(command[command.index("--run") + 1], retained)
+        self.checker_mock.reset_mock()
+        with patch.object(workspace, "settings", return_value=self.value):
+            with self.assertRaisesRegex(ValueError, "outside"):
+                workspace.coverage(argparse.Namespace(menus=True, run=[self.root / "foreign-run"]))
+        self.checker_mock.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -193,6 +193,8 @@ def inventory(root, bindings, equipment_inventory=None):
                      "status": "unproven", "effective_binding": row,
                      "acceptance": ["Eligible native context, actual action outcome, visible feedback and neutral exit"],
                      "source": "effective-bindings.json"})
+    from .menu_coverage import menu_inventory
+    rows.extend(menu_inventory(root))
     if equipment_inventory:
         matrix = read_json(equipment_inventory)
         for row in matrix.get("equipment", []):

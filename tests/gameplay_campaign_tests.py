@@ -8,6 +8,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from gameplay_bot.campaign import fingerprint, run_campaign, summarize_runs, validate_campaign, unstarted_campaign
 from gameplay_bot.core import BotFault
+from gameplay_bot.menu_coverage import menu_inventory
 
 IDENTITY = {name: letter * 64 for name, letter in zip(
     ("exe_sha256", "dll_sha256", "controls_sha256", "config_sha256"), "abcd")}
@@ -130,6 +131,31 @@ class CampaignTests(unittest.TestCase):
         result.write_text(json.dumps({'status':'failed','cases':[{'id':'palm','status':'failed'}]}))
         with self.assertRaisesRegex(BotFault,'different result'):
             summarize_runs(self.root,[{'id':'R01','status':'unproven'}],[run],IDENTITY)
+
+    def test_menu_evidence_does_not_certify_other_modes_or_presentations(self):
+        rows = menu_inventory(Path(__file__).resolve().parents[1])
+        selected = "MENU.TPP.HELICOPTER_DEVELOPMENT.mission.handheld"
+        run = self.root / "menu-run"; run.mkdir()
+        (run / "identity.json").write_text(json.dumps(IDENTITY))
+        (run / "result.json").write_text(json.dumps({"status": "observed_pass", "suites": [
+            {"id": "list-back", "status": "observed_pass", "coverage_refs": [selected]}]}))
+        report = summarize_runs(self.root, rows, [run], IDENTITY)
+        index = {row["id"]: row for row in report["rows"]}
+        self.assertEqual(index[selected]["status"], "partial_native_evidence")
+        self.assertEqual(index["MENU.TPP.HELICOPTER_DEVELOPMENT.mission.spatial"]["status"], "unproven")
+        self.assertEqual(index["MENU.TPP.HELICOPTER_DEVELOPMENT.acc.handheld"]["status"], "unproven")
+        self.assertFalse(index[selected]["discovery_complete"])
+        self.assertEqual(index[selected]["applicability"], "not_established")
+        self.assertFalse(report["release_ready"])
+
+    def test_planned_menu_catalog_keeps_undiscovered_states_and_native_roles(self):
+        rows = menu_inventory(Path(__file__).resolve().parents[1])
+        modes = {row["mode"] for row in rows}
+        self.assertTrue({"title", "acc", "mother_base", "mission", "side_op", "tutorial",
+                         "cinematic", "loading", "results", "death", "emplacement",
+                         "vehicle_driver", "vehicle_passenger", "helicopter_passenger"} <= modes)
+        self.assertEqual(len({row["id"] for row in rows}), len(rows))
+        self.assertTrue(all(row["status"] == "unproven" and row["native_page"] == "not_discovered" for row in rows))
 
 
 if __name__ == "__main__":

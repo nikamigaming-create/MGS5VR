@@ -44,8 +44,8 @@ The current-loadout inspection covers FAKEL (SLEEP), AM MRS-71 and URAGAN-5
 AIR-S. Both scoped guns publish a barrel/optic axis at the requested -30
 degrees in the stationary one-hand case. This does not certify impacts,
 reloads, support contact, weapon transitions or physical headset comfort.
-The final retained run `artifacts/bot/runs/20260930T213627283000Z` on local DLL
-`4173f9187821` passes 19 scoped cases: the three one-hand loadout inspections,
+The latest retained run `artifacts/bot/runs/20260930T215049265217Z` on local DLL
+`5761c47a74a0` passes 19 scoped cases: the three one-hand loadout inspections,
 support acquisition on both long guns, seven iDroid fit/ordinary-reopen cases,
 and seven helicopter-list navigation/Back cases. Both-eye support contact was
 reviewed, but the reported FAKEL grip feel and every reload/transition remain
@@ -54,16 +54,23 @@ The owned equipment worklist contains 418 firearm definitions across 83 model
 entries, including eligibility and variant questions; those are a coverage
 queue, not 418 passing weapon tests. See WEAPON_FIT_AUDIT.md.
 
-The helicopter development lock-up is a new open report. The native
+The helicopter development lock-up is an unconfirmed coverage concern; the
+user clarified that they did not personally experience it. The native
 Mother Base -> Development -> Helicopter list loads and Back closes it in
 the retained baseline. Item/upgrade confirmation, purchase completion and
-the user's exact failing state require separate reproduction. The currently
+any actual failing state require separate reproduction. The currently
 selected helicopter grades are already developed, so Confirm does not open a
 purchase dialog. ACC customization is a separate path that has not been
 reproduced here. The list can
 take several seconds to populate. A test that sent an extra Back after an
 already-developed item did nothing has been retained as a test failure,
 not a reproduced game lock-up.
+
+The all-menu VR queue now keeps menu families, native game states and handheld,
+left-arm/spatial presentations separate. `python tools/workspace.py coverage --menus`
+refreshes one fixed review view. Page/choice discovery, guarded nested recipes,
+progression-changing isolated fixtures and physical-headset acceptance remain
+open. See VR_MENU_COVERAGE.md; a matrix count is not the number of game screens.
 
 The cutscene's exact hologram distance and scale have **not** been recovered.
 The current 8 cm default is approximate. The native device sockets, parts
@@ -93,7 +100,7 @@ default or describe the present fit as an exact cutscene match.
 | Show the actual mappings and a quick video in the launcher | Installed in the fixed play tree: saved mappings, alternatives, one-hand/two-hand chords, ten amber contact surfaces and red pressed surfaces. 98 UI actions and eight settings-bridge contexts checked; 44-second personal mapping video available at artifacts/dev/controller-mapping.mp4. |
 | Live rotatable 3D previews for the settings | Installed: all 54 controls settings have a reference fitting view, with live edits, drag/orbit/zoom, front/side/top/back, filtering, save/reload, discard and numeric-fit reset. Runtime theatre dimensions are also previewed. Reference geometry is separate from native projection-effect and headset acceptance. |
 | Default -30 degree weapon tilt and check the arsenal | Firearm-only fit implemented, configurable and installed; current-loadout one-hand scope direction inspected. All-weapon, impact, reload, support-contact and headset coverage remains open. |
-| Stuck in helicopter upgrade menu | Open report. Native list navigation and Back pass; exact upgrade/confirmation state and purchase-completion reproduction remain open. |
+| Helicopter upgrade menu coverage | User did not personally encounter a lock-up. General concern remains unconfirmed; list/Back pass, purchase/confirmation and ACC customization remain open. |
 | Audit one-hand/two-hand control chords | Effective personal binding audit retained; no unsolicited remapping. Headset usability and crouch/prone community report remain open. |
 | Align right-hand iDroid with its native emitter/cutscene and survive forced stow/reopen | Native attachment retained; natural holding frame and lower-edge screen anchor revised. Default and custom fitting controls pass scoped simulator motion/reopening checks. Native light-cone retargeting at custom offsets/rotations, forced tutorial stow and physical headset acceptance remain open. |
 | Preserve Coco's fixes; burn down community reports; all weapons/missions/game completion | Coco's supplied changes retained. Community ledger and full-game acceptance remain open; an A* bridge route does not certify missions or combat. |

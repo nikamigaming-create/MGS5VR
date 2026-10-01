@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "game": "TPP",
+  "discovery_complete": false,
+  "description": "Planned menu-family × native-state × VR-presentation obligations. These are not an enumeration of every native page. Discover and retain each child page, legal choice and transition before claiming complete menu coverage.",
+  "modes": {
+    "title": "Title / helicopter cabin",
+    "acc": "ACC",
+    "mother_base": "Mother Base",
+    "free_roam_afghanistan": "Afghanistan free roam",
+    "free_roam_africa": "Africa free roam",
+    "mission": "Active mission on foot",
+    "side_op": "Active side operation on foot",
+    "horse": "Horse rider",
+    "vehicle_driver": "Vehicle driver",
+    "vehicle_passenger": "Vehicle passenger",
+    "emplacement": "Turret / mortar station; split by native role during discovery",
+    "walker": "Walker Gear / D-Walker; split by native role during discovery",
+    "helicopter_passenger": "Support helicopter passenger",
+    "cinematic": "Scripted cinematic",
+    "tutorial": "Forced tutorial / acknowledgment",
+    "loading": "Loading / mission-start confirmation",
+    "results": "Mission clear / abort results; split during discovery",
+    "death": "Death / retry"
+  },
+  "mode_sets": {
+    "playable": ["acc", "mother_base", "free_roam_afghanistan", "free_roam_africa", "mission", "side_op", "horse", "vehicle_driver", "vehicle_passenger", "emplacement", "walker", "helicopter_passenger"],
+    "on_foot": ["mother_base", "free_roam_afghanistan", "free_roam_africa", "mission", "side_op"]
+  },
+  "presentations": {
+    "handheld": "Physical right-hand iDroid",
+    "left_arm": "Left bionic arm interface",
+    "spatial": "Spatial stereo panel"
+  },
+  "acceptance": [
+    "Record exact native state, page, parent page, selected choice, enabled/locked choices and eligibility; an open-menu flag is insufficient.",
+    "Use the effective VR bindings and observe the actual page/choice response, including tab changes, scrolling, cursor edges and map pan/zoom where applicable.",
+    "Visit every discovered child page and legal confirmation/cancel branch. Verify actual action completion; delivered input alone is insufficient.",
+    "Back out from each depth, close, immediately reopen, and verify locomotion/combat input ownership and neutral controls recover.",
+    "Review complete final-eye sequences for both eyes: readable text, uncropped choices, correct attachment, head/hand motion and stable stereo without blinking.",
+    "Confirm physical-headset reading, controller usability, scale and comfort separately from simulator observations."
+  ],
+  "safety": "Read-only discovery first. Purchases, upgrades, deployment, abort/retry and progression-changing confirmations require an isolated verified save/checkpoint fixture. An ambiguous page never admits generic Confirm or repeated Back.",
+  "families": [
+    {"id": "FRONT_END", "title": "Title choices, Continue and setup branches", "modes": ["title"], "presentations": ["spatial"]},
+    {"id": "PAUSE", "title": "Pause choices and all nested options", "mode_set": "playable", "modes": ["cinematic", "tutorial"], "presentations": ["spatial"]},
+    {"id": "OPTIONS", "title": "Native settings and reversible value changes", "mode_set": "playable", "modes": ["title"], "presentations": ["spatial"]},
+    {"id": "IDROID_LIFECYCLE", "title": "iDroid open, stow, inspection and immediate reopen", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
+    {"id": "MAP", "title": "iDroid map, markers, lists and map controls", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
+    {"id": "MISSIONS_SIDE_OPS", "title": "Mission / Side Ops lists and nested details", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
+    {"id": "SUPPORT", "title": "Support requests, drops, strikes and helicopter choices", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
+    {"id": "MOTHER_BASE_MANAGEMENT", "title": "Mother Base management, staff and resource branches", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
+    {"id": "DEVELOPMENT", "title": "Development categories, grades and confirmation branches", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
+    {"id": "HELICOPTER_DEVELOPMENT", "title": "Helicopter development list, upgrades, cancel and Back", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
+    {"id": "CASSETTES_INTEL", "title": "Cassette / intel lists, playback and return", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
+    {"id": "EQUIPMENT", "title": "Equipment picker, categories and weapon/item options", "mode_set": "playable", "presentations": ["left_arm", "spatial"]},
+    {"id": "COMMANDS", "title": "Buddy command choices for each eligible buddy/ability", "mode_set": "playable", "presentations": ["left_arm", "spatial"]},
+    {"id": "INTERROGATION", "title": "Native target/interrogation choices and responses", "mode_set": "on_foot", "presentations": ["left_arm", "spatial"]},
+    {"id": "ACC_CUSTOMIZATION", "title": "ACC customization and nested confirmation/cancel", "modes": ["acc"], "presentations": ["handheld", "spatial"]},
+    {"id": "DEPLOYMENT", "title": "Sortie, character, buddy, loadout and deployment branches", "modes": ["acc"], "presentations": ["spatial"]},
+    {"id": "TUTORIAL_ACK", "title": "Forced tutorial pages, acknowledgment, stow and reopen", "modes": ["tutorial"], "presentations": ["handheld", "spatial"]},
+    {"id": "APPEARANCE_SETUP", "title": "Authored name / appearance setup and return", "modes": ["tutorial"], "presentations": ["spatial"]},
+    {"id": "RESULTS_RETRY", "title": "Clear, abort, death, retry and return branches", "modes": ["results", "death"], "presentations": ["spatial"]},
+    {"id": "LOADING_CONFIRMATION", "title": "Loading and visible start/continue confirmations", "modes": ["loading"], "presentations": ["spatial"]},
+    {"id": "ONLINE_ENTRY", "title": "Online / FOB menu eligibility and entry/cancel branches; network gameplay unaccepted", "modes": ["acc", "mother_base"], "presentations": ["handheld", "spatial"]}
+  ],
+  "limits": [
+    "Applicability is not established for planned menu/state pairs. Native unavailability must be observed; it is never inferred from a missing adapter.",
+    "Progression, buddy, equipment, vehicle subtype, tutorial and confirmation variants must be discovered and retained as distinct child paths.",
+    "TPP online menu branches remain open. MGO and Ground Zeroes are separate game adapters, not covered by a TPP menu pass.",
+    "No matrix count is a percentage of the game's actual menus. Menu discovery and physical-headset acceptance remain incomplete."
+  ]
+}

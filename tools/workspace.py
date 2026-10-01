@@ -410,6 +410,26 @@ def status(args):
         print("Full-game and headset acceptance: open. Next cases: docs/CURRENT.md")
 
 
+def coverage(args):
+    """Generate one fixed review view without launching or controlling a game."""
+    value = settings()
+    command = [sys.executable, ROOT / "tools/gameplay-coverage.py",
+               "--game-dir", Path(value["game_dir"]), "--candidate-dll", PLAY / "dinput8.dll",
+               "--controls-tool", PLAY / "mgs5vr_controls.exe",
+               "--output", ROOT / "artifacts/dev/coverage"]
+    if args.menus:
+        command += ["--menus-only"]
+    for candidate in args.run:
+        retained = safe_tree(candidate, SCRATCH / "runs")
+        if not (retained / "KEEP").is_file():
+            raise ValueError("Pin the reviewed run before using it as coverage evidence: " + str(retained))
+        if not all((retained / name).is_file() for name in ("identity.json", "result.json")):
+            raise ValueError("Retained coverage run needs identity.json and result.json: " + str(retained))
+        command += ["--run", retained]
+    run(command)
+    print(f"Coverage view: {ROOT / 'artifacts/dev/coverage/index.html'}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="operation", required=True)
@@ -445,6 +465,10 @@ def main():
     current = commands.add_parser("status")
     current.add_argument("--json", action="store_true")
     current.set_defaults(handler=status)
+    report = commands.add_parser("coverage", help="Refresh the fixed read-only coverage view")
+    report.add_argument("--menus", action="store_true", help="Show VR menu paths by game state and presentation")
+    report.add_argument("--run", action="append", type=Path, default=[], help="Reviewed, pinned bot evidence")
+    report.set_defaults(handler=coverage)
     commands.add_parser("prune").set_defaults(handler=lambda _: prune_runs(settings()))
     args = parser.parse_args()
     try:
