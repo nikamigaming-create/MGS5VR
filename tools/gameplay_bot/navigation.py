@@ -10,11 +10,60 @@ import hashlib
 import heapq
 import json
 import math
+import re
 import struct
 from collections import defaultdict
 from pathlib import Path
 
 from .core import BotFault, atomic_json
+
+
+class NavigationAtlas:
+    """Select hash-checked owned tiles by native location, never by proximity."""
+    def __init__(self, manifest, worlds, *, base=Path('.')):
+        self.worlds = {row['key']: row['code'] for row in worlds['locations']}
+        self.tiles = defaultdict(list)
+        self.unknown = []
+        files = {}
+        for entry in manifest:
+            asset = entry.get('path', '').replace('\\', '/')
+            if not asset.lower().endswith('.nav2'):
+                continue
+            match = re.search(r'/location/([^/]+)/', '/' + asset.lstrip('/'), re.I)
+            key = match[1].lower() if match else None
+            if key not in self.worlds:
+                self.unknown.append({'path': asset, 'reason': 'Native location identity unresolved'})
+                continue
+            path = Path(entry['file'])
+            path = (path if path.is_absolute() else base / path).resolve()
+            digest = entry.get('sha256')
+            if not isinstance(digest, str) or not re.fullmatch('[0-9a-f]{64}', digest):
+                raise BotFault('Owned navigation tile needs a SHA-256 identity')
+            identity = (self.worlds[key], digest)
+            if path in files and files[path] != identity:
+                raise BotFault('One navigation file is assigned to conflicting worlds/revisions')
+            if path not in files:
+                self.tiles[self.worlds[key]].append({**entry, 'file': str(path)})
+                files[path] = identity
+
+    def select(self, location):
+        if type(location) is not int:
+            raise BotFault('Fresh native location code is required for navigation')
+        entries = self.tiles.get(location, [])
+        if not entries:
+            raise BotFault(f'No imported navigation tiles for native location {location}')
+        for entry in entries:
+            path = Path(entry['file'])
+            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != entry['sha256']:
+                raise BotFault('Owned navigation asset changed or is missing: ' + str(path))
+        return NativeMap.from_files([entry['file'] for entry in entries])
+
+    def summary(self):
+        return {'discovery_complete': False, 'full_map_acceptance': False,
+                'locations': [{'code': code, 'key': key, 'tiles': len(self.tiles.get(code, [])),
+                               'coverage': 'partial_import' if self.tiles.get(code) else 'not_imported',
+                               'player_clearance': 'unproven'} for key, code in self.worlds.items()],
+                'unresolved_tiles': len(self.unknown)}
 
 
 def read_nav2(path):

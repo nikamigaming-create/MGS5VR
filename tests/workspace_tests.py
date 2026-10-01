@@ -208,6 +208,16 @@ class WorkspaceTests(unittest.TestCase):
                 workspace.coverage(argparse.Namespace(menus=True, run=[self.root / "foreign-run"]))
         self.checker_mock.assert_not_called()
 
+    def test_game_model_reuses_fixed_output_and_never_controls_a_game(self):
+        value={**self.value,'navigation':str(self.root/'owned-manifest.json')}
+        with patch.object(workspace,'settings',return_value=value):
+            workspace.game_model(argparse.Namespace(run=[]))
+        command=self.checker_mock.call_args.args[0]
+        self.assertEqual(command[command.index('--output')+1],self.root/'artifacts/dev/coverage')
+        self.assertEqual(command[command.index('--navigation')+1],self.root/'owned-manifest.json')
+        self.assertIn(self.play/'mgs5vr_controls.exe',command)
+        self.inventory_mock.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

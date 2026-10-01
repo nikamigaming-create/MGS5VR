@@ -317,6 +317,9 @@ def prune_runs(value, latest=None):
 
 
 def bot(args):
+    selected_transition = getattr(args, 'transition', None)
+    if args.operation == 'bot' and ((args.command == 'state') != bool(selected_transition)):
+        raise ValueError('state requires --transition; other commands do not accept it')
     value = settings()
     game, proxy = Path(value["game_dir"]), Path(value["operator_proxy"])
     manifest = read_json(PLAY / "BUILD.json")
@@ -335,6 +338,8 @@ def bot(args):
             command += ["--suite", args.suite.resolve()]
         if args.record:
             command += ["--record"]
+        if selected_transition:
+            command += ['--transition', selected_transition]
     command += ["--game-dir", game, "--proxy", proxy, "--output", output, "--seconds", args.seconds]
     code = 1
     try:
@@ -430,6 +435,22 @@ def coverage(args):
     print(f"Coverage view: {ROOT / 'artifacts/dev/coverage/index.html'}")
 
 
+def game_model(args):
+    value = settings()
+    command = [sys.executable, ROOT / 'tools/game-model.py', '--game-dir', Path(value['game_dir']),
+               '--candidate-dll', PLAY / 'dinput8.dll', '--controls-tool', PLAY / 'mgs5vr_controls.exe',
+               '--output', ROOT / 'artifacts/dev/coverage']
+    if value.get('navigation'):
+        command += ['--navigation', Path(value['navigation'])]
+    for candidate in args.run:
+        retained = safe_tree(candidate, SCRATCH / 'runs')
+        if not (retained / 'KEEP').is_file():
+            raise ValueError('Pin the reviewed run before using it as model evidence: ' + str(retained))
+        command += ['--run', retained]
+    run(command)
+    print(f"Game model: {ROOT / 'artifacts/dev/coverage/game-model.html'}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="operation", required=True)
@@ -442,10 +463,11 @@ def main():
     build.set_defaults(handler=refresh)
     commands.add_parser("deploy").set_defaults(handler=lambda _: deploy(settings()))
     observe = commands.add_parser("bot")
-    observe.add_argument("--command", choices=("observe", "continue", "run", "session", "move", "idroid", "supervise"), default="observe")
+    observe.add_argument("--command", choices=("observe", "continue", "run", "session", "move", "idroid", "supervise", "state"), default="observe")
     observe.add_argument("--suite", type=Path)
     observe.add_argument("--seconds", type=float, default=15)
     observe.add_argument("--record", action="store_true")
+    observe.add_argument('--transition', help='state: explicitly selected guarded transition')
     observe.set_defaults(handler=bot)
     navigate = commands.add_parser("navigate")
     navigate.add_argument("--goal", type=float, nargs=3, required=True)
@@ -469,6 +491,9 @@ def main():
     report.add_argument("--menus", action="store_true", help="Show VR menu paths by game state and presentation")
     report.add_argument("--run", action="append", type=Path, default=[], help="Reviewed, pinned bot evidence")
     report.set_defaults(handler=coverage)
+    model = commands.add_parser('model', help='Refresh the fixed map/state graph without game control')
+    model.add_argument('--run', action='append', type=Path, default=[], help='Reviewed, pinned bot observations')
+    model.set_defaults(handler=game_model)
     commands.add_parser("prune").set_defaults(handler=lambda _: prune_runs(settings()))
     args = parser.parse_args()
     try:

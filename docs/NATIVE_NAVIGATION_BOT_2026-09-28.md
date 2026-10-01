@@ -24,13 +24,19 @@ bounded movement leases, sprint, and retreat over visited nodes after damage.
 It stops on unsafe context changes and preserves failed-run evidence even when
 the operator fails. General combat/shooting behavior is not validated.
 
-Thirteen navigation tests cover height separation, explicit portals, disconnected
+Seventeen navigation tests cover height separation, explicit portals, disconnected
 space, obstacle replanning/expiry, enemy costs, stance acknowledgement, danger
 policy, parser rejection, slope arrival, stalled-node detection despite jitter,
 and evidence preservation after transport failure.
+The current atlas also tests per-location selection, refusal of missing/changed
+assets, separation of combined-manifest worlds and rejection of a location change
+before navigation input. These checks do not certify traversal in those worlds.
 Live traversal and cinematic acceptance are recorded separately in
 RELEASE_VALIDATION_2026-09-28.md. These tests and the PNG do not prove completion.
 
 `tools/gameplay-navigate.py` requires a private hash-checked asset manifest,
 an installed game, and the regular simulator operator. Retail navigation data,
 reference-parser sources, and private extraction outputs are not release assets.
+The current atlas selects that manifest's tiles using the live native location;
+the regional Afghanistan graph cannot be reused for Africa or another location.
+See GAME_STATE_MODEL.md for the full-game map/state discovery queue.

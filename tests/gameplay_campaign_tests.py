@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from gameplay_bot.campaign import fingerprint, run_campaign, summarize_runs, validate_campaign, unstarted_campaign
 from gameplay_bot.core import BotFault
 from gameplay_bot.menu_coverage import menu_inventory
+from gameplay_bot.state_graph import StateGraph, observation_key
 
 IDENTITY = {name: letter * 64 for name, letter in zip(
     ("exe_sha256", "dll_sha256", "controls_sha256", "config_sha256"), "abcd")}
@@ -144,6 +145,8 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(index[selected]["status"], "partial_native_evidence")
         self.assertEqual(index["MENU.TPP.HELICOPTER_DEVELOPMENT.mission.spatial"]["status"], "unproven")
         self.assertEqual(index["MENU.TPP.HELICOPTER_DEVELOPMENT.acc.handheld"]["status"], "unproven")
+        self.assertIn("ACC", index["MENU.TPP.HELICOPTER_DEVELOPMENT.acc.handheld"]["latest_report"])
+        self.assertNotIn("latest_report", index[selected])
         self.assertFalse(index[selected]["discovery_complete"])
         self.assertEqual(index[selected]["applicability"], "not_established")
         self.assertFalse(report["release_ready"])
@@ -156,6 +159,69 @@ class CampaignTests(unittest.TestCase):
                          "vehicle_driver", "vehicle_passenger", "helicopter_passenger"} <= modes)
         self.assertEqual(len({row["id"] for row in rows}), len(rows))
         self.assertTrue(all(row["status"] == "unproven" and row["native_page"] == "not_discovered" for row in rows))
+
+
+class StateGraphTests(unittest.TestCase):
+    def setUp(self):
+        self.directory=tempfile.TemporaryDirectory();self.addCleanup(self.directory.cleanup)
+        self.root=Path(self.directory.name)
+        suite={'cases':[
+            {'id':'open','before':{'scene':'gameplay'},'steps':[{'op':'action','name':'open'}],'after':{'scene':'menu'}},
+            {'id':'back','before':{'scene':'menu'},'steps':[{'op':'action','name':'back'}],'after':{'scene':'gameplay'}}]}
+        (self.root/'suite.json').write_text(json.dumps(suite))
+        self.bindings={'actions':[{'name':name,'bindings':[{'inputs':[]}]} for name in ['open','back']]}
+        self.model={'states':{'field':{'predicate':{'scene':'gameplay'}},'menu':{'predicate':{'scene':'menu'}},
+                             'unknown':{'predicate':None}},'transitions':[
+            {'id':'open','from':'field','to':'menu','suite':'suite.json','case_id':'open','cost':3},
+            {'id':'back','from':'menu','to':'field','suite':'suite.json','case_id':'back','cost':2},
+            {'id':'undiscovered','from':'field','to':'unknown','cost':0,'blocked_reason':'Unknown page/choice'}]}
+    def graph(self,**kwargs): return StateGraph(self.root,self.model,IDENTITY,self.bindings,**kwargs)
+
+    def test_shortest_path_keeps_unknown_shortcuts_blocked_and_declares_neutral_return(self):
+        graph=self.graph()
+        self.assertEqual([e['id'] for e in graph.path('field','menu',identity=IDENTITY)],['open'])
+        plan=graph.next_test('field',identity=IDENTITY,covered=['back'])
+        self.assertEqual([e['id'] for e in plan['transitions']],['open','back'])
+        self.assertEqual(plan['end'],'field')
+        with self.assertRaises(BotFault):graph.path('field','unknown',identity=IDENTITY)
+        self.assertEqual(graph.blockers()[0]['id'],'undiscovered')
+
+    def test_stale_build_and_ambiguous_state_cannot_plan(self):
+        graph=self.graph()
+        with self.assertRaisesRegex(BotFault,'another game build'):
+            graph.next_test('field',identity={**IDENTITY,'dll_sha256':'f'*64})
+        with self.assertRaisesRegex(BotFault,'unknown or ambiguous'):graph.locate({'scene':'loading'})
+        self.model['states']['ambiguous']={'predicate':{'scene':'gameplay'}}
+        with self.assertRaisesRegex(BotFault,'unknown or ambiguous'):self.graph().locate({'scene':'gameplay'})
+
+    def test_disabled_vr_action_and_save_gate_stay_in_denominator(self):
+        self.bindings['actions'][0]['bindings']=[]
+        graph=self.graph()
+        self.assertEqual(len(graph.edges),3)
+        self.assertFalse(graph.edges[0]['ready'])
+        self.assertEqual(graph.next_test('field',identity=IDENTITY)['status'],'no_guarded_roundtrip')
+        self.bindings['actions'][0]['bindings']=[{'inputs':[]}]
+        self.model['transitions'][0]['requires_isolated_save']=True
+        self.assertFalse(self.graph().edges[0]['ready'])
+        self.assertTrue(self.graph(isolated_save=True).edges[0]['ready'])
+
+    def test_nonfinite_cost_and_incomplete_menu_identity_are_rejected(self):
+        self.model['transitions'][0]['cost']=float('nan')
+        with self.assertRaisesRegex(BotFault,'finite and nonnegative'):self.graph()
+        key=observation_key({'menu':True,'idroid':True,'native':{'mission':10040,'location':10}})
+        self.assertFalse(key['identity_complete'])
+        self.assertIn('native.menu_page',key['missing'])
+
+    def test_explicit_probe_keeps_dependencies_and_exit_and_refuses_missing_return(self):
+        graph=self.graph()
+        suite=graph.probe_suite('open',identity=IDENTITY,start='field')
+        self.assertEqual(suite['transition_ids'],['open','back'])
+        self.assertEqual(suite['neutral_exit'],'field')
+        self.assertEqual(suite['cases'][1]['depends_on'],[suite['cases'][0]['id']])
+        self.assertFalse(suite['continue_after_outcome_failure'])
+        self.bindings['actions'][1]['bindings']=[]
+        with self.assertRaises(BotFault):self.graph().probe_suite('open',identity=IDENTITY,start='field')
+        with self.assertRaises(BotFault):graph.probe_suite('undiscovered',identity=IDENTITY,start='field')
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait
 from gameplay_bot.campaign import read_json, run_campaign, validate_campaign, unstarted_campaign
 from gameplay_bot.idroid import inspect_idroid
 from gameplay_bot.supervisor import run_supervised
+from gameplay_bot.state_graph import StateGraph, declared_model
 
 
 def continue_game(live, behavior):
@@ -77,7 +78,7 @@ def continue_game(live, behavior):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("observe", "continue", "run", "session", "move", "campaign", "idroid", "supervise"),
+    parser.add_argument("command", choices=("observe", "continue", "run", "session", "move", "campaign", "idroid", "supervise", "state"),
                         help="session advances Continue and runs the whole suite on one connection")
     parser.add_argument("--game-dir", required=True, type=pathlib.Path)
     parser.add_argument("--proxy", type=pathlib.Path)
@@ -87,6 +88,7 @@ def main():
     parser.add_argument("--suite", type=pathlib.Path)
     parser.add_argument("--campaign", type=pathlib.Path, default=ROOT / "tools/gameplay_bot/campaigns/community.json")
     parser.add_argument("--resume", type=pathlib.Path, help="Campaign checkpoint; requires identical executable, DLL and both INIs")
+    parser.add_argument("--transition", help="state: explicitly selected graph transition; Pause requires its own named transition")
     parser.add_argument("--seconds", type=float, help="supervise defaults to 900 seconds; other commands default to 1")
     parser.add_argument("--distance", type=float, default=.35, help="move: short forward target in native units, below one unit")
     parser.add_argument("--record", action="store_true", help="rotate native source-eye/audio takes; final compositor stills remain separate")
@@ -103,13 +105,15 @@ def main():
     args.proxy = args.proxy.resolve() if args.proxy else None
     args.controls_tool = args.controls_tool.resolve()
     if args.seconds is None:
-        args.seconds = 900. if args.command == "supervise" else 1.
+        args.seconds = 900. if args.command == "supervise" else 15. if args.command == "state" else 1.
     if not 0 < args.seconds <= 3600:
         parser.error("--seconds must be in (0,3600]")
     if args.command in ("run", "session") and not args.suite:
         parser.error(args.command + " requires --suite")
     if args.resume and args.command != "campaign":
         parser.error("--resume is only supported by campaign")
+    if (args.command == 'state') != bool(args.transition):
+        parser.error('state requires --transition; other commands do not accept it')
     campaign = read_json(args.campaign) if args.command == "campaign" else None
     if campaign:
         validate_campaign(campaign, ROOT)
@@ -193,6 +197,21 @@ def main():
                 if initial_suite is not None:
                     initial_suite = {**initial_suite, "source_path": str(args.suite.resolve()), "source_sha256": digest(args.suite)}
                 result = run_supervised(behavior, seconds=args.seconds, initial_suite=initial_suite)
+            elif args.command == 'state':
+                graph = StateGraph(ROOT, declared_model(ROOT), identity, bindings)
+                suite = graph.probe_suite(args.transition, identity=identity, max_wait=min(args.seconds, 600))
+                atomic_json(args.output/'state-plan.json', suite)
+                def state_checkpoint(records):
+                    atomic_json(args.output/'queue.json', {'cases': records, 'graph_identity': graph.identity})
+                    print(json.dumps({'event':'state_transition', 'id':records[-1]['id'],
+                                      'status':records[-1]['status']}), flush=True)
+                enter_game = lambda: continue_game(live, behavior)
+                if args.record:
+                    enter_game = after_verified_arrival(enter_game, start_recording)
+                result = run_suite(behavior, suite, state_checkpoint, enter_game)
+                result.update(graph_identity=graph.identity, selected_transition=args.transition,
+                              transition_ids=suite['transition_ids'], neutral_exit=suite['neutral_exit'],
+                              scope=suite['scope'], full_game_acceptance=False)
             elif args.command == "campaign":
                 enter_game = lambda: continue_game(live, behavior)
                 if args.record:
@@ -230,8 +249,8 @@ def main():
                 checkpoint_path = args.output / "campaign.json"
                 result = read_json(checkpoint_path) if checkpoint_path.is_file() else unstarted_campaign(campaign, ROOT, identity, error)
                 result.update(status="failed", error=str(error), release_ready=False)
-            elif args.command == "supervise":
-                checkpoint_path = args.output / "supervised-cases.json"
+            elif args.command in ('supervise', 'state'):
+                checkpoint_path = args.output / ('queue.json' if args.command == 'state' else 'supervised-cases.json')
                 result = read_json(checkpoint_path) if checkpoint_path.is_file() else {"cases": []}
                 result.update(status="failed", error=str(error), release_ready=False)
             else:

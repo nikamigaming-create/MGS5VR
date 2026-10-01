@@ -33,4 +33,9 @@ def menu_inventory(root):
                     "status": "unproven", "applicability": "not_established",
                     "discovery_complete": False, "native_page": "not_discovered",
                     "acceptance": catalog["acceptance"], "safety": catalog["safety"], "source": source})
+                if mode == "acc" and family["id"] in {"HELICOPTER_DEVELOPMENT", "ACC_CUSTOMIZATION"}:
+                    rows[-1]["latest_report"] = (
+                        "Another player reports an upgrade-menu lock-up in the ACC. Exact "
+                        "development/customization screen is unknown; field list/Back evidence "
+                        "does not reproduce it.")
     return rows

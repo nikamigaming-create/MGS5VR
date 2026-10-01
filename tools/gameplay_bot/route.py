@@ -4,7 +4,7 @@ import time
 
 from .core import BotFault, atomic_json
 from .live import authoritative_controls, channel
-from .locomotion import _axis_source, _position
+from .locomotion import _axis_source, _position, _validate_field_state
 from .navigation import ObstacleMemory, RouteProgress, arrived, movement_mode, posture, stance_press
 
 
@@ -47,9 +47,18 @@ def finish_navigation(live, head, result, output):
 
 
 def navigate(live, nav, goal, *, output, enemy_reader, mode='auto', max_seconds=600,
-             obstacle_file=None, stop_at_bridge=True, clock=time.monotonic, sleep=time.sleep):
+             obstacle_file=None, stop_at_bridge=True, expected_location=None,
+             clock=time.monotonic, sleep=time.sleep):
     if mode not in ('auto', 'walk', 'run', 'crouch', 'crawl'):
         raise BotFault('Unknown movement mode')
+    admitted_mission = None
+    if expected_location is not None:
+        preflight = live.observe(native=True)
+        observed = preflight.get('native', {}).get('location')
+        if type(expected_location) is not int or type(observed) is not int or observed != expected_location:
+            raise BotFault('Native location changed after selecting its navigation graph; no movement dispatched')
+        _validate_field_state(preflight)
+        admitted_mission = (preflight['native']['mission'], observed)
     source = _axis_source(live.bindings, 'axes.move')
     move = {'hand': source.split('_')[0], 'component': 'Thumbstick', 'sub_component': 'Y'}
     run = next(a for a in live.bindings['actions'] if a['name'] == 'gameplay.run')
@@ -58,7 +67,7 @@ def navigate(live, nav, goal, *, output, enemy_reader, mode='auto', max_seconds=
     result = {'status': 'running', 'map_identity': nav.identity, 'goal': goal,
               'samples': [], 'replans': [], 'captures': [], 'postures': [], 'enemy_snapshots': []}
     blocked, history = set(), []
-    route, index, last_life, mission = [], 0, None, None
+    route, index, last_life, mission = [], 0, None, admitted_mission
     progress = RouteProgress()
     started = clock()
     next_enemies = renew = next_report = 0.
@@ -82,8 +91,8 @@ def navigate(live, nav, goal, *, output, enemy_reader, mode='auto', max_seconds=
             native = state['native']
             now = clock()
             point = _position(state)
-            if mission is None:
-                mission = (native['mission'], native['location'])
+            if memory is None:
+                mission = mission or (native['mission'], native['location'])
                 memory = ObstacleMemory(obstacle_file, nav.identity, mission, time.time())
                 blocked = memory.active(time.time())
             if (native['mission'], native['location']) != mission:

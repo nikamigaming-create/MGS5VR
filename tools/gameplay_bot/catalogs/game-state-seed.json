@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "description": "Coarse control-owner probes. Detailed pages and native modes remain separate unresolved states; owner recognition does not certify them.",
+  "states": {
+    "owner.on_foot": {
+      "title": "Ordinary on-foot VR control owner",
+      "kind": "control_owner",
+      "predicate": {
+        "scene": "gameplay",
+        "menu": false,
+        "idroid": false,
+        "camera_active": true,
+        "controls.context": "gameplay",
+        "controls.travel_mode": 1,
+        "native.player_vehicle_id": 65535,
+        "native.title": false,
+        "native.tutorial_pause": false,
+        "native.game_over": 0,
+        "native.popup": false,
+        "camera_available": true,
+        "gamepad": false,
+        "controls.rig_input": true
+      }
+    },
+    "owner.spatial_menu": {
+      "title": "Non-iDroid spatial menu control owner; exact page still needs review",
+      "kind": "control_owner",
+      "predicate": {
+        "scene": "menu",
+        "menu": true,
+        "idroid": false,
+        "controls.context": "menus",
+        "native.title": false,
+        "native.tutorial_pause": false,
+        "native.game_over": 0
+      }
+    },
+    "owner.idroid": {
+      "title": "iDroid control owner; exact page still needs review",
+      "kind": "control_owner",
+      "predicate": {
+        "scene": "menu",
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "controls.context": "menus"
+      }
+    }
+  },
+  "transitions": [
+    {
+      "id": "probe.pause.open",
+      "from": "owner.on_foot",
+      "to": "owner.spatial_menu",
+      "suite": "tools/gameplay_bot/suites/pause-roundtrip.json",
+      "case_id": "pause-open",
+      "cost": 8
+    },
+    {
+      "id": "probe.pause.back",
+      "from": "owner.spatial_menu",
+      "to": "owner.on_foot",
+      "suite": "tools/gameplay_bot/suites/pause-roundtrip.json",
+      "case_id": "pause-close",
+      "cost": 8
+    },
+    {
+      "id": "probe.idroid.open",
+      "from": "owner.on_foot",
+      "to": "owner.idroid",
+      "suite": "tools/gameplay_bot/suites/menu-roundtrip.json",
+      "case_id": "idroid-open",
+      "cost": 8
+    },
+    {
+      "id": "probe.idroid.back",
+      "from": "owner.idroid",
+      "to": "owner.on_foot",
+      "suite": "tools/gameplay_bot/suites/menu-roundtrip.json",
+      "case_id": "idroid-close",
+      "cost": 8
+    }
+  ],
+  "execution_policy": "Plans require current final-eye review and fresh native guards before each action. Back probes require review of the actual page; one Back at an unknown depth is never assumed to close the menu. Stop on the first failed outcome, release controls and clean the owned test session."
+}

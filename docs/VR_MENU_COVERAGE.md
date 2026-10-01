@@ -4,6 +4,8 @@ The target is every discovered TPP menu page and legal branch in every eligible
 native game state, using the player's effective VR bindings. Test each branch
 where it is actually available; do not count an open-menu flag as a menu pass.
 Menu discovery, complete automation and physical-headset acceptance are open.
+The connected map/state planner is described in GAME_STATE_MODEL.md; menu paths
+are one part of that graph, alongside native roles and authored mission states.
 
 ## Walkthrough order
 
@@ -87,7 +89,10 @@ The existing supervisor can review actual final-eye captures and dispatch bounde
 semantic VR actions; a broad menu flag cannot safely drive a whole menu tree.
 After repeatable simulator traversal, each group receives a physical-headset pass.
 
-The helicopter list/Back baseline is partial evidence only. Its selected grades
-were already developed, so purchase completion and ACC customization remain open.
-The user clarified that they did not personally experience that upgrade failure;
-retain the general concern without attributing it to their play session.
+The helicopter list/Back baseline is partial field Mission 6 evidence only. Its
+selected grades were already developed, so purchase completion remains open.
+Another player reported the upgrade lock-up in the ACC; the user did not
+personally experience it. The field baseline does not reproduce that report.
+Keep ACC iDroid development and ACC helicopter customization as separate
+candidate paths until the exact screen is established. Progression-changing
+tests require a verified isolated save/checkpoint fixture.

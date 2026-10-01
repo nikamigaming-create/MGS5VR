@@ -6,11 +6,13 @@ import struct
 import sys
 import tempfile
 import unittest
+import hashlib
+from unittest.mock import patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]/'tools'))
 from gameplay_bot.core import BotFault
-from gameplay_bot.navigation import NativeMap, ObstacleMemory, RouteProgress, arrived, movement_mode, read_nav2
-from gameplay_bot.route import finish_navigation, set_posture
+from gameplay_bot.navigation import NativeMap, NavigationAtlas, ObstacleMemory, RouteProgress, arrived, movement_mode, read_nav2
+from gameplay_bot.route import finish_navigation, navigate, set_posture
 
 
 def tile(name, points, edges, *, boundaries=(), cross=(), group=4):
@@ -20,6 +22,57 @@ def tile(name, points, edges, *, boundaries=(), cross=(), group=4):
 
 
 class NavigationTests(unittest.TestCase):
+    def test_atlas_loads_each_world_separately_even_with_one_combined_manifest(self):
+        with tempfile.TemporaryDirectory() as d:
+            manifest=[]
+            for key in ['afgh','mafr']:
+                path=pathlib.Path(d)/(key+'.nav2');path.write_bytes(key.encode())
+                manifest.append({'path':f'/Assets/tpp/level/location/{key}/test.nav2','file':str(path),
+                                 'sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
+            atlas=NavigationAtlas(manifest,{'locations':[{'key':'afgh','code':10},{'key':'mafr','code':20}]})
+            with patch.object(NativeMap,'from_files') as loader:
+                atlas.select(20)
+                self.assertEqual(loader.call_args.args[0],[str(pathlib.Path(d)/'mafr.nav2')])
+                atlas.select(10)
+                self.assertEqual(loader.call_args.args[0],[str(pathlib.Path(d)/'afgh.nav2')])
+
+    def test_atlas_cannot_reuse_an_afghanistan_graph_in_africa(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=pathlib.Path(d)/'owned.nav2';path.write_bytes(b'owned bytes')
+            worlds={'locations':[{'key':'afgh','code':10},{'key':'mafr','code':20}]}
+            manifest=[{'path':'/Assets/tpp/level/location/afgh/test.nav2','file':str(path),
+                       'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}]
+            atlas=NavigationAtlas(manifest,worlds)
+            with patch.object(NativeMap,'from_files',return_value='loaded') as loader:
+                with self.assertRaisesRegex(BotFault,'No imported navigation'):
+                    atlas.select(20)
+                loader.assert_not_called()
+                self.assertEqual(atlas.select(10),'loaded')
+            self.assertEqual(atlas.summary()['locations'][1]['coverage'],'not_imported')
+            self.assertFalse(atlas.summary()['full_map_acceptance'])
+
+    def test_atlas_refuses_changed_assets_and_unknown_location_paths(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=pathlib.Path(d)/'owned.nav2';path.write_bytes(b'changed')
+            worlds={'locations':[{'key':'afgh','code':10}]}
+            manifest=[{'path':'/Assets/tpp/level/location/afgh/test.nav2','file':str(path),'sha256':'a'*64},
+                      {'path':'/Assets/tpp/level/location/unknown/test.nav2','file':str(path),'sha256':'a'*64}]
+            atlas=NavigationAtlas(manifest,worlds)
+            self.assertEqual(atlas.summary()['unresolved_tiles'],1)
+            with self.assertRaisesRegex(BotFault,'changed or is missing'):
+                atlas.select(10)
+            with self.assertRaises(BotFault): atlas.select(True)
+
+    def test_location_change_after_atlas_selection_dispatches_no_navigation_input(self):
+        class Live:
+            calls=[]
+            def observe(self,**_): return {'native':{'location':20}}
+            def call(self,*_): self.calls.append('input');raise AssertionError('No pose/input dispatch')
+        live=Live()
+        with self.assertRaisesRegex(BotFault,'no movement dispatched'):
+            navigate(live,None,[0,0,0],output=None,enemy_reader=None,expected_location=10)
+        self.assertEqual(live.calls,[])
+
     def test_arrival_accepts_observed_slope_offset_without_flattening_floors(self):
         # Actual Mission 6 road versus its authored NPC navigation vertex.
         p=(2100.11035,349.22467,-73.37537)

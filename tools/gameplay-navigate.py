@@ -1,13 +1,12 @@
 """Drive the installed game over its owned NAV2 graph with ordinary VR inputs."""
 import argparse
-import hashlib
 import json
 import subprocess
 from pathlib import Path
 
 from gameplay_bot.core import Events
 from gameplay_bot.live import Live, InputLease, game_identity
-from gameplay_bot.navigation import NativeMap
+from gameplay_bot.navigation import NavigationAtlas
 from gameplay_bot.route import navigate
 
 def main():
@@ -23,11 +22,8 @@ def main():
                         help='Continue ordinary traversal during the playable bridge event')
     args=parser.parse_args()
     manifest=json.loads(args.manifest.read_text(encoding='utf-8-sig'))
-    for entry in manifest:
-        if entry['path'].endswith('.nav2'):
-            if hashlib.sha256(Path(entry['file']).read_bytes()).hexdigest() != entry['sha256']:
-                raise ValueError('Owned navigation asset changed: '+entry['file'])
-    nav=NativeMap.from_files([e['file'] for e in manifest if e['path'].endswith('.nav2')])
+    worlds=json.loads((Path(__file__).parent/'gameplay_bot/catalogs/native-worlds.json').read_text())
+    atlas=NavigationAtlas(manifest,worlds,base=args.manifest.parent)
     with InputLease():
         identity=game_identity(args.game_dir)
         bindings=json.loads(subprocess.check_output([str(args.game_dir/'mgs5vr_controls.exe'),
@@ -35,12 +31,18 @@ def main():
         live=Live(args.proxy,args.game_dir,bindings,Events(args.output,identity))
         try:
             live.ready()
+            observed=live.observe(native=True)
+            location=observed.get('native',{}).get('location')
+            nav=atlas.select(location)
+            live.events.emit('navigation_world_selected', location=location, map_identity=nav.identity,
+                             tiles=len(nav.sources))
             lua=(Path(__file__).parent/'navigation-state.lua').read_text()
             def enemies():
                 value,_=live.native.read(lua)
                 return value
             result=navigate(live,nav,args.goal,output=args.output,enemy_reader=enemies,mode=args.mode,max_seconds=args.seconds,
-                            obstacle_file=args.manifest.parent/'blocked-edges.json',stop_at_bridge=not args.continue_through_bridge)
+                            obstacle_file=args.manifest.parent/'blocked-edges.json',stop_at_bridge=not args.continue_through_bridge,
+                            expected_location=location)
             print(json.dumps({'status':result['status'],'error':result.get('error')}))
         finally:
             # close() releases inside a finally-protected transport shutdown.
