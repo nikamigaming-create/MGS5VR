@@ -17,6 +17,11 @@ that report.
 - Menu navigation checks native prerequisites before input and after release.
   An overlapping iDroid/Help owner cannot receive ordinary navigation or
   automatic cleanup input.
+- The state planner distinguishes ordinary iDroid, native Pause/Help overlap
+  and native popup owners. The latter two have no executable edges; missing
+  flags cannot authorize ordinary navigation or confirmation.
+  Ordinary Pause also requires its own active flag and no popup, so an ACC
+  selector cannot inherit its Back recipe.
 - Nested iDroid cleanup allows at most four freshly guarded ordinary Back
   edges. Development -> Helicopter -> top -> cabin needs three. Cleanup is
   attempted once; an ambiguous failure cannot start another input chain.
@@ -82,6 +87,7 @@ run result and visual scope before reusing it.
 | 20261001T054659634674Z | Help card closes, but the reviewed tab does not change Missions; cleanup fails. |
 | 20261001T055804851427Z | One guarded autosave acknowledgment, then login completes without bot login confirmation. |
 | 20261001T055940218625Z | ACC pad-exclusion experiment: tabs, ordinary Back and terminal toggle still fail. Candidate reverted. |
+| 20261001T062129083685Z | Final runtime DLL: autosave acknowledgment progresses to login, then startup times out. Owned game/simulator closed; Steam retained. |
 
 The maintained selector probe is
 `tools/gameplay_bot/suites/acc-helicopter-customization-back.json`. It remains

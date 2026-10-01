@@ -23,16 +23,18 @@
       }
     },
     "owner.spatial_menu": {
-      "title": "Non-iDroid spatial menu control owner; exact page still needs review",
+      "title": "Ordinary native Pause control owner; exact page still needs review",
       "kind": "control_owner",
       "predicate": {
         "scene": "menu",
         "menu": true,
         "idroid": false,
+        "pause": true,
         "controls.context": "menus",
         "native.title": false,
         "native.tutorial_pause": false,
-        "native.game_over": 0
+        "native.game_over": 0,
+        "native.popup": false
       }
     },
     "owner.idroid": {
@@ -42,8 +44,39 @@
         "scene": "menu",
         "idroid": true,
         "idroid_menu_input_ready": true,
-        "controls.context": "menus"
+        "controls.context": "menus",
+        "pause": false,
+        "native.popup": false,
+        "native.tutorial_pause": false
       }
+    },
+    "owner.idroid_overlay": {
+      "title": "iDroid with native Pause/Help overlap; exact page requires review",
+      "kind": "control_owner",
+      "predicate": {
+        "scene": "menu",
+        "idroid": true,
+        "pause": true,
+        "controls.context": "menus",
+        "native.popup": false,
+        "native.tutorial_pause": false
+      },
+      "missing": [
+        "Exact overlay/page identity and a verified legal exit/reopen recipe; no automatic input is authorized"
+      ]
+    },
+    "owner.idroid_popup": {
+      "title": "iDroid with a native popup; exact dialog and selection require review",
+      "kind": "control_owner",
+      "predicate": {
+        "scene": "menu",
+        "idroid": true,
+        "controls.context": "menus",
+        "native.popup": true
+      },
+      "missing": [
+        "Exact popup identity, selected choice, cancellation and isolated transaction recipe; no automatic confirmation is authorized"
+      ]
     }
   },
   "transitions": [

@@ -114,6 +114,11 @@ its UI but left an overlapping Pause/player device state; immediate reopening
 failed. Deferred-close, cancellation-permission and ACC pad-exclusion experiments
 did not repair that failure and were reverted. Cleanup now refuses an overlapping
 iDroid/Help owner and closes only the exact owned test session on failure.
+The state planner now distinguishes ordinary iDroid, native Pause/Help overlap
+and popup owners. Overlay/popup owners have no executable edge. Compiled entry
+guards are rechecked at actual input after capture; conflicting guards block
+the route. The retained native overlap classifies as an observation-only owner.
+An ACC selector or unknown popup also cannot inherit the ordinary Pause Back recipe.
 Forced stow/reopen and the reported helicopter upgrade lock-up remain open.
 
 Startup testing also exposed a popup-admission race and a login result stall.

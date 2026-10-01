@@ -76,6 +76,18 @@ accepted maps or completed missions. The model also retains the 35 native-contex
 obligations and the menu/state/presentation queue. Its coarse control-owner
 probes are separate from exact native mode or menu-page recognition.
 
+Native ACC testing exposed two additional control owners: iDroid with a
+Pause/Help overlap, and iDroid with a native popup. Ordinary iDroid requires
+Pause, popup and tutorial-pause to be false. The overlapping/popup states are
+observation-only and have no executable exit or confirmation edge. Missing
+flags remain unknown. This prevents the planner from treating a Help card or
+purchase dialog as ordinary menu navigation; exact page identity remains open.
+Compiled owner/native entry guards are also rechecked by the first actual
+input after capture. A conflicting source guard blocks the edge.
+The coarse spatial-menu probe requires an ordinary native Pause with no popup;
+an ACC selector or unknown popup cannot become a Pause Back route.
+See ACC_MENU_REGRESSION.md.
+
 The current imported spatial data is **40 Afghanistan tiles, 44,171 nodes**.
 It is regional Mission 6 data. The other declared location entries have no
 imported graph in the current manifest; some can also require a different game

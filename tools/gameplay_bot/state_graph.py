@@ -115,6 +115,19 @@ class StateGraph:
                             raise BotFault("Effective VR action unavailable: " + str(step.get("name")))
                     case["before"] = _merge(self.nodes[a]["predicate"], case["before"])
                     case["after"] = _merge(self.nodes[b]["predicate"], case["after"])
+                    # Capturing the entry can outlive a native popup/owner.
+                    # Carry the compiled entry into the first real input's
+                    # admission, rather than checking it only before capture.
+                    first_input = next((step for step in case.get("setup", []) + case["steps"]
+                                        if step.get("op") == "action"), None)
+                    if first_input is not None:
+                        native_guard = {key[7:]: value for key, value in case["before"].items()
+                                        if key.startswith("native.")}
+                        state_guard = {key: value for key, value in case["before"].items()
+                                       if not key.startswith("native.")}
+                        first_input["state_before"] = _merge(state_guard, first_input.get("state_before", {}))
+                        if native_guard:
+                            first_input["native_before"] = _merge(native_guard, first_input.get("native_before", {}))
                     case.update(id=name, source_case_id=edge["case_id"], depends_on=[])
                     edge.update(case=case, suite_sha256=file_hash(path))
                 except (BotFault, KeyError, OSError) as error:

@@ -223,6 +223,67 @@ class StateGraphTests(unittest.TestCase):
         with self.assertRaises(BotFault):self.graph().probe_suite('open',identity=IDENTITY,start='field')
         with self.assertRaises(BotFault):graph.probe_suite('undiscovered',identity=IDENTITY,start='field')
 
+    def test_retail_idroid_overlap_and_popup_have_distinct_readonly_owners(self):
+        from gameplay_bot.state_graph import declared_model
+        root=Path(__file__).resolve().parents[1]
+        bindings={'actions':[{'name':name,'bindings':[{'inputs':[]}]} for name in
+                             ('system.idroid','system.pause','menus.back')]}
+        graph=StateGraph(root,declared_model(root),IDENTITY,bindings)
+        ordinary={'scene':'menu','idroid':True,'idroid_menu_input_ready':True,'pause':False,
+                  'controls':{'context':'menus'},'native':{'popup':False,'tutorial_pause':False}}
+        self.assertEqual(graph.locate(ordinary),'owner.idroid')
+        overlap={**ordinary,'pause':True}
+        self.assertEqual(graph.locate(overlap),'owner.idroid_overlay')
+        for pause in (False,True):
+            popup={**ordinary,'pause':pause,'native':{'popup':True,'tutorial_pause':False}}
+            self.assertEqual(graph.locate(popup),'owner.idroid_popup')
+        self.assertTrue(any(e['ready'] and e['from']=='owner.idroid' for e in graph.edges))
+        for owner in ('owner.idroid_overlay','owner.idroid_popup'):
+            with self.assertRaisesRegex(BotFault,'No validated route'):
+                graph.path(owner,'owner.on_foot',identity=IDENTITY)
+
+    def test_missing_or_paused_idroid_identity_cannot_be_an_ordinary_menu(self):
+        from gameplay_bot.state_graph import declared_model
+        root=Path(__file__).resolve().parents[1]
+        graph=StateGraph(root,declared_model(root),IDENTITY,{'actions':[]})
+        base={'scene':'menu','idroid':True,'idroid_menu_input_ready':True,
+              'controls':{'context':'menus'},'native':{'popup':False,'tutorial_pause':False}}
+        with self.assertRaisesRegex(BotFault,'unknown or ambiguous'):
+            graph.locate(base)
+        base.update(pause=False,native={'popup':False,'tutorial_pause':True})
+        with self.assertRaisesRegex(BotFault,'unknown or ambiguous'):
+            graph.locate(base)
+
+    def test_compiled_entry_is_rechecked_at_input_after_the_capture(self):
+        self.model['states']['menu']['predicate'].update({'pause':False,'native.popup':False})
+        graph=self.graph()
+        case=next(e['case'] for e in graph.edges if e['id']=='back')
+        first=case['steps'][0]
+        self.assertEqual(first['state_before'],{'scene':'menu','pause':False})
+        self.assertEqual(first['native_before'],{'popup':False})
+        # A source recipe that asks for a conflicting popup cannot be promoted
+        # to a ready edge merely because the entry was checked earlier.
+        path=self.root/'suite.json';suite=json.loads(path.read_text())
+        suite['cases'][1]['steps'][0]['native_before']={'popup':True}
+        path.write_text(json.dumps(suite))
+        blocked=next(e for e in self.graph().edges if e['id']=='back')
+        self.assertFalse(blocked['ready'])
+        self.assertIn('Conflicting transition guard',blocked['reason'])
+
+    def test_spatial_selector_or_popup_cannot_be_a_pause_back_route(self):
+        from gameplay_bot.state_graph import declared_model
+        root=Path(__file__).resolve().parents[1]
+        graph=StateGraph(root,declared_model(root),IDENTITY,{'actions':[]})
+        pause={'scene':'menu','menu':True,'idroid':False,'pause':True,
+               'controls':{'context':'menus'},'native':{'title':False,
+               'tutorial_pause':False,'game_over':0,'popup':False}}
+        self.assertEqual(graph.locate(pause),'owner.spatial_menu')
+        for changed in ({**pause,'pause':False},
+                        {**pause,'native':{**pause['native'],'popup':True}},
+                        {**pause,'native':{k:v for k,v in pause['native'].items() if k!='popup'}}):
+            with self.assertRaisesRegex(BotFault,'unknown or ambiguous'):
+                graph.locate(changed)
+
 
 class AuthoredSequenceTests(unittest.TestCase):
     def test_same_sequence_name_in_acc_and_mission_cannot_merge_or_form_a_shortcut(self):
