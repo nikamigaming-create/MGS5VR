@@ -6,6 +6,34 @@ Development through iDroid and the native helicopter customization selector
 are separate paths. Neither a field-list pass nor an open-terminal flag closes
 that report.
 
+## October 1 native lifecycle investigation
+
+Current runtime DLL `0eae8b0d8322` cold-booted naturally through login and
+physical Continue to ACC mission 40010 in retained run
+`20261001T125301162970Z`. Intermittent startup remains open; one successful
+boot does not repair the earlier login stall.
+
+Retained run `20261001T125600146402Z` reopened iDroid and reviewed the
+**Tutorials / Choose a Rival** informational Help card in both eyes. A closed
+that actual card and restored the normal Missions presentation. Ordinary
+four-edge cleanup still failed to close iDroid; the owned session was closed
+with Steam retained. The declined stale tab decision dispatched no input.
+This run does not add successful tab navigation or immediate reopening.
+
+Read-only native binding/field checks found the pending open-condition flags
+already zero, their three mode fields at the native cleared value, and
+cancellation enabled. The game also reported FOB tutorial state FINISH while
+its separate done-in-this-game flag remained false. These observations do not
+establish an active forced-open request. Do not call this Help card a proven
+forced FOB tutorial, clear progression, or retry the already-ruled-out
+cancellation/player-pad experiments.
+
+The immediate `StopMbDvcTerminal` recovery is a reproduced incomplete exit:
+clearing the terminal bit did not restore the character/device/Help lifecycle.
+The separate ordinary tab/Back failure after reviewed Help dismissal still
+needs its exact input/update owner traced. No behavior repair is claimed by
+these read-only observations.
+
 ## Confirmed changes
 
 - Ordinary ACC cabin rendering no longer draws the title-only cassette rack.

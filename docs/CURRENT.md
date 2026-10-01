@@ -6,7 +6,7 @@ left-arm HUD popups, and the right-hand iDroid. Pause uses a spatial stereo
 panel. Floating firearm aiming overlays stay off. No desktop/input automation
 or Steam shutdown is needed by the local workflow.
 
-## Current result: September 30
+## Current result: October 1
 
 ### User request status
 
@@ -120,6 +120,16 @@ guards are rechecked at actual input after capture; conflicting guards block
 the route. The retained native overlap classifies as an observation-only owner.
 An ACC selector or unknown popup also cannot inherit the ordinary Pause Back recipe.
 Forced stow/reopen and the reported helicopter upgrade lock-up remain open.
+
+October 1's current-runtime cold boot naturally passed login and physical
+Continue to ACC (`20261001T125301162970Z`). Its follow-up
+`20261001T125600146402Z` reviewed the informational Choose a Rival Help card
+in both eyes and closed it with A. Ordinary cleanup still failed. Read-only
+native checks found no pending forced-open request and cancellation already
+enabled, so those are not evidence-backed explanations for this fixture.
+The stale tab decision dispatched no input. Exact ordinary-menu input/update
+ownership and the incomplete immediate-stop lifecycle remain the next native
+repair; this does not certify forced tutorial behavior or reliable startup.
 
 Startup testing also exposed a popup-admission race and a login result stall.
 A popup that closes during capture now returns to observation only when no
