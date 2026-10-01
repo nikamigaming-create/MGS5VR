@@ -79,14 +79,20 @@ a directed state-transition planner. The current owned manifest still covers
 only 40 Afghanistan tiles; the other declared worlds remain unimported. The
 factual registry and declared state/transition obligations are viewable with
 `python tools/workspace.py model`. Four coarse control-owner probes have guarded
-recipes; exact menu pages, native roles and authored mission sequences remain
-unresolved. See GAME_STATE_MODEL.md. This is infrastructure, not full-game
+recipes. The authored inventory adds 35 named states from the owned ACC/common
+helicopter and Mission 6 sources, with literal target references retained as
+blocked obligations. Exact menu pages, native roles, sequence conditions and
+VR recipes remain unresolved. See GAME_STATE_MODEL.md. This is infrastructure, not full-game
 acceptance, and its counts are not a percentage of the game.
 An explicitly selected guarded transition can now run through
 `tools/workspace.py bot --command state --transition probe.idroid.open`;
 the state planner compiles a route with a neutral return, and the existing
 native VR runner stops dependent steps on the first failure. Pause still
 requires an explicitly named Pause transition.
+
+September 30 planner replay is pending: the maintained test launch stopped
+before starting MGSV because Steam was not running. The source/build checks
+do not stand in for native state-route acceptance or ACC reproduction.
 
 The cutscene's exact hologram distance and scale have **not** been recovered.
 The current 8 cm default is approximate. The native device sockets, parts

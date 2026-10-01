@@ -224,5 +224,63 @@ class StateGraphTests(unittest.TestCase):
         with self.assertRaises(BotFault):graph.probe_suite('undiscovered',identity=IDENTITY,start='field')
 
 
+class AuthoredSequenceTests(unittest.TestCase):
+    def test_same_sequence_name_in_acc_and_mission_cannot_merge_or_form_a_shortcut(self):
+        from gameplay_bot.state_graph import declared_model
+        root=Path(__file__).resolve().parents[1]
+        model=declared_model(root)
+        acc='AUTHORED.TPP.HELI_COMMON.Seq_Game_MainGame'
+        field='AUTHORED.TPP.S10040.Seq_Game_MainGame'
+        self.assertNotEqual(model['states'][acc]['mission_candidates'],model['states'][field]['mission_candidates'])
+        graph=StateGraph(root,model,IDENTITY,{'actions':[]})
+        self.assertTrue(all(not edge['ready'] for edge in graph.edges if edge['id'].startswith('authored.')))
+        with self.assertRaises(BotFault):graph.path(acc,field,identity=IDENTITY)
+        base={'menu':False,'native':{'mission':40060,'sequence':'Seq_Game_WeaponCustomize'}}
+        missing=observation_key(base)
+        self.assertIn('native.customization_target',missing['missing'])
+        self.assertIn('native.menu_page',missing['missing'])
+        weapon=copy.deepcopy(base);weapon['native']['customization_target']=100
+        helicopter=copy.deepcopy(base);helicopter['native']['customization_target']=200
+        self.assertNotEqual(observation_key(weapon)['key'],observation_key(helicopter)['key'])
+
+    def test_index_keeps_comments_strings_dynamic_targets_and_helper_ownership_separate(self):
+        from gameplay_bot.authored_sequences import index_source
+        source = '''
+-- sequences.Seq_Game_Fake = { TppSequence.SetNextSequence("Seq_Game_Fake") }
+--[=[ TppSequence.SetNextSequence("Seq_Game_Fake") ]=]
+local sequenceList = { "Seq_Game_Source", "Seq_Game_Target" }
+TppSequence.RegisterSequences(sequenceList)
+sequences.Seq_Game_Source = {
+  OnEnter=function()
+    local text="} TppSequence.SetNextSequence('Seq_Game_Fake') {"
+    TppSequence.SetNextSequence("Seq_Game_Target")
+    TppSequence.SetNextSequence(nextState)
+    TppSequence.SetNextSequence("Seq_Game_Target" .. suffix)
+  end,
+}
+TppSequence.SetNextSequence("Seq_Game_Source")
+sequences.Seq_Game_Target = { OnEnter=function() end }
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'owned.lua';path.write_text(source)
+            result=index_source(path,identifier='TEST',mission_codes=[40060])
+        states={state['name']:state for state in result['states']}
+        self.assertEqual(set(states), {'Seq_Game_Source','Seq_Game_Target'})
+        self.assertTrue(all(s['registration_literal'] and s['definition_present'] for s in states.values()))
+        self.assertEqual(states['Seq_Game_Source']['dynamic_target_calls'],2)
+        self.assertEqual(result['transitions'],[{'from':'Seq_Game_Source','to':'Seq_Game_Target','literal_call_sites':1}])
+        self.assertEqual(result['unattributed_targets'],['Seq_Game_Source'])
+        self.assertFalse(result['discovery_complete'])
+
+    def test_unterminated_source_cannot_produce_a_plannable_import(self):
+        from gameplay_bot.authored_sequences import index_source
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'owned.lua'
+            for text in ['sequences.Seq_Game_Source = {', '--[=[ unfinished']:
+                path.write_text(text)
+                with self.assertRaisesRegex(BotFault,'Unterminated'):
+                    index_source(path,identifier='TEST',mission_codes=[40060])
+
+
 if __name__ == "__main__":
     unittest.main()

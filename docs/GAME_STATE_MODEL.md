@@ -81,6 +81,25 @@ It is regional Mission 6 data. The other declared location entries have no
 imported graph in the current manifest; some can also require a different game
 adapter. Unresolved portals remain blocked. No whole-map acceptance is claimed.
 
+The authored sequence inventory now indexes the owned helicopter/ACC common
+source and Mission 6 source: 35 named states and 30 directed literal target
+mentions, with unresolved helper ownership and dynamic targets retained.
+The indexer ignores comments/string contents and keeps branch conditions,
+eligibility and semantic VR recipes unresolved. These authored identifiers
+extend the graph, but none is a traversable test edge yet. In particular,
+`Seq_Game_WeaponCustomize` also handles the native helicopter/vehicle selector;
+its name alone does not identify which customization target is active.
+The scenario query reads the authored `startCustomizeTarget` separately. State
+observations require that target and exact UI page identity in customization,
+even if the iDroid/menu open flags are absent. Its native readback still needs
+the pending ACC run; an unavailable target remains missing.
+
+`tools/index-authored-sequences.py` regenerates this factual metadata from an
+explicit private source manifest. It reads existing owned files in place and
+exports source hashes, identifiers and literal target references, without
+copying retail script bodies. Source indexing does not execute Lua or unlock
+a test edge.
+
 ## Finish the model against the actual game
 
 1. Import/index the remaining owned navigation tiles by location/content revision,

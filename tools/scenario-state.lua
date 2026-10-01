@@ -14,6 +14,10 @@ end
 field('mission', function() return vars.missionCode end)
 field('location', function() return vars.locationCode end)
 field('sequence', function() return TppSequence.GetCurrentSequenceName() end)
+-- ACC weapon, helicopter and vehicle selectors share WeaponCustomize sequence
+-- names. Preserve the authored target separately; nil is unknown, never a
+-- default helicopter target. This read does not change native menu ownership.
+field('customization_target', function() return mvars.startCustomizeTarget end)
 field('title', function() return gvars.ini_isTitleMode end)
 field('story', function() return gvars.str_storySequence end)
 field('player_x', function() return vars.playerPosX end)

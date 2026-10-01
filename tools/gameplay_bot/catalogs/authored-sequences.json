@@ -1,0 +1,418 @@
+{
+  "schema": 1,
+  "description": "Factual authored identifiers and literal transition targets only, derived from locally owned sequence files. Trigger, condition, pack eligibility and VR recipe discovery remain open. No retail script bodies are included.",
+  "discovery_complete": false,
+  "sources": [
+    {
+      "id": "HELI_COMMON",
+      "asset": "heli_common_sequence.lua",
+      "source_sha256": "820fbdd3cbd3303921fe7d356b2a075fcdecbcc3662d32261575720e595f5eab",
+      "mission_candidates": [
+        40010,
+        40020,
+        40050,
+        40060
+      ],
+      "states": [
+        {
+          "name": "Seq_Demo_CheckDlc",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Demo_LoadAvatarEdit",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Demo_PS3Store",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Demo_ShowDlcAnnouncePopup",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Demo_ShowDlcError",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Demo_StartHasTitleMission",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Demo_WaitReadyAvatarEdit",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Demo_WaitSavingPersonalData",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_AvatarEdit",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_AvatarEditEnd",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_ChunkCanceled",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_ChunkInstalled",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_ChunkLoading",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_MainGame",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 1
+        },
+        {
+          "name": "Seq_Game_MainGameToMissionPreparationTop",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_MissionPreparationAbort",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_MissionPreparationEnd",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_MissionPreparationTop",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_MissionPreparation_SelectDetail",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_MissionPreparation_SelectItem",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_MissionPreparation_SelectSlot",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_PandemicTutorial",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_PushStart",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_TitleMenu",
+          "registration_literal": true,
+          "definition_present": false,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_TutorialFobConstruct",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_TutorialIntroductionFobConstruct",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_WeaponCustomize",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_WeaponCustomizeAbort",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_WeaponCustomizeEnd",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        }
+      ],
+      "transitions": [
+        {
+          "from": "Seq_Demo_LoadAvatarEdit",
+          "to": "Seq_Demo_WaitReadyAvatarEdit",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Demo_WaitReadyAvatarEdit",
+          "to": "Seq_Game_AvatarEdit",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_AvatarEdit",
+          "to": "Seq_Game_AvatarEditEnd",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MainGame",
+          "to": "Seq_Game_MainGameToMissionPreparationTop",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MainGame",
+          "to": "Seq_Game_PandemicTutorial",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MainGame",
+          "to": "Seq_Game_WeaponCustomize",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MainGameToMissionPreparationTop",
+          "to": "Seq_Game_MissionPreparationTop",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparationAbort",
+          "to": "Seq_Game_MainGame",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparationTop",
+          "to": "Seq_Game_MissionPreparationAbort",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparationTop",
+          "to": "Seq_Game_MissionPreparationEnd",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparationTop",
+          "to": "Seq_Game_MissionPreparation_SelectItem",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparation_SelectDetail",
+          "to": "Seq_Game_MissionPreparationAbort",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparation_SelectDetail",
+          "to": "Seq_Game_MissionPreparation_SelectSlot",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparation_SelectItem",
+          "to": "Seq_Game_MissionPreparationAbort",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparation_SelectItem",
+          "to": "Seq_Game_MissionPreparationTop",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparation_SelectItem",
+          "to": "Seq_Game_MissionPreparation_SelectSlot",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparation_SelectSlot",
+          "to": "Seq_Game_MissionPreparationAbort",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparation_SelectSlot",
+          "to": "Seq_Game_MissionPreparationEnd",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparation_SelectSlot",
+          "to": "Seq_Game_MissionPreparation_SelectDetail",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MissionPreparation_SelectSlot",
+          "to": "Seq_Game_MissionPreparation_SelectItem",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_PandemicTutorial",
+          "to": "Seq_Game_MainGame",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_TutorialFobConstruct",
+          "to": "Seq_Game_MainGame",
+          "literal_call_sites": 3
+        },
+        {
+          "from": "Seq_Game_TutorialIntroductionFobConstruct",
+          "to": "Seq_Game_TutorialFobConstruct",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_WeaponCustomize",
+          "to": "Seq_Game_WeaponCustomizeAbort",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_WeaponCustomize",
+          "to": "Seq_Game_WeaponCustomizeEnd",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_WeaponCustomizeAbort",
+          "to": "Seq_Game_MainGame",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_WeaponCustomizeEnd",
+          "to": "Seq_Game_MainGame",
+          "literal_call_sites": 1
+        }
+      ],
+      "unattributed_targets": [
+        "Seq_Game_MainGameToMissionPreparationTop",
+        "Seq_Game_MissionPreparationEnd"
+      ],
+      "unattributed_dynamic_calls": 0,
+      "unresolved_registration_calls": 0,
+      "discovery_complete": false,
+      "native_acceptance": "unproven",
+      "limits": [
+        "Literal registration, definitions and target calls only; branch/helper conditions are not evaluated",
+        "Mission candidates do not establish eligible packs, exact UI pages, VR actions or native outcomes"
+      ]
+    },
+    {
+      "id": "S10040",
+      "asset": "s10040_sequence.lua",
+      "source_sha256": "b270f15c7d3d3cea14a3fa34cb03b646e8fa14fe74605aac4d472d60d006e0eb",
+      "mission_candidates": [
+        10040
+      ],
+      "states": [
+        {
+          "name": "Seq_Demo_HeliClear",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Demo_SkullFace",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Demo_SkullFace2",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_BossBattle",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_Escape",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        },
+        {
+          "name": "Seq_Game_MainGame",
+          "registration_literal": true,
+          "definition_present": true,
+          "dynamic_target_calls": 0
+        }
+      ],
+      "transitions": [
+        {
+          "from": "Seq_Demo_SkullFace",
+          "to": "Seq_Demo_SkullFace2",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Demo_SkullFace2",
+          "to": "Seq_Game_BossBattle",
+          "literal_call_sites": 1
+        },
+        {
+          "from": "Seq_Game_MainGame",
+          "to": "Seq_Demo_SkullFace",
+          "literal_call_sites": 1
+        }
+      ],
+      "unattributed_targets": [
+        "Seq_Demo_HeliClear",
+        "Seq_Game_Escape"
+      ],
+      "unattributed_dynamic_calls": 0,
+      "unresolved_registration_calls": 0,
+      "discovery_complete": false,
+      "native_acceptance": "unproven",
+      "limits": [
+        "Literal registration, definitions and target calls only; branch/helper conditions are not evaluated",
+        "Mission candidates do not establish eligible packs, exact UI pages, VR actions or native outcomes"
+      ]
+    }
+  ]
+}

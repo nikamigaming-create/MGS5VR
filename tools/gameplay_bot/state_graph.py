@@ -29,6 +29,7 @@ def declared_model(root):
     menus = read_json(root / "tools/gameplay_bot/catalogs/vr-menu-paths.json")
     contexts = read_json(root / "docs/NATIVE_CONTEXT_COVERAGE.json")
     worlds = read_json(root / "tools/gameplay_bot/catalogs/native-worlds.json")
+    authored = read_json(root / "tools/gameplay_bot/catalogs/authored-sequences.json")
     for mode, title in menus["modes"].items():
         model["states"]["MODE.TPP." + mode] = {"title": title, "kind": "native_mode", "predicate": None,
             "missing": ["Exact native mode/role identity and authored entry/exit recipe"]}
@@ -53,6 +54,28 @@ def declared_model(root):
         model["transitions"].append({"id": "deploy." + identifier, "from": "MODE.TPP.acc", "to": identifier,
             "cost": 1, "requires_isolated_save": True,
             "blocked_reason": "Mission-specific deployment, sequence and isolated-save adapters not implemented"})
+    for source in authored['sources']:
+        prefix = 'AUTHORED.TPP.' + source['id'] + '.'
+        for state in source['states']:
+            model['states'][prefix + state['name']] = {**state, 'title': source['id'] + ' · ' + state['name'],
+                'kind': 'authored_sequence', 'predicate': None, 'mission_candidates': source['mission_candidates'],
+                'source_sha256': source['source_sha256'],
+                'missing': ['Exact runtime pack/role/page identity, legal trigger/conditions and guarded VR recipe']}
+        for edge in source['transitions']:
+            model['transitions'].append({'id': 'authored.' + source['id'] + '.' + edge['from'] + '.' + edge['to'],
+                'from': prefix + edge['from'], 'to': prefix + edge['to'], 'cost': 1,
+                'literal_call_sites': edge['literal_call_sites'],
+                'blocked_reason': 'Authored literal target only; trigger/conditions, eligibility and VR recipe unresolved'})
+        if source['unattributed_targets'] or source['unattributed_dynamic_calls']:
+            unknown = prefix + 'unknown_caller'
+            model['states'][unknown] = {'title': source['id'] + ' · unresolved helper/caller sequence',
+                'kind': 'authored_sequence', 'predicate': None, 'source_sha256': source['source_sha256'],
+                'dynamic_target_calls': source['unattributed_dynamic_calls'],
+                'missing': ['Calling sequence identity and dynamic transition targets require native/source tracing']}
+            for target in source['unattributed_targets']:
+                model['transitions'].append({'id': 'authored.' + source['id'] + '.unknown_caller.' + target,
+                    'from': unknown, 'to': prefix + target, 'cost': 1,
+                    'blocked_reason': 'Literal helper target; calling sequence and legal trigger are unresolved'})
     model.update(discovery_complete=False, full_game_acceptance=False)
     return model
 
@@ -100,7 +123,8 @@ class StateGraph:
             self.edges.append(edge)
         definition = {"nodes": self.nodes, "edges": self.edges}
         runner_root = Path(__file__).resolve().parent
-        runner_files = sorted(runner_root.glob('*.py')) + [runner_root.parent / 'gameplay-bot.py']
+        runner_files = sorted(runner_root.glob('*.py')) + [runner_root.parent / name
+            for name in ('gameplay-bot.py', 'scenario-state.lua', 'native-actions.py')]
         runner_hashes = {str(path.relative_to(runner_root.parent)): file_hash(path) for path in runner_files}
         self.identity = {"build": self.build_identity,
             "definition_sha256": hashlib.sha256(json.dumps(definition, sort_keys=True).encode()).hexdigest(),
@@ -189,8 +213,12 @@ def observation_key(state):
                 "native.demo", "native.tutorial_pause", "native.game_over", "native.story",
                 "native.status_CRAWL", "native.status_SQUAT", "native.status_STAND", "native.status_CARRY"]
     native = state.get("native", {})
-    if state.get("menu") is True or state.get("idroid") is True:
+    sequence = native.get('sequence')
+    acc_selector = isinstance(sequence, str) and sequence.startswith(('Seq_Game_WeaponCustomize', 'Seq_Game_MissionPreparation'))
+    if state.get("menu") is True or state.get("idroid") is True or acc_selector:
         required += ["native.menu_page", "native.menu_parent", "native.menu_focus"]
+    if isinstance(sequence, str) and sequence.startswith('Seq_Game_WeaponCustomize'):
+        required += ['native.customization_target']
     if native.get("player_vehicle_id") != 65535:
         required += ["native.player_role"]
     values, missing = {}, []
