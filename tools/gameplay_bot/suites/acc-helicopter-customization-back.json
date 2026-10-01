@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "description": "Unverified native ACC helicopter-selector cancel probe. Run only on an already-open, visually reviewed selector; it opens no menu, purchases nothing and sends one ordinary VR Back action. This does not cover helicopter development through iDroid.",
+  "source_contract": "HELI_COMMON Seq_Game_WeaponCustomize -> Customize_Abort -> Seq_Game_WeaponCustomizeAbort -> Seq_Game_MainGame. Native selector exit resets CustomizeSelector; no forced iDroid close or progression writes.",
+  "continue_after_outcome_failure": false,
+  "cases": [
+    {
+      "id": "acc-helicopter-customization-cancel",
+      "before": {
+        "scene": "menu",
+        "menu": true,
+        "idroid": false,
+        "controls.context": "menus",
+        "native.title": false,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_WeaponCustomize",
+        "native.customization_kind": "helicopter",
+        "native.popup": false,
+        "native.saving": false
+      },
+      "entry_timeout": 2,
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "seconds": 0.25,
+          "state_before": {"scene": "menu", "menu": true, "idroid": false},
+          "native_before": {
+            "title": false,
+            "helicopter_space": true,
+            "sequence": "Seq_Game_WeaponCustomize",
+            "customization_kind": "helicopter",
+            "popup": false,
+            "saving": false
+          }
+        }
+      ],
+      "after": {
+        "scene": "cabin",
+        "cabin": true,
+        "menu": false,
+        "idroid": false,
+        "native.title": false,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false
+      },
+      "timeout": 8,
+      "after_stable_samples": 3
+    }
+  ]
+}

@@ -18,6 +18,24 @@ field('sequence', function() return TppSequence.GetCurrentSequenceName() end)
 -- names. Preserve the authored target separately; nil is unknown, never a
 -- default helicopter target. This read does not change native menu ownership.
 field('customization_target', function() return mvars.startCustomizeTarget end)
+field('helicopter_space', function() return TppMission.IsHelicopterSpace(vars.missionCode) end)
+field('customization_kind', function()
+    if TppSequence.GetCurrentSequenceName() ~= 'Seq_Game_WeaponCustomize' then return nil end
+    local target = mvars.startCustomizeTarget
+    if target == nil then return nil end
+    assert(type(target) == 'number' and type(Fox) == 'table' and type(Fox.StrCode32) == 'function',
+        'native customization target/hash API unavailable')
+    for kind, name in pairs({weapon='Customize_Target_Weapon', helicopter='Customize_Target_Helicopter',
+                            vehicle='Customize_Target_Vehicle'}) do
+        if target == Fox.StrCode32(name) then return kind end
+    end
+    return 'unrecognized'
+end)
+-- Read our own player-pad registration separately from the retail selector's
+-- mask. A terminal-close recovery is not a selector Cancel/End transition.
+field('vr_idroid_player_pad_block', function()
+    return TppGameStatus.IsSet('MGS5VR_iDroid', 'S_DISABLE_PLAYER_PAD')
+end)
 field('title', function() return gvars.ini_isTitleMode end)
 field('story', function() return gvars.str_storySequence end)
 field('player_x', function() return vars.playerPosX end)

@@ -1,5 +1,6 @@
 """Behavior failure tests. These fixtures do not claim native gameplay passed."""
 import json
+import copy
 import pathlib
 import sys
 import tempfile
@@ -187,6 +188,37 @@ class BotTests(unittest.TestCase):
 
     def behavior(self, adapter):
         return Behaviors(adapter, self.events, self.clock, self.clock.sleep)
+
+    def test_acc_helicopter_back_cannot_dispatch_on_field_idroid_weapon_or_unknown_target(self):
+        path=pathlib.Path(__file__).resolve().parents[1]/'tools/gameplay_bot/suites/acc-helicopter-customization-back.json'
+        case=json.loads(path.read_text())['cases'][0]
+        good={'scene':'menu','menu':True,'idroid':False,'controls':{'context':'menus'},
+              'native':{'title':False,'helicopter_space':True,'sequence':'Seq_Game_WeaponCustomize',
+                        'customization_kind':'helicopter','popup':False,'saving':False}}
+        changes=[{'helicopter_space':False},{'sequence':'Seq_Game_MainGame'},
+                 {'customization_kind':'weapon'},{'customization_kind':None},{'popup':True},{'saving':True}]
+        for change in changes:
+            state=copy.deepcopy(good);state['native'].update(change)
+            adapter=Adapter([state])
+            result=self.behavior(adapter).case(case)
+            self.assertEqual(result['failure_phase'],'entry')
+            self.assertEqual(adapter.actions,0)
+        state=copy.deepcopy(good);state['idroid']=True
+        adapter=Adapter([state]);self.behavior(adapter).case(case)
+        self.assertEqual(adapter.actions,0)
+
+    def test_acc_cancel_must_observe_native_main_cabin_instead_of_a_closed_terminal_only(self):
+        path=pathlib.Path(__file__).resolve().parents[1]/'tools/gameplay_bot/suites/acc-helicopter-customization-back.json'
+        case=json.loads(path.read_text())['cases'][0]
+        opened={'scene':'menu','menu':True,'idroid':False,'controls':{'context':'menus'},
+                'native':{'title':False,'helicopter_space':True,'sequence':'Seq_Game_WeaponCustomize',
+                          'customization_kind':'helicopter','popup':False,'saving':False}}
+        # iDroid is already closed on this selector: its close bit cannot prove Cancel.
+        adapter=Adapter([opened]*2)
+        result=self.behavior(adapter).case(case)
+        self.assertEqual(result['failure_phase'],'outcome')
+        self.assertEqual(adapter.actions,1)
+        self.assertEqual(result['status'],'failed')
 
     def test_unknown_scene_is_not_gameplay(self):
         self.assertEqual(scene({"camera_active": True, "camera_available": True}), "unknown")

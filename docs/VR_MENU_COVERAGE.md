@@ -96,3 +96,13 @@ personally experience it. The field baseline does not reproduce that report.
 Keep ACC iDroid development and ACC helicopter customization as separate
 candidate paths until the exact screen is established. Progression-changing
 tests require a verified isolated save/checkpoint fixture.
+
+The targeted customization cancel probe is
+`tools/gameplay_bot/suites/acc-helicopter-customization-back.json`. It has not
+run in game. On a visually reviewed, already-open ACC helicopter selector,
+run it with `tools/workspace.py bot --command run --suite <that path>`.
+It opens no menu and sends one ordinary Back through the effective VR binding;
+exact selector, target, popup/save and input-context guards are checked before
+dispatch. Return must reach the native main cabin, not merely clear iDroid's
+open bit. Failed outcomes stop; no repeated Back or native state forcing is
+used as the test recipe. Development through iDroid remains a separate path.

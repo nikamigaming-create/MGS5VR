@@ -31,7 +31,7 @@ acceptance remain open. The September 30 GitHub prerelease is unchanged.
 The editor passed 38 headless fixture checks, including complete save/reload,
 discard, orbit/zoom, accurate fractional text scale and reset preserving
 handheld mode. The retained controller guide still resolves 98 action locations
-across eight contexts. The focused bot contracts now have 104 checks.
+across eight contexts. The focused bot contracts now have 106 checks.
 
 The local weapon fit adds a separate **One-hand weapon tilt**, default -30
 degrees, applied through the common native firing wrist. Gun, hand, physical
@@ -93,6 +93,16 @@ requires an explicitly named Pause transition.
 September 30 planner replay is pending: the maintained test launch stopped
 before starting MGSV because Steam was not running. The source/build checks
 do not stand in for native state-route acceptance or ACC reproduction.
+
+The ACC exit trace confirms that helicopter customization uses the native
+`Customize_Abort`/End path and `CustomizeSelector` pad mask; held-Back iDroid
+recovery cannot close that selector. The scenario query now reports the native
+customization kind and our separate player-pad exclusion. A guarded, unrun
+`acc-helicopter-customization-back.json` probe sends one ordinary VR Back only
+on an already-open helicopter selector, rechecks its native identity immediately
+before input and requires return to `Seq_Game_MainGame`/cabin. It performs no
+purchase, forced terminal close or save write. This is reproduction tooling,
+not a claimed fix, and does not cover development through iDroid.
 
 The cutscene's exact hologram distance and scale have **not** been recovered.
 The current 8 cm default is approximate. The native device sockets, parts
