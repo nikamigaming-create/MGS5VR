@@ -1,5 +1,6 @@
 """Transport recovery boundary tests; no operator or game is launched."""
 import base64
+import hashlib
 import io
 import pathlib
 import sys
@@ -219,7 +220,10 @@ class LiveRecoveryIntegrationTests(unittest.TestCase):
     def test_right_recovery_retains_partial_metrics_and_admits_only_fresh_pair(self):
         live, replacement = self.fixture()
         old = live.operator
-        accepted = live.capture("recovery")
+        # Windows wall-clock resolution can repeat a nanosecond timestamp.
+        # A fresh pair must not overwrite the rejected pair's evidence.
+        with mock.patch("gameplay_bot.live.time.time_ns", return_value=123):
+            accepted = live.capture("recovery")
         captures = [fields for event, fields in live.events.rows if event == "capture"]
         invalidated = next(fields for event, fields in live.events.rows if event == "capture_pair_invalidated")
         self.assertTrue(old.closed)
@@ -232,6 +236,9 @@ class LiveRecoveryIntegrationTests(unittest.TestCase):
         live.presentation_guard.admit.assert_called_once()
         self.assertEqual(live.presentation_guard.admit.call_args.args[0], accepted)
         self.assertTrue(set(accepted).isdisjoint(invalidated["partial_captures"]))
+        for capture in captures:
+            self.assertEqual(hashlib.sha256(pathlib.Path(capture["path"]).read_bytes()).hexdigest(),
+                             capture["sha256"])
         self.assertEqual([args["eye"] for tool, args, _ in replacement.calls
                           if tool == "openxr_capture_composited_image"], ["right", "left", "right"])
         self.assertTrue(all(call[2] == 15. for call in replacement.calls))

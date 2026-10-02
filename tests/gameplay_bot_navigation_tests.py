@@ -32,9 +32,9 @@ class NavigationTests(unittest.TestCase):
             atlas=NavigationAtlas(manifest,{'locations':[{'key':'afgh','code':10},{'key':'mafr','code':20}]})
             with patch.object(NativeMap,'from_files') as loader:
                 atlas.select(20)
-                self.assertEqual(loader.call_args.args[0],[str(pathlib.Path(d)/'mafr.nav2')])
+                self.assertEqual(loader.call_args.args[0],[str((pathlib.Path(d)/'mafr.nav2').resolve())])
                 atlas.select(10)
-                self.assertEqual(loader.call_args.args[0],[str(pathlib.Path(d)/'afgh.nav2')])
+                self.assertEqual(loader.call_args.args[0],[str((pathlib.Path(d)/'afgh.nav2').resolve())])
 
     def test_atlas_cannot_reuse_an_afghanistan_graph_in_africa(self):
         with tempfile.TemporaryDirectory() as d:

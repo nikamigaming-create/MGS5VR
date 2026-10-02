@@ -583,9 +583,20 @@ class Live:
             block = next((b for b in result.get("content", []) if b.get("type") == "image"), None)
             if not block:
                 raise BotFault("Compositor returned no image")
-            path = self.events.output / f"{label}-{time.time_ns()}-{eye}.png"
             pixels = base64.b64decode(block["data"], validate=True)
-            path.write_bytes(pixels)
+            stamp = time.time_ns()
+            while True:
+                path = self.events.output / f"{label}-{stamp}-{eye}.png"
+                try:
+                    output = path.open("xb")
+                except FileExistsError:
+                    # Wall-clock resolution/recovery can repeat a timestamp.
+                    # Keep every prior capture immutable, including rejected pairs.
+                    stamp += 1
+                    continue
+                with output:
+                    output.write(pixels)
+                break
             captures.append(str(path))
             from PIL import Image, ImageStat
             with Image.open(io.BytesIO(pixels)) as frame:
