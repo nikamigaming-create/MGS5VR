@@ -81,7 +81,8 @@
             "sequence": "Seq_Game_WeaponCustomize",
             "helicopter_space": true,
             "customization_kind": "helicopter",
-            "popup": true
+            "popup": true,
+            "saving": false
           }
         },
         {

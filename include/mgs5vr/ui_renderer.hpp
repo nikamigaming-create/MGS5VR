@@ -2,6 +2,7 @@
 #include "stereo.hpp"
 #include "head_camera.hpp"
 #include "native_demo_state.hpp"
+#include "native_popup_state.hpp"
 #include <array>
 #include <cstdint>
 #include <iosfwd>
@@ -20,6 +21,9 @@ bool nativePauseMenuOpen() noexcept;
 // is treated as closing so our optional pause can never trap that transition.
 bool nativeIdroidClosing() noexcept;
 std::optional<unsigned> nativeIdroidTutorialMode() noexcept;
+// Strictly read-only popup identity. Unknown/current/last-result are distinct;
+// the result is not a live focus or choice publication.
+NativePopupSnapshot nativePopupSnapshot() noexcept;
 // Native tutorial pause ownership is separate from its input restriction.
 // Caller must establish the completed ACC guide in the native Lua transaction.
 bool releaseNativeIdroidTutorialPause() noexcept;

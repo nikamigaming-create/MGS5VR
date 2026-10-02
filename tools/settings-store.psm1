@@ -38,6 +38,8 @@ function Test-MgsRuntime([string]$Text) {
     $values=Get-MgsIni $Text
     $ranges=@{
         'theatre.enabled'=@(0,1);'theatre.width_cm'=@(100,3000);'theatre.distance_cm'=@(100,3000)
+        'ui.map_control_prompts'=@(0,1)
+        'optics.binocular_native_material'=@(0,1)
         'diagnostics.native_actions'=@(0,1);'diagnostics.camera_observer'=@(0,1)
         'diagnostics.head_camera_experiment'=@(0,1);'diagnostics.controller_rig_experiment'=@(0,1)
         'diagnostics.wrist_hud_experiment'=@(0,1);'opening.interactive_cabin'=@(0,1)

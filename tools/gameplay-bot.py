@@ -12,7 +12,7 @@ from gameplay_bot.live import InputLease, Live, ROOT, digest, game_identity, rot
 from gameplay_bot.recording import Recording, after_verified_arrival
 from gameplay_bot.locomotion import move_local
 from gameplay_bot.session import preserved_controller_pose, run_suite
-from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack
+from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack, capture_continue_rack
 from gameplay_bot.campaign import read_json, run_campaign, validate_campaign, unstarted_campaign
 from gameplay_bot.idroid import inspect_idroid
 from gameplay_bot.optic_exposure import inspect_optic_exposure
@@ -34,7 +34,7 @@ def continue_game(live, behavior):
             live.release()
             live.call("set_controller_pose", {"hand": "right", "pose_type": "grip", "base_space": "local",
                                                "position": target, "orientation": [0., 0., 0., 1.]})
-            live.capture("continue-hover")
+            capture_continue_rack(live)
             # Re-check current title ownership after capture, before the sole edge.
             state = live.observe()
             if state["scene"] != "title" or not state.get("title_menu"):

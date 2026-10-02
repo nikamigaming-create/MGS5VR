@@ -14,6 +14,7 @@ import subprocess
 import time
 
 from .core import ActionPrerequisiteChanged, BlankCompositorFrame, BotFault, matches, scene
+from .operator_recovery import CapturePairInvalidated, CaptureRecoveryResult, recover_capture_once
 from .startup_evidence import StartupEvidence
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -102,27 +103,48 @@ class NativeReader:
     def __init__(self, timeout=2.):
         self.module = load_tool("mgs5vr_native_reader", "native-actions.py")
         self.timeout = timeout
+        self._readonly_scripts = frozenset(("inspect-bot-state",
+            (ROOT / "tools/scenario-state.lua").read_text(encoding="utf-8")))
 
     def read(self, script):
         # Each request is fully correlated; an ambiguous response is never
         # replayed as an action. Callers submit authored observations or named
         # render diagnostics from an explicitly selected bounded test case.
+        return self._read(script, self.timeout)
+
+    def read_startup_observation(self, script):
+        # A retail title load can stall the Lua queue beyond its ordinary 2 s
+        # budget. Extend only the response deadline of this ONE correlated
+        # authored observation; never resubmit a timed-out request. Unrecognized
+        # Lua, input:* and diagnostics mutations cannot enter this path.
+        if script not in self._readonly_scripts:
+            raise BotFault("Startup observation requires an exact known read-only script")
+        return self._read(script, 8., readonly_startup=True)
+
+    def _read(self, script, response_timeout, *, readonly_startup=False):
         native = self.module
         request = time.time_ns()
         payload = script.encode("utf-8")
         started = time.monotonic()
         with native.connect(self.timeout) as pipe:
             pipe.write(native.REQUEST.pack(request, len(payload)) + payload)
-            deadline = time.monotonic() + self.timeout
-            response, status, length, queued, execution = native.RESPONSE.unpack(
-                native.read_exact(pipe, native.RESPONSE.size, deadline))
-            if response != request or length > native.MAX_SCRIPT:
-                raise BotFault("Native response identity/size mismatch")
-            body = native.read_exact(pipe, length, deadline).decode("utf-8")
+            deadline = time.monotonic() + response_timeout
+            try:
+                response, status, length, queued, execution = native.RESPONSE.unpack(
+                    native.read_exact(pipe, native.RESPONSE.size, deadline))
+                if response != request or length > native.MAX_SCRIPT:
+                    raise BotFault("Native response identity/size mismatch")
+                body = native.read_exact(pipe, length, deadline).decode("utf-8")
+            except RuntimeError as error:
+                if readonly_startup and str(error) == "native action response timed out; action completion is unknown":
+                    raise BotFault("Native read-only startup observation timed out after 8 seconds; request not replayed") from error
+                raise
         if status:
             raise BotFault(f"Native observation rejected: {status}: {body}")
         return json.loads(body), {"seconds": time.monotonic()-started,
-                                  "queued_ms": queued, "execution_us": execution}
+                                  "queued_ms": queued, "execution_us": execution,
+                                  "response_timeout_seconds": response_timeout,
+                                  "readonly_startup": readonly_startup}
 
 
 def rotate(q, v):
@@ -180,13 +202,32 @@ def authoritative_controls(state):
 def fresh_control_observation(observe, *, native=False, timeout=2., clock=None, sleep=None):
     """Wait only for a fresh publication; never replay a gameplay action."""
     clock, sleep = clock or time.monotonic, sleep or time.sleep
-    deadline = clock() + timeout
+    started = clock()
+    if not finite_number(started) or not finite_number(timeout) or timeout < 0:
+        raise BotFault("Control observation clock or timeout is invalid")
+    deadline = started + timeout
+    if not finite_number(deadline):
+        raise BotFault("Control observation clock or timeout is invalid")
+    prior_read_finished = started
     while True:
+        read_started = clock()
+        if not finite_number(read_started) or read_started < prior_read_finished:
+            raise BotFault("Control observation clock is invalid")
         state = observe(native=native)
+        read_finished = clock()
+        if not finite_number(read_finished) or read_finished < read_started:
+            raise BotFault("Control observation clock is invalid")
+        prior_read_finished = read_finished
         try:
-            return state, authoritative_controls(state)
+            controls = authoritative_controls(state)
+            # inspect-bot-state precedes the synchronous native Lua query.
+            # Include all read latency conservatively, without rewriting the
+            # native now/sample/age fields into a different clock domain.
+            if controls["age_ms"] + (read_finished - read_started) * 1000 > 250:
+                raise ControlSampleUnavailable("Native control publication aged during observation")
+            return state, controls
         except ControlSampleUnavailable:
-            remaining = deadline - clock()
+            remaining = deadline - read_finished
             if remaining <= 0:
                 raise
             sleep(min(.025, remaining))
@@ -196,6 +237,32 @@ def authoritative_context(state):
     """Require the current, fresh context from the native XR control resolver."""
     controls = authoritative_controls(state)
     return controls["context"]
+
+
+def released_startup_observation(state, held):
+    """Admit a longer observation at the reproduced, released title splash."""
+    if (held or state.get("scene") != "title" or state.get("title") is not True
+            or state.get("title_menu") is not False or state.get("camera_active") is not False
+            or any(state.get(key) is not False for key in ("menu", "idroid", "pause"))):
+        return False
+    try:
+        controls = authoritative_controls(state)
+    except BotFault:
+        return False
+    fast_seconds = state.get("transport", {}).get("seconds")
+    if (controls["context"] not in ("menus", "nativeButtons")
+            or not finite_number(fast_seconds) or fast_seconds < 0
+            or controls["age_ms"] + fast_seconds * 1000 > 250
+            or type(controls.get("native_buttons")) is not int or controls["native_buttons"] != 0):
+        return False
+    for key, count in (("physical", 11), ("sticks", 4), ("native_axes", 4), ("native_triggers", 2)):
+        values = controls.get(key)
+        if (not isinstance(values, list) or len(values) != count
+                or any(not finite_number(value) or abs(value) > .001 for value in values)):
+            return False
+    touches = controls.get("touches")
+    return (isinstance(touches, dict) and len(touches) == 10
+            and all(finite_number(value) and abs(value) <= .001 for value in touches.values()))
 
 
 def static_grip_capture_allowed(held, state, bindings):
@@ -337,7 +404,15 @@ class Live:
     def __init__(self, proxy, game, bindings, events, *, operator=None):
         self.events, self.game, self.bindings = events, pathlib.Path(game), bindings
         self.native = NativeReader()
-        self.operator = operator or load_tool("mgs5vr_operator", "record-simulator.py").Operator(pathlib.Path(proxy))
+        self._operator_factory = None
+        if operator is None:
+            operator_type = load_tool("mgs5vr_operator", "record-simulator.py").Operator
+            proxy_path = pathlib.Path(proxy)
+            self._operator_factory = lambda: operator_type(proxy_path)
+            self.operator = self._operator_factory()
+        else:
+            self.operator = operator
+        self._capture_recovery_used = False
         self.held = {}
         self.transport_error = None
         self.last_tick = None
@@ -424,7 +499,10 @@ class Live:
             # nonzero channel also has its own operator-side expiry.
             self.transport_error = str(error)
             self.events.emit("operator_transport_failed", tool=suffix, error=self.transport_error)
-            raise
+            factory = getattr(self, "_operator_factory", None)
+            if factory is None:
+                raise
+            result = recover_capture_once(self, suffix, args, error, make_operator=factory)
         # Binary captures are stored separately, never duplicated in JSONL.
         self.events.emit("rpc_completed", tool=suffix, seconds=time.monotonic()-started)
         return result
@@ -446,7 +524,13 @@ class Live:
         controls = state.get("controls") or {}
         native_presentation = state.get("camera_active") is False and controls.get("context") == "nativeButtons"
         if native or native_presentation:
-            state["native"], state["lua_transport"] = self.native.read(self.lua_script)
+            if released_startup_observation(state, getattr(self, "held", {})):
+                state["native"], state["lua_transport"] = self.native.read_startup_observation(self.lua_script)
+                if state["lua_transport"]["seconds"] > self.native.timeout:
+                    self.events.emit("startup_observation_wait", native_tick=tick,
+                                     transport=state["lua_transport"], request_replayed=False)
+            else:
+                state["native"], state["lua_transport"] = self.native.read(self.lua_script)
             state["scene"] = scene(state)
         self.events.emit("observation", state=state)
         return state
@@ -461,6 +545,13 @@ class Live:
                 raise BotFault("Only sampled stationary weapon-ready/support grips permit an optic inspection capture")
             try:
                 captures = self._capture_once(label, static_grip_state=state if static_grips else None)
+            except CapturePairInvalidated as error:
+                self.events.emit("capture_pair_restart", label=label,
+                                 partial_captures=error.captures,
+                                 native_tick=error.state.get("now_ms"))
+                # Reobserve both the native state and both eyes. Keep the
+                # existing presentation deadline and guard unchanged.
+                continue
             except BlankCompositorFrame as error:
                 error.state = state
                 raise
@@ -486,6 +577,9 @@ class Live:
                 if not static_grip_capture_allowed(self.held, sampled, self.bindings):
                     raise BotFault("Static grip expired or gameplay input changed during optic capture")
             result = self.call("capture_composited_image", {"eye": eye})
+            recovered = result if isinstance(result, CaptureRecoveryResult) else None
+            if recovered is not None:
+                result = recovered.mcp_result
             block = next((b for b in result.get("content", []) if b.get("type") == "image"), None)
             if not block:
                 raise BotFault("Compositor returned no image")
@@ -499,9 +593,14 @@ class Live:
                 maximum = gray.getextrema()[1]
                 deviation = ImageStat.Stat(gray).stddev[0]
                 metrics = {"size": list(frame.size), "maximum": maximum, "luma_stddev": deviation}
-            self.events.emit("capture", eye=eye, path=str(path), sha256=digest(path), source="final_compositor", metrics=metrics)
+            self.events.emit("capture", eye=eye, path=str(path), sha256=digest(path), source="final_compositor", metrics=metrics,
+                             recovered_partial=recovered is not None)
             if maximum <= 3 or deviation < .5:
                 raise BlankCompositorFrame(f"Blank/uniform {eye} compositor frame retained at {path}; readiness not proven")
+            if recovered is not None:
+                self.events.emit("capture_pair_invalidated", label=label, eye=eye,
+                                 partial_captures=captures, reason="operator_capture_recovery")
+                raise CapturePairInvalidated(captures, recovered.state)
         return captures
 
     def pose_snapshot(self, label):
@@ -680,7 +779,7 @@ class Live:
         # this fresh state; the 250 ms freshness limit is unchanged.
         state, control_sample = fresh_control_observation(self.observe, native=bool(step.get("native_before")))
         if step.get("state_before") and not matches(state, step["state_before"]):
-            raise BotFault("Observed action prerequisite changed")
+            raise ActionPrerequisiteChanged("Observed action prerequisite changed")
         if name == "system.toggle_vr":
             require_presentation_transition(state, step.get("target_presentation"))
         # Scene labels do not distinguish equipment, Commands, optics, vehicles,

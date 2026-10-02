@@ -1,4 +1,5 @@
 #include "mgs5vr/xr_runtime.hpp"
+#include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/controls.hpp"
@@ -950,14 +951,10 @@ struct Session {
             openingFrame.pulse==OpeningPulse::confirm&&!utilityCenter&&!headToggle);
         if(liveIdroid&&controllerFrame.handheldMenus&&!handheldMenuInputReady())
             pad.leftX=pad.leftY=0;
-        bool xrIntent=false;
-        for(size_t n=0;n<11;++n)xrIntent=xrIntent||physical.buttons[n]>.25f;
-        xrIntent=xrIntent||(physical.buttons[19]>.25f&&controls.hasBindingInput("left_thumbrest"))
-            ||(physical.buttons[20]>.25f&&controls.hasBindingInput("right_thumbrest"));
-        for(const auto stick:{physical.leftStick,physical.rightStick})
-            xrIntent=xrIntent||std::abs(stick[0])>.25f||std::abs(stick[1])>.25f;
-        gamepadMailbox().publish(pad,true,steadyMilliseconds(),xrIntent);
-        publishControlInputAudit({controlContext,physical,steadyMilliseconds(),pad.buttons,rigInput,static_cast<int>(mode)});
+        const auto packetTime=steadyMilliseconds();
+        gamepadMailbox().publish(pad,true,packetTime,controls.hasPhysicalIntent(physical));
+        publishControlInputAudit({controlContext,physical,packetTime,pad.buttons,rigInput,static_cast<int>(mode),
+            {pad.leftX,pad.leftY,pad.rightX,pad.rightY},{pad.leftTrigger,pad.rightTrigger}});
         const auto hapticNow=steadyMilliseconds();
         const auto wheel=wheelMailbox().read(hapticNow);
         const bool holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped&&controllerFrame.wheelGrip;
@@ -1278,6 +1275,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
                     const bool leftReady=leftEye.prepare(consumer.texture(),consumer.frame(),0);
                     const bool rightReady=rightEye.prepare(consumer.texture(),consumer.frame(),1);
                     if(leftReady&&rightReady&&acceptedStereo.accept(metadata,consumer.frame().epoch,cameraStatus.activation,steadyMilliseconds(),session.referenceEpoch)){
+                        acceptOpticNativeLightingFrame(metadata);
                         for(size_t n=0;n<2;++n)eyeScreens[n]->publishPrepared(consumer.texture(),consumer.frame(),static_cast<uint32_t>(n));
                         // The loading panel moved nearer while the frozen scene
                         // was retained. Restore its normal distance before

@@ -5,10 +5,20 @@
 
 struct ID3D11DeviceContext;
 struct ID3D11Texture2D;
+struct ID3D11PixelShader;
 
 namespace mgs5vr {
 struct OpticWaypoints;
+struct OpticNativeLightingSource;
+struct EyeFrame;
 
+// Native material insertion is legal only at the exact verified 4MT shader's
+// three-MRT/writable-depth head draw. The caller must independently prove its
+// native program-object/GPU shader join; an unclassified binding is false.
+// This leaves the current late housing fallback in place until it succeeds.
+bool drawNativeBinocularMaterialGBuffer(ID3D11DeviceContext*,
+    const OpticNativeLightingSource&,ID3D11PixelShader* exactNativeShader,
+    bool nativeProgramGpuJoinVerified=false) noexcept;
 // Copy the independent device-camera scene before the normal HMD eyes are
 // rendered. This texture never enters the stereo mailbox.
 bool capturePhysicalOpticScene(ID3D11DeviceContext* context,
@@ -40,7 +50,7 @@ bool drawPhysicalBinoculars(ID3D11DeviceContext* context,
     const std::array<float,16>& projection,
     float magnification,
     ID3D11Texture2D* sceneSource,
-    bool lensVisible) noexcept;
+    bool lensVisible,const EyeFrame* sourceEye=nullptr) noexcept;
 
 // Draw the hand-carried iDroid housing around the native UI screen. The
 // center stays open so the live game pixels remain the device's front display.

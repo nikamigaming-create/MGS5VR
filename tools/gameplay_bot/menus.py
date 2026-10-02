@@ -39,12 +39,42 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     # Resolve and validate everything before dispatch. This operation only
     # moves the menu cursor; selection stays a separate semantic action.
     from .live import authoritative_controls, channel, fresh_control_observation
-    from .core import matches
+    from .core import ActionPrerequisiteChanged, matches
     owner = step.get("owner", "idroid")
     selector = owner in ("customization", "customization_popup")
-    if owner not in ("idroid", "pause", "pause_popup", "customization", "customization_popup"):
+    help_owner = owner == "mother_base_help"
+    if owner not in ("idroid", "pause", "pause_popup", "customization", "customization_popup", "mother_base_help"):
         raise BotFault("Menu navigation requires an explicit supported owner")
     native_guard = step.get("native_before")
+    state_guard = step.get("state_before")
+    if state_guard is not None and (not isinstance(state_guard, dict) or not state_guard):
+        raise BotFault("Navigation state prerequisite must be a nonempty predicate")
+    help_state = {"scene":"menu", "menu":True, "idroid":True, "pause":True,
+                  "idroid_menu_input_ready":True, "title":False, "loading":False,
+                  "controls.context":"menus", "controls.native_buttons":0,
+                  "popup_observer.reader_verified":True, "popup_observer.owner_verified":True,
+                  "popup_observer.active":False}
+    help_native = {"mission":40010, "sequence":"Seq_Game_MainGame", "helicopter_space":True,
+                   "title":False, "popup":False, "tutorial_pause":False, "saving":False}
+    if help_owner:
+        # These flags describe the observed ACC Help ownership intersection,
+        # not a native page/cursor identity. Admit only a fresh supervised
+        # decision after both final eyes were reviewed; platform acceptance
+        # still requires an actual diagram/header change in the new eyes.
+        def contains_exact(candidate, required):
+            return isinstance(candidate, dict) and all(
+                type(candidate.get(key)) is type(value) and candidate[key] == value
+                for key, value in required.items())
+        if (getattr(live, "supervised", False) is not True
+                or not contains_exact(state_guard, help_state)
+                or not contains_exact(native_guard, help_native)):
+            raise BotFault("Mother Base Help navigation requires supervised reviewed Help and complete ACC prerequisites")
+    # A row may intentionally change on this edge. Only the explicitly
+    # requested popup identity survives navigation; completed results and
+    # sample timestamps are not current focus or a stable dialog identity.
+    popup_fields = {"reader_verified", "owner_verified", "active", "numeric_id", "string_id"}
+    popup_guard = {key:value for key,value in (state_guard or {}).items()
+                   if key in {"popup_observer." + field for field in popup_fields}}
     if owner != "idroid" and (not isinstance(native_guard, dict) or not native_guard):
         raise BotFault("Spatial menu navigation requires native scene prerequisites")
     if owner in ("pause_popup", "customization_popup") and native_guard.get("popup") is not True:
@@ -79,7 +109,11 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     axis = (0 if source == "left_stick" else 2) + (1 if direction in ("up", "down") else 0)
 
     def sample(state, *, check_native=True):
-        if owner == "idroid":
+        if help_owner:
+            if (not matches(state, help_state)
+                    or (check_native and not matches(state.get("native", {}), help_native))):
+                raise BotFault("Mother Base Help navigation lost its reviewed owner or native scene prerequisite")
+        elif owner == "idroid":
             if (state.get("idroid") is not True or state.get("idroid_menu_input_ready") is not True
                     or state.get("pause") is not False):
                 raise BotFault("iDroid navigation lost its native input owner")
@@ -90,7 +124,9 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
             if (state.get("scene") != "menu" or state.get("menu") is not True
                     or state.get("pause") is not (not selector) or state.get("idroid") is not False
                     or state.get("title") is not False or state.get("loading") is not False
-                    or (check_native and (native.get("popup") is not expected_popup or not matches(native, native_guard)))):
+                    or (check_native and (native.get("popup") is not expected_popup
+                                          or (selector and native.get("saving") is not False)
+                                          or not matches(native, native_guard)))):
                 raise BotFault("Spatial menu navigation lost its native input owner or scene prerequisite")
         controls = authoritative_controls(state)
         if controls["context"] != "menus":
@@ -102,7 +138,24 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
             raise BotFault("Fresh native menu stick samples are unavailable")
         return controls
 
-    initial, _ = fresh_control_observation(live.observe, native=native_sample or bool(native_guard))
+    def check_popup(state, *, admission=False):
+        if not popup_guard:
+            return
+        observer = state.get("popup_observer")
+        now, sampled = state.get("now_ms"), observer.get("sample_ms") if isinstance(observer, dict) else None
+        if (not isinstance(observer, dict) or observer.get("reader_verified") is not True
+                or observer.get("owner_verified") is not True
+                or observer.get("active") is not expected_popup
+                or type(now) is not int or type(sampled) is not int
+                or now < 0 or sampled < 0 or not 0 <= now - sampled <= 250
+                or not matches(state, popup_guard)):
+            error = ActionPrerequisiteChanged if admission else BotFault
+            raise error("Navigation popup identity or fresh owner changed")
+
+    initial, _ = fresh_control_observation(live.observe, native=native_sample or bool(native_guard), clock=clock, sleep=sleep)
+    if state_guard is not None and not matches(initial, state_guard):
+        raise ActionPrerequisiteChanged("Observed navigation prerequisite changed")
+    check_popup(initial, admission=True)
     admitted = sample(initial)["sample_ms"]
     live.release()
     live.events.emit("semantic_menu_navigation", source=source, direction=direction, owner=owner,
@@ -145,6 +198,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     while clock() < deadline:
         state, _ = fresh_control_observation(live.observe, native=native_sample or bool(native_guard), clock=clock, sleep=sleep)
         current = sample(state)
+        check_popup(state)
         if all(abs(v) < .08 for v in current["sticks"]):
             neutral_since = current["sample_ms"] if neutral_since is None else neutral_since
             if current["sample_ms"] - neutral_since >= 100:

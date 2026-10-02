@@ -312,6 +312,27 @@ std::optional<HeadCameraSample> HeadCamera::publishedView() const {
     if(!active_||!lastView_.applied||lastView_.activation!=activation_)return {};
     return lastView_;
 }
+std::optional<HeadCameraSample> HeadCamera::publishedRigFrame(uint64_t now) const {
+    std::lock_guard lock(mutex_);
+    const auto& frame=rig_.sample;
+    if(!active_||!rig_.camera||rig_.camera!=camera_||!rig_.owner||rig_.owner!=playerOwner_
+        ||!frame.applied||!frame.rigSequence||frame.playerOwner!=rig_.owner
+        ||frame.activation!=activation_||frame.trackingSequence>sequence_
+        ||frame.controllers.referenceEpoch!=controllers_.referenceEpoch
+        ||now<frame.sampleTime||now-frame.sampleTime>150)return {};
+    if(requirePlayerHead_){
+        const auto current=std::find_if(playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){
+            return p.camera==rig_.camera&&p.owner==rig_.owner&&p.sequence;
+        });
+        const auto& p=rig_.sourceCamera;
+        if(current==playerHeads_.end()||now<current->time||now-current->time>150
+            ||current->sourceCamera.position.x!=p.position.x||current->sourceCamera.position.y!=p.position.y
+            ||current->sourceCamera.position.z!=p.position.z||current->sourceCamera.orientation.x!=p.orientation.x
+            ||current->sourceCamera.orientation.y!=p.orientation.y||current->sourceCamera.orientation.z!=p.orientation.z
+            ||current->sourceCamera.orientation.w!=p.orientation.w)return {};
+    }
+    return frame;
+}
 HeadCameraSample HeadCamera::resolve(uintptr_t camera,Pose nativePose,uint64_t time){
     std::lock_guard lock(mutex_);
     return resolveLocked(camera,nativePose,time);

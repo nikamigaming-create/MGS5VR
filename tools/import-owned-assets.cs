@@ -14,6 +14,13 @@ internal static class OwnedAssets
 {
     const int Limit = 16 * 1024 * 1024;
     const ulong Package = 0x522a4f25e0ac957bUL;
+    const ulong ShaderArchiveEntry = 0x2cfffeb10aca508dUL;
+    const int ShaderBankBytes = 113613497;
+    const string ShaderBankHash = "af0c5f3e4084122cf102cae2aef8e0b8c0bb85af8632464a2533832567f97886";
+    const string MaterialShaderName = "fox3ddf_blin_4mt";
+    const string MaterialShaderPath = "shaders/dx11/fox3ddf_blin_4mt-ps.dxbc";
+    const int MaterialShaderBytes = 233604;
+    const string MaterialShaderHash = "cabc964687cd259e0189b33968b090980aab7e12a9c603e8560536ae2a9e64fe";
     sealed class ModelSpec
     {
         public readonly string Path, Hash;
@@ -40,6 +47,12 @@ internal static class OwnedAssets
     {
         new TextureSpec("Assets/tpp/item/tel/Pictures/tel0_main0_def_c00_bsm.dds", "7cb40d536f37faa66d8153ef04afe6a23331d5bce45908dc7aa3f63558f566b3",
             0x1568643e638c1c21UL, 0xb2c0643e638c1c21UL, 0xb570643e638c1c21UL, 0x5718643e638c1c21UL),
+        new TextureSpec("Assets/tpp/item/tel/Pictures/tel0_main0_def_nrm.dds", "285c9a61b02b5798e79a5013b49ce3344b1f196ae2a56814ab7db6bfb9028eb4",
+            0x156a46fa1ab1bafdUL, 0xb2c246fa1ab1bafdUL, 0xb57246fa1ab1bafdUL, 0x571a46fa1ab1bafdUL),
+        new TextureSpec("Assets/tpp/item/tel/Pictures/tel0_main0_def_srm.dds", "20f1d6b3c6e13c149a79fc3526a524f442fc3457bceaa5ce775579bd0d43b61d",
+            0x156bd2b731b98391UL, 0xb2c3d2b731b98391UL, 0xb573d2b731b98391UL, 0x571bd2b731b98391UL),
+        new TextureSpec("Assets/tpp/item/tel/Pictures/tel0_main0_def_mtm.dds", "88c9679a783ece860f6182d4444b0ad07b59771be2d1b0eedab166e4f18b3e13",
+            0x1568ed887bb8a4d9UL, 0xb2c0ed887bb8a4d9UL, 0xb570ed887bb8a4d9UL, 0x5718ed887bb8a4d9UL),
         new TextureSpec("Assets/tpp/item/cct/Pictures/cct0_main1_def_c00_bsm.dds", "7199b3148526ac7a4db75051762cd80808a678910a880198b381291d350d7f51",
             0x156b3dc7c2e4e39cUL, 0xb2c33dc7c2e4e39cUL, 0xb5733dc7c2e4e39cUL, 0x571b3dc7c2e4e39cUL),
         new TextureSpec("Assets/tpp/item/rdi/Pictures/rdi0_main0_def_c00_bsm.dds", "f8b62e027451ded9864e70c0f189f753c9ea4b85ae6f9f9c9124eaa8c6896f09",
@@ -57,18 +70,18 @@ internal static class OwnedAssets
     static ushort U16(byte[] b, int at) { Range(b, at, 2); return BitConverter.ToUInt16(b, at); }
     static byte[] Slice(byte[] b, int at, int size)
     { Range(b, at, size); var result = new byte[size]; Buffer.BlockCopy(b, at, result, 0, size); return result; }
-    static byte[] Read(Stream input, long at, int size)
+    static byte[] Read(Stream input, long at, int size, int limit = Limit)
     {
-        Require(at >= 0 && size >= 0 && size <= Limit && at <= input.Length && size <= input.Length - at, "Invalid archive extent");
+        Require(at >= 0 && size >= 0 && size <= limit && at <= input.Length && size <= input.Length - at, "Invalid archive extent");
         input.Position = at; var result = new byte[size]; int done = 0;
         while (done < size) { int n = input.Read(result, done, size - done); Require(n > 0, "Short archive read"); done += n; }
         return result;
     }
     static string Hash(byte[] data)
     { using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(data)).Replace("-", "").ToLowerInvariant(); }
-    static byte[] Inflate(byte[] data, int expected, bool zlib)
+    static byte[] Inflate(byte[] data, int expected, bool zlib, int limit = Limit)
     {
-        Require(expected > 0 && expected <= Limit, "Invalid inflated size");
+        Require(expected > 0 && expected <= limit, "Invalid inflated size");
         int skip = zlib ? 2 : 0, tail = zlib ? 4 : 0;
         Require(data.Length >= skip + tail, "Truncated compressed stream");
         if (zlib) Require((data[0] & 15) == 8 && ((data[0] << 8) + data[1]) % 31 == 0 && (data[1] & 32) == 0, "Unsupported zlib header");
@@ -89,7 +102,7 @@ internal static class OwnedAssets
         }
         return output;
     }
-    static byte[] DecodeEntry(byte[] data, uint hashLow, uint expected)
+    static byte[] DecodeEntry(byte[] data, uint hashLow, uint expected, int limit = Limit)
     {
         for (int at = 0; at < data.Length; at++)
         {
@@ -110,11 +123,12 @@ internal static class OwnedAssets
                 mask = unchecked(streamKey + 48828125 * mask);
             }
         }
-        if (compressed) data = Inflate(data, checked((int)expected), true);
+        if (compressed) data = Inflate(data, checked((int)expected), true, limit);
         Require(data.Length == expected, "Decoded QAR size mismatch"); return data;
     }
-    static Dictionary<ulong, byte[]> ReadArchive(Stream input, HashSet<ulong> wanted)
+    static Dictionary<ulong, byte[]> ReadArchive(Stream input, HashSet<ulong> wanted, int entryLimit = Limit)
     {
+        Require(entryLimit >= 1 && entryLimit <= ShaderBankBytes, "Invalid selective archive import limit");
         var header = Read(input, 0, 32);
         Require(U32(header, 0) == 0x52415153 && (U32(header, 24) ^ Xor[0]) == 1, "Only the supported TPP QAR v1 archives can be imported");
         uint count = U32(header, 8) ^ Xor[1]; Require(count <= 1000000, "Archive entry count is excessive");
@@ -134,8 +148,12 @@ internal static class OwnedAssets
             // TPP v1 stores packed length first, inflated length second.
             // Reading the second as packed length also consumes archive padding.
             uint stored = U32(entry, 8) ^ Xor[1], expected = U32(entry, 12) ^ Xor[2];
-            Require(expected > 0 && expected <= Limit && stored >= 4 && stored <= Limit, "Requested asset exceeds import size limit");
-            try { result.Add(hash, DecodeEntry(Read(input, position + 32, (int)stored), (uint)hash, expected)); }
+            Require(expected > 0 && expected <= entryLimit && stored >= 4 && stored <= entryLimit, "Requested asset exceeds import size limit");
+            // Only this exact owned FSOP entry may exceed the ordinary asset cap.
+            if (expected > Limit || stored > Limit)
+                Require(hash == ShaderArchiveEntry && expected == ShaderBankBytes && stored == expected,
+                    "Unsupported large shader archive entry");
+            try { result.Add(hash, DecodeEntry(Read(input, position + 32, (int)stored, entryLimit), (uint)hash, expected, entryLimit)); }
             catch (InvalidDataException e) { throw new InvalidDataException("QAR entry " + hash.ToString("x16") + ": " + e.Message, e); }
         }
         if (result.Count != wanted.Count)
@@ -206,6 +224,139 @@ internal static class OwnedAssets
             return data;
         }
     }
+    // FSOP is an authored sequential name/VS/PS record stream. Only the
+    // selected PS is copied; unrelated programs are never written to disk.
+    static byte[] SelectFsopPixelShader(byte[] bank, string wanted)
+    {
+        int at = 0, records = 0; byte[] selected = null;
+        while (at < bank.Length)
+        {
+            Require(++records <= 65536, "FSOP record count is excessive");
+            int nameBytes = bank[at++];
+            Require(nameBytes > 1, "Invalid FSOP name length"); Range(bank, at, nameBytes);
+            Require(bank[at + nameBytes - 1] == 0, "Unterminated FSOP name");
+            for (int i = 0; i < nameBytes - 1; i++)
+                Require(bank[at + i] >= 32 && bank[at + i] <= 126, "Invalid FSOP ASCII name");
+            string name = Encoding.ASCII.GetString(bank, at, nameBytes - 1); at += nameBytes;
+            for (int stage = 0; stage < 2; stage++)
+            {
+                uint size = U32(bank, at); at += 4;
+                Require(size <= Limit, "FSOP stage exceeds import size limit"); Range(bank, at, size);
+                if (stage == 1 && name == wanted)
+                {
+                    Require(selected == null, "Duplicate requested FSOP shader");
+                    Require(size > 0, "Requested FSOP pixel shader is empty");
+                    selected = Slice(bank, at, (int)size);
+                    for (int i = 0; i < selected.Length; i++) selected[i] ^= 0x9c;
+                }
+                at += (int)size;
+            }
+        }
+        Require(selected != null, "Required owned FSOP pixel shader is missing: " + wanted);
+        return selected;
+    }
+    static string ShaderString(byte[] data, uint offset)
+    {
+        Require(offset < data.Length, "Invalid shader reflection string offset");
+        int start = (int)offset, end = start;
+        while (end < data.Length && end - start <= 128 && data[end] != 0)
+        { Require(data[end] >= 32 && data[end] <= 126, "Invalid shader reflection name"); end++; }
+        Require(end < data.Length && end - start > 0 && end - start <= 128 && data[end] == 0,
+            "Unterminated shader reflection name");
+        return Encoding.ASCII.GetString(data, start, end - start);
+    }
+    static void ValidateSignature(byte[] signature, bool output)
+    {
+        int count = output ? 3 : 6;
+        Require(U32(signature, 0) == count && U32(signature, 4) == 8, "Unexpected material shader signature count");
+        Range(signature, 8, count * 24);
+        string[] names = output ? new[] { "SV_Target", "SV_Target", "SV_Target" }
+            : new[] { "SV_Position", "COLOR", "TEXCOORD", "TEXCOORD", "TEXCOORD", "TEXCOORD" };
+        uint[] indices = output ? new uint[] { 0, 1, 2 } : new uint[] { 0, 0, 0, 5, 6, 7 };
+        uint[] masks = output ? new uint[] { 15, 15, 15 } : new uint[] { 15, 15, 3, 7, 7, 7 };
+        for (int i = 0; i < count; i++)
+        {
+            int row = 8 + i * 24; uint name = U32(signature, row);
+            Require(name >= 8 + count * 24 && ShaderString(signature, name) == names[i]
+                && U32(signature, row + 4) == indices[i] && U32(signature, row + 16) == i
+                && U32(signature, row + 12) == 3 && (U32(signature, row + 20) & 255) == masks[i],
+                "Unsupported material shader signature");
+            Require(U32(signature, row + 8) == (!output && i == 0 ? 1u : 0u), "Unexpected material shader signature system value");
+        }
+    }
+    static void ValidateMaterialShaderReflection(byte[] shader)
+    {
+        Require(shader.Length >= 32 && U32(shader, 0) == 0x43425844 && U32(shader, 24) == shader.Length,
+            "Invalid material shader DXBC container");
+        uint count = U32(shader, 28); Require(count >= 4 && count <= 32, "Invalid shader chunk count");
+        Range(shader, 32, count * 4); var chunks = new Dictionary<string, byte[]>();
+        var extents = new List<Tuple<int, int>>();
+        for (int i = 0; i < count; i++)
+        {
+            int offset = checked((int)U32(shader, 32 + i * 4)); Range(shader, offset, 8);
+            int size = checked((int)U32(shader, offset + 4)); Range(shader, offset + 8, size);
+            Require(offset >= 32 + count * 4, "Shader chunk overlaps its header");
+            string name = Encoding.ASCII.GetString(shader, offset, 4);
+            Require(!chunks.ContainsKey(name), "Duplicate shader reflection chunk");
+            chunks.Add(name, Slice(shader, offset + 8, size)); extents.Add(Tuple.Create(offset, offset + 8 + size));
+        }
+        int previous = 0;
+        foreach (var extent in extents.OrderBy(value => value.Item1))
+        { Require(extent.Item1 >= previous, "Overlapping shader chunks"); previous = extent.Item2; }
+        foreach (string name in new[] { "RDEF", "ISGN", "OSGN", "SHEX" })
+            Require(chunks.ContainsKey(name), "Missing material shader reflection chunk: " + name);
+        byte[] program = chunks["SHEX"];
+        Require(program.Length >= 8 && program.Length % 4 == 0 && U32(program, 0) == 0x50
+            && U32(program, 4) == program.Length / 4, "Owned material shader must use native ps_5_0");
+        ValidateSignature(chunks["ISGN"], false); ValidateSignature(chunks["OSGN"], true);
+        byte[] reflection = chunks["RDEF"];
+        Require(U32(reflection, 0) == 2 && U32(reflection, 8) == 11, "Unexpected material shader reflection counts");
+        int cbAt = checked((int)U32(reflection, 4)), bindingAt = checked((int)U32(reflection, 12));
+        Range(reflection, cbAt, 2 * 24); Range(reflection, bindingAt, 11 * 32);
+        var buffers = new Dictionary<string, uint>();
+        for (int i = 0; i < 2; i++)
+        {
+            int row = cbAt + i * 24; string name = ShaderString(reflection, U32(reflection, row));
+            Require(!buffers.ContainsKey(name) && U32(reflection, row + 20) == 0, "Invalid material shader constant buffer");
+            buffers.Add(name, U32(reflection, row + 12));
+        }
+        Require(buffers.ContainsKey("cPSSystem") && buffers["cPSSystem"] == 64
+            && buffers.ContainsKey("cPSMaterial") && buffers["cPSMaterial"] == 128,
+            "Material shader constant-buffer sizes differ from the native contract");
+        string[] resources = { "g_sampler_diffuse", "g_sampler_normal", "g_sampler_srm", "g_samplerPoint_Wrap",
+            "g_tex_diffuse", "g_tex_normal", "g_tex_srm", "g_tex_materialmap", "g_tex_mesh", "cPSSystem", "cPSMaterial" };
+        uint[] slots = { 0, 1, 2, 8, 0, 1, 2, 3, 15, 0, 4 };
+        var seen = new HashSet<string>();
+        for (int i = 0; i < 11; i++)
+        {
+            int row = bindingAt + i * 32; string name = ShaderString(reflection, U32(reflection, row));
+            int expected = Array.IndexOf(resources, name);
+            Require(expected >= 0 && seen.Add(name), "Unexpected or duplicate material shader resource");
+            uint type = expected < 4 ? 3u : expected < 9 ? 2u : 0u;
+            Require(U32(reflection, row + 4) == type && U32(reflection, row + 20) == slots[expected]
+                && U32(reflection, row + 24) == 1, "Material shader binding differs from the native contract");
+            if (type == 2) Require(U32(reflection, row + 8) == 5 && U32(reflection, row + 12) == 4,
+                "Material shader texture must be a native float Texture2D");
+        }
+    }
+    static void ValidateMaterialShaderIdentity(byte[] shader)
+    {
+        Require(shader.Length == MaterialShaderBytes && Hash(shader) == MaterialShaderHash,
+            "Owned material pixel shader differs from the supported asset");
+        ValidateMaterialShaderReflection(shader);
+    }
+    static byte[] ReadMaterialShader(string game)
+    {
+        byte[] bank;
+        using (var input = new FileStream(Path.Combine(game, "master", "data1.dat"), FileMode.Open, FileAccess.Read, FileShare.Read))
+            bank = ReadArchive(input, new HashSet<ulong> { ShaderArchiveEntry }, ShaderBankBytes)[ShaderArchiveEntry];
+        Require(bank.Length == ShaderBankBytes && Hash(bank) == ShaderBankHash,
+            "Owned GrModel shader bank differs from the supported asset");
+        byte[] shader = SelectFsopPixelShader(bank, MaterialShaderName);
+        ValidateMaterialShaderIdentity(shader);
+        Console.WriteLine("Owned shader " + MaterialShaderName + " ps_5_0 bytes=" + shader.Length + " sha256=" + MaterialShaderHash);
+        return shader;
+    }
     static string SafeTarget(string root, string relative)
     {
         var path = Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
@@ -224,6 +375,7 @@ internal static class OwnedAssets
         var outputs = new Dictionary<string, byte[]>();
         foreach (var model in Models) outputs.Add(SafeTarget(destination, model.Path), ReadModel(package, model));
         foreach (var texture in Textures) outputs.Add(SafeTarget(destination, texture.Path), DecodeTexture(textureArchive, texture));
+        outputs.Add(SafeTarget(destination, MaterialShaderPath), ReadMaterialShader(game));
         foreach (var file in outputs) if (File.Exists(file.Key))
         {
             Require(new FileInfo(file.Key).Length == file.Value.Length, "Existing modified asset was preserved: " + file.Key);
@@ -241,7 +393,130 @@ internal static class OwnedAssets
             }
         }
         catch { foreach (string path in created) File.Delete(path); throw; }
-        Console.WriteLine("Imported owned binocular, cassette, radio and iDroid materials locally. No archive or save was modified.");
+        Console.WriteLine("Imported owned binocular, cassette, radio, iDroid materials and native material shader locally. No archive or save was modified.");
+    }
+    // These fixtures are independently authored metadata, not game bytecode.
+    // The synthetic token stream cannot pass the production identity gate.
+    static void Put32(byte[] bytes, int at, uint value)
+    { Range(bytes, at, 4); Buffer.BlockCopy(BitConverter.GetBytes(value), 0, bytes, at, 4); }
+    static uint FixtureName(MemoryStream stream, string name)
+    {
+        uint offset = checked((uint)stream.Position); byte[] bytes = Encoding.ASCII.GetBytes(name + "\0");
+        stream.Write(bytes, 0, bytes.Length); return offset;
+    }
+    static byte[] FixtureSignature(bool output)
+    {
+        int count = output ? 3 : 6;
+        string[] names = output ? new[] { "SV_Target", "SV_Target", "SV_Target" }
+            : new[] { "SV_Position", "COLOR", "TEXCOORD", "TEXCOORD", "TEXCOORD", "TEXCOORD" };
+        uint[] indices = output ? new uint[] { 0, 1, 2 } : new uint[] { 0, 0, 0, 5, 6, 7 };
+        uint[] masks = output ? new uint[] { 15, 15, 15 } : new uint[] { 15, 15, 3, 7, 7, 7 };
+        byte[] header = new byte[8 + count * 24]; Put32(header, 0, (uint)count); Put32(header, 4, 8);
+        using (var stream = new MemoryStream())
+        {
+            stream.Write(header, 0, header.Length);
+            for (int i = 0; i < count; i++)
+            {
+                int row = 8 + i * 24; Put32(header, row, FixtureName(stream, names[i]));
+                Put32(header, row + 4, indices[i]); Put32(header, row + 8, !output && i == 0 ? 1u : 0u);
+                Put32(header, row + 12, 3); Put32(header, row + 16, (uint)i); Put32(header, row + 20, masks[i]);
+            }
+            byte[] result = stream.ToArray(); Buffer.BlockCopy(header, 0, result, 0, header.Length); return result;
+        }
+    }
+    static byte[] FixtureReflection()
+    {
+        const int cbAt = 28, bindingAt = cbAt + 48;
+        byte[] header = new byte[bindingAt + 11 * 32];
+        Put32(header, 0, 2); Put32(header, 4, cbAt); Put32(header, 8, 11); Put32(header, 12, bindingAt);
+        string[] names = { "g_sampler_diffuse", "g_sampler_normal", "g_sampler_srm", "g_samplerPoint_Wrap",
+            "g_tex_diffuse", "g_tex_normal", "g_tex_srm", "g_tex_materialmap", "g_tex_mesh", "cPSSystem", "cPSMaterial" };
+        uint[] slots = { 0, 1, 2, 8, 0, 1, 2, 3, 15, 0, 4 };
+        using (var stream = new MemoryStream())
+        {
+            stream.Write(header, 0, header.Length);
+            for (int i = 0; i < names.Length; i++)
+            {
+                uint name = FixtureName(stream, names[i]); int row = bindingAt + i * 32;
+                uint type = i < 4 ? 3u : i < 9 ? 2u : 0u;
+                Put32(header, row, name); Put32(header, row + 4, type); Put32(header, row + 20, slots[i]); Put32(header, row + 24, 1);
+                if (type == 2) { Put32(header, row + 8, 5); Put32(header, row + 12, 4); }
+                if (i >= 9)
+                { int buffer = cbAt + (i - 9) * 24; Put32(header, buffer, name); Put32(header, buffer + 12, i == 9 ? 64u : 128u); }
+            }
+            byte[] result = stream.ToArray(); Buffer.BlockCopy(header, 0, result, 0, header.Length); return result;
+        }
+    }
+    static byte[] FixtureShader()
+    {
+        string[] tags = { "RDEF", "ISGN", "OSGN", "SHEX" };
+        byte[] program = new byte[8]; Put32(program, 0, 0x50); Put32(program, 4, 2);
+        byte[][] payloads = { FixtureReflection(), FixtureSignature(false), FixtureSignature(true), program };
+        byte[] header = new byte[48]; Put32(header, 0, 0x43425844); Put32(header, 20, 1); Put32(header, 28, 4);
+        using (var stream = new MemoryStream()) using (var writer = new BinaryWriter(stream))
+        {
+            writer.Write(header);
+            for (int i = 0; i < tags.Length; i++)
+            {
+                while (stream.Position % 4 != 0) writer.Write((byte)0);
+                Put32(header, 32 + i * 4, checked((uint)stream.Position));
+                writer.Write(Encoding.ASCII.GetBytes(tags[i])); writer.Write(payloads[i].Length); writer.Write(payloads[i]);
+            }
+            byte[] result = stream.ToArray(); Put32(header, 24, (uint)result.Length);
+            Buffer.BlockCopy(header, 0, result, 0, header.Length); return result;
+        }
+    }
+    static byte[] FixtureFsop(params string[] names)
+    {
+        using (var stream = new MemoryStream()) using (var writer = new BinaryWriter(stream))
+        {
+            foreach (string name in names)
+            {
+                byte[] encoded = Encoding.ASCII.GetBytes(name + "\0"); writer.Write((byte)encoded.Length); writer.Write(encoded);
+                writer.Write(0u); writer.Write(4u);
+                foreach (byte value in Encoding.ASCII.GetBytes("DXBC")) writer.Write((byte)(value ^ 0x9c));
+            }
+            return stream.ToArray();
+        }
+    }
+    static void RejectFixture(Action action, string name)
+    {
+        bool rejected = false; try { action(); } catch (InvalidDataException) { rejected = true; }
+        Require(rejected, name);
+    }
+    static void ShaderSelfTest()
+    {
+        byte[] bank = FixtureFsop("ignored", MaterialShaderName, "also_ignored");
+        Require(Encoding.ASCII.GetString(SelectFsopPixelShader(bank, MaterialShaderName)) == "DXBC", "Selective FSOP PS/XOR fixture");
+        RejectFixture(() => SelectFsopPixelShader(FixtureFsop("ignored"), MaterialShaderName), "Missing FSOP program fixture");
+        RejectFixture(() => SelectFsopPixelShader(FixtureFsop(MaterialShaderName, MaterialShaderName), MaterialShaderName), "Duplicate FSOP program fixture");
+        RejectFixture(() => SelectFsopPixelShader(Slice(bank, 0, bank.Length - 1), MaterialShaderName), "Truncated FSOP extent fixture");
+        bank = FixtureFsop(MaterialShaderName); bank[bank[0]] = 1;
+        RejectFixture(() => SelectFsopPixelShader(bank, MaterialShaderName), "FSOP name termination fixture");
+        bank = FixtureFsop(MaterialShaderName); Put32(bank, bank[0] + 1, Limit + 1u);
+        RejectFixture(() => SelectFsopPixelShader(bank, MaterialShaderName), "Bounded FSOP stage fixture");
+        byte[] shader = FixtureShader(); ValidateMaterialShaderReflection(shader);
+        RejectFixture(() => ValidateMaterialShaderIdentity(shader), "Synthetic shader never receives owned identity");
+        byte[] broken = (byte[])shader.Clone(); Put32(broken, 24, (uint)broken.Length - 1);
+        RejectFixture(() => ValidateMaterialShaderReflection(broken), "DXBC declared-size fixture");
+        broken = (byte[])shader.Clone(); Put32(broken, 36, U32(broken, 32));
+        RejectFixture(() => ValidateMaterialShaderReflection(broken), "DXBC duplicate chunk fixture");
+        broken = (byte[])shader.Clone(); Put32(broken, 32, (uint)broken.Length - 4);
+        RejectFixture(() => ValidateMaterialShaderReflection(broken), "DXBC chunk extent fixture");
+        broken = (byte[])shader.Clone(); Put32(broken, (int)U32(broken, 44) + 8, 0x10050);
+        RejectFixture(() => ValidateMaterialShaderReflection(broken), "Native pixel profile fixture");
+        broken = (byte[])shader.Clone(); Put32(broken, (int)U32(broken, 44) + 12, 999);
+        RejectFixture(() => ValidateMaterialShaderReflection(broken), "Shader token-stream extent fixture");
+        broken = (byte[])shader.Clone(); Put32(broken, (int)U32(broken, 40) + 8, 2);
+        RejectFixture(() => ValidateMaterialShaderReflection(broken), "Three native output targets fixture");
+        broken = (byte[])shader.Clone(); int reflection = (int)U32(broken, 32) + 8;
+        Put32(broken, reflection + 28 + 12, 80);
+        RejectFixture(() => ValidateMaterialShaderReflection(broken), "System buffer size fixture");
+        broken = (byte[])shader.Clone(); Put32(broken, reflection + 76 + 7 * 32 + 20, 9);
+        RejectFixture(() => ValidateMaterialShaderReflection(broken), "MTM binding slot fixture");
+        broken = (byte[])shader.Clone(); Put32(broken, reflection + 76 + 4 * 32 + 12, 5);
+        RejectFixture(() => ValidateMaterialShaderReflection(broken), "Texture2D reflection dimension fixture");
+        Console.WriteLine("Owned shader parser fixtures passed: selective FSOP, missing/duplicate/truncated records, exact identity refusal, DXBC extents, profile, signatures, native buffer and material bindings.");
     }
     static void SelfTest()
     {
@@ -258,6 +533,7 @@ internal static class OwnedAssets
         compressed[compressed.Length - 1] ^= 1;
         rejected = false; try { Inflate(compressed, 5, true); } catch (InvalidDataException) { rejected = true; }
         Require(rejected, "Zlib checksum test");
+        ShaderSelfTest();
         Console.WriteLine("Owned-asset parser self-tests passed.");
     }
     static int Main(string[] args)

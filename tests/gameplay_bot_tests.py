@@ -2,6 +2,7 @@
 import json
 import copy
 import pathlib
+import struct
 import sys
 import tempfile
 import unittest
@@ -9,13 +10,161 @@ from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
 from gameplay_bot.core import ActionPrerequisiteChanged, Behaviors, BlankCompositorFrame, BotFault, Events, ProgressGuard, astar, atomic_json, matches, scene
-from gameplay_bot.live import Live, authoritative_context, channel, fresh_control_observation, held_input_evidence, require_presentation_transition, rotate, static_grip_capture_allowed
+from gameplay_bot.live import Live, NativeReader, authoritative_context, channel, fresh_control_observation, held_input_evidence, released_startup_observation, require_presentation_transition, rotate, static_grip_capture_allowed
 from gameplay_bot.recording import Recording, after_verified_arrival, mux_timeline, validate_raw_video
 from gameplay_bot.session import run_suite
-from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack
+from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack, capture_continue_rack
 from gameplay_bot.startup_evidence import StartupEvidence
 from gameplay_bot.menus import navigate as navigate_menu, observe as observe_menu
 from gameplay_bot.optic_exposure import require_independent_luminance
+from operator_recovery_tests import RecoveryTests, LiveRecoveryIntegrationTests
+
+
+class NativePopupTransportTests(unittest.TestCase):
+    def test_fast_state_transport_preserves_unknown_closed_and_current_popup_values(self):
+        for active, numeric, string_id, last_result in ((None,None,None,None),
+                                                       (False,None,None,-1),
+                                                       (True,0,'0xffffffffffffffff',2)):
+            with self.subTest(active=active):
+                observer={'reader_verified':active is not None,'owner_verified':active is not None,
+                          'sample_ms':99,'coherent_frame':False,'active':active,
+                          'numeric_id':numeric,'string_id':string_id,'last_result':last_result}
+                body=json.dumps({'schema':1,'now_ms':100,'popup_observer':observer}).encode('utf-8')
+                reader=NativeReader.__new__(NativeReader)
+                reader.timeout=2.
+                reader.module=mock.MagicMock(REQUEST=struct.Struct('<QI'),RESPONSE=struct.Struct('<QiIQQ'),MAX_SCRIPT=1024*1024)
+                reader.module.read_exact.side_effect=[reader.module.RESPONSE.pack(42,0,len(body),0,1),body]
+                with mock.patch('gameplay_bot.live.time.time_ns',return_value=42):
+                    state, _=reader.read('inspect-bot-state')
+                self.assertEqual(state['popup_observer'],observer)
+                self.assertIs(state['popup_observer']['active'],active)
+                self.assertNotIn('selection',state['popup_observer'])
+                stream=reader.module.connect.return_value.__enter__.return_value
+                stream.write.assert_called_once_with(reader.module.REQUEST.pack(42,len(b'inspect-bot-state'))+b'inspect-bot-state')
+
+    def test_fresh_observation_retains_popup_diagnostics_without_queueing_lua(self):
+        observer={'reader_verified':True,'owner_verified':True,'sample_ms':99,
+                  'coherent_frame':False,'active':False,'numeric_id':None,'string_id':None,'last_result':2}
+        packet=json.loads(json.dumps({'now_ms':100,'title':False,'loading':False,'demo':False,
+                                     'menu':False,'camera_active':True,'camera_available':True,
+                                     'popup_observer':observer}))
+        live=Live.__new__(Live)
+        live.background_check=None;live.kernel=mock.Mock();live.kernel.WaitForSingleObject.return_value=258
+        live.process_handle=1;live.last_tick=None;live.events=mock.Mock();live.native=mock.Mock()
+        live.native.read.return_value=(packet,{})
+        state=live.observe()
+        self.assertEqual(state['popup_observer'],observer)
+        live.native.read.assert_called_once_with('inspect-bot-state')
+        self.assertEqual(state['scene'],'gameplay')
+
+
+class NativeStartupObservationTests(unittest.TestCase):
+    def reader(self):
+        reader = NativeReader.__new__(NativeReader)
+        reader.timeout = 2.
+        reader._readonly_scripts = frozenset(('inspect-bot-state', 'authored observation'))
+        reader.module = mock.MagicMock(REQUEST=struct.Struct('<QI'), RESPONSE=struct.Struct('<QiIQQ'), MAX_SCRIPT=1024*1024)
+        return reader
+
+    def state(self):
+        return {'now_ms': 100, 'scene': 'title', 'title': True, 'title_menu': False,
+                'camera_active': False, 'menu': False, 'idroid': False, 'pause': False,
+                'transport': {'seconds': .01},
+                'controls': {'context': 'menus', 'sample_ms': 90, 'age_ms': 10,
+                             'native_buttons': 0, 'physical': [0]*11, 'sticks': [0]*4,
+                             'native_axes': [0]*4, 'native_triggers': [0]*2,
+                             'touches': {str(index): 0 for index in range(10)}}}
+
+    def test_slow_known_observation_has_one_correlated_request_and_shared_bounded_deadline(self):
+        reader = self.reader()
+        body = b'{"sequence":"Seq_Demo_StartHasTitleMission"}'
+        reader.module.read_exact.side_effect = [reader.module.RESPONSE.pack(42, 0, len(body), 3000, 1234), body]
+        with mock.patch('gameplay_bot.live.time.time_ns', return_value=42), \
+             mock.patch('gameplay_bot.live.time.monotonic', side_effect=[10., 10., 13.1]):
+            state, timing = reader.read_startup_observation('authored observation')
+        self.assertEqual(state['sequence'], 'Seq_Demo_StartHasTitleMission')
+        self.assertAlmostEqual(timing['seconds'], 3.1)
+        self.assertTrue(timing['readonly_startup'])
+        reader.module.connect.assert_called_once_with(2.)
+        pipe = reader.module.connect.return_value.__enter__.return_value
+        pipe.write.assert_called_once_with(reader.module.REQUEST.pack(42, len(b'authored observation')) + b'authored observation')
+        self.assertEqual([call.args[2] for call in reader.module.read_exact.call_args_list], [18., 18.])
+
+    def test_unknown_script_and_mutation_cannot_enter_long_observation_path(self):
+        for script in ('input:a', 'diagnostics:optic-lens-render:off', 'Player.SetLife(1)', 'authored observation '):
+            with self.subTest(script=script):
+                reader = self.reader()
+                with self.assertRaisesRegex(BotFault, 'exact known read-only'):
+                    reader.read_startup_observation(script)
+                reader.module.connect.assert_not_called()
+
+    def test_action_timeout_keeps_short_deadline_and_unknown_completion(self):
+        reader = self.reader()
+        reader.module.read_exact.side_effect = RuntimeError('native action response timed out; action completion is unknown')
+        with mock.patch('gameplay_bot.live.time.monotonic', return_value=10.):
+            with self.assertRaisesRegex(RuntimeError, 'action completion is unknown'):
+                reader.read('input:a')
+        self.assertEqual(reader.module.read_exact.call_args.args[2], 12.)
+        reader.module.connect.assert_called_once()
+        reader.module.connect.return_value.__enter__.return_value.write.assert_called_once()
+
+    def test_startup_header_or_body_timeout_never_resubmits_or_extends_again(self):
+        timeout = RuntimeError('native action response timed out; action completion is unknown')
+        for responses in ([timeout], [struct.pack('<QiIQQ', 42, 0, 20, 0, 0), timeout]):
+            with self.subTest(body=len(responses) == 2):
+                reader = self.reader()
+                reader.module.read_exact.side_effect = responses
+                with mock.patch('gameplay_bot.live.time.time_ns', return_value=42), \
+                     mock.patch('gameplay_bot.live.time.monotonic', return_value=10.):
+                    with self.assertRaisesRegex(BotFault, 'read-only startup observation timed out.*request not replayed'):
+                        reader.read_startup_observation('authored observation')
+                reader.module.connect.assert_called_once()
+                reader.module.connect.return_value.__enter__.return_value.write.assert_called_once()
+                self.assertTrue(all(call.args[2] == 18. for call in reader.module.read_exact.call_args_list))
+
+    def test_late_observation_still_rejects_wrong_response_identity(self):
+        reader = self.reader()
+        reader.module.read_exact.return_value = reader.module.RESPONSE.pack(43, 0, 1, 0, 0)
+        with mock.patch('gameplay_bot.live.time.time_ns', return_value=42):
+            with self.assertRaisesRegex(BotFault, 'identity/size mismatch'):
+                reader.read_startup_observation('authored observation')
+        reader.module.read_exact.assert_called_once()
+
+    def test_long_read_requires_fresh_sampled_neutral_title_owner(self):
+        self.assertTrue(released_startup_observation(self.state(), {}))
+        self.assertFalse(released_startup_observation(self.state(), {'a': 1}))
+        changes = [('scene', 'gameplay'), ('camera_active', True), ('title_menu', True),
+                   ('menu', True), ('idroid', True), ('pause', True), ('title', None)]
+        for key, value in changes:
+            state = self.state(); state[key] = value
+            with self.subTest(key=key):
+                self.assertFalse(released_startup_observation(state, {}))
+        for key in ('physical', 'sticks', 'native_axes', 'native_triggers'):
+            state = self.state(); state['controls'][key][0] = .1
+            with self.subTest(key=key):
+                self.assertFalse(released_startup_observation(state, {}))
+        state = self.state(); state['controls']['touches']['0'] = 1
+        self.assertFalse(released_startup_observation(state, {}))
+        state = self.state(); state['transport']['seconds'] = .3
+        self.assertFalse(released_startup_observation(state, {}))
+
+    def test_live_uses_readonly_path_without_refreshing_an_aged_control_snapshot(self):
+        live = Live.__new__(Live)
+        live.background_check = None; live.held = {}; live.process_handle = 1; live.last_tick = None
+        live.kernel = mock.Mock(); live.kernel.WaitForSingleObject.return_value = 258
+        live.events = mock.Mock(); live.startup_evidence = mock.Mock(); live.startup_evidence.read.return_value = {}
+        live.lua_script = 'authored observation'; live.native = mock.Mock(); live.native.timeout = 2.
+        packet = self.state()
+        live.native.read.return_value = (packet, {'seconds': .01})
+        live.native.read_startup_observation.return_value = ({'sequence': 'Seq_Demo_StartHasTitleMission'}, {'seconds': 3.})
+        observed = live.observe(native=True)
+        live.native.read.assert_called_once_with('inspect-bot-state')
+        live.native.read_startup_observation.assert_called_once_with('authored observation')
+        self.assertEqual(observed['now_ms'], 100)
+        self.assertEqual(observed['controls']['sample_ms'], 90)
+        self.assertEqual(observed['controls']['age_ms'], 10)
+        self.assertEqual(observed['lua_transport']['seconds'], 3.)
+        self.assertTrue(any(call.args[0] == 'startup_observation_wait' for call in live.events.emit.call_args_list))
 
 
 class OpticExposureOwnershipTests(unittest.TestCase):
@@ -267,6 +416,92 @@ class MenuNavigationTests(unittest.TestCase):
         self.assertTrue(live.observe.call_args_list[-1].kwargs.get("native"))
         self.assertTrue(any(not call.kwargs.get("native") for call in live.observe.call_args_list))
 
+    def help_fixture(self, source="left_stick", change=None):
+        live, clock, active = self.fixture(source)
+        live.supervised = True
+        state_guard = {"scene":"menu", "menu":True, "idroid":True, "pause":True,
+                       "idroid_menu_input_ready":True, "title":False, "loading":False,
+                       "controls.context":"menus", "controls.native_buttons":0,
+                       "popup_observer.reader_verified":True, "popup_observer.owner_verified":True,
+                       "popup_observer.active":False}
+        native_guard = {"mission":40010, "sequence":"Seq_Game_MainGame", "helicopter_space":True,
+                        "title":False, "popup":False, "tutorial_pause":False, "saving":False}
+        original = live.observe.side_effect
+        def state(native=False):
+            value = original(native)
+            value.update(scene="menu", menu=True, pause=True, title=False, loading=False,
+                         native=dict(native_guard), now_ms=int(clock.now * 1000))
+            value["controls"]["native_buttons"] = 0
+            value["popup_observer"] = {"reader_verified":True, "owner_verified":True,
+                                       "active":False, "sample_ms":value["now_ms"]}
+            if change:
+                change(value, bool(active), live.input.called)
+            return value
+        live.observe.side_effect = state
+        return live, clock, active, {"owner":"mother_base_help", "direction":"right",
+                                    "state_before":state_guard, "native_before":native_guard}
+
+    def test_reviewed_help_uses_effective_axis_and_releases_without_held_lua(self):
+        for source in ("left_stick", "right_stick"):
+            with self.subTest(source=source):
+                live, clock, active, step = self.help_fixture(source)
+                original = live.observe.side_effect
+                held_native_reads = []
+                def state(native=False):
+                    if native and active:
+                        held_native_reads.append(True)
+                    return original(native)
+                live.observe.side_effect = state
+                result = navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+                self.assertEqual(live.input.call_args.args[0][0]["hand"], source.split("_")[0])
+                self.assertTrue(result["pause"])
+                self.assertTrue(result["idroid"])
+                self.assertEqual(active, [])
+                self.assertEqual(held_native_reads, [])
+                self.assertTrue(live.observe.call_args_list[-1].kwargs.get("native"))
+
+    def test_help_requires_explicit_supervised_review_and_every_scene_guard(self):
+        live, clock, _, step = self.help_fixture()
+        live.supervised = False
+        with self.assertRaisesRegex(BotFault, "supervised reviewed Help"):
+            navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+        live.input.assert_not_called()
+        for group in ("state_before", "native_before"):
+            _, _, _, template = self.help_fixture()
+            for key in template[group]:
+                for variant in ("missing", "unknown", "wrong_type"):
+                    with self.subTest(group=group, key=key, variant=variant):
+                        live, clock, _, step = self.help_fixture()
+                        if variant == "missing":
+                            del step[group][key]
+                        else:
+                            value = step[group][key]
+                            step[group][key] = None if variant == "unknown" else [value] if isinstance(value, str) else str(value)
+                        with self.assertRaisesRegex(BotFault, "complete ACC prerequisites"):
+                            navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+                        live.input.assert_not_called()
+
+    def test_help_owner_changes_stop_before_input_or_after_release(self):
+        changes = (("pause",False),("idroid",False),("menu",False),("loading",True),
+                   ("idroid_menu_input_ready",False),("native.saving",True),
+                   ("native.popup",True),("native.tutorial_pause",None),
+                   ("native.sequence","Seq_Game_WeaponCustomize"))
+        for field, replacement in changes:
+            for after_dispatch in (False, True):
+                with self.subTest(field=field, after_dispatch=after_dispatch):
+                    def change(state, held, called):
+                        if not after_dispatch or (called and not held):
+                            target = state
+                            path = field.split(".")
+                            for part in path[:-1]:
+                                target = target[part]
+                            target[path[-1]] = replacement
+                    live, clock, active, step = self.help_fixture(change=change)
+                    with self.assertRaises(BotFault):
+                        navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+                    self.assertEqual(active, [])
+                    self.assertEqual(live.input.call_count, int(after_dispatch))
+
     def test_paused_lua_read_cannot_extend_the_held_menu_edge(self):
         live, clock, active = self.pause_fixture()
         original = live.observe.side_effect
@@ -307,7 +542,7 @@ class MenuNavigationTests(unittest.TestCase):
             state['pause'] = False
             state['native'].update(mission=40010, helicopter_space=True,
                                    sequence='Seq_Game_WeaponCustomize',
-                                   customization_kind='helicopter', popup=popup)
+                                   customization_kind='helicopter', popup=popup, saving=False)
             if change:
                 change(state, held)
         return self.pause_fixture(customize)
@@ -358,6 +593,176 @@ class MenuNavigationTests(unittest.TestCase):
                                 'native_before':{'mission':40010,'helicopter_space':True,
                                     'sequence':'Seq_Game_WeaponCustomize','customization_kind':'helicopter'}},
                           clock=clock, sleep=clock.sleep)
+        self.assertEqual(active, [])
+
+    def popup_identity_fixture(self, change=None):
+        live, clock, active = self.selector_fixture(popup=True)
+        original = live.observe.side_effect
+        def state(native=False):
+            value = original(native)
+            value['now_ms'] = int(clock.now * 1000)
+            value['popup_observer'] = {'reader_verified':True, 'owner_verified':True,
+                'active':True, 'numeric_id':6, 'string_id':'0xe70e65b85f7a',
+                'sample_ms':value['now_ms'], 'last_result':0, 'coherent_frame':False}
+            value['reviewed_row'] = 'discard' if live.input.called else 'cancel'
+            if change:
+                change(value, bool(active), live.input.called)
+            return value
+        live.observe.side_effect = state
+        step = {'owner':'customization_popup', 'direction':'left',
+            'native_before':{'mission':40010, 'helicopter_space':True,
+                'sequence':'Seq_Game_WeaponCustomize', 'customization_kind':'helicopter', 'popup':True},
+            'state_before':{'popup_observer.reader_verified':True, 'popup_observer.owner_verified':True,
+                'popup_observer.active':True, 'popup_observer.numeric_id':6,
+                'popup_observer.string_id':'0xe70e65b85f7a', 'reviewed_row':'cancel'}}
+        return live, clock, active, step
+
+    def test_navigation_state_prerequisite_is_checked_at_fresh_admission(self):
+        live, clock, active, step = self.popup_identity_fixture()
+        step['state_before']['reviewed_row'] = 'a different page'
+        with self.assertRaisesRegex(ActionPrerequisiteChanged, 'navigation prerequisite'):
+            navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+        live.input.assert_not_called()
+        self.assertEqual(active, [])
+
+    def test_navigation_rejects_a_changed_popup_identity_before_any_input(self):
+        for field, value in (('numeric_id',1), ('string_id','0x4dc3cae5b486'), ('active',False)):
+            with self.subTest(field=field):
+                live, clock, active, step = self.popup_identity_fixture(
+                    lambda state, held, called:state['popup_observer'].update({field:value}))
+                with self.assertRaises(ActionPrerequisiteChanged):
+                    navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+                live.input.assert_not_called()
+                self.assertEqual(active, [])
+
+    def test_navigation_popup_identity_needs_verified_reader_and_owner(self):
+        for field in ('reader_verified','owner_verified'):
+            for value in (False, None, 1):
+                with self.subTest(field=field, value=value):
+                    live, clock, active, step = self.popup_identity_fixture(
+                        lambda state, held, called:state['popup_observer'].update({field:value}))
+                    # Even a partial ID prerequisite cannot borrow an unproven owner.
+                    step['state_before'] = {'popup_observer.numeric_id':6}
+                    with self.assertRaisesRegex(ActionPrerequisiteChanged, 'popup identity'):
+                        navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+                    live.input.assert_not_called()
+                    self.assertEqual(active, [])
+        live, clock, active, step = self.popup_identity_fixture(
+            lambda state, held, called:state.pop('popup_observer'))
+        with self.assertRaises(ActionPrerequisiteChanged):
+            navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+        live.input.assert_not_called()
+
+    def test_popup_guard_cannot_admit_unknown_or_numeric_activity(self):
+        for active_value in (None, 1, False):
+            live, clock, active, step = self.popup_identity_fixture(
+                lambda state, held, called:state['popup_observer'].update(active=active_value))
+            step['state_before'] = {'popup_observer.owner_verified':True}
+            with self.assertRaisesRegex(ActionPrerequisiteChanged, 'popup identity'):
+                navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+            live.input.assert_not_called()
+            self.assertEqual(active, [])
+
+    def test_navigation_popup_identity_rejects_stale_future_and_unknown_samples(self):
+        for sampled in (None, True, -1, 99, 0):
+            with self.subTest(sampled=sampled):
+                live, clock, active, step = self.popup_identity_fixture(
+                    lambda state, held, called:state['popup_observer'].update(sample_ms=sampled))
+                clock.now = .3
+                if sampled == 99:
+                    # A sample ahead of the packet clock is not current evidence.
+                    clock.now = .05
+                with self.assertRaisesRegex(ActionPrerequisiteChanged, 'popup identity'):
+                    navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+                live.input.assert_not_called()
+                self.assertEqual(active, [])
+
+    def test_popup_identity_is_rechecked_after_cursor_release_without_held_lua(self):
+        for field, value in (('numeric_id',1), ('string_id','0x4dc3cae5b486'),
+                             ('owner_verified',False), ('active',None)):
+            with self.subTest(field=field):
+                def change(state, held, called):
+                    if called and not held:
+                        state['popup_observer'][field] = value
+                live, clock, active, step = self.popup_identity_fixture(change)
+                held_native_reads = []
+                original = live.observe.side_effect
+                def state(native=False):
+                    if native and active:
+                        held_native_reads.append(True)
+                    return original(native)
+                live.observe.side_effect = state
+                with self.assertRaisesRegex(BotFault, 'popup identity') as failure:
+                    navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+                self.assertNotIsInstance(failure.exception, ActionPrerequisiteChanged)
+                live.input.assert_called_once()
+                self.assertEqual(active, [])
+                self.assertEqual(held_native_reads, [])
+
+    def test_unchanged_popup_allows_cursor_movement_and_new_sample_and_last_result(self):
+        def change(state, held, called):
+            if called:
+                state['popup_observer']['last_result'] = 2
+        live, clock, active, step = self.popup_identity_fixture(change)
+        step['state_before']['popup_observer.last_result'] = 0
+        result = navigate_menu(live, step, clock=clock, sleep=clock.sleep)
+        self.assertEqual(result['reviewed_row'], 'discard')
+        self.assertEqual(result['popup_observer']['last_result'], 2)
+        self.assertGreater(result['popup_observer']['sample_ms'], 0)
+        self.assertEqual(active, [])
+
+    def test_navigation_without_popup_guard_preserves_legacy_owner_contract(self):
+        live, clock, active = self.selector_fixture(popup=True)
+        result = navigate_menu(live, {'owner':'customization_popup','direction':'left',
+            'native_before':{'mission':40010, 'helicopter_space':True,
+                'sequence':'Seq_Game_WeaponCustomize', 'customization_kind':'helicopter', 'popup':True}},
+            clock=clock, sleep=clock.sleep)
+        self.assertNotIn('popup_observer', result)
+        self.assertEqual(active, [])
+
+    def test_invalid_navigation_state_guard_never_dispatches(self):
+        for guard in ({}, [], True, 'unknown'):
+            live, clock, _ = self.fixture()
+            with self.assertRaisesRegex(BotFault, 'state prerequisite'):
+                navigate_menu(live, {'direction':'left', 'state_before':guard}, clock=clock, sleep=clock.sleep)
+            live.input.assert_not_called()
+
+    def test_customization_requires_explicit_idle_save_at_fresh_admission(self):
+        # Suite entry and navigation admission are different observations.
+        # A save may begin between them, even if the caller's target guard
+        # omits the saving field. Unknown is also not proof of an idle save.
+        for saving in (True, None, 0, 'unavailable:save state'):
+            with self.subTest(saving=saving):
+                live, clock, active = self.selector_fixture(
+                    change=lambda state, held:state['native'].update(saving=saving))
+                with self.assertRaisesRegex(BotFault, 'scene prerequisite'):
+                    navigate_menu(live, {'owner':'customization', 'direction':'down',
+                                        'native_before':{'mission':40010,'helicopter_space':True,
+                                            'sequence':'Seq_Game_WeaponCustomize',
+                                            'customization_kind':'helicopter'}},
+                                  clock=clock, sleep=clock.sleep)
+                live.input.assert_not_called()
+                self.assertEqual(active, [])
+
+    def test_customization_save_change_after_release_fails_without_held_lua_reads(self):
+        live, clock, active = self.selector_fixture(popup=True)
+        original = live.observe.side_effect
+        held_native_reads = []
+        def state(native=False):
+            value = original(native)
+            if native and active:
+                held_native_reads.append(True)
+            if native and live.input.called and not active:
+                value['native']['saving'] = True
+            return value
+        live.observe.side_effect = state
+        with self.assertRaisesRegex(BotFault, 'scene prerequisite'):
+            navigate_menu(live, {'owner':'customization_popup','direction':'left',
+                                'native_before':{'mission':40010,'helicopter_space':True,
+                                    'sequence':'Seq_Game_WeaponCustomize',
+                                    'customization_kind':'helicopter','popup':True}},
+                          clock=clock, sleep=clock.sleep)
+        self.assertEqual(held_native_reads, [])
         self.assertEqual(active, [])
 
     def test_navigation_cannot_pass_a_different_held_axis_and_always_releases(self):
@@ -510,6 +915,64 @@ class BotTests(unittest.TestCase):
         self.assertEqual(result['failure_phase'],'outcome')
         self.assertEqual(adapter.actions,2)
         self.assertEqual(result['status'],'failed')
+
+    def overnight_pause_suite(self):
+        path=pathlib.Path(__file__).resolve().parents[1]/'tools/gameplay_bot/suites/overnight-menu-field-pause-roundtrip.json'
+        return json.loads(path.read_text())
+
+    def predicate_state(self, predicate):
+        state={}
+        for path, value in predicate.items():
+            target=state
+            parts=path.split('.')
+            for part in parts[:-1]:
+                target=target.setdefault(part,{})
+            target[parts[-1]]=copy.deepcopy(value['near'] if isinstance(value,dict) and 'near' in value else value)
+        return state
+
+    def test_overnight_pause_rejects_tutorial_popup_saving_and_unknown_before_any_input(self):
+        for case in self.overnight_pause_suite()['cases']:
+            for key in ('tutorial_pause','popup','saving'):
+                for value in (True,None):
+                    with self.subTest(case=case['id'],key=key,value=value):
+                        state=self.predicate_state(case['before'])
+                        state['native'][key]=value
+                        adapter=Adapter([state])
+                        result=self.behavior(adapter).case(case)
+                        self.assertEqual(result['failure_phase'],'entry')
+                        self.assertEqual(adapter.actions,0)
+
+    def test_overnight_pause_back_requires_actual_camera_and_gameplay_owner_return(self):
+        for case in (self.overnight_pause_suite()['cases'][1],self.overnight_pause_suite()['cases'][3]):
+            for path, value in (('camera_active',False),('camera_suspended',True),
+                                ('camera_awaiting_player',True),('controls.rig_input',False),
+                                ('controls.context','menus')):
+                with self.subTest(case=case['id'],path=path):
+                    before=self.predicate_state(case['before'])
+                    after=self.predicate_state(case['after'])
+                    target=after
+                    parts=path.split('.')
+                    for part in parts[:-1]:target=target[part]
+                    target[parts[-1]]=value
+                    adapter=Adapter([before]*2+[after]*100)
+                    result=self.behavior(adapter).case(case)
+                    self.assertEqual(result['failure_phase'],'outcome')
+                    self.assertEqual(adapter.actions,1)
+                    self.assertEqual(result['status'],'failed')
+
+    def test_overnight_pause_dispatch_and_result_guards_cover_the_same_native_fixture(self):
+        cases=self.overnight_pause_suite()['cases']
+        self.assertEqual([case['steps'][0]['name'] for case in cases],
+                         ['system.pause','menus.back','system.pause','menus.back'])
+        for index, case in enumerate(cases):
+            guard=case['steps'][0]['native_before']
+            self.assertEqual(guard['mission'],10020)
+            self.assertEqual(guard['sequence'],'Seq_Game_RescueMiller')
+            for key in ('title','helicopter_space','popup','tutorial_pause','saving','demo','demo_nonplayable'):
+                self.assertIs(guard[key],False)
+                self.assertIs(case['before']['native.'+key],False)
+            if index:
+                self.assertEqual(case['depends_on'],[cases[index-1]['id']])
 
     def test_unknown_scene_is_not_gameplay(self):
         self.assertEqual(scene({"camera_active": True, "camera_available": True}), "unknown")
@@ -1787,6 +2250,54 @@ class StartupTests(unittest.TestCase):
         self.assertEqual(live.actions, 0)
         live.capture.assert_not_called()
 
+    def test_verified_completed_login_notice_is_confirmed_once_with_identity_guard(self):
+        notice = {"scene": "cinematic", "title_menu": False,
+                  "native": {"mission": 1, "sequence": "Seq_Demo_LogInKonamiServer",
+                             "title": False, "popup": True},
+                  "popup_observer": {"reader_verified": True, "owner_verified": True,
+                                     "active": True, "numeric_id": 1,
+                                     "string_id": "0x4dc3cae5b486", "last_result": 0}}
+        menu = self.stage("Seq_Demo_StartHasTitleMission", menu=True)
+        live = mock.Mock(); clock = Clock()
+        live.observe.side_effect = [notice, notice, menu]
+        self.assertIs(advance_startup(live, clock=clock, sleep=clock.sleep), menu)
+        live.execute.assert_called_once()
+        step = live.execute.call_args.args[0]
+        self.assertEqual(step["name"], "menus.confirm")
+        self.assertEqual(step["state_before"]["popup_observer.string_id"], "0x4dc3cae5b486")
+        self.assertEqual(step["native_before"]["sequence"], "Seq_Demo_LogInKonamiServer")
+
+    def test_login_identity_rejects_unknown_progress_result_closed_and_unverified_readers(self):
+        for change in ({"string_id": "0x1234"}, {"string_id": None},
+                       {"numeric_id": 2}, {"active": False}, {"active": None},
+                       {"reader_verified": False}, {"owner_verified": None}):
+            with self.subTest(change=change):
+                notice = {"scene": "cinematic", "title_menu": False,
+                          "native": {"mission": 1, "sequence": "Seq_Demo_LogInKonamiServer",
+                                     "title": False, "popup": True},
+                          "popup_observer": {"reader_verified": True, "owner_verified": True,
+                                             "active": True, "numeric_id": 1,
+                                             "string_id": "0x4dc3cae5b486", **change}}
+                live = Adapter([notice]); live.events = mock.Mock(); clock = Clock()
+                with self.assertRaisesRegex(BotFault, "Native startup deadline"):
+                    advance_startup(live, timeout=.3, clock=clock, sleep=clock.sleep)
+                self.assertEqual(live.actions, 0)
+
+    def test_completed_login_notice_that_changes_at_dispatch_gets_no_repeated_confirm(self):
+        notice = {"scene": "cinematic", "title_menu": False,
+                  "native": {"mission": 1, "sequence": "Seq_Demo_LogInKonamiServer",
+                             "title": False, "popup": True},
+                  "popup_observer": {"reader_verified": True, "owner_verified": True,
+                                     "active": True, "numeric_id": 1,
+                                     "string_id": "0x4dc3cae5b486"}}
+        unknown = {**notice, "popup_observer": {**notice["popup_observer"], "string_id": None}}
+        menu = self.stage("Seq_Demo_StartHasTitleMission", menu=True)
+        live = mock.Mock(); clock = Clock()
+        live.observe.side_effect = [notice, unknown, menu]
+        live.execute.side_effect = ActionPrerequisiteChanged("Popup changed before dispatch")
+        self.assertIs(advance_startup(live, clock=clock, sleep=clock.sleep), menu)
+        live.execute.assert_called_once()
+
     def test_login_popup_that_never_completes_stops_without_input(self):
         for change in ({}, {"mission": 40010}, {"title": True}, {"mission": None}):
             with self.subTest(change=change):
@@ -1929,6 +2440,58 @@ class StartupTests(unittest.TestCase):
                 live.capture.assert_called_once()
 
 
+class ContinueRackPixelsTests(unittest.TestCase):
+    @staticmethod
+    def rack():
+        return {"scene": "title", "title": True, "title_menu": True,
+                "title_cabin": True, "opening_assets": True,
+                "native": {"sequence": "Seq_Game_TitleMenu", "title": True, "popup": False}}
+
+    def test_native_rack_fade_requires_real_final_eye_images_before_input(self):
+        live = mock.Mock()
+        live.capture.side_effect = [BlankCompositorFrame("retained native fade", self.rack()),
+                                    ["real-left", "real-right"]]
+        clock = Clock()
+        self.assertEqual(capture_continue_rack(live, clock=clock, sleep=clock.sleep),
+                         ["real-left", "real-right"])
+        self.assertEqual(clock.now, .1)
+        live.input.assert_not_called()
+        live.execute.assert_not_called()
+
+    def test_persistent_native_rack_black_stops_without_input(self):
+        live = mock.Mock()
+        live.capture.side_effect = BlankCompositorFrame("retained black", self.rack())
+        clock = Clock()
+        with self.assertRaisesRegex(BotFault, "remained blank.*no input sent"):
+            capture_continue_rack(live, timeout=.25, clock=clock, sleep=clock.sleep)
+        self.assertEqual(clock.now, .25)
+        live.input.assert_not_called()
+
+    def test_blank_gameplay_popup_unknown_owner_and_missing_rack_are_not_retried(self):
+        states = [dict(self.rack(), scene="gameplay"), dict(self.rack(), title_cabin=False),
+                  dict(self.rack(), opening_assets=False),
+                  dict(self.rack(), native={"sequence": "Seq_Game_TitleMenu", "title": True, "popup": True}),
+                  dict(self.rack(), native={"sequence": "Seq_Game_TitleMenu", "title": True}),
+                  dict(self.rack(), native={"sequence": "Seq_Demo_LogInKonamiServer", "title": True, "popup": False})]
+        for state in states:
+            with self.subTest(state=state):
+                live = mock.Mock()
+                live.capture.side_effect = BlankCompositorFrame("retained rejected blank", state)
+                clock = Clock()
+                with self.assertRaises(BlankCompositorFrame):
+                    capture_continue_rack(live, clock=clock, sleep=clock.sleep)
+                live.capture.assert_called_once()
+                live.input.assert_not_called()
+
+    def test_transport_failure_is_never_retried_as_a_fade(self):
+        live = mock.Mock()
+        live.capture.side_effect = BotFault("operator completion unknown")
+        with self.assertRaisesRegex(BotFault, "completion unknown"):
+            capture_continue_rack(live)
+        live.capture.assert_called_once()
+        live.input.assert_not_called()
+
+
 class ControlAcquisitionTests(unittest.TestCase):
     @staticmethod
     def fresh():
@@ -1961,6 +2524,141 @@ class ControlAcquisitionTests(unittest.TestCase):
         with self.assertRaisesRegex(BotFault, "context is unknown"):
             fresh_control_observation(adapter.observe, clock=clock, sleep=clock.sleep)
         self.assertEqual(clock.now, 0.)
+
+    def test_fast_native_read_admits_the_original_consistent_packet(self):
+        packet = self.fresh()
+        original = copy.deepcopy(packet)
+        adapter = Adapter([packet])
+        clock = Clock()
+        def observe(native=False):
+            self.assertTrue(native)
+            clock.sleep(.030)
+            return adapter.observe(native=native)
+        state, controls = fresh_control_observation(observe, native=True, clock=clock, sleep=clock.sleep)
+        self.assertIs(state, packet)
+        self.assertIs(controls, packet["controls"])
+        self.assertEqual(packet, original)
+        self.assertEqual(controls["age_ms"], state["now_ms"] - controls["sample_ms"])
+        self.assertEqual(adapter.actions, 0)
+
+    def test_successful_slow_native_query_cannot_admit_an_old_control_packet(self):
+        packet = self.fresh()
+        packet["controls"].update(sample_ms=980, age_ms=20)
+        adapter = Adapter([packet])
+        clock = Clock()
+        def observe(native=False):
+            self.assertTrue(native)
+            clock.sleep(.300)
+            return adapter.observe(native=native)
+        with self.assertRaisesRegex(BotFault, "aged during observation"):
+            fresh_control_observation(observe, native=True, timeout=.1, clock=clock, sleep=clock.sleep)
+        self.assertEqual(packet["now_ms"], 1000)
+        self.assertEqual(packet["controls"]["age_ms"], 20)
+        self.assertEqual(adapter.actions, 0)
+        self.assertAlmostEqual(clock.now, .300)
+
+    def test_slow_read_reacquires_a_fast_native_packet_without_replaying_input(self):
+        first, ready = self.fresh(), self.fresh()
+        ready["now_ms"] = 1330
+        ready["controls"].update(sample_ms=1325)
+        durations = iter((.300, .005))
+        calls = []
+        adapter = Adapter([first, ready])
+        clock = Clock()
+        def observe(native=False):
+            calls.append(native)
+            clock.sleep(next(durations))
+            return adapter.observe(native=native)
+        state, controls = fresh_control_observation(observe, native=True, clock=clock, sleep=clock.sleep)
+        self.assertIs(state, ready)
+        self.assertIs(controls, ready["controls"])
+        self.assertEqual(calls, [True, True])
+        self.assertEqual(adapter.actions, 0)
+        self.assertAlmostEqual(clock.now, .330)
+
+    def test_existing_native_age_and_sub250ms_transport_are_added(self):
+        packet = self.fresh()
+        packet["controls"].update(sample_ms=920, age_ms=80)
+        adapter = Adapter([packet])
+        clock = Clock()
+        def observe(native=False):
+            clock.sleep(.200)
+            return adapter.observe(native=native)
+        with self.assertRaisesRegex(BotFault, "aged during observation"):
+            fresh_control_observation(observe, timeout=.1, clock=clock, sleep=clock.sleep)
+        self.assertEqual(adapter.actions, 0)
+
+    def test_exact_age_budget_passes_but_fractional_overage_is_not_truncated(self):
+        for duration, accepted in ((.200, True), (.200001, False)):
+            with self.subTest(duration=duration):
+                packet = self.fresh()
+                packet["controls"].update(sample_ms=950, age_ms=50)
+                adapter = Adapter([packet])
+                clock = Clock()
+                def observe(native=False):
+                    clock.sleep(duration)
+                    return adapter.observe(native=native)
+                if accepted:
+                    state, _ = fresh_control_observation(observe, timeout=.1, clock=clock, sleep=clock.sleep)
+                    self.assertIs(state, packet)
+                else:
+                    with self.assertRaisesRegex(BotFault, "aged during observation"):
+                        fresh_control_observation(observe, timeout=.1, clock=clock, sleep=clock.sleep)
+                self.assertEqual(adapter.actions, 0)
+
+    def test_nonfinite_or_backward_read_clock_never_admits_controls(self):
+        for finish in (float('nan'), float('inf'), float('-inf'), -.001, True):
+            with self.subTest(finish=finish):
+                adapter = Adapter([self.fresh()])
+                clock = mock.Mock(side_effect=[0., 0., finish])
+                sleep = mock.Mock()
+                with self.assertRaisesRegex(BotFault, "clock is invalid"):
+                    fresh_control_observation(adapter.observe, clock=clock, sleep=sleep)
+                self.assertEqual(adapter.actions, 0)
+                sleep.assert_not_called()
+
+    def test_nonfinite_native_age_is_not_repaired_by_a_fast_transport(self):
+        packet = self.fresh()
+        packet["controls"]["age_ms"] = float('nan')
+        adapter = Adapter([packet])
+        clock = Clock()
+        with self.assertRaisesRegex(BotFault, "unavailable or stale"):
+            fresh_control_observation(adapter.observe, timeout=.05, clock=clock, sleep=clock.sleep)
+        self.assertEqual(adapter.actions, 0)
+        self.assertAlmostEqual(clock.now, .05)
+
+    def test_read_clock_cannot_go_backwards_between_reacquisition_attempts(self):
+        observe = mock.Mock(return_value=self.fresh())
+        clock = mock.Mock(side_effect=[0., 0., .300, .200])
+        sleep = mock.Mock()
+        with self.assertRaisesRegex(BotFault, "clock is invalid"):
+            fresh_control_observation(observe, clock=clock, sleep=sleep)
+        observe.assert_called_once_with(native=False)
+        sleep.assert_called_once_with(.025)
+
+    def test_slow_lua_prerequisite_read_cannot_dispatch_the_semantic_action(self):
+        clock = Clock()
+        packet = self.fresh()
+        packet["controls"].update(sample_ms=980, age_ms=20)
+        packet["native"] = {"mission":10020}
+        live = Live.__new__(Live)
+        live.bindings = {"actions":[{"name":"gameplay.interact", "contexts":["gameplay"],
+                                      "bindings":[{"gesture":"level", "milliseconds":300,
+                                                   "inputs":["y"]}]}]}
+        live.events = mock.Mock()
+        live.input = mock.Mock()
+        def observe(native=False):
+            self.assertTrue(native)
+            clock.sleep(.300)
+            return packet
+        live.observe = observe
+        with mock.patch('gameplay_bot.live.time.monotonic', clock), \
+                mock.patch('gameplay_bot.live.time.sleep', clock.sleep):
+            with self.assertRaisesRegex(BotFault, "aged during observation"):
+                live.execute({"op":"action", "name":"gameplay.interact",
+                              "native_before":{"mission":10020}})
+        live.input.assert_not_called()
+        live.events.emit.assert_not_called()
 
 
 if __name__ == "__main__":

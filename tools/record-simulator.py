@@ -6,6 +6,7 @@ make incomplete VR gameplay into a passing acceptance demonstration.
 """
 import argparse
 import base64
+import collections
 import datetime
 import json
 import math
@@ -21,17 +22,24 @@ class Operator:
     def __init__(self, executable):
         self.process = subprocess.Popen(
             [str(executable)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
+            stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         self.messages = queue.Queue()
+        self.stderr_tail = collections.deque(maxlen=8)
+        self.stderr_lock = threading.Lock()
         self.sequence = 0
         threading.Thread(target=self._read, daemon=True).start()
-        self.request("initialize", {
-            "protocolVersion": "2024-11-05", "capabilities": {},
-            "clientInfo": {"name": "mgs5vr-final-eye-capture", "version": "0.1"},
-        })
-        self.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        threading.Thread(target=self._read_stderr, daemon=True).start()
+        try:
+            self.request("initialize", {
+                "protocolVersion": "2024-11-05", "capabilities": {},
+                "clientInfo": {"name": "mgs5vr-final-eye-capture", "version": "0.1"},
+            })
+            self.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        except BaseException:
+            self.close()
+            raise
 
     def _read(self):
         for line in self.process.stdout:
@@ -40,6 +48,19 @@ class Operator:
             except json.JSONDecodeError:
                 pass
         self.messages.put({"error": {"message": "Operator proxy exited"}})
+
+    def _read_stderr(self):
+        # Drain the exact owned child continuously. Keep bounded transport
+        # diagnostics; never retain binary captures or an unbounded log.
+        for line in self.process.stderr:
+            with self.stderr_lock:
+                self.stderr_tail.append(line.strip()[-512:])
+
+    def diagnostic(self):
+        with self.stderr_lock:
+            tail = list(self.stderr_tail)
+        return {"proxy_pid": self.process.pid, "exit_code": self.process.poll(),
+                "stderr_tail": tail}
 
     def send(self, message):
         self.process.stdin.write(json.dumps(message, separators=(",", ":")) + "\n")
@@ -54,7 +75,8 @@ class Operator:
             try:
                 response = self.messages.get(timeout=max(.01, deadline - time.monotonic()))
             except queue.Empty as error:
-                raise TimeoutError(f"{method} request {request_id}: completion unknown") from error
+                raise TimeoutError(f"{method} request {request_id}: completion unknown; "
+                                   + json.dumps(self.diagnostic())) from error
             if response.get("id") != request_id:
                 if "id" not in response and "error" in response:
                     raise RuntimeError(response["error"])

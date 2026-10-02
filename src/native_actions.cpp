@@ -383,9 +383,11 @@ bool publishFastInput(const std::string& request,std::string& result){
         // publications, not a claimed coherent native simulation transaction.
         const auto rendered=headCamera().publishedView();
         const auto controlSample=controlInputSnapshot();
-        const auto now=steadyMilliseconds();
         const auto camera=headCamera().status();
         const auto menu=nativeMenuOpen();
+        const auto popupSampleMs=steadyMilliseconds();
+        const auto popup=nativePopupSnapshot();
+        const auto now=steadyMilliseconds();
         std::ostringstream out;out<<std::boolalpha;
         out<<"{\"schema\":1,\"now_ms\":"<<now
            <<",\"lua_ready\":"<<nativeLuaReady.load()
@@ -404,12 +406,16 @@ bool publishFastInput(const std::string& request,std::string& result){
            <<",\"camera_awaiting_player\":"<<camera.awaitingPlayer
            <<",\"camera_reason\":"<<static_cast<unsigned>(camera.reason)
            <<",\"activation\":"<<camera.activation<<",\"opening_assets\":"<<openingPropsAvailable();
+        out<<",\"popup_observer\":";writeNativePopupSnapshotJson(out,popup,popupSampleMs);
         if(freshControlInputAudit(controlSample,now)){
             const auto* audit=&controlSample;
             out<<",\"controls\":{\"context\":\""<<controlContextName(audit->context)
                <<"\",\"age_ms\":"<<now-audit->time<<",\"sample_ms\":"<<audit->time
                <<",\"rig_input\":"<<audit->rigInput<<",\"travel_mode\":"<<audit->travelMode
-               <<",\"native_buttons\":"<<audit->nativeButtons<<",\"physical\":[";
+               <<",\"native_packet_source\":\"xr_runtime_final_mapped_packet\",\"native_buttons\":"<<audit->nativeButtons
+               <<",\"native_axes\":["<<audit->nativeAxes[0]<<','<<audit->nativeAxes[1]<<','<<audit->nativeAxes[2]<<','<<audit->nativeAxes[3]
+               <<"],\"native_triggers\":["<<static_cast<unsigned>(audit->nativeTriggers[0])<<','<<static_cast<unsigned>(audit->nativeTriggers[1])
+               <<"],\"physical\":[";
             for(size_t i=0;i<11;++i){if(i)out<<',';out<<audit->physical.buttons[i];}
             out<<"],\"sticks\":["<<audit->physical.leftStick[0]<<','<<audit->physical.leftStick[1]
                <<','<<audit->physical.rightStick[0]<<','<<audit->physical.rightStick[1]<<"],\"touches\":{";
@@ -422,13 +428,17 @@ bool publishFastInput(const std::string& request,std::string& result){
             const auto& frame=*rendered;
             out<<",\"rendered\":{\"source\":\"last_camera_publication\",\"tracking_sequence\":"<<frame.trackingSequence
                <<",\"rig_sequence\":"<<frame.rigSequence<<",\"activation\":"<<frame.activation
-               <<",\"sample_ms\":"<<frame.sampleTime<<",\"left_palm_tracked\":"<<frame.renderedPalmTracked[0]
+               <<",\"sample_ms\":"<<frame.sampleTime<<",\"player_sequence\":"<<frame.playerSequence
+               <<",\"player_owner\":"<<frame.playerOwner<<",\"player_head\":["<<frame.playerHead.x<<','<<frame.playerHead.y<<','<<frame.playerHead.z
+               <<"],\"left_palm_tracked\":"<<frame.renderedPalmTracked[0]
                <<",\"right_palm_tracked\":"<<frame.renderedPalmTracked[1];
             const auto pose=[&](const char* name,Pose value){
                 const auto p=value.position;const auto q=value.orientation;
                 out<<",\""<<name<<"\":{\"position\":["<<p.x<<','<<p.y<<','<<p.z
                    <<"],\"orientation\":["<<q.x<<','<<q.y<<','<<q.z<<','<<q.w<<"]}";
             };
+            pose("native_pose",frame.nativePose);
+            pose("head_pose",frame.headPose);
             pose("left_palm",frame.renderedPalms[0]);
             pose("left_grip",frame.controllers.hands[0].grip);
             pose("right_palm",frame.renderedPalms[1]);
@@ -445,7 +455,23 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"native_firearm\":"<<frame.nativeFirearmActive
                <<",\"weapon_support_tracked\":"<<frame.weaponSupportGripTracked
                <<",\"weapon_support_attached\":"<<frame.weaponSupportAttached
-               <<",\"binocular_held\":"<<frame.controllers.optic.held;
+               <<",\"binocular_held\":"<<frame.controllers.optic.held
+               <<",\"binocular_magnification\":"<<frame.controllers.magnification;
+            const auto& weapon=frame.weaponRig;
+            out<<",\"weapon_native_observer\":{\"source\":\"retained_native_skin_sampling\",\"sample_ms\":"<<weapon.sampleTime
+               <<",\"sampled\":"<<weapon.sampled<<",\"character\":"<<weapon.character<<",\"component\":"<<weapon.component
+               <<",\"component_accepted\":"<<weapon.componentAccepted<<",\"instances\":"<<weapon.instances
+               <<",\"instance_first\":"<<weapon.instanceFirst<<",\"player_index\":"<<weapon.playerIndex
+               <<",\"instance_index_matched\":"<<weapon.instanceIndexMatched<<",\"state\":"<<weapon.state
+               <<",\"body_model\":"<<weapon.bodyModel<<",\"weapon_model\":null,\"weapon_definition\":null"
+               <<",\"resource_handle\":"<<weapon.resourceHandle<<",\"resource_accepted\":"<<weapon.resourceAccepted
+               <<",\"support_identity\":"<<weapon.supportIdentity<<",\"scope_identity\":"<<frame.weaponScope.weaponIdentity
+               <<",\"flags\":"<<weapon.flags<<",\"mode\":"<<weapon.mode<<",\"muzzle_attempted\":"<<weapon.muzzleAttempted
+               <<",\"muzzle_matrix_read\":"<<weapon.muzzleMatrixRead<<",\"attachment_valid\":"<<weapon.attachmentValid
+               <<",\"muzzle_socket_valid\":"<<weapon.muzzleSocketValid<<",\"muzzle_solved\":"<<weapon.muzzleSolved
+               <<",\"optical_descriptor_read\":"<<weapon.opticalRead<<",\"optical_descriptor\":[";
+            for(size_t i=0;i<weapon.optical.size();++i){if(i)out<<',';out<<static_cast<unsigned>(weapon.optical[i]);}
+            out<<']';pose("muzzle_in_grip",weapon.muzzleInGrip);out<<'}';
             out<<'}';
         }else out<<",\"rendered\":null";
         if(const auto anchor=headCamera().openingTrackingOrigin(now)){

@@ -7,6 +7,7 @@
 #include "mgs5vr/menu_surface.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/ui_clip.hpp"
+#include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/render_size.hpp"
 #include <MinHook.h>
 #include <atomic>
@@ -58,6 +59,7 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
                 checkHr(swap->GetBuffer(0,IID_PPV_ARGS(&source)),"Get game backbuffer");
                 ComPtr<ID3D11Device> device;source->GetDevice(&device);
                 ComPtr<ID3D11DeviceContext> context;device->GetImmediateContext(&context);
+                pumpOpticNativeLightingProbe(context.Get());
                 const auto eye=observeRenderPresent(swap);
                  // Keep the complete stereo family in the mailbox between native
                 // scene completions. A mono fallback would replace its array and
@@ -77,6 +79,7 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
     if(pace){const auto elapsed=[](auto begin,auto end){return std::chrono::duration<double,std::milli>(end-begin).count();};
         recordNativePresent(elapsed(entered,captured),elapsed(captured,paced),elapsed(paced,Clock::now()));}
     if(result==DXGI_ERROR_DEVICE_REMOVED||result==DXGI_ERROR_DEVICE_RESET){
+        invalidateOpticNativeLightingProbe();
         std::lock_guard lock(captureMutex);selected=nullptr;selectedWindow=nullptr;failed=false;destination->invalidate();
         log("Game device lost; waiting for replacement swapchain");
     }
@@ -86,6 +89,7 @@ HRESULT WINAPI resize(IDXGISwapChain* swap,UINT count,UINT width,UINT height,DXG
     // Serialize capture with resize. Mailbox owns copies, never backbuffer references.
     std::lock_guard lock(captureMutex);
     if(selected==swap){destination->invalidate();invalidateSceneCapture();stopNativeMenuSurface();selected=nullptr;failed=false;log("Game swapchain resize");}
+    invalidateOpticNativeLightingProbe();
     return originalResize(swap,count,width,height,format,flags);
 }
 void mh(MH_STATUS status,const char* operation){
@@ -99,7 +103,8 @@ struct Dummy {
     ~Dummy(){context.Reset();device.Reset();swap.Reset();if(window)DestroyWindow(window);}
 };
 }
-void installCaptureHook(TextureMailbox& mailbox){
+void installCaptureHook(TextureMailbox& mailbox,bool nativeBinocularMaterial,
+                        bool opticLightingDiagnostics){
     Dummy dummy;
     dummy.window=CreateWindowExW(0,L"STATIC",L"MGS5VR capture initialization",WS_OVERLAPPED,0,0,32,32,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
     if(!dummy.window)throw std::runtime_error("Create hidden DXGI probe window failed");
@@ -122,10 +127,12 @@ void installCaptureHook(TextureMailbox& mailbox){
     }catch(...){MH_DisableHook(presentAddress);MH_DisableHook(resizeAddress);MH_RemoveHook(presentAddress);MH_RemoveHook(resizeAddress);throw;}
     installSceneCapture(dummy.device.Get());
     installUiClip(dummy.device.Get());
+    installOpticNativeLightingProbe(dummy.device.Get(),nativeBinocularMaterial,opticLightingDiagnostics);
     installRenderSizeHooks(dummy.swap.Get());
     log("D3D11 capture hooks installed; native stereo awaits a complete scene draw pair");
 }
 void stopCapture() noexcept {
+    stopOpticNativeLightingProbe();
     try {
         std::lock_guard lock(captureMutex);
         failed=true;selected=nullptr;selectedWindow=nullptr;

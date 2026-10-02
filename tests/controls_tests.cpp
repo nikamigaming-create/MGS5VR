@@ -59,6 +59,12 @@ int main(int argc,char** argv){
         expect(rewriteControlPrompt("<I=G=UI_STOCK> Switch Zoom",bindings,ControlContext::menus).text=="[R CLICK] Switch Zoom"
             &&rewriteControlPrompt("<I=G=UI_STOCK>",bindings,ControlContext::gameplay).text=="<I=G=UI_STOCK>",
             "native Map zoom alias resolves only in its verified menu context");
+        const auto help=rewriteControlPrompt("<I=G=MB_HELP>HELP",bindings,ControlContext::menus);
+        expect(help.text=="[HOLD MENU]HELP"&&help.replaced==1&&help.unresolved==0,
+            "native Mother Base Help entry labels the verified physical Pause hold");
+        expect(rewriteControlPrompt("<I=G=MB_HELP>HELP",bindings,ControlContext::gameplay).text=="<I=G=MB_HELP>HELP"
+            &&rewriteControlPrompt("<I=G=MB_HELP>HELP",bindings,ControlContext::nativeButtons).text=="<I=G=MB_HELP>HELP",
+            "Mother Base Help route is isolated to its verified menu context");
         expect(rewriteControlPrompt("<I=G=RELOAD>",bindings,ControlContext::gameplay).text=="[TAP B + L GRIP]"
             &&rewriteControlPrompt("<I=G=BINOS>",bindings,ControlContext::gameplay).text=="[HOLD Y + L GRIP]",
             "reload and physical binocular equip labels include their actual gestures and chords");
@@ -72,18 +78,134 @@ int main(int argc,char** argv){
             &&rewriteControlPrompt("<I=G=PAD_START>",bindings,ControlContext::nativeButtons).text=="[MENU + L GRIP]",
             "native-button mode only resolves verified literal routes, not an assumed pad preset");
         publishControlPromptBindings(bindings);const auto prior=controlPromptBindings();
-        std::istringstream overrideFile("[menus]\nconfirm = press(a_touch)\nback = disabled\nprevious_tab = hold(left_grip + x,400)\n[axes]\nmenu = right_stick\n");
+        std::istringstream overrideFile("[menus]\nconfirm = press(a_touch)\nback = disabled\nprevious_tab = hold(left_grip + x,400)\n[axes]\nmenu = right_stick\n[system]\npause = hold(y_touch + left_grip,700)\n");
         expect(bindings.load(overrideFile).empty(),"prompt test uses a validated personal override");
         publishControlPromptBindings(bindings);
         const auto remapped=rewriteControlPrompt("<I=G=DECISION> <I=G=CANCEL> <I=G=PAD_L1> <I=G=PAD_LS>",*controlPromptBindings(),ControlContext::menus);
         expect(remapped.text=="[TOUCH A] [UNBOUND] [HOLD X + L GRIP] [R STICK]",
             "prompts follow touch, disabled, chord and axis overrides without changing native input");
         expect(prior->label("menus.confirm")=="A","UI workers retain immutable previous binding snapshots");
+        expect(rewriteControlPrompt("<I=G=MB_HELP>HELP <I=G=PAUSE> Close",*controlPromptBindings(),ControlContext::menus).text
+                =="[HOLD L GRIP + TOUCH Y]HELP [HOLD L GRIP + TOUCH Y] Close"
+            &&prior->label("system.pause")=="HOLD MENU",
+            "Help entry and native Close captions follow the same personal Pause binding snapshot");
+        ControlBindings disabledHelp;std::istringstream disabledHelpFile("[system]\npause = disabled\n");
+        expect(disabledHelp.load(disabledHelpFile).empty()
+            &&rewriteControlPrompt("<I=G=MB_HELP>HELP",disabledHelp,ControlContext::menus).text=="[UNBOUND]HELP",
+            "Help caption accurately reports a disabled personal Pause binding");
         expect(rewriteControlCaption("Placer/retirer un repère","DECISION",*controlPromptBindings(),ControlContext::menus).text=="[TOUCH A] Placer/retirer un repère",
             "separate native icons resolve the owner action while preserving translated captions");
         expect(rewriteControlCaption("caption","UNIDENTIFIED",bindings,ControlContext::menus).text=="caption"
             &&rewriteControlCaption("","DECISION",bindings,ControlContext::menus).text.empty(),
             "unidentified or empty separate help remains native");
+    }
+    {
+        ControlBindings bindings;
+        expect(rewriteControlPrompt("<I=G=PAD_A> <I=G=PAD_B> <I=G=PAD_X> <I=G=PAD_Y> <I=G=PAD_L3> <I=G=PAD_R3>",
+            bindings,ControlContext::horse).text=="[A] [B] [X] [Y] [L CLICK] [R CLICK]",
+            "mounted literal prompts use the native buttons forwarded by horse actions");
+        expect(rewriteControlPrompt("<I=G=PAD_L1> <I=G=PAD_X> <I=G=PAD_L3> <I=G=PAD_R3>",
+            bindings,ControlContext::vehicle).text=="[X] <I=G=PAD_X> [L CLICK] [R CLICK]",
+            "vehicle Call uses the downstream native shoulder rather than its intermediate X packet");
+        expect(rewriteControlPrompt("<I=G=PAD_R3> <I=G=PAD_A>",bindings,ControlContext::commands).text
+                =="[A] <I=G=PAD_A>"
+            &&rewriteControlPrompt("<I=G=PAD_R3> <I=G=PAD_A>",bindings,ControlContext::equipment).text
+                =="[A] <I=G=PAD_A>",
+            "command confirmation and item Use label the native R3 destination without inventing native A ownership");
+        RigInput vehicle;
+        vehicle.update({},false,false,TravelMode::vehicle,100,0);
+        GamepadSample intermediate{};intermediate.buttons=0x4000;
+        const auto forwarded=vehicle.update(intermediate,false,false,TravelMode::vehicle,120,0).gamepad;
+        expect((forwarded.buttons&0x0100)&&!(forwarded.buttons&0x4000),
+            "the vehicle prompt destination is checked against the actual native Call packet");
+        RigCommands commands;
+        commands.update({},true,100,0);
+        intermediate={};intermediate.leftTrigger=255;intermediate.buttons=0x4000;
+        commands.update(intermediate,true,120,0);
+        intermediate.buttons=0;commands.update(intermediate,true,160,150);
+        intermediate.rightTrigger=255;
+        const auto confirmed=commands.update(intermediate,true,180,170).gamepad;
+        expect((confirmed.buttons&0x0080)&&!(confirmed.buttons&0x1000),
+            "the command prompt destination is checked against the native R3 confirm pulse");
+        RigEquipment items;
+        items.update({},false,false,100,0);
+        items.update({},true,false,200,0);
+        items.update({},true,false,300,0);
+        intermediate={};intermediate.rightX=-30000;
+        items.update(intermediate,true,false,400,0);
+        items.update({},true,false,500,450);
+        items.update({},true,false,600,590);
+        intermediate={};intermediate.buttons=0x1000;
+        const auto used=items.update(intermediate,true,false,700,690);
+        expect((used.buttons&0x0080)&&!(used.buttons&0x1000)&&(used.buttons&0x0004),
+            "Items Use keeps its native category and emits R3 after consuming the intermediate A input");
+        std::istringstream overrideFile(
+            "[horse]\nstance=press(a_touch)\nreload=hold(left_trigger_touch,400)\ngallop=disabled\n"
+            "interact=release(y_touch)\nleft_click=press(left_stick_touch)\nright_click=press(right_stick_touch)\n"
+            "[vehicle]\nweapon_or_call=hold(x_touch + left_grip,400)\nleft_click=disabled\n"
+            "right_click=release(right_trigger_touch)\n[commands]\nconfirm=press(b_touch)\n"
+            "[equipment]\nuse=press(right_thumbrest)\n");
+        expect(bindings.load(overrideFile).empty(),"contextual prompt routes use validated touch and gesture overrides");
+        expect(rewriteControlPrompt("<I=G=PAD_A> <I=G=PAD_B> <I=G=PAD_X> <I=G=PAD_Y> <I=G=PAD_L3> <I=G=PAD_R3>",
+            bindings,ControlContext::horse).text=="[TOUCH A] [HOLD LT TOUCH] [UNBOUND] [RELEASE TOUCH Y] [L STICK TOUCH] [R STICK TOUCH]",
+            "mounted prompts retain every remapped gesture, sensor and disabled action");
+        expect(rewriteControlPrompt("<I=G=PAD_L1> <I=G=PAD_L3> <I=G=PAD_R3>",bindings,ControlContext::vehicle).text
+                =="[HOLD L GRIP + TOUCH X] [UNBOUND] [RELEASE RT TOUCH]"
+            &&rewriteControlPrompt("<I=G=PAD_R3>",bindings,ControlContext::commands).text=="[TOUCH B]"
+            &&rewriteControlPrompt("<I=G=PAD_R3>",bindings,ControlContext::equipment).text=="[R THUMBREST]",
+            "downstream native destinations show effective chords and touches rather than the physical source packet");
+    }
+    {
+        constexpr std::array<std::string_view,10> sensors{
+            "left_thumbrest","right_thumbrest","a_touch","b_touch","x_touch","y_touch",
+            "left_stick_touch","right_stick_touch","left_trigger_touch","right_trigger_touch"};
+        for(size_t n=0;n<sensors.size();++n){
+            ControlBindings controls;PhysicalControls physical;
+            physical.buttons[19+n]=1;
+            expect(!controls.hasPhysicalIntent(physical),"an unbound capacitive touch does not request XR ownership");
+            std::istringstream bind("[menus]\nconfirm=press("+std::string(sensors[n])+")\n");
+            expect(controls.load(bind).empty(),"every capacitive ownership case uses a validated effective binding");
+            GamepadOwnership owner;
+            expect(owner.update(true,{},true,false),"an idle newly connected gamepad initially retains native ownership");
+            expect(controls.hasPhysicalIntent(physical)&&!owner.update(true,{},true,controls.hasPhysicalIntent(physical)),
+                "a bound thumb, face, stick or trigger touch can reclaim XR from the idle native owner");
+            GamepadSample native{};native.buttons=0x1000;
+            expect(owner.update(true,native,true,controls.hasPhysicalIntent(physical)),
+                "live native gamepad input still takes priority over a touch-only XR request");
+            physical.buttons[19+n]=0;
+            expect(owner.update(true,{},true,controls.hasPhysicalIntent(physical)),
+                "releasing the touch preserves the current native owner until a new XR edge");
+            physical.buttons[19+n]=1;
+            expect(!owner.update(true,{},true,controls.hasPhysicalIntent(physical)),
+                "a fresh bound touch reclaims XR after native gamepad activity");
+            std::istringstream disable("[menus]\nconfirm=disabled\n");
+            expect(controls.load(disable).empty()&&!controls.hasPhysicalIntent(physical),
+                "disabling the only touch binding removes that sensor's ownership request");
+        }
+        ControlBindings controls;PhysicalControls physical;
+        for(size_t n=0;n<11;++n){
+            physical={};physical.buttons[n]=.25f;
+            expect(!controls.hasPhysicalIntent(physical),"physical buttons retain the strict ownership boundary");
+            physical.buttons[n]=.251f;
+            expect(controls.hasPhysicalIntent(physical),"ordinary buttons retain ownership independently of remapping");
+        }
+        for(size_t side=0;side<2;++side)for(size_t axis=0;axis<2;++axis)for(const float sign:{-1.f,1.f}){
+            physical={};auto& stick=side?physical.rightStick:physical.leftStick;
+            stick[axis]=sign*.25f;
+            expect(!controls.hasPhysicalIntent(physical),"both stick directions retain the strict ownership boundary");
+            stick[axis]=sign*.251f;
+            expect(controls.hasPhysicalIntent(physical),"both native stick axes still request XR ownership");
+        }
+        for(size_t n=11;n<19;++n){
+            physical={};physical.buttons[n]=1;
+            expect(!controls.hasPhysicalIntent(physical),"derived direction channels cannot independently claim XR ownership");
+        }
+        std::istringstream touchBinding("[menus]\nconfirm=press(a_touch)\n");
+        expect(controls.load(touchBinding).empty(),"touch threshold fixture is valid");
+        physical={};physical.buttons[21]=.25f;
+        expect(!controls.hasPhysicalIntent(physical),"bound touches retain the strict ownership threshold");
+        physical.buttons[21]=.251f;
+        expect(controls.hasPhysicalIntent(physical),"bound touches request ownership above the existing threshold");
     }
     {
         Fixture f;f.mode=ControlContext::horse;f.tick();
@@ -743,16 +865,28 @@ int main(int argc,char** argv){
             "completed thumb-rest chord fires and consumes its simpler face binding");
     }
     {
+        const ControlInputAudit legacy{ControlContext::menus,{},1000,0x1000,true,1};
+        expect(legacy.nativeAxes==std::array<int16_t,4>{}&&legacy.nativeTriggers==std::array<uint8_t,2>{},
+            "legacy input audit aggregates keep neutral native analog defaults");
         ControlInputAudit sample;sample.context=ControlContext::menus;sample.time=1000;
-        sample.physical.buttons[0]=1;sample.nativeButtons=0x1000;publishControlInputAudit(sample);
+        sample.physical.buttons[0]=1;sample.nativeButtons=0x1000;
+        sample.nativeAxes={-32768,32767,-12345,23456};sample.nativeTriggers={255,37};
+        publishControlInputAudit(sample);
         const auto current=controlInputAudit(1100);
         expect(current&&current->nativeButtons==0x1000&&current->physical.buttons[0]==1,
             "diagnostics join sampled physical input and final mapping without consuming the gamepad queue");
+        expect(current&&current->nativeAxes==sample.nativeAxes&&current->nativeTriggers==sample.nativeTriggers,
+            "the diagnostic snapshot retains signed final axes and unsigned trigger bytes together");
         expect(!controlInputAudit(999)&&!controlInputAudit(1251),"input diagnostics reject future and stale samples");
         const auto observed=controlInputSnapshot();
-        sample.time=1110;sample.physical.buttons[0]=0;publishControlInputAudit(sample);
+        sample.time=1110;sample.physical.buttons[0]=0;sample.nativeAxes={};sample.nativeTriggers={};
+        publishControlInputAudit(sample);
         expect(freshControlInputAudit(observed,1100)&&observed.physical.buttons[0]==1,
             "an XR publication arriving after the diagnostic copy cannot replace or invalidate that sample");
+        expect(observed.nativeAxes==std::array<int16_t,4>{-32768,32767,-12345,23456}
+            &&observed.nativeTriggers==std::array<uint8_t,2>{255,37}
+            &&controlInputSnapshot().nativeAxes==std::array<int16_t,4>{},
+            "later neutral input cannot tear analog values out of the copied diagnostic packet");
         expect(!freshControlInputAudit(observed,1251)&&!freshControlInputAudit(observed,999),
             "copied diagnostic samples retain the same age and clock-order limits");
         publishControlInputAudit({});expect(!controlInputAudit(1100),"focus suspension invalidates input diagnostics");

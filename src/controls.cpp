@@ -369,6 +369,14 @@ bool ControlBindings::hasBindingInput(std::string_view input) const{
         return std::any_of(entry.bindings.begin(),entry.bindings.end(),[&](const auto& binding){return binding.mask&bit;});
     });
 }
+bool ControlBindings::hasPhysicalIntent(const PhysicalControls& input) const{
+    for(size_t n=0;n<11;++n)if(input.buttons[n]>.25f)return true;
+    for(size_t n=19;n<names.size();++n)
+        if(input.buttons[n]>.25f&&hasBindingInput(names[n]))return true;
+    for(const auto stick:{input.leftStick,input.rightStick})
+        if(std::abs(stick[0])>.25f||std::abs(stick[1])>.25f)return true;
+    return false;
+}
 std::array<float,2> ControlBindings::axis(std::string_view name,const PhysicalControls& input) const{
     const auto it=std::find_if(axes_.begin(),axes_.end(),[&](const auto& e){return e.name==name;});
     if(it==axes_.end()||it->source<0)return {};

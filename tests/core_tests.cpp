@@ -6,6 +6,7 @@
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/paused_rig.hpp"
 #include "mgs5vr/idroid_rig.hpp"
+#include "mgs5vr/idroid_effect_probe.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/render_layout.hpp"
 #include "mgs5vr/recon.hpp"
@@ -2056,12 +2057,29 @@ int main(){
     rigCamera.trackStereo({},rigEyes,true,300,hands);rigCamera.toggle();
     rigCamera.publishPlayerHead(1,22,thirdPerson,playerRoot,headBone,300);
     auto rigFrame=rigCamera.resolve(1,thirdPerson,300);rigFrame.nativePose.position.y+=0.1f;
+    rigFrame.weaponRig.sampled=true;rigFrame.weaponRig.sampleTime=300;
+    rigFrame.weaponRig.resourceHandle=0x1234;rigFrame.weaponRig.component=55;
+    rigFrame.weaponRig.muzzleSolved=true;rigFrame.weaponRig.muzzleInGrip.position={.1f,.2f,.3f};
     expect(rigCamera.publishRigFrame(1,22,thirdPerson,rigFrame),"native skin publication latches its exact tracking input");
+    const auto skinPublication=rigCamera.publishedRigFrame(300);
+    expect(skinPublication&&skinPublication->rigSequence&&skinPublication->controllers.predictedXrTime==10000
+        &&same(skinPublication->nativePose.position,rigFrame.nativePose.position),
+        "native effects can copy the completed skin transaction before its render-camera publication");
+    expect(!rigCamera.publishedRigFrame(299)&&!rigCamera.publishedRigFrame(451),
+        "future and stale skin snapshots cannot own native effects");
     hands.predictedXrTime=11000;hands.hands[1].grip.position.x+=0.1f;
     rigCamera.trackStereo({},rigEyes,true,310,hands);
+    const auto retainedSkin=rigCamera.publishedRigFrame(310);
+    expect(retainedSkin&&retainedSkin->trackingSequence==skinPublication->trackingSequence
+        &&retainedSkin->controllers.predictedXrTime==10000,
+        "a read-only skin snapshot cannot resample newer controller tracking");
     const auto renderedRig=rigCamera.resolve(1,thirdPerson,310);
     expect(renderedRig.applied&&renderedRig.rigSequence&&renderedRig.controllers.predictedXrTime==10000
         &&same(renderedRig.nativePose.position,rigFrame.nativePose.position),"eyes use the pose that drove the native rig despite newer tracking");
+    expect(renderedRig.weaponRig.sampled&&renderedRig.weaponRig.sampleTime==300
+        &&renderedRig.weaponRig.resourceHandle==0x1234&&renderedRig.weaponRig.component==55
+        &&renderedRig.weaponRig.muzzleSolved&&same(renderedRig.weaponRig.muzzleInGrip.position,{.1f,.2f,.3f}),
+        "weapon diagnostics retain their native skin publication despite a newer tracking sample");
     auto audioStatus=rigCamera.status();
     const auto audioPose=trackedListenerPose(renderedRig,audioStatus,310);
     expect(audioPose&&same(audioPose->position,rigFrame.nativePose.position)
@@ -2087,6 +2105,7 @@ int main(){
     expect(!trackedListenerPose(badAudioFrame,rigCamera.status(),310),"missing stereo tracking leaves the native listener unchanged");
     auto changedNativeCamera=thirdPerson;changedNativeCamera.position.x+=0.1f;
     rigCamera.publishPlayerHead(1,22,changedNativeCamera,playerRoot,headBone,311);
+    expect(!rigCamera.publishedRigFrame(311),"a changed native source camera rejects the earlier skin snapshot");
     expect(!rigCamera.resolve(1,changedNativeCamera,311).applied&&rigCamera.status().reason==HeadCameraStop::rigFrameMismatch,
            "a rig from another native camera publication is withheld");
     expect(rigCamera.status().rigRejectFlags==2&&!mayReprojectAcceptedStereo(rigCamera.status()),
@@ -2457,6 +2476,50 @@ int main(){
         "a barrel offset from the palm axes follows the support controller without moving the firing grip");
     expect(!twoHandGrip(primaryGrip,primaryGrip,{0,0,-.3f},1)
         &&!twoHandGrip(primaryGrip,Pose{{},{.2f,1.2f,.1f}},{0,0,-.3f},1),"coincident or crossed hands cannot flip the weapon");
+    {
+        const Pose contact{{},{0,-.1f,-.3f}};
+        const Pose atContact{{.38268343f,0,0,.92387953f},compose(primaryGrip,contact).position};
+        const auto resting=twoHandSupportGrip(primaryGrip,atContact,contact,1);
+        expect(resting&&same(resting->position,primaryGrip.position)
+            &&same(rotate(resting->orientation,{0,0,-1}),{0,0,-1})
+            &&same(compose(*resting,contact).position,atContact.position),
+            "a hand at an off-axis support contact does not swing the weapon away from that contact");
+        const auto wrongBore=twoHandGrip(primaryGrip,atContact,{0,0,-1},1);
+        expect(wrongBore&&dot(compose(*wrongBore,contact).position-atContact.position,
+            compose(*wrongBore,contact).position-atContact.position)>.01f,
+            "the off-axis fixture distinguishes contact guidance from erroneous bore-to-palm guidance");
+        const Pose movedSupport{{},primaryGrip.position+Vec3{.3f,-.1f,0}};
+        const auto moved=twoHandSupportGrip(primaryGrip,movedSupport,contact,1);
+        expect(moved&&same(moved->position,primaryGrip.position)
+            &&same(compose(*moved,contact).position,movedSupport.position),
+            "moving the support hand rotates its authored contact exactly while retaining the primary palm");
+        const Pose frame{{0,.38268343f,0,.92387953f},{3,-1,2}};
+        const auto transformed=twoHandSupportGrip(compose(frame,primaryGrip),compose(frame,movedSupport),contact,1);
+        expect(moved&&transformed&&same(transformed->position,compose(frame,*moved).position)
+            &&same(rotate(transformed->orientation,{0,0,-1}),rotate(compose(frame,*moved).orientation,{0,0,-1}))
+            &&same(compose(*transformed,contact).position,compose(frame,movedSupport).position),
+            "support-contact guidance is invariant under a common world-frame translation and rotation");
+        const Pose farther{{},primaryGrip.position+Vec3{.6f,-.2f,0}};
+        const auto unscaled=twoHandSupportGrip(primaryGrip,farther,contact,1);
+        expect(unscaled&&same(compose(*unscaled,contact).position,primaryGrip.position+Vec3{.3f,-.1f,0}),
+            "a farther tracked support hand changes direction without stretching the authored weapon");
+        const auto disabled=twoHandSupportGrip(primaryGrip,movedSupport,contact,0);
+        expect(disabled&&same(compose(*disabled,contact).position,atContact.position),
+            "zero support influence preserves the authored contact and one-handed aim");
+        const Pose rightWristFromGrip{{0,0,.38268343f,.92387953f},{.03f,-.02f,.01f}};
+        const Pose leftWristFromGrip{{.38268343f,0,0,.92387953f},{-.02f,.015f,-.01f}};
+        const auto wristContact=compose(inverse(rightWristFromGrip),compose(contact,leftWristFromGrip));
+        const auto fromWrists=compose(rightWristFromGrip,compose(wristContact,inverse(leftWristFromGrip)));
+        const auto wristGuided=twoHandSupportGrip(primaryGrip,atContact,fromWrists,1);
+        expect(wristGuided&&same(fromWrists.position,contact.position)
+            &&same(compose(*wristGuided,fromWrists).position,atContact.position),
+            "native wrist contact converts through both anatomical palm offsets before guidance");
+        expect(!twoHandSupportGrip(primaryGrip,movedSupport,{},1)
+            &&!twoHandSupportGrip(primaryGrip,movedSupport,Pose{{},{std::numeric_limits<float>::quiet_NaN(),0,0}},1)
+            &&!twoHandSupportGrip(primaryGrip,movedSupport,Pose{{0,0,0,0},contact.position},1)
+            &&!twoHandSupportGrip(primaryGrip,primaryGrip,contact,1),
+            "invalid authored contacts and coincident controllers retain one-handed guidance fallback");
+    }
     for(unsigned finger=0;finger<5;++finger)for(unsigned joint=0;joint<3;++joint){
         const auto leftOpen=fingerJointRotation(false,finger,joint,0),rightOpen=fingerJointRotation(true,finger,joint,0);
         expect(leftOpen&&rightOpen&&same(rotate(*leftOpen,{1,0,0}),{1,0,0})&&same(rotate(*rightOpen,{-1,0,0}),{-1,0,0}),
@@ -2546,6 +2609,373 @@ int main(){
         auto& right=frame.controllers.hands[1];
         right.gripTracked=true;right.grip=Pose{{},{0,0,-.35f}};
         right.aimTracked=true;
+        constexpr uintptr_t effectBase=0x140000000ull;
+        expect(matchesNativeIdroidLightGraph(effectBase,effectBase+0x24e1460u,nativeIdroidLightGraphName),
+            "iDroid probe identifies the native Light graph by exact type and authored name");
+        expect(!matchesNativeIdroidLightGraph(0,0x24e1460u,nativeIdroidLightGraphName)
+            &&!matchesNativeIdroidLightGraph(effectBase,effectBase+0x24e1450u,nativeIdroidLightGraphName)
+            &&!matchesNativeIdroidLightGraph(effectBase,effectBase+0x24e1460u,nativeIdroidLightGraphName+1),
+            "another graph, base type or absent executable cannot register an iDroid Light");
+        expect(matchesNativeIdroidLightRetainedGraph(effectBase,effectBase+0x24e1450u,nativeIdroidLightGraphName),
+            "iDroid probe accepts the retained graph's distinct native type and exact Light name");
+        expect(!matchesNativeIdroidLightRetainedGraph(effectBase,effectBase+0x24e1460u,nativeIdroidLightGraphName)
+            &&!matchesNativeIdroidLightRetainedGraph(effectBase,effectBase+0x24e1450u,nativeIdroidLightGraphName+1)
+            &&!matchesNativeIdroidLightRetainedGraph(0,0x24e1450u,nativeIdroidLightGraphName),
+            "a temporary prototype, unrelated retained graph or absent executable cannot own runtime Light updates");
+        const auto primitiveMatches=[&](uintptr_t properties,uint16_t size,uintptr_t update){
+            return matchesNativeIdroidPrimitive(effectBase,effectBase+0x1b6bab0u,update,
+                effectBase+0x1b6c0d0u,effectBase+0x1b6c230u,properties,size);
+        };
+        expect(primitiveMatches(1,nativeIdroidPrimitivePropertySize,effectBase+0x1b6d640u),
+            "iDroid primitive registration requires its four verified native callbacks and complete property block");
+        expect(!primitiveMatches(0,nativeIdroidPrimitivePropertySize,effectBase+0x1b6d640u)
+            &&!primitiveMatches(1,nativeIdroidPrimitivePropertySize-1,effectBase+0x1b6d640u)
+            &&!primitiveMatches(1,nativeIdroidPrimitivePropertySize,effectBase+0x1b6d641u),
+            "missing, truncated or differently typed primitive cannot join a Light runtime update");
+        {
+            std::array<std::byte,0xa8> instance{};
+            std::array<std::byte,0x70> properties{};
+            std::array<std::byte,0x128> model{};
+            const auto put=[]<class T,size_t N>(std::array<std::byte,N>& bytes,size_t offset,T value){
+                std::memcpy(bytes.data()+offset,&value,sizeof(value));
+            };
+            put(instance,0,uintptr_t{0x5000});put(instance,0x30,uintptr_t{0x2000});
+            put(instance,0x60,uint32_t{1});put(instance,0x68,uint32_t{1});
+            put(properties,0x40,uintptr_t{0x3000});put(properties,0x4c,uint32_t{32});
+            put(properties,0x50,uint32_t{96});put(properties,0x54,uint32_t{32});
+            put(model,0,effectBase+0x20f4d90u);
+            put(model,0x118,uintptr_t{0x6000});put(model,0x120,uint64_t{0x84a3182ae4e26449ull});
+            put(model,0xe8,uintptr_t{0x4000});put(model,0xf8,uint16_t{1});
+            const uint32_t boneName=0x78d68a95u;
+            const std::array<float,16> parentMatrix{1,0,0,0,0,1,0,0,0,0,1,0,.5f,.6f,.7f,1};
+            unsigned headerReads{},propertyReads{};bool replace{},change{},truncated{},resourceChanged{},argumentChanged{},parentChanged{};
+            unsigned parentReads{};
+            uintptr_t missing{};
+            const auto reader=[&](uintptr_t address,void* output,size_t bytes){
+                if(address==missing)return false;
+                if(address==0x1000&&bytes==instance.size()){
+                    std::memcpy(output,instance.data(),bytes);
+                    if(++headerReads==2&&replace){const uintptr_t other=0x2200;std::memcpy(static_cast<std::byte*>(output)+0x30,&other,sizeof(other));}
+                    if(headerReads==2&&argumentChanged){const uintptr_t other=0x2300;std::memcpy(static_cast<std::byte*>(output)+8,&other,sizeof(other));}
+                    return true;
+                }
+                if(address==0x2000&&bytes==properties.size()){
+                    if(truncated)return false;
+                    std::memcpy(output,properties.data(),bytes);
+                    if(++propertyReads==2&&change)static_cast<std::byte*>(output)[0]^=std::byte{1};
+                    return true;
+                }
+                if(address==0x3000&&bytes<=model.size()){std::memcpy(output,model.data(),bytes);return true;}
+                if(address==0x3118&&bytes==sizeof(uintptr_t)){std::memcpy(output,model.data()+0x118,bytes);return true;}
+                if(address==0x3120&&bytes==sizeof(uint64_t)){
+                    std::memcpy(output,model.data()+0x120,bytes);
+                    if(resourceChanged)static_cast<std::byte*>(output)[0]^=std::byte{1};
+                    return true;
+                }
+                if(address==0x4000&&bytes==sizeof(boneName)){std::memcpy(output,&boneName,bytes);return true;}
+                if(address==0x5000&&bytes==sizeof(parentMatrix)){
+                    std::memcpy(output,parentMatrix.data(),bytes);
+                    if(++parentReads==2&&parentChanged){const float movedParent=1.f;std::memcpy(static_cast<std::byte*>(output)+12*sizeof(float),&movedParent,sizeof(movedParent));}
+                    return true;
+                }
+                return false;
+            };
+            const auto sample=[&]{headerReads=propertyReads=parentReads=0;return readNativeIdroidPrimitiveCandidate(effectBase,0x1000,reader);};
+            const auto current=sample();
+            expect(current&&current->model==0x3000&&current->properties==0x2000
+                &&current->vertices==32&&current->indices==96&&current->triangles==32
+                &&current->modelResource==0x6000&&current->modelResourceCode==0x84a3182ae4e26449ull
+                &&current->parentMatrixRead&&current->parentMatrix==parentMatrix
+                &&current->boneNamesRead&&current->boneNames[0]==boneName,
+                "already-loaded primitive discovery reads current finalized typed model without inventing a graph identity");
+            replace=true;expect(!sample(),"replaced finalized property owner rejects the discovery sample");replace=false;
+            change=true;expect(!sample(),"changed complete primitive properties reject the discovery sample");change=false;
+            resourceChanged=true;expect(!sample(),"changed native model resource code rejects stale asset identity");resourceChanged=false;
+            argumentChanged=true;expect(!sample(),"replaced interpreter arguments reject the callback owner snapshot");argumentChanged=false;
+            parentChanged=true;const auto tornParent=sample();
+            expect(tornParent&&!tornParent->parentMatrixRead,"changing native parent matrix remains unknown instead of fabricating coherent attachment");parentChanged=false;
+            truncated=true;expect(!sample(),"incomplete native property reads never yield a discovery candidate");truncated=false;
+            missing=0x3000;expect(!sample(),"missing native model rejects its candidate");missing=0;
+            put(model,0,effectBase+0x20f4d98u);expect(!sample(),"another native model type cannot borrow the finalized GrModel layout");
+            put(model,0,effectBase+0x20f4d90u);
+            put(instance,0x68,uint32_t{2});expect(!sample(),"a batch count different from its active range rejects the candidate");
+            put(instance,0x68,uint32_t{1});
+            put(instance,0x64,uint32_t{3});put(instance,0x68,uint32_t{4});
+            expect(sample().has_value(),"a nonzero native task offset is valid when end equals first plus count");
+            put(instance,0x64,uint32_t{0});put(instance,0x68,uint32_t{1});
+            missing=0x5000;const auto noParent=sample();
+            expect(noParent&&!noParent->parentMatrixRead,"unreadable parent matrix remains unknown without fabricated attachment ownership");
+            expect(!readNativeIdroidPrimitiveCandidate(effectBase,UINTPTR_MAX-2,reader),
+                "overflowing native instance spans are rejected before a read");
+            NativeIdroidCandidateBudget budget;
+            unsigned admitted{};for(unsigned i=0;i<1000;++i)if(budget.admit(1000))++admitted;
+            expect(admitted==128&&!budget.admit(1499)&&budget.admit(1500),
+                "absent candidates cannot cause unbounded native reads in one discovery window");
+            budget={};for(unsigned i=0;i<8;++i){expect(budget.admit(1000),"bounded candidate report admission");budget.reported();}
+            expect(!budget.admit(1001)&&budget.admit(1500),"candidate output has its own strict per-window budget");
+            budget={};for(unsigned window=0;window<8;++window)for(unsigned i=0;i<8;++i){
+                expect(budget.admit(1000+window*500),"bounded total candidate report admission");budget.reported();
+            }
+            expect(!budget.admit(10000),"candidate diagnostics stop all reads after their session output budget");
+            budget={};admitted=0;for(unsigned i=0;i<1000;++i)if(budget.admit(UINT64_MAX))++admitted;
+            expect(admitted==128,"saturated clock cannot restart a discovery window on every callback");
+            NativeIdroidCandidateReportState motion;
+            auto heldCandidate=*current;
+            std::array<float,7> emitter{0,0,0,1,.5f,.6f,.7f};
+            expect(motion.changed(heldCandidate,emitter,1,1000),"first finalized candidate preserves a diagnostic identity sample");
+            motion.remember(heldCandidate,emitter,1,1000);
+            budget={};budget.reported();
+            unsigned stationaryReports{};
+            for(unsigned i=1;i<=10000;++i){
+                if(motion.changed(heldCandidate,emitter,1,1000+i*500u)){
+                    ++stationaryReports;budget.reported();motion.remember(heldCandidate,emitter,1,1000+i*500u);
+                }
+            }
+            expect(stationaryReports==0&&budget.total==1,
+                "a stationary Help page cannot exhaust changed-pose discovery output");
+            auto signEquivalent=emitter;signEquivalent[3]=-1;
+            expect(!motion.changed(heldCandidate,signEquivalent,1,2000),"equivalent quaternion signs do not fabricate a changed device pose");
+            auto noise=heldCandidate;noise.parentMatrix[12]+=.0001f;
+            auto emitterNoise=emitter;emitterNoise[4]+=.0001f;
+            expect(!motion.changed(noise,emitterNoise,1,2000),"submillimetre attachment noise does not spend pose reports");
+            auto moved=heldCandidate;moved.parentMatrix[12]+=.05f;
+            expect(!motion.changed(moved,emitter,1,1499)&&motion.changed(moved,emitter,1,1500),
+                "actual parent motion is retained after the bounded half-second output interval");
+            auto movedEmitter=emitter;movedEmitter[4]+=.08f;
+            expect(motion.changed(heldCandidate,movedEmitter,1,2000),
+                "a changed physical device pose is recorded even when an unrelated candidate stays still");
+            auto rotatedEmitter=emitter;rotatedEmitter[1]=.1305262f;rotatedEmitter[3]=.9914449f;
+            expect(motion.changed(heldCandidate,rotatedEmitter,1,2000),"hand rotation without translation preserves a second emitter comparison");
+            auto replacedParent=heldCandidate;replacedParent.parent+=0x100;
+            expect(motion.changed(replacedParent,emitter,1,2000)&&motion.changed(heldCandidate,emitter,2,2000),
+                "replaced parent and changed activation require fresh candidate evidence");
+            auto unreadableParent=heldCandidate;unreadableParent.parentMatrixRead=false;
+            expect(motion.changed(unreadableParent,emitter,1,2000),"loss of parent readability is retained as unknown");
+            motion.remember(heldCandidate,emitter,1,UINT64_MAX);
+            expect(motion.nextReport==UINT64_MAX&&!motion.changed(heldCandidate,emitter,1,UINT64_MAX-1),
+                "changed-pose scheduling saturates safely at the clock limit");
+            auto drawable=heldCandidate;drawable.batchCount=1;drawable.first=0;drawable.last=1;
+            auto emptyBatch=heldCandidate;emptyBatch.batchCount=emptyBatch.first=emptyBatch.last=0;
+            motion.remember(emptyBatch,emitter,1,1000);
+            expect(motion.changed(drawable,emitter,1,1500),"an active particle range transition survives a preceding empty callback");
+            std::array<std::byte,16> clonePool{};
+            missing=0;
+            std::array<std::byte,0x128> cloneOne=model,cloneTwo=model,cloneThree=model;
+            put(clonePool,0,uint32_t{2});put(clonePool,4,uint32_t{4});put(clonePool,8,uintptr_t{0x7100});
+            const std::array<float,16> cloneWorld{.1f,0,0,0,0,.1f,0,0,0,0,.1f,0,.5f,.6f,.7f,1};
+            put(cloneOne,0x40,cloneWorld);put(cloneTwo,0x40,cloneWorld);put(cloneThree,0x40,cloneWorld);
+            put(instance,0x38,uintptr_t{0x7000});put(instance,0x60,uint32_t{2});put(instance,0x68,uint32_t{2});
+            auto cloneCandidate=*current;cloneCandidate.particlePool=0x7000;cloneCandidate.batchCount=cloneCandidate.last=2;
+            std::array<uintptr_t,3> clonePointers{0x8000,0x9000,0xa000};
+            bool replacePool{},replaceClone{},tornWorld{};unsigned poolReads{},pointerReads{},drawWorldReads{};
+            const auto cloneReader=[&](uintptr_t address,void* output,size_t bytes){
+                if(address==0x7000&&bytes==clonePool.size()){
+                    std::memcpy(output,clonePool.data(),bytes);
+                    if(++poolReads==2&&replacePool)static_cast<std::byte*>(output)[8]^=std::byte{1};
+                    return true;
+                }
+                if((address==0x7100||address==0x7108||address==0x7110)&&bytes==sizeof(uintptr_t)){
+                    const auto index=(address-0x7100)/sizeof(uintptr_t);
+                    std::memcpy(output,&clonePointers[index],bytes);
+                    if(++pointerReads>2&&replaceClone)static_cast<std::byte*>(output)[0]^=std::byte{1};
+                    return true;
+                }
+                for(const auto [start,data]:std::array<std::pair<uintptr_t,const std::array<std::byte,0x128>*>,3>{{{0x8000,&cloneOne},{0x9000,&cloneTwo},{0xa000,&cloneThree}}}){
+                    if(address>=start&&address-start<=data->size()&&bytes<=data->size()-(address-start)){
+                        std::memcpy(output,data->data()+(address-start),bytes);
+                        if(address==start+0x40&&++drawWorldReads==2&&tornWorld)static_cast<std::byte*>(output)[0]^=std::byte{1};
+                        return true;
+                    }
+                }
+                if(address>=0x1000&&address-0x1000<=instance.size()&&bytes<=instance.size()-(address-0x1000)){
+                    std::memcpy(output,instance.data()+(address-0x1000),bytes);return true;
+                }
+                return reader(address,output,bytes);
+            };
+            const auto cloneSample=[&]{poolReads=pointerReads=drawWorldReads=0;return readNativeIdroidConeDraws(effectBase,0x7000,cloneCandidate,cloneReader);};
+            const auto cloneBatch=cloneSample();
+            expect(cloneBatch&&cloneBatch->activeCount==2&&cloneBatch->active[0].record==0x8000
+                &&cloneBatch->active[0].world==cloneWorld,"post-update particle draw records belong to the exact typed source resource and pool");
+            replacePool=true;expect(!cloneSample(),"replaced cone model pool rejects the batch");replacePool=false;
+            replaceClone=true;expect(!cloneSample(),"replaced active cone model rejects the batch");replaceClone=false;
+            tornWorld=true;expect(!cloneSample(),"changing native cone model matrix cannot certify an endpoint");tornWorld=false;
+            clonePointers[1]=clonePointers[0];expect(!cloneSample(),"aliased effect clones cannot be written twice");clonePointers[1]=0x9000;
+            clonePointers[0]=cloneCandidate.model;expect(!cloneSample(),"cached property model is never an eligible effect clone");clonePointers[0]=0x8000;
+            put(model,0x120,uint64_t{0x84a3182ae4e26448ull});expect(!cloneSample(),"another source resource cannot borrow cone draw layout");
+            put(model,0x120,nativeIdroidConeResourceCode);
+            put(clonePool,0,uint32_t{1});expect(!cloneSample(),"active range outside the native pool rejects the batch");put(clonePool,0,uint32_t{2});
+            put(instance,0x68,uint32_t{1});expect(!cloneSample(),"changed active particle range rejects stale clone ownership");put(instance,0x68,uint32_t{2});
+            expect(!readNativeIdroidConeDraws(effectBase,0x7010,cloneCandidate,cloneReader),"callback pool must be the exact native header pool");
+            auto emitterCandidate=cloneCandidate;emitterCandidate.parentMatrix=parentMatrix;
+            emitterCandidate.parentMatrixRead=emitterCandidate.boneNamesRead=true;emitterCandidate.bones=1;
+            emitterCandidate.boneNames[0]=0x78d68a95u;emitterCandidate.flags=1;
+            emitterCandidate.interpreterArgument3=emitterCandidate.parent+0x50u;
+            const Pose exactEmitter{{},{.5f,.6f,.7f}};
+            expect(matchesNativeIdroidConeEmitter(emitterCandidate,exactEmitter),
+                "a canonical native cone joins the complete published emitter frame");
+            auto differentEmitter=exactEmitter;differentEmitter.orientation={0,.1305262f,0,.9914449f};
+            expect(!matchesNativeIdroidConeEmitter(emitterCandidate,differentEmitter),
+                "a nearby cone with another rotation cannot own the player's projection");
+            differentEmitter=exactEmitter;differentEmitter.position.x+=.001f;
+            expect(!matchesNativeIdroidConeEmitter(emitterCandidate,differentEmitter),
+                "millimetre proximity cannot replace emitter matrix equality");
+            emitterCandidate.interpreterArgument3+=8;
+            expect(!matchesNativeIdroidConeEmitter(emitterCandidate,exactEmitter),
+                "a replaced native attachment interpreter cannot retain projection ownership");
+            const Vec3 projectionEmitter{1,2,3};
+            const Pose projectionScreen{{0,0,.258819f,.9659258f},{1.1f,2.2f,2.8f}};
+            const auto projectionFit=nativeIdroidConeScreenFit(projectionEmitter,projectionScreen,.45f);
+            const auto conePoint=[](const std::array<float,16>& w,Vec3 p){return Vec3{
+                p.x*w[0]+p.y*w[4]+p.z*w[8]+w[12],p.x*w[1]+p.y*w[5]+p.z*w[9]+w[13],
+                p.x*w[2]+p.y*w[6]+p.z*w[10]+w[14]};};
+            expect(projectionFit&&same(conePoint(*projectionFit,{0,0,.01f}),projectionEmitter)
+                &&same(conePoint(*projectionFit,{0,0,2}),projectionScreen.position),
+                "configured cone keeps the emitter fixed and meets the screen centre");
+            bool farPlane=true;
+            if(projectionFit)for(unsigned corner=0;corner<16;++corner){
+                const float angle=corner*6.28318530718f/16;
+                const auto pointOnRing=conePoint(*projectionFit,{.8f*std::cos(angle),.8f*std::sin(angle),2});
+                if(std::abs(dot(pointOnRing-projectionScreen.position,rotate(projectionScreen.orientation,{0,0,1})))>.000001f)farPlane=false;
+            }
+            expect(projectionFit&&farPlane,"every authored far-ring sample terminates on the rotated screen plane");
+            const auto fitBounds=projectionFit?nativeIdroidConeBounds(*projectionFit):std::nullopt;
+            bool enclosed=fitBounds.has_value();
+            if(fitBounds)for(unsigned ring=0;ring<2;++ring)for(unsigned vertex=0;vertex<16;++vertex){
+                const float angle=vertex*6.28318530718f/16.f;
+                const float radius=ring?.8f:.004f,z=ring?2.f:.01f;
+                const auto p=conePoint(*projectionFit,{radius*std::cos(angle),radius*std::sin(angle),z});
+                const std::array<float,3> coordinates{p.x,p.y,p.z};
+                for(unsigned axis=0;axis<3;++axis)if(coordinates[axis]<(*fitBounds)[axis]
+                    ||coordinates[axis]>(*fitBounds)[axis+4])enclosed=false;
+            }
+            expect(enclosed,"fitted native bounds enclose every authored cone vertex after display rotation and shear");
+            auto singleDraw=cloneCandidate;singleDraw.batchCount=singleDraw.last=1;
+            put(instance,0x60,uint32_t{1});put(instance,0x68,uint32_t{1});put(clonePool,0,uint32_t{1});
+            singleDraw.boneNames[0]=0x78d68a95u;singleDraw.flags=1;
+            singleDraw.interpreterArgument3=singleDraw.parent+0x50u;
+            put(instance,8,singleDraw.interpreterArgument3);
+            unsigned projectionWrites{},projectionAttempts{},failProjectionAttempt{},failRestoreAttempt{};
+            size_t partialProjectionBytes{};bool boundsWritable=true,boundsReadable=true;
+            const auto fitWritable=[&](uintptr_t address,size_t bytes){
+                return (address==0x8040&&bytes==64)||(boundsWritable&&address==0x80a0&&bytes==32);
+            };
+            const auto fitWriter=[&](uintptr_t address,const void* data,size_t bytes){
+                if(!fitWritable(address,bytes))return false;
+                const auto attempt=++projectionAttempts;
+                if(attempt==failProjectionAttempt){
+                    std::memcpy(cloneOne.data()+(address-0x8000),data,std::min(bytes,partialProjectionBytes));
+                    return false;
+                }
+                if(attempt==failRestoreAttempt)return false;
+                ++projectionWrites;std::memcpy(cloneOne.data()+(address-0x8000),data,bytes);return true;
+            };
+            const auto fitReader=[&](uintptr_t address,void* data,size_t bytes){
+                return (boundsReadable||address!=0x80a0)&&cloneReader(address,data,bytes);
+            };
+            const Pose singleScreen{{},{.5f,.8f,.6f}};
+            const auto applyProjection=[&]{
+                poolReads=pointerReads=drawWorldReads=0;
+                return retargetNativeIdroidConeDraw(effectBase,0x7000,singleDraw,exactEmitter,singleScreen,.45f,
+                    fitReader,fitWritable,fitWriter);
+            };
+            boundsWritable=false;
+            expect(!applyProjection()&&projectionWrites==0,"unwritable native culling bounds reject the fit before any transform mutation");
+            boundsWritable=true;
+            boundsReadable=false;
+            expect(!applyProjection()&&projectionAttempts==0,"unreadable native bounds cannot be mutated without a rollback snapshot");
+            boundsReadable=true;
+            const auto originalDraw=cloneOne;
+            for(const unsigned failedAttempt:{1u,2u})for(const size_t partialBytes:{size_t{0},size_t{13},size_t{32}}){
+                cloneOne=originalDraw;projectionWrites=projectionAttempts=0;
+                failProjectionAttempt=failedAttempt;partialProjectionBytes=partialBytes;
+                expect(!applyProjection()&&cloneOne==originalDraw
+                    &&projectionAttempts==failedAttempt+2,
+                    "a partial native transform or bounds write restores both original spans independently");
+            }
+            cloneOne=originalDraw;projectionWrites=projectionAttempts=0;
+            failProjectionAttempt=2;partialProjectionBytes=13;failRestoreAttempt=3;
+            expect(!applyProjection()&&projectionAttempts==4
+                &&std::memcmp(cloneOne.data()+0xa0,originalDraw.data()+0xa0,32)==0,
+                "a failed transform rollback still attempts the original culling bounds restoration");
+            cloneOne=originalDraw;projectionWrites=projectionAttempts=0;
+            failProjectionAttempt=failRestoreAttempt=0;
+            expect(applyProjection()&&projectionWrites==2,"only the exact native draw transform and its culling bounds are written");
+            singleDraw.parentMatrix[12]+=.001f;projectionWrites=0;
+            expect(!applyProjection()&&projectionWrites==0,"a changed attachment cannot mutate even an already fitted draw record");
+            singleDraw.parentMatrix[12]-=.001f;
+            clonePointers[0]=singleDraw.model;
+            expect(!applyProjection()&&projectionWrites==0,"the shared cached source model cannot become a projection writer");
+            clonePointers[0]=0x8000;
+            // The native field counterexample publishes one canonical Light
+            // with three coincident draw particles. Fit the entire batch or
+            // restore all six spans, including a partially written late sibling.
+            singleDraw.batchCount=singleDraw.last=3;
+            put(instance,0x60,uint32_t{3});put(instance,0x68,uint32_t{3});put(clonePool,0,uint32_t{3});
+            const std::array<std::array<std::byte,0x128>,3> originalBatch{originalDraw,cloneTwo,cloneThree};
+            bool thirdBoundsWritable=true,replaceGenerationDuringBounds=false;
+            const auto resetBatch=[&]{
+                cloneOne=originalBatch[0];cloneTwo=originalBatch[1];cloneThree=originalBatch[2];
+                put(instance,0x30,singleDraw.properties);projectionWrites=projectionAttempts=0;
+                poolReads=pointerReads=drawWorldReads=0;
+            };
+            const auto batchWritable=[&](uintptr_t address,size_t bytes){
+                for(const auto start:clonePointers){
+                    if(address==start+0x40&&bytes==64)return true;
+                    if(address==start+0xa0&&bytes==32)return start!=0xa000||thirdBoundsWritable;
+                }
+                return false;
+            };
+            const auto batchWriter=[&](uintptr_t address,const void* data,size_t bytes){
+                if(!batchWritable(address,bytes))return false;
+                for(const auto [start,target]:std::array<std::pair<uintptr_t,std::array<std::byte,0x128>*>,3>{{{0x8000,&cloneOne},{0x9000,&cloneTwo},{0xa000,&cloneThree}}}){
+                    if(address<start||address-start>target->size()||bytes>target->size()-(address-start))continue;
+                    const auto attempt=++projectionAttempts;
+                    if(attempt==failProjectionAttempt){
+                        std::memcpy(target->data()+(address-start),data,std::min(bytes,partialProjectionBytes));return false;
+                    }
+                    if(attempt==failRestoreAttempt)return false;
+                    ++projectionWrites;std::memcpy(target->data()+(address-start),data,bytes);return true;
+                }
+                return false;
+            };
+            const auto batchReader=[&](uintptr_t address,void* data,size_t bytes){
+                const bool result=cloneReader(address,data,bytes);
+                if(result&&address==0xa0a0&&replaceGenerationDuringBounds)put(instance,0x30,uintptr_t{0x2008});
+                return result;
+            };
+            const auto applyBatch=[&]{return retargetNativeIdroidConeDraw(effectBase,0x7000,singleDraw,
+                exactEmitter,singleScreen,.45f,batchReader,batchWritable,batchWriter);};
+            resetBatch();thirdBoundsWritable=false;
+            expect(!applyBatch()&&projectionAttempts==0,"an unwritable third particle rejects the complete fit before any sibling changes");
+            thirdBoundsWritable=true;resetBatch();replaceGenerationDuringBounds=true;
+            expect(!applyBatch()&&projectionAttempts==0,"a replaced canonical property generation during batch preflight rejects every write");
+            replaceGenerationDuringBounds=false;resetBatch();
+            auto separatedWorld=cloneWorld;separatedWorld[12]+=.01f;put(cloneThree,0x40,separatedWorld);
+            expect(!applyBatch()&&projectionAttempts==0,"noncoincident source particles cannot borrow the canonical three-particle fit");
+            for(unsigned failedAttempt=1;failedAttempt<=6;++failedAttempt){
+                resetBatch();failProjectionAttempt=failedAttempt;partialProjectionBytes=13;
+                expect(!applyBatch()&&cloneOne==originalBatch[0]&&cloneTwo==originalBatch[1]&&cloneThree==originalBatch[2]
+                    &&projectionAttempts==failedAttempt+6,
+                    "a partial write to any canonical sibling restores all three original transforms and bounds");
+            }
+            resetBatch();failProjectionAttempt=6;failRestoreAttempt=7;partialProjectionBytes=13;
+            expect(!applyBatch()&&projectionAttempts==12&&cloneTwo==originalBatch[1]&&cloneThree==originalBatch[2],
+                "one failed batch rollback never skips later sibling restoration");
+            resetBatch();failProjectionAttempt=failRestoreAttempt=0;
+            expect(applyBatch()&&projectionWrites==6
+                &&std::memcmp(cloneOne.data()+0x40,cloneTwo.data()+0x40,64)==0
+                &&std::memcmp(cloneOne.data()+0x40,cloneThree.data()+0x40,64)==0,
+                "the observed complete three-particle Light receives one coherent configured endpoint and culling fit");
+            resetBatch();singleDraw.batchCount=singleDraw.last=4;
+            expect(!applyBatch()&&projectionAttempts==0,"unobserved fourth particles are outside the bounded writer contract");
+            singleDraw.batchCount=singleDraw.last=3;singleDraw.first=1;
+            expect(!applyBatch()&&projectionAttempts==0,"partial callback ranges cannot independently mutate a sibling subset");
+            singleDraw.first=0;
+            expect(!nativeIdroidConeScreenFit(projectionEmitter,Pose{{},projectionEmitter},.45f)
+                &&!nativeIdroidConeScreenFit(projectionEmitter,projectionScreen,0)
+                &&!nativeIdroidConeScreenFit(projectionEmitter,Pose{{0,0,0,0},projectionScreen.position},.45f),
+                "coincident, invalid or zero-sized projection targets fail without a native write");
+        }
         expect(matchesNativeIdroidMount(0x1c68632c5c53ull,0x0004000038b1433cull,12),
             "observed retail iDroid CNP variant is decoded from its packed native anchor");
         expect(!matchesNativeIdroidMount(0x1c68632c5c53ull,0x0003000038b1433cull,12)

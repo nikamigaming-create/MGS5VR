@@ -1,4 +1,5 @@
 #include "mgs5vr/ui_clip.hpp"
+#include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/log.hpp"
 #include <d3d11.h>
 #include <d3dcompiler.h>
@@ -167,10 +168,10 @@ struct ClipDraw {
     ~ClipDraw(){if(bound){context->GSSetShader(prior.Get(),nullptr,0);auto* b=priorConstants.Get();context->GSSetConstantBuffers(0,1,&b);}
         if(scissorBound){context->RSSetState(priorRaster.Get());context->RSSetScissorRects(rectCount,priorRects.data());}}
 };
-void STDMETHODCALLTYPE draw(ID3D11DeviceContext* c,UINT a,UINT b){ClipDraw clip(c);originalDraw(c,a,b);}
-void STDMETHODCALLTYPE indexed(ID3D11DeviceContext* c,UINT a,UINT b,INT d){ClipDraw clip(c);originalIndexed(c,a,b,d);}
-void STDMETHODCALLTYPE instanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,UINT e){ClipDraw clip(c);originalInstanced(c,a,b,d,e);}
-void STDMETHODCALLTYPE indexedInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,INT e,UINT f){ClipDraw clip(c);originalIndexedInstanced(c,a,b,d,e,f);}
+void STDMETHODCALLTYPE draw(ID3D11DeviceContext* c,UINT a,UINT b){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalDraw(c,a,b);}
+void STDMETHODCALLTYPE indexed(ID3D11DeviceContext* c,UINT a,UINT b,INT d){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalIndexed(c,a,b,d);}
+void STDMETHODCALLTYPE instanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,UINT e){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalInstanced(c,a,b,d,e);}
+void STDMETHODCALLTYPE indexedInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,INT e,UINT f){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalIndexedInstanced(c,a,b,d,e,f);}
 }
 UiClipScope::UiClipScope(const std::array<float,16>& canvas) noexcept:saved_(active),savedBounds_(activeBounds){
     active=uiClipPlanes(canvas);if(!active)return;

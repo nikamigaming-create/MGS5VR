@@ -17,6 +17,9 @@ constexpr Route menuRoutes[]{
     {"PAD_UP","menus.dpad_up"},{"PAD_DOWN","menus.dpad_down"},
     {"PAD_LEFT","menus.dpad_left"},{"PAD_RIGHT","menus.dpad_right"},
     {"PAD_LS","axes.menu"},{"PAD_RS","axes.map"},
+    // The native Mother Base Help entry is reached by the effective Pause
+    // hold. Keep its localized caption and the user's actual gesture/chord.
+    {"MB_HELP","system.pause"},
     {"PAD_START","system.idroid"},{"PAD_SELECT","system.pause"}};
 constexpr Route nativeRoutes[]{
     {"PAD_A","native.a"},{"PAD_B","native.b"},{"PAD_X","native.x"},{"PAD_Y","native.y"},
@@ -62,7 +65,9 @@ std::string_view controlPromptAction(std::string_view token,ControlContext conte
     }
     if(context==ControlContext::equipment){
         constexpr Route routes[]{
-            {"DECISION","equipment.use"},{"PAD_A","equipment.use"},
+            // The physical Use action reaches the native Items picker as R3;
+            // A is consumed by RigEquipment before that packet is published.
+            {"DECISION","equipment.use"},{"PAD_R3","equipment.use"},
             {"CANCEL","equipment.back"},{"PAD_B","equipment.back"},
             {"PAD_UP","equipment.primary"},{"PAD_DOWN","equipment.secondary"},
             {"PAD_RIGHT","equipment.support"},{"PAD_LEFT","equipment.items"},
@@ -71,7 +76,9 @@ std::string_view controlPromptAction(std::string_view token,ControlContext conte
     }
     if(context==ControlContext::commands){
         constexpr Route routes[]{
-            {"DECISION","commands.confirm"},{"PAD_A","commands.confirm"},
+            // Commands consumes the VR confirm input and emits native R3.
+            // Its intermediate A input is not a native A destination.
+            {"DECISION","commands.confirm"},{"PAD_R3","commands.confirm"},
             {"CANCEL","commands.back"},{"PAD_B","commands.back"},
             {"PAD_RS","axes.commands"},{"CALL","commands.keep_open"}};
         return find(token,routes);
@@ -79,15 +86,21 @@ std::string_view controlPromptAction(std::string_view token,ControlContext conte
     if(context==ControlContext::vehicle){
         constexpr Route routes[]{
             {"ACTION","vehicle.interact"},{"PAD_Y","vehicle.interact"},
-            {"PAD_X","vehicle.weapon_or_call"},{"PAD_A","vehicle.native_a"},
+            // RigInput converts the configured vehicle action's intermediate
+            // X packet to the native Call/weapon shoulder before publication.
+            {"PAD_L1","vehicle.weapon_or_call"},{"PAD_A","vehicle.native_a"},
             {"PAD_B","vehicle.native_b"},{"PAD_L2","vehicle.brake_reverse"},
-            {"PAD_R2","vehicle.accelerate"},{"PAD_LS","axes.vehicle_steering"}};
+            {"PAD_R2","vehicle.accelerate"},{"PAD_L3","vehicle.left_click"},
+            {"PAD_R3","vehicle.right_click"},{"PAD_LS","axes.vehicle_steering"}};
         return find(token,routes);
     }
     if(context==ControlContext::horse){
         constexpr Route routes[]{
             {"DASH","horse.gallop"},{"ACTION","horse.interact"},
             {"STANCE","horse.stance"},{"RELOAD","horse.reload"},
+            {"PAD_A","horse.stance"},{"PAD_B","horse.reload"},
+            {"PAD_X","horse.gallop"},{"PAD_Y","horse.interact"},
+            {"PAD_L3","horse.left_click"},{"PAD_R3","horse.right_click"},
             {"BINOS","gameplay.equip_binoculars"},{"PAD_LS","axes.move"}};
         return find(token,routes);
     }

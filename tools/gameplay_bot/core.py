@@ -182,10 +182,26 @@ class Behaviors:
                     self.events.emit("milestone_reached", label=label, milestone=name,
                                      elapsed=self.clock()-started, state=state, expected=predicate)
             if not notified and self.clock()-started >= 2.:
-                notified = True
                 captures = []
                 if not getattr(self.adapter, "held", False):
-                    captures = self.adapter.capture(label.replace(":", "-")[:90]+"-attention")
+                    try:
+                        captures = self.adapter.capture(label.replace(":", "-")[:90]+"-attention")
+                    except BlankCompositorFrame as error:
+                        from .startup import neutral_startup_transition
+                        if not neutral_startup_transition(error.state):
+                            raise
+                        # The sampled action has already ended. A retail save
+                        # load fade is observation failure, not another input
+                        # opportunity; keep the original outcome deadline.
+                        self.events.emit("startup_transition_pixels_wait", label=label,
+                                         state=error.state, error=str(error), input_replayed=False)
+                        notified = True
+                        remaining = deadline-self.clock()
+                        if remaining <= 0:
+                            raise StateDeadline(label, error.state) from error
+                        self.sleep(min(.1, remaining))
+                        continue
+                notified = True
                 self.events.emit("attention_required", label=label, expected=predicate, state=state,
                                  elapsed=self.clock()-started, captures=captures,
                                  reason="Expected transition has not completed; inspect the current intermediate menu or scene")
@@ -205,7 +221,8 @@ class Behaviors:
         if type(after_stable) is not int or not 1 <= after_stable <= 20:
             raise BotFault("Outcome stability must be 1..20 observed samples")
         self.events.emit("case_started", case_id=case_id, case=case)
-        result = {"id": case_id, "status": "failed", "visual_acceptance": "pending"}
+        result = {"id": case_id, "status": "failed", "visual_acceptance": "pending",
+                  "dispatch_completed": False, "dispatched_steps_completed": 0}
         phase = "entry"
         try:
             self.adapter.release()
@@ -234,15 +251,33 @@ class Behaviors:
                         result["during_visual_checkpoint"] = observed["visual_checkpoint"]
                 else:
                     self.adapter.execute(step)
+                result["dispatched_steps_completed"] = index+1
+            result["dispatch_completed"] = True
             phase = "outcome"
             after = self.wait_for(case["after"], case.get("timeout", 8), case_id + ":outcome",
                                   milestones=case.get("milestones", ()), stable=after_stable)
             phase = "capture"
-            captures = self.adapter.capture(case_id + "-after")
+            # A sampled, released startup action can satisfy its native
+            # outcome before the retail fade has produced visible pixels.
+            # Wait only through the recognized boot owner; never repeat the
+            # action or accept the blank pair as its visual result.
+            try:
+                captures = self.adapter.capture(case_id + "-after")
+            except BlankCompositorFrame as error:
+                from .startup import capture_released_startup_transition, neutral_startup_transition
+                if getattr(self.adapter, "held", False) or not neutral_startup_transition(error.state):
+                    raise
+                captures = capture_released_startup_transition(self.adapter, case_id + "-after",
+                    timeout=min(15., case.get("timeout", 8)), clock=self.clock, sleep=self.sleep)
+                after = self.wait_for(case["after"], case.get("timeout", 8), case_id + ":captured-outcome",
+                                     stable=after_stable)
             result.update(status="observed_pass", before=before, after=after, captures=captures)
         except Exception as error:
             result["error"] = str(error)
             result["failure_phase"] = phase
+            if isinstance(error, BlankCompositorFrame):
+                result["failure_kind"] = "blank_compositor"
+                result["failure_state"] = error.state
             if isinstance(error, AttentionRequired):
                 result["attention_required"] = True
             if phase == "outcome" and isinstance(error, StateDeadline):
@@ -254,6 +289,10 @@ class Behaviors:
                 result["captures"] = self.adapter.capture(case_id + "-failure")
             except Exception as capture_error:
                 result["capture_error"] = str(capture_error)
+                result["capture_failure_kind"] = ("blank_compositor" if isinstance(capture_error, BlankCompositorFrame)
+                                                  else "capture_or_transport")
+                if isinstance(capture_error, BlankCompositorFrame):
+                    result["capture_failure_state"] = capture_error.state
         finally:
             try:
                 self.adapter.release()

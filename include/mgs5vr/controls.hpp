@@ -30,6 +30,10 @@ struct ControlInputAudit {
     uint16_t nativeButtons{};
     bool rigInput{};
     int travelMode{};
+    // Final XR-mapped packet, before XInput ownership/arbitration. This is not
+    // an observation of the native game's input consumer. LX,LY,RX,RY; LT,RT.
+    std::array<int16_t,4> nativeAxes{};
+    std::array<uint8_t,2> nativeTriggers{};
 };
 void publishControlInputAudit(ControlInputAudit sample);
 // Copy before reading the observation clock, so a newer XR publication cannot
@@ -60,6 +64,9 @@ public:
     float value(std::string_view action) const;
     bool active(std::string_view action) const {return value(action)>.5f;}
     bool hasBindingInput(std::string_view input) const;
+    // Physical buttons/sticks retain ordinary ownership thresholds. A touch
+    // requests XR ownership only when an effective binding uses that sensor.
+    bool hasPhysicalIntent(const PhysicalControls& input) const;
     std::array<float,2> axis(std::string_view name,const PhysicalControls& input) const;
     float setting(std::string_view name) const;
     std::string label(std::string_view action) const;

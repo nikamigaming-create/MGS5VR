@@ -34,7 +34,7 @@ def _position(state):
     return tuple(float(value) for value in values)
 
 
-def _validate_field_state(state, anchor=None):
+def _validate_xr_scene_state(state, *, activation=None):
     if not isinstance(state, dict) or state.get("scene") != "gameplay":
         raise BotFault("Locomotion requires an observed gameplay scene")
     if state.get("camera_active") is not True or state.get("camera_available") is not True:
@@ -43,11 +43,33 @@ def _validate_field_state(state, anchor=None):
         raise BotFault("Locomotion is unavailable while a native menu is open")
     if state.get("gamepad") is not False:
         raise BotFault("Locomotion is unavailable while physical XInput owns gameplay")
+    if activation is not None and state.get("activation") != activation:
+        raise BotFault("Camera generation changed during locomotion")
+
+
+def _validate_xr_field_state(state, *, activation=None):
+    _validate_xr_scene_state(state, activation=activation)
     controls = authoritative_controls(state)
     if controls.get("context") != "gameplay" or controls.get("rig_input") is not True:
         raise BotFault("Native XR controls are not in the live gameplay rig")
     if type(controls.get("travel_mode")) is not int or controls["travel_mode"] != 1:
         raise BotFault("The observed native travel mode is not on foot")
+
+    now_ms = state.get("now_ms")
+    if type(now_ms) is not int or now_ms < 0:
+        raise BotFault("Native observation time is invalid")
+    sample, sticks = controls.get("physical"), controls.get("sticks")
+    if not isinstance(sample, list) or len(sample) < 11:
+        raise BotFault("Fresh physical input audit is unavailable")
+    if not isinstance(sticks, list) or len(sticks) != 4:
+        raise BotFault("Fresh physical stick audit is unavailable")
+    if any(not finite_number(value) for value in sample[:11] + sticks):
+        raise BotFault("Physical input audit contains a nonfinite value")
+    return controls, now_ms
+
+
+def _validate_field_state(state, anchor=None):
+    controls, now_ms = _validate_xr_field_state(state)
 
     native = state.get("native")
     if not isinstance(native, dict):
@@ -63,17 +85,6 @@ def _validate_field_state(state, anchor=None):
         raise BotFault("Native state is not a stable, ordinary on-foot field state")
     _position(state)
 
-    now_ms = state.get("now_ms")
-    if type(now_ms) is not int or now_ms < 0:
-        raise BotFault("Native observation time is invalid")
-    sample = controls.get("physical")
-    sticks = controls.get("sticks")
-    if not isinstance(sample, list) or len(sample) < 11:
-        raise BotFault("Fresh physical input audit is unavailable")
-    if not isinstance(sticks, list) or len(sticks) != 4:
-        raise BotFault("Fresh physical stick audit is unavailable")
-    if any(not finite_number(value) for value in sample[:11] + sticks):
-        raise BotFault("Physical input audit contains a nonfinite value")
     if anchor is not None:
         before = anchor["identity"]
         current = (mission, location, sequence, state.get("activation"))
@@ -135,14 +146,21 @@ def _sampled_move_input(state, source, requested, *, after_sample_ms):
 
 def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5.,
                progress_timeout=1.0, cruise_magnitude=.30, brake_magnitude=.15,
-               brake_fraction=.45, clock=time.monotonic, sleep=time.sleep):
-    """Walk a short configured-stick segment with a lower-speed braking phase.
+               brake_fraction=.45, pulse_seconds=.25, max_unsampled_retries=1,
+               clock=time.monotonic, sleep=time.sleep):
+    """Measure a short walk with expiring pulses and neutral native reads.
 
     Distances are native game-coordinate units: no meter conversion is assumed.
-    The routine lowers forward input before the target, releases on the measured
-    target crossing, and verifies drift after release. The hard displacement
-    limit cannot exceed one native unit and the complete segment is bounded by
-    five seconds. This is not a route or collision-clearance test.
+    Only the fast XR publication is read while a pulse is held. Input expires
+    independently after at most .25 seconds and is explicitly released before
+    any potentially blocking Lua position query. Each pulse must settle before
+    another is admitted. An unsampled axis pulse can be retried only after
+    neutral publication resumes and its native endpoint remains unchanged.
+    Unknown RPC completion is never replayed. No-progress time counts sampled
+    bounded input commands; attempted command time is retained separately,
+    while all observation/transport time still counts against the wall deadline.
+    The hard limit remains at most one native unit; this
+    is an observed safety envelope, not a collision/route guarantee.
     """
     if (not finite_number(target_distance) or not finite_number(max_displacement)
             or not .05 <= target_distance < max_displacement <= 1.0
@@ -150,30 +168,28 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
             or not finite_number(progress_timeout) or not .1 <= progress_timeout < max_seconds
             or not finite_number(cruise_magnitude) or not .08 <= cruise_magnitude <= .45
             or not finite_number(brake_magnitude) or not .05 <= brake_magnitude < cruise_magnitude
-            or not finite_number(brake_fraction) or not .25 <= brake_fraction <= .75):
-        raise BotFault("Locomotion probe bounds must be target < hard limit <= 1 unit and time <= 5 seconds")
+            or not finite_number(brake_fraction) or not .25 <= brake_fraction <= .75
+            or not finite_number(pulse_seconds) or not .03 <= pulse_seconds <= .25
+            or type(max_unsampled_retries) is not int or not 0 <= max_unsampled_retries <= 2):
+        raise BotFault("Locomotion probe bounds require target < hard limit <= 1 unit, time <= 5 seconds, and pulse 0.03..0.25 seconds")
 
     source = _axis_source(live.bindings, "axes.move")
     hand = source.split("_", 1)[0]
     _stick_y_index(source)
     value = {"hand": hand, "component": "Thumbstick", "sub_component": "Y",
              "value": cruise_magnitude}
-    anchor = None
     timeline = []
+    pulses = []
     started = clock()
     deadline = started + max_seconds
     held = False
     reached_target = False
     settle_stable = False
-    last_position = None
     final_state = None
     current_phase = "cruise"
     phase_floor_ms = None
-    phase_started = None
     phase_counts = {"cruise": 0, "braking": 0}
     speed_native_units_per_second = 0.0
-    previous_progress = 0.0
-    previous_sample_ms = None
     braking_started_distance = None
 
     # This uses only the process-private OpenXR lease. Release first so a
@@ -184,8 +200,7 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
     _neutral_audit(controls)
     origin = _position(admission)
     native = admission["native"]
-    phase_floor_ms = admission_ms
-    previous_sample_ms = admission_ms
+    phase_floor_ms = controls["sample_ms"]
     identity = (native["mission"], native["location"], native["sequence"], admission.get("activation"))
     anchor = {"identity": identity}
     live.events.emit("locomotion_started", input={"axis": "axes.move", "source": source,
@@ -195,76 +210,216 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
                      identity={"mission": identity[0], "location": identity[1],
                                "sequence": identity[2], "activation": identity[3]},
                      target_distance=target_distance, max_displacement=max_displacement,
-                     maximum_seconds=max_seconds,
+                     maximum_seconds=max_seconds, maximum_pulse_seconds=pulse_seconds,
+                     maximum_unsampled_retries=max_unsampled_retries,
+                     progress_clock="sampled_expiring_input_seconds",
                      input_evidence="fresh XR resolver stick samples required; retail consumption is not inferred")
 
     guard = ProgressGuard(timeout=progress_timeout, minimum_progress=.015)
-    guard.observe(target_distance, clock())
+    # A released Lua read took 1.422 seconds in approach-05. That latency is
+    # part of the unchanged wall deadline, not evidence that the actor ignored
+    # another second of movement: only one .10 second pulse had been sent.
+    commanded_input_seconds = 0.0
+    sampled_input_seconds = 0.0
+    unsampled_attempts = 0
+    guard.observe(target_distance, commanded_input_seconds)
     samples_with_input = 0
     sample_count = 0
-    try:
-        # Mark held before dispatch so a partial RPC failure still releases all
-        # channels in finally.
-        held = True
-        phase_started = clock()
-        lease = max(.03, min(5.0, deadline - clock()))
-        live.input([value], max_seconds, lease_seconds=lease)
-        while clock() < deadline:
-            state = live.observe(native=True)
-            _, now_ms = _validate_field_state(state, anchor)
-            position = _position(state)
-            travelled = _distance(origin, position)
-            if travelled > max_displacement:
-                raise BotFault("Native displacement exceeded the bounded movement envelope")
+    travelled = 0.0
 
-            if previous_sample_ms is not None and now_ms > previous_sample_ms:
-                sample_seconds = (now_ms - previous_sample_ms) / 1000.0
-                sampled_speed = max(0.0, (travelled - previous_progress) / sample_seconds)
-                speed_native_units_per_second = max(sampled_speed, speed_native_units_per_second * .65)
-            audit = _sampled_move_input(state, source, value["value"],
-                                        after_sample_ms=phase_floor_ms)
-            sample_count += 1
-            if audit:
-                samples_with_input += 1
-                phase_counts[current_phase] += 1
-                timeline.append({**audit, "phase": current_phase,
-                                 "position": list(position), "displacement": travelled,
-                                 "estimated_speed_native_units_per_second": speed_native_units_per_second})
-                live.events.emit("locomotion_sample", held=True, phase=current_phase, audit=audit,
-                                 position=list(position), displacement=travelled)
+    def neutral_cadence():
+        nonlocal phase_floor_ms
+        if held:
+            raise BotFault("Release movement before waiting for neutral XR cadence")
+        # xrEndFrame blocked 654ms in approach-06, swallowing the whole axis
+        # lease. Wait for three advancing neutral publications spanning 60ms,
+        # with no gap above100ms. Neither time nor freshness is relabeled.
+        cadence_deadline = min(deadline, clock()+1.0)
+        first_ms = last_ms = None
+        advancing = 0
+        while clock() < cadence_deadline:
+            read_started = clock()
+            state = live.observe(native=False)
+            read_finished = clock()
+            if read_finished >= deadline:
+                raise BotFault("Neutral XR recovery exceeded the bounded segment deadline")
+            if read_finished >= cadence_deadline:
+                break
+            _validate_xr_scene_state(state, activation=identity[3])
+            if state.get("controls") is None:
+                first_ms = last_ms = None
+                advancing = 0
             else:
-                live.events.emit("locomotion_sample", held=True, phase=current_phase, audit=None,
-                                 position=list(position), displacement=travelled,
-                                 requested_stick_value=value["value"])
+                controls, _ = _validate_xr_field_state(state, activation=identity[3])
+                _neutral_audit(controls)
+                sample_ms = controls["sample_ms"]
+                fresh = controls["age_ms"]+(read_finished-read_started)*1000 <= 250
+                if not fresh:
+                    first_ms = last_ms = None
+                    advancing = 0
+                elif sample_ms > phase_floor_ms and (last_ms is None or sample_ms > last_ms):
+                    if last_ms is None or sample_ms-last_ms > 100:
+                        first_ms, advancing = sample_ms, 0
+                    last_ms = sample_ms
+                    advancing += 1
+                    live.events.emit("locomotion_neutral_cadence", sample_ms=sample_ms,
+                                     age_ms=controls["age_ms"], advancing_samples=advancing,
+                                     span_ms=sample_ms-first_ms)
+                    if advancing >= 3 and sample_ms-first_ms >= 60:
+                        phase_floor_ms = sample_ms
+                        return
+            sleep(min(.02, max(0., cadence_deadline-clock())))
+        raise BotFault("Neutral XR publication did not resume bounded fresh cadence")
 
-            guard.observe(max(0.0, target_distance - travelled), clock())
+    def neutral_position(phase):
+        nonlocal sample_count, final_state, phase_floor_ms
+        # A slow Lua queue cannot extend movement: every call is after release.
+        if held:
+            raise BotFault("Release movement before reading native player position")
+        if clock() >= deadline:
+            raise BotFault("Native movement observation exceeded the bounded segment deadline")
+        read_started = clock()
+        state = live.observe(native=True)
+        read_finished = clock()
+        controls, now_ms = _validate_field_state(state, anchor)
+        _neutral_audit(controls)
+        position = _position(state)
+        distance = _distance(origin, position)
+        sample_count += 1
+        final_state = state
+        phase_floor_ms = controls["sample_ms"]
+        timeline.append({"sample_ms": now_ms, "phase": "neutral_settle",
+                         "movement_phase": phase, "position": list(position),
+                         "observation_seconds": read_finished-read_started,
+                         "displacement": distance})
+        live.events.emit("locomotion_sample", held=False, phase=phase,
+                         observation_seconds=read_finished-read_started,
+                         position=list(position), displacement=distance)
+        if distance > max_displacement:
+            raise BotFault("Native displacement exceeded the bounded movement envelope after release")
+        if clock() >= deadline:
+            raise BotFault("Native movement observation exceeded the bounded segment deadline")
+        return position, distance
+
+    try:
+        while clock() < deadline:
+            # Never renew a pulse across a native query. Lowering magnitude
+            # provides the braking phase; the expiry cap also bounds dispatch
+            # and observation failures independently of the runner thread.
+            duration = pulse_seconds
+            if deadline - clock() < duration:
+                break
+            before_distance = travelled
+            before_position = _position(final_state) if final_state else origin
+            pulse_started = clock()
+            pulse_deadline = pulse_started + duration
+            pulse_samples = 0
+            try:
+                # Mark held before dispatch so a partial RPC failure is released.
+                held = True
+                live.input([value], duration, lease_seconds=duration)
+                while clock() < pulse_deadline:
+                    read_started = clock()
+                    state = live.observe(native=False)
+                    read_finished = clock()
+                    _validate_xr_scene_state(state, activation=identity[3])
+                    # Missing controls are the explicit stale-publication
+                    # representation, not permission to accept older input.
+                    if state.get("controls") is None:
+                        sleep(min(.01, max(0., pulse_deadline-clock())))
+                        continue
+                    controls, _ = _validate_xr_field_state(state, activation=identity[3])
+                    audit = _sampled_move_input(state, source, value["value"],
+                                                after_sample_ms=phase_floor_ms)
+                    # The publication may have been sampled before a blocked
+                    # read. Credit it only while this exact pulse is still live.
+                    if (audit and read_finished < pulse_deadline
+                            and controls["age_ms"] + (read_finished-read_started)*1000 <= 250):
+                        pulse_samples += 1
+                        samples_with_input += 1
+                        phase_counts[current_phase] += 1
+                        phase_floor_ms = controls["sample_ms"]
+                        timeline.append({**audit, "phase": current_phase,
+                                         "pulse_index": len(pulses), "position": None,
+                                         "displacement": None})
+                        live.events.emit("locomotion_sample", held=True,
+                                         phase=current_phase, audit=audit,
+                                         position=None, displacement=None)
+                    sleep(min(.01, max(0., pulse_deadline-clock())))
+            finally:
+                if held:
+                    live.release()
+                    held = False
+                    live.events.emit("locomotion_released", target_reached=False,
+                                     pulse_index=len(pulses), expiry_seconds=duration)
+
+            commanded_input_seconds += duration
+            pulse = {"phase": current_phase, "duration_seconds": duration,
+                     "sampled_input_count": pulse_samples,
+                     "attempted_input_seconds": commanded_input_seconds}
+            pulses.append(pulse)
+            if not pulse_samples:
+                unsampled_attempts += 1
+                live.events.emit("locomotion_unsampled_attempt", pulse_index=len(pulses)-1,
+                                 attempts=unsampled_attempts,
+                                 attempted_input_seconds=commanded_input_seconds,
+                                 sampled_input_seconds=sampled_input_seconds)
+                neutral_cadence()
+            position, travelled = neutral_position(current_phase)
+            pulse.update(position_after_release=list(position), distance_after_release=travelled)
+            live.events.emit("locomotion_pulse", **pulse)
+            pulse["commanded_input_seconds"] = commanded_input_seconds
+
+            # Inertia is measured with neutral controls. No new input is allowed
+            # while position reads are delayed or the previous pulse is moving.
+            settle_deadline = min(deadline, clock() + min(.9, max_seconds * .25))
+            stable_samples = 0
+            previous = position
+            settle_stable = False
+            while clock() < settle_deadline:
+                sleep(min(.03, max(0., settle_deadline-clock())))
+                position, travelled = neutral_position(current_phase)
+                delta = _distance(previous, position)
+                timeline[-1]["step_distance"] = delta
+                stable_samples = stable_samples + 1 if delta <= .015 else 0
+                previous = position
+                if stable_samples >= 2:
+                    settle_stable = True
+                    break
+            if not settle_stable:
+                raise BotFault("Native player position did not settle promptly after neutral input")
+            pulse["settled_position"] = list(position)
+            pulse["settled_distance"] = travelled
+            if not pulse_samples:
+                # A native displacement without sampled intent is not replay
+                # permission, even if it happens to cross the short target.
+                if _distance(before_position, position) > .015:
+                    raise BotFault("Movement pulse lacks a fresh XR sample and changed native position; do not retry")
+                if unsampled_attempts > max_unsampled_retries:
+                    raise BotFault("Movement pulse has no fresh XR sample for each movement phase/pulse; retry budget exhausted")
+                pulse["outcome"] = "unsampled_unchanged_endpoint_retry_admitted"
+                live.events.emit("locomotion_unsampled_retry_admitted", pulse_index=len(pulses)-1,
+                                 position=list(position), sampled_input_seconds=sampled_input_seconds,
+                                 attempted_input_seconds=commanded_input_seconds)
+                continue
+            sampled_input_seconds += duration
+            pulse["sampled_input_seconds"] = sampled_input_seconds
+            pulse["outcome"] = "sampled_neutral_endpoint"
+            speed_native_units_per_second = max(speed_native_units_per_second,
+                                                max(0., travelled-before_distance)/duration)
+            guard.observe(max(0., target_distance-travelled), sampled_input_seconds)
             if travelled >= target_distance:
                 reached_target = True
-                final_state = state
                 break
-            if phase_counts[current_phase] == 0 and clock() - phase_started >= min(.6, progress_timeout):
-                raise BotFault(f"The {current_phase} stick value was not present in a fresh XR sample")
-
-            # Full analog drive and the old post-target polling interval both
-            # carried Snake past this short waypoint. Taper the same effective
-            # axis while there is still room, then stop only on native position.
             if current_phase == "cruise" and travelled >= target_distance * brake_fraction:
                 current_phase = "braking"
                 braking_started_distance = travelled
-                phase_floor_ms = now_ms
-                phase_started = clock()
                 value = {**value, "value": brake_magnitude}
-                lease = max(.03, min(5.0, deadline - clock()))
-                live.input([value], max_seconds, lease_seconds=lease)
                 live.events.emit("locomotion_braking", position=list(position),
                                  displacement=travelled,
                                  estimated_speed_native_units_per_second=speed_native_units_per_second,
                                  requested_stick_value=brake_magnitude,
                                  xr_sample_floor_ms=phase_floor_ms)
-
-            previous_progress = travelled
-            previous_sample_ms = now_ms
-            sleep(min(.05, max(0.0, deadline - clock())))
         if not reached_target:
             raise BotFault("The native player did not reach the short displacement target before the deadline")
     finally:
@@ -273,40 +428,6 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
             held = False
             live.events.emit("locomotion_released", target_reached=reached_target,
                              last_position=list(_position(final_state)) if final_state else None)
-
-    # Crossing the target on the first post-dispatch observation must not
-    # bypass evidence for a phase whose new stick value was never sampled.
-    required_phases = ("cruise", "braking") if braking_started_distance is not None else ("cruise",)
-    if any(phase_counts[phase] == 0 for phase in required_phases):
-        raise BotFault("Target reached without a fresh XR sample for each movement phase")
-
-    # After release, wait for the native position to settle. This detects
-    # inertia/overshoot rather than reporting only the position at button-up.
-    settle_deadline = min(deadline, clock() + min(.9, max_seconds * .25))
-    stable_samples = 0
-    previous = _position(final_state)
-    while clock() < settle_deadline:
-        state = live.observe(native=True)
-        _validate_field_state(state, anchor)
-        position = _position(state)
-        travelled = _distance(origin, position)
-        if travelled > max_displacement:
-            raise BotFault("Native displacement exceeded the bounded movement envelope after release")
-        delta = _distance(previous, position)
-        stable_samples = stable_samples + 1 if delta <= .015 else 0
-        timeline.append({"sample_ms": state["now_ms"], "phase": "neutral_settle",
-                         "position": list(position), "displacement": travelled,
-                         "step_distance": delta})
-        live.events.emit("locomotion_sample", held=False, position=list(position),
-                         displacement=travelled, step_distance=delta)
-        final_state = state
-        if stable_samples >= 2:
-            settle_stable = True
-            break
-        previous = position
-        sleep(min(.05, max(0.0, settle_deadline - clock())))
-    if not settle_stable:
-        raise BotFault("Native player position did not settle promptly after neutral input")
 
     endpoint = _position(final_state)
     displacement = [endpoint[index] - origin[index] for index in range(3)]
@@ -328,6 +449,15 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
         "input_samples_by_phase": phase_counts,
         "sample_count": sample_count,
         "held_audit_timeline": timeline,
+        "input_strategy": "expiring_pulses_with_neutral_native_reads",
+        "maximum_pulse_seconds": pulse_seconds,
+        "commanded_input_seconds": commanded_input_seconds,
+        "attempted_input_seconds": commanded_input_seconds,
+        "sampled_input_seconds": sampled_input_seconds,
+        "unsampled_attempts": unsampled_attempts,
+        "maximum_unsampled_retries": max_unsampled_retries,
+        "progress_clock": "sampled_expiring_input_seconds",
+        "pulses": pulses,
         "settled_after_release": settle_stable,
         "route_or_collision_proof": False,
         "xinput_consumption_proven": False,

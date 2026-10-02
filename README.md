@@ -13,7 +13,7 @@ fixed `play/` folder refreshed by `tools/build.ps1`.
 [Current build workflow, remaining reports and next tests](docs/CURRENT.md).
 
 **[Download the public build](https://github.com/nikamigaming-create/MGS5VR/releases)**
-· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-09-30.md)
+· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-10-02.md)
 · [Live native actions](docs/NATIVE_ACTIONS.md)
 
 Experimental Windows mod. Requires your own **TPP 1.0.15.4** and a PC-connected

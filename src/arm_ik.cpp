@@ -134,6 +134,10 @@ std::optional<Pose> twoHandGrip(Pose primary,Pose support,Vec3 forwardInPrimary,
     delta=normalize({delta.x*influence,delta.y*influence,delta.z*influence,1+(delta.w-1)*influence});
     return Pose{turn(delta,primary.orientation),primary.position};
 }
+std::optional<Pose> twoHandSupportGrip(Pose primary,Pose support,Pose contactInPrimary,float influence){
+    if(!valid(contactInPrimary))return {};
+    return twoHandGrip(primary,support,contactInPrimary.position,influence);
+}
 float freeFingerCurl(unsigned finger,float trigger,float squeeze,bool triggerTouched,bool thumbTouched,float resting,float touched){
     const float contact=finger==0?(thumbTouched?touched:resting):finger==1?(triggerTouched?touched:resting):resting;
     return std::clamp(std::max(contact,finger==1?trigger:squeeze),0.f,1.f);

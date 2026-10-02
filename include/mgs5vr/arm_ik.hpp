@@ -97,6 +97,10 @@ std::optional<Pose> aimedWeaponGrip(Pose primary,Pose aim,Vec3 forwardInPrimary)
 // Swing the authored barrel direction toward the other controller while
 // keeping the primary palm fixed. Roll stays owned by the primary controller.
 std::optional<Pose> twoHandGrip(Pose primary,Pose support,Vec3 forwardInPrimary,float influence);
+// Guide the weapon's authored support-palm contact toward the tracked palm.
+// The contact need not lie on the muzzle axis; holding it already in place
+// must not swing the weapon. Neither the contact nor the weapon is scaled.
+std::optional<Pose> twoHandSupportGrip(Pose primary,Pose support,Pose contactInPrimary,float influence);
 struct PointThrow { Vec3 origin,velocity; };
 // Start at the rendered palm; point along OpenXR aim -Z. The native solver
 // supplies speed at neutral camera angles, so looking/turning cannot steer it.

@@ -9,11 +9,30 @@ import time
 import uuid
 
 from .core import BotFault, atomic_json, matches
-from .live import digest
+from .live import digest, fresh_control_observation
 from .session import run_suite
+from .startup import capture_released_startup_transition, neutral_startup_transition
 
 
 STATE_KEYS = ("scene", "title", "menu", "idroid", "loading", "demo", "activation")
+# Model/image review and tool transport have their own bounded admission window.
+# Native control freshness and compositor presentation deadlines stay unchanged.
+# Final-eye review and tool dispatch may take longer than a minute. This
+# bounds human review only; every step still checks the live native state,
+# process generation and independently expiring controller input.
+REVIEW_WINDOW_SECONDS = 180.
+
+
+def require_unambiguous_result(result):
+    if result.get("release_error") or result.get("failure_phase") == "dispatch":
+        raise BotFault("Ambiguous dispatch/transport failure; supervised input stopped")
+    if result.get("capture_error"):
+        if (result.get("capture_failure_kind") == "blank_compositor"
+                and neutral_startup_transition(result.get("capture_failure_state", {}))):
+            # This remains a failed case. Dependents stop and publish() waits
+            # for fresh real eyes with all controls released; nothing replays.
+            return
+        raise BotFault("Compositor capture/transport failure; supervised input stopped")
 
 
 def signature(state):
@@ -68,14 +87,38 @@ def validate_decision(decision, request, state, completed, now_ns=None):
     if decision["kind"] in ("case", "plan"):
         cases = decision_cases(decision)
         age = ((time.time_ns() if now_ns is None else now_ns)-request.get("observed_unix_ns", 0))/1e9
-        if not 0 <= age <= 30.:
-            raise BotFault("Observation is older than 30 seconds; inspect fresh eyes before input")
+        if not 0 <= age <= REVIEW_WINDOW_SECONDS:
+            raise BotFault(f"Observation is older than {REVIEW_WINDOW_SECONDS:g} seconds; inspect fresh eyes before input")
         if signature(state) != request["state_signature"] or not matches(state, cases[0]["before"]):
             raise BotFault("Observed scene changed; review a new observation before input")
         # A model's decision cites the actual neutral image it inspected.
         if decision.get("reviewed_capture_sha256") not in [c["sha256"] for c in request["captures"]]:
             raise BotFault("Decision must cite an image from the current observation")
     return identifier
+
+
+def observe_decision_state(live, decision, request, *, clock=time.monotonic, sleep=time.sleep):
+    """Reacquire a transiently missing XR sample before admitting input.
+
+    The same current review and native owner must survive every observation.
+    Only absent/stale control publication may wait, for at most two seconds;
+    the existing 250 ms age and read-latency checks remain authoritative.
+    """
+    if decision.get("kind") not in ("case", "plan"):
+        return live.observe(native=True)
+    before = decision_cases(decision)[0]["before"]
+    owner_before = {key:value for key,value in before.items()
+                    if key != "controls" and not key.startswith("controls.")}
+
+    def observe(native=False):
+        state = live.observe(native=native)
+        if (signature(state) != request["state_signature"]
+                or (owner_before and not matches(state, owner_before))):
+            raise BotFault("Observed scene changed; review a new observation before input")
+        return state
+
+    state, _ = fresh_control_observation(observe, native=True, timeout=2., clock=clock, sleep=sleep)
+    return state
 
 
 def execute_plan(behavior, decision, records, *, checkpoint, clock=time.monotonic):
@@ -89,8 +132,7 @@ def execute_plan(behavior, decision, records, *, checkpoint, clock=time.monotoni
         result.update(decision_id=decision["id"], plan_index=index)
         records.append(result)
         checkpoint(records)
-        if result.get("release_error") or result.get("capture_error") or result.get("failure_phase") == "dispatch":
-            raise BotFault("Ambiguous dispatch/transport failure; supervised input stopped")
+        require_unambiguous_result(result)
         if result["status"] != "observed_pass":
             remaining = [item["id"] for item in cases[index+1:]]
             behavior.events.emit("plan_interrupted", decision_id=decision["id"], case_id=case["id"],
@@ -118,8 +160,13 @@ def run_supervised(behavior, seconds=900., clock=time.monotonic, sleep=time.slee
         live.release()
         state = live.observe(native=True)
         token = uuid.uuid4().hex
-        paths = live.capture("supervisor-"+token[:10])
+        paths = capture_released_startup_transition(live, "supervisor-"+token[:10],
+            timeout=min(15., max(.001, deadline-clock())), clock=clock, sleep=sleep)
+        # A native boot sequence can advance during the released pixel wait.
+        # Bind the eventual decision to the new state, never the pre-fade one.
+        state = live.observe(native=True)
         payload = {"observation_id": token, "observed_unix_ns": time.time_ns(),
+                   "review_window_seconds": REVIEW_WINDOW_SECONDS,
                    "state": state, "state_signature": signature(state),
                    "reason": reason, "captures": [{"path": p, "sha256": digest(p)} for p in paths],
                    "decision_file": str(decision_path), "input_owner": "single_supervised_runner"}
@@ -137,8 +184,8 @@ def run_supervised(behavior, seconds=900., clock=time.monotonic, sleep=time.slee
             records[:] = [{**row, "decision_id": "preselected-suite"} for row in rows]
             atomic_json(events.output / "supervised-cases.json", {"cases": records})
         initial_result = run_suite(behavior, {**initial_suite, "continue_after_outcome_failure": False}, initial_checkpoint)
-        if any(row.get("release_error") or row.get("capture_error") or row.get("failure_phase") == "dispatch" for row in records):
-            raise BotFault("Ambiguous preselected suite failure; supervised input stopped")
+        for row in records:
+            require_unambiguous_result(row)
         request = publish("Preselected suite "+initial_result["status"]+"; "+str(len(initial_result["not_run"]))+" dependent cases not run")
     else:
         request = publish("Ready for a reviewed semantic case; no input is being held")
@@ -156,8 +203,8 @@ def run_supervised(behavior, seconds=900., clock=time.monotonic, sleep=time.slee
                 except (ValueError, UnicodeError) as error:
                     events.emit("decision_rejected", reason=str(error))
                     continue
-                state = live.observe(native=True)
                 try:
+                    state = observe_decision_state(live, decision, request, clock=clock, sleep=sleep)
                     identifier = validate_decision(decision, request, state, completed)
                 except BotFault as error:
                     # Consume invalid decisions too: no endless retry of a stale command.

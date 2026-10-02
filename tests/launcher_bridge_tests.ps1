@@ -51,6 +51,8 @@ try {
     Assert $loaded.ok 'load accepts a disposable MGSV path and returns a settings snapshot'
     Assert ($loaded.state.gameExe -eq $game -and $loaded.state.writable -eq $true) 'load binds the snapshot to the fixture and marks its copied controls writable'
     Assert (@($loaded.state.bindings.actions).Count -gt 0 -and @($loaded.state.runtime.PSObject.Properties).Count -gt 0) 'load returns parsed bindings and runtime settings'
+    Assert ($loaded.state.runtime.'ui.map_control_prompts' -eq '1') 'reviewed Map control labels default on in the launcher runtime snapshot'
+    Assert ($loaded.state.runtime.'optics.binocular_native_material' -eq '0') 'unproven binocular scene lighting defaults off in the launcher runtime snapshot'
     $settingRows=@($loaded.state.settings)
     Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 55) 'serialized settings field is a flat array containing all 55 setting rows'
     $rowsValid=$true
@@ -92,7 +94,7 @@ try {
 
     # Simulate a different editor changing the file after the launcher load.
     $staleRevision=$fractional.state.controlsRevision
-    $externallyEdited=[IO.File]::ReadAllText($controls).Replace('idroid = tap(menu,550)','idroid = tap(menu,600)')
+    $externallyEdited=[IO.File]::ReadAllText($controls).Replace('idroid = tap(menu,550)','idroid = tap(menu,600)').Replace('pause = hold(menu,550)','pause = hold(menu,600)')
     [IO.File]::WriteAllText($controls,$externallyEdited,[Text.UTF8Encoding]::new($false))
     $beforeStale=File-Sha $controls
     $stale=Invoke-Bridge 'saveControls' $staleRevision @{ 'settings.handheld_menus'='0' }
@@ -103,6 +105,60 @@ try {
     $runtimeRejected=Invoke-Bridge 'saveRuntime' $loaded.state.runtimeRevision @{ 'theatre.width_cm'='99' }
     Assert (!$runtimeRejected.ok -and $runtimeRejected.error -match 'Invalid theatre.width_cm') 'out-of-range runtime setting is rejected'
     Assert ((File-Sha $runtime) -ceq $runtimeBefore) 'runtime validation failure leaves the fixture INI byte-identical'
+
+    $runtimeOriginal=[IO.File]::ReadAllText($runtime)
+    $controlsBeforeMap=File-Sha $controls
+    $mapOff=Invoke-Bridge 'saveRuntime' $loaded.state.runtimeRevision @{ 'ui.map_control_prompts'='0' }
+    Assert $mapOff.ok ('Map-only opt-out saves through the launcher: '+$mapOff.error)
+    Assert ($mapOff.state.runtime.'ui.map_control_prompts' -eq '0') 'Map-only opt-out returns the effective runtime value'
+    Assert ([IO.File]::ReadAllText($mapOff.state.backup) -ceq $runtimeOriginal) 'Map opt-out backup retains the exact original runtime settings'
+    $expectedRuntime=(($runtimeOriginal -split '\r?\n') -join "`r`n").Replace('map_control_prompts=1','map_control_prompts = 0')
+    Assert ([IO.File]::ReadAllText($runtime) -ceq $expectedRuntime) 'Map opt-out preserves all other runtime values and comments under the existing CRLF writer'
+    Assert ((File-Sha $controls) -ceq $controlsBeforeMap) 'Map opt-out preserves personal controls byte-for-byte'
+    $beforeInvalidMap=File-Sha $runtime
+    $invalidMap=Invoke-Bridge 'saveRuntime' $mapOff.state.runtimeRevision @{ 'ui.map_control_prompts'='2' }
+    Assert (!$invalidMap.ok -and $invalidMap.error -match 'Invalid ui.map_control_prompts') 'Map labels reject values outside the on/off range'
+    Assert ((File-Sha $runtime) -ceq $beforeInvalidMap) 'invalid Map label value cannot overwrite saved runtime settings'
+    $mapOn=Invoke-Bridge 'saveRuntime' $mapOff.state.runtimeRevision @{ 'ui.map_control_prompts'='1' }
+    Assert ($mapOn.ok -and $mapOn.state.runtime.'ui.map_control_prompts' -eq '1') 'Map control labels can be restored independently'
+
+    # Older installations have no UI block; their first launcher load merges
+    # the new default without writing or replacing the player's runtime file.
+    $legacyRuntime=[regex]::Replace([IO.File]::ReadAllText($runtime),'(?ms)^\[ui\]\r?\n.*?(?=^\[diagnostics\])','')
+    [IO.File]::WriteAllText($runtime,$legacyRuntime,[Text.UTF8Encoding]::new($false))
+    $legacyHash=File-Sha $runtime
+    $legacyLoaded=Invoke-Bridge 'load' '' $null
+    Assert ($legacyLoaded.ok -and $legacyLoaded.state.runtime.'ui.map_control_prompts' -eq '1') 'an older INI without UI settings receives the default Map label value'
+    Assert ((File-Sha $runtime) -ceq $legacyHash) 'merging the default on load does not rewrite the older runtime file'
+    $legacyOff=Invoke-Bridge 'saveRuntime' $legacyLoaded.state.runtimeRevision @{ 'ui.map_control_prompts'='0' }
+    Assert ($legacyOff.ok -and $legacyOff.state.runtime.'ui.map_control_prompts' -eq '0') 'the Map opt-out can be inserted into an older runtime INI'
+    Assert ([IO.File]::ReadAllText($legacyOff.state.backup) -ceq $legacyRuntime -and (File-Sha $controls) -ceq $controlsBeforeMap) 'older-INI opt-out retains an exact backup and leaves personal bindings unchanged'
+
+    $beforeMaterial=[IO.File]::ReadAllText($runtime)
+    $materialOn=Invoke-Bridge 'saveRuntime' $legacyOff.state.runtimeRevision @{ 'optics.binocular_native_material'='1' }
+    Assert ($materialOn.ok -and $materialOn.state.runtime.'optics.binocular_native_material' -eq '1') 'experimental binocular scene lighting opt-in saves through the launcher'
+    Assert ([IO.File]::ReadAllText($materialOn.state.backup) -ceq $beforeMaterial -and (File-Sha $controls) -ceq $controlsBeforeMap) 'binocular opt-in retains an exact runtime backup and personal bindings'
+    $originalValues=Get-MgsIni $beforeMaterial
+    $materialValues=Get-MgsIni ([IO.File]::ReadAllText($runtime))
+    $unchanged=$originalValues.Count -eq $materialValues.Count
+    foreach ($key in $originalValues.Keys) {
+        if ($key -ne 'optics.binocular_native_material' -and $originalValues[$key] -cne $materialValues[$key]) { $unchanged=$false }
+    }
+    Assert $unchanged 'binocular opt-in leaves every other runtime and asset value unchanged'
+    $materialHash=File-Sha $runtime
+    foreach ($invalidValue in @('2','-1','0.5','true')) {
+        $invalidMaterial=Invoke-Bridge 'saveRuntime' $materialOn.state.runtimeRevision @{ 'optics.binocular_native_material'=$invalidValue }
+        Assert (!$invalidMaterial.ok -and $invalidMaterial.error -match 'Invalid optics.binocular_native_material' -and (File-Sha $runtime) -ceq $materialHash) ('binocular scene lighting rejects '+$invalidValue+' without writing')
+    }
+    $materialOff=Invoke-Bridge 'saveRuntime' $materialOn.state.runtimeRevision @{ 'optics.binocular_native_material'='0' }
+    Assert ($materialOff.ok -and $materialOff.state.runtime.'optics.binocular_native_material' -eq '0') 'experimental binocular scene lighting can be disabled independently'
+    $olderMaterial=[regex]::Replace([IO.File]::ReadAllText($runtime),'(?m)^binocular_native_material[ \t]*=[^\r\n]*(?:\r?\n|$)','')
+    [IO.File]::WriteAllText($runtime,$olderMaterial,[Text.UTF8Encoding]::new($false))
+    $olderHash=File-Sha $runtime
+    $olderLoaded=Invoke-Bridge 'load' '' $null
+    Assert ($olderLoaded.ok -and $olderLoaded.state.runtime.'optics.binocular_native_material' -eq '0' -and (File-Sha $runtime) -ceq $olderHash) 'an older INI receives the safe binocular default off on read without being rewritten'
+    $olderOn=Invoke-Bridge 'saveRuntime' $olderLoaded.state.runtimeRevision @{ 'optics.binocular_native_material'='1' }
+    Assert ($olderOn.ok -and $olderOn.state.runtime.'optics.binocular_native_material' -eq '1' -and [IO.File]::ReadAllText($olderOn.state.backup) -ceq $olderMaterial) 'explicit binocular opt-in inserts its key into an older INI with an exact backup'
 
     Write-Host 'All launcher settings bridge tests passed.'
 } finally {

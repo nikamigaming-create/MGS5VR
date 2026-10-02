@@ -1,5 +1,6 @@
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/idroid_rig.hpp"
+#include "mgs5vr/idroid_effect_probe.hpp"
 #include "mgs5vr/cabin_walk.hpp"
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/head_camera.hpp"
@@ -386,6 +387,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera);
     if(!frame.applied||frame.playerOwner!=owner||frame.controllers.avatarEditor
        ||(frame.controllers.frontEnd&&!frame.controllers.openingSelector&&!frame.controllers.cabinPlay))return false;
+    frame.weaponRig={};
     // Cabin locomotion belongs to the tracked head. A temporarily occluded
     // right controller must not publish an unshifted camera for one frame and
     // snap back to the walking offset when its tracking returns.
@@ -598,21 +600,32 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     uint32_t scopeResource{};
     uint64_t weaponSupportIdentity{};
     const auto weaponComponent=get<uintptr_t>(character+0x80);
+    auto& weaponDiagnostics=frame.weaponRig;
+    weaponDiagnostics.sampled=true;weaponDiagnostics.sampleTime=steadyMilliseconds();
+    weaponDiagnostics.character=character;weaponDiagnostics.component=weaponComponent;weaponDiagnostics.bodyModel=model;
     if(!frame.controllers.vehicleControls&&get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
+        weaponDiagnostics.componentAccepted=true;
         const auto instances=get<uintptr_t>(weaponComponent+0x38);
         const auto first=get<uint32_t>(instances+0x24),index=get<uint32_t>(owner+0x3a0);
+        weaponDiagnostics.instances=instances;weaponDiagnostics.instanceFirst=first;weaponDiagnostics.playerIndex=index;
         if(index>=first&&index-first<=15){
             const auto state=get<uintptr_t>(weaponComponent+0x58)+(index-first)*0x610ull;
             const auto supportResource=get<uint32_t>(state+0x240);
+            weaponDiagnostics.instanceIndexMatched=true;weaponDiagnostics.state=state;
+            weaponDiagnostics.resourceHandle=supportResource;
             if(supportResource&&(supportResource>>16)!=0xffff)
                 weaponSupportIdentity=uint64_t(supportResource)<<32|index;
+            weaponDiagnostics.resourceAccepted=weaponSupportIdentity!=0;
+            weaponDiagnostics.supportIdentity=weaponSupportIdentity;
             // Observed throughout rifle reload and WU pistol bolt cycling; the
             // native animation owns the support hand during these operations.
             nativeManipulation=(get<uint32_t>(state+0x27c)&0x1c0)==0x40&&(get<uint32_t>(state+0x3c0)&0x04000000)!=0;
             firearmActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x40;
             throwableActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x80;
             const auto flags=get<uint32_t>(state+0x27c),mode=get<uint32_t>(state+0x3c0);
+            weaponDiagnostics.flags=flags;weaponDiagnostics.mode=mode;
             if(!binocularHeld&&frame.controllers.weaponReady&&firearmActive&&!nativeManipulation&&!(flags&0x400000)&&!(mode&0x2000)){
+                weaponDiagnostics.muzzleAttempted=true;
                 // Use the same authored barrel frame as the native shot path.
                 // The vector between animated palms is not the barrel axis,
                 // especially while the game changes its support-hand pose.
@@ -620,9 +633,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 using AttachmentGetter=uint32_t(*)(void*,void*,uint32_t);
                 reinterpret_cast<AttachmentGetter>(base+0x1042e40)(reinterpret_cast<void*>(weaponComponent),attachmentMatrix.data(),index);
                 if(read(state+((flags&0x200)?0x80:0x40),muzzleMatrix)){
+                    weaponDiagnostics.muzzleMatrixRead=true;
                     const auto attachment=nativeAffinePose(attachmentMatrix),socket=nativeAffinePose(muzzleMatrix);
+                    weaponDiagnostics.attachmentValid=attachment.has_value();weaponDiagnostics.muzzleSocketValid=socket.has_value();
                     if(attachment&&socket){
                         muzzleInGrip=compose(gripFromWrist[1],compose(*attachment,*socket));
+                        weaponDiagnostics.muzzleInGrip=*muzzleInGrip;weaponDiagnostics.muzzleSolved=true;
                         barrelInGrip=rotate(muzzleInGrip->orientation,{0,0,1});
                         // The native weapon initializer at 0x1060d5f queries
                         // this same resource's muzzle, rear and front CNPs.
@@ -633,7 +649,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                         const auto resource=get<uint32_t>(state+0x240);
                         if(scopeQueryVerified&&get<uintptr_t>(points)==base+0x234b840
                            &&get<uintptr_t>(base+0x234b840+0x148)==base+0xdbdc50
-                           &&read(state+0x208,optical)&&optical[3]==1&&optical[0]>1
+                           &&(weaponDiagnostics.opticalRead=read(state+0x208,optical))&&optical[3]==1&&optical[0]>1
                            &&resource&&(resource>>16)!=0xffff){
                             using PointGetter=bool(*)(void*,void*,uint32_t,uint64_t);
                             const auto point=reinterpret_cast<PointGetter>(base+0xdbdc50);
@@ -659,6 +675,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                                 }
                             }
                         }
+                        if(weaponDiagnostics.opticalRead)weaponDiagnostics.optical=optical;
                     }
                 }
             }
@@ -751,7 +768,11 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     attached=compose(right->pose.wrist,presentedSupport);
     bool guiding=!binocularHeld&&!compactSupport&&nearSupport&&nativeManipulation&&aimBlend>0;
     if(!compactSupport&&barrelInGrip&&frame.controllers.hands[0].gripTracked&&nearSupport){
-        if(const auto guided=twoHandGrip(grips[1],grips[0],*barrelInGrip,1.f)){
+        // Guidance follows the acquired native support palm, which can sit
+        // below or beside the bore. A hand already on that contact must not
+        // rotate the weapon merely because the two axes differ.
+        const auto supportInGrip=compose(gripFromWrist[1],compose(presentedSupport,inverse(gripFromWrist[0])));
+        if(const auto guided=twoHandSupportGrip(grips[1],grips[0],supportInGrip,1.f)){
             guidedOffset=compose(inverse(grips[1]),*guided).orientation;guiding=true;
         }
     }
@@ -1300,7 +1321,7 @@ bool controllerThrowReady() noexcept {
     std::lock_guard lock(rigMutex);
     return shotRig.throwTracked&&shotRig.owner==playerOwner.load();
 }
-void installControllerRig(uintptr_t imageBase){
+void installControllerRig(uintptr_t imageBase,bool idroidEffectProbe,bool idroidEffectRetarget){
     base=imageBase;
     wchar_t trace[2]{};
     scopeTrace=GetEnvironmentVariableW(L"MGS5VR_SCOPE_TRACE",trace,2)==1&&trace[0]==L'1';
@@ -1348,6 +1369,7 @@ void installControllerRig(uintptr_t imageBase){
     log("Controller throw origin and velocity adapters installed");
     installMotionMelee(base);
     installSmallAnimalInteraction(base);
+    installIdroidEffectProbe(base,idroidEffectProbe,idroidEffectRetarget);
     enabled.store(true);log("Experimental controller rig installed at verified skin publication RVA 0x1a6caa0 and shot solver 0x1044ff0");
 }
 void observeControllerRigOwner(uintptr_t owner) noexcept{
@@ -1360,7 +1382,7 @@ void stopControllerRig() noexcept{
         std::lock_guard publicationLock(skinPublicationMutex);
         enabled.store(false);playerOwner.store(0);pausedSkin={};pausedParts={};
     }
-    stopSmallAnimalInteraction();stopMotionMelee();
+    stopIdroidEffectProbe();stopSmallAnimalInteraction();stopMotionMelee();
     {std::lock_guard lock(rigMutex);for(auto& cache:handPresentation)cache.reset();stationaryBody.reset();}
 }
 bool controllerRigEnabled() noexcept{return enabled.load();}

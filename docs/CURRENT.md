@@ -6,7 +6,239 @@ left-arm HUD popups, and the right-hand iDroid. Pause uses a spatial stereo
 panel. Floating firearm aiming overlays stay off. No desktop/input automation
 or Steam shutdown is needed by the local workflow.
 
-## Current result: October 1
+## Current result: October 2
+
+### October 2 release source
+
+The October 2 experimental release contains the verified Map marker/footer
+binding fixes, native prompt route corrections, support-hand contact repair,
+bound-touch input ownership and bounded test recovery. Release notes are in
+`docs/RELEASE_2026-10-02.md`; the package's `BUILD.json`, `RELEASE.json` and
+`SOURCE_REVISION.txt` identify its exact committed source and checked files.
+The final native candidate `600ec71d1b2a` passed all 41 CTest groups and
+installer transactions. Local work continues in the fixed `play/` tree.
+
+Retained `20261002T145255433589Z` passed Map opening, native-button mode on/off,
+Back, immediate reopening and final Back on restored personal settings.
+All twelve outcome eyes were reviewed. The footer now shows the effective
+Y, left-click, right-click and LT/RT bindings, returns to native graphics in
+native-button mode, and restores VR captions afterward. The actual native
+Map uses mode 82/help IDs 35--38; earlier mode 46/47 admission rejected every
+row. Admission now requires the observed owner, node, row and mode identity.
+Long remaps, other languages and physical-headset readability remain open.
+
+Retained `20261002T145122033446Z` reached Mission 10020 through physical
+Continue on that candidate; both final arrival eyes were reviewed. Earlier
+`20261002T144635365551Z` on `e7091ee0d2a5` passed standing, crouched, prone,
+crouched and standing with sampled VR A input and neutral cleanup. A 120 ms
+tap crouches; the separately tested 300 ms hold went prone. This confirms
+the scoped existing stance flow, not a reproduction or closure of every
+reported hardware crouch issue.
+
+Retained `20261002T135259921572Z` passed the reviewed autosave action and reached
+the native title sequence with clean supervisor exit. Retained
+`20261002T135547048922Z` reached Mission 10020 through physical Continue, with
+both final arrival eyes reviewed. These are startup/arrival results only.
+
+Retained `20261002T144514844155Z` on `e7091ee0d2a5` passes physical binocular
+equip, fixed-pose 2x-to-4x-to-2x zoom and stow. All eight final-eye images were
+reviewed: magnification changes inside the physical ocular while housing,
+palm contact and the outside-world view stay fixed; stow removes the housing.
+The scoped manifest is `artifacts/bot/acceptance/binocular-fixed-pose-e709.json`.
+Enemy acquisition, explicit marking, continuous motion and headset acceptance
+were not tested. Native material insertion remains zero despite observed
+three-target binds, so the lighting repair is not accepted. The experiment
+now defaults off, including older INIs without the setting; the existing
+physical housing rendering remains available. Explicit opt-in preserves the
+same strict source, geometry and material checks.
+
+Retained `20261002T142717882392Z` on `77ade9c8950d` passed ordinary iDroid
+opening, two hand poses, stow, immediate reopening and final stow; all twelve
+outcome eyes were reviewed. The optional native effect writer now admits the
+observed complete three-particle batch with transactional transform/bounds
+checks. Native writes were observed, but exact cone endpoint alignment,
+forced tutorial stow/reopen and headset acceptance remain open. Cone fitting
+and its diagnostics remain off by default. A separate custom-fit replay was
+reviewed but its scratch pixels expired before promotion; it is excluded from
+retained visual acceptance.
+
+The bot waits for real pixels after a sampled startup action only while the
+known boot owner and released controls remain verified. Exact read-only title
+observations may use one eight-second response deadline on the same request;
+actions retain the ordinary deadline and are never replayed. The focused
+supervisor and behavior suites pass 27 and 198 tests. The native title replay
+exercised that admission; its responses were fast, so the delayed-response
+branch has unit coverage rather than a native timeout-recovery pass.
+
+The next playability work remains binocular environment lighting, forced
+tutorial iDroid lifecycle, cover/turret/traversal defects, all-weapon sight,
+muzzle, hit and reload alignment, and continuous physical-headset acceptance.
+These scoped simulator passes do not certify whole-game completion. Personal
+settings are restored after tests, owned test sessions are closed, and Steam
+is retained.
+
+### Earlier investigation: October 2 overnight
+
+The installed local candidate `83fce4fc8ebc` passes all 41 CTest groups and
+installer transactions. The exact owned canonical native material shader was
+imported locally and verified; source archives and saves were untouched. This
+candidate adds guarded binocular native material insertion, bounded iDroid
+Light discovery for already-loaded effects and one bounded recovery for an
+unsampled axis pulse. Its native lighting and projection acceptance is pending.
+
+The previous local candidate `0143f88c264c` passed all 41 CTest groups and
+the installer transactions. `play/` and the recorded game installation match;
+personal controls remain unchanged. Its current primary firearm support attachment passed
+five scoped simulator cases in retained `20261002T095140317683Z`: exact contact,
+rigid translation left and right, distant-hand rejection and release to one
+hand. All ten during-checkpoint final eyes were reviewed and the scoped
+manifest is `artifacts/bot/acceptance/field-smg-support-0143.json`. Continuous
+motion, finger articulation, reload, the reported compact silent long gun,
+muzzle/hit alignment and physical-headset acceptance remain open.
+Runtime resource `27873` does not identify a weapon class/model/definition.
+The native left-arm display separately showed AM MRS-4, DMG31/175; legacy
+`smg` case/file names are retained trace links, not a verified SMG classification.
+
+The same candidate reproduced the binocular housing's environment-lighting
+mismatch. A native GBuffer material insertion is being implemented; no lighting
+fix or projection-cone fit is accepted yet. The early-field movement probe also
+failed in `field-mg-approach-06`: a 654 ms simulator `xrEndFrame` blocked across
+the entire independently expiring 250 ms stick pulse. Controls stayed neutral
+and the actor did not move. The runner must distinguish that unsampled pulse
+from consumed input while keeping freshness, expiry and displacement limits.
+Retained `field-mg-approach-07` then passed the short bootstrap with two sampled
+250 ms pulses and the native NAV2 route to the coarse turret goal, life6000.
+No swallowed-pulse retry occurred in that successful replay. Enemy fire later
+interrupted stationary turret review; no mount input was sent and the owned
+test session was closed. Steam remains running. Turret, cover and whole-game
+gates remain open.
+
+On `0143f88c264c`, ordinary field Pause open/Back/immediate reopen/second Back
+passed in retained `20261002T104509634657Z`, with all eight final eyes reviewed.
+`20261002T105356113073Z` separately reached Options and Control Settings in
+both eyes. Three rapid sampled Back presses returned only to ordinary Pause;
+later maintained cleanup returned the live field. The nested Back case is
+failed and retained for timing investigation, not a proven menu lock or
+all-Options acceptance. Future Back steps require released stabilization and
+fresh page review between transitions.
+
+The previous integrated candidate `369713f9251c` passed all 41 CTest groups and
+the packaged installer transactions. `play/` and the recorded game installation
+match; personal controls remain unchanged. This build adds the corrected
+native R3 destinations for Items Use and Commands Confirm, the native vehicle
+L1 destination, and ownership recovery for every effectively bound capacitive
+touch sensor. Hardware touch dispatch and these additional prompt families
+still require native acceptance.
+
+Fresh popup diagnostics now distinguish the current numeric/StringId identity
+from the signed last completed response. Unknown readiness remains unknown;
+the completed response is never treated as the highlighted choice. Input-tag
+traces have a separate bounded budget so typewriter subtitles cannot consume
+the menu audit. These are investigation tools, not menu pass results.
+
+The candidate also observes the popup's current selection separately from its
+last response. A typed native update callback supplies a bounded owner lease;
+the reader requires a unique fresh owner, matching dialog/backlink, valid
+button count/index and stable repeated reads. Unknown choice remains null.
+The bot now honors popup prerequisites on cursor navigation and rejects a
+changed dialog before dispatch. Native choice-reader acceptance is pending.
+
+Retained `20261002T073555368643Z` reproduced the helicopter customization
+selector, Back dialog, physical selection of Discard, cabin return and immediate
+iDroid reopening. Both final eyes were reviewed. Daily Bonus and Skulls Attack
+information cards were then acknowledged separately and the physical map
+returned. Mother Base Help opened with the effective Menu hold. A reused Confirm
+close recipe failed and left Help visible, so the whole investigation is
+**failed**; the private close recipe now follows its actual Hold Menu footer and
+still requires a fresh native replay. The maintained failure cleanup closed the
+owned game/runtime, retained Steam and left no test menu open. No upgrade
+purchase/completion or whole-menu certification follows from this selector run.
+
+The early field fixture exposed a separate startup Online Information branch.
+Automatic Continue timed out in `20261002T081345580078Z`; both eyes showed the
+unhandled information page. Supervised `20261002T081959231430Z` separately
+reviewed and exercised Next, Close and the return to the title. This is retained
+startup investigation, not field or full-game acceptance.
+
+On public DLL `959f9ac763fb`, retained run `20261002T050047479366Z` passed
+ordinary field Pause open, Back, immediate reopen and second Back. Both final
+eyes were reviewed at each outcome; the spatial panel and live field return
+were visible. Tutorial Resume/Skip, nested Options and cutscene Pause remain
+separate cases.
+
+Retained investigation `20261002T051649249386Z` reproduced the binocular
+housing's environment-light mismatch at sunset and night. Its physical ocular
+reached about 4 cm, then the 3 cm safety limit; stowing restored gameplay.
+An overstrict transient grip-position predicate failed at 4 cm. The firearm
+inspection then failed to establish an active native firearm, so the overall
+run is **failed**, not acceptance. Inputs were released and the owned game
+session closed. Original settings and six original save files were restored
+before the next isolated ACC replay. Do not infer weapon readiness, continuous
+stability or headset comfort from the close-up stills.
+
+The ongoing scope remains every known community defect and the user's reports:
+menu and upgrade recovery; accurate binding prompts; physical optics and hit
+alignment; binocular lighting/contact; iDroid emitter/screen fit and forced
+stow; weapon/support/reload contact; cover/Y camera continuity; turret pitch and
+reticles; traversal; left-arm HUD readability and temporal stereo stability.
+An automated build pass does not close this scope.
+
+The completed-login notice was reproduced in both final eyes in retained
+`20261002T055911070140Z`: startup remained at `Seq_Demo_LogInKonamiServer`,
+native popup template 1 / StringId `0x4dc3cae5b486`, with **Logged in to server**
+visible. The runner now acknowledges only that verified active identity, once,
+and rechecks it before dispatch. Retained `20261002T060448782406Z` exercised
+the corrected branch and physical Continue to the ACC; neutral inputs and hand
+poses were restored. Progress, unknown results and closed dialogs receive no
+generic confirmation.
+
+Retained `20261002T060559660205Z` completed a bounded ACC investigation with
+clean menu/input/pose cleanup. Both eyes were reviewed for actual Development
+Weapons/Items, Buddy Equipment, Helicopter and Security Devices lists and their
+ordinary Back paths. One reused Weapons/Items recipe instead reached Helicopter,
+and a presumed Customize route reached Resources; those labels are not accepted
+as their intended destinations. Helicopter selector Cancel/Discard, upgrade
+completion, all other modes and full-game acceptance remain open.
+
+The test-loop continuation adds bounded proxy stderr diagnostics and one
+read-only reconnect after an unheld capture timeout. Its original partial pair
+is retained and invalidated; fresh native observations and a completely new pair
+are required. Input RPCs are never replayed. Actual recovery still needs a native
+timeout replay. The supervisor's review window is now 60 seconds for two-eye
+review/tool latency; native control freshness and presentation gates are retained.
+New opt-in iDroid Light and weapon-component diagnostics identify existing
+native owners/resources without changing geometry, bones or control behavior.
+The Light cone's separate player owner and transform repair remain unresolved.
+
+Retained `20261002T065631090452Z` on candidate `fd35a92ed161` exercised
+physical Continue after the autosave and exact completed-login notices and
+reached the ACC with restored hand poses. Both arrival eyes were reviewed.
+Retained investigation `20261002T065751143255Z` reached the actual Development
+category page, returned to Mother Base, selected the reviewed Customize row
+**above** Development, and entered the actual helicopter selector. Its Back
+dialog had Cancel selected; physical Confirm returned to the same selector,
+with both final eyes reviewed. The overall investigation is **failed** because
+the bounded review deadline expired while that selector remained open and
+cleanup refused an unreviewed exit. The exact owned game/simulator session
+was then closed; Steam remained running. This is scoped Cancel-path evidence,
+not full upgrade or successful roundtrip acceptance. Discard and immediate
+reopening still require their own completed replay.
+
+The noncompact two-hand guidance now follows the acquired native support-palm
+contact rather than the muzzle axis. A measured exact-contact counterexample
+previously swung the primary palm 18.4 degrees and moved the authored contact
+10.1 cm. Eight geometry checks now preserve exact contact, follow moved contact
+and retain rigid-frame invariance. The compact FAKEL branch, muzzle socket and
+shot axis are unchanged. Native rifle motion and physical grip comfort are open.
+
+The optional binocular lighting probe identifies exact native pixel shaders,
+reads their bounded constant buffers asynchronously without a GPU wait, and
+requires the accepted stereo source plus matching native camera matrices before
+reporting a coherent frame. It changes no rendering. The housing lighting fix
+still needs these actual head-pass values; a diagnostic contract pass is not
+visual acceptance. The first ordinary iDroid replay installed its Light probe
+but produced no graph registration. Bounded hook diagnostics now distinguish
+the missing loader path from rejected identities; no projection fix is claimed.
 
 ### User request status
 
@@ -47,8 +279,9 @@ native-mode stock-image restoration and steady reopening. Remapped run
 with no stock A, and that physical chord reaches native Confirm. Its initial
 reopening pair still spans the native animation. Controls were restored exactly.
 The reviewed Map scope is recorded under `artifacts/bot/acceptance/`; other
-prompt families and physical headset acceptance remain open. The feature stays
-opt-in. See VR_CONTROL_PROMPTS.md.
+prompt families and physical headset acceptance remain open. Map captions now
+default on; the broader prompt adapter remains opt-in. The expanded footer
+is still pending the native repair described above. See VR_CONTROL_PROMPTS.md.
 
 Coco's `scope_stabilizer.patch` filters native ocular drift relative to
 the authoritative aiming hand, with the objective sharing the same rigid

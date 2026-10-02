@@ -59,12 +59,16 @@ try {
             $mgsAssets = @{
                 'retail-assets\Assets\tpp\item\tel\Scenes\tel0_main0_def.fmdl'='935739377E6E0B14EB7186E778E265E65C8E2F66D97B8909D74725800EB21011'
                 'retail-assets\Assets\tpp\item\tel\Pictures\tel0_main0_def_c00_bsm.dds'='7CB40D536F37FAA66D8153EF04AFE6A23331D5BCE45908DC7AA3F63558F566B3'
+                'retail-assets\Assets\tpp\item\tel\Pictures\tel0_main0_def_nrm.dds'='285C9A61B02B5798E79A5013B49CE3344B1F196AE2A56814AB7DB6BFB9028EB4'
+                'retail-assets\Assets\tpp\item\tel\Pictures\tel0_main0_def_srm.dds'='20F1D6B3C6E13C149A79FC3526A524F442FC3457BCEAA5CE775579BD0D43B61D'
+                'retail-assets\Assets\tpp\item\tel\Pictures\tel0_main0_def_mtm.dds'='88C9679A783ECE860F6182D4444B0AD07B59771BE2D1B0EEDAB166E4F18B3E13'
                 'retail-assets\Assets\tpp\item\cct\Scenes\cct0_main1_def.fmdl'='58512A084176BBBC4A2F496D7D36D70AA1F33F4B67455120BB2328BFF7EE1A98'
                 'retail-assets\Assets\tpp\item\cct\Pictures\cct0_main1_def_c00_bsm.dds'='7199B3148526AC7A4DB75051762CD80808A678910A880198B381291D350D7F51'
                 'retail-assets\Assets\tpp\item\rdi\Scenes\rdi0_main0_def.fmdl'='3681E86A1B611CC33BC67D756B815D4899147532A3417D78E510CD20EDA54028'
                 'retail-assets\Assets\tpp\item\rdi\Pictures\rdi0_main0_def_c00_bsm.dds'='F8B62E027451DED9864E70C0F189F753C9EA4B85AE6F9F9C9124EAA8C6896F09'
                 'retail-assets\Assets\tpp\item\idr\Scenes\idr0_main0_def.fmdl'='6E450F67A423F83F9D42717FB6ED7A464AA7B914C4524FE7DD762FE9DFFC3F50'
                 'retail-assets\Assets\tpp\item\idr\Pictures\idr0_main0_def_c00_bsm.dds'='6129BF4BF7AB5A43F0180465356BE4735B5591C0FA77A96172377662A45E18E7'
+                'retail-assets\shaders\dx11\fox3ddf_blin_4mt-ps.dxbc'='CABC964687CD259E0189B33968B090980AAB7E12A9C603E8560536AE2A9E64FE'
             }
             foreach ($mgsAsset in $mgsAssets.Keys) {
                 $mgsAssetPath=Join-Path $mgsCaseDir $mgsAsset
@@ -84,6 +88,12 @@ try {
     }
     $mgsPlayer = Join-Path $mgsFixtureRoot "Player's game [test]"
     $mgsPlayerExe = Join-Path $mgsPlayer 'mgsvtpp.exe'
+    $mgsShader = Join-Path $mgsPlayer 'retail-assets\shaders\dx11\fox3ddf_blin_4mt-ps.dxbc'
+    $mgsShaderHash = $mgsFixtureAssetHashes[$mgsShader]
+    $mgsFixtureAssetHashes.Remove($mgsShader)
+    Assert-Refused { & $mgsInstall -GameDir $mgsPlayer -EnableVR } 'Existing modified owned asset was preserved:*fox3ddf_blin_4mt-ps.dxbc'
+    Assert-Installer (-not (Test-Path -LiteralPath (Join-Path $mgsPlayer 'dinput8.dll'))) 'Modified owned shader allowed a partial mod installation.'
+    $mgsFixtureAssetHashes[$mgsShader] = $mgsShaderHash
     & $mgsSetup -Mode Install -GameExe $mgsPlayerExe
     $mgsConfigPath = Join-Path $mgsPlayer 'mgs5vr.ini'
     $mgsEnabled = [IO.File]::ReadAllText($mgsConfigPath)

@@ -111,6 +111,18 @@ inline ControllerFrame passiveControllerFrame(ControllerFrame frame,int64_t time
     frame.predictedXrTime=time;frame.referenceEpoch=epoch;
     return frame;
 }
+// Read-only evidence copied from the rig's existing native weapon sampling.
+// Resource handles identify a runtime resource, not a named weapon definition.
+// bodyModel is the accepted player skin; no weapon render model is inferred.
+struct WeaponRigDiagnostics {
+    uint64_t sampleTime{},supportIdentity{};
+    uintptr_t character{},component{},instances{},state{},bodyModel{};
+    uint32_t instanceFirst{},playerIndex{},resourceHandle{},flags{},mode{};
+    std::array<uint8_t,4> optical{};
+    Pose muzzleInGrip{};
+    bool sampled{},componentAccepted{},instanceIndexMatched{},resourceAccepted{};
+    bool muzzleAttempted{},muzzleMatrixRead{},attachmentValid{},muzzleSocketValid{},muzzleSolved{},opticalRead{};
+};
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};
     uint64_t trackingSequence{}, activation{};
@@ -141,6 +153,7 @@ struct HeadCameraSample {
     std::array<bool,2> renderedPalmTracked{};
     Pose idroidDevice{}; // Native device root from this solved wrist/socket transaction, WORLD space.
     bool idroidDeviceTracked{};
+    WeaponRigDiagnostics weaponRig{}; // Same retained skin/camera publication; not a native draw observation.
 };
 // Native listener adapters consume the center-head pose from the camera's
 // existing publication, never a newer tracking sample or an individual eye.
@@ -184,6 +197,10 @@ public:
     // Read-only diagnostics of the last accepted render-camera publication.
     // This does not resolve a newer pose or claim a submitted final-eye frame.
     std::optional<HeadCameraSample> publishedView() const;
+    // Copies the current native skin transaction without resolving another
+    // tracking pose. Native effect callbacks can run before camera publication.
+    // This is not evidence that its pixels have reached a final eye.
+    std::optional<HeadCameraSample> publishedRigFrame(uint64_t milliseconds) const;
 private:
     HeadCameraSample resolveLocked(uintptr_t camera,Pose nativePose,uint64_t milliseconds,bool useRig=true);
     Pose followCinematicLocked(Pose nativePose,uint64_t milliseconds,bool advance);

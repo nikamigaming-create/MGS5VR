@@ -4,6 +4,8 @@
 #include "mgs5vr/ui_clip.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/control_prompts.hpp"
+#include "mgs5vr/prompt_activation_policy.hpp"
+#include "mgs5vr/prompt_trace_budget.hpp"
 #include "mgs5vr/log.hpp"
 #include <windows.h>
 #include <intrin.h>
@@ -35,17 +37,24 @@ PlainTextFn originalPlainText{};
 using MapHelpFn=void(*)(void*);
 using UiCaptionFn=void(*)(void*,void*,void*,const char*,bool);
 using UiOpacityFn=void(*)(void*,void*,float);
+using CommonFooterUpdateFn=uintptr_t(*)(void*);
+using CommonFooterCaptionFn=int(*)(void*,void*,void*,uint32_t,const char*);
 MapHelpFn originalMapHelp{};
-bool controlPromptsEnabled{},mapPromptsEnabled{},promptTraceEnabled{};
+CommonFooterUpdateFn originalCommonFooterUpdate{};
+CommonFooterCaptionFn originalCommonFooterCaption{};
+bool controlPromptsEnabled{},mapPromptsEnabled{},mapFooterPromptsEnabled{},promptTraceEnabled{};
 std::atomic_uint64_t promptCalls{},promptReplacements{},promptUnresolved{},promptPoolFull{};
 std::atomic_uint64_t mapPromptReplacements{};
 std::atomic_uint64_t mapPromptIconSuppressions{},mapPromptIconRestorations{};
+std::atomic_uint64_t mapFooterReplacements{},mapFooterRestorations{},mapFooterUpdates{};
+std::atomic_uint64_t mapFooterCaptionCalls{},mapFooterNativeCalls{},mapFooterAccepted{},mapFooterTraceCount{};
+std::atomic_uint64_t mapFooterMissingScope{},mapFooterInvalidUnits{};
 std::mutex promptMutex;
 // The native text unit BORROWS its UTF-8 pointer. Intern immutable replacement
 // strings for the module lifetime; no temporary buffers or game allocator frees.
 std::unordered_set<std::string> promptTextPool;
 size_t promptTextBytes{};
-std::unordered_set<std::string> promptTraces;
+PromptTraceBudget promptTraces;
 struct MapPromptState {
     uintptr_t owner{},node{},unit{};
     const char* nativeCaption{};
@@ -59,6 +68,18 @@ struct MapPromptState {
 std::mutex mapPromptMutex;
 MapPromptState mapPrompt;
 thread_local MapPromptState* updatingMapHelp{};
+struct MapFooterRow {
+    uintptr_t owner{},ui{},node{},units{};
+    unsigned slot{},mode{},helpId{};
+    const char* nativeCaption{};
+    const char* appliedCaption{};
+    std::shared_ptr<const ControlBindings> bindings;
+    bool vrOwned{};
+};
+std::mutex mapFooterMutex;
+std::array<MapFooterRow,4> mapFooterRows{};
+thread_local uintptr_t updatingCommonFooter{};
+const char* promptText(const char* content,bool mapFooter=false);
 using MarkerDepthFn=void(*)(void*);
 MarkerDepthFn originalMarkerDepth{};
 std::atomic_uint64_t markerDepthPreserved{};
@@ -120,11 +141,32 @@ bool wristHudEnabled{};
 bool menuReaderVerified{};
 bool idroidCloseReaderVerified{};
 bool pauseReaderVerified{};
+bool popupReaderVerified{};
+using PopupUpdateFn=void(*)(void*);
+PopupUpdateFn originalPopupUpdate{};
+bool popupChoiceReaderVerified{};
+std::mutex popupChoiceMutex;
+NativePopupChoiceLeases popupChoiceLeases;
 std::atomic_int menuState{-1};
 std::atomic_uint64_t pickerDrawTime{};
 std::atomic_uint64_t commandsDrawTime{};
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
+void popupUpdate(void* object){
+    // Exact native 898500 consumes only RCX. Forward its complete update first;
+    // this observer does not call a getter, change focus or handle an input.
+    originalPopupUpdate(object);
+    if(!enabled.load()||!popupChoiceReaderVerified)return;
+    const auto owner=reinterpret_cast<uintptr_t>(object);uintptr_t type{};
+    if(!read(owner,&type,sizeof(type))||type!=base+0x224ba40)return;
+    const auto now=steadyMilliseconds();
+    std::lock_guard lock(popupChoiceMutex);
+    auto slot=std::find_if(popupChoiceLeases.begin(),popupChoiceLeases.end(),
+        [owner](const auto& lease){return lease.owner==owner;});
+    if(slot==popupChoiceLeases.end())slot=std::min_element(popupChoiceLeases.begin(),popupChoiceLeases.end(),
+        [](const auto& left,const auto& right){return left.sampleMs<right.sampleMs;});
+    *slot={owner,now};
+}
 void equipmentUpdate(void* object){
     const auto requested=equipmentPreviewRequestedAt.load(),now=steadyMilliseconds();
     const bool preview=enabled.load()&&requested&&now>=requested&&now-requested<250
@@ -246,17 +288,20 @@ std::string readPromptText(const char* content){
     }
     return source;
 }
-void tracePrompt(void* node,const char* content,const char* path){
+void tracePrompt(const char* content,const char* path,PromptTraceOwner owner){
     if(!promptTraceEnabled||!content)return;
     try{
         const auto source=readPromptText(content);
-        if(source.empty()||source.size()>96||source.find_first_not_of("0123456789.,:% /+-") == std::string::npos)return;
-        uint32_t font{};if(node)read(reinterpret_cast<uintptr_t>(node)+0x94,&font,sizeof(font));
-        const auto key=std::string(path)+std::to_string(font)+source;
+        if(owner.node&&!owner.fontKnown)owner.fontKnown=read(owner.node+0x94,&owner.font,sizeof(owner.font));
         std::lock_guard lock(promptMutex);
-        if(promptTraces.size()>=128||!promptTraces.emplace(key).second)return;
+        if(!promptTraces.admit(path,owner,source))return;
         void* stack[6]{};const auto frames=RtlCaptureStackBackTrace(1,6,stack,nullptr);
-        std::ostringstream message;message<<"VR prompt trace "<<path<<" font="<<font<<" text="<<source<<" callers="<<std::hex;
+        std::ostringstream message;message<<"VR prompt trace "<<path<<" font=";
+        if(owner.fontKnown)message<<owner.font;else message<<"unknown";
+        message<<" node=0x"<<std::hex<<owner.node<<" unit=0x"<<owner.unit
+               <<" primary=0x"<<owner.primary<<" secondary=0x"<<owner.secondary
+               <<" content=0x"<<reinterpret_cast<uintptr_t>(content)
+               <<" text="<<std::quoted(source)<<" callers=";
         for(unsigned i=0;i<frames;++i)message<<(reinterpret_cast<uintptr_t>(stack[i])-base)<<',';
         log(message.str());
     }catch(...){}
@@ -277,7 +322,7 @@ const char* mapCaptionText(const char* content){
     try{
         const auto input=controlInputAudit(steadyMilliseconds());
         const auto bindings=controlPromptBindings();
-        if(!bindings||(input&&input->context==ControlContext::nativeButtons))return content;
+        if(!bindings||!promptVrOwned(false,input&&input->context==ControlContext::nativeButtons))return content;
         const auto source=readPromptText(content);
         auto result=rewriteControlCaption(source,"DECISION",*bindings,ControlContext::menus);
         if(result.replaced)if(const auto replacement=internPrompt(std::move(result.text)))return replacement;
@@ -285,7 +330,7 @@ const char* mapCaptionText(const char* content){
     return content;
 }
 bool plainText(void* node,void* unit,const char* content,bool scroll,bool alternateFont){
-    tracePrompt(node,content,"plain");
+    tracePrompt(content,"plain",{reinterpret_cast<uintptr_t>(node),reinterpret_cast<uintptr_t>(unit)});
     if(updatingMapHelp&&reinterpret_cast<uintptr_t>(node)==updatingMapHelp->node
         &&reinterpret_cast<uintptr_t>(unit)==updatingMapHelp->unit){
         updatingMapHelp->nativeCaption=content;
@@ -348,18 +393,187 @@ void mapHelp(void* object){
         log(trace.str());
     }
 }
-const char* promptText(const char* content){
-    if(!enabled.load()||!controlPromptsEnabled||!content)return content;
+bool mapFooterVrOwned(){
+    const auto input=controlInputAudit(steadyMilliseconds());
+    return promptVrOwned(nativeGamepadActive(),input&&input->context==ControlContext::nativeButtons)
+        &&nativeMenuOpen().value_or(false)
+        &&nativeIdroidOpen()&&!nativePauseMenuOpen();
+}
+struct FooterRowObservation {
+    uintptr_t uiType{},setter{},node{};
+    uint8_t state{},mode{};uint16_t helpId{};
+    std::array<uint8_t,16> metadata{};
+    unsigned refusal{};bool identityRead{},metadataRead{};
+};
+bool takeMapFooterTrace(){
+    auto count=mapFooterTraceCount.load(std::memory_order_relaxed);
+    while(count<24){
+        if(mapFooterTraceCount.compare_exchange_weak(count,count+1,std::memory_order_relaxed))return true;
+    }
+    return false;
+}
+bool currentFooterRow(const MapFooterRow& saved, unsigned& mode, unsigned& helpId,
+        FooterRowObservation* observed=nullptr){
+    FooterRowObservation sample;
+    const auto row=saved.owner+0x360+saved.slot*0x88;
+    sample.identityRead=read(row+0x81,&sample.mode,sizeof(sample.mode))&&read(row+0x82,&sample.helpId,sizeof(sample.helpId));
+    if(observed)sample.metadataRead=read(row+0x78,sample.metadata.data(),sample.metadata.size());
+    if(!read(saved.ui,&sample.uiType,sizeof(sample.uiType))||sample.uiType!=base+0x2184f90)sample.refusal=1;
+    else if(!read(sample.uiType+0x740,&sample.setter,sizeof(sample.setter))||sample.setter!=base+0x50a110)sample.refusal=2;
+    else if(!read(row+0x10,&sample.node,sizeof(sample.node))||sample.node!=saved.node)sample.refusal=3;
+    else if(!read(row+0x80,&sample.state,sizeof(sample.state))||sample.state!=1)sample.refusal=4;
+    else if(!sample.identityRead)sample.refusal=5;
+    if(observed)*observed=sample;
+    if(sample.refusal)return false;
+    mode=sample.mode;helpId=sample.helpId;return true;
+}
+__declspec(noinline) int commonFooterCaption(void* ui,void* node,void* units,uint32_t count,const char* content){
+    // Exact native common-footer update -> row builder -> caption setter. The
+    // unit address and Map page/table row identify the scope; localized prose
+    // is never used as an action or page discriminator.
+    MapFooterRow row{};
+    const auto unitAddress=reinterpret_cast<uintptr_t>(units);
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    const bool nativeCaller=caller==base+0x873a4b;
+    if(nativeCaller||updatingCommonFooter)++mapFooterCaptionCalls;
+    if(nativeCaller)++mapFooterNativeCalls;
+    FooterRowObservation observation;
+    unsigned refusal=1;
+    if(mapFooterPromptsEnabled&&updatingCommonFooter&&content&&caller==base+0x873a4b
+        &&unitAddress>=updatingCommonFooter+0xd0){
+        refusal=2;
+        const auto offset=unitAddress-updatingCommonFooter-0xd0;
+        if(offset%0xa0==0&&offset/0xa0<4){
+            row={updatingCommonFooter,reinterpret_cast<uintptr_t>(ui),reinterpret_cast<uintptr_t>(node),
+                 unitAddress,static_cast<unsigned>(offset/0xa0)};
+            refusal=3;
+            if(currentFooterRow(row,row.mode,row.helpId,&observation)){
+                refusal=4;
+                if(mapFooterRowEligible(row.owner,row.node,row.units,count,row.slot,row.mode,row.helpId))refusal=0;
+            }
+        }
+    }
+    // A separate finite trace is available without enabling the broad parser.
+    // Record the native call and each admission stage before any replacement;
+    // a missing report is not a claim that a footer was accepted.
+    if(nativeCaller&&refusal==1)++mapFooterMissingScope;
+    if(nativeCaller&&refusal==2)++mapFooterInvalidUnits;
+    if(nativeCaller&&nativeIdroidOpen()&&takeMapFooterTrace()){
+        try{
+            std::ostringstream trace;trace<<"VR Map footer admission caller_rva=0x"<<std::hex<<(caller-base)
+                <<" owner=0x"<<updatingCommonFooter<<" ui=0x"<<reinterpret_cast<uintptr_t>(ui)
+                <<" node=0x"<<reinterpret_cast<uintptr_t>(node)<<" units=0x"<<unitAddress
+                <<" ui_type=0x"<<observation.uiType<<" setter=0x"<<observation.setter
+                <<" observed_node=0x"<<observation.node<<std::dec<<" count="<<count
+                <<" slot="<<row.slot<<" state="<<unsigned(observation.state)
+                <<" mode="<<unsigned(observation.mode)<<" help_id="<<observation.helpId
+                <<" refusal="<<refusal<<" row_refusal="<<observation.refusal
+                <<" identity_read="<<observation.identityRead<<" metadata_read="<<observation.metadataRead
+                <<" row_78="<<std::hex<<std::setfill('0');
+            for(const auto byte:observation.metadata)trace<<std::setw(2)<<unsigned(byte);
+            trace<<" caption="<<std::quoted(readPromptText(content).substr(0,240));
+            log(trace.str());
+        }catch(...){}
+    }
+    if(refusal)return originalCommonFooterCaption(ui,node,units,count,content);
+    ++mapFooterAccepted;
+    try{
+        const auto source=readPromptText(content);
+        if(source.empty()||source.size()>16384)return originalCommonFooterCaption(ui,node,units,count,content);
+        // Keep exact native bytes alive for mode restoration and neutral live
+        // remaps. The game's text units borrow their input pointer.
+        row.nativeCaption=internPrompt(source);
+        if(!row.nativeCaption)return originalCommonFooterCaption(ui,node,units,count,content);
+        row.bindings=controlPromptBindings();row.vrOwned=mapFooterVrOwned();
+        row.appliedCaption=promptText(row.nativeCaption,true);
+    }catch(...){return originalCommonFooterCaption(ui,node,units,count,content);}
+    const auto result=originalCommonFooterCaption(ui,node,units,count,row.appliedCaption);
+    try{
+        {
+            std::lock_guard lock(mapFooterMutex);
+            for(const auto& saved:mapFooterRows)if(saved.owner&&saved.owner!=row.owner){mapFooterRows={};break;}
+            mapFooterRows[row.slot]=row;
+        }
+        if(row.appliedCaption!=row.nativeCaption)++mapFooterReplacements;
+    }catch(...){}
+    return result;
+}
+uintptr_t commonFooterUpdate(void* object){
+    struct Scope {
+        uintptr_t saved=updatingCommonFooter;
+        explicit Scope(uintptr_t owner){updatingCommonFooter=owner;}
+        ~Scope(){updatingCommonFooter=saved;}
+    } scope{reinterpret_cast<uintptr_t>(object)};
+    const auto result=originalCommonFooterUpdate(object);
+    if(!enabled.load()||!mapFooterPromptsEnabled)return result;
+    const auto updateCount=++mapFooterUpdates;
+    if(updateCount==1||updateCount==256||updateCount==1024||updateCount==4096){
+        try{
+            std::ostringstream trace;trace<<"VR Map footer activity updates="<<updateCount
+                <<" caption_calls="<<mapFooterCaptionCalls.load()<<" native_calls="<<mapFooterNativeCalls.load()
+                <<" missing_scope="<<mapFooterMissingScope.load()<<" invalid_units="<<mapFooterInvalidUnits.load()
+                <<" accepted="<<mapFooterAccepted.load()<<" replacements="<<mapFooterReplacements.load()
+                <<" restorations="<<mapFooterRestorations.load();
+            log(trace.str());
+        }catch(...){}
+    }
+    try{
+        std::array<MapFooterRow,4> rows{};
+        {std::lock_guard lock(mapFooterMutex);rows=mapFooterRows;}
+        if(std::none_of(rows.begin(),rows.end(),[object](const auto& row){
+            return row.owner==reinterpret_cast<uintptr_t>(object)&&row.nativeCaption;
+        }))return result;
+        const auto bindings=controlPromptBindings();const bool vrOwned=mapFooterVrOwned();
+        for(auto row:rows){
+            if(row.owner!=reinterpret_cast<uintptr_t>(object)||!row.nativeCaption)continue;
+            unsigned mode{},helpId{};
+            if(!currentFooterRow(row,mode,helpId))continue;
+            const bool sameCaption=helpId==row.helpId;
+            const bool mapRow=mapFooterRowEligible(row.owner,row.node,row.units,5,row.slot,mode,helpId);
+            // A changed helpId has already been replaced by the native builder.
+            // If the same caption is reused on a non-Map page, restore it before
+            // relinquishing the scope. No unrelated image node is suppressed.
+            if(!sameCaption){
+                std::lock_guard lock(mapFooterMutex);
+                auto& saved=mapFooterRows[row.slot];
+                if(saved.owner==row.owner&&saved.node==row.node&&saved.helpId==row.helpId)saved={};
+                continue;
+            }
+            // Native helpId caching also applies to unchanged binding/mode
+            // snapshots. Do not reparse/intern every footer on every frame.
+            if(mapRow&&row.bindings==bindings&&row.vrOwned==vrOwned)continue;
+            const auto replacement=mapRow?promptText(row.nativeCaption,true):row.nativeCaption;
+            if(replacement!=row.appliedCaption){
+                originalCommonFooterCaption(reinterpret_cast<void*>(row.ui),reinterpret_cast<void*>(row.node),
+                    reinterpret_cast<void*>(row.units),5,replacement);
+                if(replacement==row.nativeCaption)++mapFooterRestorations;else ++mapFooterReplacements;
+            }
+            std::lock_guard lock(mapFooterMutex);
+            auto& saved=mapFooterRows[row.slot];
+            if(saved.owner==row.owner&&saved.node==row.node&&saved.units==row.units&&saved.helpId==row.helpId){
+                if(mapRow){saved.mode=mode;saved.appliedCaption=replacement;saved.bindings=bindings;saved.vrOwned=vrOwned;}
+                else saved={};
+            }
+        }
+    }catch(...){}
+    return result;
+}
+const char* promptText(const char* content,bool mapFooter){
+    if(!enabled.load()||!promptMarkupAllowed(controlPromptsEnabled,mapFooterPromptsEnabled,mapFooter)||!content)return content;
     const char* replacement=content;
     try{
         const auto bindings=controlPromptBindings();
         const auto input=controlInputAudit(steadyMilliseconds());
         const bool menuOpen=nativeMenuOpen().value_or(false);
-        if(bindings&&(input||menuOpen)&&!nativeGamepadActive()){
+        // Native-button mode is an escape to the original game presentation.
+        // This also covers the generic parser reentry after a footer restore.
+        if(bindings&&(input||menuOpen)
+            &&promptVrOwned(nativeGamepadActive(),input&&input->context==ControlContext::nativeButtons)
+            &&(!mapFooter||(menuOpen&&nativeIdroidOpen()&&!nativePauseMenuOpen()))){
             const auto source=readPromptText(content);
             if(source.find("<I=G=")!=std::string::npos&&source.size()<=16384){
                 auto context=input?input->context:ControlContext::menus;
-                if(context!=ControlContext::nativeButtons&&menuOpen)context=ControlContext::menus;
+                if(menuOpen)context=ControlContext::menus;
                 auto result=rewriteControlPrompt(source,*bindings,context);
                 promptUnresolved.fetch_add(result.unresolved);
                 if(result.replaced){
@@ -384,7 +598,8 @@ int parseText(const char* content,void* primary,void* secondary,uint32_t font,ui
     // it into text/icon units. The later plain-text setter has already lost
     // those action identities. Preserve all layout arguments and its result.
     ++promptCalls;
-    tracePrompt(nullptr,content,"markup");
+    tracePrompt(content,"markup",{0,reinterpret_cast<uintptr_t>(units),reinterpret_cast<uintptr_t>(primary),
+                                  reinterpret_cast<uintptr_t>(secondary),font,true});
     return originalParseText(promptText(content),primary,secondary,font,flags,width,units,capacity);
 }
 __declspec(noinline) uintptr_t queue(void* job,void* state){
@@ -699,8 +914,11 @@ void installUiRenderer(uintptr_t moduleBase){
         settings=std::filesystem::path(executable.data()).parent_path()/L"mgs5vr.ini";
     wchar_t promptSwitch[4]{};
     const auto promptOverride=GetEnvironmentVariableW(L"MGS5VR_VR_BUTTON_PROMPTS",promptSwitch,4);
-    controlPromptsEnabled=promptOverride?promptOverride==1&&promptSwitch[0]==L'1'
-        :GetPrivateProfileIntW(L"diagnostics",L"vr_button_prompt_experiment",0,settings.c_str())==1;
+    const auto promptPolicy=promptActivationPolicy(promptOverride!=0,
+        promptOverride==1&&promptSwitch[0]==L'1',
+        GetPrivateProfileIntW(L"diagnostics",L"vr_button_prompt_experiment",0,settings.c_str())==1,
+        GetPrivateProfileIntW(L"ui",L"map_control_prompts",1,settings.c_str())==1);
+    controlPromptsEnabled=promptPolicy.inlineMarkup;
     if(controlPromptsEnabled){
         std::array<unsigned char,sizeof(parseTextEntry)> textBytes{};
         const auto target=reinterpret_cast<void*>(base+0x1dc3aa0);
@@ -715,13 +933,15 @@ void installUiRenderer(uintptr_t moduleBase){
     const auto traceOverride=GetEnvironmentVariableW(L"MGS5VR_PROMPT_TRACE",traceSwitch,4);
     promptTraceEnabled=controlPromptsEnabled&&(traceOverride?traceOverride==1&&traceSwitch[0]==L'1'
         :GetPrivateProfileIntW(L"diagnostics",L"vr_prompt_trace",0,settings.c_str())==1);
-    if(controlPromptsEnabled){
+    // The verified Map owner has its own ordinary admission. Failure or opt-out
+    // of the unrelated experimental parser must not suppress Map's caption.
+    if(promptPolicy.mapCaption||promptTraceEnabled){
         constexpr std::array<unsigned char,10> plainEntry{0x48,0x89,0x5c,0x24,0x10,0x48,0x89,0x6c,0x24,0x18};
         std::array<unsigned char,10> bytes{};const auto target=reinterpret_cast<void*>(base+0x5102d0);
         if(!read(base+0x5102d0,bytes.data(),bytes.size())||bytes!=plainEntry
             ||MH_CreateHook(target,reinterpret_cast<void*>(&plainText),reinterpret_cast<void**>(&originalPlainText))!=MH_OK
             ||MH_EnableHook(target)!=MH_OK){MH_DisableHook(target);promptTraceEnabled=false;}
-        else{
+        else if(promptPolicy.mapCaption){
             // The separate Map caption is updated by this verified owner.
             std::array<unsigned char,10> mapBytes{};
             const auto mapTarget=reinterpret_cast<void*>(base+0xf0a110);
@@ -730,8 +950,29 @@ void installUiRenderer(uintptr_t moduleBase){
             if(read(base+0xf0a110,mapBytes.data(),mapBytes.size())&&mapBytes==plainEntry
                 &&read(base+0x50d420,opacityBytes.data(),opacityBytes.size())&&opacityBytes==opacityEntry
                 &&MH_CreateHook(mapTarget,reinterpret_cast<void*>(&mapHelp),reinterpret_cast<void**>(&originalMapHelp))==MH_OK
-                &&MH_EnableHook(mapTarget)==MH_OK){mapPromptsEnabled=true;log("VR Map action-help owner enabled");}
+                &&MH_EnableHook(mapTarget)==MH_OK){mapPromptsEnabled=true;log("VR Map action-help owner enabled by default; native input retains native prompts");}
             else MH_DisableHook(mapTarget);
+        }
+    }
+    if(promptPolicy.mapCaption){
+        // The lower Map footer is authored input markup, separate from the
+        // f0a110 Confirm image/caption owner. Keep its caption interception
+        // inside the native common-footer update and exact Map table rows.
+        constexpr std::array<unsigned char,14> updateEntry{0x40,0x57,0x48,0x83,0xec,0x20,0x48,0x83,0xb9,0xc8,0,0,0,0};
+        constexpr std::array<unsigned char,24> captionEntry{0x48,0x89,0x5c,0x24,0x10,0x48,0x89,0x6c,0x24,0x18,0x57,0x48,0x83,0xec,0x70,0x49,0x8b,0xe8,0x48,0x8b,0xda,0x48,0x8b,0xf9};
+        std::array<unsigned char,14> updateBytes{};std::array<unsigned char,24> captionBytes{};
+        const auto updateTarget=reinterpret_cast<void*>(base+0x873d90);
+        const auto captionTarget=reinterpret_cast<void*>(base+0x50a110);
+        if(read(base+0x873d90,updateBytes.data(),updateBytes.size())&&updateBytes==updateEntry
+            &&read(base+0x50a110,captionBytes.data(),captionBytes.size())&&captionBytes==captionEntry
+            &&MH_CreateHook(updateTarget,reinterpret_cast<void*>(&commonFooterUpdate),reinterpret_cast<void**>(&originalCommonFooterUpdate))==MH_OK
+            &&MH_CreateHook(captionTarget,reinterpret_cast<void*>(&commonFooterCaption),reinterpret_cast<void**>(&originalCommonFooterCaption))==MH_OK
+            &&MH_EnableHook(captionTarget)==MH_OK&&MH_EnableHook(updateTarget)==MH_OK){
+            mapFooterPromptsEnabled=true;
+            log("VR Map footer labels enabled for verified native modes46/47; other footers retain their diagnostic policy");
+        }else{
+            MH_DisableHook(captionTarget);MH_DisableHook(updateTarget);
+            log("VR Map footer adapter unavailable; native footer retained");
         }
     }
     constexpr std::array<unsigned char,11> overviewEntry{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57};
@@ -761,6 +1002,62 @@ void installUiRenderer(uintptr_t moduleBase){
     std::array<unsigned char,8> getterBytes{},openBytes{};
     menuReaderVerified=read(base+0x85fd00,getterBytes.data(),getterBytes.size())&&getterBytes==menuGetter
         &&read(base+0x934110,openBytes.data(),openBytes.size())&&openBytes==menuOpen;
+    // Supported TPP UiSystem/GetPopupSelect/IsShowPopup contract, recovered
+    // independently from the owned retail implementation. IsShowPopup's
+    // readiness call writes a cache byte: never invoke it from observation.
+    constexpr std::array<unsigned char,8> popupSystemGetter{0x48,0x8b,0x05,0x29,0xb0,0x38,0x02,0xc3};
+    constexpr std::array<unsigned char,7> popupResultGetter{0x8b,0x81,0x18,0x15,0,0,0xc3};
+    constexpr std::array<unsigned char,56> popupParametersGetter{
+        0x8b,0x81,0x10,0x15,0,0,0x89,0x02,0x48,0x8b,0x81,0x30,0x15,0,0,0x49,0x89,0x00,
+        0x0f,0xb6,0x81,0x78,0x15,0,0,0x41,0x88,0x01,0x0f,0xb6,0x91,0x79,0x15,0,0,
+        0x48,0x8b,0x44,0x24,0x28,0x88,0x10,0x48,0x8b,0x44,0x24,0x30,0x8b,0x89,0x28,0x15,0,0,0x89,0x08,0xc3};
+    constexpr std::array<unsigned char,28> popupActiveEntry{
+        0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57,0x48,0x83,0xec,0x20,
+        0x48,0x8b,0xd9,0x48,0x8b,0x89,0x80,0x0e,0,0,0x40,0x32,0xf6};
+    constexpr std::array<unsigned char,7> popupSecondOwner{0x48,0x8b,0x8b,0x88,0x0e,0,0};
+    constexpr std::array<unsigned char,13> popupReadinessEntry{
+        0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x48,0x8b,0x49,0x10};
+    constexpr std::array<unsigned char,6> popupReadinessWrite{0xc6,0x43,0x22,0x01,0xb0,0x01};
+    std::array<unsigned char,7> popupResultBytes{};
+    std::array<unsigned char,56> popupParameterBytes{};
+    std::array<unsigned char,28> popupActiveBytes{};
+    std::array<unsigned char,7> popupSecondOwnerBytes{};
+    std::array<unsigned char,13> popupReadinessBytes{};
+    std::array<unsigned char,6> popupReadinessWriteBytes{};
+    popupReaderVerified=menuReaderVerified
+        &&read(base+0x866910,getterBytes.data(),getterBytes.size())&&getterBytes==popupSystemGetter
+        &&read(base+0x866a70,popupResultBytes.data(),popupResultBytes.size())&&popupResultBytes==popupResultGetter
+        &&read(base+0x866aa0,popupParameterBytes.data(),popupParameterBytes.size())&&popupParameterBytes==popupParametersGetter
+        &&read(base+0x867460,popupActiveBytes.data(),popupActiveBytes.size())&&popupActiveBytes==popupActiveEntry
+        &&read(base+0x86749e,popupSecondOwnerBytes.data(),popupSecondOwnerBytes.size())&&popupSecondOwnerBytes==popupSecondOwner
+        &&read(base+0x934120,popupReadinessBytes.data(),popupReadinessBytes.size())&&popupReadinessBytes==popupReadinessEntry
+        &&read(base+0x93414d,popupReadinessWriteBytes.data(),popupReadinessWriteBytes.size())&&popupReadinessWriteBytes==popupReadinessWrite;
+    // Owned native adapter: 897271 writes popup vtable 224BA40; 897C9E
+    // establishes its exact UiSystem backlink. 8985BD copies current dialog
+    // parameters, and 897859/897BB6 consume/update the live selected index.
+    // Failure disables only choice observation and preserves ordinary UI.
+    const auto choiceGuard=[&](uintptr_t rva,const auto& expected){
+        auto actual=expected;actual.fill(0);
+        return read(base+rva,actual.data(),actual.size())&&actual==expected;
+    };
+    popupChoiceReaderVerified=popupReaderVerified
+        &&choiceGuard(0x898500,std::array<unsigned char,15>{0x80,0xb9,0xc0,0,0,0,0,0x0f,0x85,3,0,0,0,0xf3,0xc3})
+        &&choiceGuard(0x897271,std::array<unsigned char,10>{0x48,0x8d,0x05,0xc8,0x47,0x9b,0x01,0x48,0x89,0x03})
+        &&choiceGuard(0x897c9e,std::array<unsigned char,12>{0xe8,0x6d,0xec,0xfc,0xff,0x48,0x89,0x85,0xe8,0,0,0})
+        &&choiceGuard(0x8985bd,std::array<unsigned char,19>{0x48,0x8d,0x93,0xc8,0,0,0,0x4c,0x8d,0x8b,0xc2,0,0,0,0xe8,0xd0,0xe4,0xfc,0xff})
+        &&choiceGuard(0x897859,std::array<unsigned char,19>{0x48,0x63,0x85,0xcc,0,0,0,0x48,0x8d,0x0c,0x80,0x80,0xbc,0xcd,0xb8,0x03,0,0,0})
+        &&choiceGuard(0x897bb6,std::array<unsigned char,21>{0x44,0x39,0xa5,0xcc,0,0,0,0x74,0x11,0x44,0x89,0xa5,0xcc,0,0,0,0xb2,0x01,0x48,0x8b,0xcd})
+        &&choiceGuard(0x8983e2,std::array<unsigned char,39>{0x89,0x87,0xcc,0,0,0,0x48,0x8b,0x8f,0xd8,0x03,0,0,0x48,0x8d,0x97,0x70,0x01,0,0,0x41,0xb1,0x01,0x4c,0x8b,0xc5,0x88,0x9f,0xb8,0x03,0,0,0x44,0x88,0xb7,0xe0,0x03,0,0});
+    if(popupChoiceReaderVerified){
+        const auto target=reinterpret_cast<void*>(base+0x898500);
+        const auto status=MH_CreateHook(target,reinterpret_cast<void*>(&popupUpdate),reinterpret_cast<void**>(&originalPopupUpdate));
+        if(status!=MH_OK)popupChoiceReaderVerified=false;
+        else if(MH_EnableHook(target)!=MH_OK){
+            MH_DisableHook(target);MH_RemoveHook(target);popupChoiceReaderVerified=false;
+        }
+    }
+    log(popupChoiceReaderVerified?"Native popup choice observer installed; read-only current choice, completed result distinct"
+                                  :"Native popup choice observer unavailable; current choice remains unknown");
     // CloseMbDvcTerminal writes the terminal's deferred close byte at +0x25.
     // Back at the root sets this same byte before the stow animation runs.
     constexpr std::array<unsigned char,4> requestClose{0xc6,0x41,0x25,0x01};
@@ -880,6 +1177,12 @@ std::optional<unsigned> nativeIdroidTutorialMode() noexcept {
        ||!read(tutorial,&type,sizeof(type))||type!=base+0x2272810
        ||!read(tutorial+8,&mode,sizeof(mode))||mode>16)return {};
     return mode;
+}
+NativePopupSnapshot nativePopupSnapshot() noexcept {
+    NativePopupChoiceLeases leases;
+    if(enabled.load()&&popupChoiceReaderVerified){std::lock_guard lock(popupChoiceMutex);leases=popupChoiceLeases;}
+    return readNativePopupSnapshot(base,enabled.load()&&popupReaderVerified,
+        [](uintptr_t address,void* output,size_t size){return read(address,output,size);},leases,steadyMilliseconds());
 }
 bool releaseNativeIdroidTutorialPause() noexcept {
     const auto mode=nativeIdroidTutorialMode();
@@ -1018,6 +1321,8 @@ bool applyUiEyeProjection(float* output) noexcept {
     std::memcpy(output,executing.projection.data(),sizeof(executing.projection));++patched;return true;
 }
 void reportUiRenderer(std::ostream& out){
+    const auto popupSampleMs=steadyMilliseconds();
+    const auto popup=nativePopupSnapshot();
     std::lock_guard lock(mutex);
     out<<"{\"event\":\"native_ui_renderer\",\"queued\":"<<queued.load()<<",\"executions\":"<<executions.load()
        <<",\"joined\":"<<joined.load()<<",\"projection_patched\":"<<patched.load()<<",\"camera_mismatch\":"<<cameraMismatch.load()
@@ -1031,7 +1336,15 @@ void reportUiRenderer(std::ostream& out){
        <<",\"prompt_pool_full\":"<<promptPoolFull.load()
        <<",\"map_control_prompts\":"<<(mapPromptsEnabled?"true":"false")<<",\"map_prompt_replacements\":"<<mapPromptReplacements.load()
        <<",\"map_prompt_icon_suppressions\":"<<mapPromptIconSuppressions.load()<<",\"map_prompt_icon_restorations\":"<<mapPromptIconRestorations.load()
-       <<",\"spatial_by_eye\":["<<spatialByEye[0].load()<<','<<spatialByEye[1].load()<<']'
+       <<",\"map_footer_prompts\":"<<(mapFooterPromptsEnabled?"true":"false")
+       <<",\"map_footer_updates\":"<<mapFooterUpdates.load()<<",\"map_footer_replacements\":"<<mapFooterReplacements.load()
+       <<",\"map_footer_restorations\":"<<mapFooterRestorations.load()
+       <<",\"map_footer_caption_calls\":"<<mapFooterCaptionCalls.load()<<",\"map_footer_native_calls\":"<<mapFooterNativeCalls.load()
+       <<",\"map_footer_accepted\":"<<mapFooterAccepted.load()
+       <<",\"map_footer_missing_scope\":"<<mapFooterMissingScope.load()<<",\"map_footer_invalid_units\":"<<mapFooterInvalidUnits.load()
+       <<",\"popup_observer\":";
+    writeNativePopupSnapshotJson(out,popup,popupSampleMs);
+    out<<",\"spatial_by_eye\":["<<spatialByEye[0].load()<<','<<spatialByEye[1].load()<<']'
        <<",\"hidden_panel_by_eye\":["<<hiddenPanelByEye[0].load()<<','<<hiddenPanelByEye[1].load()<<']'
        <<",\"pending\":"<<pending.size()<<",\"node_calls\":"<<nodeCalls.load()<<",\"nodes\":[";
     for(size_t i=0;i<nodes.size();++i){const auto& n=nodes[i];if(i)out<<',';
@@ -1040,5 +1353,8 @@ void reportUiRenderer(std::ostream& out){
     }
     out<<"]}\n";
 }
-void stopUiRenderer() noexcept {enabled.store(false);clearUiRenderSource();}
+void stopUiRenderer() noexcept {
+    enabled.store(false);{std::lock_guard lock(popupChoiceMutex);popupChoiceLeases={};}
+    clearUiRenderSource();
+}
 }

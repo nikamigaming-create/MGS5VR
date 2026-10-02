@@ -2,28 +2,33 @@
 #include "mgs5vr/core.hpp"
 #include "mgs5vr/optic_rig.hpp"
 #include "mgs5vr/optic_markers.hpp"
+#include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/scene_capture.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include <windows.h>
-#include <d3d11.h>
+#include <bcrypt.h>
+#include <d3d11_1.h>
 #include <d3dcompiler.h>
 #include <wrl/client.h>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <limits>
 #include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -36,12 +41,17 @@ struct Vertex {
     float position[3]{};
     float normal[3]{};
     float uv[2]{};
+    float tangent[4]{};
 };
 
 struct Constants {
     float mvp[16]{};
     float world[16]{};
     float baseColor[4]{};
+};
+struct NativeMaterialConstants {
+    float mvp[16]{};
+    float worldView[16]{};
 };
 
 struct IdroidVertex {
@@ -84,12 +94,17 @@ struct RetailModel {
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
     std::filesystem::path path;
+    bool authoredTangents{true};
+    std::string sha256;
+    bool nativeBinocularMaterial{};
+    std::array<float,4> nativeMaterialIndices{};
     float min[3]{std::numeric_limits<float>::max(),std::numeric_limits<float>::max(),std::numeric_limits<float>::max()};
     float max[3]{std::numeric_limits<float>::lowest(),std::numeric_limits<float>::lowest(),std::numeric_limits<float>::lowest()};
 };
 
 struct RetailTexture {
     std::filesystem::path path;
+    std::string sha256;
     DXGI_FORMAT format{DXGI_FORMAT_UNKNOWN};
     uint32_t width{},height{};
     std::vector<std::vector<uint8_t>> mipData;
@@ -135,7 +150,22 @@ bool finiteVertex(const Vertex& vertex){
     for(float value:vertex.position)if(!std::isfinite(value))return false;
     for(float value:vertex.normal)if(!std::isfinite(value))return false;
     for(float value:vertex.uv)if(!std::isfinite(value))return false;
+    for(float value:vertex.tangent)if(!std::isfinite(value))return false;
     return true;
+}
+
+std::string ownedAssetDigest(const std::vector<uint8_t>& bytes){
+    struct Provider {BCRYPT_ALG_HANDLE value{};~Provider(){if(value)BCryptCloseAlgorithmProvider(value,0);}} provider;
+    struct Hash {BCRYPT_HASH_HANDLE value{};~Hash(){if(value)BCryptDestroyHash(value);}} hash;
+    if(bytes.empty()||bytes.size()>std::numeric_limits<ULONG>::max()
+        ||BCryptOpenAlgorithmProvider(&provider.value,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0
+        ||BCryptCreateHash(provider.value,&hash.value,nullptr,0,nullptr,0,0)<0
+        ||BCryptHashData(hash.value,const_cast<PUCHAR>(bytes.data()),static_cast<ULONG>(bytes.size()),0)<0)return {};
+    std::array<UCHAR,32> result{};
+    if(BCryptFinishHash(hash.value,result.data(),static_cast<ULONG>(result.size()),0)<0)return {};
+    std::ostringstream text;text<<std::hex<<std::setfill('0');
+    for(const auto value:result)text<<std::setw(2)<<static_cast<unsigned>(value);
+    return text.str();
 }
 
 std::filesystem::path gameRoot(){
@@ -171,6 +201,16 @@ std::filesystem::path retailBinocularDiffusePath(){
     std::filesystem::path path(configured.data());
     if(path.is_relative())path=root/path;
     return path;
+}
+
+std::filesystem::path retailBinocularMaterialPath(const wchar_t* key,const wchar_t* filename){
+    const auto root=gameRoot();if(root.empty())return {};
+    const auto fallback=retailBinocularDiffusePath().parent_path()/filename;
+    std::array<wchar_t,32768> configured{};
+    const auto length=GetPrivateProfileStringW(L"optics",key,fallback.c_str(),configured.data(),
+        static_cast<DWORD>(configured.size()),(root/L"mgs5vr.ini").c_str());
+    if(!length||length>=configured.size())return {};
+    std::filesystem::path path(configured.data());return path.is_relative()?root/path:path;
 }
 
 std::filesystem::path openingAssetPath(const wchar_t* key,const wchar_t* fallback){
@@ -221,7 +261,7 @@ std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std:
         }
         if(info.type<sections.size())sections[info.type]=info;
     }
-    std::optional<Section1Info> bufferSection;
+    std::optional<Section1Info> bufferSection,parameterSection;
     const auto section1Table=static_cast<size_t>(sectionInfoOffset)+section0Count*8u;
     for(uint32_t i=0;i<section1Count;++i){
         Section1Info info{};
@@ -229,6 +269,7 @@ std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std:
             failure="truncated FMDL section table: "+path.string();return {};
         }
         if(info.type==2)bufferSection=info;
+        if(info.type==0)parameterSection=info;
     }
     const auto need=[&](uint16_t type)->std::optional<Section0Info>{
         if(type>=sections.size()||!sections[type])return {};
@@ -261,7 +302,7 @@ std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std:
         buffers.push_back({unknown,length,offset});
     }
     const auto bufferBase=static_cast<size_t>(section1Offset)+bufferSection->offset;
-    RetailModel model;model.path=path;
+    RetailModel model;model.path=path;model.sha256=ownedAssetDigest(bytes);
     for(uint16_t meshIndex=0;meshIndex<meshInfo->count;++meshIndex){
         const auto meshAt=static_cast<size_t>(section0Offset)+meshInfo->offset+meshIndex*0x30u;
         uint16_t vertexCount{};uint32_t firstFaceVertexIndex{},faceVertexCount{};
@@ -315,6 +356,7 @@ std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std:
         }
         for(uint16_t vertexIndex=0;vertexIndex<vertexCount;++vertexIndex){
             Vertex vertex{};const auto positionAt=positionBase+static_cast<size_t>(vertexIndex)*positionFormat.length;
+            bool tangentPresent=false;
             float x{},y{},z{};
             if(!readAt(bytes,positionAt,x)||!readAt(bytes,positionAt+4,y)||!readAt(bytes,positionAt+8,z)){
                 failure="retail FMDL position read failed: "+path.string();return {};
@@ -329,6 +371,22 @@ std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std:
                         failure="retail FMDL normal read failed: "+path.string();return {};
                     }
                     vertex.normal[0]=-halfToFloat(h0);vertex.normal[1]=halfToFloat(h1);vertex.normal[2]=halfToFloat(h2);
+                }else if(attribute.type==14){
+                    uint16_t h[4]{};
+                    // Other existing model paths do not use this attribute.
+                    // An unknown tangent encoding only disables native material
+                    // eligibility; it does not replace their legacy loader.
+                    if(attribute.dataType!=6)continue;
+                    if(static_cast<size_t>(attribute.offset)+sizeof(h)>attributeFormat.length
+                        ||!readAt(bytes,at,h)){
+                        failure="retail FMDL tangent read failed: "+path.string();return {};
+                    }
+                    // X reflection reverses the tangent-frame determinant.
+                    // Flip handedness so cross(N,T)*w remains the reflected
+                    // authored binormal used by the native 4MT shader.
+                    vertex.tangent[0]=-halfToFloat(h[0]);vertex.tangent[1]=halfToFloat(h[1]);
+                    vertex.tangent[2]=halfToFloat(h[2]);vertex.tangent[3]=-halfToFloat(h[3]);
+                    tangentPresent=true;
                 }else if(attribute.type==8){
                     uint16_t h0{},h1{};
                     if(static_cast<size_t>(attribute.offset)+4>attributeFormat.length||!readAt(bytes,at,h0)||!readAt(bytes,at+2,h1)){
@@ -340,6 +398,7 @@ std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std:
             vertex.uv[0]=halfToFloat(h0);vertex.uv[1]=halfToFloat(h1);
                 }
             }
+            model.authoredTangents=model.authoredTangents&&tangentPresent;
             if(!finiteVertex(vertex)){failure="retail FMDL contains non-finite vertex data: "+path.string();return {};}
             for(int axis=0;axis<3;++axis){
                 model.min[axis]=std::min(model.min[axis],vertex.position[axis]);
@@ -363,6 +422,52 @@ std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std:
     }
     if(model.vertices.empty()||model.indices.empty()||model.indices.size()%3!=0){
         failure="retail FMDL produced no drawable triangles: "+path.string();return {};
+    }
+    // Bind the native material only to the exact supported owned FMDL.
+    // Read its typed hashes/references and vectors; no filename inference.
+    if(model.sha256=="935739377e6e0b14eb7186e778e265e65c8e2f66d97b8909d74725800eb21011"
+        &&model.authoredTangents&&parameterSection){
+        const auto instances=need(4),textures=need(6),parameters=need(7),materials=need(8),paths=need(21),names=need(22);
+        constexpr std::array<uint64_t,4> parameterNames{0xcab8e38487ffull,0x7bbd89662077ull,0xe715065f2f0eull,0xc9e199a419a6ull};
+        bool valid=instances&&textures&&parameters&&materials&&paths&&names&&instances->count==1&&materials->count==1
+            &&textures->count==4&&parameters->count==8&&paths->count==4;
+        uint16_t materialIndex{},typeIndex{},firstTexture{},firstParameter{};uint8_t textureCount{},parameterCount{};
+        const auto hashName=[&](uint16_t index,uint64_t expected){uint64_t actual{};
+            return names&&index<names->count&&readAt(bytes,static_cast<size_t>(section0Offset)+names->offset+index*8u,actual)
+                &&(actual&0xffffffffffffull)==expected;};
+        if(valid){const auto at=static_cast<size_t>(section0Offset)+instances->offset;
+            valid=readAt(bytes,at+4,materialIndex)&&materialIndex==0&&readAt(bytes,at+6,textureCount)&&textureCount==4
+                &&readAt(bytes,at+7,parameterCount)&&parameterCount==4&&readAt(bytes,at+8,firstTexture)&&firstTexture==0
+                &&readAt(bytes,at+10,firstParameter)&&firstParameter==4&&readAt(bytes,static_cast<size_t>(section0Offset)+materials->offset+2,typeIndex)
+                &&hashName(typeIndex,0x7f9271882430ull);}
+        for(size_t i=0;valid&&i<4;++i){
+            uint16_t nameIndex{},referenceIndex{},textureTypeIndex{},typeBindingIndex{};
+            mgs5vr::OpticBinocularTextureRecord textureRecord;
+            const auto textureIndex=static_cast<size_t>(firstTexture)+i;
+            valid=textureIndex<textures->count
+                &&readAt(bytes,static_cast<size_t>(section0Offset)+textures->offset+textureIndex*4,nameIndex)
+                &&readAt(bytes,static_cast<size_t>(section0Offset)+textures->offset+textureIndex*4+2,referenceIndex)
+                &&nameIndex<names->count&&referenceIndex<paths->count
+                &&readAt(bytes,static_cast<size_t>(section0Offset)+names->offset+nameIndex*8u,textureRecord.bindingName)
+                &&readAt(bytes,static_cast<size_t>(section0Offset)+paths->offset+referenceIndex*8u,textureRecord.path)
+                &&readAt(bytes,static_cast<size_t>(section0Offset)+parameters->offset+i*4,textureTypeIndex)
+                &&readAt(bytes,static_cast<size_t>(section0Offset)+parameters->offset+i*4+2,typeBindingIndex)
+                &&textureTypeIndex<names->count
+                &&readAt(bytes,static_cast<size_t>(section0Offset)+names->offset+textureTypeIndex*8u,textureRecord.typeName);
+            textureRecord.bindingName&=0xffffffffffffull;textureRecord.typeName&=0xffffffffffffull;
+            textureRecord.typeBindingIndex=typeBindingIndex;textureRecord.pathIndex=referenceIndex;
+            valid=valid&&mgs5vr::opticBinocularTextureRecordEligible(i,textureRecord);
+            const auto parameterIndex=static_cast<size_t>(firstParameter)+i;
+            std::array<float,4> vector{};
+            valid=valid&&parameterIndex<parameters->count
+                &&readAt(bytes,static_cast<size_t>(section0Offset)+parameters->offset+parameterIndex*4,nameIndex)
+                &&readAt(bytes,static_cast<size_t>(section0Offset)+parameters->offset+parameterIndex*4+2,referenceIndex)
+                &&hashName(nameIndex,parameterNames[i])&&referenceIndex<parameterSection->length/16u
+                &&readAt(bytes,static_cast<size_t>(section1Offset)+parameterSection->offset+referenceIndex*16u,vector)
+                &&std::all_of(vector.begin(),vector.end(),[](float value){return std::isfinite(value);});
+            if(valid)model.nativeMaterialIndices[i]=mgs5vr::opticNativeMaterialIndex(vector[0]);
+        }
+        model.nativeBinocularMaterial=valid;
     }
     return model;
 }
@@ -391,7 +496,8 @@ std::optional<RetailTexture> readRetailDds(const std::filesystem::path& path,std
     if(fourcc==0x31545844u){format=DXGI_FORMAT_BC1_UNORM;blockBytes=8;}
     else if(fourcc==0x35545844u){format=DXGI_FORMAT_BC3_UNORM;blockBytes=16;}
     else {failure="retail binocular texture is not DXT1/DXT5: "+path.string();return {};}
-    RetailTexture texture;texture.path=path;texture.format=format;texture.width=width;texture.height=height;
+    RetailTexture texture;texture.path=path;texture.sha256=ownedAssetDigest(bytes);
+    texture.format=format;texture.width=width;texture.height=height;
     size_t dataAt=128;uint32_t levelWidth=width,levelHeight=height;
     for(uint32_t level=0;level<mipCount;++level){
         const auto blocksX=std::max<uint32_t>(1,(levelWidth+3)/4),blocksY=std::max<uint32_t>(1,(levelHeight+3)/4);
@@ -410,11 +516,12 @@ std::optional<RetailTexture> readRetailDds(const std::filesystem::path& path,std
 }
 
 bool createRetailDiffuseView(ID3D11Device* device,const RetailTexture& diffuse,
-    ComPtr<ID3D11ShaderResourceView>& output){
+    ComPtr<ID3D11ShaderResourceView>& output,bool srgb=true){
     if(!device||!diffuse.width||!diffuse.height||diffuse.mipData.empty())return false;
     D3D11_TEXTURE2D_DESC description{};description.Width=diffuse.width;description.Height=diffuse.height;
     description.MipLevels=static_cast<UINT>(diffuse.mipData.size());description.ArraySize=1;
-    description.Format=diffuse.format==DXGI_FORMAT_BC1_UNORM?DXGI_FORMAT_BC1_UNORM_SRGB:DXGI_FORMAT_BC3_UNORM_SRGB;
+    description.Format=srgb?(diffuse.format==DXGI_FORMAT_BC1_UNORM?DXGI_FORMAT_BC1_UNORM_SRGB:DXGI_FORMAT_BC3_UNORM_SRGB)
+        :diffuse.format;
     description.SampleDesc.Count=1;description.Usage=D3D11_USAGE_IMMUTABLE;description.BindFlags=D3D11_BIND_SHADER_RESOURCE;
     std::vector<D3D11_SUBRESOURCE_DATA> data;data.reserve(diffuse.mipData.size());
     uint32_t width=diffuse.width;
@@ -495,6 +602,34 @@ float4 main(PSIn input) : SV_TARGET {
     float diffuse = 0.22 + 0.78 * saturate(dot(normal, light));
     float3 albedo = retailDiffuse.Sample(retailSampler,input.uv).rgb;
     return float4(albedo * diffuse, baseColor.a);
+}
+)HLSL";
+
+// This emits the exact native 4MT PS input signature. Its material/normal
+// response remains in the verified native pixel shader, not a custom light.
+const char* nativeMaterialVertexSource=R"HLSL(
+cbuffer NativeOpticView : register(b0) {
+    row_major float4x4 mvp;
+    row_major float4x4 worldView;
+};
+struct VSIn {float3 position:POSITION;float3 normal:NORMAL;float4 tangent:TANGENT;float2 uv:TEXCOORD0;};
+struct VSOut {
+    float4 position:SV_POSITION;
+    float4 color:COLOR0;
+    float2 uv:TEXCOORD0;
+    float3 tangent:TEXCOORD5;
+    float3 binormal:TEXCOORD6;
+    float3 normal:TEXCOORD7;
+};
+VSOut main(VSIn input) {
+    VSOut output;
+    output.position=mul(float4(input.position,1),mvp);
+    output.normal=normalize(mul(float4(input.normal,0),worldView).xyz);
+    output.tangent=normalize(mul(float4(input.tangent.xyz,0),worldView).xyz);
+    output.binormal=normalize(cross(output.normal,output.tangent))*input.tangent.w;
+    output.color=float4(1,1,1,1);
+    output.uv=input.uv;
+    return output;
 }
 )HLSL";
 
@@ -589,6 +724,13 @@ struct Resources {
     ComPtr<ID3D11VertexShader> lensVertexShader;
     ComPtr<ID3D11PixelShader> lensPixelShader;
     ComPtr<ID3D11ShaderResourceView> diffuse;
+    ComPtr<ID3D11ShaderResourceView> nativeNormal,nativeSpecular,nativeMaterialMap;
+    ComPtr<ID3D11VertexShader> nativeMaterialVertexShader;
+    ComPtr<ID3D11PixelShader> nativeMaterialPixelShader;
+    ComPtr<ID3D11InputLayout> nativeMaterialInputLayout;
+    ComPtr<ID3D11Buffer> nativeMaterialView,nativeMaterialParameters;
+    std::array<float,4> nativeMaterialIndices{};
+    bool nativeMaterialRecognized{},nativeMaterialAttempted{},nativeMaterialReady{},nativeMaterialReported{};
     ComPtr<ID3D11Texture2D> sceneCopy;
     ComPtr<ID3D11ShaderResourceView> scene;
     ComPtr<ID3D11RenderTargetView> sceneOverlayTarget;
@@ -609,6 +751,10 @@ struct Resources {
     ComPtr<ID3D11DepthStencilState> lensDepthStencil;
     ComPtr<ID3D11DepthStencilState> reversedLensDepthStencil;
     ComPtr<ID3D11BlendState> blend;
+    ComPtr<ID3D11BlendState> nativeHousingDepthOnlyBlend;
+    std::array<mgs5vr::OpticNativeLightingSource,2> nativeInsertedSources;
+    std::array<bool,2> nativeInsertedValid{};
+    std::array<uint64_t,2> nativeInsertedGeneration{};
     ComPtr<ID3D11Buffer> idroidVertices;
     ComPtr<ID3D11Buffer> idroidCursorVertices;
     ComPtr<ID3D11Buffer> idroidConstants;
@@ -703,6 +849,8 @@ bool createLensResources(ID3D11Device* device){
        ||FAILED(device->CreateDepthStencilState(&depth,resources.lensDepthStencil.ReleaseAndGetAddressOf()))
        ||FAILED(device->CreateBlendState(&blend,resources.blend.ReleaseAndGetAddressOf()))
        ||FAILED(device->CreateSamplerState(&sampler,resources.lensSampler.ReleaseAndGetAddressOf())))return false;
+    D3D11_BLEND_DESC depthOnly{};
+    if(FAILED(device->CreateBlendState(&depthOnly,resources.nativeHousingDepthOnlyBlend.ReleaseAndGetAddressOf())))return false;
     depth.DepthFunc=D3D11_COMPARISON_GREATER_EQUAL;
     if(FAILED(device->CreateDepthStencilState(&depth,resources.reversedLensDepthStencil.ReleaseAndGetAddressOf())))return false;
     resources.lensReady=true;return true;
@@ -842,10 +990,14 @@ bool createResources(ID3D11Device* device){
     depth.DepthFunc=D3D11_COMPARISON_GREATER_EQUAL;
     if(FAILED(device->CreateDepthStencilState(&depth,resources.reversedDepthStencil.GetAddressOf())))return false;
     resources.indexCount=static_cast<UINT>(model->indices.size());resources.ready=true;
+    resources.nativeMaterialRecognized=model->nativeBinocularMaterial
+        &&diffuse->sha256=="7cb40d536f37faa66d8153ef04afe6a23331d5bce45908dc7aa3f63558f566b3";
+    resources.nativeMaterialIndices=model->nativeMaterialIndices;
     std::ostringstream message;message<<"Retail binocular FMDL loaded path="<<model->path.string()
         <<" bytes="<<std::filesystem::file_size(model->path)<<" vertices="<<model->vertices.size()
         <<" triangles="<<model->indices.size()/3<<" bounds="<<model->min[0]<<","<<model->min[1]<<","<<model->min[2]<<".."
-        <<model->max[0]<<","<<model->max[1]<<","<<model->max[2];mgs5vr::log(message.str());
+        <<model->max[0]<<","<<model->max[1]<<","<<model->max[2]
+        <<" authored_tangents="<<model->authoredTangents<<" native_material_recognized="<<resources.nativeMaterialRecognized;mgs5vr::log(message.str());
     std::ostringstream textureMessage;textureMessage<<"Retail binocular diffuse loaded path="<<diffuse->path.string()
         <<" size="<<diffuse->width<<"x"<<diffuse->height<<" mips="<<diffuse->mipData.size()
         <<" format="<<(diffuse->format==DXGI_FORMAT_BC1_UNORM?"BC1_SRGB":"BC3_SRGB");mgs5vr::log(textureMessage.str());
@@ -872,6 +1024,181 @@ bool createOpeningResources(ID3D11Device* device){
     return resources.openingReady;
 }
 
+bool createNativeMaterialResources(ID3D11Device* device){
+    if(!mgs5vr::opticNativeBinocularMaterialEnabled())return false;
+    if(resources.nativeMaterialReady)return true;
+    if(!device||!resources.ready||!resources.nativeMaterialRecognized||resources.nativeMaterialAttempted)return false;
+    resources.nativeMaterialAttempted=true;
+    const auto shaderUnavailable=[](const char* reason){mgs5vr::log(std::string("Native binocular material unavailable; late housing retained: ")+reason);return false;};
+    // The installer imports this one exact owned shader locally. Its bytes
+    // are never packaged with the runtime or replaced by a custom light.
+    const auto shaderPath=gameRoot()/L"retail-assets/shaders/dx11/fox3ddf_blin_4mt-ps.dxbc";
+    std::ifstream shaderInput(shaderPath,std::ios::binary|std::ios::ate);
+    if(!shaderInput||shaderInput.tellg()!=std::streamoff{233604})return shaderUnavailable("owned canonical PS asset missing/size mismatch");
+    std::vector<uint8_t> nativeShader(233604);shaderInput.seekg(0);
+    if(!shaderInput.read(reinterpret_cast<char*>(nativeShader.data()),static_cast<std::streamsize>(nativeShader.size()))
+        ||ownedAssetDigest(nativeShader)!="cabc964687cd259e0189b33968b090980aab7e12a9c603e8560536ae2a9e64fe")return shaderUnavailable("owned canonical PS SHA256 mismatch");
+    ComPtr<ID3D11ShaderReflection> reflection;D3D11_SHADER_DESC description{};
+    if(FAILED(D3DReflect(nativeShader.data(),nativeShader.size(),IID_PPV_ARGS(&reflection)))
+        ||FAILED(reflection->GetDesc(&description))||D3D11_SHVER_GET_TYPE(description.Version)!=D3D11_SHVER_PIXEL_SHADER
+        ||D3D11_SHVER_GET_MAJOR(description.Version)!=5||description.InputParameters!=6||description.OutputParameters!=3)return shaderUnavailable("owned canonical PS reflection/profile mismatch");
+    for(const auto& expected:std::array<std::tuple<const char*,UINT,UINT>,2>{{{"cPSSystem",0,64},{"cPSMaterial",4,128}}}){
+        D3D11_SHADER_INPUT_BIND_DESC binding{};D3D11_SHADER_BUFFER_DESC block{};
+        if(FAILED(reflection->GetResourceBindingDescByName(std::get<0>(expected),&binding))
+            ||binding.Type!=D3D_SIT_CBUFFER||binding.BindPoint!=std::get<1>(expected)||binding.BindCount!=1
+            ||FAILED(reflection->GetConstantBufferByName(std::get<0>(expected))->GetDesc(&block))
+            ||block.Size!=std::get<2>(expected))return shaderUnavailable("owned canonical PS typed material/system block mismatch");
+    }
+    for(UINT i=0;i<3;++i){D3D11_SIGNATURE_PARAMETER_DESC output{};
+        if(FAILED(reflection->GetOutputParameterDesc(i,&output))||output.SystemValueType!=D3D_NAME_TARGET
+            ||output.SemanticIndex!=i||output.Register!=i||output.Mask!=15||output.ComponentType!=D3D_REGISTER_COMPONENT_FLOAT32)return shaderUnavailable("owned canonical PS output signature mismatch");}
+    if(FAILED(device->CreatePixelShader(nativeShader.data(),nativeShader.size(),nullptr,resources.nativeMaterialPixelShader.GetAddressOf())))return shaderUnavailable("owned canonical PS device creation failed");
+    const std::array<const wchar_t*,3> keys{L"binocular_normal_dds",L"binocular_specular_dds",L"binocular_material_dds"};
+    const std::array<const wchar_t*,3> names{L"tel0_main0_def_nrm.dds",L"tel0_main0_def_srm.dds",L"tel0_main0_def_mtm.dds"};
+    const std::array<const char*,3> identities{
+        "285c9a61b02b5798e79a5013b49ce3344b1f196ae2a56814ab7db6bfb9028eb4",
+        "20f1d6b3c6e13c149a79fc3526a524f442fc3457bceaa5ce775579bd0d43b61d",
+        "88c9679a783ece860f6182d4444b0ad07b59771be2d1b0eedab166e4f18b3e13"};
+    std::array<ComPtr<ID3D11ShaderResourceView>,3> maps;
+    for(size_t i=0;i<maps.size();++i){
+        std::string failure;const auto texture=readRetailDds(retailBinocularMaterialPath(keys[i],names[i]),failure);
+        if(!texture||texture->sha256!=identities[i]||!createRetailDiffuseView(device,*texture,maps[i],false)){
+            mgs5vr::log("Native binocular material unavailable; late housing retained: "+
+                (failure.empty()?std::string("owned map identity/resource mismatch"):failure));return false;}
+    }
+    ComPtr<ID3DBlob> vertex;
+    if(!compile(device,nativeMaterialVertexSource,"vs_5_0",vertex.GetAddressOf()))return false;
+    constexpr std::array<D3D11_INPUT_ELEMENT_DESC,4> elements{{
+        {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},
+        {"NORMAL",0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0},
+        {"TEXCOORD",0,DXGI_FORMAT_R32G32_FLOAT,0,24,D3D11_INPUT_PER_VERTEX_DATA,0},
+        {"TANGENT",0,DXGI_FORMAT_R32G32B32A32_FLOAT,0,32,D3D11_INPUT_PER_VERTEX_DATA,0}}};
+    D3D11_BUFFER_DESC view{};view.ByteWidth=sizeof(NativeMaterialConstants);view.Usage=D3D11_USAGE_DEFAULT;
+    view.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
+    D3D11_BUFFER_DESC parameters=view;parameters.ByteWidth=128;
+    std::array<float,32> authored{};std::copy(resources.nativeMaterialIndices.begin(),resources.nativeMaterialIndices.end(),authored.begin());
+    D3D11_SUBRESOURCE_DATA initial{};initial.pSysMem=authored.data();
+    if(FAILED(device->CreateVertexShader(vertex->GetBufferPointer(),vertex->GetBufferSize(),nullptr,resources.nativeMaterialVertexShader.GetAddressOf()))
+        ||FAILED(device->CreateInputLayout(elements.data(),static_cast<UINT>(elements.size()),vertex->GetBufferPointer(),vertex->GetBufferSize(),resources.nativeMaterialInputLayout.GetAddressOf()))
+        ||FAILED(device->CreateBuffer(&view,nullptr,resources.nativeMaterialView.GetAddressOf()))
+        ||FAILED(device->CreateBuffer(&parameters,&initial,resources.nativeMaterialParameters.GetAddressOf())))return false;
+    resources.nativeNormal=maps[0];resources.nativeSpecular=maps[1];resources.nativeMaterialMap=maps[2];
+    resources.nativeMaterialReady=true;return true;
+}
+
+// This state is independent of the late single-target overlay state. The
+// three native MRTs and writable DSV remain bound throughout; retaining all
+// views locally proves their lifetime and avoids clearing unrelated OM UAVs.
+struct NativeMaterialState {
+    ID3D11DeviceContext* context{};
+    ComPtr<ID3D11DeviceContext1> context1;
+    std::array<ComPtr<ID3D11RenderTargetView>,8> targets;
+    ComPtr<ID3D11DepthStencilView> depth;
+    ComPtr<ID3D11InputLayout> layout;
+    ComPtr<ID3D11Buffer> vertex,index,viewParameters,materialParameters,systemParameters;
+    ComPtr<ID3D11VertexShader> vertexShader;
+    ComPtr<ID3D11PixelShader> pixelShader;
+    ComPtr<ID3D11GeometryShader> geometryShader;
+    ComPtr<ID3D11HullShader> hullShader;
+    ComPtr<ID3D11DomainShader> domainShader;
+    std::array<ComPtr<ID3D11ClassInstance>,256> vertexClasses;
+    std::array<ComPtr<ID3D11ClassInstance>,256> pixelClasses;
+    std::array<ComPtr<ID3D11ShaderResourceView>,4> maps;
+    ComPtr<ID3D11ShaderResourceView> meshMask;
+    std::array<ComPtr<ID3D11SamplerState>,4> samplers;
+    ComPtr<ID3D11RasterizerState> rasterizer;
+    ComPtr<ID3D11DepthStencilState> depthState;
+    ComPtr<ID3D11BlendState> blend;
+    std::array<D3D11_VIEWPORT,D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE> viewports{};
+    UINT stride{},offset{},indexOffset{},vertexClassCount{},pixelClassCount{},viewportCount{},stencil{},sampleMask{};
+    UINT viewFirst{},viewCount{},materialFirst{},materialCount{};
+    DXGI_FORMAT indexFormat{};D3D11_PRIMITIVE_TOPOLOGY topology{};
+    FLOAT factors[4]{};bool changed{};
+    explicit NativeMaterialState(ID3D11DeviceContext* value):context(value){
+        std::array<ID3D11RenderTargetView*,8> rawTargets{};ID3D11DepthStencilView* rawDepth{};
+        context->OMGetRenderTargets(8,rawTargets.data(),&rawDepth);depth.Attach(rawDepth);
+        for(size_t i=0;i<targets.size();++i)targets[i].Attach(rawTargets[i]);
+        context->IAGetInputLayout(layout.GetAddressOf());context->IAGetVertexBuffers(0,1,vertex.GetAddressOf(),&stride,&offset);
+        context->IAGetIndexBuffer(index.GetAddressOf(),&indexFormat,&indexOffset);context->IAGetPrimitiveTopology(&topology);
+        std::array<ID3D11ClassInstance*,256> rawClasses{};vertexClassCount=static_cast<UINT>(rawClasses.size());
+        context->VSGetShader(vertexShader.GetAddressOf(),rawClasses.data(),&vertexClassCount);
+        vertexClassCount=std::min(vertexClassCount,static_cast<UINT>(rawClasses.size()));
+        for(size_t i=0;i<rawClasses.size();++i)vertexClasses[i].Attach(rawClasses[i]);
+        rawClasses={};pixelClassCount=static_cast<UINT>(rawClasses.size());
+        context->PSGetShader(pixelShader.GetAddressOf(),rawClasses.data(),&pixelClassCount);
+        pixelClassCount=std::min(pixelClassCount,static_cast<UINT>(rawClasses.size()));
+        for(size_t i=0;i<rawClasses.size();++i)pixelClasses[i].Attach(rawClasses[i]);
+        context->GSGetShader(geometryShader.GetAddressOf(),nullptr,nullptr);context->HSGetShader(hullShader.GetAddressOf(),nullptr,nullptr);
+        context->DSGetShader(domainShader.GetAddressOf(),nullptr,nullptr);
+        if(SUCCEEDED(context->QueryInterface(IID_PPV_ARGS(&context1)))){
+            context1->VSGetConstantBuffers1(0,1,viewParameters.GetAddressOf(),&viewFirst,&viewCount);
+            context1->PSGetConstantBuffers1(4,1,materialParameters.GetAddressOf(),&materialFirst,&materialCount);
+        }else{
+            context->VSGetConstantBuffers(0,1,viewParameters.GetAddressOf());context->PSGetConstantBuffers(4,1,materialParameters.GetAddressOf());
+        }
+        context->PSGetConstantBuffers(0,1,systemParameters.GetAddressOf());
+        std::array<ID3D11ShaderResourceView*,4> rawMaps{};context->PSGetShaderResources(0,4,rawMaps.data());
+        for(size_t i=0;i<maps.size();++i)maps[i].Attach(rawMaps[i]);context->PSGetShaderResources(15,1,meshMask.GetAddressOf());
+        for(size_t i=0;i<samplers.size();++i)context->PSGetSamplers(i==3?8:static_cast<UINT>(i),1,samplers[i].GetAddressOf());
+        context->RSGetState(rasterizer.GetAddressOf());context->OMGetDepthStencilState(depthState.GetAddressOf(),&stencil);
+        context->OMGetBlendState(blend.GetAddressOf(),factors,&sampleMask);
+        viewportCount=static_cast<UINT>(viewports.size());context->RSGetViewports(&viewportCount,viewports.data());
+    }
+    ~NativeMaterialState(){if(!changed)return;
+        context->IASetInputLayout(layout.Get());ID3D11Buffer* originalVertex=vertex.Get();
+        context->IASetVertexBuffers(0,1,&originalVertex,&stride,&offset);context->IASetIndexBuffer(index.Get(),indexFormat,indexOffset);
+        context->IASetPrimitiveTopology(topology);
+        std::array<ID3D11ClassInstance*,256> classes{};for(size_t i=0;i<vertexClassCount;++i)classes[i]=vertexClasses[i].Get();
+        context->VSSetShader(vertexShader.Get(),classes.data(),vertexClassCount);
+        classes={};for(size_t i=0;i<pixelClassCount;++i)classes[i]=pixelClasses[i].Get();
+        context->PSSetShader(pixelShader.Get(),classes.data(),pixelClassCount);
+        ID3D11Buffer* originalView=viewParameters.Get();ID3D11Buffer* originalMaterial=materialParameters.Get();
+        if(context1){context1->VSSetConstantBuffers1(0,1,&originalView,&viewFirst,&viewCount);
+            context1->PSSetConstantBuffers1(4,1,&originalMaterial,&materialFirst,&materialCount);
+        }else{context->VSSetConstantBuffers(0,1,&originalView);context->PSSetConstantBuffers(4,1,&originalMaterial);}
+        std::array<ID3D11ShaderResourceView*,4> originalMaps{};for(size_t i=0;i<maps.size();++i)originalMaps[i]=maps[i].Get();
+        context->PSSetShaderResources(0,4,originalMaps.data());context->RSSetState(rasterizer.Get());
+        context->OMSetDepthStencilState(depthState.Get(),stencil);context->OMSetBlendState(blend.Get(),factors,sampleMask);
+    }
+    bool exactGeometryBinding(ID3D11PixelShader* verified) const{
+        if(pixelShader.Get()!=verified||geometryShader||hullShader||domainShader||!depth||!systemParameters||!meshMask
+            ||viewportCount!=1||!targets[0]||!targets[1]||!targets[2])return false;
+        for(size_t i=3;i<targets.size();++i)if(targets[i])return false;
+        for(const auto& sampler:samplers)if(!sampler)return false;
+        D3D11_SHADER_RESOURCE_VIEW_DESC meshView{};meshMask->GetDesc(&meshView);
+        if(meshView.ViewDimension!=D3D11_SRV_DIMENSION_TEXTURE2D)return false;
+        D3D11_DEPTH_STENCIL_DESC nativeDepth{};
+        if(depthState)depthState->GetDesc(&nativeDepth);
+        else {nativeDepth.DepthEnable=TRUE;nativeDepth.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ALL;
+            nativeDepth.DepthFunc=D3D11_COMPARISON_LESS;}
+        if(!mgs5vr::opticNativeMaterialDepthEligible(nativeDepth.DepthEnable!=FALSE,
+            nativeDepth.DepthWriteMask==D3D11_DEPTH_WRITE_MASK_ALL,static_cast<uint32_t>(nativeDepth.DepthFunc)))return false;
+        D3D11_BLEND_DESC nativeBlend{};
+        if(blend)blend->GetDesc(&nativeBlend);
+        else {nativeBlend.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;}
+        for(size_t i=0;i<3;++i){const auto& target=nativeBlend.RenderTarget[nativeBlend.IndependentBlendEnable?i:0];
+            if(target.BlendEnable||target.RenderTargetWriteMask!=D3D11_COLOR_WRITE_ENABLE_ALL)return false;}
+        D3D11_DEPTH_STENCIL_VIEW_DESC depthView{};depth->GetDesc(&depthView);
+        if((depthView.Flags&D3D11_DSV_READ_ONLY_DEPTH)||depthView.ViewDimension!=D3D11_DSV_DIMENSION_TEXTURE2D
+            ||depthView.Texture2D.MipSlice!=0)return false;
+        ComPtr<ID3D11Resource> depthResource;depth->GetResource(depthResource.GetAddressOf());
+        ComPtr<ID3D11Texture2D> depthTexture;if(FAILED(depthResource.As(&depthTexture)))return false;
+        D3D11_TEXTURE2D_DESC depthDescription{};depthTexture->GetDesc(&depthDescription);
+        const auto& viewport=viewports[0];
+        if(!std::isfinite(viewport.Width)||!std::isfinite(viewport.Height)||viewport.Width<=0||viewport.Height<=0
+            ||viewport.TopLeftX!=0||viewport.TopLeftY!=0||viewport.Width!=static_cast<float>(depthDescription.Width)
+            ||viewport.Height!=static_cast<float>(depthDescription.Height)||depthDescription.ArraySize!=1||depthDescription.SampleDesc.Count!=1)return false;
+        for(const auto& target:targets){if(!target)continue;
+            D3D11_RENDER_TARGET_VIEW_DESC targetView{};target->GetDesc(&targetView);
+            if(targetView.ViewDimension!=D3D11_RTV_DIMENSION_TEXTURE2D||targetView.Texture2D.MipSlice!=0)return false;
+            ComPtr<ID3D11Resource> object;target->GetResource(object.GetAddressOf());ComPtr<ID3D11Texture2D> texture;
+            if(FAILED(object.As(&texture)))return false;D3D11_TEXTURE2D_DESC description{};texture->GetDesc(&description);
+            if(description.Width!=depthDescription.Width||description.Height!=depthDescription.Height
+                ||description.ArraySize!=1||description.SampleDesc.Count!=1)return false;
+        }
+        D3D11_BUFFER_DESC system{};systemParameters->GetDesc(&system);return system.ByteWidth>=64&&system.ByteWidth<=65536;
+    }
+};
 struct SavedState {
     ComPtr<ID3D11RenderTargetView> renderTarget;ComPtr<ID3D11DepthStencilView> depthTarget;ComPtr<ID3D11InputLayout> inputLayout;
     ComPtr<ID3D11Buffer> vertexBuffer;ComPtr<ID3D11Buffer> indexBuffer;ComPtr<ID3D11Buffer> vertexConstants;ComPtr<ID3D11Buffer> pixelConstants;
@@ -1377,15 +1704,115 @@ bool drawPhysicalWeaponScope(ID3D11DeviceContext* context,const std::array<float
         restore(context,state);return drawn;
     }catch(...){return false;}
 }
+namespace {
+bool drawBinocularMaterial(ID3D11DeviceContext* context,
+    const OpticNativeLightingSource& source,ID3D11PixelShader* exactNativeShader,
+    bool nativeProgramGpuJoinVerified,const OpticNativeGeometryPass* ownedPass=nullptr) noexcept{
+    if(!context||nativeBinocularMaterialDrawing()||!nativeProgramGpuJoinVerified
+        ||!opticLightingHousingSourceEligible(source)
+        ||(!ownedPass&&!opticNativeBinocularMaterialShaderVerified(exactNativeShader)))return false;
+    if(ownedPass&&(!ownedPass->nativePairVerified||!ownedPass->materialFamilyVerified))return false;
+    try{
+        const auto fresh=[&]{const auto now=steadyMilliseconds();
+            return now>=source.eye.sampleTime&&now-source.eye.sampleTime<=150;};
+        if(!fresh())return false;
+        std::unique_lock lock(rendererMutex,std::try_to_lock);if(!lock)return false;
+        ComPtr<ID3D11Device> device;context->GetDevice(device.GetAddressOf());if(!device)return false;
+        if(resources.device.Get()!=device.Get())resources=Resources{};
+        const auto eye=source.eye.eye;
+        const auto generation=nativeBinocularMaterialGeneration();
+        // The scope also covers shader binds and RAII restoration so our
+        // temporary material never becomes a cached native binding identity.
+        OpticNativeMaterialDrawScope drawing;
+        NativeMaterialState state(context);if(!state.exactGeometryBinding(exactNativeShader))return false;
+        if(ownedPass){
+            if(ownedPass->pixelShader!=reinterpret_cast<uintptr_t>(state.pixelShader.Get())
+                ||ownedPass->vertexShader!=reinterpret_cast<uintptr_t>(state.vertexShader.Get())
+                ||!opticNativeSceneUploadVerified(context,source,*ownedPass))return false;
+            ComPtr<ID3D11Buffer> scene;UINT first{},count=4096;
+            if(state.context1)state.context1->VSGetConstantBuffers1(2,1,scene.GetAddressOf(),&first,&count);
+            else context->VSGetConstantBuffers(2,1,scene.GetAddressOf());
+            if(reinterpret_cast<uintptr_t>(scene.Get())!=ownedPass->sceneBuffer
+                ||first!=ownedPass->firstConstant||count!=ownedPass->constantCount)return false;
+        }
+        if(resources.nativeInsertedValid[eye]&&resources.nativeInsertedGeneration[eye]==generation){const auto& previous=resources.nativeInsertedSources[eye];
+            // The callback reports actual new draws, not cache hits; the late
+            // housing independently reads the same exact-source success.
+            if(opticLightingSameEye(previous.eye,source.eye))return !ownedPass&&previous.nativeCamera==source.nativeCamera
+                &&opticLightingMatrixError(previous.binocularWorld,source.binocularWorld)==0
+                &&opticLightingMatrixError(previous.view,source.view)==0&&opticLightingMatrixError(previous.projection,source.projection)==0;}
+        if(!resources.attempted){resources.device=device;if(!createResources(device.Get()))return false;}
+        if(!resources.ready||!createNativeMaterialResources(device.Get())||!fresh())return false;
+        const auto worldView=matrixProduct(source.binocularWorld,source.view);
+        const auto mvp=matrixProduct(worldView,source.projection);
+        for(const auto value:mvp)if(!std::isfinite(value))return false;
+        NativeMaterialConstants constants{};
+        std::copy(mvp.begin(),mvp.end(),std::begin(constants.mvp));
+        std::copy(worldView.begin(),worldView.end(),std::begin(constants.worldView));
+        context->UpdateSubresource(resources.nativeMaterialView.Get(),0,nullptr,&constants,0,0);
+        // No render target, DSV, native system buffer, mesh mask,
+        // sampler, viewport or scissor binding is changed by this insertion.
+        state.changed=true;
+        const UINT stride=sizeof(Vertex),offset=0;ID3D11Buffer* vertices=resources.vertices.Get();
+        context->IASetInputLayout(resources.nativeMaterialInputLayout.Get());context->IASetVertexBuffers(0,1,&vertices,&stride,&offset);
+        context->IASetIndexBuffer(resources.indices.Get(),DXGI_FORMAT_R16_UINT,0);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context->VSSetShader(resources.nativeMaterialVertexShader.Get(),nullptr,0);
+        if(ownedPass)context->PSSetShader(resources.nativeMaterialPixelShader.Get(),nullptr,0);
+        ID3D11Buffer* view=resources.nativeMaterialView.Get();context->VSSetConstantBuffers(0,1,&view);
+        ID3D11Buffer* parameters=resources.nativeMaterialParameters.Get();context->PSSetConstantBuffers(4,1,&parameters);
+        const std::array<ID3D11ShaderResourceView*,4> maps{resources.diffuse.Get(),resources.nativeNormal.Get(),
+            resources.nativeSpecular.Get(),resources.nativeMaterialMap.Get()};
+        context->PSSetShaderResources(0,4,maps.data());context->RSSetState(resources.rasterizer.Get());
+        // Use the proven writable native geometry pass's depth comparison,
+        // stencil operations/reference and opaque MRT writes unchanged.
+        context->DrawIndexed(resources.indexCount,0,0);
+        resources.nativeInsertedSources[eye]=source;resources.nativeInsertedValid[eye]=true;
+        resources.nativeInsertedGeneration[eye]=generation;
+        if(!resources.nativeMaterialReported){resources.nativeMaterialReported=true;
+            std::ostringstream message;message<<"Native binocular material inserted source="<<source.eye.sourceSequence
+                <<" tracking="<<source.eye.trackingSequence<<" activation="<<source.eye.activation<<" eye="<<source.eye.eye
+                <<" native_camera=0x"<<std::hex<<source.nativeCamera<<" native_ps=0x"<<reinterpret_cast<uintptr_t>(exactNativeShader)
+                <<" owned_ps=0x"<<reinterpret_cast<uintptr_t>(ownedPass?resources.nativeMaterialPixelShader.Get():exactNativeShader)
+                <<std::dec<<" exact_owned_shader=1 program_gpu_join_verified=1"
+                <<" source_owned_ps="<<(ownedPass!=nullptr)<<" camera_cpu_upload_verified="<<(ownedPass!=nullptr)
+                <<" native_gpu_pair_verified="<<(ownedPass?ownedPass->nativePairVerified:true)
+                <<" native_vs_family_verified="<<(ownedPass?ownedPass->materialFamilyVerified:true)
+                <<" original_ps_code_verified="<<(!ownedPass)
+                <<" authored_maps=4 native_mrt_count=3 writable_native_depth=1";
+            log(message.str());}
+        return true;
+    }catch(...){return false;}
+}
+bool drawOwnedBinocularMaterial(ID3D11DeviceContext* context,const OpticNativeLightingSource& source,
+    const OpticNativeGeometryPass& pass) noexcept {
+    return opticLightingGeometryPassEligible(pass)
+        &&drawBinocularMaterial(context,source,reinterpret_cast<ID3D11PixelShader*>(pass.pixelShader),true,&pass);
+}
+}
+bool drawNativeBinocularMaterialGBuffer(ID3D11DeviceContext* context,const OpticNativeLightingSource& source,
+    ID3D11PixelShader* exactNativeShader,bool nativeProgramGpuJoinVerified) noexcept {
+    return drawBinocularMaterial(context,source,exactNativeShader,nativeProgramGpuJoinVerified);
+}
+
 bool drawPhysicalBinoculars(ID3D11DeviceContext* context,const std::array<float,16>& world,const std::array<float,16>& view,
-    const std::array<float,16>& projection,float magnification,ID3D11Texture2D* sceneSource,bool lensVisible) noexcept{
+    const std::array<float,16>& projection,float magnification,ID3D11Texture2D* sceneSource,bool lensVisible,
+    const EyeFrame* sourceEye) noexcept{
     if(!context)return false;
     try{
         std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(device.GetAddressOf());if(!device)return false;
         if(resources.device.Get()!=device.Get())resources=Resources{};
         if(!resources.attempted){resources.device=device;if(!createResources(device.Get()))return false;}
         if(!resources.ready||!std::isfinite(magnification)||magnification<1||magnification>4)return false;
+        if(createNativeMaterialResources(device.Get()))setOpticNativeMaterialDrawCallback(&drawOwnedBinocularMaterial);
         SavedState state;save(context,state);if(!state.renderTarget){restore(context,state);return false;}
+        bool nativeHousing=false;
+        if(opticNativeBinocularMaterialEnabled()&&sourceEye&&sourceEye->eye<2&&resources.nativeInsertedValid[sourceEye->eye]
+            &&resources.nativeInsertedGeneration[sourceEye->eye]==nativeBinocularMaterialGeneration()){
+            const auto& inserted=resources.nativeInsertedSources[sourceEye->eye];
+            nativeHousing=opticLightingSameEye(inserted.eye,*sourceEye)
+                &&opticLightingMatrixError(inserted.binocularWorld,world)==0
+                &&opticLightingMatrixError(inserted.view,view)==0&&opticLightingMatrixError(inserted.projection,projection)==0;}
         // The native eye remains the user's full stereo view. Optical
         // magnification is composited through the actual retail ocular; the
         // housing itself is always projected at world scale.
@@ -1428,7 +1855,11 @@ bool drawPhysicalBinoculars(ID3D11DeviceContext* context,const std::array<float,
         context->UpdateSubresource(resources.constants.Get(),0,nullptr,&constants,0,0);const UINT stride=sizeof(Vertex),offset=0;ID3D11Buffer* vertexBuffer=resources.vertices.Get();
         context->IASetInputLayout(resources.inputLayout.Get());context->IASetVertexBuffers(0,1,&vertexBuffer,&stride,&offset);context->IASetIndexBuffer(resources.indices.Get(),DXGI_FORMAT_R16_UINT,0);
         context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);context->VSSetShader(resources.vertexShader.Get(),nullptr,0);ID3D11Buffer* constantsBuffer=resources.constants.Get();context->VSSetConstantBuffers(0,1,&constantsBuffer);
-        context->PSSetShader(resources.pixelShader.Get(),nullptr,0);ID3D11ShaderResourceView* diffuse=resources.diffuse.Get();context->PSSetShaderResources(0,1,&diffuse);ID3D11SamplerState* sampler=resources.sampler.Get();context->PSSetSamplers(0,1,&sampler);context->RSSetState(resources.rasterizer.Get());context->OMSetDepthStencilState(projection[14]>0?resources.reversedDepthStencil.Get():resources.depthStencil.Get(),0);const FLOAT blendFactor[4]{0,0,0,0};context->OMSetBlendState(resources.blend.Get(),blendFactor,0xffffffffu);
+        context->PSSetShader(resources.pixelShader.Get(),nullptr,0);ID3D11ShaderResourceView* diffuse=resources.diffuse.Get();context->PSSetShaderResources(0,1,&diffuse);ID3D11SamplerState* sampler=resources.sampler.Get();context->PSSetSamplers(0,1,&sampler);context->RSSetState(resources.rasterizer.Get());context->OMSetDepthStencilState(projection[14]>0?resources.reversedDepthStencil.Get():resources.depthStencil.Get(),0);const FLOAT blendFactor[4]{0,0,0,0};
+        // Once this exact eye/body was inserted into native lighting, retain
+        // only its physical depth here for the ocular portal. Writing the old
+        // fixed-light color would overwrite the native material result.
+        context->OMSetBlendState(nativeHousing?resources.nativeHousingDepthOnlyBlend.Get():resources.blend.Get(),blendFactor,0xffffffffu);
         context->DrawIndexed(resources.indexCount,0,0);
         if(needsLens&&!drawLensPortal(context,world,view,projection,magnification,state,housingDepth.Get(),sceneSourceView.Get())){
             restore(context,state);if(!resources.lensReported){resources.lensReported=true;mgs5vr::log("Retail optic lens portal unavailable; optical rendering remains failed closed");}return false;
@@ -1528,5 +1959,6 @@ bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<f
     }catch(...){return false;}
 }
 
-void stopPhysicalOpticRenderer() noexcept{std::lock_guard lock(rendererMutex);resources=Resources{};}
+void stopPhysicalOpticRenderer() noexcept{setOpticNativeMaterialDrawCallback(nullptr);
+    std::lock_guard lock(rendererMutex);resources=Resources{};}
 }

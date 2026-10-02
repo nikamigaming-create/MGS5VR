@@ -177,6 +177,8 @@ const settingCopy={
  snap_turn_degrees:['Snap turn angle','How far each snap turn rotates you.'],
  turn_mode:['Stick turning','Choose snap turns, smooth turning or no stick turning.'],
  hud_mode:['HUD visibility','Show the full HUD, show it only with binoculars, or hide it.'],
+ map_control_prompts:['Map control labels','Show your current VR Confirm binding beside Map actions. Native-button mode keeps its own prompts. Restart the game after changing this.'],
+ binocular_native_material:['Experimental binocular lighting','Unproven scene-lighting option; off by default. The existing housing appearance remains when unavailable. Restart the game after changing this.'],
  motion_melee:['Physical melee','Use a free-hand punch or a weapon bash. Pull your hand back before repeating.'],
  animal_touch:['Animal interactions','Enable open-palm dog petting and rat pickup gestures.'],
  wrist_surface_lift_cm:['Wrist display clearance','Raise the displays away from the surface of your arm.'],
@@ -224,7 +226,7 @@ for(const side of ['left','right']) {
  for(const [axis,label,description] of [['pitch','tilt','Tilt the hand up or down.'],['yaw','angle','Turn the hand left or right.'],['roll','roll','Rotate the hand around the grip.']]) settingCopy[side+'_hand_'+axis+'_degrees']=[hand+': '+label,description+' Held objects and aim rotate with it.'];
 }
 function settingGroup(name){if(/idroid|handheld|menu_quad/.test(name))return 'iDroid & menus';if(/wrist|weapon_hud|hud_mode/.test(name))return 'Wrist & HUD';if(/binocular|scope/.test(name))return 'Optics';if(/hand_|support_|smoothing|weapon_aim/.test(name))return 'Hands & weapons';return 'Movement & interaction'}
-function runtimeRows(){const ranges={'theatre.width_cm':[100,3000],'theatre.distance_cm':[100,3000]};return Object.keys(state.runtime).map(name=>{const bool=/enabled$|native_actions$|camera_observer$|experiment$|interactive_cabin$/.test(name);const [min,max]=ranges[name]|| (bool?[0,1]:[undefined,undefined]);return {name,value:state.runtime[name],min,max,default:catalog.runtimeDefaults?.[name]??state.runtime[name]}})}
+function runtimeRows(){const ranges={'theatre.width_cm':[100,3000],'theatre.distance_cm':[100,3000]};return Object.keys(state.runtime).map(name=>{const bool=name==='ui.map_control_prompts'||name==='optics.binocular_native_material'||/enabled$|native_actions$|camera_observer$|experiment$|interactive_cabin$/.test(name);const [min,max]=ranges[name]|| (bool?[0,1]:[undefined,undefined]);return {name,value:state.runtime[name],min,max,default:catalog.runtimeDefaults?.[name]??state.runtime[name]}})}
 function paintSettings(){
  if(!state?.settings){$('settings-grid').innerHTML='<p>Choose your game installation to edit its settings.</p>';return;}
  $('fit-layout').hidden=settingsKind==='display';$('display-settings').hidden=settingsKind!=='display';$('settings-help').textContent=settingsKind==='runtime'?'Runtime and asset changes apply after restarting the game.':settingsKind==='display'?'Choose a render size for the next game launch.':'Preview changes immediately. Save, then release all buttons and center both sticks for two seconds to apply in game.';

@@ -179,7 +179,11 @@ DWORD WINAPI initialize(void*){
             log(enableNativeFrameRate(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))
                 ?"Native variable frame rate enabled; producer capped at 120 FPS for the 90 Hz target"
                 :"Native frame-rate signatures differ; original limiter retained");
-        installCaptureHook(mailbox);
+        installCaptureHook(mailbox,
+            target->nativeAdapter
+                &&GetPrivateProfileIntW(L"optics",L"binocular_native_material",0,ini.c_str())==1,
+            target->nativeAdapter
+                &&GetPrivateProfileIntW(L"diagnostics",L"optic_native_lighting_probe",0,ini.c_str())==1);
         installProcessExitHook(&cleanupBeforeExit);
         if(target->nativeAdapter&&GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1){
             try{
@@ -190,7 +194,9 @@ DWORD WINAPI initialize(void*){
                     installRenderCamera(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),evidencePath.data());
                     headCamera().configure(true,1,true);
                     if(GetPrivateProfileIntW(L"diagnostics",L"controller_rig_experiment",0,ini.c_str())==1)
-                        installControllerRig(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)));
+                        installControllerRig(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),
+                            GetPrivateProfileIntW(L"diagnostics",L"idroid_effect_probe",0,ini.c_str())==1,
+                            GetPrivateProfileIntW(L"diagnostics",L"idroid_effect_retarget",0,ini.c_str())==1);
                     log("Native VR camera requires a matching player head-bone publication; ADS no longer supplies its position");
                 }
             }catch(const std::exception& e){log(std::string("Camera observer unavailable: ")+e.what());}

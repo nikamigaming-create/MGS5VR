@@ -1,4 +1,5 @@
 #include "mgs5vr/render_camera.hpp"
+#include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/opening_selector.hpp"
@@ -698,6 +699,20 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         mgs5vr::ReconModelVisibilityScope reconVisibility(source.pair.sample.controllers.hudMode,
             hudView,source.pair.sample.controllers.binocularActorGlow);
         if(!restoreHead){
+            // Observe the native lighting on this exact synchronous replay;
+            // never borrow the handheld lens pass or a newer camera pose.
+            std::optional<mgs5vr::OpticLightingMatrix> binocularWorld;
+            if(!lensPass&&optic.held&&optic.pose.tracked
+               &&optic.pose.kind==mgs5vr::OpticKind::binocular){
+                const auto body=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,
+                    source.pair.sample.headPose,optic.pose.renderBody);
+                alignas(16) auto bodyValues=values(body);
+                binocularWorld.emplace();
+                originalWorld(bodyValues.data(),binocularWorld->data());
+            }
+            mgs5vr::OpticNativeLightingScope lightingSource(drawingEye,source.grCamera,
+                eyeView,eyeProjection,!lensPass&&optic.held,
+                binocularWorld?&*binocularWorld:nullptr);
             result=originalScene(render,graphics,task,worker);
         }
         exposure.reset();
@@ -765,7 +780,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 // Raising the ocular to either eye opens its physical lens
                 // for both eyes. Independent pupil-radius gates left the
                 // other eye looking at opaque brown glass at normal IPD.
-                binocularLensVisible);
+                binocularLensVisible,&drawingEye);
         }
         if(afterContext&&scopeView&&mgs5vr::weaponScopeEyeVisible(scope,source.pair.sample.views[eye].pose)){
             const auto ocular=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,source.pair.sample.headPose,scope.ocular);
