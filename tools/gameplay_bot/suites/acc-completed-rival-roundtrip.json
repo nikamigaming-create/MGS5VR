@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "description": "Known completed-FOB ACC Rival guide only: physical iDroid, reviewed Help acknowledgment, restored Development eligibility, ordinary root Back and physical reopening. No upgrade purchase or campaign mutation. Unexpected informational cards require separate review.",
+  "cases": [
+    {
+      "id": "acc-idroid-observe-open",
+      "before": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "native.helicopter_space": true,
+        "native.mission": 40010,
+        "native.title": false,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.idroid_development_active": true,
+        "native.fob_tutorial_state": 127
+      },
+      "setup": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.02,
+            -0.22,
+            -0.53
+          ],
+          "orientation": [
+            0.49999999999999994,
+            0.0,
+            0.0,
+            0.8660254037844387
+          ],
+          "aim_orientation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid",
+          "native_before": {
+            "mission": 40010,
+            "helicopter_space": true,
+            "title": false,
+            "sequence": "Seq_Game_MainGame",
+            "popup": false
+          }
+        }
+      ],
+      "after": {
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true
+      },
+      "timeout": 8,
+      "after_stable_samples": 12
+    },
+    {
+      "id": "acc-reviewed-rival-help-close",
+      "before": {
+        "idroid": true,
+        "pause": true,
+        "idroid_menu_input_ready": true,
+        "native.mission": 40010,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.helicopter_space": true,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.fob_tutorial_state": 127
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.confirm",
+          "state_before": {
+            "idroid": true,
+            "pause": true
+          },
+          "native_before": {
+            "mission": 40010,
+            "sequence": "Seq_Game_MainGame",
+            "helicopter_space": true,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false
+          }
+        }
+      ],
+      "after": {
+        "idroid": true,
+        "pause": false,
+        "idroid_menu_input_ready": true,
+        "native.idroid_development_active": true
+      },
+      "after_stable_samples": 6
+    },
+    {
+      "id": "acc-native-mode-release-ordinary-back",
+      "before": {
+        "idroid": true,
+        "pause": false,
+        "controls.native_buttons": 0,
+        "native.mission": 40010,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.helicopter_space": true,
+        "native.popup": false
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "native_before": {
+            "mission": 40010,
+            "sequence": "Seq_Game_MainGame",
+            "helicopter_space": true,
+            "popup": false
+          }
+        }
+      ],
+      "after": {
+        "idroid": false,
+        "pause": false,
+        "scene": "cabin",
+        "native.vr_idroid_player_pad_block": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "camera_awaiting_player": false,
+        "controls.context": "gameplay",
+        "controls.rig_input": true
+      },
+      "timeout": 8,
+      "after_stable_samples": 3
+    },
+    {
+      "id": "acc-ordinary-immediate-reopen",
+      "before": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "native.helicopter_space": true,
+        "native.mission": 40010,
+        "native.title": false,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false
+      },
+      "setup": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.02,
+            -0.22,
+            -0.53
+          ],
+          "orientation": [
+            0.49999999999999994,
+            0.0,
+            0.0,
+            0.8660254037844387
+          ],
+          "aim_orientation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid",
+          "native_before": {
+            "mission": 40010,
+            "helicopter_space": true,
+            "title": false,
+            "sequence": "Seq_Game_MainGame",
+            "popup": false
+          }
+        }
+      ],
+      "after": {
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "native.idroid_development_active": true
+      },
+      "timeout": 8,
+      "after_stable_samples": 3
+    }
+  ]
+}

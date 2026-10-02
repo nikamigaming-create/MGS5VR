@@ -59,6 +59,67 @@ Ground Zeroes is intentionally untouched.
 
 ## Current verification
 
+### October 1: Coco's scope glass fix
+
+Coco supplied `scope_stabilizer.patch`, `controller_rig claude.cpp` and
+`NOTES_for_the_modder.md` for independently shaking scope glass. The integration
+filters completed-skin ocular drift in the aiming hand's frame, then applies
+the same rigid correction to the objective. Hand motion, one-hand weapon trim
+and guided support remain authoritative. It skips native manipulation,
+transitional support/reach and invalid tracking, and resets on optic changes,
+tracking epochs, time reversal and publication gaps. Duplicate samples cannot
+accumulate smoothing. `[settings].scope_pose_stabilization = 1` enables the
+launcher's **Steady scope glass** control; it is independently switchable.
+
+The 400-sample synthetic 2 mm / 0.3 degree drift case leaves an RMS ratio of
+0.0273. Reset, rigid-pose, duplicate-sample and ordinary-motion checks pass.
+This measures the synthetic fixture, not headset jitter, hits or every weapon.
+Actual field final-eye and physical sight/muzzle/impact checks remain open.
+
+Coco also reported overall brightness following the narrow scope camera.
+The supported retail viewport owns CPU luminance at +0x4e0/+0x4f0, current and
+previous exposure at +0x594/+0x6ec, five-sample history/ring at +0x6b8/+0x6cc,
+readback slot at +0x6f0, four registered CPU luminance texture handles at +0x648
+and four native `GrReadbackDx11` objects at +0x658. Each readback's +8 points to
+its registered CPU destination. Cloning just the GPU objects still contaminated
+the head's next-frame adaptation. The repair creates four distinct CPU texture
+leases through the verified retail resource factory and four matching GPU
+readbacks. It swaps both rings and CPU/history state before native viewport
+work, then restores the head owner exactly after the lens scene. Native texture
+descriptors, luminance targets and the authored curve are retained. Resource
+creation/destruction uses retail ownership; device, viewport, optic, readback or
+CPU-texture replacement, time reversal and publication gaps reset the cache.
+
+The repair is **on by default** for supported TPP 1.0.15.4. Ground Zeroes is
+untouched. An explicit diagnostic opt-out is `MGS5VR_SCOPE_EXPOSURE_ISOLATION=0`
+or `[diagnostics].scope_exposure_isolation=0` in the game-local INI; an environment
+override takes precedence. `inspect-native-exposure` reports successful lens
+passes, both distinct CPU/GPU rings and exact head restoration. Its existing
+`experimental_enabled` field retains compatibility with the investigation bot.
+
+In native Afghanistan Mission 10020, the maintained `workspace.py bot --command
+optics --seconds 100` compares no extra lens camera, the shared bug, and isolation
+while holding the simulated head stationary and pitching the physical binocular
+by +/-25 degrees. It then changes the head with controller LOCAL poses fixed,
+and restores poses, input, stow and diagnostic modes. There is no firing,
+locomotion, native stick aiming or progression modification. Retained runs
+`20261002T023059054018Z` and cold default-on `20261002T024344212455Z` each pass
+16 scoped samples. In the default-on run, shared head adaptation changes by
+0.3040 between mean pitch samples; isolated head means differ from the no-lens
+reference by 0.0029. The lens still changes by approximately 0.30 and ordinary
+head motion still changes head adaptation. Those are retail scalars, not
+asserted EV units. Reviewed final-eye pairs and fixed world-crop measurements
+are retained in `artifacts/bot/acceptance/optic-exposure.json`.
+
+This establishes shared lens-pass ownership through physical binoculars in
+this static simulator field scene. Firearm-specific sight/jitter/impact checks,
+changing lighting, other maps, continuous flicker and physical-headset
+acceptance remain separate. Fixed controller LOCAL poses do not guarantee a
+fixed lens WORLD pose when the native body follows the head. ACC captures have
+no lens passes and cannot validate exposure isolation.
+
+### Earlier scope verification
+
 Math checks cover socket direction, rigid motion, glass placement, unsupported
 sights, separate eye visibility, zoom sequencing and fixed-power behavior.
 The asset-free D3D11 fixture compiles the actual lens shaders, reads back the

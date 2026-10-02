@@ -185,4 +185,57 @@ function Get-MgsOrphanCleanupPlan {
     return @($liveOwned | Sort-Object @{Expression={[int]$_.depth};Descending=$true},@{Expression={[int]$_.pid};Descending=$true})
 }
 
-Export-ModuleMember -Function ConvertTo-MgsUtcStartTime,ConvertTo-MgsProcessIdentity,Test-MgsExactProcessIdentity,Test-MgsPathUnderRoot,Get-MgsOwnedRuntimeProcesses,Assert-MgsSimulatorTcpIsolation,Get-MgsOrphanCleanupPlan
+function Get-MgsBytesHash([byte[]]$Bytes) {
+    $hash=[Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($hash.ComputeHash($Bytes)).Replace('-','').ToLowerInvariant() }
+    finally { $hash.Dispose() }
+}
+
+function New-MgsRuntimeConfigLease {
+    param([Parameter(Mandatory=$true)][string]$GameExe,
+          [Parameter(Mandatory=$true)][string]$RuntimeManifest,
+          [Parameter(Mandatory=$true)][string]$OperatorDir)
+    $exe=[IO.Path]::GetFullPath($GameExe)
+    $path=Join-Path (Split-Path -Parent $exe) 'mgs5vr-runtime.ini'
+    $present=Test-Path -LiteralPath $path -PathType Leaf
+    [byte[]]$before=@()
+    if($present){$before=[IO.File]::ReadAllBytes($path)}
+    $text="[runtime]`r`nenabled=1`r`nmanifest=$RuntimeManifest`r`napi_layer_path=$OperatorDir`r`napi_layers=XR_APILAYER_METAX_operator`r`nheadless=0`r`n"
+    $bytes=[Text.UTF8Encoding]::new($false).GetBytes($text)
+    $lease=[ordered]@{path=$path;gameExe=$exe;beforePresent=[bool]$present;
+        beforeBase64=[Convert]::ToBase64String($before);beforeSha256=(Get-MgsBytesHash $before);
+        writtenSha256=(Get-MgsBytesHash $bytes)}
+    try { [IO.File]::WriteAllBytes($path,$bytes) }
+    catch {
+        if($present){[IO.File]::WriteAllBytes($path,$before)}
+        elseif(Test-Path -LiteralPath $path){Remove-Item -LiteralPath $path}
+        throw
+    }
+    return $lease
+}
+
+function Restore-MgsRuntimeConfigLease {
+    param([Parameter(Mandatory=$true)]$Lease,[Parameter(Mandatory=$true)][string]$GameExe)
+    $exe=[IO.Path]::GetFullPath($GameExe)
+    $path=Join-Path (Split-Path -Parent $exe) 'mgs5vr-runtime.ini'
+    if(![string]::Equals($exe,[string](Get-MgsValue $Lease 'gameExe'),[StringComparison]::OrdinalIgnoreCase) -or
+       ![string]::Equals($path,[string](Get-MgsValue $Lease 'path'),[StringComparison]::OrdinalIgnoreCase)){
+        throw 'Runtime configuration lease does not belong beside the recorded game; refusing restoration.'
+    }
+    $present=[bool](Get-MgsValue $Lease 'beforePresent')
+    [byte[]]$before=[Convert]::FromBase64String([string](Get-MgsValue $Lease 'beforeBase64'))
+    $beforeHash=Get-MgsBytesHash $before
+    if($beforeHash -ne [string](Get-MgsValue $Lease 'beforeSha256')){throw 'Runtime configuration backup changed; refusing restoration.'}
+    if(!(Test-Path -LiteralPath $path -PathType Leaf)){
+        if(!$present){return}
+        throw 'Runtime configuration disappeared during the test; refusing to replace an unrelated change.'
+    }
+    $currentHash=Get-MgsBytesHash ([IO.File]::ReadAllBytes($path))
+    if($present -and $currentHash -eq $beforeHash){return}
+    if($currentHash -ne [string](Get-MgsValue $Lease 'writtenSha256')){
+        throw 'Runtime configuration changed during the test; its personal changes and session record were preserved.'
+    }
+    if($present){[IO.File]::WriteAllBytes($path,$before)}else{Remove-Item -LiteralPath $path}
+}
+
+Export-ModuleMember -Function ConvertTo-MgsUtcStartTime,ConvertTo-MgsProcessIdentity,Test-MgsExactProcessIdentity,Test-MgsPathUnderRoot,Get-MgsOwnedRuntimeProcesses,Assert-MgsSimulatorTcpIsolation,Get-MgsOrphanCleanupPlan,New-MgsRuntimeConfigLease,Restore-MgsRuntimeConfigLease

@@ -12,6 +12,7 @@
 #include "mgs5vr/optic_events.hpp"
 #include "mgs5vr/optic_radio.hpp"
 #include "mgs5vr/player_visibility.hpp"
+#include "mgs5vr/native_menu_restrictions.hpp"
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -23,6 +24,75 @@ static void expect(bool ok,const char* name){++checks;if(!ok){++failures;std::ce
 static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
+    NativeMenuRestrictionLease menuLease;
+    for(unsigned index=0;index<78;++index)menuLease.beginEntry(1,2,index,index==33);
+    expect(menuLease.ready(1,2),"complete native tutorial begin has a restorable menu owner");
+    expect(menuLease.prior(33)==true&&menuLease.prior(1)==false,"recovery preserves prior disabled entries rather than unlocking everything");
+    expect(!menuLease.ready(3,2)&&!menuLease.ready(1,3),"replaced menu or tutorial cannot borrow an older snapshot");
+    menuLease.independentDisable(1,1);
+    expect(!menuLease.prior(1)&&menuLease.prior(2)==false,"another owner's disable survives guide recovery");
+    menuLease.beginEntry(1,2,0,false);menuLease.beginEntry(1,2,2,false);
+    expect(!menuLease.ready(1,2),"partial or interleaved native begin cannot restore flags");
+    menuLease.reset();expect(!menuLease.prior(2),"consumed lease cannot be reused for another lesson");
+    {
+        ScopePoseStabilizer filter;
+        const WeaponScopeSample original{Pose{{},{0,0,-.1f}},Pose{{},{0,0,-.3f}},.018f,.1f,8.f,17,true};
+        auto makeScope=[&](Pose owner,Pose noise){
+            auto s=original;s.ocular=compose(owner,compose(noise,original.ocular));
+            s.objective=compose(owner,compose(noise,original.objective));return s;
+        };
+        filter.update({},original,true,1000,1,1);
+        auto tiny=makeScope({},Pose{{},{.0005f,0,0}});
+        auto stable=filter.update({},tiny,true,1010,1,1);
+        expect(same(stable.ocular.position,original.ocular.position),"scope attachment dead zone removes sub-millimetre skin jitter");
+        const Pose movement{{0,.38268343f,0,.92387953f},{.3f,.2f,-.4f}};
+        auto moved=makeScope(movement,Pose{{},{.0005f,0,0}});
+        stable=filter.update(movement,moved,true,1020,1,1);
+        expect(same(stable.ocular.position,compose(movement,original.ocular).position)
+            &&same(rotate(stable.ocular.orientation,{0,0,-1}),rotate(movement.orientation,{0,0,-1})),
+            "scope stabilization follows deliberate controller translation and rotation without lag");
+        expect(same(compose(inverse(stable.ocular),stable.objective).position,{0,0,-.2f}),
+            "stabilized scope glass and scene keep their exact native ocular/objective relationship");
+        float rawEnergy=0,filteredEnergy=0;filter.reset();
+        filter.update({},original,true,2000,1,1);
+        for(unsigned n=1;n<=400;++n){
+            const float wave=std::sin(static_cast<float>(n)*1.3f);
+            const auto noisy=makeScope({},Pose{{0,std::sin(.002618f*wave),0,std::cos(.002618f*wave)},{.002f*wave,0,0}});
+            stable=filter.update({},noisy,true,2000+n*10,1,1);
+            if(n>50){
+                const auto raw=noisy.ocular.position-original.ocular.position;
+                const auto corrected=stable.ocular.position-original.ocular.position;
+                rawEnergy+=dot(raw,raw);filteredEnergy+=dot(corrected,corrected);
+            }
+        }
+        expect(filteredEnergy<rawEnergy*.1f,"Coco scope filter removes at least 68 percent RMS attachment jitter at x8");
+        std::cout<<"Scope attachment jitter RMS ratio "<<std::sqrt(filteredEnergy/rawEnergy)<<'\n';
+        auto changed=makeScope({},Pose{{},{.005f,0,0}});changed.weaponIdentity=18;
+        stable=filter.update({},changed,true,6010,1,1);
+        expect(same(stable.ocular.position,changed.ocular.position),"scope swap starts from the actual new glass without stale history");
+        changed.ocular.position.x+=.005f;changed.objective.position.x+=.005f;
+        stable=filter.update({},changed,true,6020,2,1);
+        expect(same(stable.ocular.position,changed.ocular.position),"XR reference-space reset discards scope attachment history");
+        changed.ocular.position.x+=.005f;changed.objective.position.x+=.005f;
+        stable=filter.update({},changed,true,6030,2,2);
+        expect(same(stable.ocular.position,changed.ocular.position),"camera activation change cannot reuse an old scope attachment");
+        changed.ocular.position.x+=.005f;changed.objective.position.x+=.005f;
+        stable=filter.update({},changed,true,6230,2,2);
+        expect(same(stable.ocular.position,changed.ocular.position),"scope tracking gap does not interpolate from an old pose");
+        stable=filter.update({},tiny,false,6240,2,2);
+        expect(same(stable.ocular.position,tiny.ocular.position),"disabled stabilization or a changing contact keeps the completed skin authoritative");
+        stable=filter.update({},original,true,6250,2,2);
+        expect(same(stable.ocular.position,original.ocular.position),"scope reactivation after menus or tracking loss starts without a jump");
+        auto flipped=original;flipped.ocular.orientation.w=-1;flipped.objective.orientation.w=-1;
+        stable=filter.update({},flipped,true,6260,2,2);
+        expect(valid(stable.ocular)&&same(rotate(stable.ocular.orientation,{0,0,-1}),{0,0,-1}),
+            "equivalent quaternion signs do not create a scope rotation spike");
+        auto invalid=original;invalid.magnification=std::numeric_limits<float>::quiet_NaN();
+        stable=filter.update({},invalid,true,6270,2,2);
+        expect(!weaponScopeSceneView(stable),"invalid scope data cannot acquire a camera through stabilization");
+        stable=filter.update({},tiny,true,6260,2,2);
+        expect(same(stable.ocular.position,tiny.ocular.position),"scope filter clock regression starts with the current pose");
+    }
     {
         OpticEventQueue events;
         events.push({OpticEventKind::raised,{},101,1});

@@ -15,6 +15,7 @@ from gameplay_bot.session import preserved_controller_pose, run_suite
 from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack
 from gameplay_bot.campaign import read_json, run_campaign, validate_campaign, unstarted_campaign
 from gameplay_bot.idroid import inspect_idroid
+from gameplay_bot.optic_exposure import inspect_optic_exposure
 from gameplay_bot.supervisor import run_supervised
 from gameplay_bot.state_graph import StateGraph, declared_model
 
@@ -78,7 +79,7 @@ def continue_game(live, behavior):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("observe", "continue", "run", "session", "move", "campaign", "idroid", "supervise", "state"),
+    parser.add_argument("command", choices=("observe", "continue", "run", "session", "move", "campaign", "idroid", "optics", "supervise", "state"),
                         help="session advances Continue and runs the whole suite on one connection")
     parser.add_argument("--game-dir", required=True, type=pathlib.Path)
     parser.add_argument("--proxy", type=pathlib.Path)
@@ -191,6 +192,9 @@ def main():
                     result = inspect_idroid(live, behavior)
                 result["controller_pose_restored"] = True
                 result["controller_pose_restore"] = saved_pose
+            elif args.command == "optics":
+                start_recording()
+                result = inspect_optic_exposure(live,args.seconds)
             elif args.command == "supervise":
                 start_recording()
                 initial_suite = read_json(args.suite) if args.suite else None

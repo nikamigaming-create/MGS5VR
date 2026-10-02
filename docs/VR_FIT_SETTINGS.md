@@ -6,7 +6,7 @@ to rotate, scroll to zoom, or use Front, Side, Top and Back. Arrow keys rotate;
 plus/minus zoom and zero resets the view. Turning the preview never changes a
 setting. Each numeric setting has a slider and an exact value box.
 
-The shared fitting view covers all 54 controls settings:
+The shared fitting view covers all 55 controls settings:
 
 | View | What changes |
 | --- | --- |

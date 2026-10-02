@@ -188,6 +188,7 @@ const std::vector<SettingDefinition>& settingDefinitions(){
         {"settings.handheld_menus",0,0,1},{"settings.menu_quad_width_cm",120,60,240},
         {"settings.menu_quad_distance_cm",130,75,300},{"settings.menu_quad_tilt_degrees",-10,-30,30},
         {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",1,0,2},{"settings.hud_mode",1,0,2},
+        {"settings.scope_pose_stabilization",1,0,1},
         {"settings.binocular_pitch_degrees",-90,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
         {"settings.binocular_roll_degrees",0,-180,180},{"settings.binocular_auto_mark",1,0,1},
         {"settings.binocular_max_eye_distance_cm",30,15,50},
@@ -380,6 +381,8 @@ float ControlBindings::setting(std::string_view name) const{
     return it==settings_.end()?0:it->value;
 }
 std::string ControlBindings::label(std::string_view action) const{
+    if(const auto axis=std::find_if(axes_.begin(),axes_.end(),[&](const auto& a){return a.name==action;});axis!=axes_.end())
+        return axis->source==0?"L STICK":axis->source==1?"R STICK":"UNBOUND";
     const auto entry=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.name==action;});
     if(entry==entries_.end()||entry->bindings.empty())return "UNBOUND";
     constexpr std::array<std::string_view,29> labels{"A","B","X","Y","MENU","L CLICK","R CLICK","L GRIP","R GRIP","L TRIGGER","R TRIGGER",

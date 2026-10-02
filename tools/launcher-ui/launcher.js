@@ -202,6 +202,7 @@ const settingCopy={
  menu_quad_distance_cm:['World menu distance','Distance to Pause, and to iDroid when handheld mode is off.'],
  menu_quad_tilt_degrees:['World menu tilt','Negative values tilt the menu panel upward.'],
  scope_eye_relief_cm:['Scope eye distance','Preferred distance from your eye to the scope glass.'],
+ scope_pose_stabilization:['Steady scope glass','Remove small scope attachment shakes. The glass and its view move together; intentional hand movement follows immediately.'],
  binocular_pitch_degrees:['Binocular tilt','Tilt the binoculars in your hand. The lenses and grip move together.'],
  binocular_yaw_degrees:['Binocular angle','Turn the binoculars left or right in your grip.'],
  binocular_roll_degrees:['Binocular roll','Rotate the binoculars to level them in your grip.'],

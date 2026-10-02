@@ -5,10 +5,8 @@ campaign slots. Only the six TPP campaign/personal files below are ever changed.
 Graphics, controls, GZ saves, cloud metadata and game assets are untouched.
 """
 import argparse
-import csv
 import datetime
 import hashlib
-import io
 import json
 import os
 import pathlib
@@ -74,6 +72,8 @@ def snapshot(source, store, name, note="", state=None):
             raise RuntimeError(f"Save changed during snapshot: {relative}; snapshot has no valid manifest")
         records.append({"path": relative, "bytes": copied.stat().st_size,
                         "sha256": before[relative], "source": str(path.resolve())})
+    if any(digest(path) != before[relative] for relative, path in sources):
+        raise RuntimeError("Paired save files changed during snapshot; snapshot has no valid manifest")
     manifest = {"schema": 1, "name": name, "created_utc": utc(), "note": note,
                 "native_state": state, "files": records}
     write_json(target / "manifest.json", manifest)
@@ -98,12 +98,22 @@ def verify(store, name):
 def require_stopped():
     if os.name != "nt":
         raise RuntimeError("Live save switching is supported only on Windows")
-    result = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True,
+    script = ("Get-Process | Where-Object { $_.ProcessName -in @('mgsvtpp','mgsgroundzeroes') "
+              "-and !$_.HasExited } | ForEach-Object { $_.ProcessName + '.exe' }")
+    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True,
                             text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
-    running = {row[0].lower() for row in csv.reader(io.StringIO(result.stdout)) if row}
-    blockers = running & {"mgsvtpp.exe", "mgsgroundzeroes.exe", "steam.exe"}
+    running = {row.strip().lower() for row in result.stdout.splitlines() if row.strip()}
+    blockers = running & {"mgsvtpp.exe", "mgsgroundzeroes.exe"}
     if blockers:
-        raise RuntimeError("Close normally before snapshot/switch: " + ", ".join(sorted(blockers)))
+        raise RuntimeError("Close the game normally before snapshot/switch: " + ", ".join(sorted(blockers)))
+
+
+def require_live_account(account):
+    if not account.is_dir() or account.parent.name.lower() != "userdata" or not account.name.isdigit():
+        raise ValueError("Live save source/destination must be an existing Steam userdata/<account-id> directory")
+    # Steam can stay running. Its two cloud mirrors must be disabled so the
+    # client cannot replace a fixture while the retail game is stopped.
+    require_cloud_disabled(account)
 
 
 def require_cloud_disabled(account):
@@ -197,15 +207,14 @@ def main():
     elif args.command == "snapshot":
         if not args.archive:
             require_stopped()
+            require_live_account(args.source)
         elif "userdata" in [part.lower() for part in args.source.resolve().parts]:
             raise ValueError("--archive cannot bypass live Steam account protection")
         state = json.loads(args.state.read_text(encoding="utf-8-sig")) if args.state else None
         print(json.dumps(snapshot(args.source, args.store, args.name, args.note, state), indent=2))
     elif args.command == "activate":
         require_stopped()
-        if not args.account.is_dir() or args.account.parent.name.lower() != "userdata" or not args.account.name.isdigit():
-            raise ValueError("--account must be an existing Steam userdata/<account-id> directory")
-        require_cloud_disabled(args.account)
+        require_live_account(args.account)
         print(json.dumps(activate(args.account, args.store, args.name), indent=2))
 
 

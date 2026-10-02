@@ -6,13 +6,17 @@ For local work use `python tools/workspace.py launch-sim`, then
 always `play/`; bot scratch runs have bounded retention. The default command
 only observes. Use `workspace.py pin` before citing a run as acceptance evidence,
 and `workspace.py stop-sim` for exact-owned test-session cleanup.
+The simulator launcher forwards to the existing Steam client and temporarily
+selects the runtime in the game's own `mgs5vr-runtime.ini`. Cleanup restores its
+exact prior bytes or absence; personal edits made during a test are preserved.
+Neither Steam nor the global OpenXR runtime is restarted or reconfigured.
 See `docs/CURRENT.md`. The explicit raw-runner examples below remain available
 for retained acceptance runs; they are not the default local iteration flow.
 
 Run from the repository root. This tool operates the local single-player game
 through the Meta XR operator and observes the installed mod's native state. It
 does not need the game in the foreground. A game and simulator session must
-already exist; `tools/launch-steam-simulator.ps1` is the supported launch helper.
+already exist; `tools/workspace.py launch-sim` is the supported launch entry.
 
 `session` handles the recognized startup prompts, physical Continue rack and
 loading acknowledgment, then runs every case in a suite on the same connection.
@@ -57,6 +61,12 @@ unrecognized popup. Prefer a suite of observed field actions for teaching takes.
   with iDroid/title/loading absent and no popup. It uses the effective menu stick
   and stops/releases if ownership or prerequisites change. This does not select
   choices or certify the identity of every nested page.
+  `owner: "customization"` and `owner: "customization_popup"` cover the native
+  ACC weapon/helicopter/vehicle selector and its reviewed popup without a Pause
+  owner. Both require exact mission, sequence and authored target prerequisites;
+  the popup owner additionally requires `popup: true`. They send one sampled
+  edge through the effective VR menu stick. The helicopter discard recipe is
+  separate from its iDroid Development list and upgrade transactions.
   Pause uses one fast sampled stick edge, avoiding repeats caused by paused Lua
   queries. Full native guards are checked before input and after release.
   `owner: "pause_popup"` additionally requires `native_before.popup: true` and a

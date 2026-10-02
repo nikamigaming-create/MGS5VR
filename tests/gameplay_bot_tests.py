@@ -15,6 +15,28 @@ from gameplay_bot.session import run_suite
 from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack
 from gameplay_bot.startup_evidence import StartupEvidence
 from gameplay_bot.menus import navigate as navigate_menu, observe as observe_menu
+from gameplay_bot.optic_exposure import require_independent_luminance
+
+
+class OpticExposureOwnershipTests(unittest.TestCase):
+    def sample(self):
+        return {'head_readbacks':['0x10','0x20','0x30','0x40'],
+                'lens_readbacks':['0x50','0x60','0x70','0x80'],
+                'head_luminance_textures':['0x100','0x200','0x300','0x400'],
+                'lens_luminance_textures':['0x500','0x600','0x700','0x800']}
+
+    def test_independent_gpu_and_cpu_rings_are_required(self):
+        require_independent_luminance(self.sample())
+        shared=self.sample()
+        shared['lens_luminance_textures']=list(shared['head_luminance_textures'])
+        with self.assertRaises(BotFault):require_independent_luminance(shared)
+
+    def test_incomplete_or_aliasing_ownership_cannot_certify_the_fix(self):
+        for name in ('lens_readbacks','lens_luminance_textures'):
+            for invalid in ([],['0x0']*4,['0x500']*4,['missing']*4,None):
+                with self.subTest(name=name,invalid=invalid):
+                    state=self.sample();state[name]=invalid
+                    with self.assertRaises(BotFault):require_independent_luminance(state)
 
 
 class Clock:
@@ -155,8 +177,33 @@ class MenuNavigationTests(unittest.TestCase):
         payload, = live.input.call_args.args[0]
         self.assertEqual(payload, {"hand": "right", "component": "Thumbstick", "sub_component": "Y", "value": -1.})
         self.assertEqual(active, [])
-        self.assertGreaterEqual(clock.now, .28)
+        self.assertGreaterEqual(clock.now, .10)
+        self.assertLess(clock.now, .20)
         live.capture.assert_not_called()
+
+    def test_idroid_cursor_edge_releases_before_native_list_repeat(self):
+        live, clock, active = self.fixture()
+        original = live.observe.side_effect
+        started, changes = [None], []
+        def state(native=False):
+            if active:
+                if started[0] is None:
+                    started[0] = clock.now
+                    changes.append("first row")
+                elif clock.now - started[0] >= .15:
+                    changes.append("repeated row")
+            return original(native)
+        live.observe.side_effect = state
+        navigate_menu(live, {"direction":"down"}, clock=clock, sleep=clock.sleep)
+        self.assertEqual(changes, ["first row"])
+        self.assertEqual(active, [])
+
+    def test_idroid_scroll_hold_is_explicit_and_bounded(self):
+        live, clock, active = self.fixture()
+        navigate_menu(live, {"direction":"down", "mode":"hold", "seconds":.16},
+                      clock=clock, sleep=clock.sleep)
+        self.assertGreaterEqual(clock.now, .28)
+        self.assertEqual(active, [])
 
     def test_idroid_native_guard_is_checked_before_dispatch(self):
         live, clock, _ = self.fixture()
@@ -254,6 +301,64 @@ class MenuNavigationTests(unittest.TestCase):
                                     "native_before":guard, "while_held":during},
                               clock=clock, sleep=clock.sleep)
             live.input.assert_not_called()
+
+    def selector_fixture(self, popup=False, change=None):
+        def customize(state, held):
+            state['pause'] = False
+            state['native'].update(mission=40010, helicopter_space=True,
+                                   sequence='Seq_Game_WeaponCustomize',
+                                   customization_kind='helicopter', popup=popup)
+            if change:
+                change(state, held)
+        return self.pause_fixture(customize)
+
+    def test_customization_and_its_popup_use_the_effective_vr_axis_without_pause(self):
+        for popup in (False, True):
+            with self.subTest(popup=popup):
+                live, clock, active = self.selector_fixture(popup)
+                guard = {'mission':40010, 'helicopter_space':True,
+                         'sequence':'Seq_Game_WeaponCustomize',
+                         'customization_kind':'helicopter', 'popup':popup}
+                navigate_menu(live, {'owner':'customization_popup' if popup else 'customization',
+                                    'direction':'left', 'native_before':guard},
+                              clock=clock, sleep=clock.sleep)
+                self.assertEqual(live.input.call_args.args[0][0]['hand'], 'right')
+                self.assertEqual(active, [])
+                self.assertTrue(live.observe.call_args_list[-1].kwargs.get('native'))
+
+    def test_customization_rejects_incomplete_target_and_other_menu_owners_before_input(self):
+        guard = {'mission':40010, 'helicopter_space':True,
+                 'sequence':'Seq_Game_WeaponCustomize', 'customization_kind':'helicopter'}
+        for key in guard:
+            live, clock, _ = self.selector_fixture()
+            incomplete = {k:v for k,v in guard.items() if k != key}
+            with self.assertRaises(BotFault):
+                navigate_menu(live, {'owner':'customization', 'direction':'down',
+                                    'native_before':incomplete}, clock=clock, sleep=clock.sleep)
+            live.input.assert_not_called()
+        for field, value in (('pause',True), ('idroid',True), ('loading',True),
+                             ('native',{'mission':40010,'popup':True}), ('menu',False)):
+            live, clock, _ = self.selector_fixture(change=lambda state, held:state.update({field:value}))
+            with self.assertRaises(BotFault):
+                navigate_menu(live, {'owner':'customization','direction':'down',
+                                    'native_before':guard}, clock=clock, sleep=clock.sleep)
+            live.input.assert_not_called()
+
+    def test_customization_target_change_after_release_cannot_count_as_navigation(self):
+        live, clock, active = self.selector_fixture()
+        original = live.observe.side_effect
+        def state(native=False):
+            value = original(native)
+            if native and live.input.called and not active:
+                value['native']['customization_kind'] = 'vehicle'
+            return value
+        live.observe.side_effect = state
+        with self.assertRaisesRegex(BotFault, 'native input owner or scene prerequisite'):
+            navigate_menu(live, {'owner':'customization','direction':'down',
+                                'native_before':{'mission':40010,'helicopter_space':True,
+                                    'sequence':'Seq_Game_WeaponCustomize','customization_kind':'helicopter'}},
+                          clock=clock, sleep=clock.sleep)
+        self.assertEqual(active, [])
 
     def test_navigation_cannot_pass_a_different_held_axis_and_always_releases(self):
         live, clock, active = self.pause_fixture()
@@ -378,8 +483,8 @@ class BotTests(unittest.TestCase):
     def test_acc_helicopter_back_cannot_dispatch_on_field_idroid_weapon_or_unknown_target(self):
         path=pathlib.Path(__file__).resolve().parents[1]/'tools/gameplay_bot/suites/acc-helicopter-customization-back.json'
         case=json.loads(path.read_text())['cases'][0]
-        good={'scene':'menu','menu':True,'idroid':False,'controls':{'context':'menus'},
-              'native':{'title':False,'helicopter_space':True,'sequence':'Seq_Game_WeaponCustomize',
+        good={'scene':'menu','menu':True,'idroid':False,'pause':False,'controls':{'context':'menus'},
+              'native':{'mission':40010,'title':False,'helicopter_space':True,'sequence':'Seq_Game_WeaponCustomize',
                         'customization_kind':'helicopter','popup':False,'saving':False}}
         changes=[{'helicopter_space':False},{'sequence':'Seq_Game_MainGame'},
                  {'customization_kind':'weapon'},{'customization_kind':None},{'popup':True},{'saving':True}]
@@ -395,15 +500,15 @@ class BotTests(unittest.TestCase):
 
     def test_acc_cancel_must_observe_native_main_cabin_instead_of_a_closed_terminal_only(self):
         path=pathlib.Path(__file__).resolve().parents[1]/'tools/gameplay_bot/suites/acc-helicopter-customization-back.json'
-        case=json.loads(path.read_text())['cases'][0]
-        opened={'scene':'menu','menu':True,'idroid':False,'controls':{'context':'menus'},
-                'native':{'title':False,'helicopter_space':True,'sequence':'Seq_Game_WeaponCustomize',
-                          'customization_kind':'helicopter','popup':False,'saving':False}}
+        case=json.loads(path.read_text())['cases'][-1]
+        opened={'scene':'menu','menu':True,'idroid':False,'pause':False,'controls':{'context':'menus'},
+                'native':{'mission':40010,'title':False,'helicopter_space':True,'sequence':'Seq_Game_WeaponCustomize',
+                          'customization_kind':'helicopter','popup':True,'saving':False}}
         # iDroid is already closed on this selector: its close bit cannot prove Cancel.
         adapter=Adapter([opened]*2)
         result=self.behavior(adapter).case(case)
         self.assertEqual(result['failure_phase'],'outcome')
-        self.assertEqual(adapter.actions,1)
+        self.assertEqual(adapter.actions,2)
         self.assertEqual(result['status'],'failed')
 
     def test_unknown_scene_is_not_gameplay(self):
@@ -826,6 +931,24 @@ class BotTests(unittest.TestCase):
         self.assertEqual(audit["physical"]["buttons"][0], 1.)
         self.assertEqual(audit["sample_ms"], 901)
         self.assertEqual(audit["xr_published_gamepad"]["buttons"], 0x1000)
+
+    def test_idroid_tap_uses_longer_pulse_below_personal_hold_boundary(self):
+        for boundary, expected in ((550, .30), (200, .12)):
+            with self.subTest(boundary=boundary):
+                self.clock.now = 0.
+                initial = {"scene":"cabin", "now_ms":900,
+                           "controls":{"context":"equipment", "age_ms":0, "sample_ms":900}}
+                held = {"scene":"cabin", **self.audit_state(button=1., sample_ms=901)}
+                live, calls, releases = self.fake_live([initial, held])
+                action = live.bindings["actions"][0]
+                action.update(name="system.idroid")
+                action["bindings"][0]["milliseconds"] = boundary
+                with mock.patch("gameplay_bot.live.time.monotonic", self.clock), \
+                        mock.patch("gameplay_bot.live.time.sleep", self.clock.sleep):
+                    live.execute({"op":"action", "name":"system.idroid"})
+                self.assertAlmostEqual(calls[0][1], expected)
+                self.assertLess(calls[0][1], boundary/1000)
+                self.assertEqual(releases, [True])
 
     def test_operator_forms_menu_chord_before_sending_native_face_edge(self):
         live = Live.__new__(Live)
@@ -1534,6 +1657,8 @@ class MenuCleanupTests(unittest.TestCase):
         def state(native=False):
             active = remaining[0] > 0
             return {"menu":active,"idroid":active,"pause":False,
+                    "scene":"cabin","camera_active":True,"camera_suspended":False,
+                    "camera_awaiting_player":False,"controls":{"rig_input":True},
                     "native":{"popup":popup,"tutorial_pause":False}}
         live.observe = mock.Mock(side_effect=state)
         def execute(step):
@@ -1579,6 +1704,50 @@ class MenuCleanupTests(unittest.TestCase):
         with self.assertRaisesRegex(BotFault, "needs review"):
             live.cleanup_menus()
         live.execute.assert_not_called()
+
+    def test_closed_terminal_with_stale_camera_cannot_pass_cleanup(self):
+        live = self.fixture(0)
+        live.observe.side_effect = None
+        live.observe.return_value = {"menu":False,"scene":"unknown","camera_active":False,
+                                    "camera_awaiting_player":True,"controls":{"rig_input":False},
+                                    "native":{"popup":False,"tutorial_pause":False}}
+        with mock.patch("gameplay_bot.live.time.monotonic", side_effect=[0,4]), \
+                self.assertRaisesRegex(BotFault, "without restoring the live VR camera"):
+            live.cleanup_menus()
+        live.execute.assert_not_called()
+        self.assertEqual(live.opened_menu,"idroid")
+
+    def test_expired_observation_during_stow_requires_three_new_playable_samples(self):
+        for missing in ("controls", "native"):
+            with self.subTest(missing=missing):
+                live = self.fixture(0)
+                ready = live.observe(native=True)
+                pending = {**ready, missing:None}
+                live.observe.reset_mock()
+                live.observe.side_effect = [ready, pending, ready, ready, ready]
+                clock = Clock()
+                with mock.patch("gameplay_bot.live.time.monotonic", clock), \
+                        mock.patch("gameplay_bot.live.time.sleep", clock.sleep):
+                    live._finish_menu_cleanup(pending)
+                self.assertEqual(live.observe.call_count, 5)
+                self.assertIsNone(live.opened_menu)
+                live.execute.assert_not_called()
+
+    def test_missing_observation_never_passes_cleanup_and_expires_without_input(self):
+        for missing in ("controls", "native"):
+            with self.subTest(missing=missing):
+                live = self.fixture(0)
+                pending = {**live.observe(native=True), missing:None}
+                live.observe.side_effect = None
+                live.observe.return_value = pending
+                clock = Clock()
+                with mock.patch("gameplay_bot.live.time.monotonic", clock), \
+                        mock.patch("gameplay_bot.live.time.sleep", clock.sleep), \
+                        self.assertRaisesRegex(BotFault, "without restoring the live VR camera"):
+                    live._finish_menu_cleanup(pending)
+                self.assertGreaterEqual(clock.now, 3)
+                self.assertEqual(live.opened_menu, "idroid")
+                live.execute.assert_not_called()
 
 
 class StartupTests(unittest.TestCase):

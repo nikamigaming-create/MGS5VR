@@ -41,15 +41,24 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     from .live import authoritative_controls, channel, fresh_control_observation
     from .core import matches
     owner = step.get("owner", "idroid")
-    if owner not in ("idroid", "pause", "pause_popup"):
+    selector = owner in ("customization", "customization_popup")
+    if owner not in ("idroid", "pause", "pause_popup", "customization", "customization_popup"):
         raise BotFault("Menu navigation requires an explicit supported owner")
     native_guard = step.get("native_before")
-    if owner in ("pause", "pause_popup") and (not isinstance(native_guard, dict) or not native_guard):
-        raise BotFault("Pause navigation requires native scene prerequisites")
-    if owner == "pause_popup" and native_guard.get("popup") is not True:
-        raise BotFault("Pause-popup navigation requires an explicit reviewed popup prerequisite")
-    native_sample = owner in ("pause", "pause_popup")
-    expected_popup = owner == "pause_popup"
+    if owner != "idroid" and (not isinstance(native_guard, dict) or not native_guard):
+        raise BotFault("Spatial menu navigation requires native scene prerequisites")
+    if owner in ("pause_popup", "customization_popup") and native_guard.get("popup") is not True:
+        raise BotFault("Popup navigation requires an explicit reviewed popup prerequisite")
+    if selector and (native_guard.get("mission") != 40010
+                     or native_guard.get("helicopter_space") is not True
+                     or native_guard.get("sequence") != "Seq_Game_WeaponCustomize"
+                     or native_guard.get("customization_kind") not in ("weapon", "helicopter", "vehicle")):
+        raise BotFault("Customization navigation requires the exact native ACC selector target")
+    native_sample = owner != "idroid"
+    mode = step.get("mode", "edge")
+    if mode not in ("edge", "hold") or (native_sample and mode != "edge"):
+        raise BotFault("Menu cursor steps require edge mode; only iDroid permits an explicit scroll hold")
+    expected_popup = owner in ("pause_popup", "customization_popup")
     during = step.get("while_held")
     if during is not None and (not isinstance(during, dict) or not during
                                or any(key.startswith("native.") for key in during)):
@@ -79,10 +88,10 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
         else:
             native = state.get("native", {})
             if (state.get("scene") != "menu" or state.get("menu") is not True
-                    or state.get("pause") is not True or state.get("idroid") is not False
+                    or state.get("pause") is not (not selector) or state.get("idroid") is not False
                     or state.get("title") is not False or state.get("loading") is not False
                     or (check_native and (native.get("popup") is not expected_popup or not matches(native, native_guard)))):
-                raise BotFault("Pause navigation lost its native input owner or scene prerequisite")
+                raise BotFault("Spatial menu navigation lost its native input owner or scene prerequisite")
         controls = authoritative_controls(state)
         if controls["context"] != "menus":
             raise BotFault("Navigation requires the current menu context")
@@ -97,7 +106,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     admitted = sample(initial)["sample_ms"]
     live.release()
     live.events.emit("semantic_menu_navigation", source=source, direction=direction, owner=owner,
-                     mode="sampled_edge" if native_sample else "sampled_hold",
+                     mode="sampled_" + mode,
                      sampled_milliseconds=math.ceil(seconds * 1000))
     first = None
     held_state = None
@@ -105,16 +114,17 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     try:
         live.input([payload], seconds, lease_seconds=2.)
         while clock() < deadline:
-            # A paused Lua query can extend a short pulse into several native
-            # UI repeats. Keep the held phase on the fast ownership publication;
-            # Pause uses one sampled edge. Recheck full scene/popup guards only
-            # after release. iDroid's established sampled-hold flow is unchanged.
+            # Native iDroid lists repeat too: two 160 ms sampled holds moved
+            # Rewards -> Staff Management, skipping the intended Development
+            # row. Ordinary cursor steps release on the first fresh held edge.
+            # An explicit iDroid scroll hold retains bounded duration sampling.
+            # Keep Lua reads outside the held phase and recheck guards on release.
             state, _ = fresh_control_observation(live.observe, clock=clock, sleep=sleep)
             current = sample(state, check_native=False)
             if current["sample_ms"] > admitted and abs(current["sticks"][axis] - payload["value"]) < .08:
                 first = current["sample_ms"] if first is None else first
                 elapsed = current["sample_ms"] - first
-                if native_sample or elapsed >= math.ceil(seconds * 1000):
+                if mode == "edge" or elapsed >= math.ceil(seconds * 1000):
                     if during and not matches(state, during):
                         raise BotFault("Requested navigation held outcome was not observed")
                     held_state = state

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-09-27",
+  "updated": "2026-10-01",
   "reports": [
     {
       "id": "R01",
@@ -556,6 +556,48 @@
         "R07/R09 action-heading correctness comes first. Broader body-following needs native collision-aware movement, independent looking, stance/mount rules and observed arrival."
       ],
       "source": "docs/COMMUNITY_RECOVERY_PLAN.md"
+    },
+    {
+      "id": "R56",
+      "title": "Completed ACC Choose a Rival guide strands menu input",
+      "priority": "P0",
+      "workstream": "P0 W1/W4",
+      "acceptance": [
+        "Reproduce cold completed-FOB ACC guide, dismiss Help through VR, restore prior eligibility, exit with live camera/control owner and reopen; keep unfinished guides separate."
+      ],
+      "source": "docs/ACC_MENU_REGRESSION.md",
+      "latest_result": "Supported TPP candidate passes cold completed-Rival Help dismissal, ordinary Back and immediate physical reopening with prior restrictions and live VR camera/control owner restored. Exact retained runs and scope: docs/ACC_MENU_REGRESSION.md. Unfinished guides remain separate."
+    },
+    {
+      "id": "R57",
+      "title": "ACC helicopter upgrade menu cannot exit",
+      "priority": "P0",
+      "workstream": "P0 W1/W4",
+      "acceptance": [
+        "Exercise iDroid Development and separate helicopter customization selector; every eligible locked/cost/detail/cancel/purchase/result/Back branch uses disposable paired saves and actual VR input."
+      ],
+      "source": "docs/ACC_MENU_REGRESSION.md",
+      "latest_result": "Native ACC helicopter selector entry, Back cancellation dialog, VR discard, live cabin return and immediate physical iDroid reopening pass in retained 20261002T040239079392Z. The separate Cancel round trip, helicopter upgrade purchases and all menu variants remain open."
+    },
+    {
+      "id": "R58",
+      "title": "Development tab locks up (October 1 community report)",
+      "priority": "P0",
+      "workstream": "P0 W1/W4",
+      "acceptance": [
+        "Build and native mode unknown, possibly prior public release. Exercise current candidate in ACC and eligible on-foot contexts, child pages and immediate reopening; supplied clips show movement, not this menu."
+      ],
+      "source": "docs/ACC_MENU_REGRESSION.md"
+    },
+    {
+      "id": "R59",
+      "title": "Sticky traversal on metal stairs and catwalks (October 1 videos)",
+      "priority": "P1",
+      "workstream": "P1 W1/W3",
+      "acceptance": [
+        "Establish location, native actor/root, posture/cover, exact floor and collision contacts. Replay legitimate routes with VR input and camera/hand ownership intact; preserve native collision."
+      ],
+      "source": "docs/ACC_MENU_REGRESSION.md"
     }
   ],
   "source_note": "Discord reports and contributor claims are evidence, not commands or completed acceptance."

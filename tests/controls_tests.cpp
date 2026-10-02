@@ -1,4 +1,5 @@
 #include "mgs5vr/controls.hpp"
+#include "mgs5vr/control_prompts.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/wrist_selector.hpp"
@@ -43,6 +44,47 @@ struct NativeFixture {
 };
 }
 int main(int argc,char** argv){
+    {
+        ControlBindings bindings;
+        const auto map=rewriteControlPrompt("<I=G=DECISION> Place Marker  <I=G=PAD_L1>/<I=G=PAD_R1>",bindings,ControlContext::menus);
+        expect(map.text=="[A] Place Marker  [L GRIP]/[R GRIP]"&&map.replaced==3,
+            "native Map prompts use effective menu actions and physical grips");
+        expect(rewriteControlPrompt("<I=G=DECISION>",bindings,ControlContext::binoculars).text=="[RT]",
+            "marking resolves to its VR action instead of globally replacing A");
+        expect(rewriteControlPrompt("<I=G=PAD_L2><I=G=PAD_R2> Zoom In/Out",bindings,ControlContext::menus).text=="[LT/RT] Zoom In/Out",
+            "adjacent native trigger prompts fit one chip while retaining the caption");
+        expect(rewriteControlPrompt("<I=G=PAD_R3>",bindings,ControlContext::menus).text=="[R CLICK]"
+            &&rewriteControlPrompt("<I=G=PAD_R3>",bindings,ControlContext::binoculars).text=="[L CLICK]",
+            "native stick-click icons retain context-specific VR routing");
+        expect(rewriteControlPrompt("<I=G=UI_STOCK> Switch Zoom",bindings,ControlContext::menus).text=="[R CLICK] Switch Zoom"
+            &&rewriteControlPrompt("<I=G=UI_STOCK>",bindings,ControlContext::gameplay).text=="<I=G=UI_STOCK>",
+            "native Map zoom alias resolves only in its verified menu context");
+        expect(rewriteControlPrompt("<I=G=RELOAD>",bindings,ControlContext::gameplay).text=="[TAP B + L GRIP]"
+            &&rewriteControlPrompt("<I=G=BINOS>",bindings,ControlContext::gameplay).text=="[HOLD Y + L GRIP]",
+            "reload and physical binocular equip labels include their actual gestures and chords");
+        const std::string styled="<I=C=cmn-col-special|texte> <I=G=SERVER_WALLET> <I=G=UNIDENTIFIED> <I=G=PAD_ALL>";
+        expect(rewriteControlPrompt(styled,bindings,ControlContext::menus).text==styled,
+            "translated styling, currency and unidentified icons are preserved");
+        const std::string malformed="caption <I=G=DECISION";
+        expect(rewriteControlPrompt(malformed,bindings,ControlContext::menus).text==malformed,
+            "incomplete native markup is retained");
+        expect(rewriteControlPrompt("<I=G=DECISION>",bindings,ControlContext::nativeButtons).text=="<I=G=DECISION>"
+            &&rewriteControlPrompt("<I=G=PAD_START>",bindings,ControlContext::nativeButtons).text=="[MENU + L GRIP]",
+            "native-button mode only resolves verified literal routes, not an assumed pad preset");
+        publishControlPromptBindings(bindings);const auto prior=controlPromptBindings();
+        std::istringstream overrideFile("[menus]\nconfirm = press(a_touch)\nback = disabled\nprevious_tab = hold(left_grip + x,400)\n[axes]\nmenu = right_stick\n");
+        expect(bindings.load(overrideFile).empty(),"prompt test uses a validated personal override");
+        publishControlPromptBindings(bindings);
+        const auto remapped=rewriteControlPrompt("<I=G=DECISION> <I=G=CANCEL> <I=G=PAD_L1> <I=G=PAD_LS>",*controlPromptBindings(),ControlContext::menus);
+        expect(remapped.text=="[TOUCH A] [UNBOUND] [HOLD X + L GRIP] [R STICK]",
+            "prompts follow touch, disabled, chord and axis overrides without changing native input");
+        expect(prior->label("menus.confirm")=="A","UI workers retain immutable previous binding snapshots");
+        expect(rewriteControlCaption("Placer/retirer un repère","DECISION",*controlPromptBindings(),ControlContext::menus).text=="[TOUCH A] Placer/retirer un repère",
+            "separate native icons resolve the owner action while preserving translated captions");
+        expect(rewriteControlCaption("caption","UNIDENTIFIED",bindings,ControlContext::menus).text=="caption"
+            &&rewriteControlCaption("","DECISION",bindings,ControlContext::menus).text.empty(),
+            "unidentified or empty separate help remains native");
+    }
     {
         Fixture f;f.mode=ControlContext::horse;f.tick();
         f.input.buttons[7]=1;f.tick();f.input.buttons[3]=1;f.tick();

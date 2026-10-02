@@ -3,6 +3,7 @@
 #include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/ui_clip.hpp"
 #include "mgs5vr/input_bridge.hpp"
+#include "mgs5vr/control_prompts.hpp"
 #include "mgs5vr/log.hpp"
 #include <windows.h>
 #include <intrin.h>
@@ -17,6 +18,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <filesystem>
 
@@ -26,6 +28,37 @@ using QueueFn=uintptr_t(*)(void*,void*);
 using ExecuteFn=uintptr_t(*)(void*,void*,void*,uint32_t);
 using NodeFn=uintptr_t(*)(void*,void*);
 QueueFn originalQueue{};ExecuteFn originalExecute{};NodeFn originalNode{};
+using ParseTextFn=int(*)(const char*,void*,void*,uint32_t,uint32_t,float,void*,uint32_t);
+ParseTextFn originalParseText{};
+using PlainTextFn=bool(*)(void*,void*,const char*,bool,bool);
+PlainTextFn originalPlainText{};
+using MapHelpFn=void(*)(void*);
+using UiCaptionFn=void(*)(void*,void*,void*,const char*,bool);
+using UiOpacityFn=void(*)(void*,void*,float);
+MapHelpFn originalMapHelp{};
+bool controlPromptsEnabled{},mapPromptsEnabled{},promptTraceEnabled{};
+std::atomic_uint64_t promptCalls{},promptReplacements{},promptUnresolved{},promptPoolFull{};
+std::atomic_uint64_t mapPromptReplacements{};
+std::atomic_uint64_t mapPromptIconSuppressions{},mapPromptIconRestorations{};
+std::mutex promptMutex;
+// The native text unit BORROWS its UTF-8 pointer. Intern immutable replacement
+// strings for the module lifetime; no temporary buffers or game allocator frees.
+std::unordered_set<std::string> promptTextPool;
+size_t promptTextBytes{};
+std::unordered_set<std::string> promptTraces;
+struct MapPromptState {
+    uintptr_t owner{},node{},unit{};
+    const char* nativeCaption{};
+    const char* appliedCaption{};
+    uintptr_t icon{};
+    float iconAlpha{1.f};
+    bool iconOwned{},traced{};
+};
+// Native Map updates can migrate between UI worker threads. Keep the owner
+// lease together, while only its current setter call receives the TLS scope.
+std::mutex mapPromptMutex;
+MapPromptState mapPrompt;
+thread_local MapPromptState* updatingMapHelp{};
 using MarkerDepthFn=void(*)(void*);
 MarkerDepthFn originalMarkerDepth{};
 std::atomic_uint64_t markerDepthPreserved{};
@@ -194,6 +227,165 @@ std::string nodeName(uintptr_t node){
     std::string result;
     for(size_t n=0;n<160;++n){char c{};if(!read(text+n,&c,1)||!c)break;result.push_back(c>=32&&c<=126?c:'?');}
     return result;
+}
+std::string readPromptText(const char* content){
+    // Read bounded UTF-8 without crossing an allocation on a bad pointer.
+    std::string source;
+    for(size_t i=0;i<16385;){
+        MEMORY_BASIC_INFORMATION region{};
+        const auto address=reinterpret_cast<uintptr_t>(content)+i;
+        if(!VirtualQuery(reinterpret_cast<void*>(address),&region,sizeof(region))){source.clear();break;}
+        const auto remaining=reinterpret_cast<uintptr_t>(region.BaseAddress)+region.RegionSize-address;
+        const auto count=std::min({size_t{128},remaining,size_t{16385}-i});
+        std::array<char,128> bytes{};
+        if(!count||!read(address,bytes.data(),count)){source.clear();break;}
+        const auto end=static_cast<const char*>(std::memchr(bytes.data(),0,count));
+        source.append(bytes.data(),end?static_cast<size_t>(end-bytes.data()):count);
+        if(end)break;
+        i+=count;
+    }
+    return source;
+}
+void tracePrompt(void* node,const char* content,const char* path){
+    if(!promptTraceEnabled||!content)return;
+    try{
+        const auto source=readPromptText(content);
+        if(source.empty()||source.size()>96||source.find_first_not_of("0123456789.,:% /+-") == std::string::npos)return;
+        uint32_t font{};if(node)read(reinterpret_cast<uintptr_t>(node)+0x94,&font,sizeof(font));
+        const auto key=std::string(path)+std::to_string(font)+source;
+        std::lock_guard lock(promptMutex);
+        if(promptTraces.size()>=128||!promptTraces.emplace(key).second)return;
+        void* stack[6]{};const auto frames=RtlCaptureStackBackTrace(1,6,stack,nullptr);
+        std::ostringstream message;message<<"VR prompt trace "<<path<<" font="<<font<<" text="<<source<<" callers="<<std::hex;
+        for(unsigned i=0;i<frames;++i)message<<(reinterpret_cast<uintptr_t>(stack[i])-base)<<',';
+        log(message.str());
+    }catch(...){}
+}
+const char* internPrompt(std::string text){
+    std::lock_guard lock(promptMutex);
+    auto found=promptTextPool.find(text);
+    if(found==promptTextPool.end()&&promptTextPool.size()<4096&&promptTextBytes+text.size()+1<=4*1024*1024){
+        promptTextBytes+=text.size()+1;
+        found=promptTextPool.emplace(std::move(text)).first;
+    }
+    if(found!=promptTextPool.end())return found->c_str();
+    ++promptPoolFull;return nullptr;
+}
+const char* mapCaptionText(const char* content){
+    if(!content||!enabled.load()||!mapPromptsEnabled||nativeGamepadActive()
+        ||!nativeMenuOpen().value_or(false))return content;
+    try{
+        const auto input=controlInputAudit(steadyMilliseconds());
+        const auto bindings=controlPromptBindings();
+        if(!bindings||(input&&input->context==ControlContext::nativeButtons))return content;
+        const auto source=readPromptText(content);
+        auto result=rewriteControlCaption(source,"DECISION",*bindings,ControlContext::menus);
+        if(result.replaced)if(const auto replacement=internPrompt(std::move(result.text)))return replacement;
+    }catch(...){}
+    return content;
+}
+bool plainText(void* node,void* unit,const char* content,bool scroll,bool alternateFont){
+    tracePrompt(node,content,"plain");
+    if(updatingMapHelp&&reinterpret_cast<uintptr_t>(node)==updatingMapHelp->node
+        &&reinterpret_cast<uintptr_t>(unit)==updatingMapHelp->unit){
+        updatingMapHelp->nativeCaption=content;
+        const auto replacement=mapCaptionText(content);
+        updatingMapHelp->appliedCaption=replacement;
+        if(replacement!=content)++mapPromptReplacements;
+        return originalPlainText(node,unit,replacement,scroll,alternateFont);
+    }
+    return originalPlainText(node,unit,content,scroll,alternateFont);
+}
+void mapHelp(void* object){
+    // Scope the plain setter to this exact native Map help owner and its text
+    // unit. Other plain captions have no recoverable action identity here.
+    const auto address=reinterpret_cast<uintptr_t>(object);
+    std::lock_guard ownerLock(mapPromptMutex);
+    uintptr_t node{},unit{};
+    if(!read(address+0x878,&node,sizeof(node))||!read(address+0x958,&unit,sizeof(unit)))return originalMapHelp(object);
+    if(mapPrompt.owner!=address||mapPrompt.node!=node||mapPrompt.unit!=unit)mapPrompt={address,node,unit};
+    const auto saved=updatingMapHelp;updatingMapHelp=&mapPrompt;
+    originalMapHelp(object);updatingMapHelp=saved;
+    uintptr_t holder{},ui{},vtable{},setter{};
+    if(!read(address+0x38,&holder,sizeof(holder))||!read(holder+0x20,&ui,sizeof(ui))
+        ||!read(ui,&vtable,sizeof(vtable))||vtable!=base+0x2184f90
+        ||!read(vtable+0x708,&setter,sizeof(setter))||setter!=base+0x50f9e0)return;
+    if(!mapPrompt.nativeCaption)read(address+0x940,&mapPrompt.nativeCaption,sizeof(mapPrompt.nativeCaption));
+    // The native owner caches the source caption pointer. A neutral live
+    // binding edit must also refresh a page whose native caption is unchanged.
+    const auto replacement=mapCaptionText(mapPrompt.nativeCaption);
+    if(replacement&&replacement!=mapPrompt.appliedCaption){
+        reinterpret_cast<UiCaptionFn>(setter)(reinterpret_cast<void*>(ui),reinterpret_cast<void*>(node),reinterpret_cast<void*>(unit),replacement,true);
+        mapPrompt.appliedCaption=replacement;++mapPromptReplacements;
+        log("VR Map action caption refreshed: "+readPromptText(replacement).substr(0,240));
+    }
+    // Native f07e80 binds the Confirm image at +868 (name 6c962274),
+    // separately from the translated action caption at +878 and cursor +870.
+    // Suppress only that direct image while its replacement label is usable.
+    uintptr_t layout{},layoutType{},root{},icon{},iconType{},iconParent{},opacity{};
+    uint32_t iconName{};float alpha{};
+    if(read(address+0x860,&layout,sizeof(layout))&&read(layout,&layoutType,sizeof(layoutType))
+        &&layoutType==base+0x2546380&&read(layout+0x80,&root,sizeof(root))
+        &&read(address+0x868,&icon,sizeof(icon))&&read(icon,&iconType,sizeof(iconType))&&iconType==base+0x2546a30
+        &&read(icon+0x10,&iconParent,sizeof(iconParent))&&iconParent==root
+        &&read(icon+0x6c,&iconName,sizeof(iconName))&&iconName==0x6c962274
+        &&read(icon+0x5c,&alpha,sizeof(alpha))&&std::isfinite(alpha)&&alpha>=0.f&&alpha<=1.f
+        &&read(vtable+0x2c8,&opacity,sizeof(opacity))&&opacity==base+0x50d420){
+        if(mapPrompt.icon!=icon){mapPrompt.icon=icon;mapPrompt.iconOwned=false;}
+        const bool replaced=replacement&&replacement!=mapPrompt.nativeCaption;
+        if(replaced){
+            if(!mapPrompt.iconOwned){mapPrompt.iconAlpha=alpha;mapPrompt.iconOwned=true;}
+            reinterpret_cast<UiOpacityFn>(opacity)(reinterpret_cast<void*>(ui),reinterpret_cast<void*>(icon),0.f);
+            ++mapPromptIconSuppressions;
+        }else if(mapPrompt.iconOwned){
+            reinterpret_cast<UiOpacityFn>(opacity)(reinterpret_cast<void*>(ui),reinterpret_cast<void*>(icon),mapPrompt.iconAlpha);
+            mapPrompt.iconOwned=false;++mapPromptIconRestorations;
+        }
+    }
+    if(promptTraceEnabled&&!mapPrompt.traced){
+        mapPrompt.traced=true;
+        std::ostringstream trace;trace<<"VR Map help owner="<<std::hex<<address<<" caption="<<node<<" icon_group="<<mapPrompt.icon;
+        log(trace.str());
+    }
+}
+const char* promptText(const char* content){
+    if(!enabled.load()||!controlPromptsEnabled||!content)return content;
+    const char* replacement=content;
+    try{
+        const auto bindings=controlPromptBindings();
+        const auto input=controlInputAudit(steadyMilliseconds());
+        const bool menuOpen=nativeMenuOpen().value_or(false);
+        if(bindings&&(input||menuOpen)&&!nativeGamepadActive()){
+            const auto source=readPromptText(content);
+            if(source.find("<I=G=")!=std::string::npos&&source.size()<=16384){
+                auto context=input?input->context:ControlContext::menus;
+                if(context!=ControlContext::nativeButtons&&menuOpen)context=ControlContext::menus;
+                auto result=rewriteControlPrompt(source,*bindings,context);
+                promptUnresolved.fetch_add(result.unresolved);
+                if(result.replaced){
+                    std::lock_guard lock(promptMutex);
+                    auto found=promptTextPool.find(result.text);
+                    if(found==promptTextPool.end()&&promptTextPool.size()<4096&&promptTextBytes+result.text.size()+1<=4*1024*1024){
+                        promptTextBytes+=result.text.size()+1;
+                        found=promptTextPool.emplace(std::move(result.text)).first;
+                        if(promptTextPool.size()<=32)log("VR control prompt ["+std::string(controlContextName(context))+"] "+source.substr(0,160)+" -> "+found->substr(0,240));
+                    }
+                    if(found!=promptTextPool.end()){
+                        replacement=found->c_str();promptReplacements.fetch_add(result.replaced);
+                    }else ++promptPoolFull;
+                }
+            }
+        }
+    }catch(...){}
+    return replacement;
+}
+int parseText(const char* content,void* primary,void* secondary,uint32_t font,uint32_t flags,float width,void* units,uint32_t capacity){
+    // This native entry consumes action markup before measuring and splitting
+    // it into text/icon units. The later plain-text setter has already lost
+    // those action identities. Preserve all layout arguments and its result.
+    ++promptCalls;
+    tracePrompt(nullptr,content,"markup");
+    return originalParseText(promptText(content),primary,secondary,font,flags,width,units,capacity);
 }
 __declspec(noinline) uintptr_t queue(void* job,void* state){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
@@ -488,6 +680,7 @@ void installUiRenderer(uintptr_t moduleBase){
     constexpr unsigned char startShowEntry[]{0x40,0x57,0x48,0x83,0xec,0x40,0x48,0x8b,0xf9};
     constexpr unsigned char markerDepthEntry[]{0x48,0x89,0x5c,0x24,0x18,0x48,0x89,0x7c,0x24,0x20};
     constexpr unsigned char equipmentUpdateEntry[]{0x40,0x57,0x48,0x83,0xec,0x30,0x80,0xb9,0xc4,0x02,0,0,0};
+    constexpr unsigned char parseTextEntry[]{0x40,0x55,0x53,0x56,0x57,0x41,0x54,0x41,0x55,0x41,0x56,0x41,0x57};
     const std::array<Hook,8> hooks{{
         {0x2d3380,reinterpret_cast<void*>(&queue),reinterpret_cast<void**>(&originalQueue),queueEntry,sizeof(queueEntry)},
         {0x2e7770,reinterpret_cast<void*>(&execute),reinterpret_cast<void**>(&originalExecute),executeEntry,sizeof(executeEntry)},
@@ -501,6 +694,46 @@ void installUiRenderer(uintptr_t moduleBase){
         if(!read(moduleBase+hook.rva,bytes.data(),hook.size)||std::memcmp(bytes.data(),hook.signature,hook.size))throw std::runtime_error("Native UI renderer signature mismatch");
     }
     base=moduleBase;
+    std::array<wchar_t,32768> executable{};
+    if(GetModuleFileNameW(nullptr,executable.data(),static_cast<DWORD>(executable.size())))
+        settings=std::filesystem::path(executable.data()).parent_path()/L"mgs5vr.ini";
+    wchar_t promptSwitch[4]{};
+    const auto promptOverride=GetEnvironmentVariableW(L"MGS5VR_VR_BUTTON_PROMPTS",promptSwitch,4);
+    controlPromptsEnabled=promptOverride?promptOverride==1&&promptSwitch[0]==L'1'
+        :GetPrivateProfileIntW(L"diagnostics",L"vr_button_prompt_experiment",0,settings.c_str())==1;
+    if(controlPromptsEnabled){
+        std::array<unsigned char,sizeof(parseTextEntry)> textBytes{};
+        const auto target=reinterpret_cast<void*>(base+0x1dc3aa0);
+        if(!read(base+0x1dc3aa0,textBytes.data(),textBytes.size())||std::memcmp(textBytes.data(),parseTextEntry,textBytes.size())
+           ||MH_CreateHook(target,reinterpret_cast<void*>(&parseText),reinterpret_cast<void**>(&originalParseText))!=MH_OK
+           ||MH_EnableHook(target)!=MH_OK){
+            MH_DisableHook(target);controlPromptsEnabled=false;
+            log("VR control prompt candidate unavailable; native UI retained");
+        }else log("VR control prompt candidate enabled at native input-markup parser");
+    }
+    wchar_t traceSwitch[4]{};
+    const auto traceOverride=GetEnvironmentVariableW(L"MGS5VR_PROMPT_TRACE",traceSwitch,4);
+    promptTraceEnabled=controlPromptsEnabled&&(traceOverride?traceOverride==1&&traceSwitch[0]==L'1'
+        :GetPrivateProfileIntW(L"diagnostics",L"vr_prompt_trace",0,settings.c_str())==1);
+    if(controlPromptsEnabled){
+        constexpr std::array<unsigned char,10> plainEntry{0x48,0x89,0x5c,0x24,0x10,0x48,0x89,0x6c,0x24,0x18};
+        std::array<unsigned char,10> bytes{};const auto target=reinterpret_cast<void*>(base+0x5102d0);
+        if(!read(base+0x5102d0,bytes.data(),bytes.size())||bytes!=plainEntry
+            ||MH_CreateHook(target,reinterpret_cast<void*>(&plainText),reinterpret_cast<void**>(&originalPlainText))!=MH_OK
+            ||MH_EnableHook(target)!=MH_OK){MH_DisableHook(target);promptTraceEnabled=false;}
+        else{
+            // The separate Map caption is updated by this verified owner.
+            std::array<unsigned char,10> mapBytes{};
+            const auto mapTarget=reinterpret_cast<void*>(base+0xf0a110);
+            constexpr std::array<unsigned char,16> opacityEntry{0x48,0x85,0xd2,0x74,0x0b,0x0f,0x28,0xca,0x48,0x8b,0xca,0xe9,0x40,0,0x8a,1};
+            std::array<unsigned char,16> opacityBytes{};
+            if(read(base+0xf0a110,mapBytes.data(),mapBytes.size())&&mapBytes==plainEntry
+                &&read(base+0x50d420,opacityBytes.data(),opacityBytes.size())&&opacityBytes==opacityEntry
+                &&MH_CreateHook(mapTarget,reinterpret_cast<void*>(&mapHelp),reinterpret_cast<void**>(&originalMapHelp))==MH_OK
+                &&MH_EnableHook(mapTarget)==MH_OK){mapPromptsEnabled=true;log("VR Map action-help owner enabled");}
+            else MH_DisableHook(mapTarget);
+        }
+    }
     constexpr std::array<unsigned char,11> overviewEntry{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57};
     constexpr std::array<unsigned char,10> overviewCloseEntry{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x6c,0x24,0x10};
     constexpr std::array<unsigned char,9> activateLayerEntry{0x48,0x83,0xec,0x28,0x48,0x85,0xd2,0x74,0x15};
@@ -539,11 +772,7 @@ void installUiRenderer(uintptr_t moduleBase){
     std::array<unsigned char,6> closeBytes{};
     pauseReaderVerified=read(base+0x53a280,getterBytes.data(),getterBytes.size())&&getterBytes==sequenceGetter
         &&read(base+0x5391ca,closeBytes.data(),closeBytes.size())&&closeBytes==closePause;
-    std::array<wchar_t,32768> executable{};
-    if(GetModuleFileNameW(nullptr,executable.data(),static_cast<DWORD>(executable.size()))){
-        settings=std::filesystem::path(executable.data()).parent_path()/L"mgs5vr.ini";
-        wristHudEnabled=GetPrivateProfileIntW(L"diagnostics",L"wrist_hud_experiment",0,settings.c_str())==1;
-    }
+    wristHudEnabled=GetPrivateProfileIntW(L"diagnostics",L"wrist_hud_experiment",0,settings.c_str())==1;
     for(const auto& hook:hooks){const auto result=MH_CreateHook(reinterpret_cast<void*>(base+hook.rva),hook.wrapper,hook.original);
         if(result!=MH_OK)throw std::runtime_error(std::string("Native UI hook: ")+MH_StatusToString(result));
     }
@@ -641,6 +870,37 @@ bool nativeIdroidClosing() noexcept {
        ||!read(terminal,&type,sizeof(type))||type!=base+0x22705a8
        ||!read(terminal+0x25,&closing,sizeof(closing)))return true;
     return closing!=0;
+}
+std::optional<unsigned> nativeIdroidTutorialMode() noexcept {
+    if(!enabled.load()||!menuReaderVerified)return {};
+    uintptr_t system{},tutorial{},type{};uint8_t mode{};
+    if(!read(base+0x2bf1518,&system,sizeof(system))||!system
+       ||!read(system,&type,sizeof(type))||type!=base+0x2242d78
+       ||!read(system+0x90,&tutorial,sizeof(tutorial))||!tutorial
+       ||!read(tutorial,&type,sizeof(type))||type!=base+0x2272810
+       ||!read(tutorial+8,&mode,sizeof(mode))||mode>16)return {};
+    return mode;
+}
+bool releaseNativeIdroidTutorialPause() noexcept {
+    const auto mode=nativeIdroidTutorialMode();
+    if(!mode||*mode!=0||nativePauseMenuOpen())return false;
+    uintptr_t system{},tutorial{},handle{},type{};uint32_t level{};
+    if(!read(base+0x2bf1518,&system,sizeof(system))||!system
+       ||!read(system+0x90,&tutorial,sizeof(tutorial))||!tutorial
+       ||!read(tutorial,&type,sizeof(type))||type!=base+0x2272810
+       ||!read(tutorial+0xd0,&handle,sizeof(handle))
+       ||handle<base+0x2b65d58||handle>=base+0x2b65d98||(handle-(base+0x2b65d58))%4
+       ||!read(base+0x2b65d40,&type,sizeof(type))||type!=base+0x20c56c0
+       ||!read(handle,&level,sizeof(level))||(level&0x7fffffff)!=0x7fffffde)return false;
+    constexpr std::array<unsigned char,14> signature{0x4c,0x8b,0x81,0xd0,0,0,0,0x41,0x8b,0,0xc1,0xe8,0x1f,0x24};
+    std::array<unsigned char,signature.size()> actual{};
+    if(!read(base+0x932960,actual.data(),actual.size())||actual!=signature)return false;
+    // The native class's pause(bool) changes only its own allocated handle's
+    // active bit. The native manager recomputes the combined mask next frame.
+    // Keep the handle allocated so a future real lesson can pause normally.
+    using Pause=void(*)(void*,bool);
+    reinterpret_cast<Pause>(base+0x932960)(reinterpret_cast<void*>(tutorial),false);
+    return read(handle,&level,sizeof(level))&&(level&0x80000000)==0;
 }
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
 void requestNativeEquipmentPreview(bool visible) noexcept {equipmentPreviewRequestedAt.store(visible?steadyMilliseconds():0);}
@@ -765,6 +1025,12 @@ void reportUiRenderer(std::ostream& out){
        <<",\"expired\":"<<expired.load()<<",\"overflow\":"<<overflow.load()
        <<",\"marker_depth_preserved\":"<<markerDepthPreserved.load()
        <<",\"recon_model_groups_hidden\":"<<reconModelGroupsHidden.load()
+       <<",\"vr_control_prompts\":"<<(controlPromptsEnabled?"true":"false")
+       <<",\"prompt_calls\":"<<promptCalls.load()
+       <<",\"prompt_replacements\":"<<promptReplacements.load()<<",\"prompt_unresolved\":"<<promptUnresolved.load()
+       <<",\"prompt_pool_full\":"<<promptPoolFull.load()
+       <<",\"map_control_prompts\":"<<(mapPromptsEnabled?"true":"false")<<",\"map_prompt_replacements\":"<<mapPromptReplacements.load()
+       <<",\"map_prompt_icon_suppressions\":"<<mapPromptIconSuppressions.load()<<",\"map_prompt_icon_restorations\":"<<mapPromptIconRestorations.load()
        <<",\"spatial_by_eye\":["<<spatialByEye[0].load()<<','<<spatialByEye[1].load()<<']'
        <<",\"hidden_panel_by_eye\":["<<hiddenPanelByEye[0].load()<<','<<hiddenPanelByEye[1].load()<<']'
        <<",\"pending\":"<<pending.size()<<",\"node_calls\":"<<nodeCalls.load()<<",\"nodes\":[";

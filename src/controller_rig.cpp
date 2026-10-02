@@ -58,6 +58,7 @@ bool scopeQueryVerified{};
 bool modelTransformVerified{};
 bool scopeTrace{};
 WeaponScopeZoom scopeZoom;
+ScopePoseStabilizer scopeAim;
 std::mutex rigMutex;
 // A native skin call may recursively publish an attached model. Keep the
 // player's solved channels installed until that complete publication returns.
@@ -400,6 +401,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         presentationGrips[side]=handPresentation[side].update(frame.controllers.hands[side].grip,
             frame.controllers.hands[side].gripTracked,frame.sampleTime,continuity);
     if(frame.controllers.nativeGamepad||!presentationGrips[1]){
+        scopeAim.reset();
         // Controller occlusion does not invalidate a tracked headset. Publish
         // this unchanged native skin with its actual camera transaction; no
         // stale tracked weapon, palm, scope or wrist UI may accompany it.
@@ -967,6 +969,31 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         frame.weaponScope={compose(localFromWrist,scopeInWrist->ocular),compose(localFromWrist,scopeInWrist->objective),
             scopeInWrist->radius,frame.controllers.scopeEyeRelief,
             scopeZoom.update(identity,frame.controllers.weaponZoomSequence,scopeInWrist->powers),identity,true};
+        const auto rawScope=frame.weaponScope;
+        // At full two-hand contact, deliberate support-hand guidance is part
+        // of the controller owner, not attachment noise. Follow that same
+        // common grip immediately; do not delay it by the x8 filter constant.
+        Pose scopeOwner=primaryHand.aim;
+        if(aimBlend>0)scopeOwner=compose(localFromWorld,compose(*root,
+            compose(grips[1],Pose{blendRotation({},guidedOffset,aimBlend),{}})));
+        const auto reach=right->pose.wrist.position-rightTarget.position;
+        const bool changingContact=(supportBlend>0&&supportBlend<1)||(aimBlend>0&&aimBlend<1);
+        const bool stabilize=frame.controllers.scopePoseStabilization&&primaryHand.aimTracked
+            &&primaryHand.gripTracked&&!nativeManipulation&&!changingContact&&dot(reach,reach)<.000004f;
+        frame.weaponScope=scopeAim.update(scopeOwner,rawScope,stabilize,frame.sampleTime,
+            frame.controllers.referenceEpoch,frame.activation);
+        if(scopeTrace&&stabilize){
+            static uint64_t statAt{};static float maxDeg{},maxMm{};
+            const auto scopeDelta=compose(Pose{rawScope.ocular.orientation,{}},
+                inverse(Pose{frame.weaponScope.ocular.orientation,{}})).orientation;
+            const auto shift=rawScope.ocular.position-frame.weaponScope.ocular.position;
+            maxDeg=std::max(maxDeg,2.f*std::atan2(std::sqrt(scopeDelta.x*scopeDelta.x+scopeDelta.y*scopeDelta.y+scopeDelta.z*scopeDelta.z),std::abs(scopeDelta.w))*57.29578f);
+            maxMm=std::max(maxMm,std::sqrt(dot(shift,shift))*1000.f);
+            if(now-statAt>=2000){
+                statAt=now;std::ostringstream s;s<<"Scope stabilizer (Coco v3): max correction "
+                    <<maxDeg<<" deg, "<<maxMm<<" mm (2 s)";log(s.str());maxDeg=maxMm=0;
+            }
+        }
         static uint64_t reported{};static float reportedPower{};
         if(reported!=identity||reportedPower!=frame.weaponScope.magnification){
             reported=identity;reportedPower=frame.weaponScope.magnification;
@@ -989,6 +1016,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             log(s.str());
         }
     }
+    else scopeAim.reset();
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
     HandContacts handContacts;
     for(size_t side=0;side<2;++side){

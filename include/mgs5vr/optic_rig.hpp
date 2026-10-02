@@ -20,6 +20,20 @@ struct WeaponScopeSample {
 std::optional<EyeView> weaponScopeSceneView(const WeaponScopeSample& scope);
 bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye);
 
+// Coco's scope-disc filter: remove noise in the completed skin's attachment
+// relative to its same-frame controller owner. Actual owner movement is never
+// filtered. Lens glass and lens camera retain their exact rigid relationship.
+class ScopePoseStabilizer {
+public:
+    WeaponScopeSample update(Pose owner,WeaponScopeSample scope,bool available,
+        uint64_t time,uint64_t epoch,uint64_t activation);
+    void reset(){*this=ScopePoseStabilizer{};}
+private:
+    Pose relative_{};
+    uint64_t identity_{},time_{},epoch_{},activation_{};
+    bool ready_{};
+};
+
 struct WeaponScopeGeometry {
     Pose ocular{},objective{}; // Equipped native weapon space; optical forward -Z.
     float radius{};

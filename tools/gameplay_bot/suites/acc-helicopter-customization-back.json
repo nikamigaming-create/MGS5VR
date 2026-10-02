@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "description": "Unverified native ACC helicopter-selector cancel probe. Run only on an already-open, visually reviewed selector; it opens no menu, purchases nothing and sends one ordinary VR Back action. This does not cover helicopter development through iDroid.",
-  "source_contract": "HELI_COMMON Seq_Game_WeaponCustomize -> Customize_Abort -> Seq_Game_WeaponCustomizeAbort -> Seq_Game_MainGame. Native selector exit resets CustomizeSelector; no forced iDroid close or progression writes.",
+  "description": "Native ACC helicopter selector only: reviewed ordinary Back opens the cancellation dialog; select its discard choice through the effective VR menu stick, confirm, and require the live cabin camera/control owner. Run from an already-open, visually reviewed selector. No upgrade purchase.",
+  "source_contract": "HELI_COMMON Seq_Game_WeaponCustomize: Back -> native cancellation dialog -> discard OK -> Customize_Abort -> Seq_Game_WeaponCustomizeAbort -> Seq_Game_MainGame. No forced terminal closure or progression writes.",
   "continue_after_outcome_failure": false,
   "cases": [
     {
-      "id": "acc-helicopter-customization-cancel",
+      "id": "acc-helicopter-customization-back-dialog",
       "before": {
         "scene": "menu",
         "menu": true,
@@ -16,7 +16,9 @@
         "native.sequence": "Seq_Game_WeaponCustomize",
         "native.customization_kind": "helicopter",
         "native.popup": false,
-        "native.saving": false
+        "native.saving": false,
+        "native.mission": 40010,
+        "pause": false
       },
       "entry_timeout": 2,
       "steps": [
@@ -24,13 +26,79 @@
           "op": "action",
           "name": "menus.back",
           "seconds": 0.25,
-          "state_before": {"scene": "menu", "menu": true, "idroid": false},
+          "state_before": {
+            "scene": "menu",
+            "menu": true,
+            "idroid": false
+          },
           "native_before": {
             "title": false,
             "helicopter_space": true,
             "sequence": "Seq_Game_WeaponCustomize",
             "customization_kind": "helicopter",
             "popup": false,
+            "saving": false
+          }
+        }
+      ],
+      "after": {
+        "scene": "menu",
+        "menu": true,
+        "idroid": false,
+        "pause": false,
+        "native.sequence": "Seq_Game_WeaponCustomize",
+        "native.customization_kind": "helicopter",
+        "native.popup": true,
+        "controls.native_buttons": 0
+      },
+      "timeout": 8,
+      "after_stable_samples": 3
+    },
+    {
+      "id": "acc-helicopter-customization-discard-confirm",
+      "before": {
+        "scene": "menu",
+        "menu": true,
+        "idroid": false,
+        "controls.context": "menus",
+        "native.title": false,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_WeaponCustomize",
+        "native.customization_kind": "helicopter",
+        "native.popup": true,
+        "native.saving": false,
+        "native.mission": 40010,
+        "pause": false
+      },
+      "entry_timeout": 2,
+      "steps": [
+        {
+          "op": "menu_navigate",
+          "owner": "customization_popup",
+          "direction": "left",
+          "native_before": {
+            "mission": 40010,
+            "sequence": "Seq_Game_WeaponCustomize",
+            "helicopter_space": true,
+            "customization_kind": "helicopter",
+            "popup": true
+          }
+        },
+        {
+          "op": "action",
+          "name": "menus.confirm",
+          "seconds": 0.25,
+          "state_before": {
+            "scene": "menu",
+            "menu": true,
+            "idroid": false
+          },
+          "native_before": {
+            "title": false,
+            "helicopter_space": true,
+            "sequence": "Seq_Game_WeaponCustomize",
+            "customization_kind": "helicopter",
+            "popup": true,
             "saving": false
           }
         }
@@ -43,7 +111,13 @@
         "native.title": false,
         "native.helicopter_space": true,
         "native.sequence": "Seq_Game_MainGame",
-        "native.popup": false
+        "native.popup": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "camera_awaiting_player": false,
+        "controls.context": "gameplay",
+        "controls.rig_input": true,
+        "native.vr_idroid_player_pad_block": false
       },
       "timeout": 8,
       "after_stable_samples": 3

@@ -14,7 +14,7 @@ The release is **not accepted from start to finish**. Keep this list separate
 from build passes and from older scene evidence.
 
 The current local work adds a shared live 3D settings editor and revises the
-iDroid holding frame. All 54 VR adjustments have a fitting view; hand/device
+iDroid holding frame. All 55 VR adjustments have a fitting view; hand/device
 position and rotation, screen width/distance/origin/rotation, left-arm HUD,
 optics and spatial menus update immediately in the reference preview. Resetting
 a fit preserves bindings and interaction modes. See VR_FIT_SETTINGS.md.
@@ -27,11 +27,49 @@ default and configured-fit runs each pass seven native cases, including
 distinct grip/pointing bases, inspection and ordinary immediate reopening.
 The retail light cone still fails to retarget to every nonzero screen
 offset/rotation. That defect, forced tutorial stow and physical ergonomic
-acceptance remain open. The September 30 GitHub prerelease is unchanged.
+acceptance remain open. Public package identity is recorded in RELEASE.json;
+the local candidate and historical runs keep their own exact build identities.
 The editor passed 38 headless fixture checks, including complete save/reload,
 discard, orbit/zoom, accurate fractional text scale and reset preserving
 handheld mode. The retained controller guide still resolves 98 action locations
-across eight contexts. The focused bot contracts now have 127 checks.
+across eight contexts. The focused bot contracts now have 138 checks.
+
+Inline VR prompts use the effective personal bindings and shared native action
+markup, keeping translated captions and unidentified icons. Compact `LT/RT`
+fits Map's bottom-row slot in both eyes. Five scoped Map cases passed in retained
+`20261001T225420725862Z`, including default Confirm dispatch and native-button
+mode on/off. Its stock A graphic remained visible, so prompt replacement is not
+accepted. The failed group/widget hiding changes are removed; the current
+direct Confirm-image build `822a8077d38a` now passes seven scoped default cases
+in retained `20261002T003629964618Z`, with both-eye review of default prompts,
+native-mode stock-image restoration and steady reopening. Remapped run
+`20261002T004055181967Z` passes five native cases: both eyes show `[X + L GRIP]`
+with no stock A, and that physical chord reaches native Confirm. Its initial
+reopening pair still spans the native animation. Controls were restored exactly.
+The reviewed Map scope is recorded under `artifacts/bot/acceptance/`; other
+prompt families and physical headset acceptance remain open. The feature stays
+opt-in. See VR_CONTROL_PROMPTS.md.
+
+Coco's `scope_stabilizer.patch` filters native ocular drift relative to
+the authoritative aiming hand, with the objective sharing the same rigid
+correction. **Steady scope glass** defaults on and remains separate from the
+older optional hand/sight stabilization. Synthetic jitter/reset checks pass;
+this is not physical headset acceptance. Coco's world-brightness bug was
+reproduced in native Mission 10020: moving only the physical binocular changed
+the head adaptation by 0.30 in its retail scalar. The repair gives the lens
+separate registered CPU luminance textures, GPU readbacks and adaptation
+history, restoring the head owner immediately afterward. Cloning only the GPU
+readbacks was insufficient because their CPU destination remained shared.
+
+The matched no-lens/shared/isolated field run `20261002T023059054018Z` and cold
+default-on replay `20261002T024344212455Z` each pass 16 scoped samples with
+both-eye review. In the latter, head means are -13.3062 without the extra lens
+and -13.3091 with isolation; the lens still adapts independently and head
+motion still changes ordinary exposure. These are native scalars, not claimed
+EV units. This repair is now **on by default** in `play/` on supported TPP;
+Ground Zeroes stays untouched. Firearm-specific motion, continuous flicker,
+other lighting scenes and physical headset acceptance remain open. See
+WEAPON_SCOPES.md and `artifacts/bot/acceptance/optic-exposure.json`.
 
 The local weapon fit adds a separate **One-hand weapon tilt**, default -30
 degrees, applied through the common native firing wrist. Gun, hand, physical
@@ -54,25 +92,100 @@ The owned equipment worklist contains 418 firearm definitions across 83 model
 entries, including eligibility and variant questions; those are a coverage
 queue, not 418 passing weapon tests. See WEAPON_FIT_AUDIT.md.
 
-Another player reported the helicopter upgrade lock-up while in the ACC;
-the user did not personally experience it. The retained native
-Mother Base -> Development -> Helicopter list/Back pass was in field Mission 6,
-so it does not reproduce that ACC report. The exact reported ACC screen remains unknown. Native ACC iDroid development
-has now been reached through the existing VR bindings: Mother Base has Customize
-first and Development second, unlike the field recipe. The Support Helicopter
-Armament list opens, and its ordinary exit requires three Back edges. A prior
-run failed the old two-edge cleanup; the test loop now allows four guarded edges
-and never starts a second cleanup chain after an ambiguous failure. The separate
-helicopter customization selector and upgrade purchase remain untested.
-See ACC_MENU_REGRESSION.md for retained successes and the forced-menu failure.
-A verified disposable campaign is used; no save replacement or purchase was
-performed in the resumed session. The field baseline's
-selected helicopter grades were already developed, so Confirm did not open a
-purchase dialog. Item/upgrade confirmation and purchase completion remain open.
-The list can
-take several seconds to populate. A test that sent an extra Back after an
-already-developed item did nothing has been retained as a test failure,
-not a reproduced game lock-up.
+The reproduced completed-FOB ACC **Choose a Rival** lock-up is repaired.
+Its native guide disabled all 78 menu entries and retained its own pause after
+Help dismissal. Recovery restores each captured prior disabled bit, preserves
+independent restrictions and releases the exact guide pause handle, only in the
+completed ACC/main-game context. ACC root Back completes the closure already
+requested by the native menu. It does not cancel unfinished tutorials or edit
+campaign progression.
+
+Candidate DLL `d893eb437a06`, retained run `20261001T181154160585Z`, reached the
+actual Missions, Map, Mother Base, Development and Support Helicopter Armament
+pages through physical VR bindings. Eleven scoped cases passed: three Back
+levels restored the live cabin camera/control owner, then physical iDroid
+reopened with Development still eligible. Both eyes of the leaf, cabin and
+reopening were reviewed. The later Daily Bonus test rejected its own already-
+satisfied outcome before input; the overall run remains partial.
+A second cold boot repeated Help dismissal and restored eligibility. Its
+12-sample Back test exceeded the two-second review deadline despite a returned
+live cabin. The maintained `acc-completed-rival-roundtrip.json` uses three
+stable samples with the same camera/control predicates, matching cleanup.
+Retained `20261001T183825927585Z` proved physical Confirm dismisses
+Daily Bonus and reveals the separate Skulls Attack informational card.
+That card received no stale confirmation. See ACC_MENU_REGRESSION.md.
+
+Final DLL `b6fd45533f6f` passed all four maintained completed-Rival cases on
+another cold boot in retained `20261001T190258541444Z`. Both final-eye pairs
+show the actual Help dismissal, live cabin return and reopened iDroid. Static
+captures establish those page/ownership results; they do not establish
+continuous flicker-free or physical-headset acceptance.
+
+The current default-exposure build `431d6cb9a5ad` repeats all four maintained
+Rival cases on another cold boot in retained `20261002T025907840443Z`.
+Both eyes of the Help dismissal, cabin return and immediate reopening were
+reviewed. Its test launcher uses the existing Steam client and a temporary
+game-local runtime configuration; cleanup restores the exact prior bytes or
+the original absence, preserving any concurrent personal edit.
+
+Community Development and stair reports supplied October 1 have unknown build
+identity; the user says they may predate the local fixes. Both attached videos
+show metal stairs/catwalk movement, not Development. Keep the menu report and
+traversal report separate and exercise the current candidate in ACC and on foot.
+Retained warm run `20261001T191943458398Z` missed a 120 ms iDroid tap; the
+300 ms tap in `20261001T192821425533Z` opened the same native ACC correctly.
+That run also exposed bot cursor overshoot: two sampled holds moved Rewards
+to Staff Management instead of Development. Cursor steps now use one fresh
+sampled edge; an iDroid scroll hold must be explicitly selected. The longer
+default iDroid tap remains below the effective personal hold boundary.
+Native replay passed on cold `20261001T193945164460Z` and warm
+`20261001T194125435098Z`: the default tap opened and two sampled edges reached
+Development exactly. Player bindings are unchanged.
+
+Warm ACC runs reviewed all four Development categories. The weapon cost/time
+confirmation canceled successfully. Security Devices returned visually to its
+parent in `20261001T195300890687Z`, but a later neutral-input acknowledgment
+timed out; that case stays failed. Fresh `20261001T200807859685Z` repeated the
+Security entry/Back successfully and dismissed both the Daily Bonus and distinct
+Skulls Attack information cards through reviewed physical Confirm.
+That run also purchased the eligible AM D114 LA development: native GMP fell
+by exactly 1,633,120, Common Metal by 31,300 and Minor Metal by 29,800, matching
+the reviewed confirmation. Completion is pending its native development timer;
+the developed count stayed 453. Cleanup restored the live cabin camera, neutral
+controls and saved hand poses. Nineteen scoped action outcomes passed; these
+are not nineteen complete menu families or stereo/flicker acceptance.
+
+The completed ACC fixture has all 19 native helicopter development definitions
+already completed. The reviewed body grades and Speaker Confirm are no-ops,
+not successful new upgrades. `tools/development-state.lua` reads actual
+completion, eligibility, grades and resources for selecting a useful fixture.
+Eligibility alone also includes already-completed items. The earlier paired-save
+fixture reached Mission 10020, where Mother Base's reviewed page was empty.
+That early field state does not establish usable on-foot Development. Retained
+`20261001T213743341533Z` passed physical iDroid open, root Back and immediate
+reopening. Cleanup returned the live field camera, neutral input and saved hand
+poses. The bot's transient null-input-audit cleanup failure is repaired; the
+freshness and stable-playable-state requirements remain in force.
+
+The distinct ACC helicopter customization selector now has a retained native
+entry/Back/discard/live-cabin/immediate-iDroid-reopen pass in
+`20261002T040239079392Z` on DLL `431d6cb9a5ad`. Ten scoped action outcomes pass;
+both eyes of the selector, cancellation dialog, cabin and reopening were reviewed.
+Back opens a cancellation dialog with Cancel selected; it does not immediately
+return to the cabin. The corrected bot supports the exact selector and its
+popup through the effective VR menu stick. The reopening stills span a queued
+Daily Bonus card, so they do not certify a stable common menu image or continuous
+refresh. The original saves and personal controls were restored; the temporary
+runtime configuration was removed and Steam remained running.
+
+The community helicopter-upgrade report remains open beyond these scoped paths:
+helicopter purchase/result, locked and unavailable grades, selector part changes,
+unfinished guides and physical headset use need separate acceptance.
+The paired-save fixture tool supports verified
+campaign/personal snapshots and six-file rollback while Steam remains running,
+with both cloud mirrors required to be disabled. The private
+`acc-completed-fob-baseline` reproduces this completed-guide flow; it does not
+make every upgrade eligible or certify purchase completion.
 
 The all-menu VR queue now keeps menu families, native game states and handheld,
 left-arm/spatial presentations separate. `python tools/workspace.py coverage --menus`
@@ -107,29 +220,11 @@ with Continue/Options/Delete/ Quit choices during ordinary cabin play. That
 extra render branch is removed; the real title rack and physical Continue still
 work. Both final eyes were reviewed at the title and in the native ACC cabin.
 
-The cold ACC iDroid can display a native Choose a Rival Help overlay. After
-closing the reviewed help card, tab/Back input still failed to change its page
-in the latest cold fixture. Held-Back's existing direct terminal stop closed
-its UI but left an overlapping Pause/player device state; immediate reopening
-failed. Deferred-close, cancellation-permission and ACC pad-exclusion experiments
-did not repair that failure and were reverted. Cleanup now refuses an overlapping
-iDroid/Help owner and closes only the exact owned test session on failure.
-The state planner now distinguishes ordinary iDroid, native Pause/Help overlap
-and popup owners. Overlay/popup owners have no executable edge. Compiled entry
-guards are rechecked at actual input after capture; conflicting guards block
-the route. The retained native overlap classifies as an observation-only owner.
-An ACC selector or unknown popup also cannot inherit the ordinary Pause Back recipe.
-Forced stow/reopen and the reported helicopter upgrade lock-up remain open.
-
-October 1's current-runtime cold boot naturally passed login and physical
-Continue to ACC (`20261001T125301162970Z`). Its follow-up
-`20261001T125600146402Z` reviewed the informational Choose a Rival Help card
-in both eyes and closed it with A. Ordinary cleanup still failed. Read-only
-native checks found no pending forced-open request and cancellation already
-enabled, so those are not evidence-backed explanations for this fixture.
-The stale tab decision dispatched no input. Exact ordinary-menu input/update
-ownership and the incomplete immediate-stop lifecycle remain the next native
-repair; this does not certify forced tutorial behavior or reliable startup.
+Earlier completed-guide menu, held-Back and stale-camera failures remain in
+ACC_MENU_REGRESSION.md. Cleanup requires the live camera and rig input to return;
+a cleared terminal flag alone cannot pass. Unknown native Help/popup owners
+receive no ordinary navigation or blind confirmation. Failed owned sessions
+close with Steam retained.
 
 Startup testing also exposed a popup-admission race and a login result stall.
 A popup that closes during capture now returns to observation only when no
@@ -184,15 +279,15 @@ default or describe the present fit as an exact cutscene match.
 | Repair silent other long gun's support hand | Open. Native wrist selection identifies the other long gun as FAKEL (SLEEP). Native support-socket telemetry is installed; reproduce the bad two-hand contact before changing grip behavior. |
 | Map capacitive face-button, stick, trigger and thumb-rest contacts independently | Implemented and installed: ten separate inputs, parser checks and fresh simulator runtime initialization pass. Physical sensor acceptance remains open because the simulator operator cannot synthesize capacitive contact. |
 | Show the actual mappings and a quick video in the launcher | Installed in the fixed play tree: saved mappings, alternatives, one-hand/two-hand chords, ten amber contact surfaces and red pressed surfaces. 98 UI actions and eight settings-bridge contexts checked; 44-second personal mapping video available at artifacts/dev/controller-mapping.mp4. |
-| Live rotatable 3D previews for the settings | Installed: all 54 controls settings have a reference fitting view, with live edits, drag/orbit/zoom, front/side/top/back, filtering, save/reload, discard and numeric-fit reset. Runtime theatre dimensions are also previewed. Reference geometry is separate from native projection-effect and headset acceptance. |
+| Live rotatable 3D previews for the settings | Installed: all 55 controls settings have a reference fitting view, with live edits, drag/orbit/zoom, front/side/top/back, filtering, save/reload, discard and numeric-fit reset. Runtime theatre dimensions are also previewed. Reference geometry is separate from native projection-effect and headset acceptance. |
 | Default -30 degree weapon tilt and check the arsenal | Firearm-only fit implemented, configurable and installed; current-loadout one-hand scope direction inspected. All-weapon, impact, reload, support-contact and headset coverage remains open. |
-| Helicopter upgrade menu coverage | Native ACC Development -> Support Helicopter Armament list reached; three-level ordinary exit observed on a historical run. Corrected-loop regression, selector exit, confirmation/purchase and the reported lock-up remain open. |
+| Helicopter upgrade menu coverage | Completed Rival restriction repaired; current candidate reaches the actual ACC helicopter list, three-level exit and physical reopening. Selector, locked grades and purchase/result coverage remain open. |
 | Audit one-hand/two-hand control chords | Effective personal binding audit retained; no unsolicited remapping. Headset usability and crouch/prone community report remain open. |
 | Align right-hand iDroid with its native emitter/cutscene and survive forced stow/reopen | Native attachment retained; natural holding frame and lower-edge screen anchor revised. Default and custom fitting controls pass scoped simulator motion/reopening checks. Native light-cone retargeting at custom offsets/rotations, forced tutorial stow and physical headset acceptance remain open. |
-| Preserve Coco's fixes; burn down community reports; all weapons/missions/game completion | Coco's supplied changes retained. Community ledger and full-game acceptance remain open; an A* bridge route does not certify missions or combat. |
+| Preserve Coco's fixes; burn down community reports; all weapons/missions/game completion | Coco's scope-glass stabilizer is integrated and configurable. Independent lens exposure is on by default after matched native field comparisons and a cold replay. Firearm-specific optics, remaining reports and full-game acceptance remain open. |
 | Publish the new build on GitHub | September 30 experimental prerelease packages the tested local DLL and committed source; see RELEASE_2026-09-30.md. Full-game and headset acceptance remain open. |
 
-The next iDroid work is the reproduced cold-ACC menu/stow/reopen failure, exact authored screen fitting and native light-cone retargeting,
+The next iDroid work is unfinished-guide/upgrade transaction coverage, exact authored screen fitting and native light-cone retargeting,
 then physical fitting/readability. FAKEL (SLEEP) support-hand reproduction,
 cover camera ownership, mounted weapon aim/reticles, binocular native lighting
 and full mission regression remain on the existing release queue.
@@ -277,7 +372,7 @@ tools/build.ps1
 # Compare source, current play tree, installed DLL and issue status.
 python tools/workspace.py status
 
-# Test runtime is selected for the game process only; Steam stays open.
+# A temporary game-local runtime lease is restored by stop-sim; Steam stays open.
 python tools/workspace.py launch-sim
 python tools/workspace.py bot --command continue
 python tools/workspace.py bot --seconds 15
@@ -296,6 +391,14 @@ under build; no dated distribution folders or ZIPs are made for local changes.
 Promotion updates changed files in place, commits BUILD.json last and preserves
 unmanaged local files. An unchanged open launcher stays running; a blocked file
 update rolls back changed files. Failed tests do not promote a build.
+
+`launch-sim` asks the already-running Steam client to start MGSV and records
+the exact new game/runtime process generations. It temporarily selects the
+simulator in `mgs5vr-runtime.ini`, without changing Steam's environment or the
+global OpenXR runtime. `stop-sim` restores that file after the owned session
+exits; an originally absent file is removed. Concurrent edits are preserved
+and reported instead of overwritten. A timed-out launch remains recorded for
+exact cleanup. The default build remains at `play/` throughout.
 
 For an explicitly requested GitHub release, commit the public source, run the
 same build/checks, then use `python tools/package-release.py --tag experimental-YYYY-MM-DD`.

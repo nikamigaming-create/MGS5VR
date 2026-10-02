@@ -19,6 +19,10 @@ bool nativePauseMenuOpen() noexcept;
 // Closing needs native character updates to stow the device. Unknown state
 // is treated as closing so our optional pause can never trap that transition.
 bool nativeIdroidClosing() noexcept;
+std::optional<unsigned> nativeIdroidTutorialMode() noexcept;
+// Native tutorial pause ownership is separate from its input restriction.
+// Caller must establish the completed ACC guide in the native Lua transaction.
+bool releaseNativeIdroidTutorialPause() noexcept;
 bool nativeTitleMenuOpen() noexcept;
 void publishNativeAvatarEdit(bool active) noexcept;
 bool nativeAvatarEditActive() noexcept;

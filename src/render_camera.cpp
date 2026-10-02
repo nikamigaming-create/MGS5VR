@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <mutex>
 #include <stdexcept>
+#include <sstream>
 #include <vector>
 
 namespace {
@@ -335,6 +336,223 @@ struct HeadSceneCopy {
     }
 };
 thread_local std::array<HeadSceneCopy,2> opticHeadScenes;
+
+// TPP GrPluginTonemap keeps CPU adaptation in GrViewport and asynchronously
+// reads four GrReadbackDx11 objects. Sharing just those readbacks lets a lens
+// draw influence a later head frame even after restoring camera matrices.
+// The readback objects themselves point to registered CPU textures. Isolating
+// only the GPU objects still writes lens luminance into the head's CPU ring.
+// Give the lens its own native texture handles as well as readbacks/history.
+struct ExposureState {
+    std::array<unsigned char,32> average{}; // +4e0/+4f0: current/previous luminance
+    float current{},previous{};
+    std::array<unsigned char,24> history{}; // five floats + ring index
+    uint8_t slot{};
+    static ExposureState capture(uintptr_t viewport){
+        ExposureState s;
+        std::memcpy(s.average.data(),reinterpret_cast<void*>(viewport+0x4e0),s.average.size());
+        s.current=field<float>(reinterpret_cast<void*>(viewport),0x594);
+        s.previous=field<float>(reinterpret_cast<void*>(viewport),0x6ec);
+        std::memcpy(s.history.data(),reinterpret_cast<void*>(viewport+0x6b8),s.history.size());
+        s.slot=field<uint8_t>(reinterpret_cast<void*>(viewport),0x6f0);return s;
+    }
+    void apply(uintptr_t viewport) const{
+        std::memcpy(reinterpret_cast<void*>(viewport+0x4e0),average.data(),average.size());
+        std::memcpy(reinterpret_cast<void*>(viewport+0x594),&current,sizeof(current));
+        std::memcpy(reinterpret_cast<void*>(viewport+0x6ec),&previous,sizeof(previous));
+        std::memcpy(reinterpret_cast<void*>(viewport+0x6b8),history.data(),history.size());
+        std::memcpy(reinterpret_cast<void*>(viewport+0x6f0),&slot,sizeof(slot));
+    }
+    bool same(const ExposureState& s) const{
+        return average==s.average&&history==s.history&&slot==s.slot
+            &&std::memcmp(&current,&s.current,sizeof(current))==0
+            &&std::memcmp(&previous,&s.previous,sizeof(previous))==0;
+    }
+};
+std::atomic_int lensExposureOverride{-1};
+std::atomic_bool diagnosticLensRendering{true};
+std::atomic_uint64_t lensLuminanceName{};
+bool lensExposureIsolationEnabled(){
+    if(renderBuild!=mgs5vr::RenderBuild::phantomPain_1_0_15_4)return false;
+    const auto override=lensExposureOverride.load();
+    if(override>=0)return override==1;
+    // Matched field renders establish independent head/lens adaptation. Keep
+    // an explicit diagnostic opt-out for unsupported native-resource failures.
+    static const bool isolationEnabled=[](){
+        wchar_t value[2]{};
+        const auto length=GetEnvironmentVariableW(L"MGS5VR_SCOPE_EXPOSURE_ISOLATION",value,2);
+        if(length)return length==1&&value[0]==L'1';
+        // A launch forwarded through an already-running Steam client cannot
+        // inherit the test helper's environment. Keep this override local to
+        // the game, without restarting Steam or selecting a global XR runtime.
+        std::array<wchar_t,32768> executable{};
+        const auto size=GetModuleFileNameW(nullptr,executable.data(),static_cast<DWORD>(executable.size()));
+        if(!size||size>=executable.size())return true;
+        const auto settings=std::filesystem::path(executable.data()).parent_path()/L"mgs5vr.ini";
+        return GetPrivateProfileIntW(L"diagnostics",L"scope_exposure_isolation",1,settings.c_str())==1;
+    }();
+    return isolationEnabled;
+}
+struct ExposureAudit {
+    uint64_t source{},lensPasses{},observedPasses{},headPasses{},headSource{};uintptr_t viewport{};
+    bool isolated{},restored{};float head{},lens{};
+    std::array<uintptr_t,4> headReadbacks{},lensReadbacks{};
+    std::array<uintptr_t,4> headLuminance{},lensLuminance{};
+};
+std::mutex exposureAuditMutex;
+ExposureAudit exposureAudit;
+struct LensExposureCache {
+    uintptr_t viewport{},device{};uint64_t identity{},lastUse{};
+    std::array<uintptr_t,4> originals{},readbacks{};
+    std::array<uint32_t,4> originalHandles{},handles{};
+    std::array<uintptr_t,4> originalTextures{},textures{};
+    ExposureState state{};
+    bool ready{},attempted{};
+    void release(){
+        // Match GrViewport's native cleanup: release the registered CPU
+        // resource lease, then destroy its associated GPU readback object.
+        using ReleaseResource=int(*)(uint32_t);
+        const auto releaseResource=reinterpret_cast<ReleaseResource>(base+0x1b9e40);
+        for(auto& handle:handles)if(handle){releaseResource(handle);handle=0;}
+        for(auto& object:readbacks)if(object){
+            // GrViewport's own cleanup calls this scalar deleting destructor.
+            using Destroy=void*(*)(void*,unsigned);
+            const auto table=field<uintptr_t>(reinterpret_cast<void*>(object),0);
+            reinterpret_cast<Destroy>(field<uintptr_t>(reinterpret_cast<void*>(table),0))(
+                reinterpret_cast<void*>(object),1);object=0;
+        }
+        textures={};
+        ready=attempted=false;
+    }
+    bool prepare(uintptr_t owner,uint64_t opticIdentity,uint64_t now){
+        if(renderBuild!=mgs5vr::RenderBuild::phantomPain_1_0_15_4)return false;
+        const auto nativeDevice=field<uintptr_t>(reinterpret_cast<void*>(base+0x2b77f58),0);
+        if(!nativeDevice)return false;
+        const auto table=field<uintptr_t>(reinterpret_cast<void*>(nativeDevice),0);
+        if(table!=base+0x21086e0||field<uintptr_t>(reinterpret_cast<void*>(table),0xc8)!=base+0x2b2700
+           ||field<uintptr_t>(reinterpret_cast<void*>(table),0xb8)!=base+0x2b27c0)return false;
+        std::array<uintptr_t,4> headBuffers{};
+        std::array<uint32_t,4> headHandles{};
+        std::array<uintptr_t,4> headTextures{},entries{};
+        std::array<std::array<unsigned char,64>,4> descriptors{};
+        std::memcpy(headBuffers.data(),reinterpret_cast<void*>(owner+0x658),sizeof(headBuffers));
+        std::memcpy(headHandles.data(),reinterpret_cast<void*>(owner+0x648),sizeof(headHandles));
+        const auto registry=field<uintptr_t>(reinterpret_cast<void*>(base+0x2b73428),0);
+        if(!registry)return false;
+        const auto registryData=field<uintptr_t>(reinterpret_cast<void*>(registry),8);
+        if(!registryData)return false;
+        for(size_t n=0;n<4;++n){
+            const auto object=reinterpret_cast<void*>(headBuffers[n]);
+            if(!object||field<uintptr_t>(object,0)!=base+0x2116718
+               ||(headHandles[n]&0x7f)!=0xb)return false;
+            entries[n]=registryData+size_t(headHandles[n]>>17)*0x70;
+            headTextures[n]=field<uintptr_t>(reinterpret_cast<void*>(entries[n]),0x20);
+            if(!headTextures[n]||field<uintptr_t>(object,8)!=headTextures[n]
+               ||field<uintptr_t>(reinterpret_cast<void*>(headTextures[n]),0)!=base+0x2116700)return false;
+            descriptors[n]=field<std::array<unsigned char,64>>(reinterpret_cast<void*>(entries[n]),0x28);
+        }
+        if(owner!=viewport||nativeDevice!=device||opticIdentity!=identity||headBuffers!=originals
+           ||headHandles!=originalHandles||headTextures!=originalTextures
+           ||now<lastUse||now-lastUse>500){
+            release();viewport=owner;device=nativeDevice;identity=opticIdentity;originals=headBuffers;
+            originalHandles=headHandles;originalTextures=headTextures;
+        }
+        lastUse=now;
+        if(ready||attempted)return ready;
+        attempted=true;
+        using CreateResource=uint32_t(*)(const void*);
+        const auto createResource=reinterpret_cast<CreateResource>(base+0x242620);
+        using Create=void*(*)(void*,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t);
+        const auto create=reinterpret_cast<Create>(base+0x2b2700);
+        for(size_t n=0;n<4;++n){
+            const auto object=reinterpret_cast<void*>(originals[n]);
+            // Copy the verified native CPU texture descriptor, not its data
+            // or object. A process-local private name gives it a distinct
+            // resource lease; the retail factory owns allocation and lifetime.
+            alignas(16) auto descriptor=descriptors[n];
+            const auto name=(field<uint64_t>(descriptor.data(),0)&0xffff000000000000ull)
+                |0x00004d3500000000ull|(++lensLuminanceName&0xffffffffull);
+            std::memcpy(descriptor.data(),&name,sizeof(name));
+            handles[n]=createResource(descriptor.data());
+            if(!handles[n]||(handles[n]&0x7f)!=0xb){release();attempted=true;return false;}
+            // Resource creation can grow the registry's entry storage.
+            const auto data=field<uintptr_t>(reinterpret_cast<void*>(registry),8);
+            textures[n]=field<uintptr_t>(reinterpret_cast<void*>(data+size_t(handles[n]>>17)*0x70),0x20);
+            if(!textures[n]||std::find(originalTextures.begin(),originalTextures.end(),textures[n])!=originalTextures.end()
+               ||field<uintptr_t>(reinterpret_cast<void*>(textures[n]),0)!=base+0x2116700){
+                release();attempted=true;return false;
+            }
+            readbacks[n]=reinterpret_cast<uintptr_t>(create(reinterpret_cast<void*>(device),
+                textures[n],field<uintptr_t>(object,0x10),field<uintptr_t>(object,0x18),
+                field<uintptr_t>(object,0x20),field<uintptr_t>(object,0x28)));
+            if(!readbacks[n]||field<uintptr_t>(reinterpret_cast<void*>(readbacks[n]),8)!=textures[n]){
+                release();attempted=true;return false;
+            }
+        }
+        state=ExposureState::capture(viewport);ready=true;
+        mgs5vr::log("Native optic exposure: separate four CPU luminance textures, GPU readbacks and adaptation history");
+        return true;
+    }
+};
+// One bounded cache per native scene worker. The OS releases it on process
+// exit; avoid calling retail destructors after the retail heap is torn down.
+thread_local LensExposureCache lensExposure;
+struct LensExposureGuard {
+    uintptr_t viewport{};ExposureState head{};uint64_t source{};
+    bool isolated{},headPass{};
+    explicit LensExposureGuard(bool lens,uintptr_t owner,uint64_t identity,uint64_t frame,uint64_t now):source(frame){
+        if(renderBuild!=mgs5vr::RenderBuild::phantomPain_1_0_15_4)return;
+        if(!lens){viewport=owner;headPass=true;return;}
+        if(!lensExposureIsolationEnabled()){
+            // Observe the same native owner in the unfixed path for matched
+            // in-game comparisons; do not change its adaptation or readbacks.
+            viewport=owner;head=ExposureState::capture(owner);return;
+        }
+        if(!lensExposure.prepare(owner,identity,now)){
+            std::lock_guard lock(exposureAuditMutex);
+            exposureAudit.source=source;exposureAudit.viewport=owner;
+            exposureAudit.isolated=exposureAudit.restored=false;
+            exposureAudit.headReadbacks={};exposureAudit.lensReadbacks={};
+            exposureAudit.headLuminance={};exposureAudit.lensLuminance={};
+            return;
+        }
+        viewport=owner;head=ExposureState::capture(owner);isolated=true;
+        lensExposure.state.apply(owner);
+        std::memcpy(reinterpret_cast<void*>(owner+0x648),lensExposure.handles.data(),sizeof(lensExposure.handles));
+        std::memcpy(reinterpret_cast<void*>(owner+0x658),lensExposure.readbacks.data(),sizeof(lensExposure.readbacks));
+    }
+    ~LensExposureGuard(){
+        if(!viewport)return;
+        if(headPass){
+            std::lock_guard lock(exposureAuditMutex);
+            ++exposureAudit.headPasses;exposureAudit.headSource=source;
+            exposureAudit.viewport=viewport;
+            exposureAudit.head=field<float>(reinterpret_cast<void*>(viewport),0x594);
+            std::memcpy(exposureAudit.headReadbacks.data(),reinterpret_cast<void*>(viewport+0x658),sizeof(exposureAudit.headReadbacks));
+            return;
+        }
+        if(!isolated){
+            const auto after=ExposureState::capture(viewport);
+            std::lock_guard lock(exposureAuditMutex);
+            ++exposureAudit.observedPasses;exposureAudit.source=source;exposureAudit.viewport=viewport;
+            exposureAudit.isolated=exposureAudit.restored=false;
+            exposureAudit.head=head.current;exposureAudit.lens=after.current;
+            std::memcpy(exposureAudit.headReadbacks.data(),reinterpret_cast<void*>(viewport+0x658),sizeof(exposureAudit.headReadbacks));
+            exposureAudit.lensReadbacks={};exposureAudit.headLuminance={};exposureAudit.lensLuminance={};return;
+        }
+        lensExposure.state=ExposureState::capture(viewport);
+        std::memcpy(reinterpret_cast<void*>(viewport+0x648),lensExposure.originalHandles.data(),sizeof(lensExposure.originalHandles));
+        std::memcpy(reinterpret_cast<void*>(viewport+0x658),lensExposure.originals.data(),sizeof(lensExposure.originals));
+        head.apply(viewport);
+        const bool restored=head.same(ExposureState::capture(viewport));
+        std::lock_guard lock(exposureAuditMutex);
+        ++exposureAudit.lensPasses;++exposureAudit.observedPasses;exposureAudit.source=source;exposureAudit.viewport=viewport;
+        exposureAudit.isolated=true;exposureAudit.restored=restored;
+        exposureAudit.head=head.current;exposureAudit.lens=lensExposure.state.current;
+        exposureAudit.headReadbacks=lensExposure.originals;exposureAudit.lensReadbacks=lensExposure.readbacks;
+        exposureAudit.headLuminance=lensExposure.originalTextures;exposureAudit.lensLuminance=lensExposure.textures;
+    }
+};
 __declspec(noinline) uintptr_t registerTarget(void* graphics,void* target){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const bool second=enabled.load()&&insideStereo&&sceneRenderPass>0&&stereoTarget
@@ -417,7 +635,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const bool binocularLensVisible=optic.held&&optic.pose.tracked&&std::any_of(
         source.pair.sample.views.begin(),source.pair.sample.views.end(),
         [&](const auto& eye){return mgs5vr::binocularEyeVisible(optic.pose,eye.pose,optic.maxEyeDistance);});
-    const auto opticView=binocularLensVisible?mgs5vr::binocularSceneView(optic.pose,
+    const auto opticView=!diagnosticLensRendering.load()?std::nullopt:binocularLensVisible?mgs5vr::binocularSceneView(optic.pose,
         source.pair.sample.controllers.magnification):scopeView;
     mgs5vr::ComPtr<ID3D11Texture2D> opticScene;
     const uint32_t extraPass=opticView?1u:0u;
@@ -455,6 +673,11 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         // camera history. This avoids introducing the opposite eye's history.
         std::memcpy(reinterpret_cast<void*>(source.grCamera+0xb0),eyeView.data(),sizeof(eyeView));
         if(!titleSurface)saved.applyTrackedNearPlane();
+        // The viewport builder can consume adaptation data too. Own the lens
+        // state before any native viewport work, and restore it on early exits.
+        std::optional<LensExposureGuard> exposure;
+        if(!restoreHead)exposure.emplace(lensPass,source.viewport,
+            optic.held?1:scope.weaponIdentity,id,mgs5vr::steadyMilliseconds());
         originalViewport(reinterpret_cast<void*>(source.viewport),0);
         if(!clipProjection||!gpuProjection){complete=false;sceneFailure=4;break;}
         if(lensPass)saved.preserveOpticVisibility();
@@ -474,7 +697,10 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         mgs5vr::setUiRenderSource(drawingEye,source.grCamera,eyeView,eyeProjection,source.pair.sample,authoredView,authoredProjection,hudView);
         mgs5vr::ReconModelVisibilityScope reconVisibility(source.pair.sample.controllers.hudMode,
             hudView,source.pair.sample.controllers.binocularActorGlow);
-        if(!restoreHead)result=originalScene(render,graphics,task,worker);
+        if(!restoreHead){
+            result=originalScene(render,graphics,task,worker);
+        }
+        exposure.reset();
         mgs5vr::clearUiRenderSource();
         // Native passes may finish and replace the current deferred context.
         const auto afterOwner=field<uintptr_t>(graphics,layout.graphicsContext);
@@ -674,6 +900,32 @@ template<size_t N> bool matches(uintptr_t address,const std::array<unsigned char
 }
 }
 namespace mgs5vr {
+bool setRenderCameraExposureIsolation(bool isolate){
+    if(renderBuild!=RenderBuild::phantomPain_1_0_15_4)return false;
+    // A diagnostic override changes only the next lens pass. Any guard already
+    // in flight keeps its lease and restores its captured head state normally.
+    lensExposureOverride.store(isolate?1:0);return true;
+}
+bool setRenderCameraLensRendering(bool renderLens){
+    if(renderBuild!=RenderBuild::phantomPain_1_0_15_4)return false;
+    diagnosticLensRendering.store(renderLens);return true;
+}
+std::string renderCameraExposureDiagnostics(){
+    std::lock_guard lock(exposureAuditMutex);const auto& a=exposureAudit;
+    std::ostringstream out;out<<std::boolalpha;
+    out<<"{\"schema\":1,\"experimental_enabled\":"<<lensExposureIsolationEnabled()
+        <<",\"lens_render_enabled\":"<<diagnosticLensRendering.load()
+        <<",\"source\":"<<a.source<<",\"lens_passes\":"<<a.lensPasses
+        <<",\"observed_lens_passes\":"<<a.observedPasses
+        <<",\"head_passes\":"<<a.headPasses<<",\"head_source\":"<<a.headSource
+        <<",\"isolated\":"<<a.isolated<<",\"head_restored\":"<<a.restored
+        <<",\"head_exposure\":"<<a.head<<",\"lens_exposure\":"<<a.lens<<",\"viewport\":\"0x"<<std::hex<<a.viewport<<std::dec<<"\"";
+    const auto array=[&](const char* name,const auto& values){out<<",\""<<name<<"\":[";
+        for(size_t n=0;n<values.size();++n){if(n)out<<',';out<<"\"0x"<<std::hex<<values[n]<<std::dec<<"\"";}out<<']';};
+    array("head_readbacks",a.headReadbacks);array("lens_readbacks",a.lensReadbacks);
+    array("head_luminance_textures",a.headLuminance);array("lens_luminance_textures",a.lensLuminance);
+    out<<'}';return out.str();
+}
 void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& directory,RenderBuild build){
     renderBuild=build;layout=renderLayout(build);
     const bool gz=build==RenderBuild::groundZeroes_1_0_0_5;

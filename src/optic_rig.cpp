@@ -35,6 +35,43 @@ bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye){
     return local.z>.002f;
 }
 
+WeaponScopeSample ScopePoseStabilizer::update(Pose owner,WeaponScopeSample scope,
+    bool available,uint64_t time,uint64_t epoch,uint64_t activation){
+    if(!available||!epoch||!activation||!finitePose(owner)||!weaponScopeSceneView(scope)){
+        reset();return scope;
+    }
+    auto measured=compose(inverse(owner),scope.ocular);
+    if(!ready_||identity_!=scope.weaponIdentity||epoch_!=epoch||activation_!=activation
+       ||time<time_||time-time_>150){
+        relative_=measured;ready_=true;identity_=scope.weaponIdentity;
+        time_=time;epoch_=epoch;activation_=activation;return scope;
+    }
+    const float dt=static_cast<float>(time-time_)*.001f;time_=time;
+    if(dt>0){
+        auto& target=measured.orientation;auto& prior=relative_.orientation;
+        if(dot(Vec3{target.x,target.y,target.z},Vec3{prior.x,prior.y,prior.z})+target.w*prior.w<0)
+            target={-target.x,-target.y,-target.z,-target.w};
+        const auto delta=compose(Pose{target,{}},inverse(Pose{prior,{}})).orientation;
+        const float angle=2.f*std::atan2(std::sqrt(delta.x*delta.x+delta.y*delta.y+delta.z*delta.z),std::abs(delta.w));
+        const auto shift=measured.position-relative_.position;
+        const float travel=std::sqrt(dot(shift,shift));
+        const bool jump=angle>.01745f||travel>.01f;
+        const float tau=jump?.03f:std::clamp(.06f*scope.magnification,.10f,.45f);
+        const float alpha=1.f-std::exp(-dt/tau);
+        if(jump||travel>.001f)relative_.position=relative_.position+shift*alpha;
+        if(jump||angle>.002618f){
+            const Quat q{prior.x+(target.x-prior.x)*alpha,prior.y+(target.y-prior.y)*alpha,
+                prior.z+(target.z-prior.z)*alpha,prior.w+(target.w-prior.w)*alpha};
+            const float n=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
+            if(n>1e-6f)prior={q.x/n,q.y/n,q.z/n,q.w/n};
+        }
+    }
+    const auto ocularFromObjective=compose(inverse(scope.ocular),scope.objective);
+    scope.ocular=compose(owner,relative_);
+    scope.objective=compose(scope.ocular,ocularFromObjective);
+    return scope;
+}
+
 std::optional<WeaponScopeGeometry> nativeWeaponScopeGeometry(Pose rear,Pose front,
     const std::array<uint8_t,4>& optical){
     if(!finitePose(rear)||!finitePose(front)||optical[3]!=1||facing(rear,front)<.999f)return {};

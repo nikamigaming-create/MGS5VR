@@ -38,6 +38,9 @@ field('vr_idroid_player_pad_block', function()
 end)
 field('title', function() return gvars.ini_isTitleMode end)
 field('story', function() return gvars.str_storySequence end)
+-- Transaction outcomes use real resources/completion, not an open-menu flag.
+field('gmp', function() return TppMotherBaseManagement.GetGmp() end)
+field('developed_equip_count', function() return TppMotherBaseManagement.GetDevelopedEquipCount() end)
 field('player_x', function() return vars.playerPosX end)
 field('player_y', function() return vars.playerPosY end)
 field('player_z', function() return vars.playerPosZ end)
@@ -55,6 +58,15 @@ field('player_life', function() return vars.playerLife end)
 field('not_alert', function() return Tpp.IsNotAlert() end)
 field('game_over', function() return svars.mis_gameOverType end)
 field('popup', function() return TppUiCommand.IsShowPopup() end)
+-- Eligibility is independent of the terminal-open and tutorial-mode flags.
+-- The completed ACC Rival guide previously left Development disabled even
+-- after its Help card and native pause had closed.
+field('idroid_development_active', function()
+    local value = TppUiCommand.IsMbTopMenuItemActive('MBM_DEVELOP')
+    assert(type(value) == 'boolean', 'native Development eligibility unavailable')
+    return value
+end)
+field('fob_tutorial_state', function() return gvars.trm_fobTutorialState end)
 -- A replayed Mission 1 tutorial enables a different Resume/Skip page. This
 -- state must never be mistaken for the ordinary field Pause menu in QA.
 field('tutorial_pause', function() return TppGameStatus.IsSet('s10020', 'S_ENABLE_TUTORIAL_PAUSE') end)

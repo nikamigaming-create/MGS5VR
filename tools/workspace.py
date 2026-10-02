@@ -77,6 +77,7 @@ def processes():
     if sys.platform != "win32":
         return []
     script = ("Get-CimInstance Win32_Process -Filter \"Name='mgsvtpp.exe'\" | "
+              "Where-Object { $mgsProcess=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; $mgsProcess -and !$mgsProcess.HasExited } | "
               "Select-Object ProcessId,ExecutablePath,CreationDate | ConvertTo-Json -Compress")
     result = run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
                  capture_output=True, text=True, timeout=15,
@@ -354,7 +355,7 @@ def bot(args):
         # A failed owned simulator run must not leave a test menu or stalled
         # game open. stop-sim checks exact process generations and keeps Steam.
         record = ROOT / "artifacts/simulator-steam-session.json"
-        if record.exists() and read_json(record).get("launchMethod") == "direct":
+        if record.exists() and read_json(record).get("launchMethod") in ("direct", "steam_cli"):
             run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
                  ROOT / "tools/stop-simulator.ps1"])
         raise ValueError(f"Bot case needs attention: {output}")
@@ -463,7 +464,7 @@ def main():
     build.set_defaults(handler=refresh)
     commands.add_parser("deploy").set_defaults(handler=lambda _: deploy(settings()))
     observe = commands.add_parser("bot")
-    observe.add_argument("--command", choices=("observe", "continue", "run", "session", "move", "idroid", "supervise", "state"), default="observe")
+    observe.add_argument("--command", choices=("observe", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state"), default="observe")
     observe.add_argument("--suite", type=Path)
     observe.add_argument("--seconds", type=float, default=15)
     observe.add_argument("--record", action="store_true")

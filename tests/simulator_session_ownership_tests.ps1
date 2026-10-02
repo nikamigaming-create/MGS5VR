@@ -107,4 +107,47 @@ $nullRejected=$false
 try { Get-MgsOrphanCleanupPlan -Record $null -Processes @($unknown) | Out-Null } catch { $nullRejected=$_.Exception.Message -match 'unrecorded MetaXRSimulator' }
 Assert $nullRejected 'an explicitly null ownership record fails closed for an unknown simulator'
 
-Write-Host 'All simulator session ownership tests passed.'
+$mgsLeaseFixture=Join-Path ([IO.Path]::GetTempPath()) ('mgs5vr-runtime-lease-'+[guid]::NewGuid().ToString('N'))
+[IO.Directory]::CreateDirectory($mgsLeaseFixture) | Out-Null
+$mgsLeaseExe=Join-Path $mgsLeaseFixture 'mgsvtpp.exe'
+$mgsLeasePath=Join-Path $mgsLeaseFixture 'mgs5vr-runtime.ini'
+try {
+    $lease=New-MgsRuntimeConfigLease -GameExe $mgsLeaseExe -RuntimeManifest 'C:\Simulator\runtime.json' -OperatorDir 'C:\Operator'
+    Assert ((Get-Content -Raw -LiteralPath $mgsLeasePath) -match 'headless=0') 'the test runtime lease keeps the real compositor enabled'
+    $roundTrip=$lease|ConvertTo-Json|ConvertFrom-Json
+    Restore-MgsRuntimeConfigLease -Lease $roundTrip -GameExe $mgsLeaseExe
+    Restore-MgsRuntimeConfigLease -Lease $roundTrip -GameExe $mgsLeaseExe
+    Assert (!(Test-Path -LiteralPath $mgsLeasePath)) 'an originally absent runtime file is removed after JSON-record recovery and repeated cleanup'
+
+    [byte[]]$personalBytes=@(239,187,191,91,114,117,110,116,105,109,101,93,13,10,101,110,97,98,108,101,100,61,48,13,10)
+    [IO.File]::WriteAllBytes($mgsLeasePath,$personalBytes)
+    $lease=New-MgsRuntimeConfigLease -GameExe $mgsLeaseExe -RuntimeManifest 'C:\Simulator\runtime.json' -OperatorDir 'C:\Operator'
+    $roundTrip=$lease|ConvertTo-Json|ConvertFrom-Json
+    Restore-MgsRuntimeConfigLease -Lease $roundTrip -GameExe $mgsLeaseExe
+    Restore-MgsRuntimeConfigLease -Lease $roundTrip -GameExe $mgsLeaseExe
+    Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes($mgsLeasePath)) -eq [Convert]::ToBase64String($personalBytes)) 'personal runtime bytes and BOM survive a simulator lease and repeated cleanup exactly'
+
+    $lease=New-MgsRuntimeConfigLease -GameExe $mgsLeaseExe -RuntimeManifest 'C:\Simulator\runtime.json' -OperatorDir 'C:\Operator'
+    [IO.File]::WriteAllText($mgsLeasePath,'personal concurrent edit')
+    $editRefused=$false
+    try { Restore-MgsRuntimeConfigLease -Lease $lease -GameExe $mgsLeaseExe } catch { $editRefused=$_.Exception.Message -match 'changed during the test' }
+    Assert ($editRefused -and [IO.File]::ReadAllText($mgsLeasePath) -eq 'personal concurrent edit') 'cleanup refuses to overwrite runtime edits made after launch'
+
+    $wrongLease=$lease|ConvertTo-Json|ConvertFrom-Json
+    $wrongLease.path=Join-Path ([IO.Path]::GetTempPath()) 'unrelated-runtime.ini'
+    $wrongPathRefused=$false
+    try { Restore-MgsRuntimeConfigLease -Lease $wrongLease -GameExe $mgsLeaseExe } catch { $wrongPathRefused=$_.Exception.Message -match 'does not belong beside' }
+    Assert $wrongPathRefused 'a runtime lease cannot restore or remove a file outside the recorded game folder'
+
+    $wrongLease=$lease|ConvertTo-Json|ConvertFrom-Json
+    $wrongLease.beforeBase64=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('changed backup'))
+    $backupRefused=$false
+    try { Restore-MgsRuntimeConfigLease -Lease $wrongLease -GameExe $mgsLeaseExe } catch { $backupRefused=$_.Exception.Message -match 'backup changed' }
+    Assert $backupRefused 'a modified runtime backup cannot replace personal settings'
+} finally {
+    $mgsResolved=[IO.Path]::GetFullPath($mgsLeaseFixture)
+    if(!(Test-MgsPathUnderRoot $mgsResolved ([IO.Path]::GetTempPath()))){throw 'Runtime lease fixture escaped its temporary test folder.'}
+    Remove-Item -LiteralPath $mgsResolved -Recurse -Force
+}
+
+Write-Host 'All simulator session ownership and runtime lease tests passed.'

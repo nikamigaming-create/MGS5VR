@@ -2,6 +2,7 @@
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/controls.hpp"
+#include "mgs5vr/control_prompts.hpp"
 #include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/head_camera.hpp"
@@ -169,6 +170,7 @@ struct Session {
         XrAction result; xrCheck(xrCreateAction(actions,&info,&result),"Create action"); return result;
     }
     void refreshControlLabels(){
+        publishControlPromptBindings(controls);
         constexpr std::array<std::string_view,4> categories{"equipment.primary","equipment.secondary","equipment.support","equipment.items"};
         for(size_t n=0;n<categories.size();++n){
             const auto label=controls.label(categories[n]);
@@ -607,6 +609,7 @@ struct Session {
         controllerFrame.handTouchCurl=controls.setting("settings.hand_touch_curl_percent")*.01f;
         controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
+        controllerFrame.scopePoseStabilization=controls.setting("settings.scope_pose_stabilization")!=0;
         controllerFrame.weaponAimPitch=controls.setting("settings.weapon_aim_pitch_degrees");
         controllerFrame.binocularAutoMark=controls.setting("settings.binocular_auto_mark")>=.5f;
         controllerFrame.binocularActorGlow=controls.setting("settings.binocular_actor_glow")>=.5f;

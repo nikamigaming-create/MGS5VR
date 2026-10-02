@@ -7,6 +7,8 @@
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/controls.hpp"
 #include "mgs5vr/ui_renderer.hpp"
+#include "mgs5vr/render_camera.hpp"
+#include "mgs5vr/native_menu_restrictions.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/optic_events.hpp"
 #include "native_cabin_script.hpp"
@@ -52,6 +54,21 @@ std::filesystem::path requestPath,resultPath,tracePath;
 bool externalCommands{};
 uint64_t checkedAt{};
 thread_local unsigned depth{};
+// Explicitly armed, bounded observations of the retail UI input and stow
+// handshake. These hooks never alter the native result or dispatch input.
+using UiButton=bool(*)(void*,uint32_t,uint32_t,bool);
+using UiClose=bool(*)(void*);
+UiButton originalUiButton{};UiClose originalUiClose{};
+using UiDisable=void(*)(void*,uint8_t,bool);
+UiDisable originalUiDisable{};
+struct MenuDisableRead {uintptr_t owner{},caller{};unsigned mode{},index{},before{},after{};bool disabled{};};
+std::deque<MenuDisableRead> menuDisableReads;
+NativeMenuRestrictionLease tutorialMenuLease;
+bool menuRestrictionAbi{};
+std::atomic_uint64_t menuTraceUntil{},menuButtonCalls{},menuCloseCalls{};
+std::mutex menuTraceMutex;
+struct MenuInputRead {uint64_t time{};uint32_t index{},bit{},held{},pressed{};uint16_t xr{};bool result{},bypass{};};
+std::deque<MenuInputRead> menuInputReads;
 constexpr wchar_t actionPipeName[]=L"\\\\.\\pipe\\MGS5VR.NativeActions";
 constexpr uint32_t maxPipeScript=1024*1024;
 constexpr size_t maxQueuedActions=256;
@@ -98,6 +115,79 @@ template<class T> T read(uintptr_t address){
     T value{};SIZE_T size{};
     if(address)ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&value,sizeof(value),&size);
     return size==sizeof(value)?value:T{};
+}
+bool uiButton(void* object,uint32_t index,uint32_t bit,bool bypass){
+    const auto result=originalUiButton(object,index,bit,bypass);
+    if(steadyMilliseconds()<menuTraceUntil.load()&&nativeIdroidOpen()){
+        ++menuButtonCalls;
+        const auto audit=controlInputSnapshot();
+        if(result||audit.nativeButtons){
+            using Pad=void*(*)(uint32_t);
+            const auto pad=index<4?reinterpret_cast<Pad>(imageBase+0x1b8a0)(index):nullptr;
+            MenuInputRead v{steadyMilliseconds(),index,bit,read<uint32_t>(reinterpret_cast<uintptr_t>(pad)+0x20),
+                read<uint32_t>(reinterpret_cast<uintptr_t>(pad)+0x28),audit.nativeButtons,result,bypass};
+            std::lock_guard lock(menuTraceMutex);
+            if(menuInputReads.size()>=128)menuInputReads.pop_front();
+            menuInputReads.push_back(v);
+        }
+    }
+    return result;
+}
+bool uiClose(void* object){
+    const auto result=originalUiClose(object);
+    if(steadyMilliseconds()<menuTraceUntil.load()&&nativeIdroidOpen())++menuCloseCalls;
+    return result;
+}
+void uiDisable(void* object,uint8_t index,bool disabled){
+    const auto owner=reinterpret_cast<uintptr_t>(object);
+    const auto mode=nativeIdroidTutorialMode();
+    const auto before=read<uint8_t>(owner+index*40+8);
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    if(index<78&&read<uintptr_t>(owner)==imageBase+0x227ee50){
+        std::lock_guard lock(menuTraceMutex);
+        const auto ui=read<uintptr_t>(imageBase+0x2bf1518);
+        const auto tutorial=read<uintptr_t>(ui+0x90);
+        const bool typed=read<uintptr_t>(ui)==imageBase+0x2242d78
+            &&read<uintptr_t>(tutorial)==imageBase+0x2272810;
+        // Verified GuiMbTutorial begin disables all entries before assigning
+        // the mode. Its FOB handler then permits entries 33/72. Observe the
+        // begin's prior values, not the already-disabled mode-10 snapshot.
+        if(typed&&disabled&&caller==imageBase+0xf4285b)
+            tutorialMenuLease.beginEntry(owner,tutorial,index,(before&0x40)!=0);
+        else if(disabled)tutorialMenuLease.independentDisable(owner,index);
+        originalUiDisable(object,index,disabled);
+        if(steadyMilliseconds()<menuTraceUntil.load()){
+            if(menuDisableReads.size()>=128)menuDisableReads.pop_front();
+            menuDisableReads.push_back({owner,caller,mode.value_or(255),index,before,read<uint8_t>(owner+index*40+8),disabled});
+        }
+    }else originalUiDisable(object,index,disabled);
+}
+bool restoreCompletedGuideRestrictions(){
+    const auto mode=nativeIdroidTutorialMode();
+    if(!menuRestrictionAbi||!originalUiDisable||!mode||*mode!=0||nativePauseMenuOpen())return false;
+    const auto ui=read<uintptr_t>(imageBase+0x2bf1518);
+    const auto tutorial=read<uintptr_t>(ui+0x90);
+    const auto common=read<uintptr_t>(ui+0x70);
+    const auto menu=read<uintptr_t>(common+0xca0);
+    if(read<uintptr_t>(ui)!=imageBase+0x2242d78||read<uintptr_t>(tutorial)!=imageBase+0x2272810
+       ||read<uintptr_t>(menu)!=imageBase+0x227ee50)return false;
+    std::lock_guard lock(menuTraceMutex);
+    if(!tutorialMenuLease.ready(menu,tutorial))return false;
+    for(unsigned index=0;index<NativeMenuRestrictionLease::entries;++index){
+        const auto prior=tutorialMenuLease.prior(index);
+        if(prior)originalUiDisable(reinterpret_cast<void*>(menu),static_cast<uint8_t>(index),*prior);
+    }
+    tutorialMenuLease.reset();return true;
+}
+bool haveGuideRestrictionLease(){
+    if(!menuRestrictionAbi||!originalUiDisable)return false;
+    const auto ui=read<uintptr_t>(imageBase+0x2bf1518);
+    const auto tutorial=read<uintptr_t>(ui+0x90);
+    const auto common=read<uintptr_t>(ui+0x70);
+    const auto menu=read<uintptr_t>(common+0xca0);
+    if(read<uintptr_t>(ui)!=imageBase+0x2242d78||read<uintptr_t>(tutorial)!=imageBase+0x2272810
+       ||read<uintptr_t>(menu)!=imageBase+0x227ee50)return false;
+    std::lock_guard lock(menuTraceMutex);return tutorialMenuLease.ready(menu,tutorial);
 }
 void* send(void* context,int32_t* result,uint32_t object,void* command){
     if((object>>9)==19&&GetTickCount64()<traceUntil.load()){
@@ -244,6 +334,49 @@ bool luaReady(void* state){
     setTop(state,top);nativeLuaReady.store(ready);return ready;
 }
 bool publishFastInput(const std::string& request,std::string& result){
+    if(request=="inspect-native-exposure"){result=renderCameraExposureDiagnostics();return true;}
+    if(request=="diagnostics:scope-exposure-isolation:on"||request=="diagnostics:scope-exposure-isolation:off"){
+        if(!setRenderCameraExposureIsolation(request.ends_with(":on")))
+            result="unsupported scope exposure diagnostic build";
+        else result=renderCameraExposureDiagnostics();
+        return true;
+    }
+    if(request=="diagnostics:optic-lens-render:on"||request=="diagnostics:optic-lens-render:off"){
+        if(!setRenderCameraLensRendering(request.ends_with(":on")))
+            result="unsupported optic lens diagnostic build";
+        else result=renderCameraExposureDiagnostics();
+        return true;
+    }
+    if(request=="trace-native-menu-input"||request=="inspect-native-menu-input"){
+        if(request=="trace-native-menu-input"){
+            std::lock_guard lock(menuTraceMutex);menuInputReads.clear();menuDisableReads.clear();
+            menuButtonCalls=0;menuCloseCalls=0;menuTraceUntil=steadyMilliseconds()+15000;
+        }
+        const auto ui=read<uintptr_t>(imageBase+0x2bf1518);
+        const auto terminal=read<uintptr_t>(ui+0x7c0);
+        const auto tutorial=read<uintptr_t>(ui+0x90);
+        const bool valid=read<uintptr_t>(ui)==imageBase+0x2242d78
+            &&read<uintptr_t>(terminal)==imageBase+0x22705a8
+            &&read<uintptr_t>(tutorial)==imageBase+0x2272810;
+        std::ostringstream out;out<<std::boolalpha;
+        out<<"{\"schema\":1,\"verified\":"<<valid<<",\"installed\":"<<(originalUiButton&&originalUiClose)
+           <<",\"armed\":"<<(steadyMilliseconds()<menuTraceUntil.load())
+           <<",\"button_calls\":"<<menuButtonCalls.load()<<",\"close_getter_calls\":"<<menuCloseCalls.load();
+        if(valid)out<<",\"terminal_open\":"<<unsigned(read<uint8_t>(terminal+0x20))
+            <<",\"deferred_close\":"<<unsigned(read<uint8_t>(terminal+0x25))
+            <<",\"active_tutorial_mode\":"<<unsigned(read<uint8_t>(tutorial+8));
+        out<<",\"reads\":[";
+        std::lock_guard lock(menuTraceMutex);bool first=true;
+        for(const auto& v:menuInputReads){if(!first)out<<',';first=false;
+            out<<"{\"ms\":"<<v.time<<",\"index\":"<<v.index<<",\"bit\":"<<v.bit
+               <<",\"held\":"<<v.held<<",\"pressed\":"<<v.pressed<<",\"xr\":"<<v.xr
+               <<",\"result\":"<<v.result<<",\"bypass\":"<<v.bypass<<'}';}
+        out<<"],\"disabled_entries\":[";first=true;
+        for(const auto& v:menuDisableReads){if(!first)out<<',';first=false;
+            out<<"{\"owner\":"<<v.owner<<",\"caller_rva\":"<<(v.caller-imageBase)<<",\"mode\":"<<v.mode
+               <<",\"index\":"<<v.index<<",\"before\":"<<v.before<<",\"after\":"<<v.after<<",\"disabled\":"<<v.disabled<<'}';}
+        out<<"]}";result=out.str();return true;
+    }
     if(request=="inspect-bot-state"){
         // Read-only transport/scene diagnostics must also work while Lua is
         // suspended at title/loading/Pause. These are individually sampled
@@ -400,11 +533,30 @@ void pump(void* state){
         // The retail game's named player-pad exclusion blocks character
         // actions without pausing skin, animation or terminal updates. Own a
         // separate registration so another tutorial's exclusion is preserved.
-        static bool idroidPadRegistered{};
+        static bool idroidPadRegistered{},accFobGuideHelpSeen{};
         static void* idroidPadState{};
-        if(idroidPadState!=state){idroidPadRegistered=false;idroidPadState=state;}
-        const bool guardIdroid=nativeIdroidOpen()&&handheldMenusSelected();
-        if(guardIdroid!=idroidPadRegistered){
+        if(idroidPadState!=state){idroidPadRegistered=accFobGuideHelpSeen=false;idroidPadState=state;}
+        const bool handheldIdroid=nativeIdroidOpen()&&!nativeIdroidClosing()&&handheldMenusSelected();
+        // ACC already fixes the character in its seat and releases the native
+        // player-pad exclusion for terminal controls. Retain that ownership;
+        // field iDroid still excludes player movement. Resolve the mission in
+        // this Lua transaction rather than an expiring render-side heartbeat.
+        bool idroidCabin{},idroidPadPolicyKnown=true;
+        if(handheldIdroid){
+            constexpr std::string_view ownerScript=
+                "if type(TppMission)=='table' and type(TppMission.IsHelicopterSpace)=='function' "
+                "and type(vars.missionCode)=='number' then return "
+                "TppMission.IsHelicopterSpace(vars.missionCode) and 'cabin' or 'field' end return 'unavailable'";
+            int ownerStatus=load(state,ownerScript.data(),ownerScript.size(),"@mgs5vr-idroid-pad-owner");
+            if(!ownerStatus)ownerStatus=original(state,0,1,0);
+            size_t length{};const auto* owner=getString(state,-1,&length);
+            idroidPadPolicyKnown=!ownerStatus&&owner&&length==5
+                &&(std::memcmp(owner,"cabin",5)==0||std::memcmp(owner,"field",5)==0);
+            idroidCabin=idroidPadPolicyKnown&&std::memcmp(owner,"cabin",5)==0;
+            setTop(state,top);
+        }
+        const bool guardIdroid=handheldIdroid&&!idroidCabin;
+        if(idroidPadPolicyKnown&&guardIdroid!=idroidPadRegistered){
             const std::string script=std::string("if type(TppGameStatus)=='table' and type(TppGameStatus.")
                 +(guardIdroid?"Set":"Reset")+")== 'function' then TppGameStatus."
                 +(guardIdroid?"Set":"Reset")+"('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD'); return 'ok' end return 'unavailable'";
@@ -418,7 +570,7 @@ void pump(void* state){
             }
             setTop(state,top);
         }
-        setHandheldMenuInputReady(guardIdroid&&idroidPadRegistered);
+        setHandheldMenuInputReady(handheldIdroid&&idroidPadPolicyKnown&&guardIdroid==idroidPadRegistered);
         // This is the retail pause API used by TppMain and TppException.
         // Own one named registration and release only that registration;
         // another menu, loading transition or script may also hold a pause.
@@ -446,18 +598,69 @@ void pump(void* state){
             }
             setTop(state,top);
         }
-        if(takeNativeIdroidClose()){
+        // Mode 10 is the native FOB_MISSION restriction (name hash f835f633).
+        // Cold ACC can retain it after the campaign reports FINISH. Let the
+        // player dismiss its informational Help first; then release only that
+        // completed guide's input restriction and separately owned world pause.
+        const auto guideMode=nativeIdroidTutorialMode();
+        if(!nativeCabinPlay()||!nativeIdroidOpen()||!guideMode||*guideMode!=10)accFobGuideHelpSeen=false;
+        else if(nativePauseMenuOpen())accFobGuideHelpSeen=true;
+        if(nativeCabinPlay()&&nativeIdroidOpen()
+           &&!nativePauseMenuOpen()&&accFobGuideHelpSeen&&guideMode&&*guideMode==10&&haveGuideRestrictionLease()){
+            constexpr std::string_view guideScript=
+                "if vars.missionCode==40010 and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame' "
+                "and gvars.trm_fobTutorialState==127 and not mvars.heliSpace_nowMissionListGuidance "
+                "and type(TppUiCommand.SetTutorialMode)=='function' and not TppUiCommand.IsShowPopup() then "
+                "TppUiCommand.SetTutorialMode(false); return 'released' end return 'active guide'";
+            int guideStatus=load(state,guideScript.data(),guideScript.size(),"@mgs5vr-acc-completed-guide");
+            if(!guideStatus)guideStatus=original(state,0,1,0);
+            size_t length{};const auto* result=getString(state,-1,&length);
+            if(!guideStatus&&result&&length==8&&std::memcmp(result,"released",8)==0){
+                const auto restored=restoreCompletedGuideRestrictions();
+                log(std::string("Completed ACC FOB guide released; native tutorial pause released=")
+                    +(releaseNativeIdroidTutorialPause()?"1":"0")+"; prior menu restrictions restored="+(restored?"1":"0"));
+            }
+            setTop(state,top);
+        }
+        const bool heldBackClose=takeNativeIdroidClose();
+        const auto tutorialMode=nativeIdroidTutorialMode();
+        // ACC has no ordinary player terminal/stow task to consume +0x25.
+        // Finish only a close already requested by native root Back. Other
+        // game modes retain their native player animation/terminal lifecycle.
+        const bool cabinClose=nativeCabinPlay()&&nativeIdroidOpen()&&nativeIdroidClosing()
+            &&tutorialMode&&*tutorialMode==0&&!nativePauseMenuOpen();
+        if((heldBackClose||cabinClose)&&!nativePauseMenuOpen()){
             // Stop is the terminal's own cleanup path. CloseMbDvcTerminal only
-            // sets a deferred close flag, which the forced FOB tutorial ignores.
+            // sets a deferred close flag, which ACC does not consume.
             // Do not mark any tutorial complete or write progression variables.
-            constexpr char closeScript[]=
+            const std::string closeScript=
                 "if type(TppUiCommand)=='table' and type(TppUiCommand.IsMbDvcTerminalOpened)=='function' "
                 "and type(TppUiCommand.StopMbDvcTerminal)=='function' and TppUiCommand.IsMbDvcTerminalOpened() "
-                "then TppUiCommand.StopMbDvcTerminal(); return 'requested' end return 'already closed'";
-            int closeStatus=load(state,closeScript,sizeof(closeScript)-1,"@mgs5vr-idroid-back-recovery");
+                "and type(TppUiCommand.IsShowPopup)=='function' and not TppUiCommand.IsShowPopup() then local completedGuide=false; "
+                +std::string(cabinClose
+                    ?"if not (vars.missionCode==40010 and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame') then return 'different owner' end "
+                    :"")
+                // A player-requested recovery may release the reproduced stale
+                // completed ACC guide restriction. Never complete a tutorial,
+                // change save/progression variables, or cancel a live lesson.
+                +std::string(heldBackClose&&nativeCabinPlay()&&tutorialMode&&*tutorialMode==10&&haveGuideRestrictionLease()
+                    ?"if vars.missionCode==40010 and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame' "
+                     "and gvars.trm_fobTutorialState==127 and not mvars.heliSpace_nowMissionListGuidance "
+                     "and type(TppUiCommand.SetTutorialMode)=='function' then TppUiCommand.SetTutorialMode(false); completedGuide=true end "
+                    :"")
+                +std::string(heldBackClose&&tutorialMode&&*tutorialMode!=0
+                    ?"if not completedGuide then return 'live tutorial retained' end ":"")
+                +"TppUiCommand.StopMbDvcTerminal(); return completedGuide and 'completed guide closed' or 'requested' end return 'already closed or overlay'";
+            int closeStatus=load(state,closeScript.data(),closeScript.size(),"@mgs5vr-idroid-back-recovery");
             if(!closeStatus)closeStatus=original(state,0,1,0);
             size_t length{};const auto* result=getString(state,-1,&length);
-            log("Native iDroid held-Back recovery status="+std::to_string(closeStatus)+": "
+            constexpr std::string_view completedGuide="completed guide closed";
+            if(!closeStatus&&result&&length==completedGuide.size()&&std::memcmp(result,completedGuide.data(),length)==0){
+                const auto restored=restoreCompletedGuideRestrictions();
+                log(std::string("Requested ACC recovery: native tutorial pause released=")+(releaseNativeIdroidTutorialPause()?"1":"0")
+                    +"; prior menu restrictions restored="+(restored?"1":"0"));
+            }
+            log(std::string(cabinClose?"Native ACC iDroid root-Back cleanup status=":"Native iDroid held-Back recovery status=")+std::to_string(closeStatus)+": "
                 +(result?std::string(result,std::min(length,size_t{300})):"no result"));
             setTop(state,top);
         }
@@ -582,6 +785,28 @@ void installNativeActions(uintptr_t base,const std::filesystem::path& folder,boo
     if(MH_CreateHook(address,reinterpret_cast<void*>(&call),reinterpret_cast<void**>(&original))!=MH_OK||MH_EnableHook(address)!=MH_OK)
         throw std::runtime_error("Cannot install native action queue");
     externalCommands=allowExternalCommands;
+    if(externalCommands){
+        const bool abi=matches(base+0x1dd7ba0,std::array<unsigned char,10>{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20})
+            &&matches(base+0x92a160,std::array<unsigned char,12>{0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x48,0x8b,0x49});
+        if(abi){
+            auto* button=reinterpret_cast<void*>(base+0x1dd7ba0);
+            auto* close=reinterpret_cast<void*>(base+0x92a160);
+            if(MH_CreateHook(button,reinterpret_cast<void*>(&uiButton),reinterpret_cast<void**>(&originalUiButton))==MH_OK
+               &&MH_EnableHook(button)==MH_OK
+               &&MH_CreateHook(close,reinterpret_cast<void*>(&uiClose),reinterpret_cast<void**>(&originalUiClose))==MH_OK
+               &&MH_EnableHook(close)==MH_OK)log("Bounded native menu input/stow diagnostics available");
+            else log("Native menu diagnostics unavailable; native behavior retained");
+        }else log("Native menu diagnostic ABI differs; observation hooks disabled");
+    }
+    const bool restrictionAbi=matches(base+0x9683d0,std::array<unsigned char,9>{0x4c,0x8b,0xc9,0x0f,0xb6,0xc2,0x45,0x84,0xc0})
+        &&matches(base+0xf42840,std::array<unsigned char,11>{0x48,0x8b,0x46,0x28,0x41,0xb0,0x01,0x40,0x0f,0xb6,0xd7})
+        &&matches(base+0xf42855,std::array<unsigned char,9>{0xff,0x90,0xa0,0,0,0,0x40,0xfe,0xc7});
+    if(restrictionAbi){
+        auto* disable=reinterpret_cast<void*>(base+0x9683d0);
+        menuRestrictionAbi=MH_CreateHook(disable,reinterpret_cast<void*>(&uiDisable),reinterpret_cast<void**>(&originalUiDisable))==MH_OK
+            &&MH_EnableHook(disable)==MH_OK;
+        if(menuRestrictionAbi)log("Native tutorial menu-restriction ownership captured; completed ACC guide recovery available");
+    }
     enabled.store(true);
     if(externalCommands){actionPipeStopping.store(false);actionPipeThread=std::thread(actionPipeLoop);}
     log(externalCommands?"Native title reader and local action queue installed":"Native title reader installed; external actions disabled");

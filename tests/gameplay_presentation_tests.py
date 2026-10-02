@@ -99,8 +99,11 @@ class PresentationTests(unittest.TestCase):
 
     def test_cleanup_closes_owned_menu_with_back_only(self):
         live = Live.__new__(Live);live.opened_menu = "pause";live.release = Mock();live.events = Mock()
+        closed = {"menu":False,"scene":"gameplay","camera_active":True,
+                  "camera_suspended":False,"camera_awaiting_player":False,
+                  "controls":{"rig_input":True},"native":{"popup":False}}
         live.observe = Mock(side_effect=[{"menu": True, "idroid": False,
-              "native": {"popup": False, "tutorial_pause": False}}, {"menu": False}])
+              "native": {"popup": False, "tutorial_pause": False}}] + [closed]*3)
         live.execute = Mock()
         live.cleanup_menus()
         self.assertEqual(live.execute.call_args.args[0]["name"], "menus.back")

@@ -90,6 +90,31 @@ class SaveProfiles(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Disable Steam Cloud"):
                     profiles.require_cloud_disabled(self.account)
 
+    def test_steam_can_remain_running_but_either_game_blocks_switching(self):
+        for game in (None, "mgsvtpp.exe", "mgsgroundzeroes.exe"):
+            rows = 'steam.exe\n'
+            if game:
+                rows += game + '\n'
+            response = mock.Mock(stdout=rows)
+            with mock.patch.object(profiles.os, "name", "nt"), mock.patch.object(profiles.subprocess, "run", return_value=response):
+                if game:
+                    with self.assertRaisesRegex(RuntimeError, "Close the game"):
+                        profiles.require_stopped()
+                else:
+                    profiles.require_stopped()
+
+    def test_a_save_changing_after_its_copy_invalidates_the_whole_pair(self):
+        copy = profiles.shutil.copy2
+        def change_earlier_file(source, destination):
+            result = copy(source, destination)
+            if pathlib.Path(source) == self.account / profiles.FILES[-1]:
+                (self.account / profiles.FILES[0]).write_bytes(b"changed after copy")
+            return result
+        with mock.patch.object(profiles.shutil, "copy2", side_effect=change_earlier_file):
+            with self.assertRaisesRegex(RuntimeError, "Paired save files"):
+                profiles.snapshot(self.account, self.store, "changing")
+        self.assertFalse((self.store / "changing/manifest.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

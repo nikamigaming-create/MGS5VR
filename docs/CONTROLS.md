@@ -25,6 +25,8 @@ thumb-rest contact does not delay applying an edit.
 The installed file is the one the game reads;
 the repository copy is a template. Every supported button action is listed,
 with separate gameplay, binocular, wrist, menu, horse and vehicle sections.
+The in-game prompt candidate and its native acceptance worklist are recorded
+in [VR_CONTROL_PROMPTS.md](VR_CONTROL_PROMPTS.md).
 
 The settings editor includes player height, each hand's local position/rotation,
 iDroid width/depth, paused panel size/distance/tilt, wrist placement, weapon smoothing, support acquire/detach

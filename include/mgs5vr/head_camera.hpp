@@ -74,6 +74,7 @@ struct ControllerFrame {
     uint64_t weaponZoomSequence{};
     float weaponAimPitch{-30.f}; // Firearms only, in the runtime pointing frame.
     float scopeEyeRelief{.1f};
+    bool scopePoseStabilization{true};
     std::array<float,2> strikeCurl{};
     bool commandControls{};
     OpticSample optic{};

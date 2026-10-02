@@ -3,8 +3,9 @@ param(
     [Parameter(Mandatory=$true)][string]$RuntimeManifest,
     [Parameter(Mandatory=$true)][string]$OperatorDir
 )
-# Direct child environment, as in the established headset launcher. Steam
-# stays running. No desktop/focus/window manipulation or global XR changes.
+# Ask the existing Steam client to launch its owned game. A temporary per-game
+# runtime lease avoids Steam's inherited environment. No Steam restart,
+# desktop/focus/window manipulation or global XR changes.
 $ErrorActionPreference='Stop'
 Import-Module Microsoft.PowerShell.Utility
 Import-Module Microsoft.PowerShell.Management
@@ -13,7 +14,7 @@ $mgsRoot=Split-Path -Parent $PSScriptRoot
 Import-Module (Join-Path $PSScriptRoot 'simulator-session-ownership.psm1') -Force
 $mgsSteam=Get-Process steam -ErrorAction Stop
 if(@($mgsSteam).Count -ne 1){throw 'One signed-in Steam client must already be running.'}
-if(Get-Process mgsvtpp -ErrorAction SilentlyContinue){throw 'MGSV already runs; reuse its session.'}
+if(Get-Process mgsvtpp -ErrorAction SilentlyContinue | Where-Object { !$_.HasExited }){throw 'MGSV already runs; reuse its session.'}
 $mgsTarget=(Resolve-Path -LiteralPath $GameDir).Path
 $mgsExe=Join-Path $mgsTarget 'mgsvtpp.exe'
 $mgsSha=[Security.Cryptography.SHA256]::Create()
@@ -25,39 +26,52 @@ $mgsManifest=(Resolve-Path -LiteralPath $RuntimeManifest).Path
 $mgsLayer=(Resolve-Path -LiteralPath $OperatorDir).Path
 if(!(Test-Path -LiteralPath (Join-Path $mgsLayer 'XrApiLayer_METAX_operator.json'))){throw 'Operator manifest missing.'}
 $mgsRuntimeRoot=Split-Path -Parent $mgsManifest
-$mgsExisting=@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and (Test-MgsPathUnderRoot $_.ExecutablePath $mgsRuntimeRoot) })
-if($mgsExisting.Count){throw 'A simulator is already alive; inspect its ownership before launching another.'}
-$mgsNames=@('XR_RUNTIME_JSON','XR_API_LAYER_PATH','XR_ENABLE_API_LAYERS','OPENXR_SIMULATOR_HEADLESS','SteamAppId','SteamGameId')
-$mgsPrevious=@{}
-foreach($mgsName in $mgsNames){$mgsPrevious[$mgsName]=[Environment]::GetEnvironmentVariable($mgsName,'Process')}
-try{
-    $env:XR_RUNTIME_JSON=$mgsManifest
-    $env:XR_API_LAYER_PATH=$mgsLayer
-    $env:XR_ENABLE_API_LAYERS='XR_APILAYER_METAX_operator'
-    # Use the normal compositor for final-eye validation and the simulator view.
-    $env:OPENXR_SIMULATOR_HEADLESS=$null
-    $env:SteamAppId='287700';$env:SteamGameId='287700'
-    # MGSV is the interactive game, not a background helper. Starting it hidden
-    # prevents its first D3D image and therefore OpenXR initialization. Let the
-    # game create its normal render window; never focus or manipulate it.
-    $mgsGame=Start-Process -FilePath $mgsExe -WorkingDirectory $mgsTarget -PassThru
-}finally{
-    foreach($mgsName in $mgsNames){[Environment]::SetEnvironmentVariable($mgsName,$mgsPrevious[$mgsName],'Process')}
+function Test-MgsLiveProcess($Process) {
+    # An observer can retain an exited process in CIM. Its generation is no
+    # longer a running owner and must not block a fresh local test session.
+    $mgsLive=Get-Process -Id $Process.ProcessId -ErrorAction SilentlyContinue
+    return $mgsLive -and !$mgsLive.HasExited
 }
-$mgsRow=Get-CimInstance Win32_Process -Filter ("ProcessId="+$mgsGame.Id)
-$mgsGameIdentity=ConvertTo-MgsProcessIdentity $mgsRow
-$mgsRecord=@{schema=2;launchMethod='direct';pid=$mgsSteam.Id;started_utc=$mgsSteam.StartTime.ToUniversalTime().ToString('o');runtime=$mgsManifest;operator=$mgsLayer;game=$mgsGameIdentity;ownedRuntimeProcesses=@()}
+$mgsExisting=@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and (Test-MgsPathUnderRoot $_.ExecutablePath $mgsRuntimeRoot) -and (Test-MgsLiveProcess $_) })
+if($mgsExisting.Count){throw 'A simulator is already alive; inspect its ownership before launching another.'}
 $mgsRecordPath=Join-Path $mgsRoot 'artifacts\simulator-steam-session.json'
 [IO.Directory]::CreateDirectory((Split-Path -Parent $mgsRecordPath)) | Out-Null
+# Recover an interrupted, already-dead lease before recording a new backup.
+# The game and selected simulator have both been excluded above.
+if(Test-Path -LiteralPath $mgsRecordPath){
+    $mgsPrior=Get-Content -Raw -LiteralPath $mgsRecordPath | ConvertFrom-Json
+    if($mgsPrior.PSObject.Properties['runtimeConfigLease']){
+        Restore-MgsRuntimeConfigLease -Lease $mgsPrior.runtimeConfigLease -GameExe $mgsExe
+    }
+}
+# Save the exact prior bytes, including an absent file, before dispatching.
+# stop-simulator restores only this lease after the owned processes exit.
+$mgsLease=New-MgsRuntimeConfigLease -GameExe $mgsExe -RuntimeManifest $mgsManifest -OperatorDir $mgsLayer
+$mgsRecord=@{schema=3;launchMethod='steam_cli';pid=$mgsSteam.Id;started_utc=$mgsSteam.StartTime.ToUniversalTime().ToString('o');runtime=$mgsManifest;operator=$mgsLayer;gameExe=$mgsExe;runtimeConfigLease=$mgsLease;game=$null;ownedRuntimeProcesses=@()}
 function Write-MgsTestRecord { [IO.File]::WriteAllText($mgsRecordPath,($mgsRecord|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false)) }
-Write-MgsTestRecord
+try { Write-MgsTestRecord }
+catch {
+    Restore-MgsRuntimeConfigLease -Lease $mgsLease -GameExe $mgsExe
+    throw
+}
+$mgsLaunchUtc=[DateTime]::UtcNow
+Start-Process -FilePath $mgsSteam.Path -ArgumentList '-applaunch','287700' -WindowStyle Hidden
 $mgsDeadline=[DateTime]::UtcNow.AddSeconds(40)
 do{
-    if($mgsGame.HasExited){throw 'MGSV exited before its simulator initialized; inspect mgs5vr.log.'}
+    if(!$mgsRecord.game){
+        $mgsRows=@(Get-CimInstance Win32_Process -Filter "Name='mgsvtpp.exe'" | Where-Object {
+            $_.ExecutablePath -eq $mgsExe -and $_.CreationDate -and $_.CreationDate.ToUniversalTime() -ge $mgsLaunchUtc -and (Test-MgsLiveProcess $_)
+        })
+        if($mgsRows.Count -gt 1){throw 'Multiple new MGSV owners appeared; refusing ambiguous session ownership.'}
+        if($mgsRows.Count -eq 1){$mgsRecord.game=ConvertTo-MgsProcessIdentity $mgsRows[0];Write-MgsTestRecord}
+    }
+    if(!$mgsRecord.game){Start-Sleep -Milliseconds 250;continue}
+    $mgsGame=Get-Process -Id $mgsRecord.game.pid -ErrorAction SilentlyContinue
+    if(!$mgsGame -or $mgsGame.HasExited){throw 'MGSV exited before its simulator initialized; inspect mgs5vr.log.'}
     # A short-lived Steam helper may exit during enumeration and lose its
     # readable path. Only complete identities can be recorded as owned.
-    $mgsSnapshot=@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.CreationDate })
-    $mgsRecord.ownedRuntimeProcesses=@(Get-MgsOwnedRuntimeProcesses -Processes $mgsSnapshot -Game $mgsGameIdentity -RuntimeRoot $mgsRuntimeRoot)
+    $mgsSnapshot=@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.CreationDate -and (Test-MgsLiveProcess $_) })
+    $mgsRecord.ownedRuntimeProcesses=@(Get-MgsOwnedRuntimeProcesses -Processes $mgsSnapshot -Game $mgsRecord.game -RuntimeRoot $mgsRuntimeRoot)
     Write-MgsTestRecord
     if(@($mgsRecord.ownedRuntimeProcesses | Where-Object role -eq 'meta_gui').Count -and
        @($mgsRecord.ownedRuntimeProcesses | Where-Object role -eq 'runtime_child').Count){

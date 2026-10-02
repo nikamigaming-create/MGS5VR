@@ -35,7 +35,9 @@ def game_identity(game):
     game = pathlib.Path(game).resolve()
     # Exact executable path and process creation time prevent PID reuse. This
     # is read-only process inventory, never Windows keyboard/focus automation.
-    script = "Get-CimInstance Win32_Process -Filter \"Name='mgsvtpp.exe'\" | Select-Object ProcessId,ExecutablePath,CreationDate | ConvertTo-Json -Compress"
+    script = ("Get-CimInstance Win32_Process -Filter \"Name='mgsvtpp.exe'\" | "
+              "Where-Object { $mgsProcess=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; $mgsProcess -and !$mgsProcess.HasExited } | "
+              "Select-Object ProcessId,ExecutablePath,CreationDate | ConvertTo-Json -Compress")
     result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
                             capture_output=True, text=True, check=True, timeout=10,
                             creationflags=subprocess.CREATE_NO_WINDOW)
@@ -103,7 +105,8 @@ class NativeReader:
 
     def read(self, script):
         # Each request is fully correlated; an ambiguous response is never
-        # replayed as an action. This adapter only submits authored read queries.
+        # replayed as an action. Callers submit authored observations or named
+        # render diagnostics from an explicitly selected bounded test case.
         native = self.module
         request = time.time_ns()
         payload = script.encode("utf-8")
@@ -703,7 +706,13 @@ class Live:
                 raise BotFault("Static support inspection requires grip-only effective bindings")
             binding = {**binding, "inputs": inputs}
         threshold = binding["milliseconds"] / 1000
-        duration = float(step.get("seconds", threshold + .1 if binding["gesture"] == "hold" else .12))
+        default_duration = threshold + .1 if binding["gesture"] == "hold" else .12
+        if name == "system.idroid" and binding["gesture"] == "tap":
+            # A real 120 ms Start pulse was sampled by XR/native XInput but
+            # missed ACC entry on a warm run. Keep a bounded, longer tap below
+            # the effective personal hold threshold; never retry implicitly.
+            default_duration = min(.30, threshold * .6)
+        duration = float(step.get("seconds", default_duration))
         if binding["gesture"] == "tap" and duration >= threshold:
             raise BotFault("Tap duration crosses the configured hold boundary")
         if binding["gesture"] == "hold" and duration <= threshold:
@@ -806,6 +815,33 @@ class Live:
             raise BotFault("Requested physical input was never observed held by the native XR control sampler")
         return observed
 
+    def _finish_menu_cleanup(self, state):
+        # A cleared terminal bit can coexist with a retained tutorial pause.
+        # Require the live camera/control owner to return, not just menu=false.
+        deadline = time.monotonic() + 3
+        stable = 0
+        while True:
+            controls = state.get("controls")
+            native = state.get("native")
+            # An audit can expire during the native stow transition. Missing
+            # observations are pending evidence, never a playable state.
+            playable = (state.get("menu") is False
+                        and state.get("scene") in ("gameplay", "cabin")
+                        and state.get("camera_active") is True
+                        and state.get("camera_suspended") is False
+                        and state.get("camera_awaiting_player") is False
+                        and isinstance(controls, dict) and controls.get("rig_input") is True
+                        and isinstance(native, dict) and native.get("popup") is False)
+            stable = stable + 1 if playable else 0
+            if stable >= 3:
+                self.opened_menu = None
+                self.events.emit("test_menu_cleanup", status="closed", camera_restored=True)
+                return
+            if time.monotonic() >= deadline:
+                raise BotFault("Test menu closed without restoring the live VR camera; session cleanup required")
+            time.sleep(.1)
+            state = self.observe(native=True)
+
     def cleanup_menus(self):
         if not getattr(self, "opened_menu", None):
             return
@@ -816,8 +852,7 @@ class Live:
         for _ in range(4 if self.opened_menu == "idroid" else 2):
             state = self.observe(native=True)
             if state.get("menu") is False:
-                self.opened_menu = None
-                self.events.emit("test_menu_cleanup", status="closed")
+                self._finish_menu_cleanup(state)
                 return
             native = state.get("native", {})
             if (state.get("menu") is not True or native.get("popup") is not False
@@ -830,10 +865,10 @@ class Live:
                                            "pause": self.opened_menu != "idroid"},
                           "native_before": {"popup": False, "tutorial_pause": False}})
             time.sleep(.3)
-        if self.observe().get("menu") is not False:
+        state = self.observe(native=True)
+        if state.get("menu") is not False:
             raise BotFault("Test-opened menu did not close")
-        self.opened_menu = None
-        self.events.emit("test_menu_cleanup", status="closed")
+        self._finish_menu_cleanup(state)
 
     def close(self, *, cleanup=True):
         try:
