@@ -1,6 +1,6 @@
 """Run arrival and a complete behavior queue on the same live connection."""
 import math
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 
 from .core import BotFault
 
@@ -11,6 +11,33 @@ NORMAL_VIEW_HAND_POSES = (
     {"op": "pose", "hand": "right", "position": [0.30, -0.30, -0.555],
      "orientation": [0.0, 0.0, 0.0, 1.0]},
 )
+
+
+@contextmanager
+def preserved_head_pose(adapter):
+    """Restore the exact starting headset transform even after a failed path."""
+    from .motion import _read
+    saved = _read(adapter, "get_head_pose", {"base_space": "local"}, local_head=True)
+    adapter.events.emit("head_pose_saved", pose=saved, source="operator_readback")
+    try:
+        yield saved
+    finally:
+        release_error = None
+        try:
+            adapter.release()
+        except Exception as error:
+            release_error = error
+        try:
+            adapter.call("set_head_pose", {"base_space": "local", **saved})
+            verified = _read(adapter, "get_head_pose", {"base_space": "local"}, local_head=True)
+            if any(abs(a-b) > 1e-5 for a, b in zip(saved["position"] + saved["orientation"],
+                                                 verified["position"] + verified["orientation"])):
+                raise BotFault("Restored head pose does not match its saved readback")
+            adapter.events.emit("head_pose_restored", pose=saved, verified=True)
+        except Exception as error:
+            raise BotFault("Could not restore saved head pose: " + str(error)) from error
+        if release_error is not None:
+            raise BotFault("Could not neutralize input before restoring head pose: " + str(release_error)) from release_error
 
 
 def _controller_pose(adapter, hand, pose_type, base_space):
@@ -71,6 +98,19 @@ def preserved_controller_pose(adapter, hand="right", pose_type="grip", base_spac
             raise BotFault(f"Could not restore saved {hand} {pose_type} pose: {restore_error}") from restore_error
         if release_error is not None:
             raise BotFault(f"Could not neutralize inputs before restoring {hand} {pose_type} pose: {release_error}") from release_error
+
+
+@contextmanager
+def preserved_tracking_poses(adapter):
+    # set_head_pose also moves simulated controllers. Restore the head FIRST,
+    # then the exact saved LOCAL grip/aim transforms; the reverse order would
+    # drag already-restored hands away after a failed headset trajectory.
+    with ExitStack() as saved:
+        for hand in ("left", "right"):
+            for kind in ("grip", "aim"):
+                saved.enter_context(preserved_controller_pose(adapter, hand, kind, "local"))
+        saved.enter_context(preserved_head_pose(adapter))
+        yield
 
 
 def reset_post_continue_hand_poses(behavior, arrival):

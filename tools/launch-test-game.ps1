@@ -1,7 +1,13 @@
 param(
     [Parameter(Mandatory=$true)][string]$GameDir,
     [Parameter(Mandatory=$true)][string]$RuntimeManifest,
-    [Parameter(Mandatory=$true)][string]$OperatorDir
+    [Parameter(Mandatory=$true)][string]$OperatorDir,
+    [ValidateRange(1024,65535)][int]$OperatorPort=8720,
+    [switch]$TrackingFaultTest,
+    [switch]$IdroidUiBoundaryTrace,
+    [string]$CameraEvidenceDir='',
+    [ValidateSet('baseline','display')][string]$ProducerPacingTest='baseline',
+    [ValidateRange(30,1200)][int]$ProducerPacingTestSeconds=900
 )
 # Ask the existing Steam client to launch its owned game. A temporary per-game
 # runtime lease avoids Steam's inherited environment. No Steam restart,
@@ -46,7 +52,7 @@ if(Test-Path -LiteralPath $mgsRecordPath){
 }
 # Save the exact prior bytes, including an absent file, before dispatching.
 # stop-simulator restores only this lease after the owned processes exit.
-$mgsLease=New-MgsRuntimeConfigLease -GameExe $mgsExe -RuntimeManifest $mgsManifest -OperatorDir $mgsLayer
+$mgsLease=New-MgsRuntimeConfigLease -GameExe $mgsExe -RuntimeManifest $mgsManifest -OperatorDir $mgsLayer -OperatorPort $OperatorPort -TrackingFaultTest:$TrackingFaultTest -IdroidUiBoundaryTrace:$IdroidUiBoundaryTrace -CameraEvidenceDir $CameraEvidenceDir -ProducerPacingTest $ProducerPacingTest -ProducerPacingTestSeconds $ProducerPacingTestSeconds
 $mgsRecord=@{schema=3;launchMethod='steam_cli';pid=$mgsSteam.Id;started_utc=$mgsSteam.StartTime.ToUniversalTime().ToString('o');runtime=$mgsManifest;operator=$mgsLayer;gameExe=$mgsExe;runtimeConfigLease=$mgsLease;game=$null;ownedRuntimeProcesses=@()}
 function Write-MgsTestRecord { [IO.File]::WriteAllText($mgsRecordPath,($mgsRecord|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false)) }
 try { Write-MgsTestRecord }

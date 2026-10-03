@@ -46,8 +46,9 @@ int main(){
     expect((ordinary.gamepad.buttons&0x1000)&&ordinary.gamepad.leftX>0&&ordinary.gamepad.rightY>0,"cinema retains native A and both analog sticks");
     expect(native.update(defaults,neutral,false).changed&&!native.selected(),"return to 3D restores the previous wand layout");
     ControlBindings controls;
-    expect(controls.setting("settings.handheld_menus")==0,"handheld menus require explicit opt-in");
+    expect(controls.setting("settings.handheld_menus")==1,"live handheld iDroid is the default");
     const auto load=[&](const char* text){std::istringstream input(text);return controls.load(input).empty();};
+    expect(load("[settings]\nhandheld_menus=0\n")&&controls.setting("settings.handheld_menus")==0,"explicit paused world-panel preference is preserved");
     expect(load("[settings]\nplayer_height_offset_cm=12\nright_hand_roll_degrees=-15\nweapon_smoothing_ms=45\nsupport_grip_radius_cm=14\nsupport_detach_radius_cm=35\n"),"community tuning loads");
     expect(!load("[settings]\nsupport_detach_radius_cm=15\n")&&controls.setting("settings.support_detach_radius_cm")==35,"invalid radius pair preserves prior settings");
     expect(!load("[settings]\nhand_rest_curl_percent=30\nhand_touch_curl_percent=20\n"),"touch cannot open a resting hand");

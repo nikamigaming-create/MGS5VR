@@ -16,12 +16,24 @@ import subprocess
 import threading
 import time
 import shutil
+import os
+import urllib.parse
 
 
 class Operator:
     def __init__(self, executable):
+        command = [str(executable)]
+        endpoint = os.environ.get("MGS5VR_OPERATOR_URL")
+        if endpoint:
+            parsed = urllib.parse.urlsplit(endpoint)
+            if (parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost")
+                    or not parsed.port or not 1024 <= parsed.port <= 65535
+                    or parsed.path or parsed.query or parsed.fragment
+                    or parsed.username is not None or parsed.password is not None):
+                raise ValueError("Operator endpoint must be a local HTTP port")
+            command.append(endpoint)
         self.process = subprocess.Popen(
-            [str(executable)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
             creationflags=subprocess.CREATE_NO_WINDOW,
         )

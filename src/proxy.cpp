@@ -100,6 +100,13 @@ std::filesystem::path modulePath(HMODULE module){
     if(!count||count>=path.size())throw std::runtime_error("Cannot resolve module path");
     return path.data();
 }
+std::filesystem::path cameraEvidenceDirectory(const std::filesystem::path& ini){
+    std::array<wchar_t,32768> path{};
+    const auto size=GetEnvironmentVariableW(L"MGS5VR_CAMERA_EVIDENCE_DIR",path.data(),static_cast<DWORD>(path.size()));
+    if(size>=path.size())throw std::runtime_error("Camera evidence environment path is too long");
+    if(!size)GetPrivateProfileStringW(L"diagnostics",L"camera_evidence_dir",L"",path.data(),static_cast<DWORD>(path.size()),ini.c_str());
+    return path.data();
+}
 void configureLocalRuntime(const std::filesystem::path& folder){
     // Steam can launch the game without inheriting a helper's environment.
     // An explicit per-game override keeps simulator selection out of the
@@ -126,14 +133,32 @@ void configureLocalRuntime(const std::filesystem::path& folder){
         throw std::runtime_error("Per-game XR API layer directory is missing or not absolute");
     if(layers.empty()!=layerPath.empty())
         throw std::runtime_error("Per-game XR layer name and directory must be specified together");
+    const auto operatorPort=value(L"operator_port");
+    if(!operatorPort.empty()){
+        if(operatorPort.size()>5||operatorPort.find_first_not_of(L"0123456789")!=std::wstring::npos)
+            throw std::runtime_error("Per-game XR operator port is invalid");
+        const auto port=std::stoul(operatorPort);
+        if(port<1024||port>65535||layers!=L"XR_APILAYER_METAX_operator")
+            throw std::runtime_error("Per-game XR operator port requires a local operator layer");
+    }
     const auto dataDir=value(L"data_dir");
     if(!dataDir.empty()&&(!std::filesystem::path(dataDir).is_absolute()
        ||!std::filesystem::is_directory(dataDir)))
         throw std::runtime_error("Per-game simulator data directory is missing or not absolute");
+    const auto cameraEvidenceDir=value(L"camera_evidence_dir");
+    if(!cameraEvidenceDir.empty()&&(!std::filesystem::path(cameraEvidenceDir).is_absolute()
+       ||!std::filesystem::is_directory(cameraEvidenceDir)))
+        throw std::runtime_error("Per-game camera evidence directory is missing or not absolute");
     if(!SetEnvironmentVariableW(L"XR_RUNTIME_JSON",manifest.c_str())
        ||!SetEnvironmentVariableW(L"XR_API_LAYER_PATH",layerPath.empty()?nullptr:layerPath.c_str())
        ||!SetEnvironmentVariableW(L"XR_ENABLE_API_LAYERS",layers.empty()?nullptr:layers.c_str())
+       ||!SetEnvironmentVariableW(L"AGENTICXR_MCP_PORT",operatorPort.empty()?nullptr:operatorPort.c_str())
+       ||!SetEnvironmentVariableW(L"MGS5VR_TRACKING_FAULT_TEST",
+            GetPrivateProfileIntW(L"runtime",L"tracking_fault_test",0,path.c_str())==1&&!operatorPort.empty()?L"1":nullptr)
+       ||!SetEnvironmentVariableW(L"MGS5VR_IDROID_UI_BOUNDARY_TRACE",
+            GetPrivateProfileIntW(L"runtime",L"idroid_ui_boundary_trace",0,path.c_str())==1&&!operatorPort.empty()?L"1":nullptr)
        ||!SetEnvironmentVariableW(L"MGS5VR_SIM_DATA_DIR",dataDir.empty()?nullptr:dataDir.c_str())
+       ||!SetEnvironmentVariableW(L"MGS5VR_CAMERA_EVIDENCE_DIR",cameraEvidenceDir.empty()?nullptr:cameraEvidenceDir.c_str())
        ||!SetEnvironmentVariableW(L"OPENXR_SIMULATOR_HEADLESS",
             GetPrivateProfileIntW(L"runtime",L"headless",0,path.c_str())==1?L"1":nullptr))
         throw std::runtime_error("Cannot apply per-game XR runtime environment");
@@ -187,11 +212,10 @@ DWORD WINAPI initialize(void*){
         installProcessExitHook(&cleanupBeforeExit);
         if(target->nativeAdapter&&GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1){
             try{
-                std::array<wchar_t,32768> evidencePath{};
-                GetPrivateProfileStringW(L"diagnostics",L"camera_evidence_dir",L"",evidencePath.data(),static_cast<DWORD>(evidencePath.size()),ini.c_str());
-                installCameraObserver(evidencePath.data());
+                const auto evidencePath=cameraEvidenceDirectory(ini);
+                installCameraObserver(evidencePath);
                 if(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1){
-                    installRenderCamera(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),evidencePath.data());
+                    installRenderCamera(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),evidencePath);
                     headCamera().configure(true,1,true);
                     if(GetPrivateProfileIntW(L"diagnostics",L"controller_rig_experiment",0,ini.c_str())==1)
                         installControllerRig(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),
@@ -225,15 +249,14 @@ DWORD WINAPI initialize(void*){
             &&(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1
                ||GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1)){
             try{
-                std::array<wchar_t,32768> evidencePath{};
-                GetPrivateProfileStringW(L"diagnostics",L"camera_evidence_dir",L"",evidencePath.data(),static_cast<DWORD>(evidencePath.size()),ini.c_str());
+                const auto evidencePath=cameraEvidenceDirectory(ini);
                 if(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1){
-                    installRenderCamera(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),evidencePath.data(),RenderBuild::groundZeroes_1_0_0_5);
+                    installRenderCamera(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),evidencePath,RenderBuild::groundZeroes_1_0_0_5);
                     headCamera().configure(true,1,false);
                     log("GZ scene-camera experiment: native stereo at the game camera, not yet a tracked first-person player rig");
                 }
                 if(GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1)
-                    installCameraObserver(evidencePath.data(),RenderBuild::groundZeroes_1_0_0_5);
+                    installCameraObserver(evidencePath,RenderBuild::groundZeroes_1_0_0_5);
             }catch(const std::exception& e){log(std::string("GZ native scene unavailable: ")+e.what());}
         }
         RuntimeChildIsolation runtimeChildren(target->id=="gz-1.0.0.5");

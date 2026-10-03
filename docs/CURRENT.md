@@ -6,7 +6,93 @@ left-arm HUD popups, and the right-hand iDroid. Pause uses a spatial stereo
 panel. Floating firearm aiming overlays stay off. No desktop/input automation
 or Steam shutdown is needed by the local workflow.
 
-## Current result: October 2
+## Current result: October 3
+
+### Unreleased iDroid regression investigation
+
+The latest built local candidate `7a5b00774fd2` passed all **44 CTest
+groups and installer transactions**, including **120 real D3D11 mailbox
+checks**. It includes paired grip/aim retention, right-hand handheld iDroid
+defaults, native opacity and modular-arm boundary repairs, recording lineage,
+completion fences and separate layer-preparation and `xrEndFrame` timing.
+The new typed routing recognizes 20 outgoing device layouts, excludes the
+shared Mission Orders scene, and uses an exact post-native-A8 handset pose.
+A bounded native visibility diagnostic can observe opacity and arm-group state;
+it does not establish GPU visibility or repair acceptance. These changes have
+code/test coverage but still need their native transition replay.
+This remains an unreleased investigation candidate;
+the published October 2 release below is a separate build.
+
+The first `7a5b00774fd2` launch timed out before the first game image. A subsequent
+baseline-pacing launch of the same DLL reached native Present and OpenXR at
+2520 x 2640 per eye; both Autosave eyes were reviewed and one acknowledgment
+was sampled. The initial startup failure remains unexplained. Display pacing
+starts after first-image capture, so this is not evidence that the display cap
+caused the failure. A later debugger-cleanup defect was separately identified
+and cleared; it did not explain the initial hang. Steam was retained.
+
+On prior candidate `f694be5341fb`, retained `20261003T054823809620Z` reached
+Afghanistan Mission 10020, with both
+arrival eyes reviewed. Retained `20261003T054944466769Z` passed seven ordinary
+iDroid state cases and schema 2 recording validation. Reviewed accepted source
+samples show a full-size attached handset at opening. Immediate reopening
+still loses both arms for one recorded source image, `95403`; the neighboring
+accepted images retain them. Exact matching body and attachment publications
+rule out a stale attachment argument on that image. The remaining visibility
+cause needs a source-bound native draw/opacity observation.
+
+Typed observations identify 20 Map/device layouts routed to the left arm at
+first-closed sources `95146` and `95646`, separately from four ordinary HUD
+layouts and a shared Mission Orders scene. Neither exact closing pair was
+copied by the recorder. The built `7a5b00774fd2` changes route only verified
+device-owned layouts, carry a strictly matching native handset pose, and
+suppress those outgoing device pixels when no current pose exists. Native
+replay remains pending; continuous closing animation is not accepted.
+Authored native transforms remain untouched.
+
+The 20.533-second recording has 570 accepted copies, 47 scheduled losses and
+46 explicit CFR repeat fills; it is not gapless evidence. The final capture-off
+stowed field window spans 295.233 seconds: 87.67 XR submissions/s and 54.98
+fresh pairs/s. Exact `xrEndFrame` reaches 811.755 ms while layer preparation
+stays below 0.182 ms. This establishes an API submission stall, not its runtime
+or driver cause. The reopen visibility defect is not concurrent with the logged
+large stall. A matched process-only display-pacing comparison is next;
+freshness limits, recommended per-eye resolution and eye FOV remain intact.
+
+The six-cycle, 180-second motion suite on `5a7bae2a2864` failed in cycle six
+after five complete cycles. No current sustained no-drops pass supersedes it.
+
+The user additionally reports that entering **any ACC Development window**
+freezes selection, navigation and Back. The `4df840eda253` replay confirms
+Weapons/Items Down/Up and eventual exit through three short Back edges in
+handheld mode, but its whole recording run failed the disk-reserve check.
+The `f694be5341fb` spatial-mode comparison reached the Development selection;
+its next reopening failed because physical input was never sampled. On `7a5b00774fd2`,
+the spatial-mode Down probe had one observed edge but a measured hold of 0 ms;
+it does not establish a usable native navigation hold or reproduce a freeze.
+Retained `20261003T071122059279Z` then reproduced a narrower exit failure:
+Up responded and wrapped to the bottom row, but three separate 120 ms Back
+commands were sampled as B and followed by neutral input while both final
+eyes still showed the Weapons grid. Retail XInput logs independently confirm
+all three deliveries and releases. The run ended with attention required and
+clean input/session cleanup. This establishes a spatial-mode Back defect in
+Weapons/Items, not a complete navigation freeze. A handheld-mode comparison
+on the same DLL is in progress; the other Development windows remain open.
+This remains a release blocker, with no ambiguous action replay or development
+item purchase.
+
+Supply-drop cues, intermittent weapon selection and lower-priority cutscene
+reports are recorded separately. The exact fight and selection symptom are
+unknown. Existing replacement cues do not identify supplies; no marker fix or
+Quest-specific cause is claimed without a native reproduction.
+
+The release gate remains blocked for the linked hand/arm and iDroid transition
+features, performance and the ACC Development report. No full-game,
+continuous-feature or physical-headset acceptance is claimed. The
+[regression catalog and coverage report](REGRESSION_COVERAGE.md) distinguish
+implemented behavior, unit coverage, bounded observations and missing sustained
+checks. Local investigation sessions release test controls and close only their
+owned game/runtime during cleanup; Steam is retained.
 
 ### October 2 release source
 

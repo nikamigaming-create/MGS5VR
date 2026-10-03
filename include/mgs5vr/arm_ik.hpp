@@ -5,19 +5,21 @@
 namespace mgs5vr {
 struct RigContinuityKey {
     uintptr_t owner{},model{};
-    uint64_t activation{},epoch{};
+    uint64_t activation{},epoch{},presentationEpoch{};
     bool operator==(const RigContinuityKey&) const=default;
 };
-// Coco's occlusion continuity, limited to presentation. Raw tracking still
-// owns firing, throws, melee, animal contact and controller interaction.
+struct HandPresentationPose {Pose grip{},aim{};};
+// Retain one complete controller sample while fresh focused publications
+// continue. Raw tracking still owns every action. Grip and aim recover together.
 class HandPresentationCache {
 public:
-    std::optional<Pose> update(Pose grip,bool tracked,uint64_t time,RigContinuityKey key);
+    std::optional<HandPresentationPose> update(HandPresentationPose pose,bool tracked,
+        bool focused,uint64_t time,RigContinuityKey key);
     void reset(){*this={};}
 private:
     RigContinuityKey key_{};
-    Pose last_{},recoveryFrom_{};
-    uint64_t sampleAt_{},trackedAt_{},recoveryAt_{};
+    HandPresentationPose last_{},recoveryFrom_{};
+    uint64_t sampleAt_{},recoveryAt_{};
     bool valid_{},tracked_{};
 };
 class StationaryBodyState {

@@ -5,7 +5,9 @@
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/paused_rig.hpp"
+#include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/idroid_rig.hpp"
+#include "mgs5vr/idroid_ui.hpp"
 #include "mgs5vr/idroid_effect_probe.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/render_layout.hpp"
@@ -17,6 +19,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <string>
 
 using namespace mgs5vr;
@@ -25,6 +28,107 @@ static void expect(bool ok,const char* name){++checks;if(!ok){++failures;std::ce
 static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
+    {
+        const std::array<uint64_t,20> deviceScenes{
+            0x504021c76a2a4cbaull,0x5040741ac64544cfull,0x504074e62baad619ull,
+            0x504094fe110e6190ull,0x5041279d9bbad3e7ull,0x5041cbb01589c388ull,
+            0x5041fbae29f09edaull,0x504234fc6f91c7d8ull,0x504261ee7ecaa18bull,
+            0x5042b59328405fccull,0x5042c3876f5a59e2ull,
+            0x5042eb67eeb4de89ull,0x504308200fe46da1ull,0x50430ad0dfd261d5ull,
+            0x5043148fe514447dull,0x50432962f66ecdf4ull,0x50439c74ecdacf51ull,
+            0x5043d809a6309ca0ull,0x5043e2ca55e8f7bbull,0x5043f3b3f0a7aff9ull};
+        const IdroidUiSource opened{1,2,3,4,1,95145,true,true,true,true};
+        auto closed=opened;closed.menuGeneration=2;closed.source=95146;closed.menuOpen=closed.idroid=false;
+        IdroidUiIdentity identity{11,12,13,14,15,deviceScenes.front()};
+        IdroidUiOpenLease lease{identity,opened};
+        for(const auto scene:deviceScenes){
+            identity.resource=lease.identity.resource=scene;
+            expect(idroidUiRole(scene)==IdroidUiRole::device&&outgoingIdroidUi(lease,identity,closed,1,true),
+                "each observed surviving Map/chrome scene remains device content after native close");
+        }
+        for(const auto scene:{0x50418b3d353471adull,0x50419149642d99b4ull,0x5043132d8cf49a67ull,0x5042c796d643f58eull}){
+            identity.resource=lease.identity.resource=scene;
+            expect(idroidUiRole(scene)==IdroidUiRole::personalHud&&!outgoingIdroidUi(lease,identity,closed,1,true),
+                "four observed persistent ordinary HUD scenes never enter the device close route");
+        }
+        identity.resource=lease.identity.resource=0;
+        expect(idroidUiRole(0)==IdroidUiRole::unknown&&!outgoingIdroidUi(lease,identity,closed,1,true),
+            "an unknown resource keeps its existing routing even when pointers and menu generations match");
+        identity.resource=lease.identity.resource=0x5042e66eb693eab8ull;
+        const bool commonMissionOutgoing=outgoingIdroidUi(lease,identity,closed,1,true);
+        expect(idroidUiRole(identity.resource)==IdroidUiRole::unknown&&!commonMissionOutgoing,
+            "shared Mission Orders cannot acquire exclusive device ownership from a prior open tuple");
+        expect(idroidUiClosingRoute(commonMissionOutgoing,false)==IdroidUiClosingRoute::unchanged,
+            "an absent current handset pose cannot suppress shared Mission Orders");
+        identity.resource=lease.identity.resource=deviceScenes.front();
+        expect(!outgoingIdroidUi(lease,identity,closed,0,true)&&!outgoingIdroidUi(lease,identity,closed,2,true)
+            &&!outgoingIdroidUi(lease,identity,closed,1,false),"missing, ambiguous and changed native owners are not device authority");
+        for(const auto member:{&IdroidUiIdentity::owner,&IdroidUiIdentity::root,&IdroidUiIdentity::packet,
+            &IdroidUiIdentity::buffer,&IdroidUiIdentity::camera}){
+            auto changed=identity;++(changed.*member);
+            expect(!outgoingIdroidUi(lease,changed,closed,1,true),"reusing one native layout link invalidates the old open owner");
+        }
+        for(const auto member:{&IdroidUiSource::activation,&IdroidUiSource::referenceEpoch,&IdroidUiSource::presentationEpoch,
+            &IdroidUiSource::menuGeneration}){
+            auto changed=closed;++(changed.*member);
+            expect(!outgoingIdroidUi(lease,identity,changed,1,true),"a different menu or XR epoch cannot prolong the device content lease");
+        }
+        auto changed=closed;++changed.player;
+        expect(!outgoingIdroidUi(lease,identity,changed,1,true),"another player cannot inherit a device layout");
+        changed=closed;changed.focused=false;
+        expect(!outgoingIdroidUi(lease,identity,changed,1,true),"lost focus does not authorize device pixels");
+        changed=closed;changed.handheld=false;
+        expect(!outgoingIdroidUi(lease,identity,changed,1,true),"spatial mode does not inherit a handheld close lease");
+        changed=closed;changed.source=opened.source;
+        expect(!outgoingIdroidUi(lease,identity,changed,1,true),"replayed source pixels cannot manufacture a closing transition");
+        changed=closed;changed.menuOpen=true;
+        expect(!outgoingIdroidUi(lease,identity,changed,1,true),"Pause or another open menu does not use outgoing Map authority");
+        auto unobserved=lease;unobserved.source.menuOpen=false;
+        expect(!outgoingIdroidUi(unobserved,identity,closed,1,true),"a scene never observed in the open iDroid cannot acquire close ownership");
+        unobserved=lease;unobserved.source.menuGeneration=UINT64_MAX;changed=closed;changed.menuGeneration=0;
+        expect(!outgoingIdroidUi(unobserved,identity,changed,1,true),"menu generation overflow is not an adjacent transition");
+        expect(idroidUiClosingRoute(true,false)==IdroidUiClosingRoute::suppress,
+            "missing exact native pose drops only verified outgoing device pixels instead of borrowing left-arm geometry");
+        expect(idroidUiClosingRoute(true,true)==IdroidUiClosingRoute::display,
+            "a verified source-matched authored pose can carry surviving device pixels");
+        expect(idroidUiClosingRoute(false,false)==IdroidUiClosingRoute::unchanged
+            &&idroidUiClosingRoute(false,true)==IdroidUiClosingRoute::unchanged,
+            "missing or present device geometry never changes unknown or ordinary HUD handling");
+    }
+    {
+        ControllerTrackingFaultProbe probe;
+        expect(!probe.arm(4,7000,100),"normal builds cannot arm a tracking-loss fixture");
+        probe.configure(true);
+        expect(!probe.arm(4,7000,100),"an unfocused test session cannot arm tracking loss");
+        probe.focused(true);
+        expect(!probe.arm(16,7000,100)&&!probe.arm(4,8001,100)&&!probe.arm(4,99,100),
+            "tracking-loss diagnostics reject unsupported masks and unbounded durations");
+        expect(probe.arm(4,7000,100)&&probe.mask(7099)==4&&probe.mask(7100)==0,
+            "tracking-loss expiry is independent of the runner and expires at its exact bound");
+        probe.arm(15,7000,8000);probe.focused(false);probe.focused(true);
+        expect(probe.mask(8010)==0,"focus loss clears every simulated tracking-loss bit");
+        probe.arm(8,7000,9000);probe.configure(false);
+        expect(probe.mask(9010)==0,"session replacement or normal configuration removes the diagnostic lease");
+    }
+    {
+        expect(nativeIdroidRecoveryForTutorialMode(std::nullopt)==NativeIdroidRecovery::refuse,
+            "unread tutorial mode cannot authorize forced terminal Stop");
+        expect(nativeIdroidRecoveryForTutorialMode(0)==NativeIdroidRecovery::ordinary,
+            "readable inactive tutorial permits ordinary requested recovery");
+        for(unsigned mode=1;mode<=16;++mode)
+            expect(nativeIdroidRecoveryForTutorialMode(mode)==NativeIdroidRecovery::completedGuideOnly,
+                "every active tutorial requires the native completed-guide proof before Stop");
+        expect(nativeIdroidRecoveryForTutorialMode(17)==NativeIdroidRecovery::refuse
+            &&nativeIdroidRecoveryForTutorialMode(std::numeric_limits<unsigned>::max())==NativeIdroidRecovery::refuse,
+            "unrecognized tutorial values cannot authorize forced terminal Stop");
+        std::ostringstream state;state<<std::boolalpha;
+        state<<"{\"unknown\":";writeNativeIdroidTutorialModeJson(state,std::nullopt);
+        state<<",\"ordinary\":";writeNativeIdroidTutorialModeJson(state,0);
+        state<<",\"active\":";writeNativeIdroidTutorialModeJson(state,10);
+        state<<",\"invalid\":";writeNativeIdroidTutorialModeJson(state,17);state<<'}';
+        expect(state.str()=="{\"unknown\":null,\"ordinary\":0,\"active\":10,\"invalid\":null}",
+            "inspect JSON preserves unknown versus inactive and active tutorial mode without boolean coercion");
+    }
     NativeMenuRestrictionLease menuLease;
     for(unsigned index=0;index<78;++index)menuLease.beginEntry(1,2,index,index==33);
     expect(menuLease.ready(1,2),"complete native tutorial begin has a restorable menu owner");
@@ -134,25 +238,78 @@ int main(){
         expect(edge.update(true,210,2),"fresh tracking after an activation begins a new use");
     }
     {
-        const RigContinuityKey key{1,2,3,4};
+        const RigContinuityKey key{1,2,3,4,5};
         HandPresentationCache cache;
         const Pose first{{},{.2f,.3f,-.5f}},second{{0,.70710678f,0,.70710678f},{.4f,.5f,-.7f}};
-        expect(!cache.update(first,false,100,key),"missing tracking cannot invent a cached hand");
-        expect(cache.update(first,true,110,key).has_value(),"fresh controller starts hand presentation");
-        const auto held=cache.update({},false,130,key);
-        expect(held&&same(held->position,first.position),"brief occlusion retains the last local controller pose");
-        const auto reacquired=cache.update(second,true,150,key);
-        expect(reacquired&&same(reacquired->position,first.position),"tracking return starts continuously from the held hand");
-        const auto middle=cache.update(second,true,200,key),complete=cache.update(second,true,250,key);
-        expect(middle&&same(middle->position,{.3f,.4f,-.6f})&&valid(*middle),"tracking recovery blends a rigid hand pose over time");
-        expect(complete&&same(complete->position,second.position),"recovered hand reaches current tracking without permanent lag");
-        expect(cache.update({},false,500,key).has_value()&&!cache.update({},false,501,key),"hand retention ends at 250 milliseconds");
-        cache.update(first,true,600,key);
-        expect(!cache.update({},false,610,{1,2,3,5}),"a changed OpenXR reference space cannot reuse the old hand");
-        cache.update(first,true,620,key);
-        expect(!cache.update({},false,630,{9,2,3,4}),"a different player cannot reuse the old hand");
-        cache.update(first,true,640,key);
-        expect(!cache.update({},false,630,key),"clock reversal clears retained hand presentation");
+        const HandPresentationPose firstPair{first,Pose{{},{.25f,.35f,-.55f}}};
+        const HandPresentationPose secondPair{second,Pose{second.orientation,{.45f,.55f,-.75f}}};
+        expect(!cache.update(firstPair,false,true,100,key),"missing tracking cannot invent a cached hand pair");
+        expect(cache.update(firstPair,true,true,110,key).has_value(),"one complete controller sample starts presentation");
+        const auto held=cache.update(secondPair,false,true,130,key);
+        expect(held&&same(held->grip.position,first.position)&&same(held->aim.position,firstPair.aim.position),
+            "an incomplete new sample cannot combine its grip with the old aim");
+        const auto heldContact=held?idroidGripContact(held->grip,held->aim):std::nullopt;
+        expect(heldContact&&same(heldContact->position,first.position),"retained aim and grip still form the same iDroid contact");
+        const auto reacquired=cache.update(secondPair,true,true,150,key);
+        expect(reacquired&&same(reacquired->grip.position,first.position)
+            &&same(reacquired->aim.position,firstPair.aim.position),"both poses begin recovery continuously from the held sample");
+        const auto middle=cache.update(secondPair,true,true,200,key),complete=cache.update(secondPair,true,true,250,key);
+        expect(middle&&same(middle->grip.position,{.3f,.4f,-.6f})&&same(middle->aim.position,{.35f,.45f,-.65f})
+            &&valid(middle->grip)&&valid(middle->aim),"grip and aim share the same rigid-pose recovery interval");
+        expect(complete&&same(complete->grip.position,second.position)&&same(complete->aim.position,secondPair.aim.position),
+            "both recovered poses reach current tracking after 100 milliseconds");
+        bool retained=true;
+        for(uint64_t time=500;time<=10500;time+=250){
+            const auto idle=cache.update({},false,true,time,key);
+            retained=retained&&idle&&same(idle->grip.position,second.position)&&same(idle->aim.position,secondPair.aim.position);
+        }
+        expect(retained,"fresh focused publications retain an idle controller pair beyond 250 milliseconds");
+        const auto delayed=cache.update({},false,true,11000,key);
+        const auto delayedAgain=cache.update({},false,true,21000,key);
+        expect(delayed&&delayedAgain&&same(delayedAgain->grip.position,second.position)
+            &&same(delayedAgain->aim.position,secondPair.aim.position),
+            "scheduling gaps preserve visual continuity in the same focused owner and reference space");
+        const auto longRecovery=cache.update(firstPair,true,true,21100,key);
+        const auto longRecoveryEnd=cache.update(firstPair,true,true,21200,key);
+        expect(longRecovery&&longRecoveryEnd&&same(longRecovery->grip.position,second.position)
+            &&same(longRecovery->aim.position,secondPair.aim.position)
+            &&same(longRecoveryEnd->grip.position,first.position)&&same(longRecoveryEnd->aim.position,firstPair.aim.position),
+            "both poses recover together after a long idle hold and rendering gap");
+        cache.update(firstPair,true,true,11000,key);
+        expect(!cache.update({},false,true,11010,{1,2,3,6,5}),"a changed OpenXR reference space cannot reuse the old hand");
+        cache.update(firstPair,true,true,11020,key);
+        expect(!cache.update({},false,true,11030,{9,2,3,4,5}),"a different player cannot reuse the old hand");
+        cache.update(firstPair,true,true,11040,key);
+        expect(!cache.update({},false,true,11050,{1,9,3,4,5}),"a replacement model cannot reuse the old hand");
+        cache.update(firstPair,true,true,11060,key);
+        expect(!cache.update({},false,true,11070,{1,2,9,4,5}),"a new camera activation cannot reuse the old hand");
+        cache.update(firstPair,true,true,11080,key);
+        expect(!cache.update({},false,true,11090,{1,2,3,4,9}),"focus or controller-profile generation changes clear both poses");
+        cache.update(firstPair,true,true,11100,key);
+        expect(!cache.update({},false,false,11110,key)&&!cache.update({},false,true,11120,key),
+            "focus loss clears presentation immediately and focus return cannot invent tracking");
+        cache.update(firstPair,true,true,11130,key);
+        expect(!cache.update({},false,true,11120,key),"clock reversal clears retained hand presentation");
+        cache.update(firstPair,true,true,11140,key);
+        auto invalidPair=firstPair;invalidPair.aim.orientation={0,0,0,0};
+        expect(!cache.update(invalidPair,true,true,11150,key),"invalid claimed tracking cannot retain or seed a broken pair");
+        std::array<HandPresentationCache,2> both;
+        ControllerFrame raw;raw.presentationFocused=true;raw.presentationEpoch=5;
+        for(size_t side=0;side<2;++side){
+            const auto pair=side?secondPair:firstPair;
+            both[side].update(pair,true,true,100,key);
+            raw.hands[side].grip=pair.grip;raw.hands[side].aim=pair.aim;
+        }
+        bool bothVisible=true;
+        for(uint64_t time=200;time<=1200;time+=100)for(size_t side=0;side<2;++side){
+            const auto& hand=raw.hands[side];
+            bothVisible=both[side].update({hand.grip,hand.aim},hand.gripTracked&&hand.aimTracked,
+                raw.presentationFocused,time,key).has_value()&&bothVisible;
+        }
+        expect(bothVisible&&!raw.hands[0].gripTracked&&!raw.hands[0].aimTracked
+            &&!raw.hands[1].gripTracked&&!raw.hands[1].aimTracked,"both idle hands stay visible without granting raw tracking authority");
+        const auto passive=passiveControllerFrame(raw,1,4);
+        expect(!passive.presentationFocused&&passive.presentationEpoch==5,"passive XR input explicitly withdraws presentation focus");
         StationaryBodyState stop;
         expect(!stop.update(true,{},100,key)&&!stop.update(true,{},200,key),"a cold stationary body does not invent prior movement");
         expect(!stop.update(true,{.03f,0,0},220,key),"native movement arms alignment without moving the pose");
@@ -1997,7 +2154,8 @@ int main(){
     {
         auto fresh=helpMenu;
         fresh.controllers.hands[1].gripTracked=true;
-        const PausedRigOwner owner{11,22,fresh.activation,fresh.controllers.referenceEpoch,110};
+        fresh.controllers.presentationFocused=true;fresh.controllers.presentationEpoch=1;
+        const PausedRigOwner owner{11,22,fresh.activation,fresh.controllers.referenceEpoch,110,fresh.menuGeneration};
         expect(mayRefreshPausedRig(owner,11,fresh,400),"paused owned animation accepts a fresh tracked skin solve");
         expect(!mayRefreshPausedRig(owner,12,fresh,400),"secondary camera cannot republish the player's paused skin");
         auto changed=fresh;changed.playerOwner=23;
@@ -2011,17 +2169,53 @@ int main(){
         changed=fresh;changed.controllers.loading=true;
         expect(!mayRefreshPausedRig(owner,11,changed,400),"loading never dereferences a retained paused target");
         changed=fresh;changed.controllers.hands[1].gripTracked=false;
-        expect(!mayRefreshPausedRig(owner,11,changed,400),"lost controller tracking cannot refresh a visible palm");
+        expect(mayRefreshPausedRig(owner,11,changed,400),"a focused paused owner may attempt a retained presentation solve without raw grip tracking");
+        changed.controllers.presentationFocused=false;
+        expect(!mayRefreshPausedRig(owner,11,changed,400),"focus loss cannot refresh a paused skin from retained hands");
+        changed=fresh;changed.controllers.presentationEpoch=0;
+        expect(!mayRefreshPausedRig(owner,11,changed,400),"unidentified presentation cannot refresh a paused skin");
         expect(!mayRefreshPausedRig(owner,11,fresh,551)&&!mayRefreshPausedRig(owner,11,fresh,399),
             "stale and future tracking cannot be passed off as current paused skin");
         auto active=owner;active.nativeUpdateTime=300;
         expect(!mayRefreshPausedRig(active,11,fresh,400),"a running native skin job retains sole publication ownership");
+        auto boundary=fresh;++boundary.menuGeneration;
+        expect(mayRefreshPausedRig(active,11,boundary,400),
+            "menu entry rebuilds the current owned skin before the paused timeout");
+        boundary.menuOpen=false;
+        expect(mayRefreshPausedRig(active,11,boundary,400),
+            "menu exit rebuilds the current owned skin before exposing the gameplay camera");
+        auto completed=active;completed.menuGeneration=boundary.menuGeneration;
+        expect(!mayRefreshPausedRig(completed,11,boundary,400),
+            "completed exit cannot repeatedly refresh ordinary gameplay skin");
+        boundary.controllers.presentationFocused=false;
+        expect(!mayRefreshPausedRig(active,11,boundary,400),"menu boundary never overrides lost presentation focus");
+        boundary=fresh;++boundary.menuGeneration;boundary.playerOwner=23;
+        expect(!mayRefreshPausedRig(active,11,boundary,400),"menu boundary never inherits another player's skin");
+        boundary=fresh;++boundary.menuGeneration;
+        expect(!mayRefreshPausedRig(active,11,boundary,551),"menu boundary never relabels stale tracking as fresh");
         fresh.renderedPalms[1].position.x+=.1f;
         expect(menuEpoch.publishRigFrame(11,22,thirdPerson,fresh),"a completed paused skin solve can publish its new palm");
         const auto refreshed=menuEpoch.resolve(11,thirdPerson,400);
         expect(refreshed.rigSequence&&refreshed.trackingSequence==fresh.trackingSequence
             &&same(refreshed.renderedPalms[1].position,fresh.renderedPalms[1].position),
             "camera and wrist display consume the refreshed paused skin transaction together");
+        const auto beforeExit=refreshed;
+        menuEpoch.setNativeMenuOpen(false);
+        menuEpoch.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,400);
+        const auto afterExit=menuEpoch.resolve(11,thirdPerson,400);
+        expect(afterExit.applied&&!afterExit.menuOpen&&!afterExit.rigSequence
+            &&afterExit.menuGeneration>beforeExit.menuGeneration,
+            "native menu exit demands a skin publication from the new camera generation");
+        expect(!menuEpoch.publishRigFrame(11,22,thirdPerson,beforeExit),
+            "an in-flight menu skin cannot overwrite the post-exit camera transaction");
+        expect(menuEpoch.publishRigFrame(11,22,thirdPerson,afterExit)
+            &&menuEpoch.resolve(11,thirdPerson,400).rigSequence,
+            "fresh post-exit skin and camera join without accepting the previous menu geometry");
+        menuEpoch.setNativeMenuOpen(true,true);
+        const auto nextEntry=menuEpoch.resolve(11,thirdPerson,400);
+        expect(nextEntry.applied&&nextEntry.menuIdroid&&nextEntry.menuGeneration>afterExit.menuGeneration
+            &&!menuEpoch.publishRigFrame(11,22,thirdPerson,afterExit),
+            "immediate reopening also rejects a skin solved for the closed camera");
     }
     handsCamera.trackStereo({},rigEyes,true,100,hands);handsCamera.toggle();
     const auto joinedHands=handsCamera.resolve(1,nativeCamera,100);
@@ -3020,6 +3214,14 @@ int main(){
         const auto moved=trackedIdroidRay(frame);
         expect(moved&&moved->hit.u<.5f&&moved->hit.u>0.f,
             "iDroid ray follows aim origin across the display");
+        right.gripTracked=false;
+        expect(trackedIdroidPose(frame).has_value()&&!trackedIdroidRay(frame),
+            "retained iDroid presentation cannot grant a ray when raw grip tracking is lost");
+        right.gripTracked=true;
+        const auto validGrip=right.grip;right.grip.orientation={0,0,0,0};
+        expect(trackedIdroidPose(frame).has_value()&&!trackedIdroidRay(frame),
+            "an invalid raw grip cannot grant a ray through a retained device");
+        right.grip=validGrip;
         right.aimTracked=false;
         expect(!trackedIdroidRay(frame),"iDroid ray fails closed when the aim pose is not tracked");
         frame.renderedPalmTracked[1]=true;frame.renderedPalms[1]=Pose{{},{7,8,9}};

@@ -13,7 +13,7 @@ import re
 import subprocess
 import time
 
-from .core import ActionPrerequisiteChanged, BlankCompositorFrame, BotFault, matches, scene
+from .core import ActionPrerequisiteChanged, BlankCompositorFrame, BotFault, matches, scene, reviewed_action_contract, REVIEWED_MENU_BUTTONS
 from .operator_recovery import CapturePairInvalidated, CaptureRecoveryResult, recover_capture_once
 from .startup_evidence import StartupEvidence
 
@@ -237,6 +237,30 @@ def authoritative_context(state):
     """Require the current, fresh context from the native XR control resolver."""
     controls = authoritative_controls(state)
     return controls["context"]
+
+
+def reviewed_action_packet(state, action, held_token=None):
+    """Exact action-mapped A/B or complete sampled release; no RPC-only proof."""
+    if action not in REVIEWED_MENU_BUTTONS:
+        return False
+    controls = authoritative_controls(state)
+    if (controls["context"] != "menus"
+            or controls.get("native_packet_source") != "xr_runtime_final_mapped_packet"
+            or type(controls.get("native_buttons")) is not int
+            or controls["native_buttons"] != (REVIEWED_MENU_BUTTONS[action] if held_token else 0)):
+        return False
+    faces = {"a":0, "b":1, "x":2, "y":3}
+    if held_token is not None and held_token not in faces:
+        return False
+    for name, count in (("physical", 11), ("sticks", 4), ("native_axes", 4), ("native_triggers", 2)):
+        values = controls.get(name)
+        if not isinstance(values, list) or len(values) != count:
+            return False
+        for index, value in enumerate(values):
+            target = 1. if name == "physical" and held_token and index == faces[held_token] else 0.
+            if not finite_number(value) or abs(value-target) > .08:
+                return False
+    return True
 
 
 def released_startup_observation(state, held):
@@ -744,6 +768,27 @@ class Live:
         return self.observe()
 
     def execute(self, step):
+        if step["op"] == "motion":
+            from .motion import move
+            return move(self, step)
+        if step["op"] == "tracking_loss":
+            mask, milliseconds = step.get("mask"), step.get("milliseconds")
+            if (type(mask) is not int or not 0 <= mask <= 15
+                    or type(milliseconds) is not int or not 100 <= milliseconds <= 8000 or self.held):
+                raise BotFault("Tracking-loss fixture requires released input and a bounded valid mask")
+            state = self.observe()
+            playable = state.get("scene") in ("gameplay", "cabin") or (
+                state.get("idroid") and not any(state.get(k) for k in ("pause", "title", "loading", "demo")))
+            if (not playable or not state.get("camera_active")
+                    or state.get("camera_suspended") or not state.get("rendered", {}).get("rig_sequence")):
+                raise BotFault("Tracking-loss fixture requires a current accepted playable rig")
+            response, timing = self.native.read(f"diagnostics:controller-tracking-loss:{mask}:{milliseconds}")
+            if not response.get("armed") or not response.get("enabled") or response.get("mask") != mask:
+                raise BotFault("Explicit local tracking-loss diagnostic was not armed")
+            self.events.emit("synthetic_tracking_loss", mask=mask, milliseconds=milliseconds,
+                             response=response, transport=timing,
+                             evidence_limit="Synthetic raw tracking loss in the actual game; not physical Quest 3 inactivity")
+            return
         if step["op"] == "menu_observe":
             from .menus import observe
             return observe(self, step)
@@ -823,6 +868,18 @@ class Live:
             # the effective personal hold threshold; never retry implicitly.
             default_duration = min(.30, threshold * .6)
         duration = float(step.get("seconds", default_duration))
+        reviewed_only = step.get("reviewed_action_only") is True
+        if reviewed_only:
+            reviewed_step = {key:value for key,value in step.items() if key != "reviewed_action_only"}
+            guard = {**step.get("state_before", {}),
+                     **{"native."+key:value for key,value in step.get("native_before", {}).items()}}
+            reviewed_action_contract({"reviewed_action_only":True, "before":guard, "after":guard,
+                                      "steps":[reviewed_step]})
+            if (getattr(self, "supervised", False) is not True or binding["gesture"] != "level"
+                    or len(binding["inputs"]) != 1 or binding["inputs"][0] not in ("a", "b", "x", "y")):
+                raise BotFault("Reviewed action requires one effective level face button in supervised mode")
+            if not reviewed_action_packet(state, name):
+                raise ActionPrerequisiteChanged("Reviewed action requires a sampled fully neutral native packet")
         if binding["gesture"] == "tap" and duration >= threshold:
             raise BotFault("Tap duration crosses the configured hold boundary")
         if binding["gesture"] == "hold" and duration <= threshold:
@@ -846,17 +903,23 @@ class Live:
                 # still has cleanup. Never close a user's pre-existing menu.
                 self.opened_menu = "idroid" if name == "system.idroid" else "pause"
             lease_seconds = min(5., duration + 2.) if sampled_hold or during else duration
+            edge_started = time.monotonic()
             self.input([channel(t) for t in binding["inputs"]], duration, lease_seconds=lease_seconds)
             self.events.emit("action_channels_held", action=name, duration=duration)
             # Slow xrEndFrame can delay action sampling by several hundred ms.
             # A host-side .7s sleep may never produce a native 550ms hold. Long
             # gestures use the resolver's sampled clock, with a hard wall limit.
-            dispatched = time.monotonic()
+            dispatched = edge_started if reviewed_only else time.monotonic()
             deadline = dispatched + (min(5., duration + 2.) if sampled_hold or during else duration)
             while True:
                 held_state = self.observe(native=native_during)
                 current = held_input_evidence(held_state, binding["inputs"],
                                               after_sample_ms=admission_sample_ms)
+                if reviewed_only:
+                    held_guard = {**step["state_before"], "controls.native_buttons":REVIEWED_MENU_BUTTONS[name]}
+                    if (time.monotonic() > deadline or not matches(held_state, held_guard)
+                            or not reviewed_action_packet(held_state, name, binding["inputs"][0])):
+                        current = None
                 if evidence is None and current is not None:
                     evidence = current
                     self.events.emit("action_input_audit", action=name, admitted_context=context,
@@ -923,6 +986,32 @@ class Live:
             self.release()
         if evidence is None:
             raise BotFault("Requested physical input was never observed held by the native XR control sampler")
+        if reviewed_only:
+            # The requested single-channel lease has already expired/released.
+            # Wait only for a fresh neutral native packet, never another edge.
+            deadline = time.monotonic()+1.
+            neutral_since = None
+            released_guard = {key:value for key,value in step["state_before"].items()
+                              if not key.startswith("controls.")}
+            while time.monotonic() < deadline:
+                released, controls = fresh_control_observation(self.observe, native=True,
+                    timeout=max(0., deadline-time.monotonic()))
+                if (controls["context"] != "menus" or not matches(released, released_guard)
+                        or not matches(released.get("native", {}), step["native_before"])):
+                    raise BotFault("Reviewed action lost its released native menu owner")
+                if controls["sample_ms"] > evidence["sample_ms"] and reviewed_action_packet(released, name):
+                    neutral_since = controls["sample_ms"] if neutral_since is None else neutral_since
+                    if controls["sample_ms"]-neutral_since >= 100:
+                        result = {"scope":"physical_input_and_release_only", "held_evidence":evidence,
+                                  "released_state":released, "requested_lease_seconds":duration,
+                                  "released_neutral_milliseconds":controls["sample_ms"]-neutral_since,
+                                  "page_outcome_proven":False, "page_outcome_pending":True, "visual_review_required":True}
+                        self.events.emit("reviewed_action_released", action=name, **result)
+                        return result
+                else:
+                    neutral_since = None
+                time.sleep(.025)
+            raise BotFault("Reviewed action did not establish sampled neutral input after release")
         return observed
 
     def _finish_menu_cleanup(self, state):

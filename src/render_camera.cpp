@@ -1,7 +1,6 @@
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/head_camera.hpp"
-#include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
@@ -591,8 +590,10 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     // remains drawable from fresh tracked eye cameras; requiring another skin
     // update would black out the menu. A spatial menu can only be anchored
     // after an accepted gameplay view, and all camera/transaction checks below
-    // still apply. Gameplay continues to require its current tracked skin.
-    if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence&&!source.pair.sample.menuOpen
+    // still apply. Gameplay and the moving handheld iDroid require their
+    // current tracked skin, including the very first menu-boundary frame.
+    if(mgs5vr::controllerRigEnabled()&&!source.pair.sample.rigSequence
+       &&(!source.pair.sample.menuOpen||(source.pair.sample.menuIdroid&&source.pair.sample.controllers.handheldMenus))
        &&!source.pair.sample.controllers.frontEnd&&!source.pair.sample.controllers.avatarEditor
        &&!source.pair.sample.controllers.authoredCamera){++sceneRejected;return originalScene(render,graphics,task,worker);}
     if(!contains||source.pair.sample.activation!=status.activation||now<source.pair.sample.sampleTime||now-source.pair.sample.sampleTime>150
@@ -601,6 +602,9 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     auto* context=contextOwner?field<ID3D11DeviceContext*>(reinterpret_cast<void*>(contextOwner),8):nullptr;
     if(!context){++sceneRejected;return originalScene(render,graphics,task,worker);}
     sceneContextType.store(context->GetType());
+    // Optional read-only native visibility evidence for this accepted source,
+    // before either eye changes GrCamera or begins native replay.
+    mgs5vr::observePlayerVisibilityForSource(source.pair.sample,id);
     NativeRestore saved(source.grCamera,source.viewport);insideStereo=true;stereoTarget=field<uintptr_t>(render,layout.renderTarget);
     alignas(16) std::array<float,16> authoredView{},authoredProjection{};
     // Every native UI camera inherits this viewport's aspect, including the
@@ -789,18 +793,6 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             originalWorld(ocularValues.data(),ocularWorld.data());
             std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
             mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get());
-        }
-        if(afterContext&&source.pair.sample.menuOpen&&source.pair.sample.menuIdroid&&source.pair.sample.controllers.handheldMenus){
-            if(const auto idroid=mgs5vr::trackedIdroidPose(source.pair.sample)){
-                alignas(16) auto bodyValues=values(idroid->body);
-                alignas(16) std::array<float,16> bodyWorld{},projection{};
-                originalWorld(bodyValues.data(),bodyWorld.data());
-                std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
-                mgs5vr::drawPhysicalIdroid(afterContext,bodyWorld,eyeView,projection);
-                // Native sticks/buttons own this menu. The former decorative
-                // ray dot did not drive a native selection and suggested a
-                // touch interaction that was not implemented.
-            }
         }
         const auto& wrist=source.pair.sample;
         if(!titleSurface&&!wrist.menuOpen&&mgs5vr::worldHudVisible(wrist.controllers.hudMode,hudView))

@@ -1,0 +1,3056 @@
+{
+  "schema": 1,
+  "description": "At least 180 seconds of continuous simulated hand and independent head motion across six ordinary iDroid open/use/stow/reopen cycles in guarded Mission10020 field gameplay. Run with tools/workspace.py bot --command run --record --suite tools/gameplay_bot/suites/idroid-continuous-roundtrip.json. It changes no saves/settings and performs no purchases, firing, mission navigation or tutorial skipping. Endpoint/state passes require separate continuous visual review before acceptance.",
+  "required_settings": {
+    "settings.handheld_menus": 1
+  },
+  "continue_after_outcome_failure": false,
+  "regression_requirements": {
+    "minimum_motion_seconds": 180,
+    "reversible_cycles": 6,
+    "continuous_native_recording_required": true,
+    "both_eye_checkpoint_review_required": true,
+    "transition_frame_review_required": true,
+    "physical_headset_acceptance": false,
+    "forced_tutorial_lifecycle_acceptance": false
+  },
+  "cases": [
+    {
+      "id": "continuous-idroid-1-open-use-look",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "scene": "gameplay",
+        "menu": false,
+        "idroid": false
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "menu": false,
+            "idroid": false
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "orientation": [
+                0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ],
+              "aim_position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "aim_orientation": [
+                -0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "orientation": [
+                0.49572243,
+                0.11303899,
+                -0.0652631,
+                0.85861644
+              ],
+              "aim_position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "aim_orientation": [
+                0,
+                0.13052619,
+                0,
+                0.99144486
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              -0.14,
+              0,
+              0
+            ],
+            "orientation": [
+              0,
+              -0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              -0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review complete recorded opening, independent headset motion, device cant/yaw and recovery in native source-eye video.",
+        "Review both final-eye checkpoints for attached hands/forearms, native right-hand handset/projector, world continuity and left-arm HUD.",
+        "Pose packets use separate grip/aim RPCs; do not claim atomic physical controller samples or headset acceptance."
+      ],
+      "setup": [
+        {
+          "op": "pose",
+          "hand": "left",
+          "position": [
+            -0.3,
+            -0.3,
+            -0.555
+          ],
+          "orientation": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.02,
+            -0.22,
+            -0.53
+          ],
+          "orientation": [
+            0.5,
+            0,
+            0,
+            0.8660254037844386
+          ],
+          "aim_position": [
+            0.02,
+            -0.22,
+            -0.53
+          ],
+          "aim_orientation": [
+            0,
+            0,
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "continuous-idroid-1-stow",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "menu": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "menu": true
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 0.8,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": false,
+            "menu": false
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": false,
+        "menu": false,
+        "scene": "gameplay",
+        "rendered.idroid_device_tracked": false,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review EVERY opening/stow boundary frame; reject absent/translucent arms, detached handset or a snap on immediate reopening.",
+        "The next case reopens with the established hand/head pose. No extra hand setup is permitted between cycles.",
+        "The native closing diagnostic can outlive visible prop rendering; a stale closing flag does not prove animation or visibility."
+      ]
+    },
+    {
+      "id": "continuous-idroid-2-open-use-look",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "scene": "gameplay",
+        "menu": false,
+        "idroid": false
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "menu": false,
+            "idroid": false
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "orientation": [
+                0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ],
+              "aim_position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "aim_orientation": [
+                -0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "orientation": [
+                0.49572243,
+                0.11303899,
+                -0.0652631,
+                0.85861644
+              ],
+              "aim_position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "aim_orientation": [
+                0,
+                0.13052619,
+                0,
+                0.99144486
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              -0.14,
+              0,
+              0
+            ],
+            "orientation": [
+              0,
+              -0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              -0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review complete recorded opening, independent headset motion, device cant/yaw and recovery in native source-eye video.",
+        "Review both final-eye checkpoints for attached hands/forearms, native right-hand handset/projector, world continuity and left-arm HUD.",
+        "Pose packets use separate grip/aim RPCs; do not claim atomic physical controller samples or headset acceptance."
+      ]
+    },
+    {
+      "id": "continuous-idroid-2-stow",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "menu": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "menu": true
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 0.8,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": false,
+            "menu": false
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": false,
+        "menu": false,
+        "scene": "gameplay",
+        "rendered.idroid_device_tracked": false,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review EVERY opening/stow boundary frame; reject absent/translucent arms, detached handset or a snap on immediate reopening.",
+        "The next case reopens with the established hand/head pose. No extra hand setup is permitted between cycles.",
+        "The native closing diagnostic can outlive visible prop rendering; a stale closing flag does not prove animation or visibility."
+      ]
+    },
+    {
+      "id": "continuous-idroid-3-open-use-look",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "scene": "gameplay",
+        "menu": false,
+        "idroid": false
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "menu": false,
+            "idroid": false
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "orientation": [
+                0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ],
+              "aim_position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "aim_orientation": [
+                -0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "orientation": [
+                0.49572243,
+                0.11303899,
+                -0.0652631,
+                0.85861644
+              ],
+              "aim_position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "aim_orientation": [
+                0,
+                0.13052619,
+                0,
+                0.99144486
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              -0.14,
+              0,
+              0
+            ],
+            "orientation": [
+              0,
+              -0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              -0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review complete recorded opening, independent headset motion, device cant/yaw and recovery in native source-eye video.",
+        "Review both final-eye checkpoints for attached hands/forearms, native right-hand handset/projector, world continuity and left-arm HUD.",
+        "Pose packets use separate grip/aim RPCs; do not claim atomic physical controller samples or headset acceptance."
+      ]
+    },
+    {
+      "id": "continuous-idroid-3-stow",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "menu": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "menu": true
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 0.8,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": false,
+            "menu": false
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": false,
+        "menu": false,
+        "scene": "gameplay",
+        "rendered.idroid_device_tracked": false,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review EVERY opening/stow boundary frame; reject absent/translucent arms, detached handset or a snap on immediate reopening.",
+        "The next case reopens with the established hand/head pose. No extra hand setup is permitted between cycles.",
+        "The native closing diagnostic can outlive visible prop rendering; a stale closing flag does not prove animation or visibility."
+      ]
+    },
+    {
+      "id": "continuous-idroid-4-open-use-look",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "scene": "gameplay",
+        "menu": false,
+        "idroid": false
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "menu": false,
+            "idroid": false
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "orientation": [
+                0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ],
+              "aim_position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "aim_orientation": [
+                -0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "orientation": [
+                0.49572243,
+                0.11303899,
+                -0.0652631,
+                0.85861644
+              ],
+              "aim_position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "aim_orientation": [
+                0,
+                0.13052619,
+                0,
+                0.99144486
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              -0.14,
+              0,
+              0
+            ],
+            "orientation": [
+              0,
+              -0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              -0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review complete recorded opening, independent headset motion, device cant/yaw and recovery in native source-eye video.",
+        "Review both final-eye checkpoints for attached hands/forearms, native right-hand handset/projector, world continuity and left-arm HUD.",
+        "Pose packets use separate grip/aim RPCs; do not claim atomic physical controller samples or headset acceptance."
+      ]
+    },
+    {
+      "id": "continuous-idroid-4-stow",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "menu": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "menu": true
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 0.8,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": false,
+            "menu": false
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": false,
+        "menu": false,
+        "scene": "gameplay",
+        "rendered.idroid_device_tracked": false,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review EVERY opening/stow boundary frame; reject absent/translucent arms, detached handset or a snap on immediate reopening.",
+        "The next case reopens with the established hand/head pose. No extra hand setup is permitted between cycles.",
+        "The native closing diagnostic can outlive visible prop rendering; a stale closing flag does not prove animation or visibility."
+      ]
+    },
+    {
+      "id": "continuous-idroid-5-open-use-look",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "scene": "gameplay",
+        "menu": false,
+        "idroid": false
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "menu": false,
+            "idroid": false
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "orientation": [
+                0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ],
+              "aim_position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "aim_orientation": [
+                -0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "orientation": [
+                0.49572243,
+                0.11303899,
+                -0.0652631,
+                0.85861644
+              ],
+              "aim_position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "aim_orientation": [
+                0,
+                0.13052619,
+                0,
+                0.99144486
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              -0.14,
+              0,
+              0
+            ],
+            "orientation": [
+              0,
+              -0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              -0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review complete recorded opening, independent headset motion, device cant/yaw and recovery in native source-eye video.",
+        "Review both final-eye checkpoints for attached hands/forearms, native right-hand handset/projector, world continuity and left-arm HUD.",
+        "Pose packets use separate grip/aim RPCs; do not claim atomic physical controller samples or headset acceptance."
+      ]
+    },
+    {
+      "id": "continuous-idroid-5-stow",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "menu": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "menu": true
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 0.8,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": false,
+            "menu": false
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": false,
+        "menu": false,
+        "scene": "gameplay",
+        "rendered.idroid_device_tracked": false,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review EVERY opening/stow boundary frame; reject absent/translucent arms, detached handset or a snap on immediate reopening.",
+        "The next case reopens with the established hand/head pose. No extra hand setup is permitted between cycles.",
+        "The native closing diagnostic can outlive visible prop rendering; a stale closing flag does not prove animation or visibility."
+      ]
+    },
+    {
+      "id": "continuous-idroid-6-open-use-look",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "scene": "gameplay",
+        "menu": false,
+        "idroid": false
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "system.idroid",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "menu": false,
+            "idroid": false
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "orientation": [
+                0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ],
+              "aim_position": [
+                0.13,
+                -0.27,
+                -0.45
+              ],
+              "aim_orientation": [
+                -0.2588190451,
+                0,
+                0,
+                0.9659258263
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "orientation": [
+                0.49572243,
+                0.11303899,
+                -0.0652631,
+                0.85861644
+              ],
+              "aim_position": [
+                -0.11,
+                -0.25,
+                -0.48
+              ],
+              "aim_orientation": [
+                0,
+                0.13052619,
+                0,
+                0.99144486
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              -0.14,
+              0,
+              0
+            ],
+            "orientation": [
+              0,
+              -0.13052619,
+              0,
+              0.99144486
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 5,
+          "head": {
+            "offset": [
+              0.07,
+              -0.02,
+              0
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "rendered.idroid_device_tracked": true
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "idroid_menu_input_ready": true,
+        "rendered.idroid_device_tracked": true,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review complete recorded opening, independent headset motion, device cant/yaw and recovery in native source-eye video.",
+        "Review both final-eye checkpoints for attached hands/forearms, native right-hand handset/projector, world continuity and left-arm HUD.",
+        "Pose packets use separate grip/aim RPCs; do not claim atomic physical controller samples or headset acceptance."
+      ]
+    },
+    {
+      "id": "continuous-idroid-6-stow",
+      "before": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": true,
+        "menu": true
+      },
+      "steps": [
+        {
+          "op": "action",
+          "name": "menus.back",
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": true,
+            "menu": true
+          },
+          "native_before": {
+            "mission": 10020,
+            "sequence": "Seq_Game_RescueMiller",
+            "helicopter_space": false,
+            "title": false,
+            "popup": false,
+            "tutorial_pause": false,
+            "saving": false,
+            "demo": false,
+            "demo_nonplayable": false
+          }
+        },
+        {
+          "op": "motion",
+          "seconds": 0.8,
+          "hands": [
+            {
+              "hand": "right",
+              "position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "orientation": [
+                0.5,
+                0,
+                0,
+                0.8660254037844386
+              ],
+              "aim_position": [
+                0.02,
+                -0.22,
+                -0.53
+              ],
+              "aim_orientation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "state_before": {
+            "native.mission": 10020,
+            "native.sequence": "Seq_Game_RescueMiller",
+            "native.helicopter_space": false,
+            "native.title": false,
+            "native.popup": false,
+            "native.tutorial_pause": false,
+            "native.saving": false,
+            "native.demo": false,
+            "native.demo_nonplayable": false,
+            "title": false,
+            "loading": false,
+            "demo": false,
+            "camera_active": true,
+            "camera_suspended": false,
+            "tracking_fault_mask": 0,
+            "pause": false,
+            "idroid": false,
+            "menu": false
+          }
+        }
+      ],
+      "after": {
+        "native.mission": 10020,
+        "native.sequence": "Seq_Game_RescueMiller",
+        "native.helicopter_space": false,
+        "native.title": false,
+        "native.popup": false,
+        "native.tutorial_pause": false,
+        "native.saving": false,
+        "native.demo": false,
+        "native.demo_nonplayable": false,
+        "title": false,
+        "loading": false,
+        "demo": false,
+        "camera_active": true,
+        "camera_suspended": false,
+        "tracking_fault_mask": 0,
+        "pause": false,
+        "idroid": false,
+        "menu": false,
+        "scene": "gameplay",
+        "rendered.idroid_device_tracked": false,
+        "rendered.left_palm_tracked": true,
+        "rendered.right_palm_tracked": true
+      },
+      "entry_timeout": 2,
+      "timeout": 8,
+      "after_stable_samples": 3,
+      "review_requires": [
+        "Review EVERY opening/stow boundary frame; reject absent/translucent arms, detached handset or a snap on immediate reopening.",
+        "The next case reopens with the established hand/head pose. No extra hand setup is permitted between cycles.",
+        "The native closing diagnostic can outlive visible prop rendering; a stale closing flag does not prove animation or visibility."
+      ]
+    }
+  ]
+}

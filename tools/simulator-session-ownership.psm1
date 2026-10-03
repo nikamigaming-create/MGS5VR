@@ -194,13 +194,25 @@ function Get-MgsBytesHash([byte[]]$Bytes) {
 function New-MgsRuntimeConfigLease {
     param([Parameter(Mandatory=$true)][string]$GameExe,
           [Parameter(Mandatory=$true)][string]$RuntimeManifest,
-          [Parameter(Mandatory=$true)][string]$OperatorDir)
+          [Parameter(Mandatory=$true)][string]$OperatorDir,
+          [ValidateRange(1024,65535)][int]$OperatorPort=8720,
+          [switch]$TrackingFaultTest,
+          [switch]$IdroidUiBoundaryTrace,
+          [string]$CameraEvidenceDir='',
+          [ValidateSet('baseline','display')][string]$ProducerPacingTest='baseline',
+          [ValidateRange(30,1200)][int]$ProducerPacingTestSeconds=900)
     $exe=[IO.Path]::GetFullPath($GameExe)
+    if($CameraEvidenceDir){
+        if(![IO.Path]::IsPathRooted($CameraEvidenceDir) -or ![IO.Directory]::Exists($CameraEvidenceDir)){
+            throw 'Camera evidence needs an existing absolute directory before the runtime lease is written.'
+        }
+        $CameraEvidenceDir=[IO.Path]::GetFullPath($CameraEvidenceDir)
+    }
     $path=Join-Path (Split-Path -Parent $exe) 'mgs5vr-runtime.ini'
     $present=Test-Path -LiteralPath $path -PathType Leaf
     [byte[]]$before=@()
     if($present){$before=[IO.File]::ReadAllBytes($path)}
-    $text="[runtime]`r`nenabled=1`r`nmanifest=$RuntimeManifest`r`napi_layer_path=$OperatorDir`r`napi_layers=XR_APILAYER_METAX_operator`r`nheadless=0`r`n"
+    $text="[runtime]`r`nenabled=1`r`nmanifest=$RuntimeManifest`r`napi_layer_path=$OperatorDir`r`napi_layers=XR_APILAYER_METAX_operator`r`noperator_port=$OperatorPort`r`ntracking_fault_test=$([int][bool]$TrackingFaultTest)`r`nidroid_ui_boundary_trace=$([int][bool]$IdroidUiBoundaryTrace)`r`ncamera_evidence_dir=$CameraEvidenceDir`r`nproducer_pacing_test=$ProducerPacingTest`r`nproducer_pacing_test_seconds=$ProducerPacingTestSeconds`r`nheadless=0`r`n"
     $bytes=[Text.UTF8Encoding]::new($false).GetBytes($text)
     $lease=[ordered]@{path=$path;gameExe=$exe;beforePresent=[bool]$present;
         beforeBase64=[Convert]::ToBase64String($before);beforeSha256=(Get-MgsBytesHash $before);

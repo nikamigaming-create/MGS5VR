@@ -346,7 +346,10 @@ def bot(args):
     try:
         print(f"Running {args.operation}; evidence: {output}", flush=True)
         with (output / "runner.log").open("w", encoding="utf-8") as log:
-            code = subprocess.run([str(a) for a in command], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT).returncode
+            environment = dict(os.environ)
+            environment["MGS5VR_OPERATOR_URL"] = f"http://127.0.0.1:{value.get('operator_port', 8720)}"
+            code = subprocess.run([str(a) for a in command], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
+                                  env=environment).returncode
     finally:
         write_json(output / "finished.json", {"finished_utc": utc(), "exit_code": code})
         write_json(SCRATCH / "latest.json", {"path": str(output), "exit_code": code})
@@ -366,7 +369,16 @@ def launch_sim(args):
     value = settings()
     command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
                ROOT / "tools/launch-test-game.ps1", "-GameDir", value["game_dir"],
-               "-RuntimeManifest", value["runtime"], "-OperatorDir", Path(value["operator_proxy"]).parent]
+               "-RuntimeManifest", value["runtime"], "-OperatorDir", Path(value["operator_proxy"]).parent,
+               "-OperatorPort", value.get("operator_port", 8720)]
+    if args.tracking_fault_test:
+        command += ["-TrackingFaultTest"]
+    if getattr(args, "idroid_ui_boundary_trace", False):
+        command += ["-IdroidUiBoundaryTrace"]
+    if getattr(args, "camera_evidence_dir", None):
+        command += ["-CameraEvidenceDir", args.camera_evidence_dir.resolve()]
+    if getattr(args, "producer_pacing_test", "baseline") == "display":
+        command += ["-ProducerPacingTest", "display", "-ProducerPacingTestSeconds", args.producer_pacing_test_seconds]
     run(command)
 
 
@@ -476,6 +488,13 @@ def main():
     navigate.add_argument("--seconds", type=float, default=60)
     navigate.set_defaults(handler=bot)
     launch = commands.add_parser("launch-sim")
+    launch.add_argument("--tracking-fault-test", action="store_true",
+                        help="Explicitly enable bounded simulated controller occlusion diagnostics")
+    launch.add_argument("--idroid-ui-boundary-trace", action="store_true",
+                        help="Collect bounded source-owned native UI transition diagnostics")
+    launch.add_argument("--camera-evidence-dir", type=Path, help="Existing local directory for owned source-frame diagnostics")
+    launch.add_argument("--producer-pacing-test", choices=("baseline", "display"), default="baseline")
+    launch.add_argument("--producer-pacing-test-seconds", type=int, default=900)
     launch.set_defaults(handler=launch_sim)
     sizing = commands.add_parser("resolution", help="Apply the active headset recommendation or custom native size")
     sizing.add_argument("--width", type=int)

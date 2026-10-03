@@ -1,6 +1,8 @@
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/idroid_rig.hpp"
+#include "mgs5vr/idroid_ui.hpp"
+#include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/ui_clip.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/control_prompts.hpp"
@@ -103,6 +105,13 @@ std::atomic_bool sceneMenuMode{};
 std::atomic_bool avatarEditMode{};
 uintptr_t base{};
 std::atomic_bool enabled{};
+// Diagnostic source tags travel through the existing native queue join. They
+// never authorize a menu draw or prolong a menu's geometry/animation lifetime.
+struct UiBoundarySource {
+    uintptr_t player{};
+    uint64_t menuGeneration{},rigSequence{},referenceEpoch{},presentationEpoch{};
+    uint32_t boundary{},sourceIndex{};
+};
 struct Source {
     EyeFrame eye{};
     uintptr_t camera{};
@@ -121,6 +130,11 @@ struct Source {
     float weaponHudSetback{.06f};
     bool firearmReticle{};
     float wristTextScale{1.5f};
+    UiBoundarySource boundaryTrace{};
+    IdroidUiSource idroidSource{};
+    Pose idroidDisplay{};
+    float idroidDisplayWidth{};
+    bool idroidDisplayTracked{};
 };
 thread_local Source producing,executing;
 std::mutex mutex;
@@ -142,6 +156,70 @@ bool menuReaderVerified{};
 bool idroidCloseReaderVerified{};
 bool pauseReaderVerified{};
 bool popupReaderVerified{};
+bool uiBoundaryTraceEnabled{};
+constexpr size_t uiBoundaryRecordLimit=8192;
+constexpr uint32_t uiBoundaryLimit=4,uiBoundarySourceLimit=12;
+using LayoutUpdateFn=void(*)(void*,void*);
+LayoutUpdateFn originalLayoutUpdate{};
+bool uiBoundaryLayoutHookVerified{};
+constexpr size_t uiBoundaryLayoutLimit=512;
+constexpr uint64_t uiBoundaryLayoutUpdateLimit=32768;
+std::atomic_bool uiBoundaryLayoutWindow{};
+std::atomic_uint64_t uiBoundaryLayoutAttempts{},uiBoundaryLayoutRejected{},uiBoundaryLayoutBudgetExhausted{};
+// Numeric resource identities are resolved against the user's original pack
+// in the private evidence exporter. No order/camera heuristic assigns a role.
+struct UiBoundaryLayout {
+    uintptr_t owner{},type{},root{},rootType{},packet{},buffer{},bufferType{},stream{},camera{};
+    uint64_t resource{},qpc{};
+    uint32_t flags{};
+    uint8_t cameraFlags{},rootFlags{};
+    std::array<unsigned char,0xe0> bytes{};
+};
+std::array<UiBoundaryLayout,uiBoundaryLayoutLimit> uiBoundaryLayouts{};
+size_t uiBoundaryLayoutCount{};
+uint64_t uiBoundaryLayoutReplacements{};
+// Separate from the optional finite diagnostic trace. Native post-update
+// observations identify the layout; the actual draw revalidates its complete
+// owner/packet/buffer/camera chain before that identity affects routing.
+struct IdroidUiOwner {UiBoundaryLayout layout{};IdroidUiOpenLease open{};};
+std::mutex idroidUiMutex;
+std::array<IdroidUiOwner,uiBoundaryLayoutLimit> idroidUiOwners{};
+size_t idroidUiOwnerCount{};
+std::atomic_uint64_t idroidUiRevision{},idroidUiClosingDraws{},idroidUiMissingDisplay{};
+struct UiBoundaryGate {
+    uintptr_t player{},camera{};
+    uint64_t activation{},referenceEpoch{},sequence{},generation{};
+    uint32_t boundaries{},sourceIndex{};
+    bool initialized{},idroid{},capturing{};
+} uiBoundaryGate;
+enum class UiObservedRoute:uint32_t {native,menu,leftEquipment,leftHud,leftAnimated,idroidClosing,idroidUnavailable};
+struct UiBoundaryRecord {
+    UiBoundarySource lineage{};
+    uint64_t source{},tracking{},activation{},sampleMs{},qpc{},priorGeneration{},priorSource{};
+    uintptr_t node{},nodeType{},camera{},cameraType{},sourceCamera{},terminal{};
+    uint32_t eye{},order{},flags{};
+    UiObservedRoute route{},priorRoute{};
+    bool menuOpen{},idroid{},menuTracked{},idroidDisplayTracked{},priorKnown{},nodeRead{},cameraRead{},terminalRead{};
+    std::array<char,161> name{};
+    std::array<unsigned char,128> nodeBytes{},cameraBytes{};
+    std::array<unsigned char,256> terminalBytes{};
+    std::array<float,16> nativeProjection{};
+    UiBoundaryLayout layout{};
+    uint32_t layoutCandidates{},layoutCurrentCandidates{},layoutCurrentFlags{};
+    uint8_t layoutCurrentRootFlags{};
+    bool layoutKnown{},layoutCurrentVerified{};
+};
+struct UiBoundaryPrior {
+    uintptr_t node{},nodeType{},camera{};
+    uint32_t order{};
+    uint64_t generation{},source{};
+    UiObservedRoute route{};
+};
+std::vector<UiBoundaryRecord> uiBoundaryRecords;
+std::vector<UiBoundaryPrior> uiBoundaryPrior;
+size_t uiBoundaryReported{};
+uint64_t uiBoundaryOverflow{};
+std::atomic_uint64_t uiBoundaryLayerOverflow{};
 using PopupUpdateFn=void(*)(void*);
 PopupUpdateFn originalPopupUpdate{};
 bool popupChoiceReaderVerified{};
@@ -152,6 +230,120 @@ std::atomic_uint64_t pickerDrawTime{};
 std::atomic_uint64_t commandsDrawTime{};
 template<class T>T field(const void* p,size_t offset){T value{};std::memcpy(&value,static_cast<const unsigned char*>(p)+offset,sizeof(value));return value;}
 bool read(uintptr_t p,void* output,size_t size){SIZE_T copied{};return p&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(p),output,size,&copied)&&copied==size;}
+bool readBoundaryLayout(uintptr_t owner,UiBoundaryLayout& result){
+    UiBoundaryLayout value{};value.owner=owner;
+    if(!read(owner,value.bytes.data(),value.bytes.size()))return false;
+    const auto* bytes=value.bytes.data();value.type=field<uintptr_t>(bytes,0);
+    if(value.type!=base+0x2546380)return false;
+    value.root=field<uintptr_t>(bytes,0x80);value.packet=field<uintptr_t>(bytes,0xc8);
+    value.buffer=field<uintptr_t>(bytes,0xd8);value.resource=field<uint64_t>(bytes,0x58);
+    value.flags=field<uint32_t>(bytes,0x74);value.cameraFlags=field<uint8_t>(bytes,0x4b);
+    value.camera=(value.flags&(1u<<14))?0:field<uintptr_t>(bytes,(value.cameraFlags&4)?0x30:0x28);
+    std::array<unsigned char,0x50> packet{};
+    std::array<unsigned char,0x18> buffer{};
+    std::array<unsigned char,0x10> root{};
+    if(!value.resource||!read(value.root,root.data(),root.size())
+        ||!read(value.packet,packet.data(),packet.size())||!read(value.buffer,buffer.data(),buffer.size())
+        ||field<uintptr_t>(packet.data(),0)!=base+0x20f2e40
+        ||field<uintptr_t>(packet.data(),0x40)!=value.buffer
+        ||field<uintptr_t>(packet.data(),0x48)!=value.camera)return false;
+    value.rootType=field<uintptr_t>(root.data(),0);value.rootFlags=field<uint8_t>(root.data(),8);
+    value.bufferType=field<uintptr_t>(buffer.data(),0);value.stream=field<uintptr_t>(buffer.data(),0x10);
+    // Re-read the owner links after the dependent reads. This is a bounded
+    // observation, not synchronization with a native update or source pixels.
+    std::array<unsigned char,0xe0> after{};
+    if(!read(owner,after.data(),after.size()))return false;
+    for(const auto offset:{0u,0x28u,0x30u,0x58u,0x80u,0xc8u,0xd8u})
+        if(field<uint64_t>(bytes,offset)!=field<uint64_t>(after.data(),offset))return false;
+    if(field<uint32_t>(after.data(),0x74)!=value.flags||field<uint8_t>(after.data(),0x4b)!=value.cameraFlags)return false;
+    result=value;return true;
+}
+bool sameBoundaryLayout(const UiBoundaryLayout& a,const UiBoundaryLayout& b){
+    return a.owner==b.owner&&a.type==b.type&&a.resource==b.resource&&a.root==b.root&&a.rootType==b.rootType
+        &&a.packet==b.packet&&a.buffer==b.buffer&&a.bufferType==b.bufferType&&a.stream==b.stream&&a.camera==b.camera;
+}
+IdroidUiIdentity idroidUiIdentity(const UiBoundaryLayout& layout) noexcept {
+    return {layout.owner,layout.root,layout.packet,layout.buffer,layout.camera,layout.resource};
+}
+void rememberIdroidUiOwner(const UiBoundaryLayout& layout){
+    std::lock_guard lock(idroidUiMutex);
+    const auto begin=idroidUiOwners.begin(),end=begin+idroidUiOwnerCount;
+    auto slot=std::find_if(begin,end,[&](const auto& old){return old.layout.owner==layout.owner;});
+    if(slot==end){
+        if(idroidUiOwnerCount<idroidUiOwners.size())slot=begin+idroidUiOwnerCount++;
+        else slot=std::min_element(begin,end,[](const auto& a,const auto& b){return a.layout.qpc<b.layout.qpc;});
+    }
+    if(!sameBoundaryLayout(slot->layout,layout))slot->open={};
+    slot->layout=layout;++idroidUiRevision;
+}
+struct IdroidUiDraw {IdroidUiRole role{};bool outgoing{};};
+IdroidUiDraw identifyIdroidUiDraw(void* state,void* item){
+    if(!uiBoundaryLayoutHookVerified||!validIdroidUiSource(executing.idroidSource))return {};
+    const auto packet=reinterpret_cast<uintptr_t>(item),buffer=field<uintptr_t>(item,0x40);
+    const auto camera=field<uintptr_t>(state,0x308);
+    // A native layer may issue hundreds of Map tile draws. Reuse only a
+    // decision from this exact queued source eye while no layout was updated.
+    struct Cached {uintptr_t packet{},buffer{},camera{};IdroidUiDraw result{};};
+    struct Cache {uint64_t source{},activation{},revision{};uint32_t eye{};size_t count{};std::array<Cached,64> rows{};};
+    thread_local Cache cache;
+    const auto revision=idroidUiRevision.load();
+    if(cache.source!=executing.eye.sourceSequence||cache.activation!=executing.eye.activation
+        ||cache.eye!=executing.eye.eye||cache.revision!=revision){
+        cache.source=executing.eye.sourceSequence;cache.activation=executing.eye.activation;
+        cache.eye=executing.eye.eye;cache.revision=revision;cache.count=0;
+    }
+    for(size_t i=0;i<cache.count;++i)if(cache.rows[i].packet==packet&&cache.rows[i].buffer==buffer
+        &&cache.rows[i].camera==camera)return cache.rows[i].result;
+    IdroidUiDraw result{};
+    {
+        std::lock_guard lock(idroidUiMutex);
+        IdroidUiOwner* match{};uint32_t candidates{};
+        for(size_t i=0;i<idroidUiOwnerCount;++i){
+            auto& row=idroidUiOwners[i];
+            if(row.layout.packet==packet&&row.layout.buffer==buffer&&row.layout.camera==camera){++candidates;match=&row;}
+        }
+        UiBoundaryLayout current{};
+        if(candidates==1&&readBoundaryLayout(match->layout.owner,current)&&sameBoundaryLayout(match->layout,current)){
+            result.role=idroidUiRole(current.resource);
+            const auto identity=idroidUiIdentity(current);const auto& source=executing.idroidSource;
+            result.outgoing=outgoingIdroidUi(match->open,identity,source,candidates,true);
+            if(result.role==IdroidUiRole::device&&source.menuOpen&&source.idroid
+                &&(!sameIdroidUiOwner(match->open.source,source)||source.source>=match->open.source.source))
+                match->open={identity,source};
+        }
+    }
+    if(cache.count<cache.rows.size())cache.rows[cache.count++]={packet,buffer,camera,result};
+    return result;
+}
+void layoutUpdate(void* object,void* transform){
+    // Verified native 1dc1ae0 consumes RCX/RDX and returns void. Let it finish
+    // building its draw buffer exactly once; never advance or replay a layout.
+    originalLayoutUpdate(object,transform);
+    if(!enabled.load())return;
+    // Most layout subclasses are not the verified semantic scene type. Reject
+    // them with one small read before inspecting any owner links.
+    uintptr_t type{};
+    if(!read(reinterpret_cast<uintptr_t>(object),&type,sizeof(type))||type!=base+0x2546380)return;
+    UiBoundaryLayout value{};
+    if(!readBoundaryLayout(reinterpret_cast<uintptr_t>(object),value)){++uiBoundaryLayoutRejected;return;}
+    LARGE_INTEGER qpc{};QueryPerformanceCounter(&qpc);value.qpc=static_cast<uint64_t>(qpc.QuadPart);
+    try{rememberIdroidUiOwner(value);}catch(...){return;}
+    if(!uiBoundaryTraceEnabled||!uiBoundaryLayoutWindow.load())return;
+    auto count=uiBoundaryLayoutAttempts.load();
+    do{if(count>=uiBoundaryLayoutUpdateLimit){++uiBoundaryLayoutBudgetExhausted;return;}}
+    while(!uiBoundaryLayoutAttempts.compare_exchange_weak(count,count+1));
+    try{
+        std::lock_guard lock(mutex);
+        if(!uiBoundaryLayoutWindow.load())return;
+        auto begin=uiBoundaryLayouts.begin(),end=begin+uiBoundaryLayoutCount;
+        auto slot=std::find_if(begin,end,[&](const auto& old){return old.owner==value.owner;});
+        if(slot==end){
+            if(uiBoundaryLayoutCount<uiBoundaryLayouts.size())slot=begin+uiBoundaryLayoutCount++;
+            else{slot=std::min_element(begin,end,[](const auto& a,const auto& b){return a.qpc<b.qpc;});++uiBoundaryLayoutReplacements;}
+        }
+        *slot=value;
+    }catch(...){++uiBoundaryLayoutRejected;}
+}
 void popupUpdate(void* object){
     // Exact native 898500 consumes only RCX. Forward its complete update first;
     // this observer does not call a getter, change focus or handle an input.
@@ -269,6 +461,115 @@ std::string nodeName(uintptr_t node){
     std::string result;
     for(size_t n=0;n<160;++n){char c{};if(!read(text+n,&c,1)||!c)break;result.push_back(c>=32&&c<=126?c:'?');}
     return result;
+}
+void tagUiBoundarySource(const HeadCameraSample& rig){
+    if(!uiBoundaryTraceEnabled||producing.eye.eye>1||!producing.eye.sourceSequence)return;
+    std::lock_guard lock(mutex);
+    auto& gate=uiBoundaryGate;
+    const bool eligible=!producing.frontEnd&&!producing.loading&&!producing.avatarEditor
+        &&rig.playerOwner&&rig.controllers.referenceEpoch;
+    const bool same=gate.initialized&&eligible&&gate.player==rig.playerOwner&&gate.camera==producing.camera
+        &&gate.activation==producing.eye.activation&&gate.referenceEpoch==rig.controllers.referenceEpoch;
+    if(!same){
+        gate.initialized=eligible;gate.player=rig.playerOwner;gate.camera=producing.camera;
+        gate.activation=producing.eye.activation;gate.referenceEpoch=rig.controllers.referenceEpoch;
+        gate.sequence=producing.eye.sourceSequence;gate.generation=rig.menuGeneration;
+        gate.idroid=producing.menuOpen&&producing.idroidMenu;gate.capturing=false;
+        gate.sourceIndex=0;uiBoundaryPrior.clear();uiBoundaryLayoutCount=0;
+        uiBoundaryLayoutWindow.store(false);return;
+    }
+    const bool idroid=producing.menuOpen&&producing.idroidMenu;
+    if(producing.eye.sourceSequence<gate.sequence||rig.menuGeneration<gate.generation)return;
+    if(idroid!=gate.idroid){
+        // Require an observed generation change, never a wall-clock grace
+        // period or the persistent native terminal +0x25 closing byte.
+        gate.capturing=rig.menuGeneration>gate.generation&&gate.boundaries<uiBoundaryLimit;
+        if(gate.capturing)++gate.boundaries;
+        gate.sourceIndex=0;gate.idroid=idroid;
+    }else if(producing.eye.sourceSequence!=gate.sequence&&gate.capturing){
+        if(++gate.sourceIndex>=uiBoundarySourceLimit)gate.capturing=false;
+    }
+    gate.sequence=producing.eye.sourceSequence;gate.generation=rig.menuGeneration;
+    uiBoundaryLayoutWindow.store(gate.capturing);
+    if(gate.capturing)producing.boundaryTrace={rig.playerOwner,rig.menuGeneration,rig.rigSequence,
+        rig.controllers.referenceEpoch,rig.controllers.presentationEpoch,gate.boundaries,gate.sourceIndex};
+}
+void traceUiBoundary(void* state,void* item,UiObservedRoute route) noexcept {
+    if(!uiBoundaryTraceEnabled||!executing.boundaryTrace.boundary)return;
+    try{
+        struct Key {uintptr_t camera{},type{};uint32_t order{};};
+        struct DrawBudget {
+            uint64_t source{},activation{};uint32_t eye{};size_t count{};
+            std::array<Key,64> keys{};
+        };
+        thread_local DrawBudget budget;
+        const auto camera=field<uintptr_t>(state,0x308),address=reinterpret_cast<uintptr_t>(item);
+        const auto order=field<uint32_t>(item,0x28);uintptr_t type{};read(address,&type,sizeof(type));
+        if(budget.source!=executing.eye.sourceSequence||budget.activation!=executing.eye.activation
+            ||budget.eye!=executing.eye.eye){
+            budget.source=executing.eye.sourceSequence;budget.activation=executing.eye.activation;
+            budget.eye=executing.eye.eye;budget.count=0;
+        }
+        // Keep one node of each camera/type/order per exact source eye. A Map
+        // containing hundreds of tiles cannot consume subsequent layer slots.
+        for(size_t i=0;i<budget.count;++i)if(budget.keys[i].camera==camera
+            &&budget.keys[i].type==type&&budget.keys[i].order==order)return;
+        if(budget.count==budget.keys.size()){++uiBoundaryLayerOverflow;return;}
+        budget.keys[budget.count++]={camera,type,order};
+        std::lock_guard lock(mutex);
+        if(uiBoundaryRecords.size()==uiBoundaryRecordLimit){++uiBoundaryOverflow;return;}
+        UiBoundaryRecord r{};r.lineage=executing.boundaryTrace;
+        r.source=executing.eye.sourceSequence;r.tracking=executing.eye.trackingSequence;
+        r.activation=executing.eye.activation;r.sampleMs=executing.eye.sampleTime;r.eye=executing.eye.eye;
+        LARGE_INTEGER qpc{};QueryPerformanceCounter(&qpc);r.qpc=static_cast<uint64_t>(qpc.QuadPart);
+        r.node=address;r.nodeType=type;r.camera=camera;r.sourceCamera=executing.camera;
+        r.order=order;r.flags=field<uint32_t>(item,0x50);r.route=route;
+        r.menuOpen=executing.menuOpen;r.idroid=executing.idroidMenu;r.menuTracked=executing.menuPanelTracked;
+        r.idroidDisplayTracked=executing.idroidDisplayTracked;
+        r.nodeRead=read(address,r.nodeBytes.data(),r.nodeBytes.size());
+        r.cameraRead=read(camera,r.cameraBytes.data(),r.cameraBytes.size());
+        read(camera,&r.cameraType,sizeof(r.cameraType));
+        r.nativeProjection=field<std::array<float,16>>(state,0x1c0);
+        const auto name=nodeName(address);std::copy(name.begin(),name.end(),r.name.begin());
+        // Join only the exact packet/buffer/camera tuple observed by the
+        // post-native typed-layout hook. Retain failures and ambiguity as
+        // evidence; none of these observations affect UI routing.
+        if(r.nodeRead)for(size_t i=0;i<uiBoundaryLayoutCount;++i){
+            const auto& candidate=uiBoundaryLayouts[i];
+            if(candidate.packet!=r.node||candidate.camera!=r.camera
+                ||candidate.buffer!=field<uintptr_t>(r.nodeBytes.data(),0x40))continue;
+            ++r.layoutCandidates;
+            if(!r.layoutKnown){r.layout=candidate;r.layoutKnown=true;}
+            UiBoundaryLayout current{};
+            if(readBoundaryLayout(candidate.owner,current)&&sameBoundaryLayout(candidate,current)){
+                ++r.layoutCurrentCandidates;r.layout=candidate;
+                r.layoutCurrentFlags=current.flags;r.layoutCurrentRootFlags=current.rootFlags;
+            }
+        }
+        r.layoutCurrentVerified=r.layoutCandidates==1&&r.layoutCurrentCandidates==1;
+        // This is a contemporaneous read-only observation, NOT an atomic join
+        // with the queued pixels. The immutable source menu bits remain above.
+        uintptr_t system{},systemType{},terminalType{};
+        if(menuReaderVerified&&read(base+0x2bf1518,&system,sizeof(system))
+            &&read(system,&systemType,sizeof(systemType))&&systemType==base+0x2242d78
+            &&read(system+0x7c0,&r.terminal,sizeof(r.terminal))
+            &&read(r.terminal,&terminalType,sizeof(terminalType))&&terminalType==base+0x22705a8)
+            r.terminalRead=read(r.terminal,r.terminalBytes.data(),r.terminalBytes.size());
+        auto prior=std::find_if(uiBoundaryPrior.begin(),uiBoundaryPrior.end(),[&](const auto& p){
+            return p.node==r.node&&p.nodeType==r.nodeType&&p.camera==r.camera&&p.order==r.order;
+        });
+        if(prior!=uiBoundaryPrior.end()&&prior->source<r.source&&prior->generation<=r.lineage.menuGeneration){
+            r.priorKnown=true;r.priorRoute=prior->route;r.priorGeneration=prior->generation;r.priorSource=prior->source;
+        }
+        // History records observed routing only; pointer equality cannot prove
+        // native terminal ownership and is never used to change presentation.
+        if(r.menuOpen&&r.idroid){
+            const UiBoundaryPrior value{r.node,r.nodeType,r.camera,r.order,r.lineage.menuGeneration,r.source,r.route};
+            if(prior!=uiBoundaryPrior.end()){if(prior->source<r.source)*prior=value;}
+            else if(uiBoundaryPrior.size()<256)uiBoundaryPrior.push_back(value);
+        }
+        uiBoundaryRecords.push_back(r);
+    }catch(...){}
 }
 std::string readPromptText(const char* content){
     // Read bounded UTF-8 without crossing an allocation on a bad pointer.
@@ -718,29 +1019,42 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             const auto order=field<uint32_t>(item,0x28);
             const bool personalStatus=layoutCamera&&read(camera+0x30,world.data(),sizeof(world))
                 &&idroidPersonalStatus(order,world[14],executing.idroidMenu);
-            if((executing.menuOpen||executing.frontEnd||avatarLayout)&&(layoutCamera||menuCamera)&&!personalStatus){
+            const auto semantic=layoutCamera?identifyIdroidUiDraw(state,item):IdroidUiDraw{};
+            const bool closingDevice=semantic.outgoing;
+            if((((executing.menuOpen||executing.frontEnd||avatarLayout)&&(layoutCamera||menuCamera))||closingDevice)
+                &&!personalStatus){
+                // A surviving typed Map draw is still device content after
+                // the native terminal clears its open flag. Without an exact
+                // current native display publication, discard only that known
+                // outgoing content; never reclassify it as left-arm HUD.
+                if(idroidUiClosingRoute(closingDevice,executing.idroidDisplayTracked)==IdroidUiClosingRoute::suppress){
+                    traceUiBoundary(state,item,UiObservedRoute::idroidUnavailable);
+                    ++idroidUiMissingDisplay;++suppressedDraws;return 0;
+                }
+                traceUiBoundary(state,item,closingDevice?UiObservedRoute::idroidClosing:UiObservedRoute::menu);
                 if(executing.menuOpen&&!executing.frontEnd&&!avatarLayout&&!executing.menuPanelTracked){
                     ++suppressedDraws;return 0;
                 }
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto layout=selectSpatialUiLayout(executing.frontEnd,executing.avatarEditor,
-                    executing.menuOpen,executing.idroidMenu,true);
+                    executing.menuOpen||closingDevice,executing.idroidMenu||closingDevice,true);
                 const auto canvas=layoutCamera?nativeUiCanvasProjection(saved,executing.projection):saved;
                 const auto panelProjection=spatialUiProjection(canvas,layout);
+                const auto panel=closingDevice?executing.idroidDisplay:executing.menuPanel;
+                const auto width=(executing.frontEnd||executing.avatarEditor)?1.6f
+                    :closingDevice?executing.idroidDisplayWidth:executing.idroidScreenWidth;
                 const auto mapped=uiPanelProjection(panelProjection,executing.view,executing.eye.view.fov,
-                    executing.menuPanel,(executing.frontEnd||executing.avatarEditor)?1.6f:executing.idroidScreenWidth,
-                    ((executing.frontEnd||executing.avatarEditor)?1.6f:executing.idroidScreenWidth)*9.f/16.f,
-                    spatialUiPlaneCenterX(layout));
+                    panel,width,width*9.f/16.f,spatialUiPlaneCenterX(layout));
                 if(!mapped){++suppressedDraws;return 0;}
                 auto* output=static_cast<unsigned char*>(state)+0x1c0;
                 std::memcpy(output,mapped->data(),sizeof(*mapped));
                 constexpr std::array<float,16> identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
                 const auto bounds=uiPanelProjection(identity,executing.view,executing.eye.view.fov,
-                    executing.menuPanel,(executing.frontEnd||executing.avatarEditor)?1.6f:executing.idroidScreenWidth,
-                    ((executing.frontEnd||executing.avatarEditor)?1.6f:executing.idroidScreenWidth)*9.f/16.f);
+                    panel,width,width*9.f/16.f);
                 UiClipScope clip(bounds.value_or(std::array<float,16>{}));
                 const auto result=originalNode(state,item);
                 std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
+                if(closingDevice)++idroidUiClosingDraws;
                 if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
                 return result;
             }
@@ -751,6 +1065,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             const bool nativeFourWay=executing.equipmentOpen&&!executing.frontEnd
                 &&layoutCamera&&order>=133&&order<=139;
             if(nativeFourWay){
+                traceUiBoundary(state,item,UiObservedRoute::leftEquipment);
                 if(!executing.panelTracked){++suppressedDraws;return 0;}
                 const auto saved=field<std::array<float,16>>(state,0x1c0);
                 const auto savedView=field<std::array<float,16>>(state,0x200);
@@ -790,6 +1105,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 &&read(camera+0x30,world.data(),sizeof(world))&&world[0]==-1&&world[5]==1&&world[10]==-1&&world[15]==1
                 &&world[1]==0&&world[2]==0&&world[3]==0&&world[4]==0&&world[6]==0&&world[7]==0&&world[8]==0&&world[9]==0&&world[11]==0
                 &&world[12]==0&&world[13]==0&&(world[14]==100||world[14]==135||world[14]==150)){
+                traceUiBoundary(state,item,UiObservedRoute::leftHud);
                 const auto layer=hudLayer(order,world[14],executing.itemsOpen,executing.commandsOpen,executing.choosingCategory);
                 const bool contextAction=layer==HudLayer::context;
                 // The native equipment carousel has its own layout camera at
@@ -858,6 +1174,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
                 ++suppressedDraws;return 0;
             }
             if(layoutCamera){
+                traceUiBoundary(state,item,UiObservedRoute::leftAnimated);
                 // Animated notification/caption cameras use the same wrist
                 // popup as fixed-camera messages. Keep their native pixels.
                 if(!executing.panelTracked||order==50){++suppressedDraws;return 0;}
@@ -882,6 +1199,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             }
         }
     }
+    traceUiBoundary(state,item,UiObservedRoute::native);
     return originalNode(state,item);
 }
 }
@@ -912,6 +1230,27 @@ void installUiRenderer(uintptr_t moduleBase){
     std::array<wchar_t,32768> executable{};
     if(GetModuleFileNameW(nullptr,executable.data(),static_cast<DWORD>(executable.size())))
         settings=std::filesystem::path(executable.data()).parent_path()/L"mgs5vr.ini";
+    wchar_t boundarySwitch[4]{};
+    const auto boundaryOverride=GetEnvironmentVariableW(L"MGS5VR_IDROID_UI_BOUNDARY_TRACE",boundarySwitch,4);
+    uiBoundaryTraceEnabled=boundaryOverride?boundaryOverride==1&&boundarySwitch[0]==L'1'
+        :GetPrivateProfileIntW(L"diagnostics",L"idroid_ui_boundary_trace",0,settings.c_str())==1;
+    if(uiBoundaryTraceEnabled){
+        uiBoundaryRecords.reserve(uiBoundaryRecordLimit);uiBoundaryPrior.reserve(256);
+        log("Read-only iDroid UI boundary trace enabled: four transitions, twelve source pairs each; camera evidence export");
+    }
+    {
+        constexpr std::array<unsigned char,13> layoutEntry{0x4c,0x8b,0xdc,0x56,0x41,0x55,0x48,0x81,0xec,0x68,0x01,0,0};
+        constexpr std::array<unsigned char,16> cameraGetter{0xf6,0x41,0x4b,0x04,0x74,0x05,0x48,0x8b,0x41,0x30,0xc3,0x48,0x8b,0x41,0x28,0xc3};
+        std::array<unsigned char,13> layoutBytes{};std::array<unsigned char,16> cameraBytes{};
+        const auto target=reinterpret_cast<void*>(base+0x1dc1ae0);
+        if(read(base+0x1dc1ae0,layoutBytes.data(),layoutBytes.size())&&layoutBytes==layoutEntry
+            &&read(base+0x1df5dc0,cameraBytes.data(),cameraBytes.size())&&cameraBytes==cameraGetter
+            &&MH_CreateHook(target,reinterpret_cast<void*>(&layoutUpdate),reinterpret_cast<void**>(&originalLayoutUpdate))==MH_OK
+            &&MH_EnableHook(target)==MH_OK){
+            uiBoundaryLayoutHookVerified=true;
+            log("Typed UI scene ownership enabled at native post-update; 512 owners, exact draw-time revalidation");
+        }else{MH_DisableHook(target);log("Typed UI scene ownership unavailable; semantic closing route disabled");}
+    }
     wchar_t promptSwitch[4]{};
     const auto promptOverride=GetEnvironmentVariableW(L"MGS5VR_VR_BUTTON_PROMPTS",promptSwitch,4);
     const auto promptPolicy=promptActivationPolicy(promptOverride!=0,
@@ -1243,6 +1582,21 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     producing.wristTextScale=rig.controllers.wristTextScale;
     producing.firearmReticle=rig.nativeFirearmActive&&rig.controllers.weaponReady;
     producing.menuPanelTracked=startup||quadMenu||(rig.menuIdroid?handMenu:picker.has_value());
+    producing.idroidSource={rig.playerOwner,rig.activation,rig.controllers.referenceEpoch,
+        rig.controllers.presentationEpoch,rig.menuGeneration,eye.sourceSequence,
+        rig.controllers.presentationFocused,rig.controllers.handheldMenus,rig.menuOpen,rig.menuIdroid};
+    if(!rig.menuOpen&&!startup&&!rig.controllers.loading&&validIdroidUiSource(producing.idroidSource)){
+        if(const auto native=resolveNativeIdroidDisplay(rig)){
+            // Reuse only the display calibration, not the interactive pose or
+            // readiness. The helper joins the authored native device to this
+            // exact completed rig publication, including its focus epoch.
+            auto displayFrame=rig;displayFrame.idroidDevice=native->body;displayFrame.idroidDeviceTracked=true;
+            if(const auto display=trackedIdroidPose(displayFrame)){
+                producing.idroidDisplay=display->screen;producing.idroidDisplayTracked=true;
+                producing.idroidDisplayWidth=rig.controllers.idroidScreenWidth;
+            }
+        }
+    }
     if(!wristHudEnabled){
         // An explicit off-wrist preference changes the HUD mount, never the
         // stereo routing or the independent right-hand iDroid screen.
@@ -1254,6 +1608,7 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
         producing.panelTracked=producing.panelVisible=valid(panel);
         producing.pickerWidth=rig.controllers.menuQuadWidth;
     }
+    tagUiBoundarySource(rig);
 }
 void clearUiRenderSource() noexcept {producing={};}
 ReconModelVisibilityScope::ReconModelVisibilityScope(HudMode mode,HudView view,bool glow) noexcept {
@@ -1324,12 +1679,87 @@ void reportUiRenderer(std::ostream& out){
     const auto popupSampleMs=steadyMilliseconds();
     const auto popup=nativePopupSnapshot();
     std::lock_guard lock(mutex);
+    if(uiBoundaryTraceEnabled){
+        const auto hexBytes=[&](const auto& bytes){
+            constexpr char digits[]="0123456789abcdef";out<<'"';
+            for(const auto b:bytes)out<<digits[b>>4]<<digits[b&15];out<<'"';
+        };
+        const auto route=[](UiObservedRoute value){switch(value){
+            case UiObservedRoute::menu:return "menu";
+            case UiObservedRoute::leftEquipment:return "left_equipment";
+            case UiObservedRoute::leftHud:return "left_hud";
+            case UiObservedRoute::leftAnimated:return "left_animated";
+            case UiObservedRoute::idroidClosing:return "idroid_closing";
+            case UiObservedRoute::idroidUnavailable:return "idroid_display_unavailable";
+            default:return "native";
+        }};
+        LARGE_INTEGER frequency{};QueryPerformanceFrequency(&frequency);
+        out<<"{\"event\":\"idroid_ui_boundary_trace_status\",\"schema\":2,\"image_base\":"<<base
+            <<",\"qpc_frequency\":"<<frequency.QuadPart<<",\"transitions\":"<<uiBoundaryGate.boundaries
+            <<",\"records\":"<<uiBoundaryRecords.size()<<",\"overflow\":"<<uiBoundaryOverflow
+            <<",\"draws_after_layer_limit\":"<<uiBoundaryLayerOverflow.load()
+            <<",\"transition_limit\":"<<uiBoundaryLimit<<",\"source_pair_limit\":"<<uiBoundarySourceLimit
+            <<",\"layer_limit_per_source_eye\":64,\"native_snapshots_joined_to_source\":false"
+            <<",\"layout_hook_verified\":"<<(uiBoundaryLayoutHookVerified?"true":"false")
+            <<",\"layout_update_attempts\":"<<uiBoundaryLayoutAttempts.load()
+            <<",\"layout_update_rejected\":"<<uiBoundaryLayoutRejected.load()
+            <<",\"layout_update_limit\":"<<uiBoundaryLayoutUpdateLimit
+            <<",\"layout_updates_after_limit\":"<<uiBoundaryLayoutBudgetExhausted.load()
+            <<",\"layout_owner_count\":"<<uiBoundaryLayoutCount<<",\"layout_owner_limit\":"<<uiBoundaryLayoutLimit
+            <<",\"layout_owner_replacements\":"<<uiBoundaryLayoutReplacements
+            <<",\"layout_observations_atomic_with_pixels\":false}\n";
+        for(;uiBoundaryReported<uiBoundaryRecords.size();++uiBoundaryReported){
+            const auto& r=uiBoundaryRecords[uiBoundaryReported];
+            out<<"{\"event\":\"idroid_ui_boundary_node\",\"record\":"<<uiBoundaryReported
+                <<",\"boundary\":"<<r.lineage.boundary<<",\"boundary_source_index\":"<<r.lineage.sourceIndex
+                <<",\"source_sequence\":"<<r.source<<",\"tracking_sequence\":"<<r.tracking
+                <<",\"activation\":"<<r.activation<<",\"sample_ms\":"<<r.sampleMs<<",\"observed_qpc\":"<<r.qpc
+                <<",\"eye\":"<<r.eye<<",\"player\":"<<r.lineage.player<<",\"rig_sequence\":"<<r.lineage.rigSequence
+                <<",\"menu_generation\":"<<r.lineage.menuGeneration<<",\"reference_epoch\":"<<r.lineage.referenceEpoch
+                <<",\"presentation_epoch\":"<<r.lineage.presentationEpoch
+                <<",\"source_menu_open\":"<<(r.menuOpen?"true":"false")
+                <<",\"source_idroid\":"<<(r.idroid?"true":"false")
+                <<",\"source_menu_tracked\":"<<(r.menuTracked?"true":"false")
+                <<",\"source_idroid_display_tracked\":"<<(r.idroidDisplayTracked?"true":"false")
+                <<",\"selected_route\":"<<std::quoted(route(r.route))
+                <<",\"prior_same_node_route_known\":"<<(r.priorKnown?"true":"false")
+                <<",\"prior_same_node_route\":"<<std::quoted(route(r.priorRoute))
+                <<",\"prior_same_node_menu_generation\":"<<r.priorGeneration
+                <<",\"prior_same_node_source_sequence\":"<<r.priorSource
+                <<",\"node\":"<<r.node<<",\"node_type\":"<<r.nodeType<<",\"camera\":"<<r.camera
+                <<",\"camera_type\":"<<r.cameraType<<",\"source_camera\":"<<r.sourceCamera
+                <<",\"order\":"<<r.order<<",\"flags\":"<<r.flags<<",\"name\":"<<std::quoted(r.name.data())
+                <<",\"node_read\":"<<(r.nodeRead?"true":"false")<<",\"node_bytes\":";hexBytes(r.nodeBytes);
+            out<<",\"camera_read\":"<<(r.cameraRead?"true":"false")<<",\"camera_bytes\":";hexBytes(r.cameraBytes);
+            out<<",\"observed_terminal\":"<<r.terminal<<",\"terminal_read\":"<<(r.terminalRead?"true":"false")
+                <<",\"terminal_bytes\":";hexBytes(r.terminalBytes);
+            out<<",\"layout_known\":"<<(r.layoutKnown?"true":"false")
+                <<",\"layout_current_verified\":"<<(r.layoutCurrentVerified?"true":"false")
+                <<",\"layout_candidates\":"<<r.layoutCandidates<<",\"layout_current_candidates\":"<<r.layoutCurrentCandidates
+                <<",\"layout_owner\":"<<r.layout.owner<<",\"layout_type\":"<<r.layout.type
+                <<",\"layout_resource_pathcode\":"<<r.layout.resource<<",\"layout_update_qpc\":"<<r.layout.qpc
+                <<",\"layout_root\":"<<r.layout.root<<",\"layout_root_type\":"<<r.layout.rootType
+                <<",\"layout_root_flags\":"<<unsigned(r.layout.rootFlags)<<",\"layout_flags\":"<<r.layout.flags
+                <<",\"layout_camera_flags\":"<<unsigned(r.layout.cameraFlags)
+                <<",\"layout_current_flags\":"<<r.layoutCurrentFlags<<",\"layout_current_root_flags\":"<<unsigned(r.layoutCurrentRootFlags)
+                <<",\"layout_packet\":"<<r.layout.packet<<",\"layout_buffer\":"<<r.layout.buffer
+                <<",\"layout_buffer_type\":"<<r.layout.bufferType<<",\"layout_stream\":"<<r.layout.stream
+                <<",\"layout_camera\":"<<r.layout.camera<<",\"layout_update_bytes\":";hexBytes(r.layout.bytes);
+            out<<",\"native_projection\":[";
+            for(size_t i=0;i<r.nativeProjection.size();++i){if(i)out<<',';
+                if(std::isfinite(r.nativeProjection[i]))out<<r.nativeProjection[i];else out<<"null";}
+            out<<"]}\n";
+        }
+    }
     out<<"{\"event\":\"native_ui_renderer\",\"queued\":"<<queued.load()<<",\"executions\":"<<executions.load()
        <<",\"joined\":"<<joined.load()<<",\"projection_patched\":"<<patched.load()<<",\"camera_mismatch\":"<<cameraMismatch.load()
        <<",\"view_restored\":"<<viewMismatch.load()<<",\"spatial_draws\":"<<spatialDraws.load()<<",\"suppressed_draws\":"<<suppressedDraws.load()
        <<",\"expired\":"<<expired.load()<<",\"overflow\":"<<overflow.load()
        <<",\"marker_depth_preserved\":"<<markerDepthPreserved.load()
        <<",\"recon_model_groups_hidden\":"<<reconModelGroupsHidden.load()
+       <<",\"idroid_ui_owner_hook\":"<<(uiBoundaryLayoutHookVerified?"true":"false")
+       <<",\"idroid_ui_closing_draws\":"<<idroidUiClosingDraws.load()
+       <<",\"idroid_ui_missing_display\":"<<idroidUiMissingDisplay.load()
        <<",\"vr_control_prompts\":"<<(controlPromptsEnabled?"true":"false")
        <<",\"prompt_calls\":"<<promptCalls.load()
        <<",\"prompt_replacements\":"<<promptReplacements.load()<<",\"prompt_unresolved\":"<<promptUnresolved.load()
@@ -1354,7 +1784,7 @@ void reportUiRenderer(std::ostream& out){
     out<<"]}\n";
 }
 void stopUiRenderer() noexcept {
-    enabled.store(false);{std::lock_guard lock(popupChoiceMutex);popupChoiceLeases={};}
+    enabled.store(false);uiBoundaryLayoutWindow.store(false);{std::lock_guard lock(popupChoiceMutex);popupChoiceLeases={};}
     clearUiRenderSource();
 }
 }

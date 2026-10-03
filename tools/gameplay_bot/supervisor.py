@@ -8,7 +8,7 @@ import json
 import time
 import uuid
 
-from .core import BotFault, atomic_json, matches
+from .core import BotFault, atomic_json, matches, reviewed_action_contract
 from .live import digest, fresh_control_observation
 from .session import run_suite
 from .startup import capture_released_startup_transition, neutral_startup_transition
@@ -94,6 +94,15 @@ def validate_decision(decision, request, state, completed, now_ns=None):
         # A model's decision cites the actual neutral image it inspected.
         if decision.get("reviewed_capture_sha256") not in [c["sha256"] for c in request["captures"]]:
             raise BotFault("Decision must cite an image from the current observation")
+        if any("reviewed_action_only" in case for case in cases):
+            if decision["kind"] != "case" or len(cases) != 1:
+                raise BotFault("Reviewed action observations cannot be chained in a plan")
+            reviewed_action_contract(cases[0])
+            both = decision.get("reviewed_both_capture_sha256")
+            expected = [c["sha256"] for c in request["captures"]]
+            if (not isinstance(both, list) or len(both) != 2 or len(set(both)) != 2
+                    or len(expected) != 2 or sorted(both) != sorted(expected)):
+                raise BotFault("Reviewed action requires both current final-eye review hashes")
     return identifier
 
 
@@ -128,7 +137,8 @@ def execute_plan(behavior, decision, records, *, checkpoint, clock=time.monotoni
     for index, case in enumerate(cases):
         behavior.events.emit("plan_progress", decision_id=decision["id"], case_id=case["id"],
                              case_index=index, cases_total=len(cases))
-        result = behavior.case(case)
+        result = (behavior.case(case, reviewed_action=True) if case.get("reviewed_action_only") is True
+                  else behavior.case(case))
         result.update(decision_id=decision["id"], plan_index=index)
         records.append(result)
         checkpoint(records)
@@ -143,6 +153,8 @@ def execute_plan(behavior, decision, records, *, checkpoint, clock=time.monotoni
 
 
 def run_supervised(behavior, seconds=900., clock=time.monotonic, sleep=time.sleep, initial_suite=None):
+    if initial_suite is not None and any("reviewed_action_only" in case for case in initial_suite.get("cases", [])):
+        raise BotFault("Reviewed action requires a fresh two-eye decision, not an initial suite")
     live, events = behavior.adapter, behavior.events
     live.supervised = True
     deadline = clock()+seconds

@@ -17,26 +17,34 @@ std::optional<std::array<size_t,14>> armHelperIndices(std::span<const uint32_t> 
     }
     return result;
 }
-std::optional<Pose> HandPresentationCache::update(Pose grip,bool tracked,uint64_t time,RigContinuityKey key){
-    if(!key.owner||!key.model||!key.activation||!key.epoch||!time){reset();return {};}
-    if(key!=key_||time<sampleAt_||time-sampleAt_>250){reset();key_=key;}
+std::optional<HandPresentationPose> HandPresentationCache::update(HandPresentationPose pose,bool tracked,
+    bool focused,uint64_t time,RigContinuityKey key){
+    if(!focused||!key.owner||!key.model||!key.activation||!key.epoch||!key.presentationEpoch||!time
+       ||(tracked&&(!valid(pose.grip)||!valid(pose.aim)))){reset();return {};}
+    if(key!=key_||time<sampleAt_){reset();key_=key;}
     sampleAt_=time;
-    if(tracked&&valid(grip)){
-        if(!tracked_&&valid_&&time>=trackedAt_&&time-trackedAt_<=250){recoveryFrom_=last_;recoveryAt_=time;}
+    if(tracked){
+        if(!tracked_&&valid_){recoveryFrom_=last_;recoveryAt_=time;}
         if(recoveryAt_){
             const float t=std::min(1.f,float(time-recoveryAt_)/100.f);
-            auto q=grip.orientation;const auto from=recoveryFrom_.orientation;
-            if(from.x*q.x+from.y*q.y+from.z*q.z+from.w*q.w<0)q={-q.x,-q.y,-q.z,-q.w};
-            q={from.x+(q.x-from.x)*t,from.y+(q.y-from.y)*t,from.z+(q.z-from.z)*t,from.w+(q.w-from.w)*t};
-            const float n=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
-            grip={Quat{q.x/n,q.y/n,q.z/n,q.w/n},recoveryFrom_.position+(grip.position-recoveryFrom_.position)*t};
+            const auto blend=[t](Pose from,Pose to){
+                auto q=to.orientation;const auto a=from.orientation;
+                if(a.x*q.x+a.y*q.y+a.z*q.z+a.w*q.w<0)q={-q.x,-q.y,-q.z,-q.w};
+                q={a.x+(q.x-a.x)*t,a.y+(q.y-a.y)*t,a.z+(q.z-a.z)*t,a.w+(q.w-a.w)*t};
+                const float n=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
+                return Pose{Quat{q.x/n,q.y/n,q.z/n,q.w/n},from.position+(to.position-from.position)*t};
+            };
+            pose={blend(recoveryFrom_.grip,pose.grip),blend(recoveryFrom_.aim,pose.aim)};
             if(t==1)recoveryAt_=0;
         }
-        last_=grip;trackedAt_=time;valid_=tracked_=true;return last_;
+        last_=pose;valid_=tracked_=true;return last_;
     }
     tracked_=false;recoveryAt_=0;
-    if(valid_&&time>=trackedAt_&&time-trackedAt_<=250)return last_;
-    valid_=false;return {};
+    // Idle controllers may remain asleep indefinitely. A continuous stream
+    // of current owner/focus/epoch publications keeps only their visual pose.
+    // A scheduling stall does not change that space or grant input authority;
+    // fresh head/eye admission still owns every subsequent rig publication.
+    return valid_?std::optional<HandPresentationPose>{last_}:std::nullopt;
 }
 bool StationaryBodyState::update(bool eligible,Vec3 root,uint64_t time,RigContinuityKey key){
     if(!eligible||!valid(Pose{{},root})||!key.owner||!key.model||!key.activation||!key.epoch){reset();return false;}

@@ -11,7 +11,7 @@ from gameplay_bot.core import Behaviors, BotFault, Events, atomic_json
 from gameplay_bot.live import InputLease, Live, ROOT, digest, game_identity, rotate
 from gameplay_bot.recording import Recording, after_verified_arrival
 from gameplay_bot.locomotion import move_local
-from gameplay_bot.session import preserved_controller_pose, run_suite
+from gameplay_bot.session import preserved_controller_pose, preserved_tracking_poses, run_suite
 from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack, capture_continue_rack
 from gameplay_bot.campaign import read_json, run_campaign, validate_campaign, unstarted_campaign
 from gameplay_bot.idroid import inspect_idroid
@@ -154,9 +154,7 @@ def main():
             live.ready()
             live.release()
             pose_cleanup = ExitStack()
-            for hand in ("left", "right"):
-                for kind in ("grip", "aim"):
-                    pose_cleanup.enter_context(preserved_controller_pose(live, hand, kind, "local"))
+            pose_cleanup.enter_context(preserved_tracking_poses(live))
             baseline = capture_startup_baseline(live)
             print(json.dumps({"event": "baseline", "captures": baseline}), flush=True)
             if args.command == "observe":

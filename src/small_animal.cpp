@@ -150,7 +150,8 @@ void observe(const Animal& a,const Hands& h){
     if(carry.model&&now>carry.began+30000&&!carry.held)carry={};
     if(owns(a)){
         if(!contextAllowed(h)||carry.activation!=h.frame.activation){release(a,"interaction ended",now);return;}
-        if(!usable||!h.frame.controllers.hands[carry.hand].gripTracked){
+        if(!usable||!h.frame.controllers.hands[carry.hand].gripTracked
+            ||!h.frame.controllers.hands[carry.hand].aimTracked){
             // A missed publication is not a deliberate release. Preserve the
             // last complete hand/animal pose briefly, then return the animal
             // to its last safe floor if tracking does not recover.
@@ -199,13 +200,14 @@ void observe(const Animal& a,const Hands& h){
         // Lowering the rat is a release, even when an open hand rests nearby.
         // Both hands must leave the contact area before offering it again.
         for(unsigned side=0;side<2;++side)
-            if(!h.frame.controllers.hands[side].gripTracked
+            if(!h.frame.controllers.hands[side].gripTracked||!h.frame.controllers.hands[side].aimTracked
                 ||length(perch(h,side).position-releasedContact.position)<.4f)return;
         releasedContact={};
     }
     for(unsigned side=0;side<2;++side){
         const auto& input=h.frame.controllers.hands[side];
-        if(!input.gripTracked||input.trigger>.2f||input.squeeze>.7f||palmNormal(h,side).y<.5f)continue;
+        // The rendered palm may be retained during partial tracking loss.
+        if(!input.gripTracked||!input.aimTracked||input.trigger>.2f||input.squeeze>.7f||palmNormal(h,side).y<.5f)continue;
         const auto target=perch(h,side);
         if(length(target.position-a.pose.position)>.35f)continue;
         if(h.frame.nativePose.position.y-target.position.y<.35f)continue;

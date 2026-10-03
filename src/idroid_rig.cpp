@@ -45,7 +45,7 @@ std::optional<IdroidPose> trackedIdroidPose(const HeadCameraSample& frame) noexc
 std::optional<IdroidRayHit> trackedIdroidRay(const HeadCameraSample& frame) noexcept{
     const auto idroid=trackedIdroidPose(frame);
     const auto& hand=frame.controllers.hands[1];
-    if(!idroid||!hand.aimTracked||!valid(hand.aim))return {};
+    if(!idroid||!hand.gripTracked||!valid(hand.grip)||!hand.aimTracked||!valid(hand.aim))return {};
     const auto aim=nativeTrackedPose(frame.nativePose,frame.headPose,hand.aim);
     if(!valid(aim))return {};
     const float width=frame.controllers.idroidScreenWidth>0?frame.controllers.idroidScreenWidth:idroidScreenWidth;

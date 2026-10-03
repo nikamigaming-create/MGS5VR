@@ -11,6 +11,7 @@ import subprocess
 import zipfile
 
 from workspace import ROOT, PLAY, digest, read_json, safe_tree, source_identity
+from regression_catalog import require_release_ready
 
 
 def checked_name(name):
@@ -29,6 +30,7 @@ def checked_name(name):
 def package(tag, output):
     if not re.fullmatch(r"experimental-\d{4}-\d{2}-\d{2}(?:\.\d+)?", tag):
         raise ValueError("Use an experimental date tag, e.g. experimental-2026-09-30")
+    regression_coverage = require_release_ready(ROOT)
     output = safe_tree(output, ROOT / "build")
     if output.resolve() == (ROOT / "build/Release").resolve():
         raise ValueError("Keep release archives separate from compiler output; use build/github-release")
@@ -76,7 +78,8 @@ def package(tag, output):
                "created_utc": datetime.now(timezone.utc).isoformat(),
                "source_commit": source["commit"], "source_sha256": source["source_sha256"],
                "dll_sha256": build["files"]["dinput8.dll"], "source_archive_sha256": digest(source_zip),
-               "validation": build["validation"], "notes": notes}
+               "validation": build["validation"], "regression_coverage": regression_coverage,
+               "notes": notes}
     payload = {"BUILD.json": (PLAY / "BUILD.json").read_bytes(),
                "RELEASE.json": (json.dumps(release, indent=2) + "\n").encode(),
                "SOURCE_REVISION.txt": (source["commit"] + "\n").encode()}

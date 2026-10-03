@@ -9,6 +9,7 @@
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/native_menu_restrictions.hpp"
+#include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/optic_events.hpp"
 #include "native_cabin_script.hpp"
@@ -31,6 +32,7 @@
 #include <string_view>
 #include <sstream>
 #include <thread>
+#include <charconv>
 #include <unordered_set>
 
 namespace mgs5vr {
@@ -334,6 +336,25 @@ bool luaReady(void* state){
     setTop(state,top);nativeLuaReady.store(ready);return ready;
 }
 bool publishFastInput(const std::string& request,std::string& result){
+    constexpr std::string_view faultPrefix="diagnostics:controller-tracking-loss:";
+    if(request.starts_with(faultPrefix)){
+        auto& probe=controllerTrackingFaultProbe();bool armed=false;
+        const auto arguments=std::string_view(request).substr(faultPrefix.size());
+        if(arguments=="off"){probe.clear();armed=true;}
+        else if(const auto separator=arguments.find(':');separator!=std::string_view::npos){
+            unsigned mask{};uint64_t duration{};
+            const auto first=std::from_chars(arguments.data(),arguments.data()+separator,mask);
+            const auto last=std::from_chars(arguments.data()+separator+1,arguments.data()+arguments.size(),duration);
+            const auto status=headCamera().status();
+            if(first.ec==std::errc{}&&first.ptr==arguments.data()+separator&&last.ec==std::errc{}
+               &&last.ptr==arguments.data()+arguments.size()&&status.active&&!status.suspended)
+                armed=probe.arm(mask,duration,steadyMilliseconds());
+        }
+        result=std::string("{\"schema\":1,\"synthetic_tracking_fault\":true,\"enabled\":")
+            +(probe.enabled()?"true":"false")+",\"armed\":"+(armed?"true":"false")
+            +",\"mask\":"+std::to_string(probe.mask(steadyMilliseconds()))+"}";
+        return true;
+    }
     if(request=="inspect-native-exposure"){result=renderCameraExposureDiagnostics();return true;}
     if(request=="diagnostics:scope-exposure-isolation:on"||request=="diagnostics:scope-exposure-isolation:off"){
         if(!setRenderCameraExposureIsolation(request.ends_with(":on")))
@@ -385,6 +406,7 @@ bool publishFastInput(const std::string& request,std::string& result){
         const auto controlSample=controlInputSnapshot();
         const auto camera=headCamera().status();
         const auto menu=nativeMenuOpen();
+        const auto tutorialMode=nativeIdroidTutorialMode();
         const auto popupSampleMs=steadyMilliseconds();
         const auto popup=nativePopupSnapshot();
         const auto now=steadyMilliseconds();
@@ -400,6 +422,10 @@ bool publishFastInput(const std::string& request,std::string& result){
            <<",\"menu\":"<<(menu?(*menu?"true":"false"):"null")
            <<",\"pause\":"<<(menu?(nativePauseMenuOpen()?"true":"false"):"null")
            <<",\"idroid\":"<<nativeIdroidOpen()<<",\"gamepad\":"<<nativeGamepadActive()
+           <<",\"idroid_closing\":"<<nativeIdroidClosing()<<",\"idroid_tutorial_mode\":";
+        writeNativeIdroidTutorialModeJson(out,tutorialMode);
+        out<<",\"tracking_fault_mask\":"<<controllerTrackingFaultProbe().mask(steadyMilliseconds())
+           <<",\"idroid_handheld\":"<<handheldMenusSelected()
            <<",\"idroid_menu_input_ready\":"<<handheldMenuInputReady()
            <<",\"camera_active\":"<<camera.active<<",\"camera_available\":"<<headCamera().available()
            <<",\"camera_pending\":"<<camera.pending<<",\"camera_suspended\":"<<camera.suspended
@@ -432,6 +458,12 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"player_owner\":"<<frame.playerOwner<<",\"player_head\":["<<frame.playerHead.x<<','<<frame.playerHead.y<<','<<frame.playerHead.z
                <<"],\"left_palm_tracked\":"<<frame.renderedPalmTracked[0]
                <<",\"right_palm_tracked\":"<<frame.renderedPalmTracked[1];
+            out<<",\"raw_left_grip_tracked\":"<<frame.controllers.hands[0].gripTracked
+               <<",\"presentation_focused\":"<<frame.controllers.presentationFocused
+               <<",\"presentation_epoch\":"<<frame.controllers.presentationEpoch
+               <<",\"raw_left_aim_tracked\":"<<frame.controllers.hands[0].aimTracked
+               <<",\"raw_right_grip_tracked\":"<<frame.controllers.hands[1].gripTracked
+               <<",\"raw_right_aim_tracked\":"<<frame.controllers.hands[1].aimTracked;
             const auto pose=[&](const char* name,Pose value){
                 const auto p=value.position;const auto q=value.orientation;
                 out<<",\""<<name<<"\":{\"position\":["<<p.x<<','<<p.y<<','<<p.z
@@ -650,12 +682,13 @@ void pump(void* state){
         }
         const bool heldBackClose=takeNativeIdroidClose();
         const auto tutorialMode=nativeIdroidTutorialMode();
+        const auto recovery=nativeIdroidRecoveryForTutorialMode(tutorialMode);
         // ACC has no ordinary player terminal/stow task to consume +0x25.
         // Finish only a close already requested by native root Back. Other
         // game modes retain their native player animation/terminal lifecycle.
         const bool cabinClose=nativeCabinPlay()&&nativeIdroidOpen()&&nativeIdroidClosing()
-            &&tutorialMode&&*tutorialMode==0&&!nativePauseMenuOpen();
-        if((heldBackClose||cabinClose)&&!nativePauseMenuOpen()){
+            &&recovery==NativeIdroidRecovery::ordinary&&!nativePauseMenuOpen();
+        if((heldBackClose||cabinClose)&&recovery!=NativeIdroidRecovery::refuse&&!nativePauseMenuOpen()){
             // Stop is the terminal's own cleanup path. CloseMbDvcTerminal only
             // sets a deferred close flag, which ACC does not consume.
             // Do not mark any tutorial complete or write progression variables.
@@ -674,7 +707,7 @@ void pump(void* state){
                      "and gvars.trm_fobTutorialState==127 and not mvars.heliSpace_nowMissionListGuidance "
                      "and type(TppUiCommand.SetTutorialMode)=='function' then TppUiCommand.SetTutorialMode(false); completedGuide=true end "
                     :"")
-                +std::string(heldBackClose&&tutorialMode&&*tutorialMode!=0
+                +std::string(heldBackClose&&recovery==NativeIdroidRecovery::completedGuideOnly
                     ?"if not completedGuide then return 'live tutorial retained' end ":"")
                 +"TppUiCommand.StopMbDvcTerminal(); return completedGuide and 'completed guide closed' or 'requested' end return 'already closed or overlay'";
             int closeStatus=load(state,closeScript.data(),closeScript.size(),"@mgs5vr-idroid-back-recovery");

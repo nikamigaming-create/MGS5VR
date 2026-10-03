@@ -1,6 +1,7 @@
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/idroid_effect_probe.hpp"
+#include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/cabin_walk.hpp"
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/head_camera.hpp"
@@ -38,6 +39,7 @@ struct PoseRestore {
     std::array<Quat,512> q{};
     std::array<Vector4,512> p{};
     PausedRigOwner owner{};
+    std::optional<HeadCameraSample> attachmentDiagnosticFrame;
     ~PoseRestore(){
         if(count){
             std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
@@ -109,6 +111,7 @@ template<class T> bool read(uintptr_t address,T& out){
 }
 template<class T> T get(uintptr_t address){T out{};read(address,out);return out;}
 uint32_t refreshPausedArmParts(const PausedSkin& body,uintptr_t character){
+    if(!modelTransformVerified)return 0;
     // Retail's prosthetic is a separate, player-owned modular model. Its
     // named forearm/wrist/finger matrices normally match the body's palette;
     // the native parts update stops during Pause even when body skin is fresh.
@@ -394,17 +397,23 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     publishNativeCabinBounds(frame);
     const auto idroidMount=frame.menuIdroid?nativeIdroidMount(driver):std::nullopt;
     std::lock_guard lock(rigMutex);
-    const RigContinuityKey continuity{owner,model,frame.activation,frame.controllers.referenceEpoch};
+    const RigContinuityKey continuity{owner,model,frame.activation,frame.controllers.referenceEpoch,
+        frame.controllers.presentationEpoch};
+    std::array<std::optional<HandPresentationPose>,2> presentationHands;
     std::array<std::optional<Pose>,2> presentationGrips;
     if(frame.controllers.nativeGamepad){
         for(auto& cache:handPresentation)cache.reset();
         stationaryBody.reset();
-    }else for(size_t side=0;side<2;++side)
-        presentationGrips[side]=handPresentation[side].update(frame.controllers.hands[side].grip,
-            frame.controllers.hands[side].gripTracked,frame.sampleTime,continuity);
+    }else for(size_t side=0;side<2;++side){
+        const auto& hand=frame.controllers.hands[side];
+        presentationHands[side]=handPresentation[side].update({hand.grip,hand.aim},
+            hand.gripTracked&&hand.aimTracked,frame.controllers.presentationFocused,frame.sampleTime,continuity);
+        if(presentationHands[side])presentationGrips[side]=presentationHands[side]->grip;
+    }
+    if(!frame.controllers.presentationFocused)stationaryBody.reset();
     if(frame.controllers.nativeGamepad||!presentationGrips[1]){
         scopeAim.reset();
-        // Controller occlusion does not invalidate a tracked headset. Publish
+        // Missing presentation does not invalidate a tracked headset. Publish
         // this unchanged native skin with its actual camera transaction; no
         // stale tracked weapon, palm, scope or wrist UI may accompany it.
         frame.controllers.hands={};frame.controllers.optic={};
@@ -553,11 +562,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     auto wristTarget=compose(grips[1],gripFromWrist[1]);
     if(frame.controllers.handheldMenus&&idroidMount){
         // Native device axes are not anatomical palm axes. Hold the connector
-        // at the tracked grip, using this controller's same-frame pointing
+        // at the presented grip, using this controller's same-sample pointing
         // basis rather than imposing the simulator's grip cant on every user.
-        const auto& hand=frame.controllers.hands[1];
-        if(!hand.aimTracked)return false;
-        const auto aim=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,hand.aim));
+        const auto aim=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,presentationHands[1]->aim));
         const auto contact=idroidGripContact(grips[1],aim,
             Pose{frame.controllers.idroidGripRotation,frame.controllers.idroidGripOffset});
         if(!contact)return false;
@@ -866,7 +873,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const auto& hand=frame.controllers.hands[side];
             auto contact=hand.grip;
             auto rendered=compose(*root,compose(bone(q,p,wrists[side]),inverse(gripFromWrist[side])));
-            bool allowed=available&&hand.gripTracked&&(side||supportBlend==0);
+            // Contact follows the rendered palm, which may retain a complete
+            // grip/aim pair while either raw pose is unavailable.
+            bool allowed=available&&hand.gripTracked&&hand.aimTracked&&(side||supportBlend==0);
             if(point==2){
                 allowed=allowed&&frame.controllers.weaponReady&&firearmActive&&muzzleInGrip.has_value();
                 if(muzzleInGrip){contact=compose(contact,*muzzleInGrip);rendered=compose(rendered,*muzzleInGrip);}
@@ -943,15 +952,15 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::array<bool,2> renderedPalmTracked{};
     for(size_t side=0;side<2;++side){
         renderedPalms[side]=compose(*root,compose(bone(q,p,wrists[side]),inverse(gripFromWrist[side])));
-        renderedPalmTracked[side]=frame.controllers.hands[side].gripTracked&&valid(renderedPalms[side]);
+        renderedPalmTracked[side]=presentationHands[side].has_value()&&valid(renderedPalms[side]);
     }
     frame.renderedPalms=renderedPalms;frame.renderedPalmTracked=renderedPalmTracked;
     if(idroidMount){
         frame.idroidDevice=compose(*root,compose(bone(q,p,12),*idroidMount));
-        frame.idroidDeviceTracked=frame.controllers.hands[1].gripTracked&&valid(frame.idroidDevice);
+        frame.idroidDeviceTracked=presentationHands[1].has_value()&&valid(frame.idroidDevice);
     }
     frame.playerHead=renderedHead;
-    if(frame.controllers.hands[0].gripTracked&&renderedPalmTracked[0]){
+    if(presentationHands[0]&&renderedPalmTracked[0]){
         const auto wrist=compose(*root,bone(q,p,8));
         const auto elbow=compose(*root,bone(q,p,7));
         // Status belongs to the forearm, not the independently articulated
@@ -1039,6 +1048,19 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     else scopeAim.reset();
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
+    if(idroidAttachmentDiagnosticsActive()){
+        // Capture this solve's assigned rig sequence before native skin work.
+        // A later render/rig query cannot stand in for this transaction.
+        const auto published=headCamera().publishedRigFrame(steadyMilliseconds());
+        if(published&&published->applied&&published->rigSequence&&published->playerOwner==owner
+            &&published->activation==frame.activation&&published->trackingSequence==frame.trackingSequence
+            &&published->playerSequence==frame.playerSequence&&published->sampleTime==frame.sampleTime
+            &&published->menuGeneration==frame.menuGeneration
+            &&published->controllers.referenceEpoch==frame.controllers.referenceEpoch
+            &&published->controllers.presentationEpoch==frame.controllers.presentationEpoch
+            &&published->controllers.predictedXrTime==frame.controllers.predictedXrTime)
+            restore.attachmentDiagnosticFrame=*published;
+    }
     HandContacts handContacts;
     for(size_t side=0;side<2;++side){
         handContacts[side][0]=renderedPalms[side].position;
@@ -1054,7 +1076,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // native publication consumes our solved pose; never feed it back into the
     // animation cache and compound garment transforms on subsequent updates.
     restore.rotations=rotations;restore.positions=positions;restore.q=originalQ;restore.p=originalP;restore.count=count;
-    restore.owner={camera,owner,frame.activation,frame.controllers.referenceEpoch,now};
+    restore.owner={camera,owner,frame.activation,frame.controllers.referenceEpoch,now,frame.menuGeneration};
     // SKL_300_ASRROOT is the authored hip holster, independent of the held
     // weapon's wrist socket. Suppress only its published render scale in VR.
     // The native animation channels and held-weapon transform remain intact.
@@ -1093,6 +1115,14 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     return true;
 }
+void noteCompletedAttachmentBody(void* context,void* binding,const PoseRestore& restore,bool paused) noexcept {
+    const auto& frame=restore.attachmentDiagnosticFrame;
+    if(!restore.count||!frame||frame->playerOwner!=restore.owner.player
+        ||frame->activation!=restore.owner.activation
+        ||frame->controllers.referenceEpoch!=restore.owner.referenceEpoch
+        ||frame->menuGeneration!=restore.owner.menuGeneration||!ownsSkinTarget(context,binding))return;
+    noteIdroidBodyComplete(reinterpret_cast<uintptr_t>(context),reinterpret_cast<uintptr_t>(binding),*frame,paused);
+}
 void update(void* context,void* binding){
     // Other skins never acquire the player lock, including work reached by the
     // native player publication. The verified skin path only builds matrices
@@ -1104,7 +1134,9 @@ void update(void* context,void* binding){
     }
     std::unique_lock publicationLock(skinPublicationMutex);
     PoseRestore restore;
-    if(enabled.load()&&headCamera().active())try{apply(context,binding,restore);}catch(...){}
+    bool solved=false;
+    if(enabled.load()&&headCamera().active())try{solved=apply(context,binding,restore);}catch(...){}
+    const bool menuBoundary=restore.count&&hasOwnedRigMenuBoundary(pausedSkin.owner,restore.owner);
     if(restore.count){
         const auto driver=reinterpret_cast<uintptr_t>(context),target=reinterpret_cast<uintptr_t>(binding);
         const auto model=target-0xa0;
@@ -1118,6 +1150,16 @@ void update(void* context,void* binding){
     }
     applySmallAnimalSkin(reinterpret_cast<uintptr_t>(binding));
     original(context,binding);
+    if(solved)noteCompletedAttachmentBody(context,binding,restore,false);
+    if(menuBoundary){
+        // The native skin can already publish the new menu generation before
+        // the prosthetic's separate update runs. That fresh body publication
+        // prevents the ordinary paused timeout from repairing this first eye
+        // image. Join the exact owned modular arm to this completed palette
+        // at the observed entry/exit boundary, under the same player lock.
+        const auto character=get<uintptr_t>(restore.owner.player+0x370);
+        if(get<uintptr_t>(character)==base+0x2295210)refreshPausedArmParts(pausedSkin,character);
+    }
     if(restore.stowedMount){
         auto matrix=get<std::array<float,16>>(restore.stowedMount);
         if(nativeAffinePose(matrix)){
@@ -1268,7 +1310,7 @@ void throwVelocity(void* context,void* state,uint32_t index,Vector4* velocity){
 }
 namespace mgs5vr {
 bool refreshPausedControllerRig(uintptr_t camera,Pose nativeCamera) noexcept {
-    if(!enabled.load()||!modelTransformVerified||!headCamera().status().nativeMenuOpen)return false;
+    if(!enabled.load()||!modelTransformVerified)return false;
     try{
         std::unique_lock publicationLock(skinPublicationMutex,std::try_to_lock);
         if(!publicationLock.owns_lock()||!enabled.load())return false;
@@ -1304,7 +1346,11 @@ bool refreshPausedControllerRig(uintptr_t camera,Pose nativeCamera) noexcept {
         using SetTransform=void(*)(void*,const float*);
         reinterpret_cast<SetTransform>(base+0x1ce7f0)(reinterpret_cast<void*>(target.model),root.data());
         original(reinterpret_cast<void*>(target.driver),reinterpret_cast<void*>(target.binding));
+        noteCompletedAttachmentBody(reinterpret_cast<void*>(target.driver),reinterpret_cast<void*>(target.binding),restore,true);
         const auto armParts=refreshPausedArmParts(target,character);
+        // This boundary is now backed by freshly rebuilt native matrices.
+        // Do not change nativeUpdateTime: no animation tick was advanced.
+        pausedSkin.owner.menuGeneration=frame.menuGeneration;
         if(restore.stowedMount){
             auto matrix=get<std::array<float,16>>(restore.stowedMount);
             if(nativeAffinePose(matrix)){
@@ -1370,6 +1416,7 @@ void installControllerRig(uintptr_t imageBase,bool idroidEffectProbe,bool idroid
     installMotionMelee(base);
     installSmallAnimalInteraction(base);
     installIdroidEffectProbe(base,idroidEffectProbe,idroidEffectRetarget);
+    installIdroidAttachmentDiagnostics(base);
     enabled.store(true);log("Experimental controller rig installed at verified skin publication RVA 0x1a6caa0 and shot solver 0x1044ff0");
 }
 void observeControllerRigOwner(uintptr_t owner) noexcept{
@@ -1382,7 +1429,7 @@ void stopControllerRig() noexcept{
         std::lock_guard publicationLock(skinPublicationMutex);
         enabled.store(false);playerOwner.store(0);pausedSkin={};pausedParts={};
     }
-    stopIdroidEffectProbe();stopSmallAnimalInteraction();stopMotionMelee();
+    stopIdroidAttachmentDiagnostics();stopIdroidEffectProbe();stopSmallAnimalInteraction();stopMotionMelee();
     {std::lock_guard lock(rigMutex);for(auto& cache:handPresentation)cache.reset();stationaryBody.reset();}
 }
 bool controllerRigEnabled() noexcept{return enabled.load();}

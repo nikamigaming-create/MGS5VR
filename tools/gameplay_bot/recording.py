@@ -4,6 +4,7 @@ This source precedes runtime crop/composition. Final compositor evidence remains
 separate. Rotation gaps and capture failures are retained, never interpolated.
 """
 import json
+import math
 import pathlib
 import shutil
 import subprocess
@@ -28,9 +29,9 @@ def after_verified_arrival(enter_game, start_recording):
 def validate_raw_video(video_stats, encoded_frames, encoded_duration, frame_rate=30.):
     """Validate CFR container cadence separately from accepted native samples.
 
-    Media Foundation's CFR sink can repeat frames to fill cadence when source
-    samples are dropped. `frames` in the native sidecar counts accepted source
-    samples, whereas ffprobe's frame count includes the CFR output slots.
+    Schema 2 records actual source timestamps and explicitly submitted CFR
+    repeats. Legacy takes retain their original checks; absent ledgers cannot
+    retrospectively explain an old frame-count mismatch.
     """
     try:
         samples = int(video_stats["frames"])
@@ -43,7 +44,7 @@ def validate_raw_video(video_stats, encoded_frames, encoded_duration, frame_rate
     except (KeyError, TypeError, ValueError, OverflowError) as error:
         raise BotFault("Native MP4/QPC metadata cannot validate the encoded cadence") from error
     if (samples < 1 or dropped < 0 or first < 0 or last < first or frames < 1
-            or duration <= 0 or fps <= 0):
+            or not math.isfinite(duration) or not math.isfinite(fps) or duration <= 0 or fps <= 0):
         raise BotFault("Native MP4/QPC metadata cannot validate the encoded cadence")
     qpc_span = (last - first) / 1e7
     frame_period = 1. / fps
@@ -55,7 +56,85 @@ def validate_raw_video(video_stats, encoded_frames, encoded_duration, frame_rate
     # cadence interval of timestamp/container rounding on either side.
     if duration < max(0., qpc_span - frame_period) or duration > qpc_span + 2 * frame_period:
         raise BotFault("Raw MP4 duration does not match the native QPC sample window")
-    if frames < samples or frames - samples > dropped + 1:
+    extra = {}
+    if video_stats.get("schema") == 2:
+        try:
+            ledger = video_stats["accepted_samples"]
+            origin = video_stats["capture_schedule_origin_qpc_100ns"]
+            scheduled = video_stats["scheduled_slots"]
+            explicit_frames, explicit_repeats = video_stats["encoded_frames"], video_stats["repeated_frames"]
+            losses = {key: video_stats[key] for key in (
+                "missed_source_cadence_slots", "queue_dropped_samples",
+                "staging_busy_samples", "staging_discarded_samples")}
+            integers = [origin, scheduled, explicit_frames, explicit_repeats, *losses.values()]
+            if (not all(type(value) is int and value >= 0 for value in integers)
+                    or origin <= 0 or not 1 <= scheduled <= 3750
+                    or not isinstance(ledger, list) or len(ledger) != samples
+                    or video_stats.get("complete") is not True
+                    or explicit_frames != frames or explicit_repeats != frames - samples
+                    or sum(losses.values()) != dropped or scheduled != samples + dropped
+                    or abs(fps - 30.) > 1e-6 or frames != expected_slots
+                    or abs(duration - frames / 30.) > .001):
+                raise ValueError("count, loss or CFR duration mismatch")
+            previous_clock, previous_capture, previous_encoded = 0, -1, -1
+            repeats, gaps, longest_repeat = 0, [], 0
+            first_capture = ledger[0]["capture_slot"]
+            for item in ledger:
+                clock, capture, encoded, fill = (item[key] for key in (
+                    "qpc_100ns", "capture_slot", "encoded_slot", "repeats_before"))
+                if (not all(type(value) is int for value in (clock, capture, encoded, fill))
+                        or clock <= previous_clock or capture <= previous_capture or clock < origin
+                        or not 0 <= capture < scheduled
+                        or (clock - origin) * 30 // 10_000_000 != capture
+                        or encoded != capture - first_capture or encoded <= previous_encoded
+                        or fill != encoded - previous_encoded - 1):
+                    raise ValueError("unordered or inconsistent source/CFR ledger")
+                if previous_clock:
+                    gaps.append((clock - previous_clock) / 1e7)
+                repeats += fill
+                longest_repeat = max(longest_repeat, fill)
+                previous_clock, previous_capture, previous_encoded = clock, capture, encoded
+            if (ledger[0]["qpc_100ns"] != first or previous_clock != last
+                    or previous_encoded + 1 != frames or repeats != explicit_repeats):
+                raise ValueError("source ledger endpoints or repeats differ")
+            extra = {**losses, "native_capture_scheduled_slot_count": scheduled,
+                     "native_source_timestamp_ledger_validated": True,
+                     "native_max_accepted_sample_gap_seconds": max(gaps, default=0.),
+                     "longest_explicit_cfr_repeat_run": longest_repeat,
+                     "native_capture_schedule_origin_qpc_100ns": origin}
+            if "source_lineage_schema" in video_stats:
+                if video_stats["source_lineage_schema"] != 1 or video_stats.get("source_sample_clock") != "steady_ms":
+                    raise ValueError("unknown source lineage or clock")
+                keys = ("image_epoch", "image_sequence", "source_sequence", "tracking_sequence",
+                        "activation", "source_sample_ms", "source_eye")
+                previous_key, previous_lineage = None, None
+                unique_images, duplicate_captures = 0, 0
+                for item in ledger:
+                    values = tuple(item[key] for key in keys)
+                    if (any(type(value) is not int or value < 0 for value in values)
+                            or min(values[:2]) <= 0
+                            or type(item["source_projected"]) is not bool
+                            or type(item["source_joined"]) is not bool):
+                        raise ValueError("invalid source transaction")
+                    if item["source_projected"] and (min(values[2:6]) <= 0
+                            or values[6] != video_stats.get("eye")):
+                        raise ValueError("projected source has no matching eye lineage")
+                    key = values[:2]
+                    lineage = (values, item["source_projected"], item["source_joined"])
+                    if previous_key is not None and (key < previous_key
+                            or (key == previous_key and lineage != previous_lineage)):
+                        raise ValueError("source transaction regressed or changed beneath the same image")
+                    if key == previous_key:
+                        duplicate_captures += 1
+                    else:
+                        unique_images += 1
+                    previous_key, previous_lineage = key, lineage
+                extra.update(native_source_lineage_validated=True,
+                             native_unique_image_transactions=unique_images,
+                             native_duplicate_image_captures=duplicate_captures)
+        except (KeyError, TypeError, ValueError, IndexError, OverflowError) as error:
+            raise BotFault("Native source timestamp/CFR ledger is inconsistent") from error
+    elif frames < samples or frames - samples > dropped + 1:
         raise BotFault("Raw CFR cadence is inconsistent with accepted and dropped native samples")
     return {
         "native_accepted_sample_count": samples,
@@ -67,6 +146,7 @@ def validate_raw_video(video_stats, encoded_frames, encoded_duration, frame_rate
         "native_expected_cfr_frames": expected_slots,
         "cfr_repeat_or_fill_frame_count": frames - samples,
         "frame_count_semantics": "encoded CFR frames include cadence fill/repeats; native accepted_sample_count is separate",
+        **extra,
     }
 
 
@@ -296,7 +376,7 @@ class Recording:
                 if not video.get("complete") or not video.get("frames") or not audio.get("frames"):
                     raise BotFault("Incomplete native video/audio segment")
                 raw_probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
-                                            "-show_entries", "stream=duration,nb_frames", "-of", "json",
+                                            "-show_entries", "stream=duration,nb_frames,avg_frame_rate", "-of", "json",
                                             str(segment["video"])], check=True, capture_output=True, text=True,
                                            timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
                 raw_streams = json.loads(raw_probe.stdout).get("streams", [])
@@ -326,7 +406,9 @@ class Recording:
                 if muxed_frames != raw_frames or muxed_duration + 1e-3 < raw_duration:
                     raise BotFault("Mux did not preserve every measured native video frame")
                 record.update(status="captured", video_stats=video, audio_stats=audio,
-                              output=str(combined), sha256=digest(combined), **mux,
+                              output=str(combined), sha256=digest(combined),
+                              raw_video_sha256=digest(segment["video"]),
+                              raw_video_metadata_sha256=digest(video_meta), **mux,
                               **raw_validation,
                               raw_video_accepted_source_samples=video["frames"],
                               raw_video_native_dropped_samples=video.get("dropped", 0),

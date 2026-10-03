@@ -103,6 +103,7 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=awaitingPlayer_=false;camera_=playerOwner_=0;reason_=HeadCameraStop::none;
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=ownerHeadTime_=0;suspended_=false;
     controllers_={};rig_={};nativeMenuOpen_=false;nativeIdroidOpen_=false;awaitingScene_=false;lastView_={};cameraRenderTime_=0;menuAnchored_=false;trackingEpoch_=0;
+    menuGeneration_=0;
     staleDemoRecoveryDwell_.reset();
     lastTitleSource_={};avatarEditorBackdrop_={};lastTitleSourceValid_=avatarEditorBackdropValid_=false;
     scriptedDemoActive_=false;cinematicFollow_={};sceneTransitionActivation_=0;
@@ -243,7 +244,7 @@ void HeadCamera::setNativeMenuOpen(bool open,bool idroid){
     const auto nextIdroid=open&&idroid;
     if(open==nativeMenuOpen_&&nextIdroid==nativeIdroidOpen_)return;
     const bool retainMenuAnchor=open&&nativeMenuOpen_&&menuAnchored_;
-    nativeMenuOpen_=open;nativeIdroidOpen_=nextIdroid;rig_={};
+    nativeMenuOpen_=open;nativeIdroidOpen_=nextIdroid;++menuGeneration_;rig_={};
     if(open)staleDemoRecoveryDwell_.reset();
     if(open){
         sceneTransitionActivation_=0;
@@ -318,7 +319,7 @@ std::optional<HeadCameraSample> HeadCamera::publishedRigFrame(uint64_t now) cons
     if(!active_||!rig_.camera||rig_.camera!=camera_||!rig_.owner||rig_.owner!=playerOwner_
         ||!frame.applied||!frame.rigSequence||frame.playerOwner!=rig_.owner
         ||frame.activation!=activation_||frame.trackingSequence>sequence_
-        ||frame.controllers.referenceEpoch!=controllers_.referenceEpoch
+        ||frame.controllers.referenceEpoch!=controllers_.referenceEpoch||frame.menuGeneration!=menuGeneration_
         ||now<frame.sampleTime||now-frame.sampleTime>150)return {};
     if(requirePlayerHead_){
         const auto current=std::find_if(playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){
@@ -349,7 +350,7 @@ bool HeadCamera::publishRigFrame(uintptr_t camera,uintptr_t owner,Pose sourceCam
     if(!owner||!frame.applied||!valid(sourceCamera)||!valid(frame.nativePose))return false;
     std::lock_guard lock(mutex_);
     if(!active_||camera_!=camera||frame.activation!=activation_||frame.trackingSequence>sequence_
-       ||frame.controllers.referenceEpoch!=controllers_.referenceEpoch)return false;
+       ||frame.controllers.referenceEpoch!=controllers_.referenceEpoch||frame.menuGeneration!=menuGeneration_)return false;
     frame.rigSequence=++rigSequence_;rig_={camera,owner,sourceCamera,frame};return true;
 }
 std::optional<Pose> HeadCamera::openingTrackingOrigin(uint64_t now) const{
@@ -371,6 +372,7 @@ std::optional<Pose> HeadCamera::openingTrackingOrigin(uint64_t now) const{
 HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint64_t time,bool useRig){
     const auto sourceCamera=nativePose;
     HeadCameraSample result{nativePose,head_,sequence_,activation_,false};
+    result.menuGeneration=menuGeneration_;
     result.views=views_;result.sampleTime=time_;result.stereoTracked=stereoTracking_;
     if(!enabled_||!camera||!valid(nativePose))return result;
     if(!tracking_){suspendLocked(HeadCameraStop::trackingLost);return result;}

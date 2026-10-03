@@ -150,6 +150,50 @@ class Events:
         return event
 
 
+REVIEWED_MENU_BUTTONS = {"menus.confirm": 0x1000, "menus.back": 0x2000}
+
+
+def reviewed_action_contract(case):
+    """One reviewed ACC Confirm/Back edge, never a generic outcome bypass."""
+    if case.get("reviewed_action_only") is not True:
+        raise BotFault("Reviewed action opt-in must be exactly true")
+    steps = case.get("steps")
+    if (not isinstance(steps, list) or len(steps) != 1 or case.get("setup")
+            or "during" in case or case.get("milestones")):
+        raise BotFault("Reviewed action requires one Confirm/Back and no setup, held outcome or plan")
+    step = steps[0]
+    if (not isinstance(step, dict) or set(step) != {"op", "name", "seconds", "state_before", "native_before"}
+            or step["op"] != "action" or step["name"] not in REVIEWED_MENU_BUTTONS
+            or type(step["seconds"]) not in (int, float) or not math.isfinite(step["seconds"])
+            or not .03 <= step["seconds"] <= .15):
+        raise BotFault("Reviewed action permits only one 30..150 ms menus.confirm or menus.back edge")
+    fast = {"scene":"menu", "menu":True, "idroid":True, "pause":False,
+            "title":False, "loading":False, "demo":False, "gamepad":False,
+            "camera_active":True, "camera_suspended":False,
+            "controls.context":"menus", "controls.native_buttons":0,
+            "rendered.presentation_focused":True, "idroid_tutorial_mode":0}
+    native = {"mission":40010, "sequence":"Seq_Game_MainGame", "helicopter_space":True,
+              "title":False, "popup":False, "saving":False, "tutorial_pause":False,
+              "fob_tutorial_state":127, "vr_idroid_player_pad_block":False,
+              "idroid_development_active":True}
+    def contains(predicate, required):
+        return isinstance(predicate, dict) and all(type(predicate.get(k)) is type(v)
+            and predicate[k] == v for k, v in required.items())
+    for predicate in (case.get("before"), case.get("after"), step["state_before"]):
+        if not contains(predicate, fast):
+            raise BotFault("Reviewed action requires complete current menu/focus/released-button guards")
+        mode, ready = predicate.get("idroid_handheld"), predicate.get("idroid_menu_input_ready")
+        if type(mode) is not bool or ready is not mode:
+            raise BotFault("Reviewed action requires an explicit consistent iDroid mode")
+    mode = case["before"]["idroid_handheld"]
+    if any(p["idroid_handheld"] is not mode for p in (case["after"], step["state_before"])):
+        raise BotFault("Reviewed action cannot change iDroid mode")
+    if not contains(step["native_before"], native) or any(not contains(case[name],
+            {"native."+key:value for key,value in native.items()}) for name in ("before", "after")):
+        raise BotFault("Reviewed action requires complete native ACC/popup/save guards")
+    return step
+
+
 class Behaviors:
     def __init__(self, adapter, events, clock=time.monotonic, sleep=time.sleep):
         self.adapter, self.events = adapter, events
@@ -212,7 +256,7 @@ class Behaviors:
                 raise StateDeadline(label, state)
             self.sleep(min(.1, remaining))
 
-    def case(self, case):
+    def case(self, case, *, reviewed_action=False):
         """RPC success never passes a case; require preconditions + a new outcome."""
         case_id = case["id"]
         if not case.get("steps") or not case.get("before") or not case.get("after"):
@@ -225,13 +269,20 @@ class Behaviors:
                   "dispatch_completed": False, "dispatched_steps_completed": 0}
         phase = "entry"
         try:
+            observation_only = "reviewed_action_only" in case
+            if observation_only:
+                reviewed_action_contract(case)
+                if reviewed_action is not True or getattr(self.adapter, "supervised", False) is not True:
+                    raise BotFault("Reviewed action requires one current two-eye-reviewed supervisor decision")
+                result.update(scope="physical_input_and_release_only", page_outcome_proven=False, page_outcome_pending=True,
+                              visual_review_required=True)
             self.adapter.release()
             during = case.get("during")
             before = self.wait_for(case["before"], case.get("entry_timeout", 8), case_id + ":entry",
                                    native=bool(during and any(key.startswith("native.") for key in during)))
             if during and (case["steps"][-1].get("op") not in ("action", "menu_navigate") or matches(before, during)):
                 raise BotFault("While-held case needs a final action and an initially unsatisfied during predicate")
-            if not during and matches(before, case["after"]):
+            if not during and not observation_only and matches(before, case["after"]):
                 raise BotFault("Outcome already satisfied before action; no action effect proven")
             result["before"] = before
             phase = "setup"
@@ -240,7 +291,13 @@ class Behaviors:
             self.adapter.capture(case_id + "-before")
             phase = "dispatch"
             for index, step in enumerate(case["steps"]):
-                if during and index == len(case["steps"]) - 1:
+                if observation_only:
+                    observed = self.adapter.execute({**step, "reviewed_action_only":True})
+                    if (not isinstance(observed, dict) or observed.get("scope") != "physical_input_and_release_only"
+                            or not observed.get("held_evidence") or not observed.get("released_state")):
+                        raise BotFault("Reviewed action did not prove sampled physical input and native release")
+                    result["action_observation"] = observed
+                elif during and index == len(case["steps"]) - 1:
                     observed = self.adapter.execute({**step, "while_held": during,
                                                      "capture_while_held": case_id + "-during"})
                     if not observed or not matches(observed.get("state", {}), during):
@@ -271,6 +328,8 @@ class Behaviors:
                     timeout=min(15., case.get("timeout", 8)), clock=self.clock, sleep=self.sleep)
                 after = self.wait_for(case["after"], case.get("timeout", 8), case_id + ":captured-outcome",
                                      stable=after_stable)
+            if observation_only and (not isinstance(captures, list) or len(captures) != 2 or len(set(captures)) != 2):
+                raise BotFault("Reviewed action requires both released final-eye captures")
             result.update(status="observed_pass", before=before, after=after, captures=captures)
         except Exception as error:
             result["error"] = str(error)

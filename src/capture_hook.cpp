@@ -59,6 +59,9 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
                 checkHr(swap->GetBuffer(0,IID_PPV_ARGS(&source)),"Get game backbuffer");
                 ComPtr<ID3D11Device> device;source->GetDevice(&device);
                 ComPtr<ID3D11DeviceContext> context;device->GetImmediateContext(&context);
+                // Drain a final queued image even when the native scene has
+                // no new complete pair. Poll only this owner context.
+                destination->poll(context.Get());
                 pumpOpticNativeLightingProbe(context.Get());
                 const auto eye=observeRenderPresent(swap);
                  // Keep the complete stereo family in the mailbox between native

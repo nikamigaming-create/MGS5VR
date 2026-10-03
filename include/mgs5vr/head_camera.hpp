@@ -42,6 +42,9 @@ struct ControllerFrame {
     std::array<TrackedHand,2> hands{};
     int64_t predictedXrTime{};
     uint64_t referenceEpoch{};
+    // Presentation continuity only; never substitutes for raw pose tracking.
+    bool presentationFocused{};
+    uint64_t presentationEpoch{};
     bool weaponReady{};
     bool supportGrip{};
     bool vehicleControls{};
@@ -65,7 +68,7 @@ struct ControllerFrame {
     // cupped fingers move together; ordinary weapon and left-arm fits are separate.
     Vec3 idroidGripOffset{};
     Quat idroidGripRotation{};
-    bool handheldMenus{}; // Opt-in: native handheld iDroid. Pause always uses the world panel.
+    bool handheldMenus{}; // Effective handheld iDroid preference. Pause always uses the world panel.
     float menuQuadWidth{1.2f},menuQuadDistance{1.3f},menuQuadTilt{-10.f};
     float supportGripRadius{.10f},supportDetachRadius{.30f};
     float handRestCurl{.08f},handTouchCurl{.20f};
@@ -105,6 +108,7 @@ struct ControllerFrame {
 // Keep presentation settings and native scene identity; discard every action.
 inline ControllerFrame passiveControllerFrame(ControllerFrame frame,int64_t time,uint64_t epoch){
     frame.hands={};frame.optic={};frame.strikeCurl={};frame.cabinMove={};
+    frame.presentationFocused=false;
     frame.weaponReady=frame.supportGrip=frame.vehicleControls=frame.wheelGrip=false;
     frame.allowMotionMelee=frame.allowAnimalTouch=frame.commandControls=frame.equipmentOpen=false;
     frame.equipmentCategory=0;frame.openingSelection=-1;
@@ -140,6 +144,9 @@ struct HeadCameraSample {
     bool wristPanelTracked{};
     bool menuOpen{};
     bool menuIdroid{};
+    // Changed only by an observed native menu boundary. Skin and camera must
+    // agree on this generation before a new handheld eye pair is admitted.
+    uint64_t menuGeneration{};
     bool menuWorldQuad{}; // Independent of wrist tracking and the handheld iDroid preference.
     Pose menuPanel{};
     WeaponScopeSample weaponScope{}; // Same solved weapon/skin publication as this eye pair.
@@ -223,6 +230,7 @@ private:
     bool awaitingPlayer_{};
     bool nativeMenuOpen_{};
     bool nativeIdroidOpen_{};
+    uint64_t menuGeneration_{};
     bool awaitingScene_{};
     HeadCameraSample lastView_{};
     uint64_t cameraRenderTime_{}; // Source liveness survives invalidating a previous scene's pixels.

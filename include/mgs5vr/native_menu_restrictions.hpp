@@ -2,8 +2,21 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <ostream>
 
 namespace mgs5vr {
+enum class NativeIdroidRecovery { refuse, ordinary, completedGuideOnly };
+// A missing native read is not evidence that a tutorial is inactive. Active
+// modes still require the existing native completed-guide checks before Stop.
+inline NativeIdroidRecovery nativeIdroidRecoveryForTutorialMode(std::optional<unsigned> mode) noexcept {
+    if(!mode||*mode>16)return NativeIdroidRecovery::refuse;
+    return *mode==0?NativeIdroidRecovery::ordinary:NativeIdroidRecovery::completedGuideOnly;
+}
+inline void writeNativeIdroidTutorialModeJson(std::ostream& out,std::optional<unsigned> mode){
+    if(nativeIdroidRecoveryForTutorialMode(mode)==NativeIdroidRecovery::refuse)out<<"null";
+    else out<<*mode;
+}
+
 // A native tutorial borrows the menu's disabled bit. Keep the prior values
 // from its ordered begin transaction; progression and other flag bits remain
 // owned by the game. A later independent disable invalidates that entry.

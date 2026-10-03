@@ -107,6 +107,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     token = source + "_" + direction
     payload = channel(token)
     axis = (0 if source == "left_stick" else 2) + (1 if direction in ("up", "down") else 0)
+    admitted_idroid_mode = None
 
     def sample(state, *, check_native=True):
         if help_owner:
@@ -114,7 +115,15 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
                     or (check_native and not matches(state.get("native", {}), help_native))):
                 raise BotFault("Mother Base Help navigation lost its reviewed owner or native scene prerequisite")
         elif owner == "idroid":
-            if (state.get("idroid") is not True or state.get("idroid_menu_input_ready") is not True
+            handheld, ready = state.get("idroid_handheld"), state.get("idroid_menu_input_ready")
+            # Readiness describes the live handheld pad lease. A native
+            # spatial iDroid intentionally has no such lease; require its
+            # explicit observed mode rather than treating every false/missing
+            # readiness value as permission to navigate.
+            input_owner = ((handheld is True and ready is True)
+                           or (handheld is False and ready is False))
+            if (state.get("idroid") is not True or not input_owner
+                    or (admitted_idroid_mode is not None and handheld is not admitted_idroid_mode)
                     or state.get("pause") is not False):
                 raise BotFault("iDroid navigation lost its native input owner")
             if check_native and native_guard and not matches(state.get("native", {}), native_guard):
@@ -157,6 +166,8 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
         raise ActionPrerequisiteChanged("Observed navigation prerequisite changed")
     check_popup(initial, admission=True)
     admitted = sample(initial)["sample_ms"]
+    if owner == "idroid":
+        admitted_idroid_mode = initial["idroid_handheld"]
     live.release()
     live.events.emit("semantic_menu_navigation", source=source, direction=direction, owner=owner,
                      mode="sampled_" + mode,

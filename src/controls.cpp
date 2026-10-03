@@ -185,7 +185,7 @@ const std::vector<SettingDefinition>& settingDefinitions(){
         {"settings.idroid_grip_z_cm",0,-15,15},
         {"settings.idroid_grip_pitch_degrees",0,-90,90},{"settings.idroid_grip_yaw_degrees",0,-90,90},
         {"settings.idroid_grip_roll_degrees",0,-90,90},
-        {"settings.handheld_menus",0,0,1},{"settings.menu_quad_width_cm",120,60,240},
+        {"settings.handheld_menus",1,0,1},{"settings.menu_quad_width_cm",120,60,240},
         {"settings.menu_quad_distance_cm",130,75,300},{"settings.menu_quad_tilt_degrees",-10,-30,30},
         {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",1,0,2},{"settings.hud_mode",1,0,2},
         {"settings.scope_pose_stabilization",1,0,1},

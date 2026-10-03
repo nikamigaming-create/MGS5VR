@@ -114,10 +114,26 @@ $mgsLeasePath=Join-Path $mgsLeaseFixture 'mgs5vr-runtime.ini'
 try {
     $lease=New-MgsRuntimeConfigLease -GameExe $mgsLeaseExe -RuntimeManifest 'C:\Simulator\runtime.json' -OperatorDir 'C:\Operator'
     Assert ((Get-Content -Raw -LiteralPath $mgsLeasePath) -match 'headless=0') 'the test runtime lease keeps the real compositor enabled'
+    Assert ((Get-Content -Raw -LiteralPath $mgsLeasePath) -match 'producer_pacing_test=baseline') 'default launches retain the existing producer margin'
+    Assert ((Get-Content -Raw -LiteralPath $mgsLeasePath) -match 'idroid_ui_boundary_trace=0') 'UI boundary tracing is off for default launches'
+    Assert (!(Test-Path (Join-Path $mgsLeaseFixture 'mgs5vr.ini')) -and !(Test-Path (Join-Path $mgsLeaseFixture 'mgs5vr-controls.ini'))) 'pacing configuration never creates or edits personal graphics or control INIs'
     $roundTrip=$lease|ConvertTo-Json|ConvertFrom-Json
     Restore-MgsRuntimeConfigLease -Lease $roundTrip -GameExe $mgsLeaseExe
     Restore-MgsRuntimeConfigLease -Lease $roundTrip -GameExe $mgsLeaseExe
     Assert (!(Test-Path -LiteralPath $mgsLeasePath)) 'an originally absent runtime file is removed after JSON-record recovery and repeated cleanup'
+
+    $lease=New-MgsRuntimeConfigLease -GameExe $mgsLeaseExe -RuntimeManifest 'C:\Simulator\runtime.json' -OperatorDir 'C:\Operator' -ProducerPacingTest display -ProducerPacingTestSeconds 600 -IdroidUiBoundaryTrace -CameraEvidenceDir $mgsLeaseFixture
+    $pacingText=Get-Content -Raw -LiteralPath $mgsLeasePath
+    Assert ($pacingText -match 'producer_pacing_test=display' -and $pacingText -match 'producer_pacing_test_seconds=600') 'display-period pacing is explicit in the isolated runtime lease'
+    Assert ($pacingText -match 'idroid_ui_boundary_trace=1') 'UI boundary tracing requires explicit ownership of the runtime lease'
+    Assert ($pacingText.Contains('camera_evidence_dir='+$mgsLeaseFixture)) 'owned evidence output is selected without editing personal INIs'
+    Restore-MgsRuntimeConfigLease -Lease ($lease|ConvertTo-Json|ConvertFrom-Json) -GameExe $mgsLeaseExe
+    Assert (!(Test-Path -LiteralPath $mgsLeasePath)) 'pacing diagnostic cleanup removes its entire temporary runtime lease'
+    foreach($bad in @(29,1201)){
+        $badPacingRefused=$false
+        try { New-MgsRuntimeConfigLease -GameExe $mgsLeaseExe -RuntimeManifest 'C:\Simulator\runtime.json' -OperatorDir 'C:\Operator' -ProducerPacingTest display -ProducerPacingTestSeconds $bad | Out-Null } catch { $badPacingRefused=$true }
+        Assert ($badPacingRefused -and !(Test-Path -LiteralPath $mgsLeasePath)) 'unbounded pacing requests are refused before runtime files are written'
+    }
 
     [byte[]]$personalBytes=@(239,187,191,91,114,117,110,116,105,109,101,93,13,10,101,110,97,98,108,101,100,61,48,13,10)
     [IO.File]::WriteAllBytes($mgsLeasePath,$personalBytes)

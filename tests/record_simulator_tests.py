@@ -11,6 +11,52 @@ recorder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(recorder)
 
 
+class OperatorEndpointTests(unittest.TestCase):
+    def construct(self, endpoint):
+        with mock.patch.dict(recorder.os.environ, {"MGS5VR_OPERATOR_URL": endpoint}), \
+             mock.patch.object(recorder.subprocess, "CREATE_NO_WINDOW", 0, create=True), \
+             mock.patch.object(recorder.subprocess, "Popen") as launch, \
+             mock.patch.object(recorder.threading, "Thread") as thread, \
+             mock.patch.object(recorder.Operator, "request", return_value={}), \
+             mock.patch.object(recorder.Operator, "send"):
+            recorder.Operator(pathlib.Path("owned-proxy.exe"))
+        return launch, thread
+
+    def test_local_http_port_is_passed_to_the_owned_proxy(self):
+        for endpoint in ("http://127.0.0.1:1024", "http://localhost:45123", "http://127.0.0.1:65535"):
+            with self.subTest(endpoint=endpoint):
+                launch, thread = self.construct(endpoint)
+                self.assertEqual(launch.call_args.args[0], ["owned-proxy.exe", endpoint])
+                self.assertFalse(launch.call_args.kwargs.get("shell", False))
+                self.assertEqual(thread.return_value.start.call_count, 2)
+
+    def test_absent_endpoint_preserves_the_normal_proxy_command(self):
+        launch, _ = self.construct("")
+        self.assertEqual(launch.call_args.args[0], ["owned-proxy.exe"])
+
+    def test_remote_userinfo_paths_queries_and_invalid_ports_never_launch(self):
+        endpoints = (
+            "http://example.com:45123", "http://127.0.0.2:45123", "http://localhost.example.com:45123",
+            "https://127.0.0.1:45123", "127.0.0.1:45123", "http://[::1]:45123",
+            "http://user@127.0.0.1:45123", "http://user:secret@localhost:45123",
+            "http://@127.0.0.1:45123", "http://:secret@localhost:45123",
+            "http://127.0.0.1:45123/", "http://127.0.0.1:45123/rpc",
+            "http://127.0.0.1:45123?target=remote", "http://127.0.0.1:45123#fragment",
+            "http://127.0.0.1", "http://127.0.0.1:", "http://127.0.0.1:abc",
+            "http://127.0.0.1:45123.0", "http://127.0.0.1:-1", "http://127.0.0.1:0",
+            "http://127.0.0.1:1023", "http://127.0.0.1:65536", "http://[127.0.0.1:45123",
+        )
+        for endpoint in endpoints:
+            with self.subTest(endpoint=endpoint), \
+                 mock.patch.dict(recorder.os.environ, {"MGS5VR_OPERATOR_URL": endpoint}), \
+                 mock.patch.object(recorder.subprocess, "Popen") as launch, \
+                 mock.patch.object(recorder.threading, "Thread") as thread:
+                with self.assertRaises(ValueError):
+                    recorder.Operator("owned-proxy.exe")
+                launch.assert_not_called()
+                thread.assert_not_called()
+
+
 class CaptureContracts(unittest.TestCase):
     def test_late_error_belongs_to_its_original_request(self):
         client = recorder.Operator.__new__(recorder.Operator)

@@ -7,6 +7,7 @@
 #include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/native_video.hpp"
@@ -18,6 +19,7 @@
 #include <openxr/openxr_platform.h>
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <fstream>
@@ -29,6 +31,9 @@
 
 namespace mgs5vr {
 namespace {
+uint64_t nextRigPresentationEpoch(){
+    static std::atomic_uint64_t epoch{};return epoch.fetch_add(1)+1;
+}
 void xrCheck(XrResult result,const char* op) {
     if(XR_FAILED(result)) throw std::runtime_error(std::string(op)+" XrResult="+std::to_string(result));
 }
@@ -37,6 +42,66 @@ XrPosef toXr(Pose p) { return {{p.orientation.x,p.orientation.y,p.orientation.z,
 constexpr XrPosef identity{{0,0,0,1},{0,0,0}};
 constexpr auto validPoseBits=XR_SPACE_LOCATION_ORIENTATION_VALID_BIT|XR_SPACE_LOCATION_POSITION_VALID_BIT;
 bool sameLuid(LUID a,LUID b) { return a.LowPart==b.LowPart&&a.HighPart==b.HighPart; }
+
+struct XrStageTiming {
+    // Fixed 0.25 ms bins through 256 ms, then one overflow bin. Reported
+    // percentiles are upper bounds; overflow uses the measured maximum.
+    static constexpr double binMilliseconds=.25;
+    std::array<uint64_t,1025> bins{};
+    uint64_t count{},overBudget{};
+    double total{},maximum{};
+    void add(double milliseconds,double budget) noexcept {
+        const auto index=static_cast<size_t>(std::min(milliseconds/binMilliseconds,
+            static_cast<double>(bins.size()-1)));
+        ++bins[index];++count;total+=milliseconds;maximum=std::max(maximum,milliseconds);
+        if(budget>0&&milliseconds>budget)++overBudget;
+    }
+    double percentile(double fraction) const noexcept {
+        const auto rank=static_cast<uint64_t>(std::ceil(static_cast<double>(count)*fraction));
+        uint64_t cumulative{};
+        for(size_t index=0;index<bins.size();++index){
+            cumulative+=bins[index];
+            if(cumulative>=rank)return index+1==bins.size()?maximum
+                :std::min(maximum,static_cast<double>(index+1)*binMilliseconds);
+        }
+        return maximum;
+    }
+};
+struct XrStageDiagnostics {
+    using Clock=std::chrono::steady_clock;
+    std::array<XrStageTiming,6> stages{};
+    uint64_t budgetSamples{};
+    double minimumBudget{},maximumBudget{};
+    void record(const std::array<Clock::duration,6>& durations,XrDuration period) noexcept {
+        const double budget=period>0?static_cast<double>(period)/1e6:0;
+        if(budget>0){
+            if(!budgetSamples)minimumBudget=maximumBudget=budget;
+            else {minimumBudget=std::min(minimumBudget,budget);maximumBudget=std::max(maximumBudget,budget);}
+            ++budgetSamples;
+        }
+        for(size_t index=0;index<stages.size();++index)
+            stages[index].add(std::chrono::duration<double,std::milli>(durations[index]).count(),budget);
+    }
+    void report() noexcept {
+        try{
+            constexpr std::array<const char*,6> names{"wait","tracking","consume","upload","submit","total"};
+            std::ostringstream line;line.setf(std::ios::fixed);line.precision(3);
+            line<<"XR stages samples="<<stages[0].count<<" budget_samples="<<budgetSamples
+                <<" budget_ms_min_max="<<minimumBudget<<','<<maximumBudget
+                <<" bin_ms="<<XrStageTiming::binMilliseconds<<" percentiles=upper_bounds";
+            for(size_t index=0;index<stages.size();++index){
+                const auto& stage=stages[index];
+                line<<' '<<names[index]<<"_ms_mean_p50_p95_max="
+                    <<(stage.count?stage.total/static_cast<double>(stage.count):0)<<','
+                    <<stage.percentile(.5)<<','<<stage.percentile(.95)<<','<<stage.maximum
+                    <<' '<<names[index]<<"_over_budget="<<stage.overBudget
+                    <<' '<<names[index]<<"_overflow="<<stage.bins.back();
+            }
+            log(line.str());
+        }catch(...){}
+        stages={};budgetSamples=0;minimumBudget=maximumBudget=0;
+    }
+};
 
 struct Instance {
     XrInstance handle{XR_NULL_HANDLE};
@@ -145,12 +210,17 @@ struct Session {
     bool wheelHeld{};
     XrTime pendingLocalChange{};
     uint64_t referenceEpoch{1};
+    uint64_t presentationEpoch{nextRigPresentationEpoch()};
     ControllerFrame controllerFrame{};
     OpeningSelector openingSelector;
     OpeningSelectorFrame openingFrame{};
     bool openingAssetsReady{};
     uint64_t openingAssetPollAt{};
-    explicit Session(Instance& i):instance(i){}
+    explicit Session(Instance& i):instance(i){
+        wchar_t enabled[2]{};
+        controllerTrackingFaultProbe().configure(
+            GetEnvironmentVariableW(L"MGS5VR_TRACKING_FAULT_TEST",enabled,2)==1&&enabled[0]==L'1');
+    }
     void requestRefreshRate(){
         if(!instance.refreshControl){log("OpenXR refresh rate is controlled by the headset runtime; 90 Hz target must be set there");return;}
         PFN_xrEnumerateDisplayRefreshRatesFB enumerate{};PFN_xrRequestDisplayRefreshRateFB request{};
@@ -211,6 +281,7 @@ struct Session {
             }
         }
         if(liveControls.apply(controls,physical)){
+            presentationEpoch=nextRigPresentationEpoch();
             nativeControls.suspend();rigControls.suspend();commandsControls.suspend();
             opticsControls.reset();opticGate.reset();snapControls.reset();smoothControls.reset();
             weaponZoomInput.update(false,false);refreshControlLabels();
@@ -351,8 +422,13 @@ struct Session {
             const auto r=xrPollEvent(instance.handle,&buffer);
             if(r==XR_EVENT_UNAVAILABLE)break;
             xrCheck(r,"Poll OpenXR events");
-            if(buffer.type==XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING){exiting=true;break;}
-            if(buffer.type==XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED)priorFocused=false;
+            if(buffer.type==XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING){
+                presentationEpoch=nextRigPresentationEpoch();focused=priorFocused=false;exiting=true;break;
+            }
+            if(buffer.type==XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED){
+                const auto& change=*reinterpret_cast<const XrEventDataInteractionProfileChanged*>(&buffer);
+                if(change.session==handle){presentationEpoch=nextRigPresentationEpoch();priorFocused=false;}
+            }
             if(buffer.type==XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING){
                 const auto& change=*reinterpret_cast<const XrEventDataReferenceSpaceChangePending*>(&buffer);
                 if(change.session==handle&&change.referenceSpaceType==XR_REFERENCE_SPACE_TYPE_LOCAL)
@@ -362,7 +438,9 @@ struct Session {
             const auto& e=*reinterpret_cast<const XrEventDataSessionStateChanged*>(&buffer);
             if(e.session!=handle)continue;
             log("OpenXR session state="+std::to_string(e.state));
-            focused=e.state==XR_SESSION_STATE_FOCUSED;
+            const bool nextFocused=e.state==XR_SESSION_STATE_FOCUSED;
+            if(focused&&!nextFocused){presentationEpoch=nextRigPresentationEpoch();priorFocused=false;}
+            focused=nextFocused;
             if(e.state==XR_SESSION_STATE_READY&&!running){
                 XrSessionBeginInfo begin{XR_TYPE_SESSION_BEGIN_INFO};begin.primaryViewConfigurationType=XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
                 xrCheck(xrBeginSession(handle,&begin),"Begin XR session");running=true;recenterRequested=true;requestRefreshRate();
@@ -402,12 +480,18 @@ struct Session {
         };
         result.gripTracked=locate(grip,gripSpaces[n],result.grip);
         result.aimTracked=locate(aim,aimSpaces[n],result.aim);
+        const auto fault=controllerTrackingFaultProbe().mask(steadyMilliseconds())>>(n*2);
+        if(fault&1){result.gripTracked=false;result.grip={};}
+        if(fault&2){result.aimTracked=false;result.aim={};}
         return result;
     }
     WeaponGripSmoothing weaponSmoothing;
     void suspendInput(XrTime time){
+        controllerTrackingFaultProbe().focused(false);
+        if(priorFocused)presentationEpoch=nextRigPresentationEpoch();
         publishControlInputAudit({});
         controllerFrame=passiveControllerFrame(controllerFrame,time,referenceEpoch);
+        controllerFrame.presentationEpoch=presentationEpoch;
         idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();
         snapControls.reset();smoothControls.reset();cabinTurn.reset();rigControls.suspend();controls.suspend();
         opticsControls.reset();opticGate.reset();opticStabilizer.reset();weaponSmoothing.reset();commandsControls.suspend();
@@ -421,7 +505,9 @@ struct Session {
         const auto r=xrSyncActions(handle,&sync);
         if(r==XR_SESSION_NOT_FOCUSED){suspendInput(time);return;}
         xrCheck(r,"Sync controller actions");
+        controllerTrackingFaultProbe().focused(true);
         if(!priorFocused){
+            presentationEpoch=nextRigPresentationEpoch();
             snapControls.reset();
             smoothControls.reset();
             for(size_t side=0;side<hands.size();++side){
@@ -436,6 +522,8 @@ struct Session {
             }
         }
         controllerFrame={{trackedHand(0,time),trackedHand(1,time)},time,referenceEpoch};
+        controllerFrame.presentationFocused=true;
+        controllerFrame.presentationEpoch=presentationEpoch;
         const bool right=controllerFrame.hands[1].gripTracked;
         // OpenXR action activity is independent of optical pose tracking.
         // Occluding a controller must not release B or the held wrist trigger.
@@ -983,6 +1071,7 @@ struct Session {
         priorRecenter=center;priorFocused=true;
     }
     ~Session(){
+        controllerTrackingFaultProbe().configure(false);
         log("OpenXR releasing session resources");
         gamepadMailbox().publish({},false,steadyMilliseconds());
         for(auto s:aimSpaces)if(s)xrDestroySpace(s);
@@ -1075,7 +1164,7 @@ struct Screen {
         else resampler.copy(session.context.Get(),source,sourceSlice,images.at(pendingIndex).texture);
         // Optional private proof of the runtime-owned image while this app
         // still owns its acquired slot. This is separate from the source take.
-        if(sourceSlice==1)uploadProof.frame(session.device.Get(),session.context.Get(),images.at(pendingIndex).texture,0);
+        if(sourceSlice==1)uploadProof.frame(session.device.Get(),session.context.Get(),images.at(pendingIndex).texture,0,nullptr,id);
         session.context->Flush();
         checkHr(session.device->GetDeviceRemovedReason(),"XR device health");
         XrSwapchainImageReleaseInfo release{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
@@ -1162,6 +1251,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
     bool haveSurround{},surroundTransition{},surroundWithScreen{true},priorNativeMenuOpen{};
     uint64_t eyeEpoch{},projectionFrames{},emptyStereoFrames{},retainedStereoFrames{};
     uint64_t performanceAt{},windowSubmissions{},windowNewPairs{},windowEmpty{},lastProjectionSource{};
+    XrStageDiagnostics stageDiagnostics;
+    XrSubmissionTiming submissionTiming;
     uint64_t windowFrames{},windowNoRender{},windowNoTracking{},windowNoLayers{},windowSlowSubmit{};
     uint64_t windowLongRetention{},windowMaxImageAge{},windowCameraTransitions{};
     uint64_t lastEmptyLog{};
@@ -1188,7 +1279,9 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         if(closing&&now>=closeDeadline){log("OpenXR STOPPING event deadline exceeded");break;}
         if(!session.running){reportConsumerDisplayPeriod(0);std::this_thread::sleep_for(std::chrono::milliseconds(10));continue;}
         XrFrameWaitInfo wi{XR_TYPE_FRAME_WAIT_INFO};XrFrameState frame{XR_TYPE_FRAME_STATE};
+        const auto stageWaitStart=XrStageDiagnostics::Clock::now();
         xrCheck(xrWaitFrame(session.handle,&wi,&frame),"Wait XR frame");
+        const auto stageWaitDone=XrStageDiagnostics::Clock::now();
         const auto waitDone=steadyMilliseconds();
         XrFrameBeginInfo bi{XR_TYPE_FRAME_BEGIN_INFO};xrCheck(xrBeginFrame(session.handle,&bi),"Begin XR frame");
         EndFrameGuard guard{session.handle,frame.predictedDisplayTime};++stats.frames;
@@ -1217,6 +1310,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             stats.firstHead=trackedHead;stats.firstViews=trackedViews;stats.haveViews=true;
         }
         headCamera().trackStereo(trackedHead,trackedViews,tracking&&stereoTracked,steadyMilliseconds(),session.controllerFrame);
+        const auto stageTrackingDone=XrStageDiagnostics::Clock::now();
         const auto trackingDone=steadyMilliseconds();
         if(tracking&&(!anchored||session.recenterRequested)){
             screenPose=recenteredScreen(fromXr(head.pose),config.distanceMeters);anchored=true;session.recenterRequested=false;
@@ -1225,6 +1319,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         auto channel=source.latest();
         if(channel&&!sameLuid(channel->adapterLuid,session.luid))throw std::runtime_error("Game and headset use different GPUs; shared capture is unavailable");
         const bool fresh=consumer.consume(channel);
+        const auto stageConsumeDone=XrStageDiagnostics::Clock::now();
         const auto consumeDone=steadyMilliseconds();
         if(fresh)++stats.sourceFrames;
         if(eyeEpoch!=consumer.frame().epoch){acceptedStereo.clear();eyeEpoch=consumer.frame().epoch;layoutLogged=false;}
@@ -1287,6 +1382,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
                 }
             }
         }
+        const auto stageUploadDone=XrStageDiagnostics::Clock::now();
+        const auto retainedBeforeSubmission=retainedStereoFrames;
         const auto uploadDone=steadyMilliseconds();
         const bool cameraTransition=!session.manualScreenSelected&&anchored&&tracking&&stereoTracked
             &&cameraStatus.active&&!cameraStatus.suspended&&!cameraStatus.nativeMenuOpen
@@ -1364,14 +1461,36 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
                 }
             }else if(anchored&&screen.ready){end.layerCount=1;end.layers=&layer;++stats.submittedScreens;}
         }
-        xrCheck(xrEndFrame(session.handle,&end),"Submit XR frame");guard.ended=true;
+        const auto stageEndFrameStart=XrStageDiagnostics::Clock::now();
+        const auto endFrameResult=xrEndFrame(session.handle,&end);
+        const auto stageEndFrameDone=XrStageDiagnostics::Clock::now();
+        xrCheck(endFrameResult,"Submit XR frame");guard.ended=true;
+        const auto stageSubmitDone=XrStageDiagnostics::Clock::now();
         const auto submitDone=steadyMilliseconds();
         const bool recordedStereo=end.layerCount&&layer==reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);
         const bool recordable=!surroundTransition&&(recordedStereo?consumer.frame().sequence&&consumer.eyes()[1].sourceSequence==eyeFrames[1].sourceSequence
             :end.layerCount&&consumer.frame().sequence&&!cameraStatus.active&&!cameraStatus.pending);
         video.frame(session.device.Get(),session.context.Get(),recordable?consumer.texture():nullptr,recordedStereo?1u:0u,
-            recordedStereo?&consumer.eyes()[1]:nullptr);
+            recordedStereo?&consumer.eyes()[1]:nullptr,consumer.frame());
+        const auto stageCycleDone=XrStageDiagnostics::Clock::now();
         const auto cycleEnd=steadyMilliseconds();
+        // All normal running-session cycles, including menus and missing
+        // tracking. Wait isolates xrWaitFrame; other stages include their
+        // intervening bookkeeping. Total also includes event polling and
+        // optional recording. Counters are diagnostics, not a no-drops gate.
+        stageDiagnostics.record({stageWaitDone-stageWaitStart,stageTrackingDone-stageWaitDone,
+            stageConsumeDone-stageTrackingDone,stageUploadDone-stageConsumeDone,
+            stageSubmitDone-stageUploadDone,stageCycleDone-now},frame.predictedDisplayPeriod);
+        bool submittedProjection{},submittedQuad{};
+        for(uint32_t index=0;index<end.layerCount;++index){
+            submittedProjection|=end.layers[index]->type==XR_TYPE_COMPOSITION_LAYER_PROJECTION;
+            submittedQuad|=end.layers[index]->type==XR_TYPE_COMPOSITION_LAYER_QUAD;
+        }
+        submissionTiming.record(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(stageEndFrameStart-stageUploadDone).count(),
+            std::chrono::duration_cast<std::chrono::nanoseconds>(stageEndFrameDone-stageEndFrameStart).count(),
+            frame.predictedDisplayPeriod,end.layerCount,submittedProjection,submittedQuad,
+            retainedStereoFrames!=retainedBeforeSubmission);
         ++windowFrames;
         if(!frame.shouldRender)++windowNoRender;
         else if(!tracking)++windowNoTracking;
@@ -1418,6 +1537,9 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         }
         if(cycleEnd-performanceAt>=5000){
             const double seconds=static_cast<double>(cycleEnd-performanceAt)/1000.0;
+            stageDiagnostics.report();
+            try{log(submissionTiming.summary());}catch(...){}
+            submissionTiming={};
             log("XR presentation frames="+std::to_string(windowFrames)+" no_render="+std::to_string(windowNoRender)
                 +" no_tracking="+std::to_string(windowNoTracking)+" no_layers="+std::to_string(windowNoLayers)
                 +" slow_submit="+std::to_string(windowSlowSubmit)+" retained_over_500ms="+std::to_string(windowLongRetention)

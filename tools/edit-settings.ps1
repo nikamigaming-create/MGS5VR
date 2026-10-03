@@ -58,7 +58,7 @@ $mgsLayout=[Windows.Forms.TableLayoutPanel]::new();$mgsLayout.Dock='Fill';$mgsLa
 [void]$mgsLayout.RowStyles.Add([Windows.Forms.RowStyle]::new('Percent',100))
 [void]$mgsLayout.RowStyles.Add([Windows.Forms.RowStyle]::new('Absolute',90))
 $mgsHelp=[Windows.Forms.Label]::new();$mgsHelp.Dock='Fill';$mgsHelp.Padding=[Windows.Forms.Padding]::new(12)
-$mgsHelp.Text="Edit a value, then Save. Units are in each setting's name. Existing bindings are preserved.`r`nRelease controls for 2 seconds to apply. Runtime settings need a restart. handheld_menus=0: paused panel in 3D; 1: handheld opt-in.`r`niDroid fit: screen_width sets size; depth/x/y set distance and position; pitch/yaw/roll tilt only the display.`r`niDroid: tap LEFT Menu; grips change tabs; sticks navigate/pan; A selects; B goes back. Hold B for 0.75 s to close."
+$mgsHelp.Text="Edit a value, then Save. Units are in each setting's name. Existing bindings are preserved.`r`nRelease controls for 2 seconds to apply. Runtime settings need a restart. handheld_menus=0: paused panel in 3D; 1: handheld (default).`r`niDroid fit: screen_width sets size; depth/x/y set distance and position; pitch/yaw/roll tilt only the display.`r`niDroid: tap LEFT Menu; grips change tabs; sticks navigate/pan; A selects; B goes back. Hold B for 0.75 s to close."
 $mgsGrid=[Windows.Forms.DataGridView]::new();$mgsGrid.Dock='Fill';$mgsGrid.AllowUserToAddRows=$false;$mgsGrid.AllowUserToDeleteRows=$false
 $mgsGrid.RowHeadersVisible=$false;$mgsGrid.AutoSizeColumnsMode='Fill'
 foreach ($column in @('Setting','Value','Allowed')) { [void]$mgsGrid.Columns.Add($column,$column) }

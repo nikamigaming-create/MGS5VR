@@ -9,7 +9,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
-from gameplay_bot.core import ActionPrerequisiteChanged, Behaviors, BlankCompositorFrame, BotFault, Events, ProgressGuard, astar, atomic_json, matches, scene
+from gameplay_bot.core import ActionPrerequisiteChanged, Behaviors, BlankCompositorFrame, BotFault, Events, ProgressGuard, astar, atomic_json, matches, scene, reviewed_action_contract
 from gameplay_bot.live import Live, NativeReader, authoritative_context, channel, fresh_control_observation, held_input_evidence, released_startup_observation, require_presentation_transition, rotate, static_grip_capture_allowed
 from gameplay_bot.recording import Recording, after_verified_arrival, mux_timeline, validate_raw_video
 from gameplay_bot.session import run_suite
@@ -18,6 +18,108 @@ from gameplay_bot.startup_evidence import StartupEvidence
 from gameplay_bot.menus import navigate as navigate_menu, observe as observe_menu
 from gameplay_bot.optic_exposure import require_independent_luminance
 from operator_recovery_tests import RecoveryTests, LiveRecoveryIntegrationTests
+from gameplay_motion_tests import MotionTests
+
+
+class NativeRecordingLedgerTests(unittest.TestCase):
+    @staticmethod
+    def fixture():
+        origin = 1_000_000_000
+        capture_slots = (2, 3, 6, 7)
+        samples = [{"qpc_100ns": origin + (slot * 10_000_000 + 29) // 30 + jitter,
+                    "capture_slot": slot, "encoded_slot": slot - 2, "repeats_before": fill}
+                   for slot, jitter, fill in zip(capture_slots, (10000, 20000, 5000, 19000), (0, 0, 2, 0))]
+        return {"schema": 2, "complete": True, "frames": 4, "dropped": 6,
+                "first_qpc_100ns": samples[0]["qpc_100ns"],
+                "last_qpc_100ns": samples[-1]["qpc_100ns"],
+                "capture_schedule_origin_qpc_100ns": origin, "scheduled_slots": 10,
+                "missed_source_cadence_slots": 2, "queue_dropped_samples": 2,
+                "staging_busy_samples": 1, "staging_discarded_samples": 1,
+                "encoded_frames": 6, "repeated_frames": 2, "accepted_samples": samples}
+
+    def test_source_ledger_explains_exact_cfr_slots_and_preserves_copy_clock(self):
+        stats = validate_raw_video(self.fixture(), 6, .2, 30.)
+        self.assertTrue(stats["native_source_timestamp_ledger_validated"])
+        self.assertEqual(stats["cfr_repeat_or_fill_frame_count"], 2)
+        self.assertEqual(stats["longest_explicit_cfr_repeat_run"], 2)
+        self.assertEqual(stats["native_capture_scheduled_slot_count"], 10)
+        self.assertAlmostEqual(stats["native_max_accepted_sample_gap_seconds"], .0985)
+
+    def test_unreported_container_repeat_is_rejected_even_with_large_loss_total(self):
+        with self.assertRaisesRegex(BotFault, "ledger"):
+            validate_raw_video(self.fixture(), 7, 7 / 30., 30.)
+
+    def lineage_fixture(self):
+        video = self.fixture()
+        video.update(source_lineage_schema=1, source_sample_clock="steady_ms", eye=1)
+        for item, sequence in zip(video["accepted_samples"], (90, 90, 92, 93)):
+            item.update(image_epoch=4, image_sequence=sequence, source_sequence=sequence+100,
+                        tracking_sequence=sequence+200, activation=2, source_sample_ms=sequence+300,
+                        source_eye=1, source_projected=True, source_joined=True)
+        return video
+
+    def test_duplicate_source_images_are_counted_separately_from_cfr_fill(self):
+        result = validate_raw_video(self.lineage_fixture(), 6, .2, 30.)
+        self.assertTrue(result["native_source_lineage_validated"])
+        self.assertEqual(result["native_unique_image_transactions"], 3)
+        self.assertEqual(result["native_duplicate_image_captures"], 1)
+        self.assertEqual(result["cfr_repeat_or_fill_frame_count"], 2)
+
+    def test_source_lineage_rejects_replacement_reordering_wrong_eye_and_missing_identity(self):
+        for index, field, value in ((1, "tracking_sequence", 999), (2, "image_sequence", 89),
+                                    (2, "image_epoch", 3), (1, "source_eye", 0),
+                                    (1, "image_epoch", 0), (1, "source_sample_ms", None)):
+            with self.subTest(field=field):
+                video = self.lineage_fixture()
+                video["accepted_samples"][index][field] = value
+                with self.assertRaisesRegex(BotFault, "ledger"):
+                    validate_raw_video(video, 6, .2, 30.)
+
+    def test_source_lineage_keeps_epoch_reset_distinct_and_rejects_unknown_clock(self):
+        video = self.lineage_fixture()
+        video["accepted_samples"][-1].update(image_epoch=5, image_sequence=1)
+        self.assertEqual(validate_raw_video(video, 6, .2, 30.)["native_unique_image_transactions"], 3)
+        video["source_sample_clock"] = "qpc_100ns"
+        with self.assertRaisesRegex(BotFault, "ledger"):
+            validate_raw_video(video, 6, .2, 30.)
+
+    def test_source_order_timestamp_slot_and_repeat_changes_are_rejected(self):
+        for key, value in (("qpc_100ns", 1_000_000_000), ("capture_slot", 4),
+                           ("encoded_slot", 2), ("repeats_before", 1)):
+            with self.subTest(key=key):
+                video = self.fixture()
+                video["accepted_samples"][1][key] = value
+                with self.assertRaisesRegex(BotFault, "ledger"):
+                    validate_raw_video(video, 6, .2, 30.)
+        video = self.fixture()
+        video["accepted_samples"][1:3] = reversed(video["accepted_samples"][1:3])
+        with self.assertRaisesRegex(BotFault, "ledger"):
+            validate_raw_video(video, 6, .2, 30.)
+
+    def test_all_loss_categories_and_source_ledger_length_are_accounted(self):
+        for key in ("missed_source_cadence_slots", "queue_dropped_samples",
+                    "staging_busy_samples", "staging_discarded_samples", "scheduled_slots",
+                    "encoded_frames", "repeated_frames"):
+            with self.subTest(key=key):
+                video = self.fixture()
+                video[key] += 1
+                with self.assertRaisesRegex(BotFault, "ledger"):
+                    validate_raw_video(video, 6, .2, 30.)
+        video = self.fixture()
+        video["accepted_samples"].pop()
+        with self.assertRaisesRegex(BotFault, "ledger"):
+            validate_raw_video(video, 6, .2, 30.)
+
+    def test_wrong_actual_frame_rate_and_nonfinite_duration_are_rejected(self):
+        for duration, fps in ((.2, 29.97), (float("nan"), 30.), (.2, float("inf"))):
+            with self.subTest(duration=duration, fps=fps), self.assertRaises(BotFault):
+                validate_raw_video(self.fixture(), 6, duration, fps)
+
+    def test_reproduced_c960_legacy_failure_is_not_retroactively_admitted(self):
+        video = {"frames": 667, "dropped": 16, "first_qpc_100ns": 868114717742,
+                 "last_qpc_100ns": 868345073807, "complete": True}
+        with self.assertRaisesRegex(BotFault, "accepted and dropped"):
+            validate_raw_video(video, 692, 23.066633, 30.)
 
 
 class NativePopupTransportTests(unittest.TestCase):
@@ -291,6 +393,91 @@ class ControllerFitPoseTests(unittest.TestCase):
         self.assertGreater(clock.now, 1.8)
 
 
+class TrackingLossFixtureTests(unittest.TestCase):
+    def make_live(self, state=None):
+        live = Live.__new__(Live)
+        live.held = {}
+        live.observe = mock.Mock(return_value=state or {
+            "scene": "gameplay", "camera_active": True, "camera_suspended": False,
+            "rendered": {"rig_sequence": 42}})
+        live.native = mock.Mock(spec=NativeReader)
+        live.native.read.return_value = ({"enabled": True, "armed": True, "mask": 4}, {"seconds": .01})
+        live.events = mock.Mock()
+        live.call = mock.Mock()
+        live.input = mock.Mock()
+        return live
+
+    def test_valid_bounds_arm_only_the_explicit_native_fixture(self):
+        for mask, milliseconds in ((0, 100), (1, 8000), (4, 500), (15, 100)):
+            for state in ({"scene": "gameplay"}, {"scene": "cabin"},
+                          {"scene": "menu", "idroid": True}):
+                with self.subTest(mask=mask, milliseconds=milliseconds, state=state):
+                    live = self.make_live()
+                    live.observe.return_value.update(state)
+                    response = {"enabled": True, "armed": True, "mask": mask}
+                    live.native.read.return_value = (response, {"seconds": .01})
+                    live.execute({"op": "tracking_loss", "mask": mask, "milliseconds": milliseconds})
+                    live.native.read.assert_called_once_with(f"diagnostics:controller-tracking-loss:{mask}:{milliseconds}")
+                    event = live.events.emit.call_args
+                    self.assertEqual(event.args, ("synthetic_tracking_loss",))
+                    self.assertEqual(event.kwargs["response"], response)
+                    self.assertEqual(event.kwargs["mask"], mask)
+                    self.assertEqual(event.kwargs["milliseconds"], milliseconds)
+                    self.assertIn("not physical Quest 3", event.kwargs["evidence_limit"])
+                    live.call.assert_not_called()
+                    live.input.assert_not_called()
+
+    def test_invalid_mask_duration_or_held_input_reject_before_observation(self):
+        invalid = [(value, 500) for value in (None, -1, 16, True, 4.0, "4")]
+        invalid += [(4, value) for value in (None, 99, 8001, False, 500.0, "500")]
+        for mask, milliseconds in invalid:
+            with self.subTest(mask=mask, milliseconds=milliseconds):
+                live = self.make_live()
+                with self.assertRaisesRegex(BotFault, "released input.*bounded valid mask"):
+                    live.execute({"op": "tracking_loss", "mask": mask, "milliseconds": milliseconds})
+                live.observe.assert_not_called()
+                live.native.read.assert_not_called()
+                live.events.emit.assert_not_called()
+        live = self.make_live()
+        live.held = {("right", "A", None): channel("a")}
+        with self.assertRaisesRegex(BotFault, "released input"):
+            live.execute({"op": "tracking_loss", "mask": 4, "milliseconds": 500})
+        live.observe.assert_not_called()
+        live.native.read.assert_not_called()
+
+    def test_unowned_inactive_suspended_or_unpublished_rig_cannot_arm(self):
+        changes = [{"scene": name} for name in ("title", "loading", "demo", "unknown", "menu")]
+        changes += [{"scene": "menu", "idroid": True, flag: True}
+                    for flag in ("pause", "title", "loading", "demo")]
+        changes += [{"camera_active": False}, {"camera_active": None}, {"camera_suspended": True},
+                    {"rendered": {}}, {"rendered": {"rig_sequence": 0}},
+                    {"rendered": {"rig_sequence": None}}]
+        for change in changes:
+            with self.subTest(change=change):
+                live = self.make_live()
+                live.observe.return_value.update(change)
+                with self.assertRaisesRegex(BotFault, "current accepted playable rig"):
+                    live.execute({"op": "tracking_loss", "mask": 4, "milliseconds": 500})
+                live.native.read.assert_not_called()
+                live.events.emit.assert_not_called()
+                live.input.assert_not_called()
+
+    def test_disabled_unarmed_or_wrong_mask_response_never_claims_success(self):
+        responses = ({}, {"enabled": True, "mask": 4}, {"armed": True, "mask": 4},
+                     {"enabled": False, "armed": True, "mask": 4},
+                     {"enabled": True, "armed": False, "mask": 4},
+                     {"enabled": True, "armed": True, "mask": 1})
+        for response in responses:
+            with self.subTest(response=response):
+                live = self.make_live()
+                live.native.read.return_value = (response, {})
+                with self.assertRaisesRegex(BotFault, "diagnostic was not armed"):
+                    live.execute({"op": "tracking_loss", "mask": 4, "milliseconds": 500})
+                live.native.read.assert_called_once()
+                live.events.emit.assert_not_called()
+                live.input.assert_not_called()
+
+
 class MenuNavigationTests(unittest.TestCase):
     def fixture(self, source="left_stick", fault=None):
         clock = Clock()
@@ -311,7 +498,7 @@ class MenuNavigationTests(unittest.TestCase):
                 sticks[axis] = value["value"]
             if not active and fault == "stuck_release" and live.input.called:
                 sticks[1] = -.8
-            return {"idroid": fault != "owner", "idroid_menu_input_ready": True, "pause":False,
+            return {"idroid": fault != "owner", "idroid_menu_input_ready": True, "idroid_handheld":True, "pause":False,
                     "controls": {"context": "menus", "age_ms": 0,
                                  "sample_ms": int(clock.now * 1000), "sticks": sticks,
                                  "physical": [0.] * 11}}
@@ -346,6 +533,57 @@ class MenuNavigationTests(unittest.TestCase):
         navigate_menu(live, {"direction":"down"}, clock=clock, sleep=clock.sleep)
         self.assertEqual(changes, ["first row"])
         self.assertEqual(active, [])
+
+    def test_spatial_idroid_requires_explicit_mode_and_samples_effective_axis(self):
+        live, clock, active = self.fixture("right_stick")
+        original = live.observe.side_effect
+        live.observe.side_effect = lambda native=False: {**original(native),
+            "idroid_handheld":False, "idroid_menu_input_ready":False,
+            "native":{"mission":40010,"popup":False}}
+        result = navigate_menu(live, {"direction":"down", "native_before":{"mission":40010,"popup":False}},
+                               clock=clock, sleep=clock.sleep)
+        self.assertEqual(live.input.call_args.args[0], [{"hand":"right", "component":"Thumbstick",
+                                                       "sub_component":"Y", "value":-1.}])
+        self.assertFalse(result["idroid_handheld"])
+        self.assertFalse(result["idroid_menu_input_ready"])
+        self.assertEqual(active, [])
+        self.assertTrue(any(call.args[0] == "menu_navigation_sampled" for call in live.events.emit.call_args_list))
+        self.assertTrue(any(call.args[0] == "menu_navigation_released" for call in live.events.emit.call_args_list))
+
+    def test_idroid_unknown_mode_or_inconsistent_readiness_never_dispatches(self):
+        for mode, ready in ((None,False),(None,True),(True,False),(False,True),(False,None),(0,False),("false",False)):
+            with self.subTest(mode=mode, ready=ready):
+                live, clock, _ = self.fixture()
+                original = live.observe.side_effect
+                live.observe.side_effect = lambda native=False: {**original(native),
+                    "idroid_handheld":mode, "idroid_menu_input_ready":ready}
+                with self.assertRaisesRegex(BotFault, "native input owner"):
+                    navigate_menu(live, {"direction":"down"}, clock=clock, sleep=clock.sleep)
+                live.input.assert_not_called()
+
+    def test_spatial_idroid_rejects_mode_change_or_pause_and_releases_input(self):
+        for when in ("admission", "held", "released"):
+            for fault in ("mode", "pause", "readiness"):
+                with self.subTest(when=when, fault=fault):
+                    live, clock, active = self.fixture()
+                    original = live.observe.side_effect
+                    def state(native=False):
+                        value = {**original(native), "idroid_handheld":False, "idroid_menu_input_ready":False}
+                        failing = when == "admission" or (when == "held" and bool(active)) or (when == "released" and live.input.called and not active)
+                        if failing:
+                            if fault == "mode":
+                                value["idroid_handheld"] = None if when == "admission" else True
+                                value["idroid_menu_input_ready"] = True
+                            elif fault == "pause":
+                                value["pause"] = True
+                            else:
+                                value["idroid_menu_input_ready"] = None
+                        return value
+                    live.observe.side_effect = state
+                    with self.assertRaisesRegex(BotFault, "native input owner"):
+                        navigate_menu(live, {"direction":"down"}, clock=clock, sleep=clock.sleep)
+                    self.assertEqual(active, [])
+                    self.assertEqual(live.input.call_count, 0 if when == "admission" else 1)
 
     def test_idroid_scroll_hold_is_explicit_and_bounded(self):
         live, clock, active = self.fixture()
@@ -1394,6 +1632,26 @@ class BotTests(unittest.TestCase):
         self.assertEqual(audit["physical"]["buttons"][0], 1.)
         self.assertEqual(audit["sample_ms"], 901)
         self.assertEqual(audit["xr_published_gamepad"]["buttons"], 0x1000)
+
+    def test_tracking_fixture_leaves_normal_semantic_action_and_release_intact(self):
+        initial = {"scene": "gameplay", "now_ms": 900, "camera_active": True,
+                   "camera_suspended": False, "rendered": {"rig_sequence": 42},
+                   "controls": {"context": "equipment", "age_ms": 4, "sample_ms": 896}}
+        held = {"scene": "gameplay", **self.audit_state(button=1., native_buttons=0x1000,
+                                                       sample_ms=901, context="menus")}
+        live, calls, releases = self.fake_live([initial, initial, held])
+        live.native = mock.Mock(spec=NativeReader)
+        live.native.read.return_value = ({"enabled": True, "armed": True, "mask": 4}, {})
+        with mock.patch("gameplay_bot.live.time.monotonic", self.clock), \
+             mock.patch("gameplay_bot.live.time.sleep", self.clock.sleep):
+            live.execute({"op": "tracking_loss", "mask": 4, "milliseconds": 500})
+            live.execute({"op": "action", "name": "test.action", "seconds": .03})
+        live.native.read.assert_called_once_with("diagnostics:controller-tracking-loss:4:500")
+        self.assertEqual(calls, [([channel("a")], .03)])
+        self.assertEqual(releases, [True])
+        events = [json.loads(line) for line in self.events.path.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([event["event"] for event in events],
+                         ["synthetic_tracking_loss", "semantic_action", "action_channels_held", "action_input_audit"])
 
     def test_idroid_tap_uses_longer_pulse_below_personal_hold_boundary(self):
         for boundary, expected in ((550, .30), (200, .12)):
@@ -2659,6 +2917,265 @@ class ControlAcquisitionTests(unittest.TestCase):
                               "native_before":{"mission":10020}})
         live.input.assert_not_called()
         live.events.emit.assert_not_called()
+
+
+class ReviewedConfirmTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.clock = Clock()
+        self.events = Events(self.directory.name, {"fixture":True}, self.clock)
+
+    @staticmethod
+    def case(mode=False, action="menus.confirm"):
+        fast = {"scene":"menu", "menu":True, "idroid":True, "pause":False, "title":False,
+                "loading":False, "demo":False, "gamepad":False, "camera_active":True,
+                "camera_suspended":False, "controls.context":"menus", "controls.native_buttons":0,
+                "rendered.presentation_focused":True, "idroid_tutorial_mode":0,
+                "idroid_handheld":mode, "idroid_menu_input_ready":mode}
+        native = {"mission":40010, "sequence":"Seq_Game_MainGame", "helicopter_space":True,
+                  "title":False, "popup":False, "saving":False, "tutorial_pause":False,
+                  "fob_tutorial_state":127, "vr_idroid_player_pad_block":False,
+                  "idroid_development_active":True}
+        combined = {**fast, **{"native."+key:value for key,value in native.items()}}
+        return {"id":"reviewed-"+action.split(".")[-1], "reviewed_action_only":True,
+                "before":combined, "after":copy.deepcopy(combined),
+                "steps":[{"op":"action", "name":action, "seconds":.12,
+                          "state_before":fast, "native_before":native}], "timeout":.4}
+
+    def fixture(self, fault=None, mode=False, action="menus.confirm", token=None):
+        case = self.case(mode, action)
+        button = 0x1000 if action == "menus.confirm" else 0x2000
+        token = token or ("a" if action == "menus.confirm" else "b")
+        state = {}
+        for key, value in case["before"].items():
+            target = state
+            parts = key.split(".")
+            for part in parts[:-1]:target = target.setdefault(part, {})
+            target[parts[-1]] = value
+        live = Live.__new__(Live)
+        live.supervised = True
+        live.events, live.held = self.events, {}
+        live.bindings = {"actions":[{"name":action, "label":token.upper(), "contexts":["menus"],
+            "bindings":[{"gesture":"level", "milliseconds":300, "inputs":[token]}]}]}
+        calls, active, expiry, last_held_sample = [], [False], [0.], [0]
+        def input_(values, duration, **options):
+            calls.append((values, duration, options))
+            active[0] = True
+            expiry[0] = self.clock()+options["lease_seconds"]
+            live.held = {"fixture":True}
+            if fault == "rpc":raise TimeoutError("unknown input completion")
+        def release():
+            active[0] = False
+            live.held.clear()
+        def observe(native=False):
+            self.clock.sleep(.005)
+            if active[0] and fault == "late":self.clock.sleep(.2)
+            current = copy.deepcopy(state)
+            held = active[0] and (self.clock() < expiry[0] or fault == "late") and fault != "unsampled"
+            sample = 1000+round(self.clock()*1000)
+            packet = button if held else 0
+            if held:last_held_sample[0] = sample
+            if held and fault == "wrong_packet":packet = 0x2000 if button == 0x1000 else 0x1000
+            if calls and not active[0] and fault == "stuck_release":packet = button
+            if calls and not active[0] and fault == "no_release_sample":sample = last_held_sample[0]
+            physical = [0.]*11
+            physical[{"a":0, "b":1, "x":2, "y":3}[token]] = float(held)
+            if held and fault == "wrong_physical":physical = [float(held)]+[0.]*10
+            current["now_ms"] = sample
+            current["controls"].update(age_ms=0, sample_ms=sample,
+                native_packet_source="xr_runtime_final_mapped_packet", native_buttons=packet,
+                physical=physical, sticks=[0.]*4,
+                native_axes=[0.]*4, native_triggers=[0.]*2)
+            if calls and not active[0] and fault == "owner_changed":current["native"]["popup"] = True
+            return current
+        live.input, live.release, live.observe = input_, release, observe
+        live.capture = lambda label:[label+"-left", label+"-right"]
+        return case, live, calls
+
+    def run_case(self, live, case, reviewed=True):
+        with mock.patch("gameplay_bot.live.time.monotonic", self.clock), \
+                mock.patch("gameplay_bot.live.time.sleep", self.clock.sleep):
+            return Behaviors(live, self.events, self.clock, self.clock.sleep).case(case, reviewed_action=reviewed)
+
+    def test_strict_confirm_proves_input_and_release_without_page_outcome(self):
+        for mode in (False, True):
+            case, live, calls = self.fixture(mode=mode)
+            result = self.run_case(live, case)
+            self.assertEqual(result["status"], "observed_pass")
+            self.assertEqual(result["scope"], "physical_input_and_release_only")
+            self.assertFalse(result["page_outcome_proven"])
+            self.assertEqual(result["visual_acceptance"], "pending")
+            self.assertTrue(result["visual_review_required"])
+            self.assertEqual(len(result["captures"]), 2)
+            self.assertEqual(calls, [([channel("a")], .12, {"lease_seconds":.12})])
+            evidence = result["action_observation"]
+            self.assertGreaterEqual(evidence["released_neutral_milliseconds"], 100)
+            self.assertGreater(evidence["released_state"]["controls"]["sample_ms"], evidence["held_evidence"]["sample_ms"])
+            self.assertEqual(live.held, {})
+
+    def test_reviewed_contract_rejects_arbitrary_operations_holds_and_incomplete_guards(self):
+        changes = [lambda c:c.update(reviewed_action_only=1),
+                   lambda c:c.update(setup=[{"op":"pose"}]),
+                   lambda c:c.update(during={"controls.native_buttons":4096}),
+                   lambda c:c["steps"].append(copy.deepcopy(c["steps"][0])),
+                   lambda c:c["steps"][0].update(name="system.idroid"),
+                   lambda c:c["steps"][0].update(op="menu_navigate"),
+                   lambda c:c["steps"][0].update(seconds=.151),
+                   lambda c:c["steps"][0].update(seconds=True),
+                   lambda c:c["steps"][0].update(while_held={"idroid":True}),
+                   lambda c:c["before"].pop("native.saving"),
+                   lambda c:c["after"].pop("native.popup"),
+                   lambda c:c["steps"][0]["state_before"].pop("controls.native_buttons"),
+                   lambda c:c["steps"][0]["native_before"].update(mission=10020),
+                   lambda c:c["after"].update(idroid_handheld=True, idroid_menu_input_ready=True),
+                   lambda c:c["before"].update(idroid_menu_input_ready=True)]
+        for change in changes:
+            case, live, calls = self.fixture()
+            change(case)
+            result = self.run_case(live, case)
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(calls, [])
+
+    def test_unsupervised_or_preselected_case_cannot_bypass_outcome_rule(self):
+        for reviewed, supervised in ((False, True), (True, False)):
+            case, live, calls = self.fixture()
+            live.supervised = supervised
+            result = self.run_case(live, case, reviewed)
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(calls, [])
+
+    def test_unsampled_wrong_mapped_packet_and_late_proof_fail_without_replay(self):
+        for fault in ("unsampled", "wrong_packet", "late", "rpc"):
+            with self.subTest(fault=fault):
+                case, live, calls = self.fixture(fault)
+                result = self.run_case(live, case)
+                self.assertEqual(result["status"], "failed")
+                self.assertEqual(result["failure_phase"], "dispatch")
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0][2], {"lease_seconds":.12})
+                self.assertEqual(live.held, {})
+
+    def test_stuck_mapped_a_or_changed_native_owner_cannot_pass_release(self):
+        for fault in ("stuck_release", "owner_changed"):
+            case, live, calls = self.fixture(fault)
+            result = self.run_case(live, case)
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["failure_phase"], "dispatch")
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(live.held, {})
+
+    def test_effective_chord_or_hold_binding_is_rejected_before_input(self):
+        for changed in ({"gesture":"hold"}, {"gesture":"press"}, {"inputs":["left_grip", "a"]}):
+            case, live, calls = self.fixture()
+            live.bindings["actions"][0]["bindings"][0].update(changed)
+            self.assertEqual(self.run_case(live, case)["status"], "failed")
+            self.assertEqual(calls, [])
+
+    def test_two_released_final_eyes_are_required(self):
+        case, live, calls = self.fixture()
+        live.capture = lambda label:[label+"-left"]
+        result = self.run_case(live, case)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failure_phase"], "capture")
+        self.assertEqual(len(calls), 1)
+
+    def test_current_two_eye_review_is_required_and_plans_are_rejected(self):
+        from gameplay_bot.supervisor import signature, validate_decision
+        case, live, _ = self.fixture()
+        state = live.observe()
+        request = {"observation_id":"current", "observed_unix_ns":100,
+                   "state_signature":signature(state), "captures":[{"sha256":"left"}, {"sha256":"right"}]}
+        decision = {"id":"one", "kind":"case", "case":case, "observation_id":"current",
+                    "reviewed_capture_sha256":"left", "reviewed_both_capture_sha256":["left", "right"]}
+        self.assertEqual(validate_decision(decision, request, state, set(), now_ns=101), "one")
+        for both in (None, ["left"], ["left", "left"], ["left", "old"]):
+            changed = {**decision, "reviewed_both_capture_sha256":both}
+            with self.assertRaises(BotFault):validate_decision(changed, request, state, set(), now_ns=101)
+        with self.assertRaises(BotFault):
+            validate_decision({**decision, "kind":"plan", "cases":[case]}, request, state, set(), now_ns=101)
+
+    def test_strict_back_checks_native_b_and_effective_physical_binding_in_both_modes(self):
+        for mode, token in ((False, "b"), (True, "x")):
+            with self.subTest(mode=mode, token=token):
+                case, live, calls = self.fixture(mode=mode, action="menus.back", token=token)
+                result = self.run_case(live, case)
+                self.assertEqual(result["status"], "observed_pass")
+                self.assertEqual(result["scope"], "physical_input_and_release_only")
+                self.assertTrue(result["page_outcome_pending"])
+                self.assertFalse(result["page_outcome_proven"])
+                proof = result["action_observation"]
+                self.assertEqual(proof["held_evidence"]["xr_published_gamepad"]["buttons"], 0x2000)
+                self.assertEqual(proof["released_state"]["controls"]["native_buttons"], 0)
+                self.assertGreaterEqual(proof["released_neutral_milliseconds"], 100)
+                self.assertEqual(calls, [([channel(token)], .12, {"lease_seconds":.12})])
+                self.assertEqual(live.held, {})
+
+    def test_back_rejects_missing_late_wrong_native_or_wrong_physical_press_without_retry(self):
+        for fault in ("unsampled", "late", "wrong_packet", "wrong_physical", "rpc"):
+            with self.subTest(fault=fault):
+                case, live, calls = self.fixture(fault, action="menus.back")
+                result = self.run_case(live, case)
+                self.assertEqual(result["status"], "failed")
+                self.assertEqual(result["failure_phase"], "dispatch")
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0][2], {"lease_seconds":.12})
+                self.assertEqual(live.held, {})
+
+    def test_back_requires_new_neutral_release_and_unchanged_native_owner(self):
+        for fault in ("stuck_release", "no_release_sample", "owner_changed"):
+            with self.subTest(fault=fault):
+                case, live, calls = self.fixture(fault, action="menus.back")
+                result = self.run_case(live, case)
+                self.assertEqual(result["status"], "failed")
+                self.assertEqual(result["failure_phase"], "dispatch")
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(live.held, {})
+
+    def test_back_rejects_held_outcome_extensions_and_incomplete_mode_or_focus_guards(self):
+        changes = [lambda c:c.update(during={"controls.native_buttons":0x2000}),
+                   lambda c:c["steps"][0].update(while_held={"idroid":True}),
+                   lambda c:c.update(setup=[{"op":"action", "name":"menus.back"}]),
+                   lambda c:c["steps"][0].update(seconds=.151),
+                   lambda c:c["steps"][0].update(seconds=.029),
+                   lambda c:c["steps"][0]["state_before"].pop("rendered.presentation_focused"),
+                   lambda c:c["steps"][0]["native_before"].pop("tutorial_pause"),
+                   lambda c:c["after"].update(idroid_handheld=True, idroid_menu_input_ready=True),
+                   lambda c:c["before"].update(idroid_menu_input_ready=True)]
+        for change in changes:
+            case, live, calls = self.fixture(action="menus.back")
+            change(case)
+            self.assertEqual(self.run_case(live, case)["status"], "failed")
+            self.assertEqual(calls, [])
+
+    def test_back_cannot_run_as_an_initial_or_ordinary_unreviewed_suite(self):
+        from gameplay_bot.supervisor import run_supervised
+        case, live, calls = self.fixture(action="menus.back")
+        behavior = Behaviors(live, self.events, self.clock, self.clock.sleep)
+        with mock.patch("gameplay_bot.supervisor.run_suite") as initial:
+            with self.assertRaisesRegex(BotFault, "not an initial suite"):
+                run_supervised(behavior, initial_suite={"cases":[case]}, clock=self.clock)
+            initial.assert_not_called()
+        result = self.run_case(live, case, reviewed=False)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(calls, [])
+
+    def test_back_needs_fresh_distinct_current_two_eye_review_and_cannot_be_a_plan(self):
+        from gameplay_bot.supervisor import signature, validate_decision, REVIEW_WINDOW_SECONDS
+        case, live, _ = self.fixture(action="menus.back")
+        state = live.observe()
+        request = {"observation_id":"current", "observed_unix_ns":100,
+                   "state_signature":signature(state), "captures":[{"sha256":"left"}, {"sha256":"right"}]}
+        decision = {"id":"back-one", "kind":"case", "case":case, "observation_id":"current",
+                    "reviewed_capture_sha256":"left", "reviewed_both_capture_sha256":["left", "right"]}
+        self.assertEqual(validate_decision(decision, request, state, set(), now_ns=101), "back-one")
+        for both in (None, ["left"], ["left", "left"], ["left", "old"]):
+            with self.assertRaises(BotFault):
+                validate_decision({**decision, "reviewed_both_capture_sha256":both}, request, state, set(), now_ns=101)
+        with self.assertRaises(BotFault):
+            validate_decision(decision, request, state, set(), now_ns=int((REVIEW_WINDOW_SECONDS+1)*1e9))
+        with self.assertRaises(BotFault):
+            validate_decision({**decision, "kind":"plan", "cases":[case]}, request, state, set(), now_ns=101)
 
 
 if __name__ == "__main__":

@@ -417,15 +417,16 @@ you opened it. The world pauses and Snake stays still; stereo, head tracking,
 hand tracking and menu controls stay active. It defaults to 1.2 metres wide and
 1.3 metres away. Width, distance and tilt are editable in VR Settings.
 
-By default, iDroid also uses a world panel, slightly below eye level. Gameplay
-pauses while that mode is open. Closing it releases only the mod's own pause;
-other native pauses remain.
+By default, iDroid and its projection stay in the cupped right palm with native
+hand and device animations. Snake stays stationary while the sticks navigate
+iDroid; the surrounding world keeps running. This experimental mode still needs
+headset feedback. Pause stays in front of you. Equipment and Commands remain
+on the left wrist.
 
-Set **`settings.handheld_menus = 1`** to hold iDroid and its projection in the
-cupped right palm. Snake stays stationary while the sticks navigate iDroid;
-the surrounding world keeps running. This experimental mode still needs
-headset feedback. Pause stays in front of you in both modes. Equipment and
-Commands remain on the left wrist.
+Set **`settings.handheld_menus = 0`** to use a world panel slightly below eye
+level. Gameplay pauses while that mode is open. Closing it releases only the
+mod's own pause; other native pauses remain. An existing explicit preference
+is preserved.
 
 **Left stick** selects menu rows; **A** confirms and **B** goes back.
 The **right stick** moves the live map. **Left/right grip** change tabs as
