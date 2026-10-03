@@ -25,6 +25,11 @@ private:
 // Transfer a short-lived recovery request from XR input to the native Lua job.
 void requestNativeIdroidClose(bool requested) noexcept;
 bool takeNativeIdroidClose() noexcept;
+// Only the mod's spatial field terminal owns this world pause. Verified ACC
+// cabin play already owns the seated player and must keep its native tasks live.
+constexpr bool nativeIdroidWorldPauseRequired(bool open,bool closing,bool handheld,bool cabinPlay) noexcept {
+    return open&&!closing&&!handheld&&!cabinPlay;
+}
 // The native Lua job owns the pause registration; XR only publishes the mode.
 void setHandheldMenus(bool enabled) noexcept;
 bool handheldMenusSelected() noexcept;

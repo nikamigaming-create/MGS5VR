@@ -1,5 +1,6 @@
 #include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/paused_rig.hpp"
+#include <stdexcept>
 
 static_assert(!mgs5vr::shouldRestoreStalePlayerVisibility(249, false, false, false));
 static_assert(mgs5vr::shouldRestoreStalePlayerVisibility(250, false, false, false));
@@ -97,4 +98,54 @@ static_assert(!mgs5vr::hasOwnedRigMenuBoundary(menuBefore,{12,35,2,7,1010,4}));
 static_assert(!mgs5vr::hasOwnedRigMenuBoundary(menuBefore,{12,34,3,7,1010,4}));
 static_assert(!mgs5vr::hasOwnedRigMenuBoundary(menuBefore,{12,34,2,8,1010,4}));
 static_assert(!mgs5vr::hasOwnedRigMenuBoundary({},{12,34,2,7,1010,4}));
-int main() { return 0; }
+int main() {
+    using namespace mgs5vr;
+    const auto require=[](bool value,const char* message){
+        if(!value)throw std::runtime_error(message);
+    };
+    const PausedRigOwner nativeBody{12,34,2,7,1000,3};
+    HeadCameraSample frame{};
+    frame.applied=true;frame.stereoTracked=true;frame.playerOwner=34;
+    frame.activation=2;frame.menuGeneration=4;frame.menuOpen=true;frame.menuIdroid=true;
+    frame.controllers.referenceEpoch=7;frame.controllers.presentationEpoch=9;
+    frame.controllers.predictedXrTime=1234;frame.controllers.presentationFocused=true;
+    frame.controllers.handheldMenus=true;frame.sampleTime=1001;
+
+    // Reproduced sequence: native body/A8 completed, then the opening camera
+    // observes a new menu generation. A body-only rebuild would detach the
+    // handset. Wait for native publication without advancing animation.
+    require(!mayRefreshPausedRig(nativeBody,12,frame,1001),"fresh handheld opening rebuilt body after device");
+    frame.sampleTime=1150;
+    require(!mayRefreshPausedRig(nativeBody,12,frame,1150),"freshness boundary admitted premature body rebuild");
+    frame.sampleTime=1151;
+    require(mayRefreshPausedRig(nativeBody,12,frame,1151),"existing long-paused refresh was lost");
+
+    // The opposite boundary must preserve the already-fixed tracked stow;
+    // native closing alone never authorizes suppressing the handset.
+    frame.sampleTime=1001;frame.menuOpen=false;frame.menuIdroid=false;
+    require(mayRefreshPausedRig(nativeBody,12,frame,1001),"close boundary no longer refreshes immediately");
+    frame.menuOpen=true;
+    require(mayRefreshPausedRig(nativeBody,12,frame,1001),"spatial Pause/Help boundary was deferred");
+    frame.menuIdroid=true;frame.controllers.handheldMenus=false;
+    require(mayRefreshPausedRig(nativeBody,12,frame,1001),"explicit spatial iDroid boundary was deferred");
+
+    // Once normal native publication reaches the menu generation, ordinary
+    // timeout behavior is unchanged. No repeated boundary refresh or latch.
+    frame.controllers.handheldMenus=true;frame.menuGeneration=3;
+    require(!mayRefreshPausedRig(nativeBody,12,frame,1001),"fresh existing menu unexpectedly rebuilt");
+    frame.sampleTime=1151;
+    require(mayRefreshPausedRig(nativeBody,12,frame,1151),"ordinary paused handheld refresh was lost");
+
+    // Deferral must not weaken the original ownership, focus or clock guards.
+    frame.playerOwner=35;
+    require(!mayRefreshPausedRig(nativeBody,12,frame,1151),"different player admitted paused refresh");
+    frame.playerOwner=34;frame.controllers.referenceEpoch=8;
+    require(!mayRefreshPausedRig(nativeBody,12,frame,1151),"different reference space admitted paused refresh");
+    frame.controllers.referenceEpoch=7;frame.controllers.presentationFocused=false;
+    require(!mayRefreshPausedRig(nativeBody,12,frame,1151),"unfocused source admitted paused refresh");
+    frame.controllers.presentationFocused=true;frame.sampleTime=1000;
+    require(!mayRefreshPausedRig(nativeBody,12,frame,1151),"stale tracked frame admitted paused refresh");
+    frame.sampleTime=999;
+    require(!mayRefreshPausedRig(nativeBody,12,frame,999),"reversed native clock admitted paused refresh");
+    return 0;
+}

@@ -1,11 +1,15 @@
 """Reject stale coverage accounting and known-broken release packaging offline."""
 import importlib.util
+from contextlib import redirect_stdout
+import copy
+import io
 import json
 from pathlib import Path
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -189,6 +193,141 @@ class CatalogTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Release blocked by current native regressions"):
             catalog.require_release_ready(self.root, self.data)
 
+    def test_explicit_known_issues_override_retains_full_blocked_coverage(self):
+        before = copy.deepcopy(self.data)
+        result = catalog.require_release_ready(self.root, self.data, allow_known_issues=True)
+        blocked = [f for f in self.data["features"] if f["release_gate"]["status"] == "blocked"]
+        self.assertTrue(blocked)
+        self.assertEqual(result["blocked_feature_coverage"], blocked)
+        self.assertEqual(result["blocked_features"], [f["id"] for f in blocked])
+        self.assertEqual(self.data, before)
+        self.assertTrue(result["known_issues_override"]["requested"])
+        self.assertTrue(result["known_issues_override"]["applied"])
+        self.assertFalse(result["full_game_accepted"])
+        self.assertFalse(result["physical_headset_accepted"])
+        with self.assertRaisesRegex(ValueError, "Release blocked"):
+            catalog.require_release_ready(self.root, self.data)
+
+    def test_override_cannot_admit_malformed_or_missing_catalog(self):
+        self.data["features"][1]["id"] = self.data["features"][0]["id"]
+        with self.assertRaisesRegex(ValueError, "Duplicate feature ID"):
+            catalog.require_release_ready(self.root, self.data, allow_known_issues=True)
+        with self.assertRaises(FileNotFoundError):
+            catalog.require_release_ready(self.root, allow_known_issues=True)
+
+    def package_fixture(self):
+        spec = importlib.util.spec_from_file_location("isolated_release_package", ROOT / "tools/package-release.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        (self.root / catalog.CATALOG).write_text(json.dumps(self.data), encoding="utf-8")
+        play = self.root / "play"
+        play.mkdir()
+        names = {"docs/RELEASE_2026-10-02.1.md", "dinput8.dll", "MGS5VR-Launcher.exe",
+                 "MGS5VR-FieldKit.exe", "mgs5vr_import.exe", "mgs5vr_controls.exe", "mgs5vr_probe.exe",
+                 "Install.cmd", "Launch-Headset.cmd", "tools/setup.ps1", "tools/install.ps1", "LICENSE",
+                 "licenses/OpenXR.txt", "licenses/MinHook.txt", "licenses/WebView2-LICENSE.txt",
+                 "launcher-ui/vendor/three-r180/LICENSE", "launcher-ui/assets/LICENSE-webxr-input-profiles.md",
+                 "mgs5vr.ini", "mgs5vr-controls.ini"}
+        for name in names:
+            path = play / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("checked fixture " + name, encoding="utf-8")
+        for name in ("mgs5vr.ini", "mgs5vr-controls.ini"):
+            path = self.root / "config" / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes((play / name).read_bytes())
+        source = {"commit": "1" * 40, "source_sha256": "2" * 64, "changes": []}
+        build = {"schema": 1, "source": copy.deepcopy(source),
+                 "files": {name: module.digest(play / name) for name in names},
+                 "validation": {"automated": "passed", "full_game": "unproven", "headset": "unproven"}}
+        (play / "BUILD.json").write_text(json.dumps(build), encoding="utf-8")
+        for field, value in (("ROOT", self.root), ("PLAY", play)):
+            patcher = patch.object(module, field, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        patcher = patch.object(module, "source_identity", return_value=source)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        def source_archive(args, **kwargs):
+            self.assertEqual(args[:3], ["git", "archive", "--format=zip"])
+            self.assertEqual(args[-1], source["commit"])
+            target = Path(next(arg.removeprefix("--output=") for arg in args if arg.startswith("--output=")))
+            with zipfile.ZipFile(target, "w") as archive:
+                archive.writestr("MGS5VR-source/src/fixture.cpp", "// isolated archive fixture")
+
+        patcher = patch.object(module.subprocess, "run", side_effect=source_archive)
+        archive_mock = patcher.start()
+        self.addCleanup(patcher.stop)
+        return module, play, source, build, self.root / "build/release-test", archive_mock
+
+    def test_patch_package_discloses_waiver_and_keeps_exact_patch_notes(self):
+        module, play, source, build, output, archive_mock = self.package_fixture()
+        with redirect_stdout(io.StringIO()):
+            module.package("experimental-2026-10-02.1", output, allow_known_issues=True)
+        archive_mock.assert_called_once()
+        with zipfile.ZipFile(output / "MGS5VR-experimental-2026-10-02.1.zip") as archive:
+            release = json.loads(archive.read("MGS5VR/RELEASE.json"))
+            self.assertEqual(release["notes"], "docs/RELEASE_2026-10-02.1.md")
+            self.assertEqual(release["source_commit"], source["commit"])
+            self.assertEqual(release["validation"], build["validation"])
+            coverage = release["regression_coverage"]
+            self.assertTrue(coverage["known_issues_override"]["applied"])
+            self.assertEqual(coverage["blocked_feature_coverage"],
+                [f for f in self.data["features"] if f["release_gate"]["status"] == "blocked"])
+            self.assertIsNone(archive.testzip())
+
+    def test_packaging_override_still_requires_clean_matching_source(self):
+        module, play, source, build, output, archive_mock = self.package_fixture()
+        for key, value in (("changes", [" M src/fixture.cpp"]), ("source_sha256", "3" * 64),
+                           ("commit", "4" * 40)):
+            with self.subTest(key=key):
+                altered = {**source, key: value}
+                with patch.object(module, "source_identity", return_value=altered):
+                    with self.assertRaisesRegex(ValueError, "Commit the public source"):
+                        module.package("experimental-2026-10-02.1", output, allow_known_issues=True)
+        archive_mock.assert_not_called()
+        self.assertFalse(output.exists())
+
+    def test_packaging_override_still_requires_passed_build_and_installer_payload(self):
+        module, play, source, build, output, archive_mock = self.package_fixture()
+        for change, message in (("validation", "automated checks"), ("installer", "Incomplete checked")):
+            with self.subTest(change=change):
+                altered = copy.deepcopy(build)
+                if change == "validation":
+                    altered["validation"]["automated"] = "failed"
+                else:
+                    del altered["files"]["Install.cmd"]
+                (play / "BUILD.json").write_text(json.dumps(altered), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, message):
+                    module.package("experimental-2026-10-02.1", output, allow_known_issues=True)
+        archive_mock.assert_not_called()
+        self.assertFalse(output.exists())
+
+    def test_packaging_override_rejects_changed_files_and_personal_defaults(self):
+        module, play, source, build, output, archive_mock = self.package_fixture()
+        dll = play / "dinput8.dll"
+        original = dll.read_bytes()
+        dll.write_bytes(b"unchecked binary")
+        with self.assertRaisesRegex(ValueError, "Checked play file changed"):
+            module.package("experimental-2026-10-02.1", output, allow_known_issues=True)
+        dll.write_bytes(original)
+        (self.root / "config/mgs5vr.ini").write_text("different public defaults", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "public defaults"):
+            module.package("experimental-2026-10-02.1", output, allow_known_issues=True)
+        archive_mock.assert_not_called()
+        self.assertFalse(output.exists())
+
+    def test_patch_cannot_silently_use_base_release_notes(self):
+        module, play, source, build, output, archive_mock = self.package_fixture()
+        patch_note = play / "docs/RELEASE_2026-10-02.1.md"
+        patch_note.rename(play / "docs/RELEASE_2026-10-02.md")
+        build["files"]["docs/RELEASE_2026-10-02.md"] = build["files"].pop("docs/RELEASE_2026-10-02.1.md")
+        (play / "BUILD.json").write_text(json.dumps(build), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Incomplete checked"):
+            module.package("experimental-2026-10-02.1", output, allow_known_issues=True)
+        archive_mock.assert_not_called()
+
     def test_pending_scope_is_reported_without_full_game_or_headset_claim(self):
         for feature in self.data["features"]:
             if feature["release_gate"]["status"] == "blocked":
@@ -211,7 +350,7 @@ class CatalogTests(unittest.TestCase):
                 patch.object(module, "read_json") as read, patch.object(module, "source_identity") as source:
             with self.assertRaisesRegex(ValueError, "known blocker"):
                 module.package("experimental-2026-10-02", output)
-        gate.assert_called_once_with(module.ROOT)
+        gate.assert_called_once_with(module.ROOT, allow_known_issues=False)
         read.assert_not_called()
         source.assert_not_called()
         self.assertFalse(output.exists())

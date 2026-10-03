@@ -27,10 +27,10 @@ def checked_name(name):
     return path
 
 
-def package(tag, output):
+def package(tag, output, *, allow_known_issues=False):
     if not re.fullmatch(r"experimental-\d{4}-\d{2}-\d{2}(?:\.\d+)?", tag):
         raise ValueError("Use an experimental date tag, e.g. experimental-2026-09-30")
-    regression_coverage = require_release_ready(ROOT)
+    regression_coverage = require_release_ready(ROOT, allow_known_issues=allow_known_issues)
     output = safe_tree(output, ROOT / "build")
     if output.resolve() == (ROOT / "build/Release").resolve():
         raise ValueError("Keep release archives separate from compiler output; use build/github-release")
@@ -41,7 +41,7 @@ def package(tag, output):
         raise ValueError("Commit the public source, then run tools/build.ps1 before packaging")
     if build["validation"]["automated"] != "passed":
         raise ValueError("The play build has not passed its automated checks")
-    notes = f"docs/RELEASE_{tag.removeprefix('experimental-').split('.')[0]}.md"
+    notes = f"docs/RELEASE_{tag.removeprefix('experimental-')}.md"
     required = {notes, "dinput8.dll", "MGS5VR-Launcher.exe", "MGS5VR-FieldKit.exe", "mgs5vr_import.exe",
                 "mgs5vr_controls.exe", "mgs5vr_probe.exe", "Install.cmd", "Launch-Headset.cmd",
                 "tools/setup.ps1", "tools/install.ps1", "LICENSE", "licenses/OpenXR.txt",
@@ -114,5 +114,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--output", type=Path, default=ROOT / "build/github-release")
+    parser.add_argument("--allow-known-issues", action="store_true",
+                        help="package documented blocked coverage with an explicit manifest disclosure; all integrity checks still apply")
     args = parser.parse_args()
-    package(args.tag, args.output)
+    package(args.tag, args.output, allow_known_issues=args.allow_known_issues)

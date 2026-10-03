@@ -15,12 +15,57 @@ source references and honest coverage scopes, not private captures or user data.
 
 ## Current gate
 
-**The current candidate remains blocked.** Candidate `7a5b00774fd2` passed
+**Five coverage families remain blocked.** Candidate `92d1a69368bd` passed
 44 CTest groups and installer transactions, including 120 real D3D11 mailbox
 checks. These isolated checks do not accept native gameplay. Three linked
 hand/arm and iDroid transition families retain unresolved device/animation
-failures. The ACC Development report and measured performance failures are
-also explicit release blockers, for five blocked families total.
+failures. The ACC Development report and measured performance failures
+also retain blocked status. These statuses remain recorded in the package
+manifest; they are not converted into passes by an experimental release.
+
+Candidate `92d1a69368bd` adds the handheld opening defer while the native body
+update is within 150 ms, five additional guarded chrome layouts (25 total),
+and omission of only the mod-owned spatial-iDroid world pause during verified
+native cabin play. Spatial field pausing remains. Retained
+`20261003T104542847534Z` passed 13 spatial-mode state cases: Weapons/Items and
+Buddy Equipment each returned from its actual child grid to the Development
+root after one ordinary 120 ms VR Back, with both eyes reviewed. Helicopter
+opened its armament grid; its Back decision was not consumed before the
+supervisor deadline. Retained `20261003T112828492997Z` passed eight handheld
+state cases, including one 120 ms Back from the settled Weapons/Items grid to
+the category root, with both before/after eyes reviewed. Its ninth category
+Down check reported `Native menu stick stayed held after release`; the runner
+neutralized input and closed the owned game/runtime, retaining Steam. No cause
+is established. Handheld Buddy Equipment and both-mode Helicopter/Security
+exits stay open.
+
+Retained `20261003T114628779393Z` passed seven handheld field cases: open,
+cant, right/left yaw, ordinary Back, immediate reopening and final stow. All
+14 outcome PNGs were reviewed: open outcomes retain the full-size right-hand
+phone and both arms, and stow clears device UI. Initial/reopen left-eye images
+capture the UI fade while later right-eye images are settled. They are
+sequential outcomes, not continuous-boundary or simultaneous stereo evidence.
+The preceding recording attempt stopped before cases at the 25 GiB reserve.
+Retained `20261003T120302596202Z` passed four spatial field cases: open, one
+120 ms Back, immediate reopen and final 120 ms Back. All eight outcome PNGs
+show the expected Map-open/UI-cleared states and both arms. The final native
+handset is mid-stow in the left capture and gone in the later right capture.
+This does not establish simultaneous stereo, continuous animation or paused
+world motion. Retained `20261003T115540064524Z` expected `pause=true`
+incorrectly; all other guards matched 53 open observations. The native flag
+describes Pause/Help UI, so the corrected private fixture expects `pause=false`
+and retains every other guard.
+
+Retained `20261003T114817998847Z` passed 12 state cases for five independent
+injected raw-pose losses after opening, with 5.500–5.891-second measured holds
+inside eight-second leases. All ten loss and ten recovery images were reviewed
+with both arms, full-size phone, Map and world visible. Raw flags recover,
+activation/epoch remain stable and current camera/rig publications advance.
+The native player sequence remains fixed while the menu is open, and
+compositor still records do not identify an immutable source frame.
+This is bounded synthetic tracking evidence, not physical Quest idle testing,
+opening with loss, API-stall recovery, continuous animation or proof against
+repeated images.
 
 Earlier candidate `1b641438f481` failed the sustained motion fixture in cycle
 two on stale rig observations. Candidate `5a7bae2a2864` completed five full
@@ -29,9 +74,12 @@ publication. Its reviewed left-arm opening disappearance and stow fades cleared,
 but candidate `787d1828c937` still showed a tiny detached device on first opening.
 The later `f694be5341fb` source recording shows a full-size attached handset at
 first opening and one missing-both-arms image on reopening. Its exact closing
-source pairs were not copied by the recorder. Candidate `7a5b00774fd2` includes
-20 typed outgoing-device routes, an exact post-native-A8 display publication
-and a bounded visibility diagnostic, with native transition proof still pending.
+source pairs were not copied by the recorder. Candidate `7a5b00774fd2` passed
+seven ordinary field state cases with both outcome eyes reviewed, but its
+recording showed a detached small handset at first opening and left-forearm
+Map chrome for one closing source. The current `92d1a69368bd` repairs target
+those defects; the newer handheld outcome pass does not clear the exact
+continuous boundaries seen in the earlier recording.
 No candidate has promoted six-cycle continuous acceptance. Neither endpoint
 state cases nor valid segmented source video closes that gate.
 
@@ -49,7 +97,8 @@ reaching 811.755 ms while layer preparation stays below 0.182 ms. These are
 different scenes and workloads, not a matched before/after comparison.
 The initial `7a5b00774fd2` pre-image startup timeout remains unexplained; a
 subsequent baseline-pacing boot of the same DLL reached native Present and XR.
-No no-drops, full-game, continuous-feature or physical-headset pass is claimed.
+Those older observations do not establish `92d1a69368bd` performance.
+Full-game, continuous-feature and physical Quest/headset coverage remain open.
 
 ### Current user reports
 
@@ -59,7 +108,7 @@ the historical R01–R55 report IDs.
 
 | Report | Current evidence and unknowns | Required regression |
 | --- | --- | --- |
-| ACC Development freezes selection, navigation and Back | Release blocker. On `7a5b00774fd2`, retained `20261003T071122059279Z` reproduced a spatial-mode Weapons/Items exit failure: Up moved/wrapped, but three separate 120 ms Back commands were sampled as B then neutral and both final eyes remained on the grid. Retail XInput confirms delivery/release. The earlier Down edge had 0 ms measured hold and is inconclusive. Same-DLL handheld comparison and the other windows remain pending; a complete navigation freeze is not established. | Review each window, enabled/disabled entries, selection/navigation, Back and immediate re-entry through effective VR bindings. Exclude purchases. |
+| ACC Development freezes selection, navigation and Back | Blocked overall; scoped improvement on `92d1a69368bd`. Weapons/Items exited to Development after one ordinary 120 ms VR Back in both spatial and handheld runs; spatial Buddy Equipment also exited. Both eyes were reviewed for these outcomes. The handheld run's later category Down check failed its stick-release observation and cleaned up safely; cause unknown. Handheld Buddy and both-mode Helicopter/Security exits remain untested. The earlier `7a5b00774fd2` Weapons/Items failure had retail-confirmed B delivery while Up worked; a complete navigation freeze was not established. | Complete all four categories in handheld and spatial modes, enabled/disabled entries, selection/navigation, Back and immediate re-entry through effective VR bindings. Exclude purchases. |
 | Supply drops hard to locate during a fight because markers were absent | Open, not reproduced in the reported fight. Fight, supply type, native marker identity and original settings are unknown. Current inspected HUD mode is binoculars-only; the replacement label path covers waypoints and acquired people, with no identified supply-specific replacement. | Reproduce request/landing/location cues while moving in the actual combat state. Keep firearm reticles off, physical optics and the left-arm HUD intact. |
 | Intermittent weapon-selection trouble | Open, exact symptom unknown. Opening, category selection, confirmation, cancellation and native equip are distinct possibilities, not diagnosed causes. | Observe visible picker contents during input and resulting native weapon identity; repeat selection/cancel/reuse with movement and neutral releases. |
 | Cutscene camera or animation bugs | Open, lower priority. Exact scene, transition and symptom are unknown. Older Mission 6 evidence does not resolve it. | Identify the native scene and review continuous entry, authored shots/animation and natural gameplay recovery in both eyes. |

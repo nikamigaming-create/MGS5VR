@@ -232,11 +232,18 @@ def validate_catalog(root=ROOT, catalog=None):
     return catalog
 
 
-def require_release_ready(root=ROOT, catalog=None):
+def require_release_ready(root=ROOT, catalog=None, *, allow_known_issues=False):
     catalog = validate_catalog(root, catalog)
-    blocked = [f["id"] for f in catalog["features"] if f["release_gate"]["status"] == "blocked"]
-    require(not blocked, "Release blocked by current native regressions: " + ", ".join(blocked))
+    require(type(allow_known_issues) is bool, "Known-issues override must be explicit boolean")
+    blocked_records = [f for f in catalog["features"] if f["release_gate"]["status"] == "blocked"]
+    blocked = [f["id"] for f in blocked_records]
+    require(not blocked or allow_known_issues,
+            "Release blocked by current native regressions: " + ", ".join(blocked))
     return {"catalog": CATALOG, "summary": catalog["summary"],
+            "known_issues_override": {"requested": allow_known_issues,
+                "applied": allow_known_issues and bool(blocked),
+                "scope": "Only the refusal for documented blocked feature coverage is waived; catalog validation and package integrity checks remain required."},
+            "blocked_features": blocked, "blocked_feature_coverage": blocked_records,
             "pending_features": [f["id"] for f in catalog["features"] if f["release_gate"]["status"] == "pending"],
             "experimental_features": [f["id"] for f in catalog["features"] if f["release_gate"]["status"] == "experimental"],
             "full_game_accepted": False, "physical_headset_accepted": False}

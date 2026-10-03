@@ -20,11 +20,18 @@ inline bool mayRefreshPausedRig(const PausedRigOwner& owner,uintptr_t camera,
     // The rig must still produce a complete current or retained presentation
     // pair for this exact player/model before publishing any skin matrices.
     constexpr uint64_t freshnessMilliseconds=150;
-    // Native menu entry/exit can change the camera after the last animation
-    // job in this frame. Rebuild that same owned skin at the new camera now;
-    // waiting for the ordinary paused timeout exposes a mismatched arm pose.
+    // A handheld opening can be observed after native body AND equipment
+    // publication. Rebuilding just the body here detaches the already-published
+    // handset. While that native skin is fresh, let the next native body/A8
+    // transaction establish the open generation. The source admission rejects
+    // a missing rig; it must not label the preceding rig as the new menu.
+    // Close boundaries and spatial menus still need the immediate body refresh.
+    // A genuinely paused menu retains the existing freshness timeout below.
     // The caller holds the same publication mutex as the native skin job.
     const bool boundary=frame.menuGeneration>owner.menuGeneration;
+    const bool freshHandheldOpening=boundary&&frame.menuOpen&&frame.menuIdroid
+        &&frame.controllers.handheldMenus&&now>=owner.nativeUpdateTime
+        &&now-owner.nativeUpdateTime<=freshnessMilliseconds;
     return owner.camera&&owner.player&&camera==owner.camera
         &&frame.applied&&frame.stereoTracked&&(frame.menuOpen||boundary)
         &&frame.playerOwner==owner.player&&frame.activation==owner.activation
@@ -33,7 +40,8 @@ inline bool mayRefreshPausedRig(const PausedRigOwner& owner,uintptr_t camera,
         &&frame.controllers.presentationEpoch
         &&!frame.controllers.nativeGamepad&&!frame.controllers.loading
         &&!frame.controllers.frontEnd&&!frame.controllers.avatarEditor&&!frame.controllers.authoredCamera
-        &&now>=owner.nativeUpdateTime&&(boundary||now-owner.nativeUpdateTime>freshnessMilliseconds)
+        &&now>=owner.nativeUpdateTime&&!freshHandheldOpening
+        &&(boundary||now-owner.nativeUpdateTime>freshnessMilliseconds)
         &&now>=frame.sampleTime&&now-frame.sampleTime<=freshnessMilliseconds;
 }
 }

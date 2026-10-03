@@ -2478,18 +2478,21 @@
         "include/mgs5vr/native_actions.hpp",
         "include/mgs5vr/xr_runtime.hpp",
         "src/ui_renderer.cpp",
-        "include/mgs5vr/idroid_ui.hpp"
+        "include/mgs5vr/idroid_ui.hpp",
+        "include/mgs5vr/native_controls.hpp"
       ],
       "automated_tests": [
         "contracts",
         "gameplay_bot_idroid_contracts",
-        "gameplay_bot_contracts"
+        "gameplay_bot_contracts",
+        "configurable_controls"
       ],
       "test_sources": [
         "tests/core_tests.cpp",
         "tests/gameplay_bot_idroid_tests.py",
         "tests/gameplay_bot_tests.py",
-        "tests/gameplay_motion_tests.py"
+        "tests/gameplay_motion_tests.py",
+        "tests/controls_tests.cpp"
       ],
       "auxiliary_tests": [],
       "native_fixtures": [
@@ -2508,7 +2511,7 @@
       "coverage": {
         "automated": {
           "status": "partial",
-          "scope": "State/runner outcome and cleanup contracts; native animation playback is not simulated. Exact native device-layout ownership, prior-open lineage, close-boundary epochs and missing-pose routing are isolated policy checks, not a native close-animation pass."
+          "scope": "State/runner outcome and cleanup contracts; native animation playback is not simulated. Exact native device-layout ownership, prior-open lineage, close-boundary epochs and missing-pose routing are isolated policy checks, not a native close-animation pass. The mod-owned world-pause policy retains spatial field pausing, excludes verified cabin play and handheld presentation, and releases before native closing; ACC child-page exit still needs native replay."
         },
         "native": {
           "status": "blocked",

@@ -497,7 +497,7 @@ void tagUiBoundarySource(const HeadCameraSample& rig){
 void traceUiBoundary(void* state,void* item,UiObservedRoute route) noexcept {
     if(!uiBoundaryTraceEnabled||!executing.boundaryTrace.boundary)return;
     try{
-        struct Key {uintptr_t camera{},type{};uint32_t order{};};
+        struct Key {uintptr_t camera{},type{},owner{};uint64_t resource{};uint32_t order{};};
         struct DrawBudget {
             uint64_t source{},activation{};uint32_t eye{};size_t count{};
             std::array<Key,64> keys{};
@@ -510,13 +510,24 @@ void traceUiBoundary(void* state,void* item,UiObservedRoute route) noexcept {
             budget.source=executing.eye.sourceSequence;budget.activation=executing.eye.activation;
             budget.eye=executing.eye.eye;budget.count=0;
         }
-        // Keep one node of each camera/type/order per exact source eye. A Map
-        // containing hundreds of tiles cannot consume subsequent layer slots.
-        for(size_t i=0;i<budget.count;++i)if(budget.keys[i].camera==camera
-            &&budget.keys[i].type==type&&budget.keys[i].order==order)return;
-        if(budget.count==budget.keys.size()){++uiBoundaryLayerOverflow;return;}
-        budget.keys[budget.count++]={camera,type,order};
         std::lock_guard lock(mutex);
+        // Distinct typed scenes can share a camera, type and draw order. Keep
+        // their owners separate, while repeated tiles of one scene still use
+        // one fixed-budget slot. Unknown/ambiguous owners retain aggregation.
+        uintptr_t layoutOwner{};uint64_t layoutResource{};uint32_t layoutMatches{};
+        const auto buffer=field<uintptr_t>(item,0x40);
+        for(size_t i=0;i<uiBoundaryLayoutCount;++i){
+            const auto& candidate=uiBoundaryLayouts[i];
+            if(candidate.packet==address&&candidate.camera==camera&&candidate.buffer==buffer){
+                ++layoutMatches;layoutOwner=candidate.owner;layoutResource=candidate.resource;
+            }
+        }
+        if(layoutMatches!=1){layoutOwner=0;layoutResource=0;}
+        for(size_t i=0;i<budget.count;++i)if(budget.keys[i].camera==camera
+            &&budget.keys[i].type==type&&budget.keys[i].order==order
+            &&budget.keys[i].owner==layoutOwner&&budget.keys[i].resource==layoutResource)return;
+        if(budget.count==budget.keys.size()){++uiBoundaryLayerOverflow;return;}
+        budget.keys[budget.count++]={camera,type,layoutOwner,layoutResource,order};
         if(uiBoundaryRecords.size()==uiBoundaryRecordLimit){++uiBoundaryOverflow;return;}
         UiBoundaryRecord r{};r.lineage=executing.boundaryTrace;
         r.source=executing.eye.sourceSequence;r.tracking=executing.eye.trackingSequence;
@@ -1700,6 +1711,7 @@ void reportUiRenderer(std::ostream& out){
             <<",\"draws_after_layer_limit\":"<<uiBoundaryLayerOverflow.load()
             <<",\"transition_limit\":"<<uiBoundaryLimit<<",\"source_pair_limit\":"<<uiBoundarySourceLimit
             <<",\"layer_limit_per_source_eye\":64,\"native_snapshots_joined_to_source\":false"
+            <<",\"dedup_key\":\"camera_type_order_typed_owner_resource\",\"unowned_draws_aggregated\":true"
             <<",\"layout_hook_verified\":"<<(uiBoundaryLayoutHookVerified?"true":"false")
             <<",\"layout_update_attempts\":"<<uiBoundaryLayoutAttempts.load()
             <<",\"layout_update_rejected\":"<<uiBoundaryLayoutRejected.load()

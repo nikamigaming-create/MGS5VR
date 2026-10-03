@@ -3,9 +3,9 @@
 
 namespace mgs5vr {
 enum class IdroidUiRole { unknown, device, personalHud };
-// Exact original scene resources joined to their current typed draw owners in
-// two native open/close cycles. Priorities and camera depth do not identify a
-// scene: Map and the ordinary left-arm HUD reuse both.
+// Exact original Map and common device-chrome resources. Runtime ownership
+// still requires the current typed draw owner and its observed open lease.
+// Priorities and camera depth do not identify a scene: ordinary HUD reuses both.
 constexpr IdroidUiRole idroidUiRole(uint64_t resource) noexcept {
     switch(resource){
     case 0x504021c76a2a4cbaull: // mb_map_mapmenu_main
@@ -17,6 +17,11 @@ constexpr IdroidUiRole idroidUiRole(uint64_t resource) noexcept {
     case 0x5041fbae29f09edaull: // mb_map_icn_GOAL_base
     case 0x504234fc6f91c7d8ull: // mb_map_mapfilter_tablist
     case 0x504261ee7ecaa18bull: // mb_map_icn_GOAL
+    case 0x504272424c6b2689ull: // device key help
+    case 0x50435510b520b581ull: // device title
+    case 0x504158c4dcffcc86ull: // device location
+    case 0x5043a3f10f91b84aull: // device menu title
+    case 0x5041a1a4d4cde5f3ull: // device clock
     case 0x5042b59328405fccull: // mb_cmn_mark_new
     case 0x5042c3876f5a59e2ull: // mb_map_search
     case 0x5042eb67eeb4de89ull: // mb_cmn_layout

@@ -29,14 +29,16 @@ static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
     {
-        const std::array<uint64_t,20> deviceScenes{
+        const std::array<uint64_t,25> deviceScenes{
             0x504021c76a2a4cbaull,0x5040741ac64544cfull,0x504074e62baad619ull,
             0x504094fe110e6190ull,0x5041279d9bbad3e7ull,0x5041cbb01589c388ull,
             0x5041fbae29f09edaull,0x504234fc6f91c7d8ull,0x504261ee7ecaa18bull,
             0x5042b59328405fccull,0x5042c3876f5a59e2ull,
             0x5042eb67eeb4de89ull,0x504308200fe46da1ull,0x50430ad0dfd261d5ull,
             0x5043148fe514447dull,0x50432962f66ecdf4ull,0x50439c74ecdacf51ull,
-            0x5043d809a6309ca0ull,0x5043e2ca55e8f7bbull,0x5043f3b3f0a7aff9ull};
+            0x5043d809a6309ca0ull,0x5043e2ca55e8f7bbull,0x5043f3b3f0a7aff9ull,
+            0x504272424c6b2689ull,0x50435510b520b581ull,0x504158c4dcffcc86ull,
+            0x5043a3f10f91b84aull,0x5041a1a4d4cde5f3ull};
         const IdroidUiSource opened{1,2,3,4,1,95145,true,true,true,true};
         auto closed=opened;closed.menuGeneration=2;closed.source=95146;closed.menuOpen=closed.idroid=false;
         IdroidUiIdentity identity{11,12,13,14,15,deviceScenes.front()};
@@ -44,7 +46,11 @@ int main(){
         for(const auto scene:deviceScenes){
             identity.resource=lease.identity.resource=scene;
             expect(idroidUiRole(scene)==IdroidUiRole::device&&outgoingIdroidUi(lease,identity,closed,1,true),
-                "each observed surviving Map/chrome scene remains device content after native close");
+                "each source-identified Map/chrome scene requires its matching open lease after native close");
+            auto noOpen=lease;noOpen.source={};
+            expect(!outgoingIdroidUi(noOpen,identity,closed,1,true)
+                &&!outgoingIdroidUi(lease,identity,closed,1,false),
+                "a known device resource alone cannot claim an unobserved or unverified closing draw");
         }
         for(const auto scene:{0x50418b3d353471adull,0x50419149642d99b4ull,0x5043132d8cf49a67ull,0x5042c796d643f58eull}){
             identity.resource=lease.identity.resource=scene;

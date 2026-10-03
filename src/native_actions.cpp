@@ -68,8 +68,13 @@ std::deque<MenuDisableRead> menuDisableReads;
 NativeMenuRestrictionLease tutorialMenuLease;
 bool menuRestrictionAbi{};
 std::atomic_uint64_t menuTraceUntil{},menuButtonCalls{},menuCloseCalls{};
+std::atomic_uint32_t menuTraceImageSize{};
 std::mutex menuTraceMutex;
-struct MenuInputRead {uint64_t time{};uint32_t index{},bit{},held{},pressed{};uint16_t xr{};bool result{},bypass{};};
+struct MenuMaskRead {uintptr_t type{};uint32_t count{};bool valid{};};
+struct MenuInputRead {
+    uint64_t time{};uint32_t index{},bit{},held{},pressed{};uint16_t xr{};bool result{},bypass{};
+    uintptr_t object{},caller{};uint16_t xrBefore{};MenuMaskRead maskBefore{},maskAfter{};
+};
 std::deque<MenuInputRead> menuInputReads;
 constexpr wchar_t actionPipeName[]=L"\\\\.\\pipe\\MGS5VR.NativeActions";
 constexpr uint32_t maxPipeScript=1024*1024;
@@ -118,16 +123,35 @@ template<class T> T read(uintptr_t address){
     if(address)ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&value,sizeof(value),&size);
     return size==sizeof(value)?value:T{};
 }
+MenuMaskRead menuInputMask(uintptr_t object){
+    MenuMaskRead value;SIZE_T bytes{};
+    if(!object||!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(object),&value.type,sizeof(value.type),&bytes)
+        ||bytes!=sizeof(value.type)||(value.type!=imageBase+0x227d870&&value.type!=imageBase+0x2548660))return value;
+    if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(object+0x18),&value.count,sizeof(value.count),&bytes)
+        ||bytes!=sizeof(value.count))return value;
+    uintptr_t after{};
+    value.valid=ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(object),&after,sizeof(after),&bytes)
+        &&bytes==sizeof(after)&&after==value.type;
+    return value;
+}
 bool uiButton(void* object,uint32_t index,uint32_t bit,bool bypass){
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    const auto owner=reinterpret_cast<uintptr_t>(object);
+    const bool tracing=steadyMilliseconds()<menuTraceUntil.load()&&nativeIdroidOpen();
+    const auto xrBefore=tracing?controlInputSnapshot().nativeButtons:uint16_t{};
+    // Observe only an armed physical edge before the native query. Idle
+    // queries do not pay for an owner walk. Missing pre-state stays unknown.
+    const auto before=xrBefore?menuInputMask(owner):MenuMaskRead{};
     const auto result=originalUiButton(object,index,bit,bypass);
-    if(steadyMilliseconds()<menuTraceUntil.load()&&nativeIdroidOpen()){
+    if(tracing&&steadyMilliseconds()<menuTraceUntil.load()&&nativeIdroidOpen()){
         ++menuButtonCalls;
         const auto audit=controlInputSnapshot();
-        if(result||audit.nativeButtons){
+        if(result||audit.nativeButtons||xrBefore){
             using Pad=void*(*)(uint32_t);
             const auto pad=index<4?reinterpret_cast<Pad>(imageBase+0x1b8a0)(index):nullptr;
             MenuInputRead v{steadyMilliseconds(),index,bit,read<uint32_t>(reinterpret_cast<uintptr_t>(pad)+0x20),
                 read<uint32_t>(reinterpret_cast<uintptr_t>(pad)+0x28),audit.nativeButtons,result,bypass};
+            v.object=owner;v.caller=caller;v.xrBefore=xrBefore;v.maskBefore=before;v.maskAfter=menuInputMask(owner);
             std::lock_guard lock(menuTraceMutex);
             if(menuInputReads.size()>=128)menuInputReads.pop_front();
             menuInputReads.push_back(v);
@@ -371,6 +395,13 @@ bool publishFastInput(const std::string& request,std::string& result){
     if(request=="trace-native-menu-input"||request=="inspect-native-menu-input"){
         if(request=="trace-native-menu-input"){
             std::lock_guard lock(menuTraceMutex);menuInputReads.clear();menuDisableReads.clear();
+            menuTraceImageSize=0;
+            const auto dos=read<IMAGE_DOS_HEADER>(imageBase);
+            if(dos.e_magic==IMAGE_DOS_SIGNATURE&&dos.e_lfanew>0&&dos.e_lfanew<0x100000){
+                const auto nt=read<IMAGE_NT_HEADERS64>(imageBase+dos.e_lfanew);
+                if(nt.Signature==IMAGE_NT_SIGNATURE&&nt.OptionalHeader.Magic==IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+                    menuTraceImageSize=nt.OptionalHeader.SizeOfImage;
+            }
             menuButtonCalls=0;menuCloseCalls=0;menuTraceUntil=steadyMilliseconds()+15000;
         }
         const auto ui=read<uintptr_t>(imageBase+0x2bf1518);
@@ -391,7 +422,19 @@ bool publishFastInput(const std::string& request,std::string& result){
         for(const auto& v:menuInputReads){if(!first)out<<',';first=false;
             out<<"{\"ms\":"<<v.time<<",\"index\":"<<v.index<<",\"bit\":"<<v.bit
                <<",\"held\":"<<v.held<<",\"pressed\":"<<v.pressed<<",\"xr\":"<<v.xr
-               <<",\"result\":"<<v.result<<",\"bypass\":"<<v.bypass<<'}';}
+               <<",\"result\":"<<v.result<<",\"bypass\":"<<v.bypass
+               <<",\"object\":"<<v.object<<",\"caller\":"<<v.caller<<",\"caller_rva\":";
+            if(v.caller>=imageBase&&v.caller-imageBase<menuTraceImageSize.load())out<<v.caller-imageBase;else out<<"null";
+            out<<",\"xr_before\":"<<v.xrBefore;
+            const auto mask=[&](const char* name,const MenuMaskRead& value){
+                out<<",\""<<name<<"\":{\"verified\":"<<value.valid<<",\"vtable\":"<<value.type<<",\"count\":";
+                if(value.valid)out<<value.count;else out<<"null";
+                out<<",\"masked\":";if(value.valid)out<<(value.count>0);else out<<"null";out<<'}';
+            };
+            mask("mask_before",v.maskBefore);mask("mask_after",v.maskAfter);
+            out<<",\"mask_owner_type_stable\":"<<(v.maskBefore.valid&&v.maskAfter.valid&&v.maskBefore.type==v.maskAfter.type)
+               <<",\"snapshot_atomic\":false}";
+        }
         out<<"],\"disabled_entries\":[";first=true;
         for(const auto& v:menuDisableReads){if(!first)out<<',';first=false;
             out<<"{\"owner\":"<<v.owner<<",\"caller_rva\":"<<(v.caller-imageBase)<<",\"mode\":"<<v.mode
@@ -636,7 +679,8 @@ void pump(void* state){
         // A native close request precedes IsMbDvcTerminalOpened becoming
         // false: the character must run its stow animation in between.
         // Keeping our pause until the open bit clears deadlocks that exit.
-        const bool pauseIdroid=nativeIdroidOpen()&&!nativeIdroidClosing()&&!handheldMenusSelected();
+        const bool pauseIdroid=nativeIdroidWorldPauseRequired(nativeIdroidOpen(),nativeIdroidClosing(),
+            handheldMenusSelected(),nativeCabinPlay());
         if(pauseIdroid!=idroidPauseRegistered){
             // The ordinary menu mask also freezes the iDroid's own update:
             // opening stops halfway and Back/tab input never runs. Retail's

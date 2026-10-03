@@ -45,6 +45,25 @@ struct NativeFixture {
 }
 int main(int argc,char** argv){
     {
+        expect(nativeIdroidWorldPauseRequired(true,false,false,false),
+            "an open spatial field iDroid retains the mod-owned world pause");
+        expect(!nativeIdroidWorldPauseRequired(true,false,false,true),
+            "verified ACC spatial iDroid leaves seated native child tasks running");
+        expect(!nativeIdroidWorldPauseRequired(true,false,true,false)
+            &&!nativeIdroidWorldPauseRequired(true,false,true,true),
+            "handheld iDroid keeps native tasks live in both field and ACC");
+        for(const bool handheld:{false,true})for(const bool cabin:{false,true}){
+            expect(!nativeIdroidWorldPauseRequired(false,false,handheld,cabin)
+                &&!nativeIdroidWorldPauseRequired(false,true,handheld,cabin),
+                "a closed terminal cannot retain the mod-owned pause in either presentation or scene");
+            expect(!nativeIdroidWorldPauseRequired(true,true,handheld,cabin),
+                "native closing releases the owned pause before the open bit clears");
+        }
+        expect(!nativeIdroidWorldPauseRequired(true,false,false,true)
+            &&nativeIdroidWorldPauseRequired(true,false,false,false),
+            "leaving verified cabin ownership restores ordinary spatial field pause policy");
+    }
+    {
         ControlBindings bindings;
         const auto map=rewriteControlPrompt("<I=G=DECISION> Place Marker  <I=G=PAD_L1>/<I=G=PAD_R1>",bindings,ControlContext::menus);
         expect(map.text=="[A] Place Marker  [L GRIP]/[R GRIP]"&&map.replaced==3,
