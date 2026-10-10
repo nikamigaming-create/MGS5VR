@@ -1,0 +1,306 @@
+{
+  "schema": 1,
+  "description": "Synthetic validity loss in an owned simulator session; physical headset idle is unverified.",
+  "cases": [
+    {
+      "id": "idle-head-loss",
+      "before": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": false,
+        "head_tracking_fault_mask": 0
+      },
+      "steps": [
+        {
+          "op": "head_tracking_loss",
+          "mask": 1,
+          "milliseconds": 7000
+        }
+      ],
+      "after": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": true,
+        "camera_reason": 2,
+        "head_tracking_fault_mask": 1
+      },
+      "timeout": 2,
+      "after_stable_samples": 3
+    },
+    {
+      "id": "idle-head-recovery",
+      "before": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": true,
+        "head_tracking_fault_mask": 1
+      },
+      "steps": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.3,
+            -0.33,
+            -0.46
+          ],
+          "orientation": [
+            0.5,
+            0,
+            0,
+            0.8660254
+          ],
+          "aim_orientation": [
+            0,
+            0,
+            0,
+            1
+          ]
+        }
+      ],
+      "after": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": false,
+        "camera_reason": 0,
+        "head_tracking_fault_mask": 0,
+        "controls.context": "gameplay",
+        "controls.rig_input": true
+      },
+      "timeout": 12,
+      "after_stable_samples": 3
+    },
+    {
+      "id": "idle-views-loss",
+      "before": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": false,
+        "head_tracking_fault_mask": 0
+      },
+      "steps": [
+        {
+          "op": "head_tracking_loss",
+          "mask": 2,
+          "milliseconds": 7000
+        }
+      ],
+      "after": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": true,
+        "camera_reason": 2,
+        "head_tracking_fault_mask": 2
+      },
+      "timeout": 2,
+      "after_stable_samples": 3
+    },
+    {
+      "id": "idle-views-recovery",
+      "before": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": true,
+        "head_tracking_fault_mask": 2
+      },
+      "steps": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.3,
+            -0.33,
+            -0.46
+          ],
+          "orientation": [
+            0.5,
+            0,
+            0,
+            0.8660254
+          ],
+          "aim_orientation": [
+            0,
+            0,
+            0,
+            1
+          ]
+        }
+      ],
+      "after": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": false,
+        "camera_reason": 0,
+        "head_tracking_fault_mask": 0,
+        "controls.context": "gameplay",
+        "controls.rig_input": true
+      },
+      "timeout": 12,
+      "after_stable_samples": 3
+    },
+    {
+      "id": "idle-head-and-views-loss",
+      "before": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": false,
+        "head_tracking_fault_mask": 0
+      },
+      "steps": [
+        {
+          "op": "head_tracking_loss",
+          "mask": 3,
+          "milliseconds": 7000
+        }
+      ],
+      "after": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": true,
+        "camera_reason": 2,
+        "head_tracking_fault_mask": 3
+      },
+      "timeout": 2,
+      "after_stable_samples": 3
+    },
+    {
+      "id": "idle-head-and-views-recovery",
+      "before": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": true,
+        "head_tracking_fault_mask": 3
+      },
+      "steps": [
+        {
+          "op": "pose",
+          "hand": "right",
+          "position": [
+            0.3,
+            -0.33,
+            -0.46
+          ],
+          "orientation": [
+            0.5,
+            0,
+            0,
+            0.8660254
+          ],
+          "aim_orientation": [
+            0,
+            0,
+            0,
+            1
+          ]
+        }
+      ],
+      "after": {
+        "scene": "cabin",
+        "menu": false,
+        "idroid": false,
+        "pause": false,
+        "camera_active": true,
+        "native.mission": 40010,
+        "native.helicopter_space": true,
+        "native.sequence": "Seq_Game_MainGame",
+        "native.popup": false,
+        "native.saving": false,
+        "camera_suspended": false,
+        "camera_reason": 0,
+        "head_tracking_fault_mask": 0,
+        "controls.context": "gameplay",
+        "controls.rig_input": true
+      },
+      "timeout": 12,
+      "after_stable_samples": 3
+    }
+  ]
+}

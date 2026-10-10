@@ -299,6 +299,118 @@ class Clock:
         self.now += duration
 
 
+class HandheldFocusHandoffTests(unittest.TestCase):
+    def live(self, *, focused=True, changed_owner=False, focus='left_grip'):
+        live = Live.__new__(Live)
+        live.bindings = {'actions': [{'name': 'system.idroid_focus', 'modifier': True,
+            'bindings': [{'gesture': 'level', 'inputs': [focus]}]}]}
+        live.events = mock.Mock()
+        base = {'now_ms': 900, 'idroid': True, 'pause': False, 'idroid_handheld': True,
+                'idroid_menu_routing_available': True, 'gamepad': False, 'loading': False,
+                'native': {'popup': False, 'saving': False},
+                'controls': {'context': 'gameplay', 'sample_ms': 900, 'age_ms': 0}}
+        held = copy.deepcopy(base)
+        held.update(now_ms=901,idroid_menu_input_ready=focused,idroid_menu_control=2 if focused else 0)
+        held['controls'].update(sample_ms=901,physical=[0.]*11,sticks=[0.]*4,native_buttons=0)
+        held['controls']['physical'][7 if focus=='left_grip' else 8]=1.
+        held['controls']['context'] = 'menus' if focused else 'gameplay'
+        if changed_owner:
+            held['native']['popup'] = True
+        live.observe = mock.Mock(side_effect=[base, held] if focused or changed_owner else
+                                      lambda **kwargs: held)
+        if not focused and not changed_owner:
+            live.observe = mock.Mock(return_value=held)
+        live.input = mock.Mock()
+        live.release = mock.Mock()
+        live._execute = mock.Mock(return_value='dispatched')
+        return live
+
+    def test_menu_action_waits_for_native_ack_and_releases_focus(self):
+        live = self.live()
+        self.assertEqual(live.execute({'op': 'action', 'name': 'menus.back'}), 'dispatched')
+        live.input.assert_called_once_with([channel('left_grip')], .2, lease_seconds=5.)
+        live._execute.assert_called_once_with({'op': 'action', 'name': 'menus.back'})
+        live.release.assert_called_once()
+
+    def test_previous_tab_uses_effective_focus_and_explicit_chord(self):
+        live = self.live(focus='right_grip')
+        live.execute({'op': 'action', 'name': 'menus.previous_tab'})
+        self.assertEqual(live.input.call_args.args[0], [channel('right_grip')])
+        self.assertEqual(live._execute.call_args.args[0]['name'], 'idroid.previous_tab')
+        live.release.assert_called_once()
+
+    def test_menu_navigation_retains_focus_until_cursor_release(self):
+        live = self.live()
+        step = {'op': 'menu_navigate', 'owner': 'idroid', 'direction': 'down', 'seconds': .1}
+        def navigate(recipe):
+            self.assertEqual(recipe, step)
+            self.assertEqual(live._menu_focus_keep, (('left', 'Grip', None),))
+            return 'cursor-moved'
+        live._execute.side_effect = navigate
+        self.assertEqual(live.execute(step), 'cursor-moved')
+        self.assertEqual(live._menu_focus_keep, ())
+        live.release.assert_called_once()
+
+    def test_existing_guide_menu_ack_cannot_replace_sampled_grip_focus(self):
+        live = self.live()
+        base, held = list(live.observe.side_effect)
+        previous = copy.deepcopy(held)
+        previous['idroid_menu_control'] = 0
+        previous['controls']['physical'] = [0.]*11
+        pending = copy.deepcopy(held)
+        pending['idroid_menu_input_ready'] = False
+        live.observe = mock.Mock(side_effect=[base, previous, pending, held])
+        clock = Clock()
+        with mock.patch('gameplay_bot.live.time.monotonic', clock), \
+                mock.patch('gameplay_bot.live.time.sleep', clock.sleep):
+            self.assertEqual(live.execute({'op':'action','name':'menus.confirm'}), 'dispatched')
+        self.assertEqual(live.observe.call_count, 4)
+        live._execute.assert_called_once()
+        live.release.assert_called_once()
+
+    def test_help_covering_terminal_uses_its_spatial_menu_input_owner(self):
+        live = self.live()
+        base = next(live.observe.side_effect)
+        base['pause'] = True
+        base['controls']['context'] = 'menus'
+        live.observe = mock.Mock(return_value=base)
+        action = {'op':'action','name':'menus.confirm'}
+        self.assertEqual(live.execute(action), 'dispatched')
+        live.input.assert_not_called()
+        live._execute.assert_called_once_with(action)
+
+    def test_missing_ack_dispatches_no_menu_edge_and_releases_focus(self):
+        live = self.live(focused=False)
+        clock = Clock()
+        with mock.patch('gameplay_bot.live.time.monotonic', clock), \
+                mock.patch('gameplay_bot.live.time.sleep', clock.sleep):
+            with self.assertRaisesRegex(BotFault, 'not acknowledged'):
+                live.execute({'op': 'action', 'name': 'menus.confirm'})
+        live._execute.assert_not_called()
+        live.release.assert_called_once()
+
+    def test_owner_change_between_focus_and_action_releases_without_selection(self):
+        live = self.live(changed_owner=True)
+        with self.assertRaisesRegex(BotFault, 'owner changed'):
+            live.execute({'op': 'action', 'name': 'menus.confirm'})
+        live._execute.assert_not_called()
+        live.release.assert_called_once()
+
+    def test_failed_menu_action_still_releases_focus(self):
+        live = self.live()
+        live._execute.side_effect = BotFault('native action failed')
+        with self.assertRaisesRegex(BotFault, 'native action failed'):
+            live.execute({'op': 'action', 'name': 'menus.back'})
+        live.release.assert_called_once()
+
+    def test_single_face_contract_does_not_silently_add_a_grip(self):
+        live = self.live()
+        with self.assertRaisesRegex(BotFault, 'explicit grip'):
+            live.execute({'op': 'action', 'name': 'menus.confirm', 'reviewed_action_only': True})
+        live.input.assert_not_called()
+        live._execute.assert_not_called()
+
+
 class AtomicStatusTests(unittest.TestCase):
     def test_transient_windows_sharing_conflict_preserves_then_replaces_complete_status(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -394,6 +506,26 @@ class ControllerFitPoseTests(unittest.TestCase):
 
 
 class TrackingLossFixtureTests(unittest.TestCase):
+    def test_head_loss_uses_its_own_bounded_native_fixture(self):
+        for mask in (0, 1, 2, 3):
+            live = self.make_live()
+            live.native.read.return_value = ({"enabled": True, "armed": True, "mask": mask}, {})
+            live.execute({"op": "head_tracking_loss", "mask": mask, "milliseconds": 7000})
+            live.native.read.assert_called_once_with(f"diagnostics:head-tracking-loss:{mask}:7000")
+            self.assertEqual(live.events.emit.call_args.kwargs["target"], "head")
+            if mask:
+                live.presentation_guard.expect_head_tracking_loss.assert_called_once_with(mask, 7000)
+            else:
+                live.presentation_guard.expect_head_tracking_loss.assert_not_called()
+            live.call.assert_not_called()
+            live.input.assert_not_called()
+        for mask in (4, 15, True):
+            live = self.make_live()
+            with self.assertRaisesRegex(BotFault, "bounded valid mask"):
+                live.execute({"op": "head_tracking_loss", "mask": mask, "milliseconds": 7000})
+            live.observe.assert_not_called()
+            live.native.read.assert_not_called()
+
     def make_live(self, state=None):
         live = Live.__new__(Live)
         live.held = {}
@@ -402,6 +534,7 @@ class TrackingLossFixtureTests(unittest.TestCase):
             "rendered": {"rig_sequence": 42}})
         live.native = mock.Mock(spec=NativeReader)
         live.native.read.return_value = ({"enabled": True, "armed": True, "mask": 4}, {"seconds": .01})
+        live.presentation_guard = mock.Mock()
         live.events = mock.Mock()
         live.call = mock.Mock()
         live.input = mock.Mock()
@@ -516,6 +649,27 @@ class MenuNavigationTests(unittest.TestCase):
         self.assertGreaterEqual(clock.now, .10)
         self.assertLess(clock.now, .20)
         live.capture.assert_not_called()
+
+    def test_sortie_navigation_uses_native_unpaused_acc_preparation(self):
+        live, clock, active = self.fixture()
+        original = live.observe.side_effect
+        guard = {'mission':40020, 'helicopter_space':True,
+                 'sequence':'Seq_Game_MissionPreparation_SelectItem', 'popup':False, 'saving':False}
+        def state(native=False):
+            value = original(native)
+            value.update(scene='menu',menu=True,idroid=False,pause=False,title=False,loading=False,
+                         native=dict(guard))
+            return value
+        live.observe.side_effect = state
+        navigate_menu(live, {'owner':'sortie','direction':'down','native_before':guard},
+                      clock=clock,sleep=clock.sleep)
+        self.assertEqual(active, [])
+        live.input.reset_mock()
+        with self.assertRaisesRegex(BotFault, 'exact current ACC preparation owner'):
+            navigate_menu(live, {'owner':'sortie','direction':'down',
+                                'native_before':{**guard,'sequence':'Seq_Game_MainGame'}},
+                          clock=clock,sleep=clock.sleep)
+        live.input.assert_not_called()
 
     def test_idroid_cursor_edge_releases_before_native_list_repeat(self):
         live, clock, active = self.fixture()
@@ -1281,6 +1435,21 @@ class BotTests(unittest.TestCase):
                          ["get_session_info", "get_session_info", "get_head_pose"])
         self.assertEqual(self.clock.now, .25)
 
+    def test_exited_game_stops_readiness_immediately_without_retrying_for_sixty_seconds(self):
+        live = Live.__new__(Live)
+        live.events = self.events
+        live.process_handle = 42
+        live.kernel = mock.Mock()
+        live.kernel.WaitForSingleObject.return_value = 0
+        live.transport_error = None
+        live.call = mock.Mock(side_effect=BotFault('Game process exited'))
+        with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep):
+            with self.assertRaisesRegex(BotFault, 'Game process exited'):
+                live.ready(timeout=60.)
+        live.call.assert_called_once_with('get_session_info', {})
+        self.assertEqual(self.clock.now, 0.)
+
     def test_xr_focus_waits_for_native_startup_without_queuing_lua(self):
         live = Live.__new__(Live)
         live.events = self.events
@@ -1451,6 +1620,109 @@ class BotTests(unittest.TestCase):
         self.assertFalse(static_grip_capture_allowed(held, state, remapped))
         unsafe = {**held, ("right", "Trigger", None): channel("right_trigger")}
         self.assertFalse(static_grip_capture_allowed(unsafe, state, bindings))
+
+    def test_static_support_inspection_ignores_inactive_terminal_focus(self):
+        import copy
+        state=self.audit_state();state.update(camera_active=True,menu=False,idroid=False,
+            rendered={'weapon_support_attached':True})
+        state['controls'].update(rig_input=True)
+        state['controls']['physical'][7]=state['controls']['physical'][8]=1.
+        held={('right','Grip',None):channel('right_grip'),('left','Grip',None):channel('left_grip')}
+        bindings={'actions':[
+            {'name':'gameplay.ready_weapon','modifier':True,'contexts':['gameplay'],
+             'bindings':[{'gesture':'level','inputs':['right_grip']}]},
+            {'name':'gameplay.support_grip','modifier':True,'contexts':['gameplay'],
+             'bindings':[{'gesture':'level','inputs':['left_grip']}]},
+            {'name':'system.idroid_focus','modifier':True,'contexts':['gameplay','menus'],
+             'bindings':[{'gesture':'level','inputs':['left_grip']}]}
+        ]}
+        self.assertTrue(static_grip_capture_allowed(held,state,bindings))
+        changed=copy.deepcopy(state);changed['rendered']['weapon_support_attached']=False
+        self.assertFalse(static_grip_capture_allowed(held,changed,bindings))
+        changed=copy.deepcopy(state);changed['idroid']=True
+        self.assertFalse(static_grip_capture_allowed(held,changed,bindings))
+        changed=copy.deepcopy(state);changed['controls']['native_buttons']=0x1000
+        self.assertFalse(static_grip_capture_allowed(held,changed,bindings))
+        changed=copy.deepcopy(bindings);changed['actions'][-1]['name']='gameplay.interact'
+        self.assertFalse(static_grip_capture_allowed(held,state,changed))
+
+    def test_static_weapon_inspection_with_owned_free_handheld_idroid(self):
+        import copy
+        state=self.audit_state();state.update(camera_active=True,menu=True,idroid=True,
+            idroid_ui_only_owner=True,idroid_handheld=True,idroid_menu_control=1,
+            idroid_menu_input_ready=True,idroid_tutorial_mode=0,pause=False,
+            gamepad=False,loading=False,native={'popup':False})
+        state['controls'].update(rig_input=True,native_triggers=[255,0])
+        state['controls']['physical'][8]=1.
+        held={('right','Grip',None):channel('right_grip')}
+        bindings={'actions':[{'name':'gameplay.ready_weapon','modifier':True,
+            'contexts':['gameplay'],'bindings':[{'inputs':['right_grip']}]}]}
+        self.assertTrue(static_grip_capture_allowed(held,state,bindings))
+        for key,value in [('idroid_ui_only_owner',False),('idroid_menu_control',2),
+                          ('idroid_menu_input_ready',False),('idroid_tutorial_mode',11),
+                          ('pause',True),('gamepad',True),('loading',True)]:
+            changed=copy.deepcopy(state);changed[key]=value
+            self.assertFalse(static_grip_capture_allowed(held,changed,bindings))
+        changed=copy.deepcopy(state);changed['native']['popup']=True
+        self.assertFalse(static_grip_capture_allowed(held,changed,bindings))
+        changed=copy.deepcopy(state);changed['controls']['native_triggers']=[255,255]
+        self.assertFalse(static_grip_capture_allowed(held,changed,bindings))
+        changed=copy.deepcopy(state);changed['controls']['physical'][7]=1.
+        self.assertFalse(static_grip_capture_allowed({**held,('left','Grip',None):channel('left_grip')},changed,bindings))
+        changed['rendered']={'idroid_stowed':True,'weapon_support_attached':True}
+        self.assertTrue(static_grip_capture_allowed({**held,('left','Grip',None):channel('left_grip')},changed,bindings))
+        focused=copy.deepcopy(bindings)
+        focused['actions'].append({'name':'system.idroid_focus','modifier':True,
+            'contexts':['gameplay','menus'],'bindings':[{'gesture':'level','inputs':['left_grip']}]})
+        self.assertTrue(static_grip_capture_allowed({**held,('left','Grip',None):channel('left_grip')},changed,focused))
+        unsafe=copy.deepcopy(focused);unsafe['actions'][-1]['bindings'][0]['gesture']='hold'
+        self.assertFalse(static_grip_capture_allowed({**held,('left','Grip',None):channel('left_grip')},changed,unsafe))
+        unsafe=copy.deepcopy(focused);unsafe['actions'][-1]['name']='gameplay.interact'
+        self.assertFalse(static_grip_capture_allowed({**held,('left','Grip',None):channel('left_grip')},changed,unsafe))
+        changed['rendered']['weapon_support_attached']=False
+        self.assertFalse(static_grip_capture_allowed({**held,('left','Grip',None):channel('left_grip')},changed,focused))
+
+    def test_recorded_held_inspection_keeps_source_eye_provenance_and_refuses_trigger_capture(self):
+        state=self.audit_state();state.update(camera_active=True,menu=False)
+        state['controls'].update(rig_input=True);state['controls']['physical'][8]=1.
+        live=Live.__new__(Live);live.events=mock.Mock();live.observe=mock.Mock(return_value=state)
+        live.held={('right','Grip',None):channel('right_grip')}
+        live.bindings={'actions':[{'name':'gameplay.ready_weapon','modifier':True,
+            'contexts':['gameplay'],'bindings':[{'inputs':['right_grip']}]}]}
+        live.held_action_recording=mock.Mock(segments=[{'video':'actual-segment.mp4'}])
+        live._capture_once=mock.Mock()
+        self.assertEqual(live.capture('aim',static_grips=True),[])
+        live.held_action_recording.check.assert_called_once()
+        checkpoint=live.events.emit.call_args.kwargs
+        self.assertFalse(checkpoint['final_compositor_captured'])
+        self.assertEqual(checkpoint['source'],'native_source_eye_before_runtime_composition')
+        self.assertEqual(checkpoint['visual_acceptance'],'pending_recorded_frame_review')
+        live._capture_once.assert_not_called()
+        live.held[('right','Trigger',None)]=channel('right_trigger')
+        with self.assertRaisesRegex(BotFault,'sampled ready/support grips only'):
+            live.capture('fire',static_grips=True)
+        live._capture_once.assert_not_called()
+
+    def test_each_held_idroid_eye_rechecks_native_popup_ownership(self):
+        import base64, io
+        from PIL import Image
+        state=self.audit_state();state.update(camera_active=True,menu=True,idroid=True,
+            idroid_ui_only_owner=True,idroid_handheld=True,idroid_menu_control=1,
+            idroid_menu_input_ready=True,idroid_tutorial_mode=0,pause=False,
+            gamepad=False,loading=False,native={'popup':False})
+        state['controls'].update(rig_input=True,native_triggers=[255,0]);state['controls']['physical'][8]=1.
+        live=Live.__new__(Live);live.observe=mock.Mock(return_value=state)
+        live.held={('right','Grip',None):channel('right_grip')};live.pose_recording=False
+        live.bindings={'actions':[{'name':'gameplay.ready_weapon','modifier':True,
+            'contexts':['gameplay'],'bindings':[{'inputs':['right_grip']}]}]}
+        frame=Image.new('RGB',(16,16));frame.putdata([(n%256,n%256,n%256) for n in range(256)])
+        stream=io.BytesIO();frame.save(stream,format='PNG')
+        live.call=mock.Mock(return_value={'content':[{'type':'image','data':base64.b64encode(stream.getvalue()).decode()}]})
+        with tempfile.TemporaryDirectory() as folder:
+            live.events=mock.Mock(output=pathlib.Path(folder))
+            paths=live._capture_once('owned-idroid-gun',static_grip_state=state)
+            self.assertEqual(len(paths),2)
+        self.assertEqual(live.observe.call_args_list,[mock.call(native=True),mock.call(native=True)])
 
     def test_touch_bindings_cannot_be_faked_by_the_simulator(self):
         for token in ("a_touch", "b_touch", "x_touch", "y_touch", "left_stick_touch",
@@ -1632,6 +1904,375 @@ class BotTests(unittest.TestCase):
         self.assertEqual(audit["physical"]["buttons"][0], 1.)
         self.assertEqual(audit["sample_ms"], 901)
         self.assertEqual(audit["xr_published_gamepad"]["buttons"], 0x1000)
+
+    def ready_fire_live(self, fault=None, *, zoom=False):
+        import copy
+        base = {"scene": "gameplay", "now_ms": 900, "camera_active": True,
+                "menu": False, "idroid": False, "gamepad": False,
+                **self.audit_state(sample_ms=900, age_ms=0)}
+        base["controls"].update(rig_input=True, native_triggers=[0, 0])
+        ready = copy.deepcopy(base)
+        ready["now_ms"] = ready["controls"]["sample_ms"] = 901
+        ready["controls"]["physical"][8] = 1.
+        ready["controls"]["native_triggers"] = [255, 0]
+        ready["rendered"] = {"native_firearm": True, 'scope_tracked': zoom}
+        stable = copy.deepcopy(ready)
+        stable["now_ms"] = stable["controls"]["sample_ms"] = 1151
+        fired = copy.deepcopy(stable)
+        fired["now_ms"] = fired["controls"]["sample_ms"] = 1152
+        if zoom:
+            fired['controls']['sticks'][3] = 1.
+        else:
+            fired["controls"]["physical"][10] = 1.
+            fired["controls"]["native_triggers"] = [255, 255]
+        if fault == "unready":
+            ready["rendered"]["native_firearm"] = False
+            stable = ready
+        elif fault == "owner":
+            stable["menu"] = True
+        elif fault == 'unscoped':
+            ready['rendered']['scope_tracked'] = False
+            stable = ready
+        live, calls, releases = self.fake_live([base, ready, stable, fired] if not fault else [base, ready, stable])
+        live.bindings = {"actions": [
+            {"name": 'gameplay.zoom' if zoom else "gameplay.fire_or_cqc", "label": "Ready action", "contexts": ["gameplay"],
+             "bindings": [{"gesture": 'press' if zoom else "level", "milliseconds": 0, "inputs": ['right_stick_up'] if zoom else ["right_trigger"]}]},
+            {"name": "gameplay.ready_weapon", "modifier": True, "contexts": ["gameplay"],
+             "bindings": [{"gesture": "level", "milliseconds": 0, "inputs": ["right_grip"]}]}]}
+        return live, calls, releases
+
+    def test_ready_fire_waits_for_native_readiness_then_dispatches_effective_chord(self):
+        live, calls, releases = self.ready_fire_live()
+        with mock.patch("gameplay_bot.live.time.monotonic", self.clock), \
+                mock.patch("gameplay_bot.live.time.sleep", self.clock.sleep):
+            live.execute({"op": "action", "name": "gameplay.fire_or_cqc", "include_ready": True, "seconds": .05})
+        self.assertEqual(calls, [([channel("right_grip")], .25),
+                                 ([channel("right_grip"), channel("right_trigger")], .05)])
+        self.assertEqual(releases, [True])
+        events = [json.loads(line) for line in self.events.path.read_text().splitlines()]
+        self.assertTrue(any(event["event"] == "weapon_ready_before_fire" for event in events))
+
+    def test_scope_zoom_uses_ready_grip_and_stick_without_firing(self):
+        live, calls, releases = self.ready_fire_live(zoom=True)
+        with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep):
+            live.execute({'op':'action', 'name':'gameplay.zoom', 'include_ready':True, 'seconds':.05})
+        self.assertEqual(calls, [([channel('right_grip')], .25),
+                                 ([channel('right_grip'), channel('right_stick_up')], .05)])
+        self.assertEqual(releases, [True])
+
+    def test_scope_zoom_requires_native_scope_and_releases_without_zooming(self):
+        live, calls, releases = self.ready_fire_live('unscoped', zoom=True)
+        with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep), self.assertRaisesRegex(BotFault, 'readiness'):
+            live.execute({'op':'action', 'name':'gameplay.zoom', 'include_ready':True, 'seconds':.05})
+        self.assertEqual(calls, [([channel('right_grip')], .25)])
+        self.assertEqual(releases, [True])
+
+    def test_ready_fire_does_not_send_trigger_without_native_readiness_or_owner(self):
+        for fault in ("unready", "owner"):
+            with self.subTest(fault=fault):
+                live, calls, releases = self.ready_fire_live(fault)
+                with mock.patch("gameplay_bot.live.time.monotonic", self.clock), \
+                        mock.patch("gameplay_bot.live.time.sleep", self.clock.sleep), self.assertRaises(BotFault):
+                    live.execute({"op": "action", "name": "gameplay.fire_or_cqc", "include_ready": True, "seconds": .05})
+                self.assertEqual(calls, [([channel("right_grip")], .25)])
+                self.assertEqual(releases, [True])
+
+    def test_ready_fire_rejects_remapped_trigger_long_burst_and_nonfire_actions_before_input(self):
+        for fault in ("remap", "long", "nonfire"):
+            with self.subTest(fault=fault):
+                live, calls, releases = self.ready_fire_live()
+                step = {"op": "action", "name": "gameplay.fire_or_cqc", "include_ready": True, "seconds": .05}
+                if fault == "remap":
+                    live.bindings["actions"][1]["bindings"][0]["inputs"] = ["right_trigger"]
+                elif fault == "long":
+                    step["seconds"] = .8
+                else:
+                    step["name"] = "gameplay.ready_weapon"
+                with self.assertRaises(BotFault):
+                    live.execute(step)
+                self.assertFalse(calls)
+
+    def test_ready_fire_rpc_failure_still_releases_ready_and_trigger(self):
+        live, calls, releases = self.ready_fire_live()
+        original = live.input
+        def dispatch(values, duration, **options):
+            original(values, duration, **options)
+            if any(value["component"] == "Trigger" for value in values):
+                raise TimeoutError("trigger dispatch interrupted")
+        live.input = dispatch
+        with mock.patch("gameplay_bot.live.time.monotonic", self.clock), \
+                mock.patch("gameplay_bot.live.time.sleep", self.clock.sleep), self.assertRaises(TimeoutError):
+            live.execute({"op": "action", "name": "gameplay.fire_or_cqc", "include_ready": True, "seconds": .05})
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(releases, [True])
+
+    def vehicle_ready_fire_live(self, fault=None):
+        native = {'mission':30010, 'location':10, 'sequence':'Seq_Game_FreePlay',
+                  'player_vehicle_id':25600, 'status_ON_VEHICLE':True,
+                  'popup':False, 'saving':False, 'not_alert':True, 'ammo':10}
+        states = []
+        for stamp, ready, fire in ((900, False, False), (901, True, False),
+                                   (1151, True, False), (1152, True, True)):
+            state = {'scene':'gameplay', 'now_ms':stamp, 'activation':2,
+                     'camera_active':True, 'camera_suspended':False,
+                     'menu':False, 'idroid':False, 'gamepad':False,
+                     **self.audit_state(sample_ms=stamp, age_ms=0, context='vehicle'),
+                     'native':dict(native), 'rendered':{
+                         'player_owner':1234, 'activation':2, 'sample_ms':stamp,
+                         'presentation_focused':True, 'raw_right_grip_tracked':True,
+                         'raw_right_aim_tracked':True, 'native_firearm':ready,
+                         'weapon_native_observer':{
+                             'source':'retained_native_skin_sampling', 'sampled':True,
+                             'component_accepted':True, 'sample_ms':stamp,
+                             'instance_index_matched':True, 'resource_accepted':True,
+                             'resource_handle':27873, 'muzzle_matrix_read':True,
+                             'attachment_valid':True, 'muzzle_socket_valid':True,
+                             'muzzle_solved':ready, 'weapon_model':None,
+                             'mode':0x40001},
+                         'vehicle_weapon':{'available':True, 'requested':ready,
+                             'ready':ready, 'eligible':True, 'player':1234,
+                             'activation':2, 'time':stamp}}}
+            state['controls'].update(travel_mode=3, rig_input=True,
+                                     native_axes=[0, 0, 0, 0], native_triggers=[0, 0])
+            state['controls']['physical'][8] = float(ready)
+            state['controls']['physical'][10] = float(fire)
+            if fire:
+                state['native']['ammo'] = 9
+            states.append(state)
+        if fault in ('unready', 'foreign_ack', 'stale_ack'):
+            for state in states[1:]:
+                weapon = state['rendered']['vehicle_weapon']
+                if fault == 'unready':
+                    weapon['ready'] = False
+                elif fault == 'foreign_ack':
+                    weapon['player'] = 5678
+                else:
+                    weapon['time'] = state['now_ms'] - 151
+        elif fault in ('missing_muzzle', 'stale_muzzle', 'manipulating', 'invalid_attachment', 'invalid_resource', 'missing_native_firearm'):
+            for state in states[1:]:
+                observer = state['rendered']['weapon_native_observer']
+                if fault == 'missing_muzzle':
+                    observer['muzzle_solved'] = False
+                elif fault == 'stale_muzzle':
+                    observer['sample_ms'] = state['now_ms'] - 151
+                elif fault == 'invalid_attachment':
+                    observer['attachment_valid'] = False
+                elif fault == 'invalid_resource':
+                    observer['resource_handle'] = 0xffff0000
+                elif fault == 'missing_native_firearm':
+                    state['rendered']['native_firearm'] = False
+                else:
+                    observer['mode'] |= 0x04000000
+        elif fault == 'transient_muzzle_during':
+            states[3]['rendered']['weapon_native_observer']['muzzle_solved'] = False
+            states[3]['rendered']['weapon_native_observer']['component_accepted'] = False
+            states[3]['rendered']['native_firearm'] = False
+        elif fault == 'unready_during':
+            states[3]['rendered']['vehicle_weapon']['ready'] = False
+        elif fault == 'stale_ack_during':
+            states[3]['rendered']['vehicle_weapon']['time'] = states[3]['now_ms'] - 151
+        elif fault == 'pedals_during':
+            states[3]['controls']['native_triggers'] = [0, 255]
+        elif fault in ('owner_before', 'owner_during'):
+            states[2 if fault == 'owner_before' else 3]['native']['player_vehicle_id'] = 65535
+        live, calls, releases = self.fake_live(states)
+        live.bindings = {'actions':[
+            {'name':'vehicle.fire', 'label':'Vehicle fire', 'contexts':['vehicle'],
+             'bindings':[{'gesture':'level', 'milliseconds':0, 'inputs':['right_trigger']}]},
+            {'name':'vehicle.ready_weapon', 'label':'Vehicle ready', 'modifier':True,
+             'contexts':['vehicle'], 'bindings':[{'gesture':'level', 'milliseconds':0,
+                                                 'inputs':['right_grip']}]}]}
+        step = {'op':'action', 'name':'vehicle.fire', 'include_ready':True,
+                'seconds':.05, 'native_before':native}
+        return live, calls, releases, step
+
+    def test_vehicle_fire_waits_for_matching_native_ack_and_keeps_pedals_released(self):
+        live, calls, releases, step = self.vehicle_ready_fire_live()
+        with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep):
+            live.execute(step)
+        self.assertEqual(calls, [([channel('right_grip')], .25),
+                                 ([channel('right_grip'), channel('right_trigger')], .05)])
+        self.assertEqual(releases, [True])
+        events = [json.loads(line) for line in self.events.path.read_text().splitlines()]
+        ready = next(event for event in events if event['event'] == 'vehicle_weapon_ready_before_fire')
+        self.assertGreaterEqual(ready['sampled_milliseconds'], 200)
+        self.assertEqual(ready['state']['controls']['native_triggers'], [0, 0])
+        self.assertIsNone(ready['state']['rendered']['weapon_native_observer']['weapon_model'])
+
+    def test_vehicle_fire_refuses_unready_foreign_stale_or_lost_owner_before_trigger(self):
+        for fault in ('unready', 'foreign_ack', 'stale_ack', 'owner_before'):
+            with self.subTest(fault=fault):
+                live, calls, releases, step = self.vehicle_ready_fire_live(fault)
+                with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                        mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep), self.assertRaises(BotFault):
+                    live.execute(step)
+                self.assertEqual(calls, [([channel('right_grip')], .25)])
+                self.assertEqual(releases, [True])
+
+    def test_vehicle_fire_releases_both_channels_on_owner_loss_during_trigger(self):
+        for fault in ('owner_during', 'unready_during', 'stale_ack_during', 'pedals_during'):
+            with self.subTest(fault=fault):
+                live, calls, releases, step = self.vehicle_ready_fire_live(fault)
+                with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                        mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep), \
+                        self.assertRaisesRegex(BotFault, 'during trigger lease'):
+                    live.execute(step)
+                self.assertEqual(len(calls), 2)
+                self.assertEqual(releases, [True])
+
+    def test_vehicle_fire_never_dispatches_trigger_before_fresh_completed_draw(self):
+        for fault in ('missing_muzzle', 'stale_muzzle', 'manipulating', 'invalid_attachment', 'invalid_resource', 'missing_native_firearm'):
+            with self.subTest(fault=fault):
+                live, calls, releases, step = self.vehicle_ready_fire_live(fault)
+                with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                        mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep), self.assertRaises(BotFault):
+                    live.execute(step)
+                self.assertEqual(calls, [([channel('right_grip')], .25)])
+                self.assertEqual(releases, [True])
+
+    def test_vehicle_fire_keeps_valid_trigger_lease_through_transient_muzzle_publication(self):
+        live, calls, releases, step = self.vehicle_ready_fire_live('transient_muzzle_during')
+        with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep):
+            live.execute(step)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(releases, [True])
+
+    def test_vehicle_fire_rejects_standalone_trigger_or_missing_driver_guard(self):
+        for missing in ('include_ready', 'native_before'):
+            with self.subTest(missing=missing):
+                live, calls, releases, step = self.vehicle_ready_fire_live()
+                del step[missing]
+                with self.assertRaises(BotFault):
+                    live.execute(step)
+                self.assertFalse(calls)
+
+    def vehicle_wheel_pair_live(self, fault=None, *, duration=.65):
+        native = {'mission':30010, 'location':10, 'sequence':'Seq_Game_FreePlay',
+                  'player_vehicle_id':25600, 'status_ON_VEHICLE':True,
+                  'player_vehicle_is_vehicle':True, 'player_vehicle_is_helicopter':False,
+                  'player_x':828.35, 'player_y':354.26, 'player_z':292.09,
+                  'popup':False, 'saving':False, 'not_alert':True}
+        states = []
+        for stamp, held in ((900, False), (1050, False), (1051, True),
+                            (1051 + int(duration * 1000) + 50, True)):
+            state = {'scene':'gameplay', 'now_ms':stamp, 'activation':3,
+                     'camera_active':True, 'camera_suspended':False,
+                     'menu':False, 'idroid':False, 'gamepad':False,
+                     **self.audit_state(sample_ms=stamp, age_ms=0, context='vehicle'),
+                     'native':dict(native), 'rendered':{
+                         'player_owner':1234, 'activation':3, 'sample_ms':stamp,
+                         'presentation_focused':True, 'raw_right_grip_tracked':True,
+                         'raw_right_aim_tracked':True, 'raw_left_grip_tracked':True,
+                         'raw_left_aim_tracked':True, 'driver_wheel_tracked':True,
+                         'driver_wheel_hands':3 if held else 0,
+                         'vehicle_weapon':{'requested':False, 'ready':False}}}
+            state['controls'].update(travel_mode=3, rig_input=True,
+                native_packet_source='xr_runtime_final_mapped_packet',
+                native_axes=[0, 0, 0, 0], native_triggers=[0, 0])
+            state['controls']['physical'][7:9] = [float(held)] * 2
+            states.append(state)
+        if fault == 'moving_before':
+            states[1]['native']['player_x'] += .06
+        elif fault == 'held_before':
+            states[0]['controls']['physical'][10] = 1.
+        elif fault == 'owner_during':
+            states[2]['rendered']['player_owner'] = 5678
+        elif fault == 'vehicle_during':
+            states[2]['native']['player_vehicle_id'] = 25601
+        elif fault == 'tracking_during':
+            states[2]['rendered']['raw_left_grip_tracked'] = False
+        elif fault == 'pedal_during':
+            states[2]['controls']['native_triggers'][1] = 255
+        elif fault == 'button_during':
+            states[2]['controls']['physical'][3] = 1.
+        elif fault == 'weapon_during':
+            states[2]['rendered']['vehicle_weapon']['requested'] = True
+        elif fault == 'moving_during':
+            states[2]['native']['player_z'] += .06
+        live, calls, releases = self.fake_live(states)
+        live.bindings = {'actions':[
+            {'name':'vehicle.right_wheel_grip', 'label':'Right wheel grip', 'modifier':True,
+             'contexts':['vehicle'], 'bindings':[{'gesture':'level', 'milliseconds':0,
+                                                 'inputs':['right_grip']}]},
+            {'name':'vehicle.wheel_grip', 'label':'Left wheel grip', 'modifier':True,
+             'contexts':['vehicle'], 'bindings':[{'gesture':'level', 'milliseconds':0,
+                                                 'inputs':['left_grip']}]}]}
+        step = {'op':'action', 'name':'vehicle.right_wheel_grip', 'include_left_wheel':True,
+                'seconds':duration, 'native_before':native,
+                'while_held':{'rendered.driver_wheel_hands':3}}
+        return live, calls, releases, step
+
+    def test_two_hand_wheel_uses_only_effective_grips_after_stationary_native_samples(self):
+        live, calls, releases, step = self.vehicle_wheel_pair_live()
+        with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep):
+            result = live.execute(step)
+        self.assertEqual(calls, [([channel('left_grip'), channel('right_grip')], .65)])
+        self.assertEqual(releases, [True])
+        self.assertEqual(result['state']['rendered']['driver_wheel_hands'], 3)
+        events = [json.loads(line) for line in self.events.path.read_text().splitlines()]
+        self.assertTrue(any(event['event'] == 'vehicle_wheel_stationary_before_grip' for event in events))
+
+    def test_two_hand_wheel_refuses_movement_and_other_held_inputs_before_dispatch(self):
+        for fault in ('moving_before', 'held_before'):
+            with self.subTest(fault=fault):
+                live, calls, releases, step = self.vehicle_wheel_pair_live(fault)
+                with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                        mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep), self.assertRaises(BotFault):
+                    live.execute(step)
+                self.assertFalse(calls)
+
+    def test_two_hand_wheel_releases_on_owner_tracking_pedal_weapon_or_root_change(self):
+        for fault in ('owner_during', 'vehicle_during', 'tracking_during', 'pedal_during',
+                      'button_during', 'weapon_during', 'moving_during'):
+            with self.subTest(fault=fault):
+                live, calls, releases, step = self.vehicle_wheel_pair_live(fault)
+                with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                        mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep), \
+                        self.assertRaisesRegex(BotFault, 'during grip lease'):
+                    live.execute(step)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(releases, [True])
+
+    def test_two_hand_wheel_rejects_arbitrary_chords_and_unbounded_inspections(self):
+        for fault in ('right_remap', 'left_remap', 'alternate_binding', 'wrong_action',
+                      'missing_native', 'include_ready', 'include_support', 'capture', 'long'):
+            with self.subTest(fault=fault):
+                live, calls, releases, step = self.vehicle_wheel_pair_live()
+                actions = live.bindings['actions']
+                if fault in ('right_remap', 'left_remap'):
+                    actions[0 if fault == 'right_remap' else 1]['bindings'][0]['inputs'].append('y')
+                elif fault == 'alternate_binding':
+                    actions[1]['bindings'].append(dict(actions[1]['bindings'][0]))
+                elif fault == 'wrong_action':
+                    step['name'] = 'vehicle.wheel_grip'
+                elif fault == 'missing_native':
+                    del step['native_before']
+                elif fault in ('include_ready', 'include_support'):
+                    step[fault] = True
+                elif fault == 'capture':
+                    step['static_grip_capture'] = True
+                else:
+                    step['seconds'] = 2.51
+                with self.assertRaises(BotFault):
+                    live.execute(step)
+                self.assertFalse(calls)
+
+    def test_two_hand_wheel_backend_expiry_including_modifier_tail_is_at_most_three_seconds(self):
+        live, calls, releases, step = self.vehicle_wheel_pair_live(duration=2.5)
+        requests = []
+        live.call = lambda method, values: requests.append((method, values))
+        live.input = lambda values, duration, **options: Live.input(live, values, duration, **options)
+        with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep):
+            live.execute(step)
+        self.assertEqual([args['component'] for _, args in requests], ['Grip', 'Grip'])
+        self.assertTrue(all(args['auto_release'] and 0 < args['hold_duration'] <= 3. for _, args in requests))
+        self.assertEqual(releases, [True])
 
     def test_tracking_fixture_leaves_normal_semantic_action_and_release_intact(self):
         initial = {"scene": "gameplay", "now_ms": 900, "camera_active": True,
@@ -2407,6 +3048,19 @@ class MenuCleanupTests(unittest.TestCase):
             live.cleanup_menus()
         self.assertEqual(live.execute.call_count, 4)
 
+    def test_field_control_type_options_and_pause_unwind_in_one_cleanup(self):
+        live=self.fixture(3);live.opened_menu="pause"
+        original=live.observe.side_effect
+        def state(native=False):
+            result=original(native)
+            result.update(idroid=False,pause=result["menu"],scene="menu" if result["menu"] else "gameplay")
+            return result
+        live.observe.side_effect=state
+        with mock.patch("gameplay_bot.live.time.sleep"):
+            live.cleanup_menus()
+        self.assertIsNone(live.opened_menu)
+        self.assertEqual(live.execute.call_count,3)
+
     def test_close_after_cleanup_attempt_releases_without_replaying_navigation(self):
         live = self.fixture(3)
         live.cleanup_menus = mock.Mock(side_effect=BotFault("completion unknown"))
@@ -3176,6 +3830,116 @@ class ReviewedConfirmTests(unittest.TestCase):
             validate_decision(decision, request, state, set(), now_ns=int((REVIEW_WINDOW_SECONDS+1)*1e9))
         with self.assertRaises(BotFault):
             validate_decision({**decision, "kind":"plan", "cases":[case]}, request, state, set(), now_ns=101)
+
+
+class SampledReleaseTests(unittest.TestCase):
+    def fixture(self):
+        live = Live.__new__(Live)
+        live.events = mock.Mock()
+        live.held = {}
+        live.transport_error = None
+        live.call = mock.Mock()
+        state = {'now_ms': 1000, 'transport': {'seconds': .002},
+                 'controls': {'sample_ms': 990, 'age_ms': 10, 'context': 'gameplay',
+                              'rig_input': True, 'native_packet_source': 'xr_runtime_final_mapped_packet',
+                              'physical': [0.] * 11, 'sticks': [0.] * 4}}
+        live.observe = mock.Mock(return_value=state)
+        return live, state
+
+    def test_first_release_clears_all_then_fresh_idle_sample_avoids_redundant_writes(self):
+        live, _ = self.fixture()
+        live.release()
+        self.assertEqual(live.call.call_count, 15)
+        live.observe.assert_not_called()
+        live.call.reset_mock()
+        live.release()
+        live.observe.assert_called_once_with()
+        live.call.assert_not_called()
+
+    def test_held_leases_and_unowned_sampled_channels_are_always_released(self):
+        live, state = self.fixture()
+        live._released_once = True
+        live.held = {('right', 'Grip', None): channel('right_grip')}
+        state['controls']['physical'][3] = 1.
+        state['controls']['sticks'][1] = -.001
+        import copy
+        neutral = copy.deepcopy(state)
+        neutral.update(now_ms=1020)
+        neutral['controls'].update(sample_ms=1010, physical=[0.] * 11, sticks=[0.] * 4)
+        # The first post-RPC sample can still contain the pre-release channels.
+        live.observe.side_effect = [state, state, state, neutral]
+        live.release()
+        calls = [c.args[1] for c in live.call.call_args_list]
+        self.assertEqual([(c['hand'], c['component'], c.get('sub_component')) for c in calls],
+                         [('left', 'Y', None), ('left', 'Thumbstick', 'Y'), ('right', 'Grip', None)])
+        self.assertTrue(all(c['value'] == 0 for c in calls))
+        self.assertFalse(live.held)
+        self.assertEqual(live.observe.call_count, 4)
+
+    def test_menu_transition_can_confirm_release_without_gameplay_rig_ownership(self):
+        live, state = self.fixture()
+        live._released_once = True
+        live.held = {('left', 'Menu', None): channel('menu')}
+        state['controls']['physical'][4] = 1.
+        menu_held = copy.deepcopy(state)
+        menu_held.update(now_ms=1010, menu=True, idroid=True)
+        menu_held['controls'].update(sample_ms=1000, context='menus', rig_input=False)
+        neutral = copy.deepcopy(menu_held)
+        neutral.update(now_ms=1030)
+        neutral['controls'].update(sample_ms=1020, physical=[0.] * 11)
+        # A fresh menu sample still holding Menu must not count as released.
+        live.observe.side_effect = [state, state, menu_held, neutral]
+        with mock.patch('gameplay_bot.live.time.sleep'):
+            live.release()
+        live.call.assert_called_once_with('set_controller_input',
+            {**channel('menu'), 'value': 0, 'auto_release': False})
+        live.events.emit.assert_any_call('release_sample_verified', state=neutral)
+        self.assertEqual(live.observe.call_count, 4)
+        self.assertFalse(live.held)
+        self.assertTrue(live._released_once)
+
+    def test_menu_release_audit_still_rejects_unknown_owner_stale_or_incomplete_samples(self):
+        for field, value in [('rig_input', None), ('sample_ms', 989), ('age_ms', 251),
+                             ('physical', [0.]), ('sticks', [float('nan')] * 4),
+                             ('native_packet_source', 'native_xinput')]:
+            with self.subTest(field=field):
+                live, state = self.fixture()
+                live._released_once = True
+                state['controls'].update(context='menus', rig_input=False)
+                state['controls'][field] = value
+                live.release()
+                self.assertEqual(live.call.call_count, 15)
+        live, state = self.fixture()
+        live._released_once = True
+        state['controls'].update(context='menus', rig_input=False)
+        state['transport']['seconds'] = .3
+        live.release()
+        self.assertEqual(live.call.call_count, 15)
+
+    def test_incomplete_stale_slow_or_invalid_audit_falls_back_to_all_channels(self):
+        for field, value in [('physical', [0.]), ('sticks', [float('nan')] * 4),
+                             ('age_ms', 251), ('rig_input', False), ('native_packet_source', 'other')]:
+            with self.subTest(field=field):
+                live, state = self.fixture()
+                live._released_once = True
+                state['controls'][field] = value
+                live.release()
+                self.assertEqual(live.call.call_count, 15)
+        live, state = self.fixture()
+        live._released_once = True
+        state['transport']['seconds'] = .3
+        live.release()
+        self.assertEqual(live.call.call_count, 15)
+
+    def test_failed_release_preserves_lease_and_disables_sampled_shortcut(self):
+        live, _ = self.fixture()
+        live._released_once = True
+        live.held = {('right', 'Grip', None): channel('right_grip')}
+        live.call.side_effect = TimeoutError('unknown completion')
+        with self.assertRaises(BotFault):
+            live.release()
+        self.assertTrue(live.held)
+        self.assertFalse(live._released_once)
 
 
 if __name__ == "__main__":

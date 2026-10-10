@@ -16,6 +16,7 @@ struct WeaponScopeSample {
     float radius{},eyeRelief{},magnification{};
     uint64_t weaponIdentity{};
     bool tracked{};
+    bool dotReticle{};
 };
 std::optional<EyeView> weaponScopeSceneView(const WeaponScopeSample& scope);
 bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye);
@@ -39,11 +40,17 @@ struct WeaponScopeGeometry {
     float radius{};
     uint32_t sight{};
     std::array<uint8_t,3> powers{};
+    bool dotReticle{};
 };
 // Match the equipped CNP_REAR_SIGHT / CNP_FRONT_SIGHT pair and native optical
 // parameters to a measured round sight. Unknown/iron/holographic sights close.
 std::optional<WeaponScopeGeometry> nativeWeaponScopeGeometry(Pose rear,Pose front,
     const std::array<uint8_t,4>& powersAndUi);
+// Exact native st02 collimator and st03 hinged magnifier frames. Roots are
+// copied from the current assembled weapon, never inferred from its name.
+std::optional<WeaponScopeGeometry> nativeMagnifierScopeGeometry(Pose collimatorRoot,
+    Pose magnifierRoot,uint64_t collimatorModel,uint64_t magnifierModel,
+    const std::array<uint8_t,4>& powersAndUi,float power);
 class WeaponScopeZoom {
 public:
     float update(uint64_t identity,uint64_t sequence,const std::array<uint8_t,3>& powers);

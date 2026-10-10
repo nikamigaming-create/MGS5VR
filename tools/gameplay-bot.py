@@ -1,6 +1,7 @@
 """Maintained MGS5VR observation/action runner. No desktop input or synthetic footage."""
 import argparse
 import json
+import math
 import pathlib
 import subprocess
 import sys
@@ -18,6 +19,7 @@ from gameplay_bot.idroid import inspect_idroid
 from gameplay_bot.optic_exposure import inspect_optic_exposure
 from gameplay_bot.supervisor import run_supervised
 from gameplay_bot.state_graph import StateGraph, declared_model
+from gameplay_bot.motion import _blend
 
 
 def continue_game(live, behavior):
@@ -32,8 +34,20 @@ def continue_game(live, behavior):
         # grip pose and restore it on every exit path before continuing/loading.
         with preserved_controller_pose(live, "right", "grip", "local") as saved_pose:
             live.release()
-            live.call("set_controller_pose", {"hand": "right", "pose_type": "grip", "base_space": "local",
-                                               "position": target, "orientation": [0., 0., 0., 1.]})
+            reach_started = time.monotonic()
+            for frame in range(1, 11):
+                current = live.observe()
+                if current["scene"] != "title" or not current.get("title_menu"):
+                    raise BotFault("Title ownership changed during Continue reach")
+                fraction = frame / 10
+                eased = fraction * fraction * (3 - 2 * fraction)
+                pose = _blend(saved_pose, {"position": target,
+                                          "orientation": [0., 0., 0., 1.]}, eased)
+                live.call("set_controller_pose", {"hand": "right", "pose_type": "grip",
+                                                   "base_space": "local", **pose})
+                time.sleep(max(0., reach_started + .75 * fraction - time.monotonic()))
+            live.events.emit("human_paced_continue_reach", duration_seconds=time.monotonic()-reach_started,
+                             packets=10, instant_pose_change=False, target=target)
             capture_continue_rack(live)
             # Re-check current title ownership after capture, before the sole edge.
             state = live.observe()
@@ -91,8 +105,10 @@ def main():
     parser.add_argument("--resume", type=pathlib.Path, help="Campaign checkpoint; requires identical executable, DLL and both INIs")
     parser.add_argument("--transition", help="state: explicitly selected graph transition; Pause requires its own named transition")
     parser.add_argument("--seconds", type=float, help="supervise defaults to 900 seconds; other commands default to 1")
+    parser.add_argument('--idle-seconds', type=float, default=10., help='Supervisor no-decision handoff window')
     parser.add_argument("--distance", type=float, default=.35, help="move: short forward target in native units, below one unit")
     parser.add_argument("--record", action="store_true", help="rotate native source-eye/audio takes; final compositor stills remain separate")
+    parser.add_argument("--trace-menu-input", action="store_true", help="Arm the bounded 15-second native UI input observer for one explicit run/session suite")
     args = parser.parse_args()
     if not args.elliott_data and not args.proxy:
         parser.error("Provide --proxy or --elliott-data")
@@ -106,11 +122,14 @@ def main():
     args.proxy = args.proxy.resolve() if args.proxy else None
     args.controls_tool = args.controls_tool.resolve()
     if args.seconds is None:
-        args.seconds = 900. if args.command == "supervise" else 15. if args.command == "state" else 1.
-    if not 0 < args.seconds <= 3600:
-        parser.error("--seconds must be in (0,3600]")
+        args.seconds = 0. if args.command == "supervise" else 15. if args.command == "state" else 1.
+    if (not math.isfinite(args.seconds) or args.seconds < 0
+            or (not args.seconds and args.command != 'supervise')):
+        parser.error('--seconds must be positive; supervise also accepts zero for no total timer')
     if args.command in ("run", "session") and not args.suite:
         parser.error(args.command + " requires --suite")
+    if args.trace_menu_input and args.command not in ("run", "session"):
+        parser.error('--trace-menu-input requires one explicit run/session suite')
     if args.resume and args.command != "campaign":
         parser.error("--resume is only supported by campaign")
     if (args.command == 'state') != bool(args.transition):
@@ -157,6 +176,10 @@ def main():
             pose_cleanup.enter_context(preserved_tracking_poses(live))
             baseline = capture_startup_baseline(live)
             print(json.dumps({"event": "baseline", "captures": baseline}), flush=True)
+            if args.trace_menu_input:
+                trace, timing = live.native.read('trace-native-menu-input')
+                events.emit('menu_input_trace_armed', observation=trace, transport=timing,
+                            scope='15-second diagnostic; native query behavior unchanged')
             if args.command == "observe":
                 start_recording()
                 deadline = time.monotonic() + args.seconds
@@ -198,7 +221,8 @@ def main():
                 initial_suite = read_json(args.suite) if args.suite else None
                 if initial_suite is not None:
                     initial_suite = {**initial_suite, "source_path": str(args.suite.resolve()), "source_sha256": digest(args.suite)}
-                result = run_supervised(behavior, seconds=args.seconds, initial_suite=initial_suite)
+                result = run_supervised(behavior, seconds=args.seconds, initial_suite=initial_suite,
+                                        idle_seconds=args.idle_seconds)
             elif args.command == 'state':
                 graph = StateGraph(ROOT, declared_model(ROOT), identity, bindings)
                 suite = graph.probe_suite(args.transition, identity=identity, max_wait=min(args.seconds, 600))
@@ -258,6 +282,13 @@ def main():
             else:
                 result = {"status": "failed", "error": str(error)}
         finally:
+            if args.trace_menu_input and live:
+                try:
+                    trace, timing = live.native.read('inspect-native-menu-input')
+                    result['menu_input_trace'] = {'observation':trace, 'transport':timing,
+                                                'snapshot_atomic':False}
+                except Exception as error:
+                    result['menu_input_trace_error'] = str(error)
             if recording:
                 try:
                     recording_result = recording.close()

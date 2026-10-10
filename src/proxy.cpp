@@ -11,6 +11,7 @@
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/vehicle_weapon.hpp"
 #include "mgs5vr/process_exit.hpp"
 #include "mgs5vr/native_actions.hpp"
 #include "mgs5vr/game_target.hpp"
@@ -69,6 +70,7 @@ void cleanupBeforeExit() noexcept {
     log("MGS5VR process exit requested; stopping OpenXR worker");
     stopRequested.store(true);
     stopNativeActions();
+    stopVehicleWeaponInput();
     stopNativePerformance();
     if(wakeWorker)SetEvent(wakeWorker);
     try{gamepadMailbox().publish({},false,steadyMilliseconds());}catch(...){}
@@ -226,6 +228,9 @@ DWORD WINAPI initialize(void*){
             }catch(const std::exception& e){log(std::string("Camera observer unavailable: ")+e.what());}
         }
         try{installGamepadHook();}catch(const std::exception& e){log(std::string("XR gamepad unavailable: ")+e.what());}
+        if(target->nativeAdapter)
+            try{installVehicleWeaponInput(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)));}
+            catch(const std::exception& e){log(std::string("Vehicle firearm input unavailable: ")+e.what());}
         if(target->nativeAdapter)
             try{installNativeActions(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),folder,
                 GetPrivateProfileIntW(L"diagnostics",L"native_actions",0,ini.c_str())==1);}

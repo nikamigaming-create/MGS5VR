@@ -70,6 +70,9 @@ public:
     TextureConsumer& operator=(const TextureConsumer&)=delete;
     // Open/copy on a separate D3D11 device; the game's context is never used here.
     bool consume(const std::shared_ptr<TextureChannel>& channel);
+    // Poll completed copy/releases on this XR thread without consuming images.
+    // Call after submission as well as acquisition, before xrWaitFrame sleeps.
+    void poll();
     ID3D11Texture2D* texture() const { return cached_.Get(); }
     FrameId frame() const { return frame_; }
     EyeFrame eye() const { return eyes_[0]; }

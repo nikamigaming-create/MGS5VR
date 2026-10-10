@@ -1,12 +1,19 @@
-param([Parameter(Mandatory=$true)][string]$RequestPath)
+param([Parameter(Mandatory=$true)][string]$RequestPath,[string]$CheckerPath)
 $ErrorActionPreference='Stop'
 Import-Module Microsoft.PowerShell.Utility
 Import-Module Microsoft.PowerShell.Management
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'settings-store.psm1') -Force
 $root=Split-Path -Parent $PSScriptRoot
-$checker=Join-Path $root 'mgs5vr_controls.exe'
-if (!(Test-Path -LiteralPath $checker)) { $checker=Join-Path $root 'build/Release/mgs5vr_controls.exe' }
+if ($CheckerPath) {
+    # The pre-install build check must use its newly compiled parser, before
+    # build/dev is refreshed. Launcher requests cannot override this path.
+    $checker=[IO.Path]::GetFullPath($CheckerPath)
+} else {
+    $checker=Join-Path $root 'mgs5vr_controls.exe'
+    if (!(Test-Path -LiteralPath $checker -PathType Leaf)) { $checker=Join-Path $root 'build/dev/mgs5vr_controls.exe' }
+}
+if (!(Test-Path -LiteralPath $checker -PathType Leaf)) { throw 'The development controls checker is missing. Build development before opening these settings.' }
 $request=Get-Content -LiteralPath $RequestPath -Raw | ConvertFrom-Json
 $game=[IO.Path]::GetFullPath([string]$request.gameExe)
 if ([IO.Path]::GetFileName($game) -ine 'mgsvtpp.exe' -and [IO.Path]::GetFileName($game) -ine 'MgsGroundZeroes.exe') { throw 'Choose the game executable.' }
@@ -55,9 +62,22 @@ function Snapshot {
             $display.live=!!($sourceProcess -and $sourceProcess.Path -ieq $game -and ((Get-Date)-(Get-Item -LiteralPath $actualPath).LastWriteTime).TotalSeconds -lt 15)
         }
     }
+    $bindings=Read-Checker '--bindings-json' $path
+    # The runtime parser supplies defaults and legacy migrations. The editor,
+    # lessons and exported guide must all show that same effective mapping.
+    foreach ($action in $bindings.actions) {
+        $alternatives=@(foreach ($binding in $action.bindings) {
+            $chord=$binding.inputs -join ' + '
+            if ($binding.gesture -eq 'level') { $chord }
+            elseif ($binding.gesture -eq 'tap' -or $binding.gesture -eq 'hold') { '{0}({1},{2})' -f $binding.gesture,$chord,$binding.milliseconds }
+            else { '{0}({1})' -f $binding.gesture,$chord }
+        })
+        $values[$action.name]=if ($alternatives.Count) { $alternatives -join ' | ' } else { 'disabled' }
+    }
+    foreach ($axis in $bindings.axes) { $values[$axis.name]=$axis.source }
     return [ordered]@{gameExe=$game;installed=(Test-Path -LiteralPath (Join-Path $dir 'mgs5vr-install.json'));writable=$hasControls;display=$display;
         controlsRevision=(Revision $controls);runtimeRevision=(Revision $runtime);values=$values;runtime=$runtimeValues;
-        bindings=(Read-Checker '--bindings-json' $path);settings=$settings}
+        bindings=$bindings;settings=$settings}
 }
 $backup=$null
 if ($request.method -eq 'saveControls' -or $request.method -eq 'saveRuntime') {
@@ -66,6 +86,11 @@ if ($request.method -eq 'saveControls' -or $request.method -eq 'saveRuntime') {
     $original=[IO.File]::ReadAllText($path)
     if ((Revision $original) -cne [string]$request.revision) { throw 'Settings changed outside this launcher. Reload before saving; your changes have not been written.' }
     $allowed=Get-MgsIni ([IO.File]::ReadAllText((Join-Path $root $(if($isRuntime){'config/mgs5vr.ini'}else{'config/mgs5vr-controls.ini'}))))
+    if (!$isRuntime) {
+        $knownBindings=Read-Checker '--bindings-json' ''
+        foreach ($action in $knownBindings.actions) { $allowed[$action.name]='' }
+        foreach ($axis in $knownBindings.axes) { $allowed[$axis.name]='' }
+    }
     $updated=$original
     foreach ($change in $request.changes.PSObject.Properties) {
         if (!$allowed.Contains($change.Name)) { throw "Unknown setting: $($change.Name)" }

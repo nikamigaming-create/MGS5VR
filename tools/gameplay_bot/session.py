@@ -13,6 +13,31 @@ NORMAL_VIEW_HAND_POSES = (
 )
 
 
+def bring_hands_into_view(adapter, native):
+    """Put bot hands in front of its current eye with their measured pair fit."""
+    from .combat import comfortable_grip, controller_pair, inverse, mul, normalized, paired_aim_position
+    right = comfortable_grip(native)
+    result = []
+    adapter.release()
+    for hand, sign in (('left', -1), ('right', 1)):
+        grip = _controller_pose(adapter, hand, 'grip', 'local')
+        aim = _controller_pose(adapter, hand, 'aim', 'local')
+        pair = controller_pair(grip, aim)
+        position = [sign * right[0], right[1], right[2]]
+        orientation = normalized(grip['orientation'])
+        aim_orientation = normalized(mul(orientation, inverse(pair['orientation'])))
+        aim_position = paired_aim_position(position, aim_orientation, pair)
+        adapter.execute({'op': 'pose', 'hand': hand, 'position': position,
+                         'orientation': orientation, 'aim_position': aim_position,
+                         'aim_orientation': aim_orientation})
+        result.append({'hand': hand, 'base_space': 'view', 'grip': {'position': position,
+                       'orientation': orientation}, 'aim': {'position': aim_position,
+                       'orientation': aim_orientation}, 'measured_pair': pair})
+    adapter.events.emit('bot_hands_placed_in_current_view', poses=result,
+                        source='measured_local_grip_aim_pair', native_rig_changed=False)
+    return result
+
+
 @contextmanager
 def preserved_head_pose(adapter):
     """Restore the exact starting headset transform even after a failed path."""

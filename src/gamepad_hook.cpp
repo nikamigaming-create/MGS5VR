@@ -3,6 +3,7 @@
 #include <MinHook.h>
 #include <intrin.h>
 #include "mgs5vr/input_bridge.hpp"
+#include "mgs5vr/native_input_delivery.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/mailbox.hpp"
 #include "mgs5vr/motion_melee.hpp"
@@ -24,6 +25,8 @@ bool reported{};
 unsigned reportedButtons{};
 GamepadOwnership ownership;
 std::atomic<DWORD> physicalIndex{};
+std::atomic_uintptr_t deliveryImageBase{};
+std::atomic_uint32_t deliveryImageSize{};
 GamepadSample sampleOf(const XINPUT_STATE& state){
     const auto& p=state.Gamepad;return {p.wButtons,p.bLeftTrigger,p.bRightTrigger,p.sThumbLX,p.sThumbLY,p.sThumbRX,p.sThumbRY};
 }
@@ -39,21 +42,37 @@ DWORD WINAPI setState(DWORD index,XINPUT_VIBRATION* vibration){
     return originalSet(index,vibration);
 }
 DWORD WINAPI getState(DWORD index,XINPUT_STATE* state){
-    if(!state)return ERROR_BAD_ARGUMENTS;
+    const auto callerAddress=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    const auto callerSize=deliveryImageSize.load(std::memory_order_acquire);
+    const auto caller=nativeInputCaller(callerAddress,deliveryImageBase.load(std::memory_order_relaxed),callerSize);
+    const auto delivered=[&](DWORD result,NativeInputDeliverySource source,bool xrFresh=false,
+                             bool nativeSlotValid=false,DWORD nativeSlot=0){
+        NativeInputDelivery value;
+        value.timeMs=steadyMilliseconds();value.index=index;value.resultCode=result;value.caller=caller;
+        value.source=source;value.xrMailboxFresh=xrFresh;value.nativeSlotValid=nativeSlotValid;value.nativeSlot=nativeSlot;
+        value.packetValid=state&&result==ERROR_SUCCESS;
+        if(value.packetValid){
+            const auto& pad=state->Gamepad;value.packetNumber=state->dwPacketNumber;value.buttons=pad.wButtons;
+            value.axes={pad.sThumbLX,pad.sThumbLY,pad.sThumbRX,pad.sThumbRY};
+            value.triggers={pad.bLeftTrigger,pad.bRightTrigger};
+        }
+        nativeInputDeliveryAudit().publish(value);return result;
+    };
+    if(!state)return delivered(ERROR_BAD_ARGUMENTS,NativeInputDeliverySource::unavailable);
     if(index==0){
         bool freshActive{},xrIntent{};
         const auto sample=gamepadMailbox().read(steadyMilliseconds(),&freshActive,&xrIntent);
-        XINPUT_STATE physical{};bool connected=false;const DWORD slot=physicalIndex.load();
+        XINPUT_STATE physical{};bool connected=false;DWORD observedPhysicalSlot{};const DWORD slot=physicalIndex.load();
         for(DWORD n=0;n<XUSER_MAX_COUNT;++n){
             const DWORD candidate=(slot+n)%XUSER_MAX_COUNT;XINPUT_STATE found{};
             if(original(candidate,&found)!=ERROR_SUCCESS)continue;
-            if(!connected){physical=found;physicalIndex.store(candidate);connected=true;}
-            if(gamepadHasIntent(sampleOf(found))){physical=found;physicalIndex.store(candidate);break;}
+            if(!connected){physical=found;physicalIndex.store(candidate);connected=true;observedPhysicalSlot=candidate;}
+            if(gamepadHasIntent(sampleOf(found))){physical=found;physicalIndex.store(candidate);observedPhysicalSlot=candidate;break;}
         }
         bool usePhysical{};
         {std::lock_guard guard(stateMutex);usePhysical=ownership.update(connected,sampleOf(physical),freshActive,xrIntent);}
         setNativeGamepadActive(usePhysical);
-        if(usePhysical){*state=physical;return ERROR_SUCCESS;}
+        if(usePhysical){*state=physical;return delivered(ERROR_SUCCESS,NativeInputDeliverySource::nativeXInput,freshActive,connected,observedPhysicalSlot);}
         if(sample){
             if(freshActive){consumeAnimalTouch();consumeMeleeSweep();}
             // Give an attached physical pad back when XR is inactive. If none is
@@ -73,10 +92,11 @@ DWORD WINAPI getState(DWORD index,XINPUT_STATE* state){
             state->Gamepad.sThumbLX=sample->leftX;state->Gamepad.sThumbLY=sample->leftY;
             state->Gamepad.sThumbRX=sample->rightX;state->Gamepad.sThumbRY=sample->rightY;
             if(!reported){reported=true;log("Game consumed OpenXR controller state through its XInputGetState import");}
-            return ERROR_SUCCESS;
+            return delivered(ERROR_SUCCESS,NativeInputDeliverySource::xrMailbox,freshActive);
         }
     }
-    return original(index,state);
+    const DWORD result=original(index,state);
+    return delivered(result,NativeInputDeliverySource::nativeXInput,false,true,index);
 }
 }
 void installGamepadHook(){
@@ -86,6 +106,8 @@ void installGamepadHook(){
     const auto* nt=reinterpret_cast<const IMAGE_NT_HEADERS64*>(base+dos->e_lfanew);
     if(nt->Signature!=IMAGE_NT_SIGNATURE||nt->OptionalHeader.Magic!=IMAGE_NT_OPTIONAL_HDR64_MAGIC)
         throw std::runtime_error("Invalid game PE64 header");
+    deliveryImageBase.store(reinterpret_cast<uintptr_t>(base),std::memory_order_relaxed);
+    deliveryImageSize.store(nt->OptionalHeader.SizeOfImage,std::memory_order_release);
     const auto directory=nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
     if(!directory.VirtualAddress||directory.Size<sizeof(IMAGE_IMPORT_DESCRIPTOR))throw std::runtime_error("Game import directory unavailable");
     const auto* entries=reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR*>(base+directory.VirtualAddress);

@@ -1,7 +1,10 @@
 #include "mgs5vr/idroid_attachment.hpp"
+#include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/input_bridge.hpp"
+#include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/log.hpp"
 #include <windows.h>
 #include <intrin.h>
@@ -46,15 +49,28 @@ struct Owned {
     uint32_t playerIndex{},localIndex{},handle{},flags{},pointFlags{};
     uint16_t pointState{},pointVariant{};
     uint8_t state{},recordFlags{},bindingFlags{},handsetBindingFlags{};
+    uint64_t equipmentLease{};
+    unsigned inspectionStage{};
     Matrix wrist{},cnp{},bindingRoot{},bodyRoot{},handsetRoot{},handsetBindingRoot{},handsetRootBone{};
 };
 struct DisplayPublication {NativeIdroidDisplay value{};Matrix rootBone{},bindingRoot{};uint8_t bindingFlags{};};
+struct VisibilityLease {NativeIdroidBinding binding{};uintptr_t player{};uint64_t activation{};bool visible{};};
+std::mutex visibilityMutex;
+VisibilityLease visibilityLease{};
+bool visibilityWriterVerified{};
 std::optional<DisplayPublication> display;
+bool transformWriterVerified{};
+struct EquipmentLease {uintptr_t player{},character{},service{};uint64_t activation{},generation{};uint32_t handle{};};
+std::mutex equipmentMutex;
+EquipmentLease equipmentLease{};
+uint64_t equipmentGeneration{};
+bool equipmentWriterVerified{};
 NativeIdroidBinding binding(const Owned& owned) noexcept {
     return {owned.character,owned.service,owned.component,owned.row,owned.nativeInterface,
-        owned.model,owned.palette,owned.point,owned.playerIndex,owned.localIndex,owned.handle};
+        owned.model,owned.palette,owned.point,owned.playerIndex,owned.localIndex,owned.handle,owned.equipmentLease};
 }
 bool inspect(uintptr_t owner,Owned& value) noexcept {
+    value.inspectionStage=1;
     if(get<uintptr_t>(owner)!=base+0x23b8218)return false;
     value.character=get<uintptr_t>(owner+0x370);
     if(get<uintptr_t>(value.character)!=base+0x2295210)return false;
@@ -63,6 +79,7 @@ bool inspect(uintptr_t owner,Owned& value) noexcept {
     value.service=get<uintptr_t>(weapon+0x60);
     if(get<uintptr_t>(value.service)!=base+0x234b840)return false;
     value.playerIndex=get<uint32_t>(owner+0x3a0);
+    value.inspectionStage=2;
     std::array<uintptr_t,4> callbacks{},contexts{};
     if(!read(value.service+0x1f0,callbacks)||!read(value.service+0x210,contexts))return false;
     for(size_t i=0;i<callbacks.size();++i){
@@ -71,14 +88,22 @@ bool inspect(uintptr_t owner,Owned& value) noexcept {
         if(value.component)return false; // Ambiguous current-character registration.
         value.component=contexts[i];
     }
-    if(!value.component)return false;
-    const auto instances=get<uintptr_t>(value.component+0x38),rows=get<uintptr_t>(value.component+0x78);
-    const auto first=get<uint32_t>(instances+0x24);
-    if(!instances||!rows||value.playerIndex<first||value.playerIndex-first>15)return false;
-    value.row=rows+static_cast<uintptr_t>(value.playerIndex-first)*0x60;
-    value.handle=get<uint32_t>(value.row+0x18);value.flags=get<uint32_t>(value.row+0x50);
-    value.state=get<uint8_t>(value.row+0x10);
+    if(value.component){
+        const auto instances=get<uintptr_t>(value.component+0x38),rows=get<uintptr_t>(value.component+0x78);
+        const auto first=get<uint32_t>(instances+0x24);
+        if(!instances||!rows||value.playerIndex<first||value.playerIndex-first>15)return false;
+        value.row=rows+static_cast<uintptr_t>(value.playerIndex-first)*0x60;
+        value.handle=get<uint32_t>(value.row+0x18);value.flags=get<uint32_t>(value.row+0x50);
+        value.state=get<uint8_t>(value.row+0x10);
+    }else{
+        std::lock_guard lock(equipmentMutex);
+        if(equipmentLease.player!=owner||equipmentLease.character!=value.character
+                ||equipmentLease.service!=value.service||!equipmentLease.generation
+                ||!handheldIdroidOwned(owner,equipmentLease.activation))return false;
+        value.handle=equipmentLease.handle;value.equipmentLease=equipmentLease.generation;
+    }
     const auto slot=value.handle>>16;
+    value.inspectionStage=3;
     if((value.handle&31u)!=17u||((value.handle>>5)&0x7ffu)!=499u||slot>255)return false;
     const auto records=get<uintptr_t>(value.service+0x140);
     if(!records||!read(records+static_cast<uintptr_t>(slot)*6+5,value.recordFlags)||!(value.recordFlags&1))return false;
@@ -92,6 +117,7 @@ bool inspect(uintptr_t owner,Owned& value) noexcept {
     }
     if(!mapped)return false;
     value.nativeInterface=get<uintptr_t>(value.service+0x190);
+    value.inspectionStage=4;
     if(get<uintptr_t>(value.nativeInterface)!=base+0x22e2970)return false;
     const auto models=get<uintptr_t>(value.nativeInterface+0x58);
     value.model=get<uintptr_t>(models+static_cast<uintptr_t>(value.localIndex)*8);
@@ -104,6 +130,7 @@ bool inspect(uintptr_t owner,Owned& value) noexcept {
     value.palette=get<uintptr_t>(value.model+0xe0);
     if(!read(value.model+0xfa,value.handsetBindingFlags))return false;
     value.bodyInterface=get<uintptr_t>(value.character+0x10);
+    value.inspectionStage=5;
     const auto fade=get<uintptr_t>(value.character+0x78);
     if(get<uintptr_t>(fade)!=base+0x23b0c70||get<uintptr_t>(fade+0x408)!=value.character
         ||get<uintptr_t>(fade+0x238)!=value.bodyInterface
@@ -118,6 +145,7 @@ bool inspect(uintptr_t owner,Owned& value) noexcept {
     if(bones<13||bones>512)return false;
     value.bodyPalette=get<uintptr_t>(value.body+0xe0);value.bindingFlags=get<uint8_t>(value.body+0xfa);
     const auto wrappers=get<uintptr_t>(value.holder+0x80);
+    value.inspectionStage=6;
     const auto wrapperCount=get<uint8_t>(value.holder+0xb9);
     const uint32_t selected=value.state==3?2u:1u;
     if(!wrappers||wrapperCount<=selected||wrapperCount>128)return false;
@@ -133,15 +161,18 @@ bool inspect(uintptr_t owner,Owned& value) noexcept {
         ||get<uint64_t>(value.point+0x10)!=0x1c68632c5c53ull
         ||get<uint32_t>(value.point+0xa0)!=0x38b1433cu||get<int16_t>(value.point+0xa8)!=12)return false;
     value.pointState=get<uint16_t>(value.point+0xa4);value.pointVariant=get<uint16_t>(value.point+0xa6);
+    value.inspectionStage=7;
     value.pointFlags=get<uint32_t>(value.point+0xac);
     if(value.pointVariant!=(selected==1?4u:6u))return false;
     if(!value.palette||!value.bodyPalette||!read(value.bodyPalette+12*64,value.wrist)
         ||!read(value.point+0x20,value.cnp)||!read(value.body+0xa0,value.bindingRoot)
         ||!read(value.body+0x40,value.bodyRoot)||!read(value.model+0x40,value.handsetRoot)
         ||!read(value.model+0xa0,value.handsetBindingRoot)||!read(value.palette,value.handsetRootBone))return false;
+    value.inspectionStage=8;
     return finite(value.wrist)&&finite(value.cnp)&&finite(value.bindingRoot)&&finite(value.bodyRoot)&&finite(value.handsetRoot)
         &&finite(value.handsetBindingRoot)&&finite(value.handsetRootBone)
-        &&get<uintptr_t>(owner+0x370)==value.character&&get<uint32_t>(value.row+0x18)==value.handle
+        &&get<uintptr_t>(owner+0x370)==value.character
+        &&(value.equipmentLease||get<uint32_t>(value.row+0x18)==value.handle)
         &&get<uintptr_t>(models+static_cast<uintptr_t>(value.localIndex)*8)==value.model
         &&get<uintptr_t>(value.holder+0x68)==value.body&&get<uintptr_t>(value.holder+0x70)==value.driver
         &&get<uintptr_t>(value.body+0xe0)==value.bodyPalette&&get<uintptr_t>(value.model+0xe0)==value.palette;
@@ -150,6 +181,36 @@ IdroidBodyStamp stamp(const HeadCameraSample& frame,const Owned& owned) noexcept
     return {frame.playerOwner,owned.body,owned.driver,owned.bodyPalette,frame.activation,
         frame.controllers.referenceEpoch,frame.controllers.presentationEpoch,frame.trackingSequence,
         frame.rigSequence,frame.menuGeneration,frame.controllers.predictedXrTime,frame.controllers.presentationFocused};
+}
+void updateHandheldVisibility(const HeadCameraSample& frame,const Owned& owned) noexcept {
+    if(!visibilityWriterVerified)return;
+    std::lock_guard lock(visibilityMutex);
+    const bool wanted=handheldIdroidOwned(frame.playerOwner,frame.activation)
+        &&frame.menuOpen&&frame.menuIdroid&&frame.controllers.handheldMenus
+        &&!frame.controllers.handheldIdroidStowed&&!frame.menuWorldQuad&&!nativeIdroidClosing();
+    const auto current=binding(owned);
+    // Native dc4430 owns category-17 visibility: record+5 bit2 is inverted
+    // draw enable; its typed B0 target publishes that decision to the renderer.
+    // Use the exact already-loaded ID499 model, never allocate a second phone.
+    using Visible=void(*)(void*,uint32_t,bool);
+    const auto setVisible=reinterpret_cast<Visible>(base+0xdc4430);
+    if(owned.equipmentLease){
+        // This allocation belongs to the VR terminal, not the native stationary
+        // player action. The native release API retires it when the UI closes.
+        if(wanted?((owned.recordFlags&4)||get<uint32_t>(owned.model+0x1a4)!=0):!(owned.recordFlags&4))
+            setVisible(reinterpret_cast<void*>(owned.service),owned.handle,wanted);
+        return;
+    }
+    if(visibilityLease.player&&(!wanted||visibilityLease.player!=frame.playerOwner
+            ||visibilityLease.activation!=frame.activation||!sameNativeIdroidBinding(visibilityLease.binding,current))){
+        if(visibilityLease.player==frame.playerOwner&&sameNativeIdroidBinding(visibilityLease.binding,current)
+                &&!(owned.flags&0x20)&&!(owned.recordFlags&4))
+            setVisible(reinterpret_cast<void*>(owned.service),owned.handle,visibilityLease.visible);
+        visibilityLease={};
+    }
+    if(!wanted||(owned.flags&0x20))return; // Native held equipment retains its visibility owner.
+    if(!visibilityLease.player)visibilityLease={current,frame.playerOwner,frame.activation,!(owned.recordFlags&4)};
+    if(owned.recordFlags&4)setVisible(reinterpret_cast<void*>(owned.service),owned.handle,true);
 }
 bool reserveEvent() noexcept {
     const auto now=GetTickCount64();uint64_t zero{};
@@ -160,6 +221,43 @@ bool reserveEvent() noexcept {
 void printMatrix(std::ostringstream& stream,const char* label,const Matrix& matrix){
     stream<<' '<<label<<'=';
     for(size_t i=0;i<matrix.size();++i){if(i)stream<<',';stream<<matrix[i];}
+}
+bool publishHandheldBody(const HeadCameraSample& frame,const Owned& owned,
+                         const Completion& completion) noexcept {
+    if(!transformWriterVerified||!frame.menuOpen||!frame.menuIdroid
+        ||!frame.controllers.handheldMenus||frame.controllers.handheldIdroidStowed||frame.menuWorldQuad
+        ||!frame.idroidDeviceTracked||nativeIdroidClosing()
+        ||(!handheldIdroidOwned(frame.playerOwner,frame.activation)&&(owned.state==3||!(owned.flags&0x20)))
+        ||!sameIdroidBodyPublication(completion.stamp,stamp(frame,owned)))return false;
+    // UI-only ID499 has no player equipment task to move its scene root.
+    // A reused native slot otherwise keeps its old world bounds, culling the
+    // handset even when its bone palette has reached the tracked left hand.
+    // Move the leased model root and rebase its palette in that SAME space.
+    // Native player-owned equipment retains the root published by its task.
+    constexpr Matrix identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+    const auto leasedRoot=owned.equipmentLease
+        ?nativeIdroidAttachmentDelta(identity,identity,0,frame.idroidDevice):std::optional<Matrix>{owned.handsetRoot};
+    if(!leasedRoot)return false;
+    alignas(16) const auto root=*leasedRoot;
+    const auto delta=nativeIdroidAttachmentDelta(owned.handsetRootBone,
+        owned.equipmentLease?root:owned.handsetBindingRoot,owned.handsetBindingFlags,frame.idroidDevice);
+    if(!delta)return false;
+    Owned verified;
+    if(!inspect(frame.playerOwner,verified)||!sameNativeIdroidBinding(binding(owned),binding(verified))
+        ||!sameIdroidBodyPublication(completion.stamp,stamp(frame,verified))
+        ||owned.state!=verified.state||owned.flags!=verified.flags
+        ||owned.handsetRoot!=verified.handsetRoot
+        ||owned.handsetRootBone!=verified.handsetRootBone
+        ||owned.handsetBindingRoot!=verified.handsetBindingRoot
+        ||owned.handsetBindingFlags!=verified.handsetBindingFlags)return false;
+    // The native root setter updates the scene bounds and binding root. A8
+    // preserves the antenna/camera bones with one attachment delta. Never
+    // replay the equipment phase or its animation.
+    alignas(16) const auto transform=*delta;
+    using SetTransform=void(*)(void*,const float*);
+    reinterpret_cast<SetTransform>(base+0x1ce7f0)(reinterpret_cast<void*>(owned.model),root.data());
+    original(reinterpret_cast<void*>(owned.nativeInterface),owned.localIndex,transform.data());
+    return true;
 }
 void emit(const char* kind,const Owned& owned,const IdroidBodyStamp& current,
           uint64_t eventQpc,uint64_t event,const Completion& before,const Matrix* input){
@@ -205,6 +303,7 @@ void paletteApply(void* object,uint32_t index,const float* matrix){
         }
     }catch(...){}
     original(object,index,matrix);
+    refreshNativeWeaponMagnifier(reinterpret_cast<uintptr_t>(object),index);
     if(admitted&&enabled.load())try{
         // The native call above is the only transform writer. Copy its named
         // root bone, using the exact native binding-space branch, before any
@@ -214,6 +313,7 @@ void paletteApply(void* object,uint32_t index,const float* matrix){
         if(!frame||!inspect(current.player,after)||!sameIdroidBodyPublication(current,stamp(*frame,after))
             ||!sameNativeIdroidBinding(binding(owned),binding(after))
             ||owned.state!=after.state||owned.flags!=after.flags)return;
+        if(publishHandheldBody(*frame,after,before)&&!inspect(current.player,after))return;
         const auto pose=nativeAffinePose(nativeIdroidWorldMatrix(after.handsetRootBone,
             after.handsetBindingRoot,after.handsetBindingFlags));
         if(!pose)return;
@@ -269,6 +369,26 @@ void installIdroidAttachmentDiagnostics(uintptr_t moduleBase) noexcept {
     if(enabled.load())return;
     traceEnabled.store(requested(L"MGS5VR_IDROID_ATTACHMENT_TRACE")||requested(L"MGS5VR_IDROID_UI_BOUNDARY_TRACE"));
     base=moduleBase;
+    std::array<uint8_t,15> visibilityEntry{},modelEntry{};
+    visibilityWriterVerified=read(base+0xdc4430,visibilityEntry)
+        &&visibilityEntry==std::array<uint8_t,15>{0x89,0x54,0x24,0x10,0x55,0x57,0x48,0x83,0xec,0x28,0x8b,0xc2,0x41,0x0f,0xb6}
+        &&read(base+0xade4d0,modelEntry)
+        &&modelEntry==std::array<uint8_t,15>{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57,0x48,0x83,0xec,0x20}
+        &&get<uintptr_t>(base+0x234b840+0x70)==base+0xdc4430
+        &&get<uintptr_t>(base+0x22e2970+0xb0)==base+0xade4d0;
+    const auto signature=[](uintptr_t address,const std::array<uint8_t,15>& expected){
+        std::array<uint8_t,15> actual{};return read(address,actual)&&actual==expected;
+    };
+    equipmentWriterVerified=visibilityWriterVerified
+        &&get<uintptr_t>(base+0x234b840)==base+0xdc3250
+        &&get<uintptr_t>(base+0x234b840+8)==base+0xdc63a0
+        &&get<uintptr_t>(base+0x234b840+0x30)==base+0xdc0920
+        &&signature(base+0xdc3250,{0x44,0x89,0x4c,0x24,0x20,0x53,0x41,0x54,0x41,0x55,0x41,0x56,0x41,0x57,0x48})
+        &&signature(base+0xdc63a0,{0x48,0x89,0x74,0x24,0x18,0x89,0x54,0x24,0x10,0x57,0x48,0x83,0xec,0x20,0x8b})
+        &&signature(base+0xdc0920,{0x89,0x54,0x24,0x10,0x53,0x48,0x83,0xec,0x20,0x8b,0xc2,0x44,0x8b,0xc2,0x48});
+    std::array<uint8_t,12> setter{};
+    transformWriterVerified=read(base+0x1ce7f0,setter)&&setter==std::array<uint8_t,12>{
+        0x40,0x53,0x48,0x83,0xec,0x20,0x0f,0x28,0x02,0x48,0x8b,0xd9};
     constexpr std::array<uint8_t,22> expected{0x48,0x83,0xec,0x58,0x48,0x8b,0x41,0x58,0x8b,0xd2,
         0x48,0x8b,0x04,0xd0,0x48,0x0f,0xbf,0x88,0xf8,0,0,0};
     std::array<uint8_t,expected.size()> actual{};
@@ -280,19 +400,134 @@ void installIdroidAttachmentDiagnostics(uintptr_t moduleBase) noexcept {
     if(MH_EnableHook(address)!=MH_OK){MH_RemoveHook(address);log("Idroid attachment observation hook enable failed");return;}
     enabled.store(true);
     LARGE_INTEGER frequency{};QueryPerformanceFrequency(&frequency);
-    log("Idroid attachment read-only publication enabled qpc_frequency="+std::to_string(frequency.QuadPart)
-        +" trace="+std::to_string(traceEnabled.load())+" max_events=4096 max_duration_ms=45000 transforms_unchanged=1");
+    log("Native iDroid attachment publication enabled qpc_frequency="+std::to_string(frequency.QuadPart)
+        +" trace="+std::to_string(traceEnabled.load())+" max_events=4096 max_duration_ms=45000 owned_handheld_root_delta="
+        +std::to_string(transformWriterVerified)+" ui_only_native_equipment="+std::to_string(equipmentWriterVerified)
+        +" animation_callbacks_replayed=0");
 }
-void noteIdroidBodyComplete(uintptr_t driver,uintptr_t binding,const HeadCameraSample& frame,bool pausedRefresh) noexcept {
+void pumpHandheldIdroidEquipment() noexcept {
+    if(!enabled.load()||!equipmentWriterVerified)return;
+    try{
+        const auto frame=headCamera().publishedRigFrame(steadyMilliseconds());
+        const auto borrow=handheldIdroidBorrow();
+        const bool wanted=handheldIdroidOwned()&&((nativeIdroidOpen()&&!nativeIdroidClosing())||borrow.player)
+            &&handheldMenusSelected()&&!nativeGamepadActive()
+            &&!nativeLoadingTipsOpen()&&!nativeTitleModeActive()&&!nativeScriptedDemoActive();
+        uintptr_t character{},service{};
+        if(frame&&get<uintptr_t>(frame->playerOwner)==base+0x23b8218){
+            character=get<uintptr_t>(frame->playerOwner+0x370);
+            if(get<uintptr_t>(character)==base+0x2295210){
+                const auto weapon=get<uintptr_t>(character+0x80);
+                if(get<uintptr_t>(weapon)==base+0x23b3e80&&get<uintptr_t>(weapon+8)==character){
+                    service=get<uintptr_t>(weapon+0x60);
+                    if(get<uintptr_t>(service)!=base+0x234b840)service=0;
+                }
+            }
+        }
+        std::lock_guard lock(equipmentMutex);
+        const bool ownerKnown=frame&&character&&service;
+        const bool same=ownerKnown&&equipmentLease.player==frame->playerOwner
+            &&equipmentLease.character==character&&equipmentLease.service==service;
+        if(equipmentLease.generation&&same&&borrow.player&&!nativeIdroidOpen()){
+            const auto slot=equipmentLease.handle>>16;
+            const auto records=get<uintptr_t>(service+0x140);
+            if(records&&slot<=255&&get<uint16_t>(records+slot*6)==499
+                    &&!(get<uint8_t>(records+slot*6+5)&4)){
+                using Visible=void(*)(void*,uint32_t,bool);
+                reinterpret_cast<Visible>(base+0xdc4430)(reinterpret_cast<void*>(service),equipmentLease.handle,false);
+            }
+        }
+        if(equipmentLease.generation&&(!wanted||(ownerKnown&&!same))){
+            // A camera publication with a temporarily unavailable typed player
+            // chain is not a new native owner. Keep its allocation until that
+            // chain is observable again, including a close during the gap.
+            // Dropping the lease here leaves a live handset behind and the next
+            // open allocates a second one in the same equipment service.
+            if(!ownerKnown)return;
+            // A changed native character/service cannot validate a former
+            // allocation. Never release a reused level's slot by its number.
+            const auto slot=equipmentLease.handle>>16;
+            const auto records=get<uintptr_t>(equipmentLease.service+0x140);
+            if(same
+                    &&records&&slot<=255&&get<uint16_t>(records+slot*6)==499){
+                // Hide the exact owned allocation before retiring its record.
+                // No later skin publication may leave its last pose visible.
+                using Visible=void(*)(void*,uint32_t,bool);
+                reinterpret_cast<Visible>(base+0xdc4430)(reinterpret_cast<void*>(service),equipmentLease.handle,false);
+                using Release=void(*)(void*,uint32_t);
+                reinterpret_cast<Release>(base+0xdc63a0)(reinterpret_cast<void*>(service),equipmentLease.handle);
+                log("VR handheld native ID499 allocation released lease="+std::to_string(equipmentLease.generation));
+            }else{
+                log("VR handheld native ID499 allocation owner retired lease="+std::to_string(equipmentLease.generation)
+                    +" current_owner_matches="+std::to_string(same));
+            }
+            equipmentLease={};
+        }
+        if(equipmentLease.generation&&same&&handheldIdroidOwned(frame->playerOwner,frame->activation))
+            equipmentLease.activation=frame->activation;
+        if(!wanted||!frame||!service||equipmentLease.generation)return;
+        // The real player-held path retains its existing resource owner.
+        std::array<uintptr_t,4> callbacks{},contexts{};
+        if(!read(service+0x1f0,callbacks)||!read(service+0x210,contexts))return;
+        for(size_t i=0;i<callbacks.size();++i)
+            if(callbacks[i]==base+0x11fae20&&get<uintptr_t>(contexts[i])==base+0x23c7bc8
+                    &&get<uintptr_t>(contexts[i]+8)==character)return;
+        uint32_t handle{};
+        using Allocate=uint32_t*(*)(void*,uint32_t*,uint32_t,uint32_t);
+        reinterpret_cast<Allocate>(base+0xdc3250)(reinterpret_cast<void*>(service),&handle,499,0);
+        if((handle&31u)!=17u||((handle>>5)&0x7ffu)!=499u||(handle>>16)>255u){
+            log("VR handheld native ID499 allocation unavailable");return;
+        }
+        equipmentLease={frame->playerOwner,character,service,frame->activation,++equipmentGeneration,handle};
+        // dc0920 requests this exact native equipment slot's asset load. It
+        // queues an unloaded alternate slot, which retail's service completes.
+        using Load=void(*)(void*,uint32_t);
+        reinterpret_cast<Load>(base+0xdc0920)(reinterpret_cast<void*>(service),handle);
+        using Visible=void(*)(void*,uint32_t,bool);
+        reinterpret_cast<Visible>(base+0xdc4430)(reinterpret_cast<void*>(service),handle,true);
+        log("VR handheld native ID499 allocation requested lease="+std::to_string(equipmentLease.generation)
+            +" handle="+std::to_string(handle));
+    }catch(...){}
+}
+void noteIdroidBodyComplete(uintptr_t driver,uintptr_t bodyBinding,const HeadCameraSample& frame,bool pausedRefresh) noexcept {
     if(!enabled.load()||!frame.applied||!frame.rigSequence)return;
     try{
         const auto eventQpc=qpc(),event=eventSequence.fetch_add(1)+1;
         Owned owned;
-        if(!inspect(frame.playerOwner,owned)||owned.driver!=driver||owned.body+0xa0!=binding)return;
+        const bool inspected=inspect(frame.playerOwner,owned);
+        static std::atomic_uint64_t lastDiagnostic{};
+        const auto now=GetTickCount64();
+        if(handheldIdroidOwned(frame.playerOwner)&&now-lastDiagnostic.load()>1000){
+            lastDiagnostic.store(now);
+            log("VR handheld handset publication inspect="+std::to_string(inspected)
+                +" stage="+std::to_string(owned.inspectionStage)+" lease="+std::to_string(owned.equipmentLease)
+                +" model="+std::to_string(owned.model)+" body="+std::to_string(owned.body)
+                +" driver_matches="+std::to_string(owned.driver==driver)
+                +" binding_matches="+std::to_string(owned.body+0xa0==bodyBinding));
+        }
+        if(!inspected||owned.driver!=driver||owned.body+0xa0!=bodyBinding)return;
+        updateHandheldVisibility(frame,owned);
         const auto current=stamp(frame,owned);
         Completion before;
         {std::lock_guard lock(completionMutex);before=completed;
             completed={current,eventQpc,event,GetCurrentThreadId(),pausedRefresh};display.reset();}
+        const Completion transaction{current,eventQpc,event,GetCurrentThreadId(),pausedRefresh};
+        const bool published=publishHandheldBody(frame,owned,transaction);
+        if(handheldIdroidOwned(frame.playerOwner)&&now==lastDiagnostic.load())
+            log("VR handheld handset transform published="+std::to_string(published)
+                +" tracked="+std::to_string(frame.idroidDeviceTracked)+" flags="+std::to_string(owned.handsetBindingFlags));
+        if(published){
+            Owned after;
+            if(!inspect(frame.playerOwner,after)||!sameNativeIdroidBinding(binding(owned),binding(after))
+                ||!sameIdroidBodyPublication(current,stamp(frame,after)))return;
+            const auto pose=nativeAffinePose(nativeIdroidWorldMatrix(after.handsetRootBone,
+                after.handsetBindingRoot,after.handsetBindingFlags));
+            if(!pose)return;
+            std::lock_guard lock(completionMutex);
+            if(completed.event==event&&sameIdroidBodyPublication(completed.stamp,current))
+                display=DisplayPublication{{*pose,current,binding(after),eventQpc,qpc()},
+                    after.handsetRootBone,after.handsetBindingRoot,after.handsetBindingFlags};
+        }
         emit("body_complete",owned,current,eventQpc,event,before,nullptr);
     }catch(...){}
 }
@@ -300,5 +535,6 @@ void stopIdroidAttachmentDiagnostics() noexcept {
     enabled.store(false);
     traceEnabled.store(false);
     std::lock_guard lock(completionMutex);completed={};display.reset();
+    std::lock_guard equipmentLock(equipmentMutex);equipmentLease={};
 }
 }

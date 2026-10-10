@@ -2,9 +2,881 @@
 
 The release goal is playable TPP from start to finish, with reliable physical
 weapons, optics and binoculars, the existing left-arm weapon/status display and
-left-arm HUD popups, and the right-hand iDroid. Pause uses a spatial stereo
+left-arm HUD popups, and the left-hand iDroid requested on October 4. Pause uses a spatial stereo
 panel. Floating firearm aiming overlays stay off. No desktop/input automation
 or Steam shutdown is needed by the local workflow.
+
+## October 10 headset-feedback implementation
+
+The development candidate, `0a0d5f0f26cf`, passes all 54 automated test groups
+and installer checks (`driver-ready-freshness-build.log`). Retained run
+`20261010T180016091187Z` passes all four cases: stationary jeep sidearm fire
+(8 to 7 rounds, primary/back ammunition unchanged at 30/200, pedals neutral),
+LEFT-hand +35-degree steering, both-hand -35-degree steering, and normal
+exit using a 0.08-second Y tap. The steering sweeps deliver full native
+positive/negative input. The player finishes on foot with every input released.
+These are stationary driver firing and steering checks; moving-vehicle
+handling, the R08 obstructed-barrel negative, tab-wrap acceptance and physical
+headset acceptance remain open. The release is not certified.
+Post-shot stereo seated views and the exit image were reviewed; continuous
+held-gun visibility is not accepted by those captures. The owned simulator
+session is stopped, Steam remains running, and both the per-game and saved
+launcher runtime are restored to Meta OpenXR. The `6ac2` pin is unchanged.
+The scoped receipt is `driver-final-acceptance-0a0d.json`.
+
+An earlier shot on this DLL is preserved in `driver-sidearm-shot-0a0d.json`:
+the selected sidearm fired from 10 to 9 while its fixture incorrectly expected
+primary-rifle ammunition to decrease. That fixture remains failed; the final
+8-to-7 sidearm case above passes with the correct selected-slot assertion.
+
+The preceding candidate, `439294973d88`, also passed 54 automated test groups
+and installer checks. On that DLL, retained run `20261010T172426703635Z`
+passes four helicopter-flight cases: bare LEFT grip does not enter native
+binocular mode, and physical binocular equip, LEFT support and stow work.
+Both final eyes were reviewed: physical binoculars remain, without a second
+stock overlay. Native Y exit reached the field in `20261010T172459733214Z`;
+that case failed its obsolete landing-zone position guard, so only the exit
+transition is accepted, not the whole fixture.
+
+Retained run `20261010T172857273358Z` passes three cases: closing the native
+Exit Tutorial notice, ordinary held Back for 1.2 seconds followed by immediate
+iDroid reopening, and final stow/cleanup. Ammunition stayed at 30/200/10.
+The preceding actual Help mode 9 stow in `20261010T172801794846Z` closed the
+iDroid but presented that native notice; its outcome check failed until the
+next run acknowledged the notice with A. This is observed native tutorial
+behavior, not a complete pass for every forced guide.
+
+On the same DLL, `20261010T173716923612Z` passes four primary-weapon cases:
+selection/readiness, native reload, entering prone and clear-muzzle firing
+while still prone (31 to 30 rounds). `20261010T174500064295Z` passes two
+stationary wheel sweeps: LEFT hand at +35 degrees and both hands at -35
+degrees deliver full positive/negative native steering, with neutral pedals
+and a neutral release. These checks establish steering range/input delivery,
+not moving-vehicle handling.
+
+Jeep entry with a single 0.08-second Y tap passes in
+`20261010T174323243118Z`; the subsequent driver-gun readiness case times out.
+A follow-up correction in `0a0d5f0f26cf` refreshes the existing readiness
+acknowledgement from the ongoing native weapon phase; the stationary sidearm
+firing result above verifies that corrected path.
+
+The R08 obstructed-barrel negative, moving-vehicle handling
+and current-build tab-wrap acceptance remain pending. These scoped results
+do not certify the release or physical-headset readiness. The preceding live
+candidate, `165320977b11`, passed scoped simulator checks for Continue, prone
+clear-muzzle fire, native jeep entry and LEFT/both-hand wheel ownership. On
+that build, driver weapon eligibility acknowledged the request, but drawing
+remained unfinished and the firing check did not consume ammunition.
+Eligibility alone is not a visible or usable gun. Ordinary iDroid
+stow also exposed a stale native Back packet, and tab cycling exposed a second
+advance. The new build includes both corrections and fixes the disagreement
+between initial/ongoing native driver eligibility that repeatedly cancelled
+gun drawing, plus the separate native fire and pedal-history input paths.
+The current ACC/deployment investigation and exact evidence are tracked in
+`artifacts/dev/headset-feedback-current/requests.json`.
+
+The current source contains exclusive LEFT-grip iDroid focus, neutral-stick
+handoff between control owners, a held-firearm exception with separate native
+UI trigger filtering, and one tab advance per squeeze with root-page wrap.
+The native iDroid Previous prompt uses its effective dedicated chord rather
+than claiming that the focus grip alone changes tabs.
+
+Driving uses the physical wheel with a stronger 35-degree range and independent
+LEFT/empty-RIGHT hand contacts. A right-grip squeeze stays assigned to its
+chosen interaction until release. It no longer opens the equipment picker;
+the separately configured optional picker retains its own exclusive input.
+Personal-gun input now has a guarded native semantic adapter: RIGHT grip away
+from the wheel requests the gun, the firing trigger leaves the pedals, and
+LEFT stick vertical supplies acceleration/braking after centering. Rendering
+and firing require a fresh native weapon-ready acknowledgement. Stationary
+driver sidearm firing is verified above; this does not establish every weapon
+or moving-vehicle handling.
+
+Returning to the ACC provides an effective-binding iDroid/deployment hint on
+the LEFT forearm. A positively identified native field-helicopter passenger
+gets cabin movement carried with the live helicopter, native collision and
+normal Y exit. Authored cutscenes retain their native ownership.
+
+The launcher editor, lessons and four PNG guides use the same effective
+binding export, including migration of the legacy driving grip. The guides
+reuse the launcher's field-kit artwork and actual 3D controller models. They live
+in `docs/control-guides/`; regenerate them after the combined development
+build. They describe controls, not completed gameplay acceptance.
+
+Implementation and verification state for this feedback batch is recorded in
+`artifacts/dev/headset-feedback-current/requests.json`. The earlier scoped
+simulator results below belong to their named DLLs. They do not validate
+these newer changes or clear the prone/cover firing report. No pinned-build
+promotion is implied by this work.
+
+## October 10 physical feedback: firing denied near cover and prone
+
+First priority from the user's wired Quest Link session: repeated denial dings
+and the cannot-fire wrist symbol while the visible tracked gun appears clear,
+especially prone or near objects. This is the existing R08 issue. It is a
+physical user report; the new source has not yet passed the reported case.
+The native pre-fire clearance query now follows the tracked gun barrel and
+authored muzzle for the verified local firearm owner. Original physics,
+clearance radius, asynchronous result consumption, ammo and projectile
+collision remain in charge. `tracked_weapon_obstruction=0` restores the
+legacy clearance origin. Details are in `docs/NATIVE_WEAPON_OBSTRUCTION.md`.
+Required acceptance: a clear gun fires prone/around cover, while an obstructed
+barrel remains obstructed, without a stance reset.
+The physical session log and exact report are retained privately at
+`artifacts/dev/headset-feedback-current/r08-prone-firing.json`.
+
+## October 10 tutorial and frame-delivery fixes
+
+Local physical play uses wired Quest Link through Meta OpenXR. Windows still
+registers SteamVR globally, so MGS5VR now honors the user's saved
+`HKCU\\Software\\Nikami\\MGS5VR\\Launcher\\HeadsetRuntime` first. Both root
+Play commands use the shared launcher, preserving the pinned payload. The
+per-game runtime file also selects Meta for direct game launches. Explicit
+runtime arguments override the saved choice; an invalid saved choice fails
+instead of silently choosing another provider. Launcher regression tests pass.
+The physical game was launched with Meta and its loaded LibOVR runtime verified;
+this confirms provider selection, not full physical-headset acceptance.
+
+Earlier development DLL `bfa228f7bc04` fixes four reproduced defects. Help over
+first-open iDroid retains the live stereo camera; the native guide's own
+pause retains the correct camera; fresh paused skin publication keeps the
+LEFT handset attached to its hand and projection; and the XR owner returns
+GPU-completed shared slots before the next runtime wait. The last change does
+not alter image/pose provenance, cached frames, queue depth or resolution.
+
+The real forced Security guide completed through VR controls: Security
+Settings -> Command Platform -> Basic Settings -> close its Help card. Retained
+run `20261010T123130663211Z` witnesses mode zero, native tutorial pause cleared
+and live stereo. The game owns all progression; no pause/progression writes,
+tutorial skip, security purchase or save replacement were used. This does not
+establish permanent guide completion across a future native save/reload.
+
+On this exact DLL, 44 distinct scoped field cases passed across retained runs
+`20261010T123205186650Z` (31 passes) and `20261010T123624390618Z` (13 passes).
+Coverage includes completed-guide stow; ordinary LEFT iDroid opening, hand/head
+motion, stow and immediate reopening; wrist input contexts; physical binocular
+equip/stow; Pause roundtrip; stance changes; synthetic head/view loss and
+recovery; three actually loaded weapons selected/raised/fired/reloaded with
+one/two-hand support; and the SVG-76 physical 1x -> 2x -> 1x switch.
+The ALM fixture initially expected 198 loaded rounds, while native state was
+200. It failed before dispatch. The inspected 200-round fixture passed; the
+failed run remains retained. SVG-76, ALM48 and WU S.PISTOL reload capacities
+observed were 31, 200 and 11. This is three loaded cards, not the full catalog.
+
+The preceding `ce20be11da9d` candidate also passed 47 scoped checks before the
+frame-delivery change. Its prior images/results remain evidence of that DLL,
+not substitutes for the current rerun. All 145 decoded frames of the current
+40-second LEFT compositor guide motion capture have been reviewed; the real
+Help closes and the paused handset/projection move together. The low-rate
+recording does not establish 90 Hz visual smoothness or physical comfort.
+Current paired-eye outcome/held-ready captures are in the private report.
+
+A quiet, unrecorded 45-second field comparison (first five seconds excluded)
+measured fresh XR frames improving from 73.85-77.20 FPS (median 74.89) to
+89.62-90.04 FPS (median 90.00) at the 90 Hz runtime. Native stereo production
+remained 103.59-106.11 FPS, with zero empty submissions. This accepts only the
+measured quiet-field frame-delivery repair, not heavy combat or headset timing.
+The native build passes all 54 CTest groups and installer checks. The final
+startup fade guard also passes nine focused supervisor tests; the final build
+log and current verification result are recorded in the private report.
+
+Full release acceptance remains open: complete missions/other guide modes,
+fresh/middle/end saves, the 418 weapon definitions and their configurations,
+full sight/muzzle/hit alignment, binocular acquisition/marking, vehicle flows,
+held wrist-popup visual acceptance, sustained soak and physical headset use.
+The off-axis weapon images cannot certify optic aperture or hit alignment.
+No full-game, universal-player or 100-percent readiness claim is supported.
+
+Exactly two builds are retained: `play/` stays the selected `6ac2` pin and
+`build/dev/` contains these fixes. Use `Play-Dev.cmd` for the fixed candidate;
+`Play.cmd` restores the selected pin. No promotion or release was performed.
+The current result, exact identities, retained runs and cleanup status are in
+`artifacts/dev/readiness-current/report.json`.
+
+## October 10 original pinned-build simulator check — blocked
+
+The pinned `6ac226f4bf2c` DLL was tested in the real Meta XR Simulator before
+headset handoff. **Do not call this candidate release-ready or headset-accepted.**
+The current report is `artifacts/dev/readiness-current/report.json`.
+
+Cold startup needed four visually reviewed Online Information acknowledgments
+because the startup bot did not recognize those pages. Continue then reached
+Afghanistan free play, Mission30010 / `Seq_Game_FreePlay`. The first LEFT iDroid
+opening entered forced guide mode 11 with Pause ownership and camera reason 7;
+the runtime continued submitting at 90 Hz while new stereo production stopped.
+The failed run is retained at `artifacts/bot/runs/20261010T111107368414Z`.
+This reproduced a player-visible freeze, not a successful readiness check.
+
+Bounded held Back recovered the live camera and mode zero, leaving the native
+Exit Tutorial card. The explicitly selected Pause roundtrip then cleared that
+card. This is guide suspension/recovery, never tutorial completion or a fix.
+After recovery, 26 distinct scoped state checks passed: seven control checks,
+seven ordinary iDroid lifecycle checks, Pause open/close, four stance changes,
+and six synthetic head/view tracking loss/recovery checks. The clean run is
+`artifacts/bot/runs/20261010T111749974073Z`; tracking evidence is
+`artifacts/bot/runs/20261010T111648372960Z`. Both-eye outcome images and all 135
+decoded frames of the 40-second LEFT compositor motion take were reviewed.
+LEFT handset/screen motion, ordinary stow and immediate reopening worked in
+that recovered session. Held wrist-popup visual acceptance, weapon sight/hit
+alignment, binocular acquisition/marking, sustained soak and headset comfort
+remain unproven by this check.
+
+During the recorded clean run, logged fresh stereo rates were 77.0–86.5 FPS
+(window median 81.4) against the 90 Hz simulator runtime. Concurrent source-eye
+and compositor recording was active; these figures do not establish physical
+headset performance or an unrecorded baseline. Performance remains unaccepted.
+
+Final observation confirmed released inputs, no menu/Pause/iDroid, mode zero,
+and an active unsuspended camera. The owned game/simulator session was closed,
+Steam retained, and pinned `play/` restored to the game. Pin and personal INI
+hashes are unchanged. Next work is the first-open forced-guide transition,
+followed by a cold-start rerun with fresh-image and sustained-motion gates.
+
+## October 10 pinned play and development builds
+
+The user selected `6ac226f4bf2c` as the pinned playable candidate. Its existing
+`play/` files and manifest remain unchanged. This is the October 5 evening
+build that passed 54 CTest groups and installer checks; physical headset and
+full-game acceptance remain open. The prior source-hash mismatch was exactly
+the two later documentation updates, not a different runtime implementation.
+
+There are now two retained local build slots: `play/` and `build/dev/`.
+Normal `tools/build.ps1` work updates development only. `Play.cmd` verifies
+the pin and restores it into the recorded game before headset launch.
+`Play-Dev.cmd` selects development for a physical debug session; `launch-sim`
+selects development for the bot. Both preserve personal settings. Only an
+explicitly requested `workspace.py pin-build` replaces the pinned candidate.
+Old packages and binary backups are removed by the guarded cleanup command;
+the inventory and removal receipt live in `artifacts/dev/build-cleanup.json`.
+Settings, saves, source, release notes and retained test evidence are preserved.
+
+## October 5 duplicate handset and free field iDroid
+
+The current recorded field checks now include a real mortar discharge and
+distant impact. The maintained mortar bot resolves the exact owned fixture's
+current streamed registry ID once, then freezes it for the run. Isolated
+human-paced stick pulses cross the measured native dead zone; a final
+observation after the last pulse fixes a false aim rejection. Pinned run
+`20261006T041836747984Z` reaches the measured downrange bearing (yaw error
+1.32 degrees, pitch error -1.49 degrees), delivers ready plus fire, and exits.
+All 110 LEFT compositor frames were reviewed. The shell-loading animation,
+launch gas, falling shell and distant impact are visible; both exit eyes show
+the impact. A vertical white beam and stippled white patches remain visible;
+the complete curved trajectory and exact impact coordinates are not accepted.
+Private fixture placement does not accept a navigation route. Cleanup releases
+inputs, exits, restores tracking and returns to the original field fixture.
+All 54 CTest groups and installer checks pass in
+`artifacts/dev/field-mortar-final-aim-full-build-20261005.log`.
+
+Ordinary current-save Mother Base -> Development -> Weapons/Items -> Back ->
+Back -> stow is now recorded on `6ac2`, with all 88 parent frames and ten
+paired images reviewed. The native pages and single LEFT handset are visible,
+mode remains zero, and cleanup leaves no menu open. This scoped pass does not
+clear the forced tutorial spinner, other menu branches or fresh-save flows.
+The separate binocular/iDroid take changes physical zoom 2x -> 4x and walks
+about 0.63 native units; all 98 parent frames and eight paired images were
+reviewed. Its centered projection crosses the optic's sightline. A subsequent
+physical move of the LEFT handset aside, stow and reopening shows the world
+in the right ocular with the projection clear; target acquisition/marking and
+full optical acceptance still require their own evidence.
+
+One private combined video, `field-kit-current-proof.mp4`, contains these
+scoped mortar, pistol/iDroid, scope, menu and binocular takes plus the explicitly
+identified earlier `3a8a` physical steering proof. All 488 delivered frames
+match reviewed decoded source pixels; original cadence is retained with hard
+chapter cuts. It is a 142-second evidence video, not whole-game acceptance.
+Current `6ac2` truck-0003 entry attempts failed and were cleaned up; incoming
+fire interrupted the native-button comparison before its comparative input.
+Current cab/driving, every weapon/scope/configuration, complete menus and
+fresh/middle/end progression remain open.
+
+The expanded private `field-kit-current-proof-v2.mp4` now retains 567 exact
+reviewed source frames across seven chapters (187 seconds). Its new current
+loaded-card sweep completes in 39.94 seconds: native resources 27873, 93478
+and 159074 are independently sampled and visible as SVG-76, AM MRS-4 and WU
+pistol. Native ammunition decreases by two, three and one rounds respectively.
+All 110 parent frames and all 24 sequential paired-eye images were reviewed.
+One- and two-hand ready are observed on each; SVG-76 powers 1x and 2x are
+exercised. The other two cards do not establish a variable-power descriptor.
+Brief weapon pose jumps, exact contacts, hits and every fitted sight remain
+unaccepted. This does not bind or clear the 418 native catalog definitions.
+The wrapper now honors the compositor recorder's existing 45-second limit;
+the earlier failed 60-second request dispatched no weapon checks. Cleanup
+completes with no input, recording, menu or tracking error.
+
+The expanded video replaces the centered-binocular chapter with the physical
+centered/aside/stowed/reopened comparison. All 67 parent frames and fourteen
+sequential paired-eye images are reviewed. The right ocular shows the world
+with the handset aside, closed and reopened aside; the left eye remains
+outside that right ocular at the measured hand pose. Acquisition, marking,
+full optical alignment and physical-headset acceptance remain open. The
+current measured truck-0002 doorway trial was interrupted by actual incoming
+fire before boarding and restored the safe field fixture; it is not a driving
+pass. The earlier steering chapter remains explicitly identified as `3a8a`.
+
+The following current truck-0003 threat-response attempt also fails and is
+cleaned up. Native visibility queries locate two unoccluded guards about four
+and five units away, but measured two-hand barrel errors plateau around 0.21
+and 0.37 units and never satisfy the existing 0.18 firing gate. No trigger is
+dispatched. Actual alert and health loss then interrupt boarding; the safe
+field fixture is restored. This retains a concrete bot aiming failure rather
+than crediting camp clearance or current driving. The rig's support hand
+guides weapon direction; independently changing the dominant orientation then
+copying the existing support contact is a feedback limitation requiring a
+coherent two-hand correction and a new actual-game reproduction. Final live
+inspection confirms no Pause/iDroid menu and zero buttons, axes, triggers or
+physical test inputs.
+
+Candidate `6ac226f4bf2c` repairs the missing 1x dot reproduced on `02052`.
+The unmagnified collimator retains native transparent glass and stereo pixels;
+only its dot is drawn at the measured native rear sight point. It does not
+request an extra magnified scene replay. All 54 CTest groups and installer
+checks passed in `artifacts/dev/field-collimator-dot-full-build-20261005.log`.
+The live `20261005-dual-scope-collimator-6ac2` run now completes physical
+1x -> 2x -> 1x. All 88 LEFT compositor frames and six paired images were
+reviewed: both powers show their dot, and the existing native magnifier hinge
+moves 120 -> 0 -> 120 degrees. The right-eye 1x aperture is clear; the off-axis
+left-eye 1x aperture is largely dark with a red point and a sliver of scene.
+Handling still jumps briefly, and the low capture cadence does not clear the
+earlier separated-lens defect. Full optical alignment, exact native reticle
+texture, hits, catalog permutations and headset acceptance remain open.
+
+The field Development page reproduced a loading spinner with forced mode 11.
+Ordinary Back reached actual game XInput but did not close it. The existing
+VR iDroid Menu tap stowed that UI-only owner and restored mode zero. Its native
+Exit Tutorial card remained visible after the pause owner closed; LEFT-grip
+focus plus the reviewed A Close input dismissed the card in both eyes. The
+subsequent clean actual WU S.PISTOL case fires 11 -> 10, reloads to 11 and
+stows/returns the single LEFT handset for support grip. All 107 decoded LEFT
+parent frames and all eight paired images were reviewed. A stream-copy chapter
+retains original frames/timing; capture throughput is 3.55 FPS, not game FPS.
+These bounded recoveries do not accept
+Development loading, all menus or the complete field-kit video.
+
+The real `02052` run `20261005-dual-scope-alignment-02052` completed physical
+1x -> 2x -> 1x inputs, with native hinge angles 120 -> 0 -> 120 degrees.
+Both final eyes show the aligned 2x lens image and dot. All 152 decoded LEFT
+compositor parent frames and all six paired images were reviewed. The visual
+gate remains failed: the 1x dot is absent, and handling includes a brief
+separated lens and weapon pose jumps. Capture throughput was 3.37 FPS, not a
+measurement of game frame rate. Its reviewed proof remains with the private
+case. This does not accept motion, hits, the full catalog or a physical headset.
+
+Preceding candidate `02052fbf45bd` adds the missing fitted collimator/magnifier path.
+The actual SVG-76 resource was joined through the native custom-weapon part
+resolver to `st02_main0_def` and `st03_main0_def`, including its two named
+magnifier bones. Owned glass measurements select separate 1x collimator and
+2x magnifier apertures. The existing VR zoom binding moves the existing native
+magnifier hinge to its authored aligned bind; no extra tube or housing is
+drawn. A guarded native palette callback keeps that joint on its current gun
+publication. The new dot reticle is functional presentation and is not yet
+accepted as an exact reproduction of the native reticle texture.
+All 54 CTest groups and installer checks passed in
+`artifacts/dev/field-dual-magnifier-full-build-20261005.log`.
+The checked stage's interrupted promotion was completed through the existing
+workspace promotion/deployment functions after verifying its JUnit results,
+installer log and every staged binary against `build/Release`.
+Both-eye lens, hinge, motion and zoom acceptance remains pending the live take.
+
+The `cb356` actual field take tested three distinct native resources: HIP
+27873 (`[1,2,0,1]`), BACK 93478 (`[1,0,0,2]`), and secondary 159074
+(`[0,0,0,0]`). Both eyes were reviewed for one-hand and acquired two-hand
+contact; native ammunition decreased in the correct slots by 3, 3 and 1.
+The HIP gun fails because the fitted 1x/2x scope never publishes a tracked
+view. BACK collimator and secondary iron-sight acceptance remain unknown.
+The actual LEFT compositor take is
+`private/field-kit-current/20261005-three-loaded-weapons-cb356-video/simulator.mp4`.
+All 135 decoded parent frames were reviewed. Capture completed without an
+encoder error at 2.99 acquired frames per second; this is capture throughput,
+not a measured game frame rate. Handling also exposes brief weapon jumps.
+This run does not accept optics, hits, two-hand discharge or the 418-entry
+catalog. New diagnostics observe the native assembled rear/front sight points
+and their completed-skin LOCAL poses without accepting an unmeasured profile.
+
+Preceding candidate `cb356d87ae77` passes all 54 CTest groups and installer checks
+(`artifacts/dev/field-driver-menu-seat-focus-full-build-20261005.log`).
+Native vehicle occupancy now remains separate from input availability: focusing
+or closing handheld iDroid must preserve the occupied seat and forward facing.
+The reproduced `3a8a` closing-frame jump had native travel mode 3 but menu
+input context and disabled rig input. This new repair awaits live final-eye
+verification; unit checks do not accept it.
+
+The preceding `3a8a0ff61429` private truck-0003 fixture moved the actual vehicle
+3.414 native units using physical LEFT-grip acquisition, a human-paced 30-degree
+controller roll and the accelerator. Eight actual game XInput returns witnessed
+steering and pedal delivery. Both cab eyes now face the native seated root and
+use its authored head position; removing the standing backward/height fit clears
+the shoulder mesh and restores native wheel reach. The retained real LEFT
+compositor take is `20261005-truck-native-seat-night-wheel-3a8a-video`; all
+decoded parent frames were reviewed. It is scoped evidence, not the full field
+kit: two handheld transition frames still jump, and the complete case failed
+its three-second exit deadline. Cleanup completed the actual exit, released
+inputs, restored tracking poses and the native clock, and left no menu open.
+The private exit bound is now seven seconds, matching the observed native
+door animation. Fixture placement and clock changes do not accept navigation
+or progression. Current live DLL is `6ac226f4bf2c`.
+
+Preceding candidate `de2fa91c704b` repairs an actual mounted handheld-camera failure:
+ordinary VR Interact boarded native truck 0002, but opening iDroid then placed
+the final VR eyes at the native chase camera outside the truck. Live handheld
+menus now join the exact fresh camera/player-head transaction and apply the
+same first-person stabilization and height offset as ordinary play. All 54
+CTest groups and installer checks passed. The installed game was relaunched
+through existing Steam 8644; both reviewed arrival eyes in pinned
+`20261005T231924974365Z` show actual healthy first-person field play.
+Later native-root yaw and seated-position repairs above address the remaining
+backward view and shoulder clipping exposed by this earlier candidate.
+
+The recovered truck fixture also retained an old door position while native
+truck 0002 rolled 1.51 units. It now follows fresh exact vehicle positions.
+The preceding `69cf` run boarded with the ordinary VR binding and moved the
+real truck 3.706 units with reverse; its forward/handheld driving case failed,
+and its paired images expose the chase-camera defect. This is not accepted
+driving footage. A subsequent daytime entry was interrupted by incoming fire;
+the test incorrectly treated the native entry animation's temporary travel
+mode as occupancy loss. That diagnostic guard is corrected. Genuine native
+checkpoint recovery included declining the reviewed Chicken Hat prompt, then
+loading acknowledgment; healthy field return is pinned in
+`20261005T232816191769Z`. No health or progression was patched.
+
+Native Options -> Control Type was reviewed in both eyes: the active setting
+is Action Type. Y delivery was observed in the game's actual XInput return,
+so Shooter Type was excluded as the cause. The nested Options inspection also
+exposed the bot's two-level Pause cleanup bound; it now permits four guarded
+Back edges. The 255 bot tests pass, including that nested cleanup regression.
+
+The native bolt cycle can temporarily withdraw a valid firearm muzzle after
+a shot. Combat now waits up to 2.8 seconds for the same fresh owner's muzzle,
+within the existing grip lease, without replaying the trigger. All 43 combat
+tests and the preceding full 54-group build passed. Current daytime combat
+also recorded two rounds and one native incapacitation, without excluding
+buddy attribution; this does not certify reliable autonomous camp clearance.
+
+The already reviewed `69cf` pistol and rifle chapters now have hash-linked
+parents, native receipts and all six paired checkpoints in
+`private/field-kit-current/reviewed-idroid-chapters-proof.json`.
+They remain two scoped chapters rather than the full field kit or acceptance
+of every weapon on the newer build.
+
+Retained `69cfeb25878c` has a reviewed final LEFT compositor chapter at
+`private/field-kit-current/idroid-pistol-field-chapter.mp4`, trimmed from the
+retained `20261005-idroid-sidearm-69cf-video` take. All 178 parent frames and
+all 66 delivery frames were reviewed, alongside all six paired-eye return and
+support checkpoints. The actual WU S.PISTOL resource is 159074: ammunition went
+9 -> 8 after an ordinary 250 ms shot and 11 after native reload. One handset
+returns in the LEFT bionic hand after reload; its projection and geometry stow
+during actual two-hand support and return on LEFT-grip release. Human pacing is
+200 ms taps, 350 ms modifier formation and 750 ms hand trajectories. Inputs
+were released, the terminal closed and controller poses restored. The scene is
+night; this accepts scoped visibility and stow/return, not full firearm sight,
+muzzle/hit alignment, exact projection bounds or physical headset readiness.
+
+The earlier current-build rifle chapter remains at
+`private/field-kit-current/idroid-field-chapter.mp4`. All 70 delivery frames and
+six paired checkpoints were reviewed. Device stow/return passes that scope,
+but the native rifle leaves the hand during portions of its manipulation;
+weapon reload alignment remains unaccepted. Neither chapter is the full kit.
+
+The bounded bot's default cruise was below the actual native walking threshold:
+0.30 held for 800 ms produced zero displacement on clear ground; 0.45 produced
+1.335 native units. Default cruise is now 0.45 with the existing short leases,
+fresh observations and settling gates retained. Pinned
+`20261005T204235616850Z` reached a 0.35-unit local target with 0.523 units of
+observed displacement and settled after release. The previous failure is also
+pinned. This is one local walk, not full map/navigation acceptance. The full
+`tools/build.ps1 -SkipBootstrap -NoDeploy` run passed all 54 CTest groups and
+installer checks; `play/` was refreshed. This is historical `69cf` evidence,
+not the identity of the current live DLL.
+
+The next four configured weapon trials each attached native two-hand support,
+but all retained rendered resource 27873 and optical descriptor `[1,2,0,1]`.
+Typed slot changes and ammunition consumption do not prove four loaded models
+or scopes. All four full weapon/scope results remain unaccepted. A subsequent
+ordinary secondary/primary switch and source-backed native equipment-request
+mask did not replace that rendered primary resource. The inspection harness
+now respects effective aim pitch and the runtime grip/aim cant; no personal
+binding or production attachment calibration was changed to disguise this.
+
+An earlier `69cf` truck driving case failed: the revised fixture reached stable native ground
+beside truck 0002, but ordinary VR Interact did not board. Its reviewed source
+frame places the player beside the spare wheel, before the cab door. Earlier
+low placement fell through the floor and is retained as failed evidence.
+Actual Continue From Checkpoint and the loading confirmation recovered healthy
+field play in pinned `20261005T205651184711Z`. Fixture placement is not route
+acceptance, and no failed truck attempt is credited as driving coverage.
+
+The reported doubled handset was reproduced in the actual field. The typed
+native equipment inventory contained two visible ID499 instances after a cold
+terminal transition. A temporarily unavailable typed owner was discarding the
+VR allocation lease without retiring its native resource. The equipment pump
+now retains that lease through unknown-owner gaps, and hides the exact owned
+allocation before its native release. The UI-only field handset also needs its
+native scene root and bounds moved with its completed wrist publication;
+changing only its bone palette had left it culled at an old world position.
+
+Candidate `eaf6f645152e` passed all 54 test groups and installer checks. Its
+reviewed two-eye gun/iDroid capture shows one native handset in the LEFT bionic
+hand and a native firearm in the RIGHT. The typed inventory contains one
+ID499 instance. Forced SECURITY stow, immediate reopening and walking after
+reopening also passed that bounded field run. Capture cleanup encountered an
+operator transport failure after native stow and neutral input; a separate
+bounded observation verified the closed terminal and released controls. This
+is scoped simulator evidence, not acceptance of every weapon or gun alignment.
+
+Actual follow-up reproduced reload closing the terminal without returning it,
+and LEFT grip at the native support socket choosing menu focus instead of
+weapon support. Native terminal input filtering alone did not repair reload:
+the retail player action stops the terminal. The current implementation borrows
+the exact UI-only owner with native Stop/Start, preserves the native handset
+lease, sends one effective reload chord, and returns after actual manipulation
+ends. Transient rig publications use at most 150 ms of same-owner control
+history for hand-use arbitration; rendering still requires its fresh pose join.
+
+Candidate `9b893adf64c5` passed all 54 test groups and installer checks. Retained
+`private/idroid-current/20261005-human-hand-return-9b89/` passed a human-paced
+field reproduction: 200 -> 197 -> 200 rounds, actual native reload manipulation,
+automatic terminal/handset return, continuous support attachment and automatic
+return on LEFT-grip release while the RIGHT ready grip remains held. The chord
+was formed one button at a time, using 200 ms taps, a 350 ms modifier lead,
+750 ms hand trajectories and a deliberate support hold. All six final-eye
+images were reviewed, showing one LEFT handset on return and no handset or
+projection during support. Cleanup released inputs, closed the terminal and
+restored controller poses without error. These are simulator trajectories,
+not physical-headset user testing or firearm alignment acceptance.
+
+The associated retained final LEFT compositor chapter is
+`private/idroid-current/20261005-human-hand-return-9b89-video/simulator.mp4`.
+It contains 122 source frames over 35.172 seconds (3.47 capture frames/s),
+without interpolation. Eight timed frames were reviewed alongside the paired
+stills. It proves this bounded chapter, not the full requested field-kit.
+Earlier `e0b9fc1c7491` paired images also show physical RIGHT binoculars
+coexisting with the single LEFT handset; zoom/acquisition/mark alongside the
+handset still need acceptance on the current candidate.
+
+The full field-kit video, driving with iDroid, all weapon/scope combinations,
+all menu/configuration combinations, genuine fresh/middle/end save and resume
+coverage, mortar arc/impact and headset acceptance remain open. The user
+explicitly requested a retail-created fresh campaign on October 5. Closed
+middle-campaign snapshots are retained; they are not certified fully unlocked.
+All further interaction cases must use ordinary human timing. The authored
+hand/contact transforms are source-bound; exact native physical projection
+canvas bounds remain a separate measurement. The pictured firearm pose still
+requires its own muzzle, sight, hit and grip investigation before acceptance.
+
+## October 5 retail fresh-save regression
+
+The six TPP save payloads were backed up and cleared with the guarded local
+`reset-new` operation. Retail created the fresh campaign itself. Its native
+story is 0 and developed-equipment count is 0; no unlock or story flags were
+patched. The closed native snapshot is retained as
+`artifacts/test-profiles/regression-fresh-20261005`, alongside the protected
+middle-campaign and original-save archives.
+
+Autosave confirmation advanced, but the first-run Terms document did not open
+after either an ordinary tap or a deliberate 800 ms confirm hold. Both final
+eyes remained on the same Terms page. The input receipt's `observed_pass`
+does not certify this interaction; its retained visual review records failure.
+The later native trace proved that Confirm reached the retail edge getter.
+The selected document action invokes the retail browser service, leaving the
+same VR page visible. A separately sampled downward stick hold reproduced the
+actual defect: physical LEFT Y was -1, but all mapped native axes were zero.
+The Terms owner was being classified as a cinematic, which suppresses sticks.
+
+Candidate `69cfeb25878c` passes all 54 test groups and installer checks. Its
+typed, fresh Terms owner now retains the effective menu stick during that
+startup cinematic. The speculative button-edge fallback was removed; the
+native getter retains its original result. Readiness and native selected-action
+observations prevent startup input during initialization or confirmation on the
+wrong choice.
+
+Retained `20261005T183251955121Z` moved the native selection down after a
+222 ms sampled hold. Both eyes show Decline selected; a separate LEFT movement
+in `20261005T183445108415Z` selected Accept in both eyes. Ordinary VR Confirm
+then advanced Content Terms to Currency Terms, Currency Terms to Privacy, and
+Privacy to the actual server-login progress dialog. The native story and
+developed-equipment count remain zero, with no direct agreement or progression
+writes. Privacy's 200 ms downward hold repeated to its final choice row; the
+fixture expecting only the intermediate document row remains failed, and its
+corrected follow-up checks the observed native selection before Confirm.
+
+The final-eye Terms and Privacy handoff chapters are retained under
+`private/fresh-startup-current/`, with truthful capture cadence. This accepts
+the reproduced first-run menu-axis repair, not the fresh prologue, Continue,
+save/resume, all menus or full field-kit video. Those broader checks remain open.
+
+## October 4 native left-hand iDroid
+
+Candidate `e8e3a4d3c90c` passed all 54 CTest groups and installer transactions.
+Retained `20261005T042233419201Z` passed seven live simulator cases: natural
+left-hand hold, pitch, opposing yaw, ordinary stow, immediate reopening and
+final stow. All 14 outcome eye images were reviewed. The handset and screen
+turn together, the native left cupped fingers hold the device, and the right
+hand remains free. The preceding `a08af486bdd3` run had an edge-on natural
+screen and is negative visual evidence, despite its native state checks.
+
+The hold comes from the actual owned `p31_010010` arrival cinematic, including
+the left wrist-relative device transform and 16 left finger joints. Steady
+native palette reads corroborate that contact; asynchronous reads contain
+motion outliers and do not certify every frame. Source-eye video is retained
+separately from the final-eye stills. The existing left forearm HUD retains
+its owner. Ordinary stow/reopen is scoped acceptance; forced tutorial stow,
+physical headset use, every menu/configuration and whole-game acceptance
+remain open.
+
+The native cinematic UI job and its transform getters were recovered during
+one further bounded reference replay. Its graph root shares the handset's
+orientation and lies 9 cm forward of `CNP_HOLOGRAM`. The configurable default
+has been corrected from 8 to 9 cm; this subsequent fit needs its own live
+verification. Exact physical canvas bounds remain separate from that proven
+root transform and are not yet a 100% cinematic-size match.
+
+## October 4 immediate mortar firing proof
+
+The October 4 field idle stalls were reproduced in the live simulator:
+`xrEndFrame` repeatedly took 0.65--0.85 seconds, image age exceeded one second,
+and GPU memory was 11.6 GB of 12.3 GB. The simulator's unused Bedroom synthetic
+environment was still running alongside OpenNV. Stopping only that exact owned
+batch-room child reduced GPU memory to 7.9 GB and restored approximately 90 XR
+submissions per second. Subsequent idle windows had no slow submissions or
+retained images over 500 ms; source pairs remained about 65--74 per second, so
+this is not a zero-repeat or physical-headset performance claim. Both actual
+eyes in retained `20261005T014926762193Z` show the native field and rig.
+Before/after timing and GPU evidence is retained in
+`artifacts/dev/idle-stereo-20261005/`. Both simulator launch paths now release
+only the exactly recorded, isolated batch passthrough room for opaque MGSV VR,
+preserving the live game and compositor. Shared clients and changed process
+identities block that cleanup.
+
+Follow-up `20261004T234601864851Z` reproduced horizontal aim response but
+discarded both elevation pulses: native Y stayed zero while the physical stick
+was nonzero. Stationary mortar entry leaves ON_VEHICLE false and clears
+NORMAL_ACTION, so on-foot turn handling was consuming its aim. The runtime now
+retains both native axes during the verified standing non-ordinary action,
+excluding carry/CQC/treatment/optics and respecting menu/native-input ownership.
+This is an action-state owner, not an exact mortar-ID getter. Handheld firearm
+replacement/suppression is inactive during that owner. The bounded mortar case
+now records the ready grip and all four aiming pulses before firing; aim/arc
+remain false in raw results until pixels are reviewed.
+The stationary action retains the on-foot button owner: a vehicle-style release
+gate at this boundary cancels the held Y that is completing native entry.
+Entry/exit now require a sampled native action acknowledgement, rather than
+crediting an expiring unsampled short host delay. Active-camp damage allowances
+are explicit policy values with a surviving-player floor; the default is zero.
+
+Retained `20261004T231347` reached the reviewed Sloped West mortar002 operator
+position, entered through physical Y, delivered one 180 ms VR right-trigger
+pulse to native XInput `[0,255]`, and dismounted through Y. Its seven-second
+source-eye/game-audio recording contains the native discharge flash and muzzle
+smoke at approximately 4.33 seconds, following the shell-load animation. Both
+released entry/fire/exit compositor eyes were inspected. Native health remained
+7801 through this take. The firing result is a scoped simulator pass; impact,
+barrel aiming axes, exact stationary mounted-ID getter, rig contact and physical
+headset acceptance are separate.
+
+The reusable `workspace.py bot --command mortar --policy ... --record --seconds
+60` now approaches the reviewed operator position rather than treating the
+authored mortar pivot as the player's stand point. It acknowledges the observed
+stationary action without requiring the game's empty ridden-vehicle getter,
+records three seconds of the native discharge response after one trigger and
+dismounts. Damage, changed ownership and a total action deadline remain guards.
+Raw action results retain pending visual review instead of crediting a delivered
+trigger as a shot. The first shortcut attempt `20261004T232201287152Z` stopped
+on actual native damage in the previously fired-on camp; it is retained as a
+negative, not shortcut acceptance. Failed Y follow-up `20261004T231654744771Z`
+started after dismount had moved Snake outside the prior interaction position.
+The original successful firing recording is retained independently.
+
+Retained `20261004T233252335383Z` then passed the repaired shortcut in
+17.188 seconds from the reached mortar neighborhood: native entry, one 180 ms
+physical RT with matching game XInput `[0,255]`, recorded discharge, native exit
+and neutral release. Its nine-second source-eye/audio take was reviewed, and
+health stayed 7801. Prior fresh-session approach `20261004T233035391364Z`
+stopped on detection with full health; the explicit active-camp diagnostic
+policy acknowledged that battle state before the successful remaining approach.
+The 17-second result does not include cold boot or the earlier staging route.
+All 54 CTest groups and installer transactions pass. Test game/simulator cleanup
+retains Steam, restores the runtime lease and leaves no test menu open.
+
+## October 3 idle stereo and helicopter menu investigation
+
+Local candidate `72fdf5e65ad5` repairs a reproduced empty-layer path when raw
+head/view validity disappears. The last admitted stereo pair retains its
+original poses, FOVs and crops while the same camera and reference space still
+own it. Invalid poses cannot admit new pixels; reference-space changes, camera
+ownership changes and `shouldRender=false` remain separate boundaries.
+
+Retained negative `20261004T045321827065Z` on diagnostic candidate
+`f87d9be1302f` reproduced black final-eye output and seven seconds of empty XR
+layers after raw head validity was removed in actual ACC. Retained
+`20261004T050618985244Z` on the repair passed six seven-second loss/recovery
+cases for head validity, view validity and both. All twelve outcome eyes were
+reviewed; scoped XR logs contain no empty-layer event and recovery advances
+camera/rig publications without changing activation/reference ownership.
+
+Retained `20261004T060748849943Z` passed the same six diagnostic cases with
+right-hand iDroid open. Both eyes were reviewed: the actual page was a
+**Daily Bonus Received information card**, not Map. The later stow case failed
+because Back advanced to a **Skulls Attack notice**; no unknown notice was
+confirmed. Cleanup closed the owned game/runtime and retained Steam. These
+scoped stereo results do not pass that failed lifecycle case or the menu tree.
+
+Retained `20261004T054602946280Z` reviewed Choose a Rival dismissal, Missions
+and Map tab changes, Mission List entry/Back, and ordinary root Back to the
+cabin. A supervised tracking recovery wait stopped at its two-second review
+threshold before the deliberate seven-second lease expired; the runner now
+waits only for its exact armed lease and unchanged owner. Unexpected popups,
+unarmed loss and expired loss retain the normal review gate. Native area
+selection was active but invisible in the observed ACC state. Re-running the
+game's story-dependent helicopter setup did not restore it, so that setup was
+not adopted as a production fix. The free-roam route remains unresolved.
+
+Public head-loss fixtures and exact remaining obligations are in
+[the idle/menu report](HELICOPTER_IDLE_REPORT.md). Physical headset idle,
+runtime stalls, continuous stereo, every menu/item and whole-game acceptance
+remain open. The prior twenty-minute no-input simulator observation did not
+reproduce the user's idle symptom and does not clear their physical report.
+
+Retained `20261004T094310678869Z` adds fifteen bounded ACC navigation cases
+and seventeen reviewed two-eye observations (34 images). Actual results cover
+Choose a Rival dismissal, Missions list entry/paging/Back, Map, Mother Base,
+Customize, Helicopter, Chassis grades, Back, discard confirmation and return to
+the live cabin. Scratch case names claiming a category/filter change were
+corrected in `visual-review.json`: the observed actions paged the mission list
+and zoomed its miniature map. No helicopter upgrade was purchased. The cabin
+baseline still lacks an instruction for opening iDroid; Map offered marker
+placement rather than departure. The free-roam route remains unresolved.
+
+An isolated save fixture is used for firing, vehicle and emplacement checks;
+the user's exact prior save is preserved as `before-cockpit-arsenal-audit`.
+Retained `20261004T101905227429Z` reviewed native Continue, a readable
+`A — Resume Game` loading card and entry to Afghanistan free play. The first
+weapon inspection in retained `20261004T102059202073Z` failed its unsupported
+assumption that the selected AM M48 must publish a tracked round scope. It
+does not establish a missing fitted sight. Gun readiness/firing and optic
+eligibility are now separate checks. Every firearm variant, dual sight,
+vehicle subtype, enemy mortar/turret and physical headset acceptance remains
+open until its actual native use and visual outcome are retained.
+
+Retained `20261004T104632827998Z` confirms native ammunition changes after
+bounded VR ready/trigger input: AM M48 198→194, SVG-76 31→28 and WU S.PISTOL
+9→8. Their held firearm and released wrist presentations were reviewed in both
+eyes. A small-number reading error was corrected with an inspection crop:
+the M48 wrist display correctly shows 194/400; no stale-display repair was made.
+Scratch IDs calling the SVG-76 an MRS-4 are corrected by its actual visible
+name in the review manifest. This establishes these discharges, not impact,
+hand/sight alignment, every variant or every optic. The SVG-76 fixture publishes
+native optical powers 1×/2× with no admitted scope portal. Native CNP queries
+now consider every listed power; unknown geometry still requires calibration.
+
+The bot's owned small-block navigation import now contains 659 Afghanistan
+and 725 Africa NAV2 files. All forty prior Afghanistan tiles match their old
+hashes. The expanded Afghanistan graph has 938,496 nodes and admits the current
+fixture's supporting floor, previously outside the forty-tile import. Authored
+locator files provide connected candidate routes to the loaded Sloped West
+machine gun and mortars. Import completeness for these indexed small-block
+packages is separate from physical clearance, vehicle roads, other map/package
+classes, autonomous combat and mission completion. None of those is certified.
+
+## October 4 autonomous field investigation
+
+Local candidate `4a6e96f33675` passed all **46 CTest groups and installer
+transactions** and is synchronized through the fixed `play/` tree. Its new
+native cover observer is read-only: at most eight caller-selected NAV points,
+four actual person-marker origins and 32 terrain rays on the native marker
+job. Admission requires fresh same-owner focus, a joined observed root/native
+eye and a bounded nonce/lease. Retained `20261004T172412196409Z` admitted
+same-owner live obstruction probes and a mapped covered approach. It discharged
+two WU rounds with support attached; guard 1167 entered Sleep while buddy
+attribution remained possible. Other guards were still active when the
+commander deadline ended the run. These are obstruction and scoped action
+observations; enemy-eye, shadows, native AI concealment and completed camp
+acceptance remain open.
+
+The reusable camp policy now supports physical reconnaissance, exact positive
+acquisition before explicit marking, close suppressed engagement with the
+authored two-hand support contact, observation-only publication recovery,
+health priority, and a reviewed primary fallback after detection. Moving
+targets can be reacquired before dispatch without replaying an uncertain
+trigger. Cover approaches and crouched peeks still require live verification.
+The bot now composes each navigation turn onto its current head orientation;
+the prior absolute replacement could undo the previous turn. Trigger pulses
+have separate leases from the ready/support grips. Native pickup/carry/drop is
+an explicitly selected bounded experiment with exact body and guard checks,
+walking routes and no claimed direct carrier-to-body link. These corrections
+still require a completed live encounter and both-eye action review.
+The local director observes current artifacts and completed source-eye clips;
+it does not provide an independent continuous final-eye feed.
+
+Retained `20261004T175758596525Z` moved from staging through two mapped
+approaches, with run/crouch, full health and no detection. Before its third
+route, the left final compositor eye was entirely black immediately after a
+harness recenter. Both released cleanup eyes showed the world again. The run
+stopped and closed its owned game/runtime before firing, body handling or
+mounting. Repeated recenter was removed from autonomous route boundaries;
+standalone recenter interaction remains available. This is a retained negative,
+not proof that the user's headset idle report or native recenter is repaired.
+
+Retained `20261004T161525577828Z` demonstrates run/crouch/crawl progression,
+physical binocular zoom 2x to 4x, current exact-actor acquisition and explicit
+mark of guard 1166, and two suppressed WU rounds with native support attachment.
+Guard 1166 then entered Sleep. The later expired diagnostic lease stopped that
+run before the emplacement; scoped observations do not certify a whole mission.
+
+Retained `20261004T170412185254Z` demonstrates three WU rounds at camp with
+support attached and full health: one at guard 1167, then two at guard 1214,
+whose native life became Sleep. Buddy attribution is not excluded. Both final
+eyes at the later stop show Snake low behind a tall crate wall blocking aim.
+The commander request expired before a fresh clue was supplied. It did not
+reach the mortar. Retained `20261004T165246164071Z` reached native camp
+incapacitation and health recovery but failed the harness's incorrect registry
+category/type comparison before mounting. That comparison is corrected using
+actual `gimmickType` 5 and native `type` 81; the mortar still needs live proof.
+
+Retained `20261004T163607271650Z` reproduced a 15-second compositor RPC stall
+during a held gun inspection. Recorded held inspections now place explicitly
+qualified checkpoints in continuous NativeEyeAV source-eye video. They create
+no final-compositor still or stereo acceptance. Neutral observations still
+capture both eyes. Cadence loss/repeats, source lineage and real audio remain
+retained. Mortars, turrets, trucks, roads, CQC, carried-body identity, concealment,
+all firearm/scope variants, complete missions, native binocular-command leakage
+and physical-headset readiness remain open.
+
+## October 4 field-kit and direct mortar follow-up
+
+Candidate `14a36ed5e5ac` passed all **53 CTest groups and installer
+transactions** and is synchronized through `play/`. Its added native input
+observer records actual XInput returns, separately retaining index zero, exact
+packet values, caller, source and timestamps. It changes no input mapping or
+gameplay mask. The new bot binocular presentation preserves the measured
+grip/aim pairs, places the left hand at the authored support cup and samples
+head/hand movement instead of the previous 133–162 degree single-packet turns.
+Live support, motion and eye acceptance remain pending.
+
+Retained `20261004T194951821331Z` published full physical/mapped forward input
+without native player displacement at staging. Its failure is downstream of
+the XR sampler; that earlier candidate has no current XInput return witness.
+Retained `20261004T200116814810Z` then used an explicit VR crouch entry and
+completed the native run/crouch/crawl route to the mortar, reaching
+`[88.6299, 333.5233, 99.4788]` with full health and no alert. This scoped result
+does not identify the exact downstream reason for the previous stall.
+
+Retained `20261004T200403232896Z` records the actual authored mortar and a
+sampled Y press from a crouched 1.25-unit approach. It did not acknowledge the
+expected mounted ID. The requested head pose was published before the press;
+the first saved before-mount observation was stale and is corrected by an
+explicit publication wait. The next selected permutation stands and approaches
+more closely. Mount identity, barrel motion on all axes, shell fire, dismount
+and the native stationary-aim adapter remain unresolved.
+
+The private `showcase/current-field-kit/snake-current-field-kit.mp4` working cut
+contains 112 seconds of fresh retained source-eye footage, game audio and the
+original field-kit artwork. It labels failed firing/recovery and unshown
+mounts/driving. NativeEyeAV precedes compositor crop/composition; this cut is
+not final-eye stereo or complete-game acceptance. The exhaustive private state
+matrix lists every requested boolean combination and ordered transition, with
+unknown/illegal states separate. Enumerating a case does not pass it. Original
+six-file save `before-cockpit-arsenal-audit` remains protected while isolated
+fixtures are in use.
 
 ## October 3 experimental patch
 
@@ -596,12 +1468,10 @@ before input and requires return to `Seq_Game_MainGame`/cabin. It performs no
 purchase, forced terminal close or save write. This is reproduction tooling,
 not a claimed fix, and does not cover development through iDroid.
 
-The cutscene's exact hologram distance and scale have **not** been recovered.
-The current 8 cm default is approximate. The native device sockets, parts
-attachments and matching cutscene animation/UI package are recovered, but
-their raw canvas units and effect offsets are not a measured screen fit.
-Do not replace this remaining native projection work with another guessed
-default or describe the present fit as an exact cutscene match.
+The cutscene's hologram graph-root transform has now been recovered: handset
+orientation, 9 cm forward of `CNP_HOLOGRAM`. Physical canvas bounds remain
+unresolved. Raw canvas units and effect offsets alone do not establish them;
+the graph-root measurement is not a claim of a 100% cinematic display match.
 
 | Request | Current result |
 | --- | --- |
@@ -703,17 +1573,27 @@ the launcher tour is verified and synchronized into the same play tree.
 
 ## One place to work
 
-Use this checkout. `play/` is the fixed current local test tree;
-`Play.cmd` launches the installed game on the physical headset. The launcher
-is always `play/MGS5VR-Launcher.exe`. `play/BUILD.json` identifies the source,
-DLL and every installed file. Personal game settings remain authoritative.
+Use this checkout. `play/` is the pinned playable tree, and `build/dev/` is the
+only development tree. Each `BUILD.json` identifies its source, checks and
+files. `Play.cmd` restores pinned binaries before physical headset launch;
+`Play-Dev.cmd` installs development instead. Personal game settings remain
+authoritative. Close MGSV before switching between different binaries.
 
 ```powershell
-# Build, run checks, refresh the same play folder, and sync the recorded game.
+# Build and check development without changing pinned play or the installed game.
 tools/build.ps1
 
-# Compare source, current play tree, installed DLL and issue status.
+# Explicitly install development for debugging (MGSV must be closed).
+tools/build.ps1 -Deploy
+
+# Compare both build slots, the pin, installed DLL and current source.
 python tools/workspace.py status
+
+# Only after the user chooses to promote the reviewed development build:
+python tools/workspace.py pin-build
+
+# Inventory old copies; add -Apply to remove them after both slots verify.
+tools/clean-local-builds.ps1
 
 # A temporary game-local runtime lease is restored by stop-sim; Steam stays open.
 python tools/workspace.py launch-sim
@@ -726,25 +1606,29 @@ python tools/workspace.py bot --command run --suite tools/gameplay_bot/suites/pa
 python tools/workspace.py navigate --goal X Y Z --seconds 60
 ```
 
-`build.ps1 -NoDeploy` refreshes play without changing the game installation.
-Normal synchronization requires MGSV closed, checks the recorded install's
-ownership, preserves both personal INIs byte for byte, and updates actual DLL
-hashes. One previous play tree and one small installed-binary rollback are kept
-under build; no dated distribution folders or ZIPs are made for local changes.
-Promotion updates changed files in place, commits BUILD.json last and preserves
-unmanaged local files. An unchanged open launcher stays running; a blocked file
-update rolls back changed files. Failed tests do not promote a build.
+`build.ps1 -NoDeploy` remains a compatibility alias for the default. Explicit
+deployment checks the recorded install's ownership, preserves both personal
+INIs byte for byte and records the selected slot and actual binary hashes.
+Transactional staging and rollback are removed after a successful update or
+completed recovery. An interrupted recovery is preserved for repair, never
+silently discarded. No dated packages or persistent rollback builds are kept.
+Compiler intermediates and the installed game are outputs of the two slots.
+Replacement commits BUILD.json last and preserves unmanaged local files.
+An unchanged open launcher stays running; failed checks leave both slots intact.
 
-`launch-sim` asks the already-running Steam client to start MGSV and records
+`launch-sim` installs the checked development slot, then asks the already-running
+Steam client to start MGSV and records
 the exact new game/runtime process generations. It temporarily selects the
 simulator in `mgs5vr-runtime.ini`, without changing Steam's environment or the
 global OpenXR runtime. `stop-sim` restores that file after the owned session
 exits; an originally absent file is removed. Concurrent edits are preserved
 and reported instead of overwritten. A timed-out launch remains recorded for
-exact cleanup. The default build remains at `play/` throughout.
+exact cleanup. The pinned build remains at `play/` throughout. Use `Play.cmd`
+for the next physical play session to restore its binaries automatically.
 
 For an explicitly requested GitHub release, commit the public source, run the
-same build/checks, then use `python tools/package-release.py --tag experimental-YYYY-MM-DD`.
+same build/checks, explicitly promote the approved candidate with `pin-build`,
+then use `python tools/package-release.py --tag experimental-YYYY-MM-DD`.
 The packager verifies the checked play tree and public defaults, includes the
 committed source and per-file hashes, and writes to the fixed `build/github-release/`
 directory. Private game data and simulator dependencies are rejected. Publishing

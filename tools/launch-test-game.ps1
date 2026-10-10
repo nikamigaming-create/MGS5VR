@@ -81,6 +81,7 @@ do{
     Write-MgsTestRecord
     if(@($mgsRecord.ownedRuntimeProcesses | Where-Object role -eq 'meta_gui').Count -and
        @($mgsRecord.ownedRuntimeProcesses | Where-Object role -eq 'runtime_child').Count){
+        Start-MgsOpaqueVrEnvironmentRelease -Record $mgsRecord -RuntimeRoot $mgsRuntimeRoot -EvidenceDirectory (Split-Path -Parent $mgsRecordPath)
         Write-Output ('MGSV test process '+$mgsGame.Id+' launched; Steam '+$mgsSteam.Id+' retained. Verify a fresh compositor capture.');return
     }
     Start-Sleep -Milliseconds 250

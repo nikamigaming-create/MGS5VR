@@ -125,4 +125,17 @@ end
 -- The mission keeps Seq_Game_MainGame on its failure screen. Check the
 -- retail game-over state only after authored demos have retained ownership.
 if queryBoolean(TppMission, 'IsGameOver') == true then return 'game-over' end
+-- The streamed field helicopter is not the static ACC space. Resolve the
+-- actual local passenger owner, rather than a stale vehicle variable alone.
+-- Authored cinematics and loading have already kept their own owners above.
+if checkStatus('PARTS_ACTIVE') == true and type(Player) == 'table'
+        and type(Player.GetGameObjectIdIsRiddenToLocal) == 'function'
+        and type(Tpp) == 'table' and type(Tpp.IsHelicopter) == 'function' then
+    local ok, ridden = pcall(Player.GetGameObjectIdIsRiddenToLocal)
+    if ok and type(ridden) == 'number' and ridden ~= 65535
+            and type(vars) == 'table' and vars.playerVehicleGameObjectId == ridden then
+        local kindOk, helicopter = pcall(Tpp.IsHelicopter, ridden)
+        if kindOk and helicopter == true then return 'cabin-flight' end
+    end
+end
 return 'closed'

@@ -10,7 +10,10 @@ const actions=[
  ['gameplay.equip_binoculars','Equip binoculars','Keep them physical: raise them, aim with your hand and look through the lenses.'],
  ['binoculars.zoom','Binocular zoom','This binding applies while holding binoculars.'],
  ['binoculars.mark','Mark a target','Aim at a visible target, then explicitly mark it.'],
- ['system.idroid','Open iDroid','The iDroid stays in your right hand.'],
+ ['system.idroid','Open iDroid','The iDroid stays in your LEFT bionic hand. The ordinary HUD stays on the left forearm.'],
+ ['system.idroid_focus','Focus iDroid','Hold to operate an open iDroid. Its controls own both sticks and the face buttons; release to return to movement where the native screen permits it.'],
+ ['menus.next_tab','Next iDroid page','While focused, press once per page and release before repeating. The root tabs wrap back to the first page.'],
+ ['idroid.previous_tab','Previous iDroid page','While focused, use the full chord. Its stick click does not also perform a native menu click.'],
  ['system.pause','Pause','Pause opens on the spatial panel in front of you.']
 ];
 export function controlsTour(bindings){

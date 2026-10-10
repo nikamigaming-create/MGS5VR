@@ -8,12 +8,13 @@ binoculars and scopes, and equipment on your left wrist.
 **Current development status:** Coco's adaptations, physical binocular lesson
 integration and native A* navigation are retained. Full-game, weapon coverage,
 iDroid tutorial recovery and physical-headset acceptance remain open. Native
-handheld iDroid alignment passes scoped simulator checks. Local testing uses one
-fixed `play/` folder refreshed by `tools/build.ps1`.
+handheld iDroid alignment passes scoped simulator checks. Local work keeps two
+builds: pinned `play/` for playing and `build/dev/` for development.
+`tools/build.ps1` refreshes development; `Play.cmd` restores the pinned version.
 [Current build workflow, remaining reports and next tests](docs/CURRENT.md).
 
 **[Download the public build](https://github.com/nikamigaming-create/MGS5VR/releases)**
-· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-10-02.md)
+· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-10-10.md)
 · [Live native actions](docs/NATIVE_ACTIONS.md)
 
 Experimental Windows mod. Requires your own **TPP 1.0.15.4** and a PC-connected

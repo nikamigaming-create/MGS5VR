@@ -1,10 +1,13 @@
 #include "mgs5vr/native_actions.hpp"
 #include "mgs5vr/native_controls.hpp"
+#include "mgs5vr/vehicle_weapon.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/animal_interaction.hpp"
 #include "mgs5vr/small_animal.hpp"
 #include "mgs5vr/input_bridge.hpp"
+#include "mgs5vr/native_input_delivery.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/controls.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/render_camera.hpp"
@@ -12,6 +15,7 @@
 #include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/optic_events.hpp"
+#include "mgs5vr/optic_markers.hpp"
 #include "native_cabin_script.hpp"
 #include "native_presentation_script.hpp"
 #include <windows.h>
@@ -25,6 +29,7 @@
 #include <cstring>
 #include <deque>
 #include <fstream>
+#include <iomanip>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -55,27 +60,64 @@ std::mutex requestMutex;
 std::filesystem::path requestPath,resultPath,tracePath;
 bool externalCommands{};
 uint64_t checkedAt{};
+uintptr_t stowHelpOwner{};
+uint64_t stowHelpRequestedAt{};
 thread_local unsigned depth{};
-// Explicitly armed, bounded observations of the retail UI input and stow
-// handshake. These hooks never alter the native result or dispatch input.
+// Bounded observations of the retail UI input and stow handshake, plus
+// focused-firearm ownership filtering at the native UI trigger consumers.
 using UiButton=bool(*)(void*,uint32_t,uint32_t,bool);
 using UiClose=bool(*)(void*);
-UiButton originalUiButton{};UiClose originalUiClose{};
+UiButton originalUiButton{},originalUiEdge{},originalUiRelease{};UiClose originalUiClose{};
+using UiRepeat=bool(*)(void*,uint32_t,uint32_t,double,double,bool);
+using UiRepeatState=uint32_t(*)(void*,uint32_t,uint32_t,double,bool);
+UiRepeat originalUiRepeat{};
+UiRepeatState originalUiRepeatState{};
+using UiTabUpdate=void(*)(void*);
+UiTabUpdate originalUiTabUpdate{};
+using UiTabAction=bool(*)(uint32_t);
+UiTabAction originalUiTabAction{};
+thread_local uintptr_t idroidTabOwner{};
+thread_local bool idroidTabWrapped{};
+thread_local NativeIdroidTabEdge idroidTabNativeEdge;
+
+void uiTabUpdate(void* object){
+    const auto previous=idroidTabOwner;
+    const auto previousWrapped=idroidTabWrapped;
+    idroidTabOwner=reinterpret_cast<uintptr_t>(object);
+    idroidTabWrapped=false;
+    originalUiTabUpdate(object);
+    idroidTabOwner=previous;
+    idroidTabWrapped=previousWrapped;
+}
+using UiInputMasked=bool(*)(void*);
+UiInputMasked originalUiInputMasked{};
+std::atomic_uint64_t handheldUiBlockedQueries{};
 using UiDisable=void(*)(void*,uint8_t,bool);
 UiDisable originalUiDisable{};
 struct MenuDisableRead {uintptr_t owner{},caller{};unsigned mode{},index{},before{},after{};bool disabled{};};
 std::deque<MenuDisableRead> menuDisableReads;
 NativeMenuRestrictionLease tutorialMenuLease;
 bool menuRestrictionAbi{};
-std::atomic_uint64_t menuTraceUntil{},menuButtonCalls{},menuCloseCalls{};
+std::atomic_uint64_t menuTraceUntil{},menuButtonCalls{},menuEdgeCalls{},menuCloseCalls{};
 std::atomic_uint32_t menuTraceImageSize{};
 std::mutex menuTraceMutex;
 struct MenuMaskRead {uintptr_t type{};uint32_t count{};bool valid{};};
 struct MenuInputRead {
     uint64_t time{};uint32_t index{},bit{},held{},pressed{};uint16_t xr{};bool result{},bypass{};
-    uintptr_t object{},caller{};uint16_t xrBefore{};MenuMaskRead maskBefore{},maskAfter{};
+    uintptr_t object{},caller{};uint16_t xrBefore{};MenuMaskRead maskBefore{},maskAfter{};bool edge{};
 };
 std::deque<MenuInputRead> menuInputReads;
+using EulaUpdate=void(*)(void*);
+EulaUpdate originalEulaUpdate{};
+struct EulaRead {
+    uint64_t time{};uintptr_t owner{},type{},control{};uint32_t phase{},selection{},line{},lines{};
+    uint8_t active{},readToEnd{},selectorVisible{},mode{},flags{};bool valid{},route{};
+    uint64_t inputTime{};uint16_t buttons{};ControlContext context{};
+};
+EulaRead eulaRead;
+std::deque<EulaRead> eulaReads;
+std::atomic_uint64_t eulaBridgeEdges{},eulaScopedQueries{};
+thread_local bool eulaInputScope{};
 constexpr wchar_t actionPipeName[]=L"\\\\.\\pipe\\MGS5VR.NativeActions";
 constexpr uint32_t maxPipeScript=1024*1024;
 constexpr size_t maxQueuedActions=256;
@@ -134,24 +176,36 @@ MenuMaskRead menuInputMask(uintptr_t object){
         &&bytes==sizeof(after)&&after==value.type;
     return value;
 }
-bool uiButton(void* object,uint32_t index,uint32_t bit,bool bypass){
-    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+bool focusedWeaponOwnsUiTrigger(void* object,uint32_t index,uint32_t bit){
+    // The supported XInput converter sets FOX bits 4/5 for LT/RT at
+    // 0x350ec/0x350fa. Only those UI queries are withheld. The player's
+    // separate native trigger path still sees the firearm's aim/fire packet.
+    return index==0&&(bit==4||bit==5)&&handheldFocusedWeapon()
+        &&handheldMenuControl()==HandheldMenuControl::menu&&controllerRigEnabled()
+        &&nativeIdroidOpen()&&!nativePauseMenuOpen()&&!nativeGamepadActive()
+        &&reinterpret_cast<uintptr_t>(object)==imageBase+0x2bff868
+        &&menuInputMask(reinterpret_cast<uintptr_t>(object)).valid;
+}
+bool observeUiButton(void* object,uint32_t index,uint32_t bit,bool bypass,uintptr_t caller,UiButton getter,bool edge){
     const auto owner=reinterpret_cast<uintptr_t>(object);
-    const bool tracing=steadyMilliseconds()<menuTraceUntil.load()&&nativeIdroidOpen();
+    // Explicit, expiring diagnostics also cover fresh-start menus such as
+    // native Terms of Use. Those use the named-action edge getter rather
+    // than the held getter used by the iDroid.
+    const bool tracing=steadyMilliseconds()<menuTraceUntil.load();
     const auto xrBefore=tracing?controlInputSnapshot().nativeButtons:uint16_t{};
     // Observe only an armed physical edge before the native query. Idle
     // queries do not pay for an owner walk. Missing pre-state stays unknown.
     const auto before=xrBefore?menuInputMask(owner):MenuMaskRead{};
-    const auto result=originalUiButton(object,index,bit,bypass);
-    if(tracing&&steadyMilliseconds()<menuTraceUntil.load()&&nativeIdroidOpen()){
-        ++menuButtonCalls;
+    const auto result=getter(object,index,bit,bypass);
+    if(tracing&&steadyMilliseconds()<menuTraceUntil.load()){
+        if(edge)++menuEdgeCalls;else ++menuButtonCalls;
         const auto audit=controlInputSnapshot();
         if(result||audit.nativeButtons||xrBefore){
             using Pad=void*(*)(uint32_t);
             const auto pad=index<4?reinterpret_cast<Pad>(imageBase+0x1b8a0)(index):nullptr;
             MenuInputRead v{steadyMilliseconds(),index,bit,read<uint32_t>(reinterpret_cast<uintptr_t>(pad)+0x20),
-                read<uint32_t>(reinterpret_cast<uintptr_t>(pad)+0x28),audit.nativeButtons,result,bypass};
-            v.object=owner;v.caller=caller;v.xrBefore=xrBefore;v.maskBefore=before;v.maskAfter=menuInputMask(owner);
+                read<uint32_t>(reinterpret_cast<uintptr_t>(pad)+(edge?0x2c:0x28)),audit.nativeButtons,result,bypass};
+            v.object=owner;v.caller=caller;v.xrBefore=xrBefore;v.maskBefore=before;v.maskAfter=menuInputMask(owner);v.edge=edge;
             std::lock_guard lock(menuTraceMutex);
             if(menuInputReads.size()>=128)menuInputReads.pop_front();
             menuInputReads.push_back(v);
@@ -159,10 +213,163 @@ bool uiButton(void* object,uint32_t index,uint32_t bit,bool bypass){
     }
     return result;
 }
+bool uiButton(void* object,uint32_t index,uint32_t bit,bool bypass){
+    if(focusedWeaponOwnsUiTrigger(object,index,bit))return false;
+    return observeUiButton(object,index,bit,bypass,reinterpret_cast<uintptr_t>(_ReturnAddress()),originalUiButton,false);
+}
+bool uiEdge(void* object,uint32_t index,uint32_t bit,bool bypass){
+    if(focusedWeaponOwnsUiTrigger(object,index,bit))return false;
+    const auto native=observeUiButton(object,index,bit,bypass,reinterpret_cast<uintptr_t>(_ReturnAddress()),originalUiEdge,true);
+    if(eulaInputScope&&!index&&reinterpret_cast<uintptr_t>(object)==imageBase+0x2bff868)++eulaScopedQueries;
+    return native;
+}
+bool uiRelease(void* object,uint32_t index,uint32_t bit,bool bypass){
+    return !focusedWeaponOwnsUiTrigger(object,index,bit)&&originalUiRelease(object,index,bit,bypass);
+}
+bool uiRepeat(void* object,uint32_t index,uint32_t bit,double interval,double initialDelay,bool bypass){
+    return !focusedWeaponOwnsUiTrigger(object,index,bit)&&originalUiRepeat(object,index,bit,interval,initialDelay,bypass);
+}
+uint32_t uiRepeatState(void* object,uint32_t index,uint32_t bit,double interval,bool bypass){
+    return focusedWeaponOwnsUiTrigger(object,index,bit)?0:originalUiRepeatState(object,index,bit,interval,bypass);
+}
+bool uiTabAction(uint32_t action){
+    const auto native=originalUiTabAction(action);
+    const auto callerRva=reinterpret_cast<uintptr_t>(_ReturnAddress())-imageBase;
+    const bool rootNext=idroidTabOwner&&callerRva==nativeIdroidNextTabReturnRva;
+    const bool nextEdge=rootNext&&idroidTabNativeEdge.update(native);
+    if(idroidTabOwner&&steadyMilliseconds()<menuTraceUntil.load()){
+        const auto audit=controlInputSnapshot();
+        if(audit.nativeButtons==0x200&&callerRva==nativeIdroidNextTabReturnRva){
+            static uint64_t last{};
+            const auto now=steadyMilliseconds();
+            if(now-last>300){
+                last=now;
+                std::ostringstream trace;
+                trace<<"iDroid tab owner="<<std::hex<<idroidTabOwner<<" caller="
+                    <<callerRva<<" action="<<action
+                    <<" native="<<native<<" common="<<read<uintptr_t>(idroidTabOwner+0x100)
+                    <<" phase="<<read<uint32_t>(idroidTabOwner+0x130)<<","<<read<uint32_t>(idroidTabOwner+0x140)
+                    <<" tab="<<unsigned(read<uint8_t>(idroidTabOwner+0x17da))
+                    <<" control="<<unsigned(handheldMenuControl())<<" ready="<<handheldMenuInputReady();
+                log(trace.str());
+            }
+        }
+    }
+    // The root tab update has already saved its previous tab at +17d8 before
+    // querying this real native RB edge. Select the first tab at the last
+    // boundary and consume that edge. The remainder of the original update
+    // performs its normal page transition, animation and sound exactly once.
+    // Native IDs/order: Mother Base=1, Map=3, Missions=2. The SECOND native
+    // query supplies next-tab (dil); the first query supplies previous (r14b).
+    // IdroidTabInput already makes one short pulse per physical squeeze. The
+    // native action query owns its edge: never manufacture another event from
+    // that pulse's XR audit after the game has already advanced to Missions.
+    if(native&&!idroidTabWrapped&&rootNext
+       &&controllerRigEnabled()&&handheldMenusSelected()&&nativeIdroidOpen()
+       &&!nativePauseMenuOpen()&&!nativeGamepadActive()
+       &&handheldMenuControl()==HandheldMenuControl::menu&&handheldMenuInputReady()){
+        if(!nextEdge)return false;
+        const auto tutorial=nativeIdroidTutorialMode();
+        const auto popup=nativePopupSnapshot();
+        const auto ui=read<uintptr_t>(imageBase+0x2bf1518);
+        // Read common state from the tab task currently executing, then
+        // validate that task's native root-page and input-ready fields.
+        const auto common=read<uintptr_t>(idroidTabOwner+0x100);
+        const auto wrapTarget=nativeIdroidRootNextWrapTarget(callerRva,read<uint8_t>(idroidTabOwner+0x17da),nextEdge);
+        using Busy=bool(*)();
+        if(tutorial&&*tutorial==0&&popup.active&&!*popup.active
+           &&read<uintptr_t>(ui)==imageBase+0x2242d78&&common
+           &&read<uint8_t>(common+0x820)!=0
+           &&wrapTarget
+           &&read<uint32_t>(idroidTabOwner+0x130)==0x24
+           &&read<uint32_t>(idroidTabOwner+0x140)==7
+           &&read<uint8_t>(common+0xc96)==3&&read<uint8_t>(common+0xc78)==0
+           &&!reinterpret_cast<Busy>(imageBase+0x91ed80)()){
+            *reinterpret_cast<uint8_t*>(idroidTabOwner+0x17da)=wrapTarget;
+            // This native reset normally follows the root-tab mutation.
+            // Our boundary change precedes the update's local old-tab copy,
+            // so invoke its exact reset here before the normal transition.
+            using Reset=void(*)(void*);
+            reinterpret_cast<Reset>(imageBase+0x91ed20)(reinterpret_cast<void*>(common));
+            idroidTabWrapped=true;
+            log("Held-focus iDroid next tab wrapped Missions to Mother Base");
+            return false;
+        }
+    }
+    return native;
+}
+void eulaUpdate(void* object){
+    const auto owner=reinterpret_cast<uintptr_t>(object);
+    EulaRead value;value.time=steadyMilliseconds();value.owner=owner;value.type=read<uintptr_t>(owner);
+    value.control=read<uintptr_t>(owner+0x100);
+    // The live update owner supplies membership; the exact recovered update
+    // slot and retail control type must both match before reading its fields.
+    const bool updateSlot=value.type==imageBase+0x224c680
+        &&read<uintptr_t>(value.type+0x80)==imageBase+0x89ccf0;
+    if(updateSlot&&read<uintptr_t>(value.control)==imageBase+0x227a050){
+        value.active=read<uint8_t>(owner+0xc0);value.readToEnd=read<uint8_t>(owner+0xc2);
+        value.selectorVisible=read<uint8_t>(owner+0xc3);value.phase=read<uint32_t>(owner+0xdc);
+        value.selection=read<uint32_t>(owner+0xe0);value.line=read<uint32_t>(owner+0xe4);
+        value.lines=read<uint32_t>(owner+0xd8);
+        value.flags=read<uint8_t>(value.control+0x38e0);value.mode=read<uint8_t>(value.control+0x38e1);
+        value.valid=read<uintptr_t>(owner)==value.type&&read<uintptr_t>(owner+0x100)==value.control
+            &&read<uintptr_t>(value.control)==imageBase+0x227a050;
+    }
+    const auto controls=controlInputSnapshot();
+    // Snapshot the producer before reading the observation clock. A newer
+    // XR publication must not look like future input halfway through a read.
+    value.time=steadyMilliseconds();value.inputTime=controls.time;
+    value.buttons=controls.nativeButtons;value.context=controls.context;
+    const bool route=value.valid&&value.active==1&&value.phase==5&&controllerRigEnabled()
+        &&!nativeGamepadActive()&&controls.context==ControlContext::menus
+        &&freshControlInputAudit(controls,value.time);
+    NativeTermsMenu observed;
+    observed.time=value.time;observed.owner=owner;observed.verified=value.valid;
+    observed.active=value.active==1;observed.phase=value.phase;observed.mode=value.mode;
+    if(value.valid&&value.active==1&&value.phase==5){
+        observed.horizontal=read<uint32_t>(owner+0x9e8c);
+        observed.vertical=read<uint32_t>(owner+0xa04c);
+        // The retail selector resolves the same row/column to its authored
+        // action; observing it does not select or accept an agreement.
+        if(observed.horizontal<=1&&observed.vertical<=3){
+            observed.action=read<uint32_t>(owner+0x188+observed.vertical*4);
+            if(!observed.action)observed.action=read<uint32_t>(owner+0x188+(observed.vertical+observed.horizontal)*4);
+        }
+    }
+    publishNativeTermsMenu(observed);
+    value.route=route;
+    const auto previousScope=eulaInputScope;eulaInputScope=route;
+    originalEulaUpdate(object);
+    eulaInputScope=previousScope;
+    if(steadyMilliseconds()<menuTraceUntil.load()){
+        std::lock_guard lock(menuTraceMutex);
+        if(eulaReads.empty()||eulaReads.back().owner!=value.owner||eulaReads.back().buttons!=value.buttons
+           ||eulaReads.back().route!=value.route||eulaReads.back().phase!=value.phase){
+            if(eulaReads.size()>=64)eulaReads.pop_front();eulaReads.push_back(value);
+        }
+        eulaRead=value;
+    }
+}
 bool uiClose(void* object){
     const auto result=originalUiClose(object);
-    if(steadyMilliseconds()<menuTraceUntil.load()&&nativeIdroidOpen())++menuCloseCalls;
+    if(steadyMilliseconds()<menuTraceUntil.load())++menuCloseCalls;
     return result;
+}
+bool uiInputMasked(void* object){
+    const bool native=originalUiInputMasked(object);
+    if(native||!controllerRigEnabled()||!handheldMenusSelected()||!nativeIdroidOpen()
+       ||nativePauseMenuOpen()||nativeGamepadActive())return native;
+    const auto owner=reinterpret_cast<uintptr_t>(object);
+    const auto type=read<uintptr_t>(owner);
+    // The retail singleton uses the concrete UiPad type in ordinary gameplay
+    // and its base type during other UI lifecycles. Both implement this same
+    // verified mask slot. Requiring only the base type left map input live.
+    if(owner!=imageBase+0x2bff868
+       ||(type!=imageBase+0x227d870&&type!=imageBase+0x2548660))return native;
+    const auto control=handheldMenuControl();
+    if(!handheldUiInputBlocked(control,handheldMenuInputReady()))return native;
+    ++handheldUiBlockedQueries;
+    return true;
 }
 void uiDisable(void* object,uint8_t index,bool disabled){
     const auto owner=reinterpret_cast<uintptr_t>(object);
@@ -360,10 +567,101 @@ bool luaReady(void* state){
     setTop(state,top);nativeLuaReady.store(ready);return ready;
 }
 bool publishFastInput(const std::string& request,std::string& result){
+    constexpr std::string_view coverPrefix="diagnostics:cover-probe:";
+    constexpr std::string_view coverInspectPrefix="inspect-cover-probe:";
+    if(request.starts_with(coverPrefix)||request.starts_with(coverInspectPrefix)){
+        const auto now=steadyMilliseconds();bool accepted{},parsed{};uint64_t nonce{};
+        if(request=="diagnostics:cover-probe:off"){clearCoverProbe();accepted=parsed=true;}
+        else if(request.starts_with(coverPrefix)){
+            if(const auto arguments=parseCoverProbeRequest(std::string_view(request).substr(coverPrefix.size()))){
+                parsed=true;nonce=arguments->nonce;accepted=leaseCoverProbe(*arguments,now);
+            }
+        }else {
+            const auto argument=std::string_view(request).substr(coverInspectPrefix.size());
+            if(!argument.empty()&&argument.size()<=20){
+                const auto value=std::from_chars(argument.data(),argument.data()+argument.size(),nonce);
+                parsed=value.ec==std::errc{}&&value.ptr==argument.data()+argument.size()&&nonce;
+            }
+        }
+        auto cover=coverProbeSnapshot(now,nonce);
+        if(!parsed){cover={};cover.reason=CoverProbeReason::request;}
+        else if(request.starts_with(coverPrefix)&&!accepted){
+            cover={};cover.request.nonce=nonce;cover.reason=CoverProbeReason::lease;
+        }
+        const auto vector=[](std::ostream& out,Vec3 value){out<<'['<<value.x<<','<<value.y<<','<<value.z<<']';};
+        std::ostringstream out;out<<std::boolalpha<<std::setprecision(std::numeric_limits<float>::max_digits10);
+        out<<"{\"schema\":1,\"source\":\"native_marker_job_terrain_obstruction\",\"scope\":\"person_marker_points_to_candidate_eye;not_enemy_ai_concealment\""
+            <<",\"parsed\":"<<parsed<<",\"accepted\":"<<accepted<<",\"available\":"<<cover.available
+            <<",\"reason\":\""<<coverProbeReasonName(cover.reason)<<"\",\"reason_code\":"<<static_cast<unsigned>(cover.reason)
+            <<",\"nonce\":"<<cover.request.nonce<<",\"now_ms\":"<<now<<",\"issued_ms\":"<<cover.request.issuedMs
+            <<",\"expires_ms\":"<<cover.request.expiresMs<<",\"observed_player_ms\":"<<cover.request.observedMs
+            <<",\"sample_ms\":"<<cover.sampleMs<<",\"frame_sample_ms\":"<<cover.frame.sampleMs
+            <<",\"tracking_sequence\":"<<cover.frame.trackingSequence
+            <<",\"activation\":"<<cover.frame.owner.activation<<",\"player_owner\":"<<cover.frame.owner.playerOwner
+            <<",\"presentation_epoch\":"<<cover.frame.owner.presentationEpoch
+            <<",\"requested_owner\":{\"activation\":"<<cover.request.owner.activation
+            <<",\"player_owner\":"<<cover.request.owner.playerOwner<<",\"presentation_epoch\":"<<cover.request.owner.presentationEpoch
+            <<"},\"observed_player\":";vector(out,cover.request.observedPlayer);
+        out<<",\"native_eye\":";vector(out,cover.frame.nativeEye);
+        out<<",\"eye_offset\":";vector(out,cover.eyeOffset);
+        out<<",\"requested_candidates\":"<<cover.request.count<<",\"persons\":[";
+        for(size_t i=0;i<cover.personCount;++i){const auto& person=cover.persons[i];if(i)out<<',';
+            out<<"{\"id\":"<<person.id<<",\"marker_record_index\":"<<person.recordIndex
+                <<",\"native_flags\":"<<static_cast<unsigned>(person.flags)<<",\"distance_from_player\":"<<person.distance<<",\"marker\":";
+            vector(out,person.marker);out<<'}';
+        }
+        out<<"],\"candidates\":[";
+        for(size_t i=0;i<cover.count;++i){const auto& candidate=cover.candidates[i];if(i)out<<',';
+            out<<"{\"node\":"<<candidate.node<<",\"point\":";vector(out,candidate.point);
+            out<<",\"eye\":";vector(out,candidate.eye);
+            out<<",\"all_marker_rays_obstructed\":"<<candidate.allMarkerRaysObstructed<<",\"rays\":[";
+            for(size_t j=0;j<candidate.count;++j){const auto& ray=candidate.rays[j];if(j)out<<',';
+                out<<"{\"actor_id\":"<<ray.actor<<",\"marker\":";vector(out,ray.marker);
+                out<<",\"endpoint\":";vector(out,ray.endpoint);
+                out<<",\"distance\":"<<ray.distance<<",\"surface_distance\":"<<ray.surfaceDistance
+                    <<",\"query_valid\":"<<ray.queryValid<<",\"query_reason\":"<<static_cast<unsigned>(ray.queryReason)
+                    <<",\"terrain_obstructed\":"<<ray.terrainObstructed<<",\"ray_result\":"<<ray.rayResult
+                    <<",\"hit_count\":"<<ray.hitCount<<",\"hit_index\":"<<ray.hitIndex<<",\"raw_surface\":";
+                vector(out,ray.rawSurface);out<<",\"raw_along\":"<<ray.rawAlong<<",\"raw_lateral_squared\":"<<ray.rawLateralSquared<<'}';
+            }
+            out<<"]}";
+        }
+        out<<"]}";result=out.str();return true;
+    }
+    constexpr std::string_view combatPrefix="diagnostics:combat-sight:";
+    if(request.starts_with(combatPrefix)||request=="inspect-combat-sight"){
+        const auto now=steadyMilliseconds();bool armed=false;
+        if(request.starts_with(combatPrefix)){
+            const auto argument=std::string_view(request).substr(combatPrefix.size());uint64_t duration{};
+            const auto parsed=std::from_chars(argument.data(),argument.data()+argument.size(),duration);
+            if(parsed.ec==std::errc{}&&parsed.ptr==argument.data()+argument.size())armed=leaseCombatSight(now,duration);
+        }
+        const auto sight=combatSightSnapshot();const auto expiry=combatSightLeaseExpiry();
+        std::ostringstream out;out<<std::boolalpha<<"{\"schema\":1,\"source\":\"native_marker_job_world_visibility\",\"armed\":"<<armed
+            <<",\"enabled\":"<<(expiry>now)<<",\"now_ms\":"<<now<<",\"expires_ms\":"<<expiry
+            <<",\"sample_ms\":"<<sight.sampleTime<<",\"activation\":"<<sight.activation
+            <<",\"presentation_epoch\":"<<sight.presentationEpoch<<",\"player_owner\":"<<sight.playerOwner
+            <<",\"tracking_sequence\":"<<sight.trackingSequence<<",\"muzzle_tracked\":"<<sight.muzzleTracked
+            <<",\"muzzle\":{\"position\":["<<sight.muzzle.position.x<<','<<sight.muzzle.position.y<<','<<sight.muzzle.position.z
+            <<"],\"orientation\":["<<sight.muzzle.orientation.x<<','<<sight.muzzle.orientation.y<<','<<sight.muzzle.orientation.z<<','<<sight.muzzle.orientation.w
+            <<"]},\"candidates\":"<<sight.candidates<<",\"targets\":[";
+        for(size_t i=0;i<sight.count;++i){const auto& target=sight.targets[i];if(i)out<<',';
+            out<<"{\"id\":"<<target.id<<",\"marker\":["<<target.marker.x<<','<<target.marker.y<<','<<target.marker.z
+                <<"],\"aim\":["<<target.aim.x<<','<<target.aim.y<<','<<target.aim.z<<"],\"distance\":"<<target.distance
+                <<",\"surface_distance\":"<<target.surfaceDistance<<",\"query_valid\":"<<target.queryValid
+                <<",\"unoccluded\":"<<target.unoccluded<<",\"aim_kind\":"<<static_cast<unsigned>(target.aimKind)
+                <<",\"query_reason\":"<<static_cast<unsigned>(target.queryReason)
+                <<",\"ray_result\":"<<target.rayResult<<",\"hit_count\":"<<target.hitCount<<",\"hit_index\":"<<target.hitIndex
+                <<",\"raw_surface\":["<<target.rawSurface.x<<','<<target.rawSurface.y<<','<<target.rawSurface.z
+                <<"],\"raw_along\":"<<target.rawAlong<<",\"raw_lateral_squared\":"<<target.rawLateralSquared<<'}';}
+        out<<"]}";result=out.str();return true;
+    }
     constexpr std::string_view faultPrefix="diagnostics:controller-tracking-loss:";
-    if(request.starts_with(faultPrefix)){
-        auto& probe=controllerTrackingFaultProbe();bool armed=false;
-        const auto arguments=std::string_view(request).substr(faultPrefix.size());
+    constexpr std::string_view headFaultPrefix="diagnostics:head-tracking-loss:";
+    const bool headFault=request.starts_with(headFaultPrefix);
+    if(headFault||request.starts_with(faultPrefix)){
+        auto& probe=headFault?headTrackingFaultProbe():controllerTrackingFaultProbe();bool armed=false;
+        const auto arguments=std::string_view(request).substr(headFault?headFaultPrefix.size():faultPrefix.size());
         if(arguments=="off"){probe.clear();armed=true;}
         else if(const auto separator=arguments.find(':');separator!=std::string_view::npos){
             unsigned mask{};uint64_t duration{};
@@ -394,7 +692,7 @@ bool publishFastInput(const std::string& request,std::string& result){
     }
     if(request=="trace-native-menu-input"||request=="inspect-native-menu-input"){
         if(request=="trace-native-menu-input"){
-            std::lock_guard lock(menuTraceMutex);menuInputReads.clear();menuDisableReads.clear();
+            std::lock_guard lock(menuTraceMutex);menuInputReads.clear();menuDisableReads.clear();eulaReads.clear();eulaRead={};
             menuTraceImageSize=0;
             const auto dos=read<IMAGE_DOS_HEADER>(imageBase);
             if(dos.e_magic==IMAGE_DOS_SIGNATURE&&dos.e_lfanew>0&&dos.e_lfanew<0x100000){
@@ -402,7 +700,7 @@ bool publishFastInput(const std::string& request,std::string& result){
                 if(nt.Signature==IMAGE_NT_SIGNATURE&&nt.OptionalHeader.Magic==IMAGE_NT_OPTIONAL_HDR64_MAGIC)
                     menuTraceImageSize=nt.OptionalHeader.SizeOfImage;
             }
-            menuButtonCalls=0;menuCloseCalls=0;menuTraceUntil=steadyMilliseconds()+15000;
+            menuButtonCalls=0;menuEdgeCalls=0;menuCloseCalls=0;menuTraceUntil=steadyMilliseconds()+15000;
         }
         const auto ui=read<uintptr_t>(imageBase+0x2bf1518);
         const auto terminal=read<uintptr_t>(ui+0x7c0);
@@ -413,7 +711,8 @@ bool publishFastInput(const std::string& request,std::string& result){
         std::ostringstream out;out<<std::boolalpha;
         out<<"{\"schema\":1,\"verified\":"<<valid<<",\"installed\":"<<(originalUiButton&&originalUiClose)
            <<",\"armed\":"<<(steadyMilliseconds()<menuTraceUntil.load())
-           <<",\"button_calls\":"<<menuButtonCalls.load()<<",\"close_getter_calls\":"<<menuCloseCalls.load();
+           <<",\"button_calls\":"<<menuButtonCalls.load()<<",\"edge_calls\":"<<menuEdgeCalls.load()
+           <<",\"edge_installed\":"<<(originalUiEdge!=nullptr)<<",\"close_getter_calls\":"<<menuCloseCalls.load();
         if(valid)out<<",\"terminal_open\":"<<unsigned(read<uint8_t>(terminal+0x20))
             <<",\"deferred_close\":"<<unsigned(read<uint8_t>(terminal+0x25))
             <<",\"active_tutorial_mode\":"<<unsigned(read<uint8_t>(tutorial+8));
@@ -422,7 +721,7 @@ bool publishFastInput(const std::string& request,std::string& result){
         for(const auto& v:menuInputReads){if(!first)out<<',';first=false;
             out<<"{\"ms\":"<<v.time<<",\"index\":"<<v.index<<",\"bit\":"<<v.bit
                <<",\"held\":"<<v.held<<",\"pressed\":"<<v.pressed<<",\"xr\":"<<v.xr
-               <<",\"result\":"<<v.result<<",\"bypass\":"<<v.bypass
+               <<",\"result\":"<<v.result<<",\"bypass\":"<<v.bypass<<",\"edge\":"<<v.edge
                <<",\"object\":"<<v.object<<",\"caller\":"<<v.caller<<",\"caller_rva\":";
             if(v.caller>=imageBase&&v.caller-imageBase<menuTraceImageSize.load())out<<v.caller-imageBase;else out<<"null";
             out<<",\"xr_before\":"<<v.xrBefore;
@@ -439,6 +738,20 @@ bool publishFastInput(const std::string& request,std::string& result){
         for(const auto& v:menuDisableReads){if(!first)out<<',';first=false;
             out<<"{\"owner\":"<<v.owner<<",\"caller_rva\":"<<(v.caller-imageBase)<<",\"mode\":"<<v.mode
                <<",\"index\":"<<v.index<<",\"before\":"<<v.before<<",\"after\":"<<v.after<<",\"disabled\":"<<v.disabled<<'}';}
+        out<<"],\"eula\":{\"installed\":"<<(originalEulaUpdate!=nullptr)<<",\"verified\":"<<eulaRead.valid
+           <<",\"bridge_edges\":"<<eulaBridgeEdges.load()<<",\"scoped_queries\":"<<eulaScopedQueries.load()
+           <<",\"route\":"<<eulaRead.route<<",\"input_ms\":"<<eulaRead.inputTime
+           <<",\"buttons\":"<<eulaRead.buttons<<",\"context\":\""<<controlContextName(eulaRead.context)<<'"'
+           <<",\"sample_ms\":"<<eulaRead.time<<",\"owner\":"<<eulaRead.owner<<",\"vtable\":"<<eulaRead.type
+           <<",\"control\":"<<eulaRead.control<<",\"active\":"<<unsigned(eulaRead.active)
+           <<",\"phase\":"<<eulaRead.phase<<",\"mode\":"<<unsigned(eulaRead.mode)<<",\"flags\":"<<unsigned(eulaRead.flags)
+           <<",\"read_to_end\":"<<unsigned(eulaRead.readToEnd)<<",\"selector_visible\":"<<unsigned(eulaRead.selectorVisible)
+           <<",\"selection\":"<<eulaRead.selection<<",\"line\":"<<eulaRead.line<<",\"lines\":"<<eulaRead.lines
+           <<",\"snapshot_atomic\":false},\"eula_updates\":[";first=true;
+        for(const auto& v:eulaReads){if(!first)out<<',';first=false;
+            out<<"{\"ms\":"<<v.time<<",\"owner\":"<<v.owner<<",\"verified\":"<<v.valid<<",\"active\":"<<unsigned(v.active)
+               <<",\"phase\":"<<v.phase<<",\"mode\":"<<unsigned(v.mode)<<",\"route\":"<<v.route
+               <<",\"input_ms\":"<<v.inputTime<<",\"buttons\":"<<v.buttons<<",\"context\":\""<<controlContextName(v.context)<<"\"}";}
         out<<"]}";result=out.str();return true;
     }
     if(request=="inspect-bot-state"){
@@ -452,12 +765,15 @@ bool publishFastInput(const std::string& request,std::string& result){
         const auto tutorialMode=nativeIdroidTutorialMode();
         const auto popupSampleMs=steadyMilliseconds();
         const auto popup=nativePopupSnapshot();
+        const auto delivery=nativeInputDeliveryAudit().snapshot();
         const auto now=steadyMilliseconds();
+        const auto terms=nativeTermsMenu();
         std::ostringstream out;out<<std::boolalpha;
         out<<"{\"schema\":1,\"now_ms\":"<<now
            <<",\"lua_ready\":"<<nativeLuaReady.load()
            <<",\"title\":"<<nativeTitleModeActive()<<",\"title_menu\":"<<nativeTitleMenuOpen()
            <<",\"title_cabin\":"<<nativeTitleCabinMode()<<",\"cabin\":"<<nativeCabinPlay()
+           <<",\"cabin_transit\":"<<nativeCabinTransit()
            <<",\"loading\":"<<nativeLoadingTipsOpen()<<",\"demo\":"<<nativeScriptedDemoActive()
            <<",\"demo_candidate\":"<<(nativeDemoMode()==NativeDemoMode::staleCandidate)
            <<",\"demo_recovery_ready\":"<<headCamera().staleDemoRecoveryReady()
@@ -465,17 +781,30 @@ bool publishFastInput(const std::string& request,std::string& result){
            <<",\"menu\":"<<(menu?(*menu?"true":"false"):"null")
            <<",\"pause\":"<<(menu?(nativePauseMenuOpen()?"true":"false"):"null")
            <<",\"idroid\":"<<nativeIdroidOpen()<<",\"gamepad\":"<<nativeGamepadActive()
+           <<",\"idroid_ui_only_owner\":"<<handheldIdroidOwned()
            <<",\"idroid_closing\":"<<nativeIdroidClosing()<<",\"idroid_tutorial_mode\":";
         writeNativeIdroidTutorialModeJson(out,tutorialMode);
         out<<",\"tracking_fault_mask\":"<<controllerTrackingFaultProbe().mask(steadyMilliseconds())
+           <<",\"head_tracking_fault_mask\":"<<headTrackingFaultProbe().mask(steadyMilliseconds())
            <<",\"idroid_handheld\":"<<handheldMenusSelected()
            <<",\"idroid_menu_input_ready\":"<<handheldMenuInputReady()
+           <<",\"idroid_tutorial_paused\":"<<nativeIdroidTutorialPaused()
+           <<",\"idroid_menu_routing_available\":"<<handheldMenuRoutingAvailable()
+           <<",\"idroid_menu_control\":"<<static_cast<unsigned>(handheldMenuControl())
+           <<",\"idroid_focused_weapon\":"<<handheldFocusedWeapon()
+           <<",\"idroid_focused_weapon_available\":"<<handheldFocusedWeaponRoutingAvailable()
+           <<",\"idroid_ui_blocked_queries\":"<<handheldUiBlockedQueries.load()
            <<",\"camera_active\":"<<camera.active<<",\"camera_available\":"<<headCamera().available()
            <<",\"camera_pending\":"<<camera.pending<<",\"camera_suspended\":"<<camera.suspended
            <<",\"camera_awaiting_player\":"<<camera.awaitingPlayer
            <<",\"camera_reason\":"<<static_cast<unsigned>(camera.reason)
            <<",\"activation\":"<<camera.activation<<",\"opening_assets\":"<<openingPropsAvailable();
         out<<",\"popup_observer\":";writeNativePopupSnapshotJson(out,popup,popupSampleMs);
+        out<<",\"terms_menu\":{\"verified\":"<<terms.verified<<",\"active\":"<<terms.active
+           <<",\"ready\":"<<terms.ready(now)<<",\"sample_ms\":"<<terms.time<<",\"owner\":"<<terms.owner
+           <<",\"phase\":"<<terms.phase<<",\"mode\":"<<unsigned(terms.mode)
+           <<",\"horizontal\":"<<terms.horizontal<<",\"vertical\":"<<terms.vertical<<",\"action\":"<<terms.action<<'}';
+        out<<",\"xinput_delivery\":";writeNativeInputDeliveryJson(out,delivery,now);
         if(freshControlInputAudit(controlSample,now)){
             const auto* audit=&controlSample;
             out<<",\"controls\":{\"context\":\""<<controlContextName(audit->context)
@@ -506,7 +835,9 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"presentation_epoch\":"<<frame.controllers.presentationEpoch
                <<",\"raw_left_aim_tracked\":"<<frame.controllers.hands[0].aimTracked
                <<",\"raw_right_grip_tracked\":"<<frame.controllers.hands[1].gripTracked
-               <<",\"raw_right_aim_tracked\":"<<frame.controllers.hands[1].aimTracked;
+               <<",\"raw_right_aim_tracked\":"<<frame.controllers.hands[1].aimTracked
+               <<",\"idroid_stowed\":"<<frame.controllers.handheldIdroidStowed
+               <<",\"handheld_menu_free\":"<<frame.controllers.handheldMenuFree;
             const auto pose=[&](const char* name,Pose value){
                 const auto p=value.position;const auto q=value.orientation;
                 out<<",\""<<name<<"\":{\"position\":["<<p.x<<','<<p.y<<','<<p.z
@@ -522,6 +853,22 @@ bool publishFastInput(const std::string& request,std::string& result){
             pose("scope_ocular",frame.weaponScope.ocular);
             pose("scope_objective",frame.weaponScope.objective);
             pose("weapon_support_grip",frame.weaponSupportGrip);
+            pose("driver_left_wheel_grip",frame.driverWheelGrips[0]);
+            pose("driver_right_wheel_grip",frame.driverWheelGrips[1]);
+            out<<",\"driver_wheel_tracked\":"<<frame.driverWheelTracked
+               <<",\"driver_wheel_held\":"<<frame.driverWheelHeld
+               <<",\"driver_wheel_hands\":"<<unsigned(frame.driverWheelHands)
+               <<",\"driver_wheel_axis\":"<<frame.driverWheelAxis;
+            const auto vehicleGun=vehicleWeaponState();
+            out<<",\"vehicle_weapon\":{\"available\":"<<vehicleWeaponRoutingAvailable()
+               <<",\"requested\":"<<vehicleGun.requested<<",\"ready\":"<<vehicleGun.ready
+               <<",\"eligible\":"<<vehicleGun.nativeEligible<<",\"player\":"<<vehicleGun.player
+               <<",\"activation\":"<<vehicleGun.activation<<",\"time\":"<<vehicleGun.time
+               <<",\"held\":"<<vehicleGun.semanticHeld<<",\"input_mask\":"<<vehicleGun.inputMask
+               <<",\"weapon_flags\":"<<vehicleGun.weaponFlags<<",\"render_flags\":"<<vehicleGun.renderFlags
+               <<",\"action_flags\":"<<vehicleGun.renderActionFlags<<",\"pose_flags\":"<<vehicleGun.renderPoseFlags
+               <<",\"native_action\":"<<vehicleGun.nativeActionId<<",\"posture\":"<<unsigned(vehicleGun.nativePosture)
+               <<",\"equipped_slot\":"<<unsigned(vehicleGun.equippedSlot)<<",\"requested_slot\":"<<unsigned(vehicleGun.requestedSlot)<<'}';
             pose("binocular_ocular",frame.controllers.optic.pose.rightEyepiece);
             out<<",\"scope_tracked\":"<<frame.weaponScope.tracked
                <<",\"idroid_device_tracked\":"<<frame.idroidDeviceTracked
@@ -541,12 +888,20 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"body_model\":"<<weapon.bodyModel<<",\"weapon_model\":null,\"weapon_definition\":null"
                <<",\"resource_handle\":"<<weapon.resourceHandle<<",\"resource_accepted\":"<<weapon.resourceAccepted
                <<",\"support_identity\":"<<weapon.supportIdentity<<",\"scope_identity\":"<<frame.weaponScope.weaponIdentity
+               <<",\"magnifier_interface\":"<<weapon.magnifierInterface<<",\"magnifier_model\":"<<weapon.magnifierModel
+               <<",\"magnifier_index\":"<<weapon.magnifierIndex<<",\"magnifier_model_code\":"<<weapon.magnifierModelCode
                <<",\"flags\":"<<weapon.flags<<",\"mode\":"<<weapon.mode<<",\"muzzle_attempted\":"<<weapon.muzzleAttempted
                <<",\"muzzle_matrix_read\":"<<weapon.muzzleMatrixRead<<",\"attachment_valid\":"<<weapon.attachmentValid
                <<",\"muzzle_socket_valid\":"<<weapon.muzzleSocketValid<<",\"muzzle_solved\":"<<weapon.muzzleSolved
                <<",\"optical_descriptor_read\":"<<weapon.opticalRead<<",\"optical_descriptor\":[";
             for(size_t i=0;i<weapon.optical.size();++i){if(i)out<<',';out<<static_cast<unsigned>(weapon.optical[i]);}
-            out<<']';pose("muzzle_in_grip",weapon.muzzleInGrip);out<<'}';
+            out<<']';pose("muzzle_in_grip",weapon.muzzleInGrip);
+            out<<",\"sight_query_attempted\":"<<weapon.sightQueryAttempted
+               <<",\"sight_rear_read\":"<<weapon.sightRearRead<<",\"sight_front_read\":"<<weapon.sightFrontRead
+               <<",\"sight_rear_valid\":"<<weapon.sightRearValid<<",\"sight_front_valid\":"<<weapon.sightFrontValid;
+            pose("sight_rear_native_model",weapon.sightRear);pose("sight_front_native_model",weapon.sightFront);
+            pose("sight_rear_in_wrist",weapon.sightRearInWrist);pose("sight_front_in_wrist",weapon.sightFrontInWrist);
+            pose("sight_rear_local",weapon.sightRearLocal);pose("sight_front_local",weapon.sightFrontLocal);out<<'}';
             out<<'}';
         }else out<<",\"rendered\":null";
         if(const auto anchor=headCamera().openingTrackingOrigin(now)){
@@ -606,9 +961,91 @@ void pump(void* state){
     const auto now=GetTickCount64();
     if(!lock.owns_lock()||now-checkedAt<100)return;
     checkedAt=now;
+    // Menu entry/Help can briefly lack a fresh rig and can re-admit the same
+    // player under a new camera activation. Neither is a terminal-owner change.
+    // Keep the UI-only resource until a verified different player or UI exit.
+    if(handheldIdroidOwned()){
+        const auto rig=headCamera().publishedRigFrame(steadyMilliseconds());
+        const auto borrow=handheldIdroidBorrow();
+        if((!nativeIdroidOpen()&&!borrow.player)||nativeLoadingTipsOpen()||nativeTitleModeActive()||nativeScriptedDemoActive()
+                ||(rig&&!handheldIdroidOwned(rig->playerOwner))){
+            cancelHandheldIdroidBorrow();publishHandheldIdroidOwner(0,0);
+        }
+        else if(rig&&rig->activation&&headCamera().status().activation==rig->activation
+                &&!handheldIdroidOwned(rig->playerOwner,rig->activation))
+            publishHandheldIdroidOwner(rig->playerOwner,rig->activation);
+    }
+    pumpHandheldIdroidEquipment();
+    // Help can pause the gameplay Lua owner. Its native UI cleanup must run
+    // on the pump independently of gameplay globals or coroutine addresses.
+    if(controllerRigEnabled()&&stowHelpOwner){
+        if(now<stowHelpRequestedAt||now-stowHelpRequestedAt>2000)stowHelpOwner=0;
+        else if(closeNativeIdroidStowHelp(stowHelpOwner)){
+            stowHelpOwner=0;
+            nativeMenuOpen();
+            restoreCompletedGuideRestrictions();
+            releaseNativeIdroidTutorialPause();
+            log("Requested terminal stow: owned native post-close Help released");
+        }
+    }
     if(controllerRigEnabled()&&luaReady(state)){
         const int top=getTop(state);
         const auto cameraStatus=headCamera().status();
+        const auto currentRig=headCamera().publishedRigFrame(steadyMilliseconds());
+        const auto borrow=handheldIdroidBorrow();
+        if(borrow.player&&!borrow.stopped&&!borrow.returnRequested&&currentRig
+                &&currentRig->playerOwner==borrow.player&&cameraStatus.activation==borrow.activation
+                &&cameraStatus.active&&!cameraStatus.suspended&&handheldMenusSelected()
+                &&handheldIdroidOwned(borrow.player,borrow.activation)&&!nativeGamepadActive()
+                &&!nativePauseMenuOpen()&&!nativeCabinPlay()
+                &&nativeIdroidTutorialMode()==std::optional<unsigned>{0}){
+            constexpr std::string_view stopScript=
+                "if not TppUiCommand.IsShowPopup() and not TppSave.IsSaving() "
+                "and not gvars.ini_isTitleMode and not DemoDaemon.IsDemoPlaying() "
+                "and TppSequence.IsMissionPrepareFinished() and not TppMission.IsHelicopterSpace(vars.missionCode) "
+                "and vars.missionCode~=10010 and TppSequence.GetCurrentSequenceName():match('^Seq_Game_') "
+                "and PlayerInfo.AndCheckStatus{PlayerStatus.NORMAL_ACTION} then "
+                "if TppUiCommand.IsMbDvcTerminalOpened() then TppUiCommand.StopMbDvcTerminal() end "
+                "return TppUiCommand.IsMbDvcTerminalOpened() and 'pending' or 'stopped' end return 'owner changed'";
+            int status=load(state,stopScript.data(),stopScript.size(),"@mgs5vr-handheld-idroid-borrow");
+            if(!status)status=original(state,0,1,0);
+            size_t length{};const auto* value=getString(state,-1,&length);
+            if(!status&&value&&std::string_view(value,length)=="stopped"){
+                acknowledgeHandheldIdroidBorrow(borrow);nativeMenuOpen();
+                log("VR handheld iDroid stopped for native reload; same handset retained");
+            }else if(status||(value&&std::string_view(value,length)=="owner changed"))cancelHandheldIdroidBorrow();
+            setTop(state,top);
+        }
+        const auto openRequest=takeHandheldIdroidOpen();
+        if(freshHandheldIdroidOpenRequest(openRequest,cameraStatus.activation,steadyMilliseconds())
+                &&currentRig&&currentRig->playerOwner&&cameraStatus.active&&!cameraStatus.suspended
+                &&!cameraStatus.nativeMenuOpen&&handheldMenusSelected()&&!nativeGamepadActive()
+                &&!nativeIdroidOpen()&&!nativePauseMenuOpen()&&!nativeCabinPlay()
+                &&nativeIdroidTutorialMode()==std::optional<unsigned>{0}
+                &&(!borrow.player||(borrow.returnRequested&&borrow.player==currentRig->playerOwner
+                    &&borrow.activation==cameraStatus.activation))){
+            constexpr std::string_view openScript=
+                "if type(TppUiCommand.StartMbDvcTerminal)=='function' and not TppUiCommand.IsMbDvcTerminalOpened() "
+                "and not TppUiCommand.IsShowPopup() and not TppSave.IsSaving() "
+                "and not gvars.ini_isTitleMode and not DemoDaemon.IsDemoPlaying() "
+                "and TppSequence.IsMissionPrepareFinished() and not TppMission.IsHelicopterSpace(vars.missionCode) "
+                "and vars.missionCode~=10010 and TppSequence.GetCurrentSequenceName():match('^Seq_Game_') "
+                "and (PlayerInfo.AndCheckStatus{PlayerStatus.NORMAL_ACTION} "
+                "or PlayerInfo.AndCheckStatus{PlayerStatus.ON_VEHICLE}) then "
+                "TppUiCommand.StartMbDvcTerminal(); return 'opened' end return 'owner changed'";
+            int status=load(state,openScript.data(),openScript.size(),"@mgs5vr-handheld-idroid-open");
+            if(!status)status=original(state,0,1,0);
+            size_t length{};const auto* result=getString(state,-1,&length);
+            if(!status&&result&&std::string_view(result,length)=="opened"){
+                nativeMenuOpen();
+                if(nativeIdroidOpen()){
+                    publishHandheldIdroidOwner(currentRig->playerOwner,cameraStatus.activation);
+                    if(borrow.player)cancelHandheldIdroidBorrow();
+                }
+            }
+            log("VR handheld iDroid open status="+std::to_string(status)+": "+(result?std::string(result,std::min(length,size_t{200})):"no result"));
+            setTop(state,top);
+        }
         if(cameraStatus.active&&!cameraStatus.suspended&&!cameraStatus.nativeMenuOpen){
             while(const auto event=takeOpticEvent(steadyMilliseconds(),cameraStatus.activation)){
                 std::ostringstream script;
@@ -635,12 +1072,16 @@ void pump(void* state){
         // actions without pausing skin, animation or terminal updates. Own a
         // separate registration so another tutorial's exclusion is preserved.
         static bool idroidPadRegistered{},accFobGuideHelpSeen{};
+        static IdroidPadRelease idroidPadRelease;
         static void* idroidPadState{};
-        if(idroidPadState!=state){idroidPadRegistered=accFobGuideHelpSeen=false;idroidPadState=state;}
+        if(idroidPadState!=state){
+            idroidPadRegistered=accFobGuideHelpSeen=false;idroidPadState=state;idroidPadRelease.reset();
+        }
         const bool handheldIdroid=nativeIdroidOpen()&&!nativeIdroidClosing()&&handheldMenusSelected();
         // ACC already fixes the character in its seat and releases the native
         // player-pad exclusion for terminal controls. Retain that ownership;
-        // field iDroid still excludes player movement. Resolve the mission in
+        // Grip focus excludes field movement; the free handheld route releases
+        // it. Resolve the mission in
         // this Lua transaction rather than an expiring render-side heartbeat.
         bool idroidCabin{},idroidPadPolicyKnown=true;
         if(handheldIdroid){
@@ -656,22 +1097,68 @@ void pump(void* state){
             idroidCabin=idroidPadPolicyKnown&&std::memcmp(owner,"cabin",5)==0;
             setTop(state,top);
         }
-        const bool guardIdroid=handheldIdroid&&!idroidCabin;
-        if(idroidPadPolicyKnown&&guardIdroid!=idroidPadRegistered){
-            const std::string script=std::string("if type(TppGameStatus)=='table' and type(TppGameStatus.")
-                +(guardIdroid?"Set":"Reset")+")== 'function' then TppGameStatus."
-                +(guardIdroid?"Set":"Reset")+"('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD'); return 'ok' end return 'unavailable'";
+        const auto idroidControl=handheldMenuControl();
+        const bool guardIdroid=handheldIdroid&&!idroidCabin&&idroidControl!=HandheldMenuControl::locomotion;
+        const bool requestedWeapon=guardIdroid&&idroidControl==HandheldMenuControl::menu
+            &&handheldFocusedWeapon()&&handheldFocusedWeaponRoutingAvailable();
+        const auto requestedPolicy=requestedWeapon?HandheldPlayerPadPolicy::weaponOnly:
+            guardIdroid?HandheldPlayerPadPolicy::blocked:HandheldPlayerPadPolicy::released;
+        auto appliedPolicy=requestedPolicy;
+        if(idroidPadPolicyKnown){
+            const auto mapped=controlInputSnapshot();
+            const auto delivered=nativeInputDeliveryAudit().snapshot();
+            const bool wasWaiting=idroidPadRelease.waiting();
+            // A deliberate reload already owns a separate, validated
+            // terminal Stop/Start lease. Its post-Stop B pulse is intentional;
+            // it must not be mistaken for a menu Back handoff.
+            const bool borrowedHand=borrow.player&&borrow.activation==cameraStatus.activation
+                &&handheldIdroidOwned(borrow.player,borrow.activation);
+            appliedPolicy=idroidPadRelease.update(requestedPolicy,handheldIdroid||borrowedHand,
+                mapped,delivered,steadyMilliseconds());
+            if(!wasWaiting&&idroidPadRelease.waiting())
+                log("Handheld iDroid stow: retaining player-pad policy until native input release");
+            else if(wasWaiting&&!idroidPadRelease.waiting()&&appliedPolicy==HandheldPlayerPadPolicy::released)
+                log("Handheld iDroid stow: native input release witnessed");
+        }
+        const bool focusedWeapon=appliedPolicy==HandheldPlayerPadPolicy::weaponOnly;
+        const bool excludePlayer=appliedPolicy==HandheldPlayerPadPolicy::blocked;
+        bool idroidPadAcknowledged=false;
+        if(idroidPadPolicyKnown){
+            // The named game registration can survive a mission/Lua-state
+            // replacement while the C++ cache is reset. Read its actual state
+            // in this same transaction; a cached match cannot acknowledge a
+            // free route or leave the player disabled after stowing.
+            const std::string desired=excludePlayer?"true":"false";
+            const std::string script=
+                std::string("local weapon=")+(focusedWeapon?"true ":"false ")+
+                "if type(Player)~='table' or type(Player.ResetPadMask)~='function' then return 'unavailable' end "
+                "if weapon then "
+                "if type(Player.SetPadMask)~='function' or type(PlayerPad)~='table' "
+                "or type(PlayerPad.TRIGGER_L)~='number' or type(PlayerPad.TRIGGER_R)~='number' "
+                "or type(PlayerPad.HOLD)~='number' or type(PlayerPad.FIRE)~='number' then return 'unavailable' end "
+                "Player.SetPadMask{settingName='MGS5VR_iDroidFocus',except=true,buttons=PlayerPad.HOLD+PlayerPad.FIRE,"
+                "triggers=PlayerPad.TRIGGER_L+PlayerPad.TRIGGER_R} "
+                "else Player.ResetPadMask{settingName='MGS5VR_iDroidFocus'} end "
+                "if type(TppGameStatus)=='table' and type(TppGameStatus.IsSet)=='function' "
+                "and type(TppGameStatus.Set)=='function' and type(TppGameStatus.Reset)=='function' then "
+                "if TppGameStatus.IsSet('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD')~="+desired+" then TppGameStatus."
+                +(excludePlayer?"Set":"Reset")+"('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD') end "
+                "if TppGameStatus.IsSet('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD')=="+desired+" then return 'ok' end end return 'unavailable'";
             int padStatus=load(state,script.data(),script.size(),"@mgs5vr-idroid-player-pad");
             if(!padStatus)padStatus=original(state,0,1,0);
             size_t length{};const auto* result=getString(state,-1,&length);
             if(!padStatus&&result&&length==2&&std::memcmp(result,"ok",2)==0){
-                idroidPadRegistered=guardIdroid;
-                log(guardIdroid?"Handheld iDroid: player pad excluded; hand and UI updates retained"
-                    :"Handheld iDroid: owned player-pad exclusion released");
+                idroidPadAcknowledged=true;
+                if(excludePlayer!=idroidPadRegistered){
+                    idroidPadRegistered=excludePlayer;
+                    log(excludePlayer?"Handheld iDroid: player pad excluded; hand and UI updates retained"
+                        :"Handheld iDroid: owned player-pad exclusion released");
+                }
             }
             setTop(state,top);
         }
-        setHandheldMenuInputReady(handheldIdroid&&idroidPadPolicyKnown&&guardIdroid==idroidPadRegistered);
+        acknowledgeHandheldMenuControl(idroidControl,
+            handheldIdroid&&idroidPadAcknowledged&&appliedPolicy==requestedPolicy,steadyMilliseconds(),focusedWeapon);
         // This is the retail pause API used by TppMain and TppException.
         // Own one named registration and release only that registration;
         // another menu, loading transition or script may also hold a pause.
@@ -710,7 +1197,7 @@ void pump(void* state){
         if(nativeCabinPlay()&&nativeIdroidOpen()
            &&!nativePauseMenuOpen()&&accFobGuideHelpSeen&&guideMode&&*guideMode==10&&haveGuideRestrictionLease()){
             constexpr std::string_view guideScript=
-                "if vars.missionCode==40010 and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame' "
+                "if TppMission.IsHelicopterSpace(vars.missionCode) and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame' "
                 "and gvars.trm_fobTutorialState==127 and not mvars.heliSpace_nowMissionListGuidance "
                 "and type(TppUiCommand.SetTutorialMode)=='function' and not TppUiCommand.IsShowPopup() then "
                 "TppUiCommand.SetTutorialMode(false); return 'released' end return 'active guide'";
@@ -732,28 +1219,36 @@ void pump(void* state){
         // game modes retain their native player animation/terminal lifecycle.
         const bool cabinClose=nativeCabinPlay()&&nativeIdroidOpen()&&nativeIdroidClosing()
             &&recovery==NativeIdroidRecovery::ordinary&&!nativePauseMenuOpen();
-        if((heldBackClose||cabinClose)&&recovery!=NativeIdroidRecovery::refuse&&!nativePauseMenuOpen()){
-            // Stop is the terminal's own cleanup path. CloseMbDvcTerminal only
-            // sets a deferred close flag, which ACC does not consume.
+        const bool uiOnlyClose=handheldIdroidOwned()&&nativeIdroidOpen()&&nativeIdroidClosing()
+            &&recovery!=NativeIdroidRecovery::refuse&&!nativePauseMenuOpen();
+        if((heldBackClose||cabinClose||uiOnlyClose)&&recovery!=NativeIdroidRecovery::refuse&&!nativePauseMenuOpen()){
+            // Field players consume the deferred close in their native stow
+            // task. Calling Stop directly there leaves the equipped-device
+            // task alive and can reopen Help. ACC has no such player task.
             // Do not mark any tutorial complete or write progression variables.
+            const bool immediateStop=nativeCabinPlay()||handheldIdroidOwned();
+            // SECURITY also opens its post-close Help when a UI-only terminal
+            // stops immediately. Capture that exact tutorial owner before Stop
+            // resets its mode; the pump can release only its resulting Help.
+            const auto requestedHelpOwner=(heldBackClose||uiOnlyClose)
+                ?captureNativeIdroidStowHelpOwner():0;
+            const std::string closeFunction=immediateStop?"StopMbDvcTerminal":"CloseMbDvcTerminal";
             const std::string closeScript=
                 "if type(TppUiCommand)=='table' and type(TppUiCommand.IsMbDvcTerminalOpened)=='function' "
-                "and type(TppUiCommand.StopMbDvcTerminal)=='function' and TppUiCommand.IsMbDvcTerminalOpened() "
+                "and type(TppUiCommand."+closeFunction+")== 'function' and TppUiCommand.IsMbDvcTerminalOpened() "
                 "and type(TppUiCommand.IsShowPopup)=='function' and not TppUiCommand.IsShowPopup() then local completedGuide=false; "
                 +std::string(cabinClose
-                    ?"if not (vars.missionCode==40010 and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame') then return 'different owner' end "
+                    ?"if not (TppMission.IsHelicopterSpace(vars.missionCode) and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame') then return 'different owner' end "
                     :"")
-                // A player-requested recovery may release the reproduced stale
-                // completed ACC guide restriction. Never complete a tutorial,
-                // change save/progression variables, or cancel a live lesson.
+                // Only the reproduced completed ACC guide permits clearing its
+                // tutorial mode here. Other lessons retain progression; held
+                // Back requests only the native terminal's stow operation.
                 +std::string(heldBackClose&&nativeCabinPlay()&&tutorialMode&&*tutorialMode==10&&haveGuideRestrictionLease()
-                    ?"if vars.missionCode==40010 and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame' "
+                    ?"if TppMission.IsHelicopterSpace(vars.missionCode) and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame' "
                      "and gvars.trm_fobTutorialState==127 and not mvars.heliSpace_nowMissionListGuidance "
                      "and type(TppUiCommand.SetTutorialMode)=='function' then TppUiCommand.SetTutorialMode(false); completedGuide=true end "
                     :"")
-                +std::string(heldBackClose&&recovery==NativeIdroidRecovery::completedGuideOnly
-                    ?"if not completedGuide then return 'live tutorial retained' end ":"")
-                +"TppUiCommand.StopMbDvcTerminal(); return completedGuide and 'completed guide closed' or 'requested' end return 'already closed or overlay'";
+                +"TppUiCommand."+closeFunction+"(); return completedGuide and 'completed guide closed' or 'requested' end return 'already closed or overlay'";
             int closeStatus=load(state,closeScript.data(),closeScript.size(),"@mgs5vr-idroid-back-recovery");
             if(!closeStatus)closeStatus=original(state,0,1,0);
             size_t length{};const auto* result=getString(state,-1,&length);
@@ -762,6 +1257,25 @@ void pump(void* state){
                 const auto restored=restoreCompletedGuideRestrictions();
                 log(std::string("Requested ACC recovery: native tutorial pause released=")+(releaseNativeIdroidTutorialPause()?"1":"0")
                     +"; prior menu restrictions restored="+(restored?"1":"0"));
+            }
+            if(!closeStatus&&heldBackClose&&!immediateStop&&nativeIdroidClosing()){
+                // Deliberate stow must run the native player task even while
+                // a lesson has paused the field. Release only the verified
+                // tutorial object's own pause handle, retaining its mode,
+                // restrictions, allocated handle and progression.
+                log(std::string("Requested field iDroid stow: tutorial pause released=")
+                    +(releaseNativeIdroidTutorialPause(true)?"1":"0")
+                    +"; post-close Help owner captured="+(requestedHelpOwner?"1":"0"));
+            }
+            if(!closeStatus&&requestedHelpOwner){
+                stowHelpOwner=requestedHelpOwner;stowHelpRequestedAt=now;
+            }
+            if(!closeStatus&&heldBackClose&&nativeIdroidRecoveryForTutorialMode(nativeIdroidTutorialMode())==NativeIdroidRecovery::ordinary){
+                // Restore only entry disables captured before this lesson
+                // borrowed them. An independent later disable remains owned
+                // by the game, and no completion/save variable is changed.
+                restoreCompletedGuideRestrictions();
+                releaseNativeIdroidTutorialPause();
             }
             log(std::string(cabinClose?"Native ACC iDroid root-Back cleanup status=":"Native iDroid held-Back recovery status=")+std::to_string(closeStatus)+": "
                 +(result?std::string(result,std::min(length,size_t{300})):"no result"));
@@ -790,6 +1304,8 @@ void pump(void* state){
             &&std::memcmp(presentationValue,"title",5)==0);
         const bool cabinActive=!presentationStatus&&presentationValue&&presentationLength==5
             &&std::memcmp(presentationValue,"cabin",5)==0;
+        const bool cabinTransit=!presentationStatus&&presentationValue&&presentationLength==12
+            &&std::memcmp(presentationValue,"cabin-flight",12)==0;
         const bool sceneMenuActive=!presentationStatus&&presentationValue
             &&((presentationLength==10&&std::memcmp(presentationValue,"cabin-menu",10)==0)
                 ||(presentationLength==9&&std::memcmp(presentationValue,"game-over",9)==0));
@@ -800,7 +1316,7 @@ void pump(void* state){
             ||(presentationValue&&((presentationLength==5&&std::memcmp(presentationValue,"title",5)==0)
                 ||(presentationLength==5&&std::memcmp(presentationValue,"cabin",5)==0)
                 ||(presentationLength==6&&std::memcmp(presentationValue,"closed",6)==0)
-                ||avatarEditorActive||titleCabinActive||sceneMenuActive));
+                ||avatarEditorActive||titleCabinActive||sceneMenuActive||cabinTransit));
         // A failed or malformed Lua query is not a negative demo signal. Keep
         // the previous conservative mode; its candidate heartbeat expires.
         if(!presentationStatus&&knownDemoPresentation)
@@ -811,6 +1327,7 @@ void pump(void* state){
         publishNativeTitleMode(titleActive);
         publishNativeTitleCabinMode(titleCabinActive);
         publishNativeCabinPlay(cabinActive);
+        publishNativeCabinTransit(cabinTransit);
         publishNativeSceneMenu(sceneMenuActive);
         setTop(state,top);
         const bool requested=openingCabinEnabled()&&nativeTitleMenuOpen()&&headCamera().status().active;
@@ -884,23 +1401,64 @@ void installNativeActions(uintptr_t base,const std::filesystem::path& folder,boo
     setTop=reinterpret_cast<SetTop>(base+0x1a11f70);getString=reinterpret_cast<String>(base+0x1a12150);
     requestPath=folder/L"mgs5vr-native-actions.lua";resultPath=folder/L"mgs5vr-native-actions-result.txt";
     imageBase=base;tracePath=folder/L"mgs5vr-animal-trace.txt";
+    // UiPad vtable slot 0x120 is the native input-mask predicate. All ordinary
+    // button/axis getters consult it; retain its existing tutorial count.
+    const bool inputMaskAbi=matches(base+0x1dd7eb0,std::array<unsigned char,9>{0x33,0xc0,0x39,0x41,0x18,0x0f,0x97,0xc0,0xc3})
+        &&read<uintptr_t>(base+0x2548780)==base+0x1dd7eb0;
+    auto* inputMask=reinterpret_cast<void*>(base+0x1dd7eb0);
+    const bool inputMaskInstalled=inputMaskAbi
+        &&MH_CreateHook(inputMask,reinterpret_cast<void*>(&uiInputMasked),reinterpret_cast<void**>(&originalUiInputMasked))==MH_OK
+        &&MH_EnableHook(inputMask)==MH_OK;
+    setHandheldMenuRoutingAvailable(inputMaskInstalled);
+    log(inputMaskInstalled?"Handheld iDroid UI input gate verified; held focus can transfer movement ownership"
+        :"Handheld iDroid UI input gate unavailable; existing menu input ownership retained");
     auto* address=reinterpret_cast<void*>(base+0x1a116c0);
     if(MH_CreateHook(address,reinterpret_cast<void*>(&call),reinterpret_cast<void**>(&original))!=MH_OK||MH_EnableHook(address)!=MH_OK)
         throw std::runtime_error("Cannot install native action queue");
     externalCommands=allowExternalCommands;
-    if(externalCommands){
-        const bool abi=matches(base+0x1dd7ba0,std::array<unsigned char,10>{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20})
-            &&matches(base+0x92a160,std::array<unsigned char,12>{0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x48,0x8b,0x49});
-        if(abi){
-            auto* button=reinterpret_cast<void*>(base+0x1dd7ba0);
-            auto* close=reinterpret_cast<void*>(base+0x92a160);
-            if(MH_CreateHook(button,reinterpret_cast<void*>(&uiButton),reinterpret_cast<void**>(&originalUiButton))==MH_OK
-               &&MH_EnableHook(button)==MH_OK
-               &&MH_CreateHook(close,reinterpret_cast<void*>(&uiClose),reinterpret_cast<void**>(&originalUiClose))==MH_OK
-               &&MH_EnableHook(close)==MH_OK)log("Bounded native menu input/stow diagnostics available");
-            else log("Native menu diagnostics unavailable; native behavior retained");
-        }else log("Native menu diagnostic ABI differs; observation hooks disabled");
-    }
+    const auto installInputHook=[&](uintptr_t rva,void* detour,void** trampoline){
+        auto* target=reinterpret_cast<void*>(base+rva);
+        return MH_CreateHook(target,detour,trampoline)==MH_OK&&MH_EnableHook(target)==MH_OK;
+    };
+    constexpr std::array<unsigned char,10> buttonSignature{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20};
+    const bool buttonInstalled=matches(base+0x1dd7ba0,buttonSignature)
+        &&installInputHook(0x1dd7ba0,reinterpret_cast<void*>(&uiButton),reinterpret_cast<void**>(&originalUiButton));
+    if(externalCommands&&matches(base+0x92a160,std::array<unsigned char,12>{0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x48,0x8b,0x49}))
+        installInputHook(0x92a160,reinterpret_cast<void*>(&uiClose),reinterpret_cast<void**>(&originalUiClose));
+    // UiPad slot 0x40 is the logical edge queried by native Terms. The
+    // expiring observer retains the original result without a fallback edge.
+    const bool edgeAbi=matches(base+0x1dd78c0,std::array<unsigned char,10>{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20})
+        &&read<uintptr_t>(base+0x227d8b0)==base+0x1dd78c0;
+    const bool edgeInstalled=edgeAbi&&installInputHook(0x1dd78c0,reinterpret_cast<void*>(&uiEdge),reinterpret_cast<void**>(&originalUiEdge));
+    if(edgeInstalled)log("Native Terms button-edge observer verified");
+    const bool triggerGate=buttonInstalled&&edgeInstalled
+        &&matches(base+0x1dd7980,buttonSignature)
+        &&matches(base+0x1dd7a40,std::array<unsigned char,8>{0x48,0x8b,0xc4,0x57,0x48,0x83,0xec,0x60})
+        &&matches(base+0x1dd7760,std::array<unsigned char,6>{0x40,0x57,0x48,0x83,0xec,0x40})
+        &&installInputHook(0x1dd7980,reinterpret_cast<void*>(&uiRelease),reinterpret_cast<void**>(&originalUiRelease))
+        &&installInputHook(0x1dd7a40,reinterpret_cast<void*>(&uiRepeat),reinterpret_cast<void**>(&originalUiRepeat))
+        &&installInputHook(0x1dd7760,reinterpret_cast<void*>(&uiRepeatState),reinterpret_cast<void**>(&originalUiRepeatState));
+    setHandheldFocusedWeaponRoutingAvailable(triggerGate);
+    log(triggerGate?"Handheld iDroid held-firearm trigger/UI ownership adapter installed"
+        :"Handheld iDroid firearm exception unavailable: native trigger-query ABI differs");
+    auto* tabs=reinterpret_cast<void*>(base+0x878940);
+    auto* tabAction=reinterpret_cast<void*>(base+0x915890);
+    if(matches(base+0x878940,std::array<unsigned char,13>{0x40,0x53,0x48,0x83,0xec,0x30,0x0f,0xb6,0x81,0xda,0x17,0,0})
+       &&matches(base+0x878a05,std::array<unsigned char,10>{0x8b,0xc8,0xe8,0x84,0xce,0x09,0,0x0f,0xb6,0xf8})
+       &&matches(base+0x878bb2,std::array<unsigned char,20>{0x0f,0xb6,0x8b,0xda,0x17,0,0,0xff,0xc9,0x74,0x0e,
+            0x83,0xe9,0x02,0x0f,0x84,0x6c,0xff,0xff,0xff})
+       &&matches(base+0x915890,std::array<unsigned char,9>{0x40,0x53,0x48,0x83,0xec,0x20,0x8b,0xd9,0xe8})
+       &&matches(base+0x91ed80,std::array<unsigned char,7>{0xb1,0x15,0xe9,0x49,0xfd,0xc1,0xff})
+       &&matches(base+0x91ed20,std::array<unsigned char,20>{0x48,0xb8,0x98,0x9f,0x16,0xbf,0xa0,0xb8,0,0,
+            0xc7,0x81,0x30,0x08,0,0,0,0,0,0})
+       &&MH_CreateHook(tabAction,reinterpret_cast<void*>(&uiTabAction),reinterpret_cast<void**>(&originalUiTabAction))==MH_OK
+       &&MH_EnableHook(tabAction)==MH_OK
+       &&MH_CreateHook(tabs,reinterpret_cast<void*>(&uiTabUpdate),reinterpret_cast<void**>(&originalUiTabUpdate))==MH_OK
+       &&MH_EnableHook(tabs)==MH_OK)log("Native iDroid root tab update verified; grip next-tab wrap available");
+    auto* eula=reinterpret_cast<void*>(base+0x89ccf0);
+    if(matches(base+0x89ccf0,std::array<unsigned char,7>{0x80,0xb9,0xc0,0,0,0,0})
+       &&MH_CreateHook(eula,reinterpret_cast<void*>(&eulaUpdate),reinterpret_cast<void**>(&originalEulaUpdate))==MH_OK
+       &&MH_EnableHook(eula)==MH_OK)log("Native Terms modal owner verified; menu sticks retained");
     const bool restrictionAbi=matches(base+0x9683d0,std::array<unsigned char,9>{0x4c,0x8b,0xc9,0x0f,0xb6,0xc2,0x45,0x84,0xc0})
         &&matches(base+0xf42840,std::array<unsigned char,11>{0x48,0x8b,0x46,0x28,0x41,0xb0,0x01,0x40,0x0f,0xb6,0xd7})
         &&matches(base+0xf42855,std::array<unsigned char,9>{0xff,0x90,0xa0,0,0,0,0x40,0xfe,0xc7});
@@ -915,7 +1473,10 @@ void installNativeActions(uintptr_t base,const std::filesystem::path& folder,boo
     log(externalCommands?"Native title reader and local action queue installed":"Native title reader installed; external actions disabled");
 }
 void stopNativeActions() noexcept{
-    enabled.store(false);requestNativeIdroidClose(false);actionPipeStopping.store(true);
+    enabled.store(false);setHandheldMenuRoutingAvailable(false);
+    publishHandheldMenuControl(HandheldMenuControl::native,0);
+    publishHandheldFocusedWeapon(false,0);setHandheldFocusedWeaponRoutingAvailable(false);
+    requestNativeIdroidClose(false);requestHandheldIdroidOpen(0);cancelHandheldIdroidBorrow();publishHandheldIdroidOwner(0,0);actionPipeStopping.store(true);
     std::shared_ptr<ActionConnection> connection;{std::lock_guard lock(connectionMutex);connection=activeConnection;}
     if(connection)connection->responseReady.notify_all();
     if(connection&&connection->pipe!=INVALID_HANDLE_VALUE)CancelIoEx(connection->pipe,nullptr);

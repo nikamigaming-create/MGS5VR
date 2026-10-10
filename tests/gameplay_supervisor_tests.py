@@ -86,6 +86,26 @@ class Tests(unittest.TestCase):
             self.assertEqual(sum(row['event']=='milestone_reached' for row in rows),0)
             self.assertEqual(len(live.captures),2)
 
+    def test_unlimited_session_hands_off_idle_work_in_ten_seconds_with_released_inputs(self):
+        clock = Clock()
+        with tempfile.TemporaryDirectory() as folder:
+            live = mock.Mock(held={}, bindings={})
+            live.observe.return_value = self.state
+            paths = []
+            for eye in ('left', 'right'):
+                path = pathlib.Path(folder)/(eye+'.fixture')
+                path.write_text(eye)
+                paths.append(str(path))
+            live.capture.return_value = paths
+            result = run_supervised(Behaviors(live, Events(folder, {}, clock=clock),
+                                    clock=clock, sleep=clock.sleep),
+                                    seconds=0., clock=clock, sleep=clock.sleep)
+            self.assertEqual(result['status'], 'needs_decision')
+            self.assertGreaterEqual(clock.now, 10.)
+            self.assertLess(clock.now, 10.1)
+            live.execute.assert_not_called()
+            self.assertFalse(json.loads((pathlib.Path(folder)/'supervisor-health.json').read_text())['input_held'])
+
     def test_shallow_scene_comparison_still_refreshes_on_native_menu_transition(self):
         clock=Clock()
         with tempfile.TemporaryDirectory() as folder:
@@ -291,6 +311,19 @@ class StartupTransitionTests(unittest.TestCase):
         self.assertEqual(live.capture.call_count,2)
         live.execute.assert_not_called()
         self.assertEqual(clock.now,.25)
+
+    def test_title_cabin_fade_waits_without_accepting_playable_or_press_start_blanks(self):
+        state = self.state()
+        state.update(scene='title', title=True, title_menu=False, press_start_ready=False)
+        state['native'].update(mission=40010, sequence=None, title=True, popup=False, player_life=7801)
+        self.assertTrue(neutral_startup_transition(state))
+        live=mock.Mock(held={}); clock=Clock()
+        live.capture.side_effect=[BlankCompositorFrame('retained cabin fade',state), ['left','right']]
+        self.assertEqual(capture_released_startup_transition(live,'cabin-fade',clock=clock,sleep=clock.sleep),
+                         ['left','right'])
+        live.execute.assert_not_called()
+        for change in ({'press_start_ready':True}, {'title_menu':True}, {'camera_active':True}, {'scene':'cabin'}):
+            self.assertFalse(neutral_startup_transition({**state, **change}))
 
     def test_native_owner_controls_and_gameplay_cannot_admit_blank_retry(self):
         variants=[{"native":{**self.state()["native"],"mission":10020}},

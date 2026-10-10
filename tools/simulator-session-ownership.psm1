@@ -74,7 +74,7 @@ function Get-MgsOwnedRuntimeProcesses {
                 if($isRuntime){
                     $identity.role=if($parent.depth -eq 0 -and $isMetaGui){'meta_gui'}else{'runtime_child'}
                     $identity.depth=[int]$parent.depth+1
-                    $parentIdentity=if([int]$parent.pid -eq [int]$Game.pid){$Game}else{ConvertTo-MgsProcessIdentity $byId[[int]$parent.pid]}
+                    $parentIdentity=if([int]$parent.pid -eq [int]$Game.pid){ConvertTo-MgsProcessIdentity $Game}else{ConvertTo-MgsProcessIdentity $byId[[int]$parent.pid]}
                     $identity.parentIdentity=[ordered]@{pid=[int]$parentIdentity.pid;parentPid=[int]$parentIdentity.parentPid;startedUtc=[string]$parentIdentity.startedUtc;path=[string]$parentIdentity.path}
                     $result.Add($identity)
                     $next.Add([pscustomobject]@{pid=$identity.pid;depth=$identity.depth})
@@ -84,6 +84,159 @@ function Get-MgsOwnedRuntimeProcesses {
         $frontier=@($next)
     }
     return @($result | Sort-Object @{Expression={[int]$_.depth}},@{Expression={[int]$_.pid}})
+}
+
+function Expand-MgsLiveRuntimeRecord {
+    param([Parameter(Mandatory=$true)]$Record,[Parameter(Mandatory=$true)][object[]]$Processes,
+        [Parameter(Mandatory=$true)][string]$RuntimeRoot)
+    $game=@($Processes | Where-Object { [int]$_.ProcessId -eq [int]$Record.game.pid })
+    if($game.Count -ne 1 -or !(Test-MgsExactProcessIdentity $Record.game $game[0])){
+        throw 'Exact recorded game owner changed; refusing late runtime registration.'
+    }
+    $known=@{}
+    foreach($identity in @($Record.ownedRuntimeProcesses)){
+        $current=@($Processes | Where-Object { [int]$_.ProcessId -eq [int]$identity.pid })
+        if($current.Count -and ($current.Count -ne 1 -or !(Test-MgsExactProcessIdentity $identity $current[0]))){
+            throw 'Recorded runtime generation changed; refusing late runtime registration.'
+        }
+        $known[[int]$identity.pid]=$identity
+    }
+    foreach($identity in @(Get-MgsOwnedRuntimeProcesses -Processes $Processes -Game $Record.game -RuntimeRoot $RuntimeRoot)){
+        if((ConvertTo-MgsUtcStartTime $identity.startedUtc) -lt (ConvertTo-MgsUtcStartTime $identity.parentIdentity.startedUtc)){
+            throw 'Runtime child predates its live parent; refusing late runtime registration.'
+        }
+        if($known.ContainsKey([int]$identity.pid)){
+            if(!(Test-MgsExactProcessIdentity $known[[int]$identity.pid] $identity)){
+                throw 'Discovered runtime generation changed; refusing late runtime registration.'
+            }
+        }else{$known[[int]$identity.pid]=$identity}
+    }
+    # Return a new snapshot; never replace the immutable helper's game owner.
+    $expanded=$Record|ConvertTo-Json -Depth 8|ConvertFrom-Json
+    $expanded.ownedRuntimeProcesses=@($known.Values | Sort-Object depth,pid)
+    return $expanded
+}
+
+function Get-MgsOpaqueVrEnvironmentPlan {
+    param(
+        [Parameter(Mandatory=$true)]$Record,
+        [Parameter(Mandatory=$true)][object[]]$Processes,
+        [Parameter(Mandatory=$true)][string]$RuntimeRoot,
+        [AllowEmptyCollection()][object[]]$TcpConnections=@(),
+        [bool]$TcpSnapshotComplete=$false
+    )
+    # MGSV submits opaque native VR. The simulator's optional passthrough room
+    # is unused, and its multi-GB allocation can evict the stereo swapchains.
+    # Select only its exact recorded child; never select another game or GUI.
+    $selected=[Collections.Generic.List[object]]::new()
+    $expectedPath=Join-Path $RuntimeRoot 'synthetic_env_server\synth_env_server.exe'
+    foreach($identity in @(Get-MgsValue $Record 'ownedRuntimeProcesses')){
+        if(![string]::Equals([string]$identity.path,$expectedPath,[StringComparison]::OrdinalIgnoreCase)){continue}
+        $current=@($Processes | Where-Object { [int]$_.ProcessId -eq [int]$identity.pid })
+        if(!$current.Count){continue}
+        if($current.Count -ne 1 -or !(Test-MgsExactProcessIdentity $identity $current[0])){throw 'Synthetic environment identity changed; refusing VR resource cleanup.'}
+        $game=Get-MgsValue $Record 'game'
+        if(!$game -or [IO.Path]::GetFileName([string]$game.path) -ine 'mgsvtpp.exe'){throw 'Exact MGSV owner is not live; refusing VR resource cleanup.'}
+        $liveGame=@($Processes | Where-Object { [int]$_.ProcessId -eq [int]$game.pid })
+        if($liveGame.Count -ne 1 -or !(Test-MgsExactProcessIdentity $game $liveGame[0])){throw 'Exact MGSV owner is not live; refusing VR resource cleanup.'}
+        $parent=Get-MgsValue $identity 'parentIdentity'
+        $gui=@($Processes | Where-Object { $parent -and [int]$_.ProcessId -eq [int]$parent.pid })
+        if(!$parent -or $gui.Count -ne 1 -or !(Test-MgsExactProcessIdentity $parent $gui[0]) -or [int]$parent.parentPid -ne [int]$game.pid -or [int]$identity.parentPid -ne [int]$parent.pid -or ![string]::Equals([string]$parent.path,(Join-Path $RuntimeRoot 'MetaXRSimulator.exe'),[StringComparison]::OrdinalIgnoreCase)){
+            throw 'Synthetic environment has no exact MGSV simulator parent; refusing VR resource cleanup.'
+        }
+        if([string](Get-MgsValue $current[0] 'CommandLine') -notmatch '(?i)(?:^|\s)-batchmode(?:\s|$)'){throw 'Synthetic environment is not the recorded batch room; refusing VR resource cleanup.'}
+        Assert-MgsSimulatorTcpIsolation -Connections $TcpConnections -Processes $Processes -Record $Record -SimulatorPids @([int]$parent.pid,[int]$identity.pid) -SnapshotComplete $TcpSnapshotComplete | Out-Null
+        $selected.Add($identity)
+    }
+    return @($selected)
+}
+
+function Stop-MgsOpaqueVrEnvironmentOnce {
+    param([Parameter(Mandatory=$true)]$Record,[Parameter(Mandatory=$true)][string]$RuntimeRoot)
+    $snapshot=@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.CreationDate })
+    $roomPath=Join-Path $RuntimeRoot 'synthetic_env_server\synth_env_server.exe'
+    $recordedRoom=@($Record.ownedRuntimeProcesses | Where-Object { [string]::Equals([string]$_.path,$roomPath,[StringComparison]::OrdinalIgnoreCase) })
+    if(!@($snapshot | Where-Object { [int]$_.ProcessId -in @($recordedRoom | ForEach-Object { [int]$_.pid }) }).Count){return}
+    $Record=Expand-MgsLiveRuntimeRecord -Record $Record -Processes $snapshot -RuntimeRoot $RuntimeRoot
+    $connections=@(Get-NetTCPConnection -ErrorAction Stop)
+    $plan=@(Get-MgsOpaqueVrEnvironmentPlan -Record $Record -Processes $snapshot -RuntimeRoot $RuntimeRoot -TcpConnections $connections -TcpSnapshotComplete $true)
+    foreach($identity in $plan){
+        $process=$null
+        try{
+            $process=[Diagnostics.Process]::GetProcessById([int]$identity.pid)
+            if($process.HasExited){continue}
+            # Recheck all owners and connections immediately before stopping
+            # this process handle. PID reuse or a new shared client blocks it.
+            $latest=@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.CreationDate })
+            $Record=Expand-MgsLiveRuntimeRecord -Record $Record -Processes $latest -RuntimeRoot $RuntimeRoot
+            $latestConnections=@(Get-NetTCPConnection -ErrorAction Stop)
+            $verified=@(Get-MgsOpaqueVrEnvironmentPlan -Record $Record -Processes $latest -RuntimeRoot $RuntimeRoot -TcpConnections $latestConnections -TcpSnapshotComplete $true)
+            if(!@($verified | Where-Object { [int]$_.pid -eq [int]$identity.pid }).Count){continue}
+            $started=ConvertTo-MgsUtcStartTime $identity.startedUtc
+            if(![string]::Equals($process.MainModule.FileName,[string]$identity.path,[StringComparison]::OrdinalIgnoreCase) -or [Math]::Abs(($process.StartTime.ToUniversalTime()-$started).TotalMilliseconds) -gt 10){throw 'Synthetic environment process handle changed; refusing resource cleanup.'}
+            $process.Kill()
+            if(!$process.WaitForExit(2000)){
+                $process.Refresh()
+                if(!$process.HasExited){throw 'Unused synthetic environment did not exit within two seconds.'}
+            }
+            Write-Output ('Released unused simulator passthrough room '+$identity.pid+'; MGSV and stereo compositor retained.')
+        }finally{if($process){$process.Dispose()}}
+    }
+}
+
+function Stop-MgsOpaqueVrEnvironment {
+    param([Parameter(Mandatory=$true)]$Record,[Parameter(Mandatory=$true)][string]$RuntimeRoot,
+        [ValidateRange(0,180)][int]$StartupPeerWaitSeconds=6)
+    # The freshly started GUI briefly opens an outbound HTTPS connection.
+    # A refused snapshot is not permission to stop its room. Retry only that
+    # transient network condition, taking all identities and peers afresh;
+    # shared local clients and changed owners still fail immediately.
+    # Launchers defer a long-lived startup peer to an exact-owner helper.
+    # Keep ownership checks intact and report progress during any bounded wait.
+    $deadline=[DateTime]::UtcNow.AddSeconds($StartupPeerWaitSeconds)
+    $nextProgress=[DateTime]::UtcNow
+    do{
+        try{
+            Stop-MgsOpaqueVrEnvironmentOnce -Record $Record -RuntimeRoot $RuntimeRoot
+            return
+        }catch{
+            if($_.Exception.Message -notmatch 'established non-loopback TCP peer' -or [DateTime]::UtcNow -ge $deadline){throw}
+            if([DateTime]::UtcNow -ge $nextProgress){
+                Write-Host 'Waiting for the simulator startup peer to close; checking fresh ownership before releasing its unused room.'
+                $nextProgress=[DateTime]::UtcNow.AddSeconds(5)
+            }
+            Start-Sleep -Milliseconds 200
+        }
+    }while($true)
+}
+
+function Start-MgsOpaqueVrEnvironmentRelease {
+    param([Parameter(Mandatory=$true)]$Record,[Parameter(Mandatory=$true)][string]$RuntimeRoot,
+        [Parameter(Mandatory=$true)][string]$EvidenceDirectory)
+    try {
+        Stop-MgsOpaqueVrEnvironment -Record $Record -RuntimeRoot $RuntimeRoot -StartupPeerWaitSeconds 0
+        return
+    } catch {
+        # Only the observed startup HTTPS peer may defer cleanup. A shared
+        # local client, changed identity or incomplete inventory stays fatal.
+        if($_.Exception.Message -notmatch 'established non-loopback TCP peer'){throw}
+    }
+    $directory=[IO.Path]::GetFullPath($EvidenceDirectory)
+    [IO.Directory]::CreateDirectory($directory) | Out-Null
+    $prefix=Join-Path $directory ('simulator-room-release-'+[Guid]::NewGuid().ToString('N'))
+    $snapshot=$prefix+'.json'
+    # This immutable snapshot belongs to this exact launch. A subsequent
+    # session can never replace the identities used by the helper.
+    $bytes=[Text.UTF8Encoding]::new($false).GetBytes(($Record|ConvertTo-Json -Depth 8))
+    $stream=[IO.File]::Open($snapshot,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write)
+    try{$stream.Write($bytes,0,$bytes.Length)}finally{$stream.Dispose()}
+    $helper=Join-Path $PSScriptRoot 'release-simulator-room.ps1'
+    $arguments=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',('"'+$helper+'"'),
+        '-Record',('"'+$snapshot+'"'),'-RuntimeRoot',('"'+$RuntimeRoot+'"'),'-Status',('"'+$prefix+'.status.json"'))
+    $powershell=Join-Path ([Environment]::GetFolderPath('System')) 'WindowsPowerShell\v1.0\powershell.exe'
+    Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden `
+        -RedirectStandardOutput ($prefix+'.log') -RedirectStandardError ($prefix+'.error.log') | Out-Null
+    Write-Output ('Unused simulator room release is pending; exact-owner helper evidence: '+$prefix+'.status.json')
 }
 
 function Test-MgsLoopbackAddress([string]$Address) {
@@ -250,4 +403,4 @@ function Restore-MgsRuntimeConfigLease {
     if($present){[IO.File]::WriteAllBytes($path,$before)}else{Remove-Item -LiteralPath $path}
 }
 
-Export-ModuleMember -Function ConvertTo-MgsUtcStartTime,ConvertTo-MgsProcessIdentity,Test-MgsExactProcessIdentity,Test-MgsPathUnderRoot,Get-MgsOwnedRuntimeProcesses,Assert-MgsSimulatorTcpIsolation,Get-MgsOrphanCleanupPlan,New-MgsRuntimeConfigLease,Restore-MgsRuntimeConfigLease
+Export-ModuleMember -Function ConvertTo-MgsUtcStartTime,ConvertTo-MgsProcessIdentity,Test-MgsExactProcessIdentity,Test-MgsPathUnderRoot,Get-MgsOwnedRuntimeProcesses,Expand-MgsLiveRuntimeRecord,Get-MgsOpaqueVrEnvironmentPlan,Stop-MgsOpaqueVrEnvironment,Start-MgsOpaqueVrEnvironmentRelease,Assert-MgsSimulatorTcpIsolation,Get-MgsOrphanCleanupPlan,New-MgsRuntimeConfigLease,Restore-MgsRuntimeConfigLease

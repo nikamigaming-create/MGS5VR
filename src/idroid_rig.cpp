@@ -1,8 +1,41 @@
 #include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/stereo.hpp"
+#include "mgs5vr/idroid_attachment.hpp"
+#include "mgs5vr/idroid_native_hold.hpp"
+#include "mgs5vr/arm_ik.hpp"
 #include <cmath>
 
 namespace mgs5vr {
+std::optional<Pose> nativeIdroidLeftWristFromGrip() noexcept {
+    const auto palm=anatomicalGrip(Pose{},Vec3{.087f,.018f,.029f},Vec3{.078f,.012f,-.037f});
+    return palm?std::optional<Pose>{inverse(*palm)}:std::nullopt;
+}
+std::optional<Pose> nativeIdroidLeftHandheldWrist(Pose grip,Pose aim,Pose fit) noexcept {
+    if(!valid(grip)||!valid(aim)||!valid(fit))return {};
+    const auto wristFromGrip=nativeIdroidLeftWristFromGrip();
+    if(!wristFromGrip)return {};
+    const auto palmInBody=compose(inverse(nativeIdroidLeftBodyInWrist),inverse(*wristFromGrip));
+    const auto orientation=compose(Pose{aim.orientation,{}},Pose{fit.orientation,{}}).orientation;
+    const Pose body{orientation,compose(grip,fit).position-rotate(orientation,palmInBody.position)};
+    const auto wrist=compose(body,inverse(nativeIdroidLeftBodyInWrist));
+    return valid(wrist)?std::optional<Pose>{wrist}:std::nullopt;
+}
+std::optional<std::array<float,16>> nativeIdroidAttachmentDelta(const std::array<float,16>& rootBone,
+        const std::array<float,16>& bindingRoot,uint8_t bindingFlags,Pose desiredWorld) noexcept {
+    const auto current=nativeAffinePose(rootBone);
+    if(!current||!valid(desiredWorld))return {};
+    Pose desired=desiredWorld;
+    if(bindingFlags&1u){
+        const auto root=nativeAffinePose(bindingRoot);
+        if(!root)return {};
+        desired=compose(inverse(*root),desiredWorld);
+    }
+    const auto delta=compose(desired,inverse(*current));
+    if(!valid(delta))return {};
+    const auto x=rotate(delta.orientation,{1,0,0}),y=rotate(delta.orientation,{0,1,0}),z=rotate(delta.orientation,{0,0,1});
+    return std::array<float,16>{x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,
+                               delta.position.x,delta.position.y,delta.position.z,1};
+}
 std::optional<Pose> idroidBodyFromConnector(Pose connector) noexcept {
     if(!valid(connector))return {};
     const auto body=compose(connector,inverse(idroidConnectorInBody));
@@ -18,7 +51,7 @@ std::optional<Pose> idroidGripContact(Pose grip,Pose aim,Pose fit) noexcept {
 }
 
 std::optional<IdroidPose> trackedIdroidPose(const HeadCameraSample& frame) noexcept{
-    if(!frame.applied||!frame.stereoTracked||!frame.activation
+    if(frame.controllers.handheldIdroidStowed||!frame.applied||!frame.stereoTracked||!frame.activation
        ||!frame.idroidDeviceTracked||!valid(frame.idroidDevice)
        ||!valid(frame.nativePose)||!valid(frame.headPose))return {};
     const auto body=frame.idroidDevice;

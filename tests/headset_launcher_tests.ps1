@@ -6,6 +6,7 @@ $mgsOriginal=@{}
 foreach ($mgsName in $mgsNames) { $mgsOriginal[$mgsName]=[Environment]::GetEnvironmentVariable($mgsName,'Process') }
 $mgsLaunches=[Collections.Generic.List[object]]::new()
 $mgsRunning=$false; $mgsFailLaunch=$false
+$mgsSavedHeadset=$null
 function Assert([bool]$mgsOk,[string]$mgsWhy) { if (-not $mgsOk) { throw $mgsWhy } }
 function Refuses([scriptblock]$mgsAction,[string]$mgsPattern) {
     try { & $mgsAction } catch { if ($_.Exception.Message -notlike $mgsPattern) { throw }; return }
@@ -18,7 +19,7 @@ function Get-Process {
 }
 function Get-ItemProperty {
     [CmdletBinding()]param([string]$LiteralPath)
-    return [pscustomobject]@{ActiveRuntime=$mgsSim; PreviousActiveRuntime=$mgsPhysical; TppExe=(Join-Path $mgsFixture 'mgsvtpp.exe')}
+    return [pscustomobject]@{ActiveRuntime=$mgsSim; PreviousActiveRuntime=$mgsPhysical; HeadsetRuntime=$mgsSavedHeadset; TppExe=(Join-Path $mgsFixture 'mgsvtpp.exe')}
 }
 function Start-Process {
     param([string]$FilePath,[string]$WorkingDirectory,[string]$WindowStyle,[switch]$PassThru)
@@ -72,6 +73,22 @@ try {
     Refuses { & $mgsTool } '*Select your physical headset OpenXR runtime*'
     Assert ($mgsLaunches.Count -eq ($mgsBeforeMissing+1)) 'No valid headset runtime still launched the game.'
     $mgsPhysical=$mgsPresentPhysical; $mgsSim=$mgsPresentSim
+    # A valid global provider can still be wrong for this user's wired Link.
+    # Honor the saved headset independently; an explicit argument wins.
+    $mgsGlobalProvider=Join-Path $mgsFixture 'global-provider.json'
+    [IO.File]::WriteAllText($mgsGlobalProvider,'{"runtime":{"name":"Other physical XR","library_path":"other.dll"}}')
+    $mgsSim=$mgsGlobalProvider; $mgsSavedHeadset=$mgsPhysical
+    & $mgsTool
+    Assert ($mgsLaunches[$mgsLaunches.Count-1].runtime -eq $mgsPhysical) 'Saved headset lost to the global runtime.'
+    & $mgsTool -RuntimeManifest $mgsGlobalProvider
+    Assert ($mgsLaunches[$mgsLaunches.Count-1].runtime -eq $mgsGlobalProvider) 'Explicit headset did not override the saved preference.'
+    $mgsBeforeInvalid=$mgsLaunches.Count
+    $mgsSavedHeadset=Join-Path $mgsFixture 'missing-saved-headset.json'
+    Refuses { & $mgsTool } '*Select your physical headset OpenXR runtime*'
+    $mgsSavedHeadset=$mgsPresentSim
+    Refuses { & $mgsTool } '*simulator is not a headset runtime*'
+    Assert ($mgsLaunches.Count -eq $mgsBeforeInvalid) 'Invalid saved headset silently fell back to another provider.'
+    $mgsSavedHeadset=$null; $mgsSim=$mgsPresentSim
     Refuses { & $mgsTool -RuntimeManifest $mgsSim } '*simulator is not a headset runtime*'
     $mgsRunning=$true
     Refuses { & $mgsTool } '*Close the current MGSV session*'
@@ -79,7 +96,7 @@ try {
     Refuses { & $mgsTool -RuntimeManifest $mgsPhysical } '*Authored launch failure*'
     Assert ($env:XR_RUNTIME_JSON -eq $mgsSim -and $env:XR_ENABLE_API_LAYERS -eq 'XR_APILAYER_METAX_operator;XR_APILAYER_other') 'Failure did not restore the calling environment.'
     Assert ($env:SteamAppId -eq '892970' -and $env:SteamGameId -eq '892970') 'Failed launch did not restore Steam identity.'
-    Write-Output 'Headset launcher: simulator isolation, missing-runtime fallback, explicit-runtime refusal, Steam identity isolation, unrelated layers, dry run, live-game refusal and failure cleanup passed.'
+    Write-Output 'Headset launcher: saved-provider precedence, explicit override, invalid-preference refusal, simulator isolation, missing-runtime fallback, Steam identity isolation, unrelated layers, dry run, live-game refusal and failure cleanup passed.'
 } finally {
     foreach ($mgsName in $mgsNames) { [Environment]::SetEnvironmentVariable($mgsName,$mgsOriginal[$mgsName],'Process') }
     $mgsResolved=[IO.Path]::GetFullPath($mgsFixture); $mgsTemp=[IO.Path]::GetFullPath([IO.Path]::GetTempPath())

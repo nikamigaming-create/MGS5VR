@@ -120,6 +120,7 @@ function Wait-MgsGameProcess([string]$SessionRecord,[string]$RuntimeRoot,[DateTi
                 foreach($property in $mgsRecord.PSObject.Properties){$mgsRecordMap[$property.Name]=$property.Value}
                 $mgsRecordMap.schema=2;$mgsRecordMap.game=$mgsGame;$mgsRecordMap.ownedRuntimeProcesses=$mgsOwned
                 [IO.File]::WriteAllText($SessionRecord,($mgsRecordMap|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false))
+                Start-MgsOpaqueVrEnvironmentRelease -Record $mgsRecordMap -RuntimeRoot $RuntimeRoot -EvidenceDirectory (Split-Path -Parent $SessionRecord)
                 $mgsOwned | ConvertTo-Json -Compress -Depth 5 | Write-Output
                 Write-Output 'MGSV and its exact Meta simulator process tree are recorded. A fresh compositor capture is still required to verify the VR session.'
                 return

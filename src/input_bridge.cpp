@@ -52,7 +52,17 @@ int16_t NativeSmoothTurn::update(float x,float y,bool available){
 }
 bool mountedViewOwnsRightStick(TravelMode mode,bool rigInput,bool nativeExclusive,bool stickNavigation) noexcept{
     return rigInput&&!nativeExclusive&&!stickNavigation
-        &&(mode==TravelMode::horse||mode==TravelMode::vehicle);
+        &&(mode==TravelMode::horse||mode==TravelMode::vehicle||mode==TravelMode::nativeAction);
+}
+TravelMode travelModeFromPlayerStatus(const std::array<uint32_t,5>& flags) noexcept{
+    const auto status=[&](unsigned bit){return (flags[bit/32]&(1u<<(bit%32)))!=0;};
+    if(status(37))return TravelMode::unknown;
+    if(status(26))return TravelMode::vehicle;
+    if(status(25))return TravelMode::horse;
+    if(!status(7)&&status(4)&&status(145)&&!status(134)
+       &&!status(87)&&!status(88)&&!status(83)&&!status(58)&&!status(56)&&!status(59))
+        return TravelMode::nativeAction;
+    return TravelMode::onFoot;
 }
 LocomotionInput RigLocomotion::update(GamepadSample sample,bool available,uint64_t time){
     constexpr uint16_t sprint=0x0040,dive=0x4000,stance=0x1000;
@@ -80,7 +90,8 @@ LocomotionInput RigLocomotion::update(GamepadSample sample,bool available,uint64
     if(active&&direction_<0)sample.leftTrigger=0;
     return {sample,active&&direction_<0};
 }
-WheelSample WheelSteering::update(Pose tracked,Pose contact,bool available,bool squeeze,uint64_t time,uint64_t epoch,Vec3 forward){
+WheelSample WheelSteering::update(Pose tracked,Pose contact,bool available,bool squeeze,uint64_t time,uint64_t epoch,
+                                 Vec3 forward,float fullLockDegrees,float initialAxis){
     if(!available||!valid(tracked)||!valid(contact)||!epoch){reset();held_=squeeze;return {};}
     if(time<time_||epoch!=epoch_){reset();held_=squeeze;}
     time_=time;epoch_=epoch;
@@ -89,6 +100,8 @@ WheelSample WheelSteering::update(Pose tracked,Pose contact,bool available,bool 
     bool engaged{};
     if(!held_&&dot(separation,separation)<.04f&&valid(Pose{{},forward})&&std::abs(dot(forward,forward)-1)<.01f){
         gripped_=engaged=true;start_=tracked;axis_=forward;
+        initialAxis_=std::isfinite(initialAxis)?std::clamp(initialAxis,-1.f,1.f):0.f;
+        fullLockRadians_=std::clamp(std::isfinite(fullLockDegrees)?fullLockDegrees:35.f,15.f,90.f)*.01745329252f;
     }
     held_=true;
     const auto travel=tracked.position-start_.position;
@@ -100,7 +113,7 @@ WheelSample WheelSteering::update(Pose tracked,Pose contact,bool available,bool 
     // Engine +Z versus XR -Z cannot invert steering; subsequent head turns
     // cannot rotate the steering basis. Grip pitch does not create a singularity.
     const float angle=2*std::atan2(dot(Vec3{rotation.x,rotation.y,rotation.z},axis_),rotation.w);
-    const float axis=std::clamp(angle/1.04719755f,-1.f,1.f);
+    const float axis=std::clamp(initialAxis_+angle/fullLockRadians_,-1.f,1.f);
     return {std::abs(axis)<.035f?0.f:axis,true,engaged,time};
 }
 void WheelMailbox::publish(WheelSample sample){std::lock_guard lock(mutex_);sample_=sample;}
@@ -333,25 +346,55 @@ GamepadSample RigEquipment::update(GamepadSample sample,bool modifier,bool allow
     active_=modifier;
     return sample;
 }
-RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,TravelMode mode,uint64_t time,uint64_t pickerDrawTime,bool throwing){
-    if(mode==TravelMode::unknown){releaseRequired_=true;wristMode_=false;equipment_.reset();return {};}
+RigInputSample RigInput::update(GamepadSample raw,bool leftGrip,bool rightGrip,TravelMode mode,uint64_t time,uint64_t pickerDrawTime,bool throwing,
+                               bool rightWheelRequested,bool vehicleWeaponRequested,bool vehicleEquipmentRequested){
+    // Stationary actions keep the existing on-foot button meanings. Treating
+    // them as a vehicle handoff cancels held Y midway through native entry.
+    // Their camera axes are owned separately by mountedViewOwnsRightStick.
+    if(mode==TravelMode::nativeAction){mode=TravelMode::onFoot;throwing=false;}
+    if(mode==TravelMode::unknown){releaseRequired_=true;wristMode_=false;vehicleRight_=VehicleRight::released;equipment_.reset();return {};}
     if(mode!=mode_){
         if(mode_!=TravelMode::unknown)releaseRequired_=true;
-        mode_=mode;wristMode_=false;equipment_.reset();
+        mode_=mode;wristMode_=false;vehicleRight_=VehicleRight::released;equipment_.reset();
     }
     if(releaseRequired_){
-        if(raw.buttons||raw.leftTrigger>24||raw.rightTrigger>24||leftGrip||rightGrip
+        if(raw.buttons||raw.leftTrigger>24||raw.rightTrigger>24||leftGrip||rightGrip||vehicleEquipmentRequested
            ||std::abs(static_cast<int>(raw.leftX))>6000||std::abs(static_cast<int>(raw.leftY))>6000
            ||std::abs(static_cast<int>(raw.rightX))>6000||std::abs(static_cast<int>(raw.rightY))>6000)return {};
         releaseRequired_=false;
     }
     if(mode==TravelMode::vehicle){
+        if(vehicleEquipmentRequested){
+            // A deliberately configured picker chord owns its controls before
+            // wheel/weapon acquisition. It cannot also press a pedal or fire
+            // the vehicle's armament, including RigEquipment's ordinary X/LB.
+            vehicleRight_=rightGrip?VehicleRight::unavailable:VehicleRight::released;
+            vehiclePedalsReleaseRequired_=true;
+            raw.leftX=raw.leftY=0;raw.leftTrigger=raw.rightTrigger=0;
+            raw=equipment_.update(raw,true,false,time,pickerDrawTime);
+            raw.buttons&=~uint16_t{0x0300};
+            return {raw};
+        }
+        raw=equipment_.update(raw,false,false,time,pickerDrawTime);
+        if(raw.leftTrigger<=24&&raw.rightTrigger<=24)vehiclePedalsReleaseRequired_=false;
+        if(vehiclePedalsReleaseRequired_)raw.leftTrigger=raw.rightTrigger=0;
         const auto wheel=wheelMailbox().read(time);
-        if(leftGrip&&wheel.gripped)raw.leftX=static_cast<int16_t>(wheel.axis*32767);
-        // Left grip belongs to the physical wheel. X retains native vehicle
-        // attack/call, while both triggers retain their pedal meanings.
+        if(!rightGrip)vehicleRight_=VehicleRight::released;
+        else if(vehicleRight_==VehicleRight::released)
+            vehicleRight_=rightWheelRequested&&(wheel.nearHands&2)?VehicleRight::wheel:
+                vehicleWeaponRequested?VehicleRight::weapon:VehicleRight::unavailable;
+        const bool rightWheel=rightGrip&&vehicleRight_==VehicleRight::wheel;
+        const bool weaponIntent=rightGrip&&vehicleRight_==VehicleRight::weapon;
+        if(wheel.gripped&&((leftGrip&&(wheel.hands&1))||(rightWheel&&(wheel.hands&2))))
+            raw.leftX=static_cast<int16_t>(wheel.axis*32767);
+        // A squeeze has one owner until release. Pulling a held hand away
+        // from the wheel cannot draw a gun, and right grip never opens the
+        // equipment popup unless its separate picker binding owns input.
+        // A firearm adapter must consume the separate
+        // intent; it is not fabricated by sending driving pedals as
+        // on-foot aim/fire. Native vehicle attack/call stays on X.
         if(raw.buttons&0x4000){raw.buttons&=~0x4000;raw.buttons|=0x0100;}
-        return {equipment_.update(raw,rightGrip,false,time,pickerDrawTime),false};
+        return {raw,false,rightWheel,weaponIntent};
     }
     const bool modifier=raw.leftTrigger>(wristMode_?64:127);
     wristMode_=modifier;

@@ -1,4 +1,4 @@
-"""One checkout, one current play build, bounded local bot runs."""
+"""One pinned play build, one development build, bounded local bot runs."""
 from __future__ import annotations
 
 import argparse
@@ -6,15 +6,18 @@ import collections
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 SETTINGS = ROOT / "private/workspace.json"
 PLAY = ROOT / "play"
+DEV = ROOT / "build/dev"
 SCRATCH = ROOT / "artifacts/bot"
 SUPPORTED_EXE = "085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45"
 BINARIES = ("dinput8.dll", "mgs5vr_controls.exe")
@@ -141,11 +144,30 @@ def source_identity():
             "changes": run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout.splitlines()}
 
 
+def checked_build(path, pin=None):
+    """Verify a complete slot before installing it or discarding older copies."""
+    safe_tree(path, ROOT)
+    manifest = read_json(path / "BUILD.json")
+    if pin and digest(path / "BUILD.json") != pin["manifest_sha256"]:
+        raise ValueError("Pinned play manifest changed; refusing to install an unrecognized build")
+    if manifest.get("validation", {}).get("automated") != "passed":
+        raise ValueError(f"Build has not passed automated checks: {path}")
+    if not set(BINARIES).issubset(manifest.get("files", {})):
+        raise ValueError(f"Incomplete build manifest: {path}")
+    for name, expected in manifest["files"].items():
+        target = safe_tree(path / name, path)
+        if not target.is_file() or digest(target) != expected:
+            raise ValueError(f"Checked build file changed: {target}")
+    return manifest
+
+
 def promote(stage, play=None, previous=None):
-    play = play or PLAY
-    previous = previous or ROOT / "build/play-previous"
+    # Low-level replacement defaults to development. Only pin_build selects PLAY.
+    play = play or DEV
+    previous = previous or ROOT / "build/slot-rollback"
     safe_tree(stage, ROOT / "build")
     safe_tree(play, ROOT)
+    safe_tree(previous, ROOT / "build")
     if not stage.is_dir():
         raise ValueError("The checked play stage is missing")
     wanted = {p.relative_to(stage).as_posix(): digest(p) for p in stage.rglob("*") if p.is_file()}
@@ -160,10 +182,12 @@ def promote(stage, play=None, previous=None):
     obsolete = sorted(managed - wanted.keys())
     for name in (*wanted, *obsolete):
         safe_tree(play / name, play)
-    remove_tree(previous, ROOT / "build")
+    if previous.exists():
+        raise ValueError(f"Unfinished build transaction preserved: {previous}")
     shutil.copytree(play, previous)
     replaced = []
     temporary = None
+    recovered = False
     try:
         for name in obsolete:
             target = play / name
@@ -188,6 +212,7 @@ def promote(stage, play=None, previous=None):
         for name, expected in wanted.items():
             if digest(play / name) != expected:
                 raise ValueError(f"Play update did not verify: {name}")
+        recovered = True
     except BaseException:
         for name in reversed(replaced):
             target, saved = play / name, previous / name
@@ -195,19 +220,22 @@ def promote(stage, play=None, previous=None):
                 shutil.copy2(saved, target)
             else:
                 target.unlink()
+        recovered = True
         raise
     finally:
         if temporary is not None and temporary.exists():
             temporary.unlink()
+        if recovered:
+            remove_tree(previous, ROOT / "build")
     remove_tree(stage, ROOT / "build")
 
 
-def deploy(value, known_old=None):
+def deploy(value, known_old=None, build=None):
+    build = build or PLAY
+    manifest = checked_build(build, value.get("pinned_build") if build == PLAY else None)
     if not value.get("game_dir"):
-        print("play/ refreshed; configure the game once to enable synchronization.")
-        return
-    if processes():
-        raise ValueError("Close MGSV before synchronizing; play/ contains the new build.")
+        raise ValueError("Configure the game once before installing a build")
+    running = bool(processes())
     game = Path(value["game_dir"]).resolve()
     safe_tree(game / "dinput8.dll", game)
     if digest(game / "mgsvtpp.exe") != SUPPORTED_EXE:
@@ -217,41 +245,49 @@ def deploy(value, known_old=None):
     if (record.get("schema") != 1 or record.get("product") != "MGS5VR theatre preview"
             or Path(record.get("game_dir", "")).resolve() != game):
         raise ValueError("Install record does not own this game folder")
-    manifest = read_json(PLAY / "BUILD.json")
+    if running and any(not (game / name).is_file() or digest(game / name) != digest(build / name)
+                       for name in BINARIES):
+        raise ValueError("Close MGSV before switching builds; both retained builds are unchanged")
     for name in (*BINARIES, "mgs5vr.ini", "mgs5vr-controls.ini", "mgs5vr-install.json"):
         safe_tree(game / name, game)
         if not (game / name).is_file():
             raise ValueError(f"Incomplete recorded install: {name}")
     for name in BINARIES:
-        if digest(PLAY / name) != manifest["files"][name]:
-            raise ValueError(f"Current play build was modified: {name}")
         allowed = {record["files"].get(name)}
         allowed.add(value.get("trusted_local_files", {}).get(name))
         if name == "dinput8.dll":
             allowed.add(value.get("trusted_local_dll"))
         if known_old:
             allowed.add(known_old.get(name))
-        for base in (PLAY, ROOT / "build/play-previous", ROOT / "build/Release"):
+        for base in (PLAY, DEV, ROOT / "build/Release"):
             if (base / name).exists():
                 allowed.add(digest(base / name))
         if digest(game / name).lower() not in {h.lower() for h in allowed if h}:
             raise ValueError(f"Installed {name} has unknown provenance; preserved")
-    run([PLAY / "mgs5vr_controls.exe", "--check", game / "mgs5vr-controls.ini"])
+    run([build / "mgs5vr_controls.exe", "--check", game / "mgs5vr-controls.ini"])
     personal = {name: digest(game / name) for name in ("mgs5vr.ini", "mgs5vr-controls.ini")}
-    if all(digest(game / name) == digest(PLAY / name) for name in BINARIES) and record.get("development_build") == manifest["source"]:
-        print("Installed game already matches play/.")
+    slot = "play" if build == PLAY else "dev"
+    if (all(digest(game / name) == digest(build / name) for name in BINARIES)
+            and record.get("development_build") == manifest["source"] and record.get("build_slot") == slot):
+        print(f"Installed game already matches {slot}.")
         return
-    rollback = ROOT / "build/installed-previous"
-    remove_tree(rollback, ROOT / "build")
+    rollback = ROOT / "build/install-rollback"
+    if rollback.exists():
+        raise ValueError(f"Unfinished install transaction preserved: {rollback}")
     rollback.mkdir(parents=True)
     for name in (*BINARIES, "mgs5vr-install.json"):
         shutil.copy2(game / name, rollback / name)
+    recovered = False
     try:
         for name in BINARIES:
-            temporary = game / (name + ".mgs5vr-tmp")
-            safe_tree(temporary, game)
-            shutil.copy2(PLAY / name, temporary)
-            os.replace(temporary, game / name)
+            # Tool/documentation changes can refresh the build record while
+            # the unchanged DLL is loaded by a live game. Do not replace an
+            # already matching binary just to update that record.
+            if digest(game / name) != digest(build / name):
+                temporary = game / (name + ".mgs5vr-tmp")
+                safe_tree(temporary, game)
+                shutil.copy2(build / name, temporary)
+                os.replace(temporary, game / name)
             record["files"][name] = digest(game / name)
         for name, expected in personal.items():
             if digest(game / name) != expected:
@@ -259,44 +295,82 @@ def deploy(value, known_old=None):
             record["files"][name] = expected
         record["installed_utc"] = utc()
         record["development_build"] = manifest["source"]
+        record["build_slot"] = slot
         write_json(record_path, record)
+        recovered = True
     except BaseException:
         for name in (*BINARIES, "mgs5vr-install.json"):
-            shutil.copy2(rollback / name, game / name)
+            if not (game / name).is_file() or digest(rollback / name) != digest(game / name):
+                shutil.copy2(rollback / name, game / name)
+        recovered = True
         raise
     finally:
         for name in BINARIES:
             temporary = game / (name + ".mgs5vr-tmp")
             if temporary.exists():
                 temporary.unlink()
+        if recovered:
+            remove_tree(rollback, ROOT / "build")
     value["trusted_local_dll"] = manifest["files"]["dinput8.dll"]
     value["trusted_local_files"] = {name: manifest["files"][name] for name in BINARIES}
     write_json(SETTINGS, value)
-    print(f"Installed {manifest['files']['dinput8.dll'][:12]} from {PLAY}; personal settings preserved.")
+    print(f"Installed {manifest['files']['dinput8.dll'][:12]} from {build}; personal settings preserved.")
+
+
+def pin_build(args):
+    value = settings()
+    if args.current:
+        manifest = checked_build(PLAY, value.get("pinned_build"))
+    else:
+        if processes():
+            raise ValueError("Close MGSV before promoting the development build")
+        manifest = checked_build(DEV)
+        if PLAY.exists():
+            checked_build(PLAY, value.get("pinned_build"))
+        stage = ROOT / "build/pin-stage"
+        if stage.exists():
+            raise ValueError(f"Unfinished pin transaction preserved: {stage}")
+        shutil.copytree(DEV, stage)
+        promote(stage, PLAY)
+    value["pinned_build"] = {"pinned_utc": utc(), "manifest_sha256": digest(PLAY / "BUILD.json"),
+                             "dll_sha256": manifest["files"]["dinput8.dll"],
+                             "validation": manifest["validation"]}
+    write_json(SETTINGS, value)
+    print(f"Pinned play build: {manifest['files']['dinput8.dll'][:12]}. Headset/full-game acceptance is unchanged.")
+    if not args.current:
+        deploy(value)
 
 
 def refresh(args):
     value = settings()
-    if value.get("game_dir") and not args.no_deploy and processes():
+    install = getattr(args, "deploy", False)
+    if value.get("game_dir") and install and processes():
         raise ValueError("Close MGSV before building and synchronizing the test installation")
     known_old = {name: digest(ROOT / "build/Release" / name) for name in BINARIES
                  if (ROOT / "build/Release" / name).exists()}
     run(["cmake", "--preset", "windows-x64", f"-DPython3_EXECUTABLE={sys.executable}"])
     run(["cmake", "--build", "--preset", "release", "--parallel"])
     run(["ctest", "--preset", "release", "--output-junit", ROOT / "build/current-tests.xml"])
-    stage = ROOT / "build/play-stage"
+    stage = ROOT / "build/dev-stage"
+    if (ROOT / "build/slot-rollback").exists():
+        raise ValueError("Recover the unfinished build/slot-rollback transaction before building again")
     remove_tree(stage, ROOT / "build")
-    run(["cmake", "--install", "build", "--config", "Release", "--component", "MGS5VR", "--prefix", stage])
-    run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-         ROOT / "tests/installer_tests.ps1", "-PackageRoot", stage])
-    files = {p.relative_to(stage).as_posix(): digest(p) for p in stage.rglob("*") if p.is_file()}
-    write_json(stage / "BUILD.json", {"schema": 1, "built_utc": utc(), "source": source_identity(), "files": files,
-               "validation": {"automated": "passed", "test_report": "build/current-tests.xml",
-                              "simulator": "unproven_on_this_build", "headset": "unproven", "full_game": "unproven"}})
-    promote(stage)
-    if not args.no_deploy:
-        deploy(value, known_old)
-    print(f"Current test build: {PLAY}")
+    try:
+        run(["cmake", "--install", "build", "--config", "Release", "--component", "MGS5VR", "--prefix", stage])
+        run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+             ROOT / "tests/installer_tests.ps1", "-PackageRoot", stage])
+        files = {p.relative_to(stage).as_posix(): digest(p) for p in stage.rglob("*") if p.is_file()}
+        write_json(stage / "BUILD.json", {"schema": 1, "built_utc": utc(), "source": source_identity(), "files": files,
+                   "validation": {"automated": "passed", "test_report": "build/current-tests.xml",
+                                  "simulator": "unproven_on_this_build", "headset": "unproven", "full_game": "unproven"}})
+        checked_build(stage)
+        promote(stage)
+    finally:
+        if not (ROOT / "build/slot-rollback").exists():
+            remove_tree(stage, ROOT / "build")
+    if install:
+        deploy(value, known_old, DEV)
+    print(f"Development build: {DEV}\nPinned play build unchanged: {PLAY}")
 
 
 def prune_runs(value, latest=None):
@@ -317,30 +391,113 @@ def prune_runs(value, latest=None):
             remove_tree(path, runs)
 
 
+def retained_field_session(output, game, manifest):
+    """Keep the same live field after a failed case with verified cleanup."""
+    from gameplay_bot.live import released_field_state
+    try:
+        receipt = read_json(output / 'released-session.json')
+        identity = receipt['identity']
+        age = time.time_ns() - receipt['unix_ns']
+        if (receipt.get('schema') != 1 or receipt.get('status') != 'released_field'
+                or not 0 <= age <= 15_000_000_000 or not released_field_state(receipt['state'])
+                or identity.get('dll_sha256') != manifest['files']['dinput8.dll']):
+            return False
+        current = [p for p in processes() if p.get('ExecutablePath')
+                   and Path(p['ExecutablePath']).resolve() == game.resolve() / 'mgsvtpp.exe']
+        return (len(current) == 1 and all(current[0].get(key) == identity['process'].get(key)
+                for key in ('ProcessId', 'CreationDate')))
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
 def bot(args):
+    idle_seconds = getattr(args, 'idle_seconds', None)
+    if idle_seconds is not None and (args.operation != 'bot' or args.command != 'supervise'
+            or not math.isfinite(idle_seconds) or not 0. < idle_seconds <= 180.):
+        raise ValueError('--idle-seconds requires bot --command supervise and 0..180 seconds')
+    if args.operation == 'bot' and args.command == 'mortar':
+        if (not args.record or not args.policy or not args.policy.is_file()
+                or not math.isfinite(args.seconds) or not 15. <= args.seconds <= 120.):
+            raise ValueError('bot mortar requires --record, an existing --policy and 15..120 seconds')
+    if args.operation == 'motherpuffer' and (not math.isfinite(args.seconds) or not 15. <= args.seconds <= 120.):
+        raise ValueError('motherpuffer requires 15..120 seconds')
     selected_transition = getattr(args, 'transition', None)
     if args.operation == 'bot' and ((args.command == 'state') != bool(selected_transition)):
         raise ValueError('state requires --transition; other commands do not accept it')
+    if args.operation in ('idroid-film', 'emplacement'):
+        valid_seconds = (15. <= args.seconds <= 90. if args.operation == 'idroid-film' else args.seconds >= 0.)
+        if not args.record or not math.isfinite(args.seconds) or not valid_seconds:
+            raise ValueError(f'{args.operation} requires --record and a valid finite duration')
+        if args.operation == 'idroid-film' and args.goal_node < 0:
+            raise ValueError('idroid-film requires a nonnegative reviewed --goal-node')
+        if args.operation == 'emplacement' and not args.policy.is_file():
+            raise ValueError('emplacement requires an existing reviewed --policy file')
     value = settings()
     game, proxy = Path(value["game_dir"]), Path(value["operator_proxy"])
-    manifest = read_json(PLAY / "BUILD.json")
+    manifest = checked_build(DEV)
     if digest(game / "dinput8.dll") != manifest["files"]["dinput8.dll"]:
-        raise ValueError("Installed game differs from play/; synchronize before testing")
+        raise ValueError("Installed game differs from build/dev; use launch-sim or deploy --slot dev before testing")
     prune_runs(value)
     output = SCRATCH / "runs" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     write_json(output / "managed-run.json", {"schema": 1, "source": manifest["source"], "started_utc": utc()})
     if args.operation == "navigate":
         command = [sys.executable, ROOT / "tools/gameplay-navigate.py", "--manifest", value["navigation"],
-                   "--goal", *args.goal, "--mode", args.mode]
+                   "--goal", *args.goal, "--mode", args.mode, "--arrival-radius",args.arrival_radius]
+        if args.interrupt_on_danger:
+            command += ["--interrupt-on-danger"]
+        if args.no_recenter:
+            command += ["--no-recenter"]
+        if args.record:
+            command += ["--record"]
+    elif args.operation == "combat":
+        command = [sys.executable, ROOT / "tools/gameplay-combat.py", "--max-rounds", args.max_rounds, "--radius", args.radius]
+        if args.camp:
+            command += ["--camp", args.camp]
+    elif args.operation == "autonomy":
+        command = [sys.executable, ROOT / "tools/gameplay-autonomy.py", "--manifest", value["navigation"], "--camp", args.camp,
+                   "--stealth-loadout", args.stealth_loadout.resolve()]
+        if args.record:
+            command += ["--record"]
+        if args.emplacement:
+            command += ["--emplacement", args.emplacement.resolve()]
+        if args.body_handling:
+            command += ["--body-handling"]
+    elif args.operation == "idroid-film":
+        command = [sys.executable, ROOT / "tools/gameplay-idroid-film.py",
+                   "--navigation-manifest", value["navigation"], "--goal-node", args.goal_node,
+                   "--expected-mission", 30010, "--expected-location", 10,
+                   "--expected-sequence", "Seq_Game_FreePlay", "--record"]
+    elif args.operation == "emplacement":
+        command = [sys.executable, ROOT / "tools/gameplay-emplacement.py",
+                   "--manifest", value["navigation"], "--policy", args.policy.resolve(), "--record"]
+        if args.diagnostic_active_camp:
+            command += ["--diagnostic-active-camp"]
+    elif args.operation == "motherpuffer":
+        command = [sys.executable, ROOT / 'tools/gameplay-motherpuffer.py', args.mode,
+                   '--vehicle-id', args.vehicle_id, '--record']
+    elif args.operation == "mortar-response":
+        if not args.policy.is_file() or not math.isfinite(args.seconds) or not 15. <= args.seconds <= 60.:
+            raise ValueError('mortar-response requires an existing --policy and 15..60 seconds')
+        command = [sys.executable, ROOT / 'private/mortar-native-response-probe.py',
+                   '--policy', args.policy.resolve(), '--record']
+        if args.enter:
+            command += ['--enter']
+    elif args.operation == 'bot' and args.command == 'mortar':
+        command = [sys.executable, ROOT / 'tools/gameplay-mortar.py', '--manifest', value['navigation'],
+                   '--policy', args.policy.resolve(), '--record']
     else:
         command = [sys.executable, ROOT / "tools/gameplay-bot.py", args.command,
-                   "--controls-tool", PLAY / "mgs5vr_controls.exe"]
+                   "--controls-tool", DEV / "mgs5vr_controls.exe"]
         if args.suite:
             command += ["--suite", args.suite.resolve()]
         if args.record:
             command += ["--record"]
         if selected_transition:
             command += ['--transition', selected_transition]
+        if getattr(args, 'trace_menu_input', False):
+            command += ['--trace-menu-input']
+        if getattr(args, 'idle_seconds', None) is not None:
+            command += ['--idle-seconds', args.idle_seconds]
     command += ["--game-dir", game, "--proxy", proxy, "--output", output, "--seconds", args.seconds]
     code = 1
     try:
@@ -355,18 +512,22 @@ def bot(args):
         write_json(SCRATCH / "latest.json", {"path": str(output), "exit_code": code})
         prune_runs(value, output)
     if code:
-        # A failed owned simulator run must not leave a test menu or stalled
-        # game open. stop-sim checks exact process generations and keeps Steam.
-        record = ROOT / "artifacts/simulator-steam-session.json"
-        if record.exists() and read_json(record).get("launchMethod") in ("direct", "steam_cli"):
-            run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-                 ROOT / "tools/stop-simulator.ps1"])
-        raise ValueError(f"Bot case needs attention: {output}")
+        retained = retained_field_session(output, game, manifest)
+        write_json(output / 'session-handoff.json', {'schema': 1,
+                   'status': 'retained_released_field' if retained else 'needs_recovery',
+                   'utc': utc(), 'case_exit_code': code, 'action_acceptance': False,
+                   'automatic_shutdown': False})
+        # A case result is not authority to terminate the user's live session.
+        # Inputs still expire and unwind; unresolved cleanup is handed to the
+        # operator for recovery rather than destroying the camp position.
+        detail = 'live field retained with inputs released' if retained else 'live session kept for recovery'
+        raise ValueError(f'Case needs correction; {detail}: {output}')
     print(f"Latest bot evidence: {output}")
 
 
 def launch_sim(args):
     value = settings()
+    deploy(value, build=DEV)
     command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
                ROOT / "tools/launch-test-game.ps1", "-GameDir", value["game_dir"],
                "-RuntimeManifest", value["runtime"], "-OperatorDir", Path(value["operator_proxy"]).parent,
@@ -406,14 +567,21 @@ def pin_latest(_):
 def status(args):
     value = settings()
     manifest = read_json(PLAY / "BUILD.json") if (PLAY / "BUILD.json").exists() else None
+    development = read_json(DEV / "BUILD.json") if (DEV / "BUILD.json").exists() else None
+    source = source_identity()
     ledger = read_json(ROOT / "docs/COMMUNITY_VERIFICATION_2026-09-27.json")
     installed = None
     if value.get("game_dir") and (Path(value["game_dir"]) / "dinput8.dll").exists():
         installed = digest(Path(value["game_dir"]) / "dinput8.dll")
     info = {"checkout": str(ROOT), "play": str(PLAY), "build": manifest,
+            "dev": str(DEV), "development_build": development, "pinned_build": value.get("pinned_build"),
+            "pin_matches_play": bool(value.get("pinned_build") and manifest
+                                     and digest(PLAY / "BUILD.json") == value["pinned_build"]["manifest_sha256"]),
             "installed_dll_sha256": installed,
             "installed_matches_play": bool(manifest and installed == manifest["files"]["dinput8.dll"]),
-            "source_matches_play": bool(manifest and source_identity()["source_sha256"] == manifest["source"]["source_sha256"]),
+            "installed_matches_dev": bool(development and installed == development["files"]["dinput8.dll"]),
+            "source_matches_play": bool(manifest and source["source_sha256"] == manifest["source"]["source_sha256"]),
+            "source_matches_dev": bool(development and source["source_sha256"] == development["source"]["source_sha256"]),
             "reports": dict(collections.Counter(r["status"] for r in ledger["reports"])),
             "claims": dict(collections.Counter(c["status"] for r in ledger["reports"] for c in r["claims"])),
             "ledger_evidence_dll": ledger["candidate"]["dll_sha256"],
@@ -421,9 +589,12 @@ def status(args):
     if args.json:
         print(json.dumps(info, indent=2))
     else:
-        print(f"Checkout: {ROOT}\nPlay: {PLAY}\nInstalled matches play: {info['installed_matches_play']}\nSource matches play: {info['source_matches_play']}")
+        print(f"Checkout: {ROOT}\nPinned play: {PLAY}\nDevelopment: {DEV}")
+        print(f"Pin matches play: {info['pin_matches_play']}\nInstalled matches play: {info['installed_matches_play']}\nInstalled matches dev: {info['installed_matches_dev']}\nSource matches dev: {info['source_matches_dev']}")
         if manifest:
-            print(f"DLL: {manifest['files']['dinput8.dll']}\nBuilt: {manifest['built_utc']}")
+            print(f"Pinned DLL: {manifest['files']['dinput8.dll']}\nPinned built: {manifest['built_utc']}")
+        if development:
+            print(f"Development DLL: {development['files']['dinput8.dll']}\nDevelopment built: {development['built_utc']}")
         print(f"Community reports: {info['reports']}\nScoped claims: {info['claims']}")
         print("Full-game and headset acceptance: open. Next cases: docs/CURRENT.md")
 
@@ -432,8 +603,8 @@ def coverage(args):
     """Generate one fixed review view without launching or controlling a game."""
     value = settings()
     command = [sys.executable, ROOT / "tools/gameplay-coverage.py",
-               "--game-dir", Path(value["game_dir"]), "--candidate-dll", PLAY / "dinput8.dll",
-               "--controls-tool", PLAY / "mgs5vr_controls.exe",
+               "--game-dir", Path(value["game_dir"]), "--candidate-dll", DEV / "dinput8.dll",
+               "--controls-tool", DEV / "mgs5vr_controls.exe",
                "--output", ROOT / "artifacts/dev/coverage"]
     if args.menus:
         command += ["--menus-only"]
@@ -451,7 +622,7 @@ def coverage(args):
 def game_model(args):
     value = settings()
     command = [sys.executable, ROOT / 'tools/game-model.py', '--game-dir', Path(value['game_dir']),
-               '--candidate-dll', PLAY / 'dinput8.dll', '--controls-tool', PLAY / 'mgs5vr_controls.exe',
+               '--candidate-dll', DEV / 'dinput8.dll', '--controls-tool', DEV / 'mgs5vr_controls.exe',
                '--output', ROOT / 'artifacts/dev/coverage']
     if value.get('navigation'):
         command += ['--navigation', Path(value['navigation'])]
@@ -472,21 +643,77 @@ def main():
         setup.add_argument("--" + name, type=Path)
     setup.set_defaults(handler=configure)
     build = commands.add_parser("build")
-    build.add_argument("--no-deploy", action="store_true")
+    deployment = build.add_mutually_exclusive_group()
+    deployment.add_argument("--no-deploy", action="store_true", help="Compatibility flag; builds already leave the installed game alone")
+    deployment.add_argument("--deploy", action="store_true", help="Explicitly install the checked development build")
     build.set_defaults(handler=refresh)
-    commands.add_parser("deploy").set_defaults(handler=lambda _: deploy(settings()))
+    install = commands.add_parser("deploy", help="Switch the installed game without changing either retained build")
+    install.add_argument("--slot", choices=("play", "dev"), default="play")
+    install.set_defaults(handler=lambda args: deploy(settings(), build=PLAY if args.slot == "play" else DEV))
+    pinned = commands.add_parser("pin-build", help="Explicitly replace pinned play with the checked development build")
+    pinned.add_argument("--current", action="store_true", help="Record the existing play build as pinned without replacing it")
+    pinned.set_defaults(handler=pin_build)
+    cleanup = commands.add_parser("clean-builds", help="Inventory or remove recognized old builds; retain the two verified slots")
+    cleanup.add_argument("--apply", action="store_true")
+    def clean_builds(args):
+        from build_retention import clean
+        clean(sys.modules[__name__], args)
+    cleanup.set_defaults(handler=clean_builds)
     observe = commands.add_parser("bot")
-    observe.add_argument("--command", choices=("observe", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state"), default="observe")
+    observe.add_argument("--command", choices=("observe", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state", "mortar"), default="observe")
+    observe.add_argument('--policy', type=Path, help='mortar: reviewed authored fixture and operator position')
     observe.add_argument("--suite", type=Path)
     observe.add_argument("--seconds", type=float, default=15)
+    observe.add_argument('--idle-seconds', type=float, help='Supervisor review window before neutral cleanup')
     observe.add_argument("--record", action="store_true")
+    observe.add_argument("--trace-menu-input", action="store_true", help="Explicit bounded native UI query trace for a selected run/session suite")
     observe.add_argument('--transition', help='state: explicitly selected guarded transition')
     observe.set_defaults(handler=bot)
     navigate = commands.add_parser("navigate")
     navigate.add_argument("--goal", type=float, nargs=3, required=True)
-    navigate.add_argument("--mode", choices=("auto", "walk", "run", "crouch", "crawl"), default="auto")
-    navigate.add_argument("--seconds", type=float, default=60)
+    navigate.add_argument("--mode", choices=("auto", "stealth", "walk", "run", "crouch", "crawl"), default="auto")
+    navigate.add_argument("--interrupt-on-danger", action="store_true")
+    navigate.add_argument("--no-recenter", action="store_true")
+    navigate.add_argument("--record", action="store_true")
+    navigate.add_argument("--seconds", type=float, default=0, help='Optional total limit; zero uses progress guards')
+    navigate.add_argument("--arrival-radius", type=float, default=3.5)
     navigate.set_defaults(handler=bot)
+    combat = commands.add_parser("combat", help="Bounded native-observed combat through physical VR hand inputs")
+    combat.add_argument("--seconds", type=float, default=30.)
+    combat.add_argument("--camp")
+    combat.add_argument("--max-rounds", type=int, default=24)
+    combat.add_argument("--radius", type=float, default=80.)
+    combat.set_defaults(handler=bot)
+    autonomy = commands.add_parser("autonomy", help="Approach, engage and verify a named native camp without agent intervention")
+    autonomy.add_argument("--camp", required=True)
+    autonomy.add_argument("--seconds", type=float, default=180.)
+    autonomy.add_argument("--record", action="store_true")
+    autonomy.add_argument("--stealth-loadout",type=Path,required=True)
+    autonomy.add_argument("--emplacement",type=Path)
+    autonomy.add_argument("--body-handling",action="store_true")
+    autonomy.set_defaults(handler=bot)
+    idroid_film = commands.add_parser("idroid-film", help="Record a bounded current-state physical iDroid control probe")
+    idroid_film.add_argument("--goal-node", type=int, required=True)
+    idroid_film.add_argument("--seconds", type=float, default=90.)
+    idroid_film.add_argument("--record", action="store_true", required=True)
+    idroid_film.set_defaults(handler=bot)
+    emplacement = commands.add_parser("emplacement", help="Record a bounded native-observed emplacement interaction")
+    emplacement.add_argument("--policy", type=Path, required=True)
+    emplacement.add_argument("--seconds", type=float, default=0., help='Optional total limit; zero uses progress guards')
+    emplacement.add_argument("--record", action="store_true", required=True)
+    emplacement.add_argument("--diagnostic-active-camp", action="store_true",
+                             help="Explicit diagnostic mount/axes/fire/dismount probe; does not certify camp security")
+    emplacement.set_defaults(handler=bot)
+    mortar_response = commands.add_parser('mortar-response', help='Explicit recorded stationary mortar trigger response diagnostic')
+    mortar_response.add_argument('--policy', type=Path, required=True)
+    mortar_response.add_argument('--seconds', type=float, default=30.)
+    mortar_response.add_argument('--enter', action='store_true')
+    mortar_response.set_defaults(handler=bot)
+    field_operator = commands.add_parser('motherpuffer', help='Perform direct bounded live VR field actions')
+    field_operator.add_argument('--mode',choices=('vehicle','firearm'),required=True)
+    field_operator.add_argument('--vehicle-id',type=int,default=25603)
+    field_operator.add_argument('--seconds',type=float,default=60.)
+    field_operator.set_defaults(handler=bot)
     launch = commands.add_parser("launch-sim")
     launch.add_argument("--tracking-fault-test", action="store_true",
                         help="Explicitly enable bounded simulated controller occlusion diagnostics")

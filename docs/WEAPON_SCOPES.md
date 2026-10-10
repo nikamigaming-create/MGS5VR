@@ -41,8 +41,13 @@ than separate sight packages, and use their native 2×/4×/6× powers. Their por
 fit inside the actual polygonal opening, not over the outer eyecup. Package
 filenames are not equipment IDs: RC_80103 uses ms02, RC_80203 uses ms03, and
 RC_80303 uses ms01. No retail model, texture, UI file or save is distributed.
-Holographic/reflex, flip-to-side and night-vision presentations remain separate
-work. A round launcher lens does not establish target lock or guidance support.
+The native st02 collimator and st03/st04 hinged magnifiers are also supported.
+Right-stick up while ready cycles the fitted powers and aligns the existing
+magnifier for magnified viewing; returning to 1x restores the native side pose.
+The SVG-76's 1x -> 2x -> 1x path has recorded simulator coverage on the 6ac2 pin.
+Other holographic/reflex and night-vision presentations, complete optical
+alignment and physical-headset acceptance remain open. A round launcher lens
+does not establish target lock or guidance support.
 
 ### Close-up native depth
 

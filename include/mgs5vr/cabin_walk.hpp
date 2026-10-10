@@ -43,6 +43,8 @@ struct CabinWalkState {
     Vec3 position{};
     uint64_t lastUpdateMs{};
     uint64_t sceneGeneration{};
+    Pose lastBase{};
+    bool baseTracked{};
 };
 
 struct CabinSweep {
@@ -79,7 +81,7 @@ std::optional<Vec3> resolveCabinMovement(Vec3 from,Vec3 target,Sweep sweep,Suppo
 template<class Resolve>
 Vec3 advanceCabinWalk(CabinWalkState& state,Vec3 basePosition,Quat heading,
     std::array<float,2> axis,uint64_t nowMs,uint64_t sceneGeneration,Resolve resolve,
-    float metersPerSecond=.85f) {
+    float metersPerSecond=.85f,bool menuOpen=false,bool movingBase=false) {
     if(!valid(Pose{heading,basePosition})||!sceneGeneration
        ||!std::isfinite(metersPerSecond)||metersPerSecond<0){
         state={};
@@ -87,6 +89,30 @@ Vec3 advanceCabinWalk(CabinWalkState& state,Vec3 basePosition,Quat heading,
     }
     if(state.sceneGeneration!=sceneGeneration){
         state={Vec3{},basePosition,nowMs,sceneGeneration};
+        state.lastBase={heading,basePosition};state.baseTracked=true;
+        return basePosition;
+    }
+    if(movingBase){
+        // Carry the accepted offset with the live cabin before sweeping a
+        // walking step. A world-anchored position would trail a moving heli.
+        const Pose currentBase{heading,basePosition};
+        if(state.baseTracked){
+            const auto delta=basePosition-state.lastBase.position;
+            if(dot(delta,delta)>900.f||nowMs<state.lastUpdateMs||nowMs-state.lastUpdateMs>500){
+                state.offset={};state.position=basePosition;
+            }else{
+                const auto turn=compose(Pose{heading,{}},inverse(Pose{state.lastBase.orientation,{}})).orientation;
+                state.offset=rotate(turn,state.offset);
+                state.position=basePosition+state.offset;
+            }
+        }
+        state.lastBase=currentBase;state.baseTracked=true;
+    }
+    // Menu cameras already include the walk offset accepted when they opened.
+    // Preserve that offset for stow without applying it twice or consuming
+    // menu-stick input as movement. Refresh time so closing cannot catch up.
+    if(menuOpen){
+        state.lastUpdateMs=nowMs;
         return basePosition;
     }
     float dt=0;

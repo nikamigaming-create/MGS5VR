@@ -5,6 +5,7 @@ reads its events, reviews new blockers, and submits an explicit semantic case.
 Unrecognized UI never authorizes a generic confirm/retry loop.
 """
 import json
+import math
 import time
 import uuid
 
@@ -152,12 +153,17 @@ def execute_plan(behavior, decision, records, *, checkpoint, clock=time.monotoni
     return "Reviewed plan completed: "+decision["id"]
 
 
-def run_supervised(behavior, seconds=900., clock=time.monotonic, sleep=time.sleep, initial_suite=None):
+def run_supervised(behavior, seconds=0., clock=time.monotonic, sleep=time.sleep, initial_suite=None,
+                   idle_seconds=10.):
+    if (type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0
+            or type(idle_seconds) not in (int, float) or not math.isfinite(idle_seconds)
+            or not 0 < idle_seconds <= REVIEW_WINDOW_SECONDS):
+        raise BotFault('Supervisor requires a finite total limit and bounded decision idle window')
     if initial_suite is not None and any("reviewed_action_only" in case for case in initial_suite.get("cases", [])):
         raise BotFault("Reviewed action requires a fresh two-eye decision, not an initial suite")
     live, events = behavior.adapter, behavior.events
     live.supervised = True
-    deadline = clock()+seconds
+    deadline = clock()+seconds if seconds else math.inf
     completed, records = set(), []
     decision_path = events.output / "decision.json"
     request = None
@@ -256,11 +262,20 @@ def run_supervised(behavior, seconds=900., clock=time.monotonic, sleep=time.slee
                 "observation_id": request["observation_id"], "waiting_seconds": clock()-waiting_since,
                 "cases_completed": len(records), "input_held": bool(live.held)})
             next_health=clock()+1.
-        if not notified_wait and clock()-waiting_since >= 10.:
+        if clock()-waiting_since >= idle_seconds:
             events.emit("supervisor_waiting", reason="Worker has not supplied the next decision within ten seconds",
                         observation_id=request["observation_id"], elapsed=clock()-waiting_since,
                         captures=request["captures"])
-            notified_wait=True
+            # Return the checkpoint for immediate correction, never park for
+            # the old 900/1800-second session timer. Known plans run continuously.
+            live.release()
+            atomic_json(events.output / 'supervisor-health.json', {
+                'updated_unix_ns': time.time_ns(), 'state': 'needs_decision',
+                'cases_completed': len(records), 'input_held': False})
+            return {'status': 'needs_decision', 'cases': records,
+                    'observation_id': request['observation_id'],
+                    'visual_acceptance': 'pending', 'release_ready': False,
+                    'decisions_consumed': sorted(completed)}
         sleep(.05)
     live.release()
     atomic_json(events.output / "supervisor-health.json", {

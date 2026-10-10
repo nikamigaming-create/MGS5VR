@@ -38,7 +38,7 @@ def package(tag, output, *, allow_known_issues=False):
     build = read_json(PLAY / "BUILD.json")
     source = source_identity()
     if source["changes"] or source != build["source"]:
-        raise ValueError("Commit the public source, then run tools/build.ps1 before packaging")
+        raise ValueError("Commit the public source, run tools/build.ps1, then explicitly pin-build the reviewed candidate before packaging")
     if build["validation"]["automated"] != "passed":
         raise ValueError("The play build has not passed its automated checks")
     notes = f"docs/RELEASE_{tag.removeprefix('experimental-')}.md"

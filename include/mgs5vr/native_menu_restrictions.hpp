@@ -5,16 +5,28 @@
 #include <ostream>
 
 namespace mgs5vr {
-enum class NativeIdroidRecovery { refuse, ordinary, completedGuideOnly };
-// A missing native read is not evidence that a tutorial is inactive. Active
-// modes still require the existing native completed-guide checks before Stop.
+enum class NativeIdroidRecovery { refuse, ordinary, requestedStow };
+// A missing native read cannot authorize terminal recovery. A deliberate held
+// Back may stow a live lesson's terminal through its native lifecycle without
+// marking the lesson complete. Automatic root-Back cleanup remains mode-zero.
 inline NativeIdroidRecovery nativeIdroidRecoveryForTutorialMode(std::optional<unsigned> mode) noexcept {
     if(!mode||*mode>16)return NativeIdroidRecovery::refuse;
-    return *mode==0?NativeIdroidRecovery::ordinary:NativeIdroidRecovery::completedGuideOnly;
+    return *mode==0?NativeIdroidRecovery::ordinary:NativeIdroidRecovery::requestedStow;
 }
 inline void writeNativeIdroidTutorialModeJson(std::ostream& out,std::optional<unsigned> mode){
     if(nativeIdroidRecoveryForTutorialMode(mode)==NativeIdroidRecovery::refuse)out<<"null";
     else out<<*mode;
+}
+
+inline bool nativeIdroidTutorialPauseReleaseAllowed(std::optional<unsigned> mode,bool pauseMenu,
+    bool closing,bool requestedStow) noexcept {
+    if(!mode||*mode>16||pauseMenu)return false;
+    return *mode==0||(requestedStow&&closing);
+}
+
+inline bool nativeIdroidStowHelpCloseAllowed(std::optional<unsigned> mode,bool idroidOpen,
+    unsigned pauseKind,bool ownedRequest) noexcept {
+    return ownedRequest&&mode&&*mode==0&&!idroidOpen&&pauseKind==32;
 }
 
 // A native tutorial borrows the menu's disabled bit. Keep the prior values

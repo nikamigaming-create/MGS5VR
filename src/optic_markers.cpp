@@ -13,6 +13,8 @@
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <algorithm>
+#include <vector>
 
 namespace {
 using namespace mgs5vr;
@@ -25,6 +27,10 @@ std::atomic_bool enabled{};
 std::mutex mutex;
 HeadCameraSample latest;
 OpticWaypoints waypoints;
+CombatSightSnapshot combatSight;
+std::atomic_uint64_t combatSightExpiry{};
+CoverProbeRequest coverRequest;
+CoverProbeSnapshot coverResult;
 uint64_t consumed{},consumedClear{};
 uint64_t consumedIntel{};
 ReconDwell reconDwell;
@@ -84,6 +90,189 @@ std::optional<Vector> surface(const HeadCameraSample& frame,bool* queryValid=nul
     if(!valid(Pose{{},{hit.x,hit.y,hit.z}})||along<.05f||along>1500.1f||dot(residual,residual)>.04f)return {};
     if(queryValid)*queryValid=true;
     return hit;
+}
+
+// Reuse the signature-verified native world query and its visibility filter.
+// This must stay on the marker-update job, rather than the pipe/XR thread.
+std::optional<Vector> combatSurface(Vec3 origin,CombatSightTarget& target){
+    const auto endpoint=target.aim;
+    auto& queryValid=target.queryValid;queryValid=false;target.queryReason=1;
+    const auto delta=endpoint-origin;const float length=std::sqrt(dot(delta,delta));
+    if(!read<uintptr_t>(base+0x2c79710))return {};
+    target.queryReason=2;
+    if(!valid(Pose{{},origin})||!valid(Pose{{},endpoint})
+       ||!std::isfinite(length)||length<1.f||length>300.f)return {};
+    alignas(16) std::array<std::byte,0x250> query{};
+    using Init=void*(*)(void*,uint32_t);
+    using Ray=uint32_t(*)(void*,uint32_t,const Vector*,const Vector*,float);
+    using Position=void*(*)(const void*,Vector*);
+    reinterpret_cast<Init>(base+0xa0fb50)(query.data(),0);
+    const uint64_t layers=~uint64_t{},filter=0x80000004;
+    std::memcpy(query.data(),&layers,sizeof(layers));
+    std::memcpy(query.data()+0x18,&filter,sizeof(filter));
+    const Vector start{origin.x,origin.y,origin.z,0},end{endpoint.x,endpoint.y,endpoint.z,0};
+    target.rayResult=reinterpret_cast<Ray>(base+0x1b9b130)(query.data(),0x04000700,&start,&end,0.f);
+    if(!target.rayResult){
+        target.queryReason=3;queryValid=true;return {};
+    }
+    const auto address=reinterpret_cast<uintptr_t>(query.data());
+    const auto count=read<uint32_t>(address+0x60);const auto index=read<int32_t>(address+0x64);
+    target.hitCount=count;target.hitIndex=index;target.queryReason=4;
+    if(!count||count>5||index<0||static_cast<uint32_t>(index)>=count)return {};
+    Vector hit;
+    reinterpret_cast<Position>(base+0x1b9a5d0)(query.data()+0x70+index*0x60,&hit);
+    const auto direction=delta*(1.f/length),offset=Vec3{hit.x,hit.y,hit.z}-origin;
+    const float along=dot(offset,direction);const auto residual=offset-direction*along;
+    target.queryReason=5;
+    if(!valid(Pose{{},{hit.x,hit.y,hit.z}})||!std::isfinite(along)||!std::isfinite(dot(residual,residual)))return {};
+    target.rawSurface={hit.x,hit.y,hit.z};target.rawAlong=along;target.rawLateralSquared=dot(residual,residual);
+    target.queryReason=6;if(along<0.f)return {};
+    target.queryReason=7;if(along>length+.1f)return {};
+    target.queryReason=8;if(dot(residual,residual)>.04f)return {};
+    target.queryReason=9;queryValid=true;return hit;
+}
+
+void sampleCombatSight(uintptr_t markers,const HeadCameraSample& frame,uint64_t now){
+    if(now>=combatSightExpiry.load())return;
+    {std::lock_guard lock(mutex);
+        if(combatSight.activation==frame.activation&&combatSight.presentationEpoch==frame.controllers.presentationEpoch
+           &&now>=combatSight.sampleTime&&now-combatSight.sampleTime<50)return;
+    }
+    CombatSightSnapshot result;
+    result.sampleTime=now;result.activation=frame.activation;
+    result.presentationEpoch=frame.controllers.presentationEpoch;
+    result.playerOwner=frame.playerOwner;result.trackingSequence=frame.trackingSequence;
+    const auto& weapon=frame.weaponRig;
+    if(frame.controllers.presentationFocused&&!frame.controllers.vehicleControls
+       &&frame.controllers.weaponReady&&frame.nativeFirearmActive
+       &&frame.renderedPalmTracked[1]&&weapon.muzzleSolved){
+        result.muzzle=compose(frame.renderedPalms[1],weapon.muzzleInGrip);
+        result.muzzleTracked=valid(result.muzzle);
+    }
+    if(result.muzzleTracked){
+        const auto records=read<uintptr_t>(markers+0x88);
+        const auto actors=read<std::array<std::byte,0x3b7*0x30>>(records);
+        std::vector<CombatSightTarget> candidates;
+        for(size_t i=0;i<0x3b7;++i){
+            const auto* record=actors.data()+i*0x30;
+            const auto flags=std::to_integer<uint8_t>(record[0x1f]);
+            if(std::to_integer<uint8_t>(record[0x1e])!=1||(flags&5)!=1)continue;
+            CombatSightTarget target;
+            std::memcpy(&target.id,record+0x1c,sizeof(target.id));
+            std::memcpy(&target.marker,record+0x10,sizeof(target.marker));
+            if(!target.id||target.id==0xffff||!valid(Pose{{},target.marker})||dot(target.marker,target.marker)<1)continue;
+            // Aim inside the same native person-marker capsule used by recon;
+            // this is a torso aim policy, not a recovered anatomical bone.
+            target.aim=target.marker+Vec3{0,-.65f,0};
+            const auto delta=target.aim-result.muzzle.position;
+            target.distance=std::sqrt(dot(delta,delta));
+            if(target.distance>=1.f&&target.distance<=180.f)candidates.push_back(target);
+        }
+        std::sort(candidates.begin(),candidates.end(),[](const auto& a,const auto& b){return a.distance<b.distance;});
+        result.candidates=candidates.size();
+        result.count=std::min(candidates.size(),result.targets.size());
+        for(size_t i=0;i<result.count;++i){
+            auto& target=candidates[i];
+            const auto queryPoint=[&](CombatSightTarget& point){
+                const auto delta=point.aim-result.muzzle.position;
+                point.distance=std::sqrt(dot(delta,delta));
+                const auto hit=combatSurface(result.muzzle.position,point);
+                point.surfaceDistance=hit?std::sqrt(dot(Vec3{hit->x,hit->y,hit->z}-result.muzzle.position,
+                    Vec3{hit->x,hit->y,hit->z}-result.muzzle.position)):point.distance;
+                point.unoccluded=point.queryValid&&(!hit||point.surfaceDistance>=point.distance-.35f);
+            };
+            queryPoint(target);
+            if(!target.unoccluded){
+                // Low cover can conceal the torso while the native recon
+                // point is exposed. Query that actual point separately;
+                // neither a guessed bone nor the first blocked ray admits it.
+                auto exposed=target;exposed.aim=exposed.marker;exposed.aimKind=1;
+                exposed.rawSurface={};exposed.rawAlong=exposed.rawLateralSquared=0;
+                exposed.rayResult=exposed.hitCount=0;exposed.hitIndex=-1;
+                queryPoint(exposed);
+                if(exposed.unoccluded)target=exposed;
+            }
+            result.targets[i]=target;
+        }
+    }
+    std::lock_guard lock(mutex);combatSight=result;
+}
+
+CoverProbeFrame coverFrame(const HeadCameraSample& frame,bool active){
+    return {{frame.activation,frame.playerOwner,frame.controllers.presentationEpoch},
+        frame.sampleTime,frame.trackingSequence,frame.nativePose.position,
+        active&&frame.applied&&!frame.menuOpen&&frame.controllers.presentationFocused
+        &&!frame.controllers.frontEnd&&!frame.controllers.loading&&!frame.controllers.scriptedDemo
+        &&!frame.controllers.authoredCamera&&!frame.controllers.cabinPlay&&!frame.controllers.avatarEditor
+        &&!frame.controllers.vehicleControls&&valid(frame.nativePose)};
+}
+
+void sampleCoverProbe(uintptr_t markers,const HeadCameraSample& frame,uint64_t now){
+    CoverProbeRequest request;
+    {std::lock_guard lock(mutex);
+        if(!coverRequest.nonce||now>=coverRequest.expiresMs
+           ||(coverResult.request.nonce==coverRequest.nonce&&coverResult.sampleMs))return;
+        request=coverRequest;
+    }
+    const auto status=headCamera().status();
+    CoverProbeSnapshot result;result.request=request;result.sampleMs=now;
+    result.frame=coverFrame(frame,status.active&&!status.suspended&&status.activation==frame.activation);
+    result.reason=coverProbeFrameReason(request,result.frame,now);
+    if(result.reason==CoverProbeReason::none){
+        // Native pose and supplied observed root are joined above before this
+        // offset is used. No estimated standing/crouched eye height is added.
+        result.eyeOffset=result.frame.nativeEye-request.observedPlayer;
+        const auto actors=read<std::array<std::byte,0x3b7*0x30>>(read<uintptr_t>(markers+0x88));
+        for(size_t i=0;i<0x3b7;++i){
+            const auto* record=actors.data()+i*0x30;
+            const auto flags=std::to_integer<uint8_t>(record[0x1f]);
+            if(std::to_integer<uint8_t>(record[0x1e])!=1||(flags&5)!=1)continue;
+            CoverProbePerson person;person.recordIndex=static_cast<uint16_t>(i);person.flags=flags;
+            std::memcpy(&person.id,record+0x1c,sizeof(person.id));
+            std::memcpy(&person.marker,record+0x10,sizeof(person.marker));
+            if(!person.id||person.id==0xffff||!coverProbeFinite(person.marker)||dot(person.marker,person.marker)<1.f)continue;
+            const auto distanceSquared=coverProbeDistanceSquared(person.marker,request.observedPlayer);
+            if(distanceSquared<1.f||distanceSquared>180.f*180.f)continue;
+            person.distance=std::sqrt(distanceSquared);
+            bool duplicate{};
+            for(size_t j=0;j<result.personCount;++j)if(result.persons[j].id==person.id)duplicate=true;
+            if(duplicate)continue;
+            if(result.personCount<result.persons.size())result.persons[result.personCount++]=person;
+            else if(person.distance<result.persons.back().distance)result.persons.back()=person;
+            else continue;
+            std::sort(result.persons.begin(),result.persons.begin()+result.personCount,
+                [](const auto& a,const auto& b){return a.distance<b.distance||(a.distance==b.distance&&a.id<b.id);});
+        }
+        if(!result.personCount)result.reason=CoverProbeReason::noActors;
+        else {
+            result.count=request.count;result.available=true;
+            for(size_t i=0;i<result.count;++i){
+                auto& candidate=result.candidates[i];
+                candidate.node=request.nodes[i].node;candidate.point=request.nodes[i].point;
+                candidate.eye=candidate.point+result.eyeOffset;
+                candidate.count=result.personCount;candidate.allMarkerRaysObstructed=true;
+                for(size_t j=0;j<result.personCount;++j){
+                    const auto& person=result.persons[j];
+                    CombatSightTarget ray;ray.id=person.id;ray.marker=person.marker;ray.aim=candidate.eye;
+                    const auto delta=ray.aim-person.marker;ray.distance=std::sqrt(dot(delta,delta));
+                    // Exactly the combat observer's verified ABI/filter, on
+                    // this native job. The origin is the actual marker point,
+                    // not a recovered enemy eye/bone or an AI vision request.
+                    const auto hit=combatSurface(person.marker,ray);
+                    ray.surfaceDistance=hit?std::sqrt(coverProbeDistanceSquared(ray.rawSurface,person.marker)):ray.distance;
+                    const bool blocked=coverProbeTerrainObstruction(ray.queryValid,ray.queryReason,ray.rayResult,
+                        ray.distance,ray.rawAlong,ray.rawLateralSquared);
+                    candidate.rays[j]={person.id,person.marker,candidate.eye,ray.rawSurface,
+                        ray.distance,ray.surfaceDistance,ray.rawAlong,ray.rawLateralSquared,
+                        ray.queryValid,blocked,ray.queryReason,ray.rayResult,ray.hitCount,ray.hitIndex};
+                    candidate.allMarkerRaysObstructed=candidate.allMarkerRaysObstructed&&blocked;
+                }
+            }
+        }
+    }
+    std::lock_guard lock(mutex);
+    if(coverRequest.nonce==request.nonce&&coverRequest.issuedMs==request.issuedMs
+       &&coverRequest.expiresMs==request.expiresMs)coverResult=result;
 }
 
 void snapshot(uintptr_t markers,uint64_t now,uint64_t activation){
@@ -302,6 +491,8 @@ void update(void* job,void* input,const void* output){
     const auto markers=read<uintptr_t>(ui+0x80);
     if(read<uintptr_t>(markers)!=base+0x21addf0){reconDwell.reset();return;}
     snapshot(markers,now,status.activation);
+    sampleCombatSight(markers,frame,now);
+    sampleCoverProbe(markers,frame,now);
     const auto& optic=frame.controllers.optic;
     if(!optic.held||!optic.pose.tracked||!optic.pose.ray.tracked||optic.pose.kind!=OpticKind::binocular){reconDwell.reset();opticUseEdge.reset();return;}
     if(opticUseEdge.update(optic.active,frame.sampleTime,frame.activation))
@@ -365,6 +556,48 @@ void update(void* job,void* input,const void* output){
 }
 
 namespace mgs5vr {
+bool leaseCombatSight(uint64_t now,uint64_t milliseconds) noexcept {
+    if(!milliseconds){combatSightExpiry.store(0);std::lock_guard lock(mutex);combatSight={};return true;}
+    if(!enabled.load()||milliseconds<100||milliseconds>5000)return false;
+    const auto status=headCamera().status();
+    if(!status.active||status.suspended)return false;
+    combatSightExpiry.store(now+milliseconds);return true;
+}
+CombatSightSnapshot combatSightSnapshot(){std::lock_guard lock(mutex);return combatSight;}
+uint64_t combatSightLeaseExpiry() noexcept {return combatSightExpiry.load();}
+bool leaseCoverProbe(CoverProbeRequest request,uint64_t now) noexcept {
+    if(!enabled.load()||!validCoverProbeRequest(request)
+       ||now>std::numeric_limits<uint64_t>::max()-request.leaseMs)return false;
+    request.issuedMs=now;request.expiresMs=now+request.leaseMs;
+    const auto status=headCamera().status();
+    HeadCameraSample frame;
+    {std::lock_guard lock(mutex);frame=latest;}
+    if(coverProbeFrameReason(request,coverFrame(frame,status.active&&!status.suspended
+       &&status.activation==frame.activation),now)!=CoverProbeReason::none)return false;
+    std::lock_guard lock(mutex);
+    if(coverRequest.nonce==request.nonce)return false; // A nonce cannot refresh an old result.
+    coverRequest=request;coverResult={};coverResult.request=request;
+    coverResult.frame=coverFrame(frame,true);return true;
+}
+void clearCoverProbe() noexcept {
+    std::lock_guard lock(mutex);coverRequest={};coverResult={};
+}
+CoverProbeSnapshot coverProbeSnapshot(uint64_t now,uint64_t nonce){
+    CoverProbeSnapshot result;HeadCameraSample current;
+    {std::lock_guard lock(mutex);result=coverResult;current=latest;}
+    if(!nonce||result.request.nonce!=nonce){
+        result={};result.request.nonce=nonce;result.reason=CoverProbeReason::nonce;return result;
+    }
+    const auto status=headCamera().status();
+    const auto reason=enabled.load()?coverProbeFrameReason(result.request,
+        coverFrame(current,status.active&&!status.suspended&&status.activation==current.activation),now):CoverProbeReason::disabled;
+    if(reason!=CoverProbeReason::none){result.available=false;result.reason=reason;}
+    else if(result.available&&(!result.sampleMs||now<result.sampleMs||now-result.sampleMs>150)){
+        result.available=false;result.reason=CoverProbeReason::staleFrame;
+    }
+    if(!result.available){result.count=0;result.personCount=0;result.candidates={};result.persons={};}
+    return result;
+}
 void installOpticMarkers(uintptr_t moduleBase){
     constexpr std::array<unsigned char,9> updateEntry{0x48,0x85,0xd2,0x0f,0x84,0x99,0x02,0,0};
     constexpr std::array<unsigned char,10> placeEntry{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20};
@@ -415,5 +648,5 @@ void acknowledgeOpticUse(const OpticEvent& event){
     std::lock_guard lock(mutex);
     if(event.activation==latest.activation&&latest.controllers.optic.active)queuedUse=event;
 }
-void stopOpticMarkers() noexcept {enabled.store(false);}
+void stopOpticMarkers() noexcept {enabled.store(false);combatSightExpiry.store(0);clearCoverProbe();}
 }

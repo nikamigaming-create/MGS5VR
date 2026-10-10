@@ -7,6 +7,8 @@
 #include "mgs5vr/paused_rig.hpp"
 #include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/idroid_rig.hpp"
+#include "mgs5vr/idroid_native_hold.hpp"
+#include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/idroid_ui.hpp"
 #include "mgs5vr/idroid_effect_probe.hpp"
 #include "mgs5vr/opening_selector.hpp"
@@ -16,6 +18,8 @@
 #include "mgs5vr/optic_radio.hpp"
 #include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/native_menu_restrictions.hpp"
+#include "mgs5vr/native_controls.hpp"
+#include "mgs5vr/vehicle_pedals.hpp"
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -28,6 +32,39 @@ static void expect(bool ok,const char* name){++checks;if(!ok){++failures;std::ce
 static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
+    {
+        NativeTermsMenu terms{100,41,5,1,0,2,3,true,true};
+        expect(terms.ready(100)&&terms.ready(350),"a current typed Terms owner can retain native menu navigation");
+        expect(!terms.ready(99)&&!terms.ready(351),"future or stale Terms data cannot override cinematic controls");
+        auto incomplete=terms;incomplete.phase=4;
+        expect(!incomplete.ready(100),"Terms initialization is not input-ready");
+        incomplete=terms;incomplete.active=false;
+        expect(!incomplete.ready(100),"a closed Terms page cannot keep its menu route");
+        incomplete=terms;incomplete.verified=false;
+        expect(!incomplete.ready(100),"an unverified native type cannot override a cinematic");
+        expect(nativeSceneInputMode(terms.ready(100),true,false,false,false)==NativeMenuInput::menu,
+               "the live first-run Terms page takes menu navigation during the startup cinematic");
+    }
+    {
+        cancelHandheldIdroidBorrow();publishHandheldIdroidOwner(0,0);
+        expect(!requestHandheldIdroidBorrow(41,42),"an unowned terminal cannot promise an automatic return");
+        publishHandheldIdroidOwner(41,42);
+        expect(requestHandheldIdroidBorrow(41,42),"native reload borrows its exact UI-only terminal");
+        const auto borrow=handheldIdroidBorrow();
+        auto changed=borrow;changed.activation=43;acknowledgeHandheldIdroidBorrow(changed);
+        expect(!handheldIdroidBorrow().stopped,"a replaced activation cannot acknowledge an earlier stow");
+        acknowledgeHandheldIdroidBorrow(borrow);returnHandheldIdroidBorrow(changed);
+        expect(handheldIdroidBorrow().stopped&&!handheldIdroidBorrow().returnRequested,
+            "stow acknowledgement does not authorize another owner's return");
+        returnHandheldIdroidBorrow(borrow);
+        expect(handheldIdroidBorrow().returnRequested,"the original native reload owner can return its handset");
+        cancelHandheldIdroidBorrow();
+        expect(!handheldIdroidBorrow().player,"explicit stow cancels a pending automatic return");
+        expect(requestHandheldIdroidBorrow(41,42),"a fresh reload can borrow the remaining exact handset owner");
+        const auto fresh=handheldIdroidBorrow();
+        expect(!handheldIdroidBorrow(fresh.time+10001).player,"a stalled reload cannot reopen a former terminal later");
+        publishHandheldIdroidOwner(0,0);
+    }
     {
         const std::array<uint64_t,25> deviceScenes{
             0x504021c76a2a4cbaull,0x5040741ac64544cfull,0x504074e62baad619ull,
@@ -115,18 +152,49 @@ int main(){
         expect(probe.mask(8010)==0,"focus loss clears every simulated tracking-loss bit");
         probe.arm(8,7000,9000);probe.configure(false);
         expect(probe.mask(9010)==0,"session replacement or normal configuration removes the diagnostic lease");
+        TrackingFaultProbe headProbe{3};
+        expect(!headProbe.arm(1,7000,100),"head loss cannot be armed in a normal session");
+        headProbe.configure(true);headProbe.focused(true);
+        expect(!headProbe.arm(4,7000,100),"head loss rejects controller masks");
+        expect(headProbe.arm(3,7000,100)&&headProbe.mask(7099)==3&&headProbe.mask(7100)==0,
+            "head/view loss expires independently of a blocked capture or runner");
+        expect(probe.mask(7099)==0,"head/view loss never arms controller loss");
+        headProbe.arm(1,1000,8000);headProbe.focused(false);headProbe.focused(true);
+        expect(headProbe.mask(8010)==0,"head loss clears when session focus is lost");
     }
     {
         expect(nativeIdroidRecoveryForTutorialMode(std::nullopt)==NativeIdroidRecovery::refuse,
-            "unread tutorial mode cannot authorize forced terminal Stop");
+            "unread tutorial mode cannot authorize forced terminal recovery");
         expect(nativeIdroidRecoveryForTutorialMode(0)==NativeIdroidRecovery::ordinary,
             "readable inactive tutorial permits ordinary requested recovery");
         for(unsigned mode=1;mode<=16;++mode)
-            expect(nativeIdroidRecoveryForTutorialMode(mode)==NativeIdroidRecovery::completedGuideOnly,
-                "every active tutorial requires the native completed-guide proof before Stop");
+            expect(nativeIdroidRecoveryForTutorialMode(mode)==NativeIdroidRecovery::requestedStow,
+                "readable active tutorials permit deliberate terminal stow without completing the lesson");
         expect(nativeIdroidRecoveryForTutorialMode(17)==NativeIdroidRecovery::refuse
             &&nativeIdroidRecoveryForTutorialMode(std::numeric_limits<unsigned>::max())==NativeIdroidRecovery::refuse,
-            "unrecognized tutorial values cannot authorize forced terminal Stop");
+            "unrecognized tutorial values cannot authorize forced terminal recovery");
+        expect(nativeIdroidTutorialPauseReleaseAllowed(0,false,false,false),
+            "an inactive tutorial may release its retained own pause");
+        for(unsigned mode=1;mode<=16;++mode){
+            expect(nativeIdroidTutorialPauseReleaseAllowed(mode,false,true,true),
+                "explicit native closing may release only the active lesson's own pause");
+            expect(!nativeIdroidTutorialPauseReleaseAllowed(mode,false,false,true)
+                &&!nativeIdroidTutorialPauseReleaseAllowed(mode,false,true,false),
+                "active lessons retain their pause without both explicit stow and native closing");
+        }
+        expect(!nativeIdroidTutorialPauseReleaseAllowed(0,true,true,true)
+            &&!nativeIdroidTutorialPauseReleaseAllowed(11,true,true,true)
+            &&!nativeIdroidTutorialPauseReleaseAllowed(std::nullopt,false,true,true)
+            &&!nativeIdroidTutorialPauseReleaseAllowed(17,false,true,true),
+            "Help/Pause ownership and unknown tutorial values cannot release a pause");
+        expect(nativeIdroidStowHelpCloseAllowed(0,false,32,true),
+            "the exact post-stow Help may close under its captured request");
+        expect(!nativeIdroidStowHelpCloseAllowed(11,false,32,true)
+            &&!nativeIdroidStowHelpCloseAllowed(0,true,32,true)
+            &&!nativeIdroidStowHelpCloseAllowed(0,false,1,true)
+            &&!nativeIdroidStowHelpCloseAllowed(0,false,32,false)
+            &&!nativeIdroidStowHelpCloseAllowed(std::nullopt,false,32,true),
+            "active lessons, open terminals, ordinary Pause and absent owners remain untouched");
         std::ostringstream state;state<<std::boolalpha;
         state<<"{\"unknown\":";writeNativeIdroidTutorialModeJson(state,std::nullopt);
         state<<",\"ordinary\":";writeNativeIdroidTutorialModeJson(state,0);
@@ -494,6 +562,31 @@ int main(){
         }
     }
     {
+        constexpr uint64_t centerCode=0x84a35edc984905ceull,magnifierCode=0x84a1df03c6484ee1ull;
+        const Pose center{{},{0,.1285718f,.1034005f}},magnifier{{},{0,.1285718f,-.0165436f}};
+        const auto one=nativeMagnifierScopeGeometry(center,magnifier,centerCode,magnifierCode,{1,2,0,1},1);
+        const auto two=nativeMagnifierScopeGeometry(center,magnifier,centerCode,magnifierCode,{1,2,0,1},2);
+        expect(one&&two&&one->sight==4&&two->sight==4,"native magnifier modes retain one zoom owner");
+        expect(one&&two&&one->ocular.position.z>two->ocular.position.z+.1f,
+            "1x uses the collimator sight point and 2x uses the separate rear magnifier glass");
+        expect(one&&near(one->ocular.position.z,.0754532f),
+            "unmagnified dot stays 0.2 mm behind the observed native rear sight point");
+        expect(one&&two&&near(one->radius,.0202493f)&&near(two->radius,.0147864f),
+            "each lens fits its own owned polygonal aperture");
+        const Pose motion{{0,.38268343f,0,.92387953f},{2,-1,4}};
+        const auto moved=nativeMagnifierScopeGeometry(compose(motion,center),compose(motion,magnifier),centerCode,magnifierCode,{1,2,0,1},2);
+        expect(two&&moved&&same(moved->ocular.position,compose(motion,two->ocular).position),
+            "assembled magnifier glass follows the exact weapon root under motion");
+        expect(!nativeMagnifierScopeGeometry(center,magnifier,centerCode,0,{1,2,0,1},2),
+            "missing magnifier cannot manufacture a 2x lens");
+        expect(!nativeMagnifierScopeGeometry(center,magnifier,0,magnifierCode,{1,2,0,1},1),
+            "unknown central sight cannot borrow collimator geometry");
+        expect(!nativeMagnifierScopeGeometry(center,magnifier,centerCode,magnifierCode,{1,2,0,1},4),
+            "a copied power absent from this weapon cannot create another scope mode");
+        const auto fixed=nativeMagnifierScopeGeometry(center,{},centerCode,0,{1,0,0,2},1);
+        expect(fixed&&fixed->sight==2&&fixed->dotReticle,"the native standalone collimator retains its 1x sight");
+    }
+    {
         const Pose wrist{{},{-.35f,-.4f,-.3f}};
         const auto popup=wristPopupPose(wrist,{},.09f);
         expect(popup&&same(popup->position,{-.35f,-.31f,-.3f}),
@@ -587,17 +680,78 @@ int main(){
         expect(movement.update(up,true,2060).gamepad.buttons==0x0040,"fresh upward gesture works after focus recovery");
     }
     {
+        VehiclePedalInput pedals;
+        GamepadSample heldShot{};
+        heldShot.rightTrigger=255;heldShot.leftTrigger=180;
+        heldShot.leftX=14000;heldShot.leftY=24000;heldShot.buttons=0x1000;
+        auto drive=pedals.update(heldShot,.8f,true,true);
+        expect(drive.leftTrigger==0&&drive.rightTrigger==0&&drive.leftY==0,
+            "requesting a vehicle gun immediately removes held triggers and an already-deflected stick from pedals");
+        expect(drive.leftX==heldShot.leftX&&drive.buttons==heldShot.buttons,
+            "vehicle pedal ownership preserves the steering axis and unrelated buttons");
+        drive=pedals.update(heldShot,-.8f,true,true);
+        expect(drive.leftTrigger==0&&drive.rightTrigger==0,
+            "reversing a stick held through gun acquisition cannot arm either pedal");
+        drive=pedals.update(heldShot,0.f,true,true);
+        expect(drive.leftTrigger==0&&drive.rightTrigger==0,
+            "centering the new pedal stick does not turn a held firing trigger into acceleration");
+        drive=pedals.update(heldShot,1.f,true,true);
+        expect(drive.rightTrigger==255&&drive.leftTrigger==0&&drive.leftY==0,
+            "a fresh forward pedal-stick gesture supplies full acceleration without a brake input");
+        drive=pedals.update(heldShot,.59f,true,true);
+        expect(drive.rightTrigger>=126&&drive.rightTrigger<=128&&drive.leftTrigger==0,
+            "the vehicle pedal stick retains proportional acceleration between neutral and full travel");
+        drive=pedals.update(heldShot,-1.f,true,true);
+        expect(drive.leftTrigger==255&&drive.rightTrigger==0,
+            "backward pedal-stick travel supplies brake or reverse without simultaneous acceleration");
+        drive=pedals.update(heldShot,.1f,true,true);
+        expect(drive.leftTrigger==0&&drive.rightTrigger==0,
+            "small centered pedal-stick motion leaves both native pedals released");
+        drive=pedals.update(heldShot,0.f,false,true);
+        expect(drive.leftTrigger==0&&drive.rightTrigger==0,
+            "stowing the vehicle gun cannot convert either held trigger into a pedal");
+        drive=pedals.update(heldShot,0.f,false,true);
+        expect(drive.leftTrigger==0&&drive.rightTrigger==0,
+            "held triggers remain blocked across later native polls after gun stow");
+        auto brakeHeld=heldShot;brakeHeld.rightTrigger=0;
+        drive=pedals.update(brakeHeld,0.f,false,true);
+        expect(drive.leftTrigger==0&&drive.rightTrigger==0,
+            "releasing only the firing trigger cannot restore pedals while the other trigger is still held");
+        auto released=heldShot;released.leftTrigger=released.rightTrigger=0;
+        pedals.update(released,0.f,false,true);
+        auto freshAccelerator=released;freshAccelerator.rightTrigger=220;
+        drive=pedals.update(freshAccelerator,0.f,false,true);
+        expect(drive==freshAccelerator,
+            "after both triggers release, a fresh trigger press restores ordinary vehicle pedals unchanged");
+
+        pedals.update(heldShot,0.f,true,true);
+        drive=pedals.update(heldShot,0.f,false,false);
+        expect(drive==heldShot,
+            "temporary pedal unavailability leaves the other input context's sample unchanged");
+        pedals.update(released,0.f,false,false);
+        drive=pedals.update(heldShot,0.f,false,true);
+        expect(drive.leftTrigger==0&&drive.rightTrigger==0,
+            "resuming pedal input after another context cannot reinterpret held firing triggers as pedals");
+        drive=pedals.update(heldShot,0.f,false,true);
+        expect(drive.leftTrigger==0&&drive.rightTrigger==0,
+            "the resumed pedal owner keeps its release latch until both triggers release in that context");
+        pedals.update(released,0.f,false,true);
+        drive=pedals.update(freshAccelerator,0.f,false,true);
+        expect(drive==freshAccelerator,
+            "a fresh trigger press restores pedals after release in the resumed input context");
+    }
+    {
         WheelSteering steering;const Pose contact{{},{-.2f,-.3f,.5f}};
         steering.update(contact,contact,true,false,100,1);
         auto wheel=steering.update(contact,contact,true,true,111,1);
         expect(wheel.gripped&&wheel.engaged&&wheel.axis==0,"fresh near-wheel grip acquires without steering jump");
         auto turn=contact;turn.orientation={0,0,-.258819f,.965926f};
         wheel=steering.update(turn,contact,true,true,122,1);
-        expect(wheel.gripped&&!wheel.engaged&&std::abs(wheel.axis-.5f)<.001f,"clockwise hand roll turns the wheel right");
+        expect(wheel.gripped&&!wheel.engaged&&std::abs(wheel.axis-30.f/35.f)<.001f,"one-hand steering reaches useful range with a thirty-degree wrist turn");
         const auto lookAway=steering.update(turn,contact,true,true,127,1,Vec3{1,0,0});
         expect(near(lookAway.axis,wheel.axis),"head turns while holding cannot change the steering basis");
         turn.orientation={0,0,.258819f,.965926f};
-        expect(std::abs(steering.update(turn,contact,true,true,129,1).axis+.5f)<.001f,"counterclockwise hand roll turns left");
+        expect(std::abs(steering.update(turn,contact,true,true,129,1).axis+30.f/35.f)<.001f,"counterclockwise hand roll has the same increased range");
         expect(!steering.update(turn,contact,true,false,133,1).gripped,"releasing the grip releases the wheel");
         turn.position.x+=1;
         expect(!steering.update(turn,contact,true,true,144,1).gripped,"distant squeezing cannot snap to the wheel");
@@ -605,6 +759,12 @@ int main(){
         steering.update(contact,contact,true,true,166,1);
         expect(!steering.update(contact,contact,false,true,177,1).gripped,"tracking or vehicle loss releases the wheel");
         expect(!steering.update(contact,contact,true,true,188,1).gripped,"held grip cannot reattach after tracking loss");
+        WheelSteering joining;
+        joining.update(contact,contact,true,false,200,1);
+        const auto joined=joining.update(contact,contact,true,true,210,1,{0,0,-1},35.f,.6f);
+        expect(joined.gripped&&near(joined.axis,.6f),"second hand takes the current steering angle without straightening the vehicle");
+        turn=contact;turn.orientation={0,0,-.70710678f,.70710678f};
+        expect(near(joining.update(turn,contact,true,true,220,1).axis,1.f),"wheel response remains clamped at native full lock");
         RumbleMailbox rumble;rumble.publish({.4f,.2f,100});
         expect(rumble.read(110).low==.4f&&rumble.read(351).low==0,"native rumble expires without a new game sample");
     }
@@ -1252,6 +1412,27 @@ int main(){
     expect(displayed.accept(pair,7,4,110),"a fresh joined stereo transaction is accepted");
     expect(displayed.presentable(7,4,601)&&displayed.presentable(7,4,5100),
         "a runtime stall beyond500ms reprojects the accepted image instead of blinking black");
+    {
+        AcceptedStereoFrame idle;
+        expect(idle.accept(pair,7,4,110,42),"idle recovery starts with a valid joined stereo pair in its reference space");
+        HeadCameraStatus lost{};lost.active=true;lost.suspended=true;lost.activation=4;
+        lost.reason=HeadCameraStop::trackingLost;
+        expect(mayReprojectAcceptedStereo(lost)&&idle.presentable(7,4,7110,42)
+            &&!mayAcceptNewStereoPair(lost),"head or view validity loss retains original stereo without admitting untracked pixels");
+        expect(!idle.presentable(7,4,7110,43)&&!idle.presentable(7,4,7110)
+            &&!idle.presentable(8,4,7110,42)&&!idle.presentable(7,5,7110,42)
+            &&!idle.presentable(7,4,99,42),"tracking loss cannot reuse pixels across reference spaces, graphics resets, camera changes or clock reversal");
+        expect(idle.eyes()[0].sampleTime==100&&idle.eyes()[0].trackingSequence==31
+            &&near(idle.eyes()[0].view.pose.position.x,-.032f)
+            &&near(idle.eyes()[1].view.pose.position.x,.032f),"idle retention preserves original time, generation and both eye offsets");
+        for(auto reason:{HeadCameraStop::cameraChanged,HeadCameraStop::matrixMismatch,
+            HeadCameraStop::clockMismatch,HeadCameraStop::sceneUnavailable,HeadCameraStop::manual}){
+            lost.reason=reason;
+            expect(!mayReprojectAcceptedStereo(lost),"tracking continuity cannot authorize another camera or invalid scene");
+        }
+        lost.reason=HeadCameraStop::trackingLost;lost.active=false;
+        expect(!mayReprojectAcceptedStereo(lost),"an inactive camera cannot revive stereo after tracking loss");
+    }
     HeadCameraStatus delayedMismatch{};delayedMismatch.active=true;delayedMismatch.suspended=true;
     delayedMismatch.reason=HeadCameraStop::rigFrameMismatch;delayedMismatch.activation=4;
     delayedMismatch.rigRejectFlags=10;delayedMismatch.rigAgeMs=151;
@@ -1319,7 +1500,7 @@ int main(){
         expect(!handoff.accept(nextShot,7,5,870,42)&&!handoff.transitionPresentable(7,5,5,42,870),
             "a broken new stereo join cannot replace old pixels or refresh the transition deadline");
         nextShot[1].trackingSequence=31;
-        expect(handoff.accept(nextShot,7,5,870,42)&&handoff.presentable(7,5,870)
+        expect(handoff.accept(nextShot,7,5,870,42)&&handoff.presentable(7,5,870,42)
             &&!handoff.transitionPresentable(7,5,5,42,870),"a fresh complete shot replaces the transition immediately");
         expect(handoff.transitionPresentable(7,6,6,42,900),"a later cut can retain its own newly accepted source image");
         handoff.clear();
@@ -1954,6 +2135,44 @@ int main(){
         advanceCabinWalk(failClosed,{},{},{0,1},1000,1,unavailable);
         position=advanceCabinWalk(failClosed,{},{},{0,1},1050,1,unavailable);
         expect(same(position,{}),"unavailable native clearance fails closed without cabin movement");
+        CabinWalkState menuWalk{};
+        unsigned movementQueries=0;
+        const auto countedResolve=[&](Vec3 a,Vec3 b){++movementQueries;return resolve(a,b);};
+        advanceCabinWalk(menuWalk,{},{},{0,0},1000,1,countedResolve,1.f);
+        const auto menuAnchor=advanceCabinWalk(menuWalk,{},{},{0,1},1050,1,countedResolve,1.f);
+        const auto queriesBeforeMenu=movementQueries;
+        const auto offsetBeforeMenu=menuWalk.offset;
+        const auto menuPosition=advanceCabinWalk(menuWalk,menuAnchor,{},{0,1},5000,1,countedResolve,1.f,true);
+        expect(same(menuPosition,menuAnchor)&&same(menuWalk.offset,offsetBeforeMenu)
+            &&movementQueries==queriesBeforeMenu,
+            "opening an ACC menu preserves the walked anchor without adding the offset twice or querying movement");
+        const auto menuNavigation=advanceCabinWalk(menuWalk,menuAnchor,{},{1,-1},10000,1,countedResolve,1.f,true);
+        expect(same(menuNavigation,menuAnchor)&&movementQueries==queriesBeforeMenu,
+            "ACC menu navigation cannot move or collide the cabin camera");
+        const auto stowed=advanceCabinWalk(menuWalk,{},{},{0,0},10010,1,countedResolve,1.f);
+        expect(same(stowed,menuAnchor),"stowing an ACC menu restores the single preserved cabin walk offset");
+        const auto resumed=advanceCabinWalk(menuWalk,{},{},{0,1},10020,1,countedResolve,1.f);
+        expect(near(resumed.z,menuAnchor.z+.01f),"cabin walking resumes without accumulating time spent in a menu");
+    }
+    {
+        CabinWalkState flight{};
+        const auto clear=[](Vec3,Vec3 to)->std::optional<Vec3>{return to;};
+        const auto blocked=[](Vec3,Vec3)->std::optional<Vec3>{return {};};
+        advanceCabinWalk(flight,{10,20,30},{},{},1000,1,clear,1.f,false,true);
+        const auto walked=advanceCabinWalk(flight,{10,20,30},{},{0,1},1050,1,clear,1.f,false,true);
+        expect(near(walked.z,30.05f),"a passenger can walk inside the moving cabin");
+        const auto carried=advanceCabinWalk(flight,{12,21,35},{},{},1100,1,blocked,1.f,false,true);
+        expect(same(carried,{12,21,35.05f}),
+            "native cabin translation carries the accepted offset even without a new walking step");
+        const Quat quarterTurn{0,.70710678f,0,.70710678f};
+        const auto turned=advanceCabinWalk(flight,{12,21,35},quarterTurn,{},1150,1,blocked,1.f,false,true);
+        expect(same(turned,{12.05f,21,35}),"cabin rotation carries the passenger offset with the helicopter");
+        const auto rebased=advanceCabinWalk(flight,{100,21,35},quarterTurn,{},1200,1,clear,1.f,false,true);
+        expect(same(rebased,{100,21,35})&&same(flight.offset,{}),
+            "a discontinuous native flight transition clears stale passenger offset");
+        advanceCabinWalk(flight,{100,21,35},quarterTurn,{0,1},1250,1,clear,1.f,false,true);
+        const auto fresh=advanceCabinWalk(flight,{101,21,35},quarterTurn,{},1300,2,clear,1.f,false,true);
+        expect(same(fresh,{101,21,35}),"a new cabin owner cannot inherit the previous flight offset");
     }
     {
         CabinTurn turn;
@@ -1969,6 +2188,140 @@ int main(){
         expect(near(turn.update({1,0},2,30,true,2150,1),0),"turning off disables cabin stick yaw");
         turn.update({0,0},1,30,true,2160,1);
         expect(near(turn.update({1,0},1,30,true,2170,2),0),"new cabin generation discards an armed stick");
+    }
+    {
+        HeadCamera driver;driver.configure(true,1,true);
+        ControllerFrame input;input.vehicleControls=true;input.vehicleMounted=true;input.handheldMenus=true;
+        input.referenceEpoch=1;input.predictedXrTime=1;
+        auto root=identityMatrix;root[12]=100.f;
+        root[0]=root[10]=0;root[2]=-1;root[8]=1;
+        auto head=identityMatrix;head[13]=1.6f;
+        const Pose chase{{0,1,0,0},{94.f,3.f,-8.f}};
+        driver.trackStereo({},rigEyes,true,100,input);driver.toggle();
+        expect(driver.publishPlayerHead(31,42,chase,root,head,100),"driver skin joins the native vehicle chase camera");
+        const auto seated=driver.resolve(31,chase,100);
+        expect(seated.applied&&same(rotate(seated.nativePose.orientation,{0,0,1}),Vec3{1,0,0}),
+            "vehicle first-person eyes face the authored seated player rather than the backward chase-camera orbit");
+        expect(same(seated.nativePose.position,seated.playerHead),
+            "a seated driver uses the native head rather than the standing backward/height fit that places the wheel beyond reach");
+        driver.setNativeMenuOpen(true,true);
+        root[12]+=3.f;
+        Pose movingChase{{0,std::sin(-1.f),0,std::cos(-1.f)},{97.f,3.f,-8.f}};
+        driver.trackStereo({},rigEyes,true,110,input);
+        driver.publishPlayerHead(31,42,movingChase,root,head,110);
+        const auto phone=driver.resolve(31,movingChase,110);
+        expect(seated.applied&&phone.applied&&phone.menuIdroid
+            &&same(phone.nativePose.position,seated.nativePose.position+Vec3{3.f,0,0})
+            &&phone.playerOwner==42&&phone.playerSequence>seated.playerSequence,
+            "handheld iDroid follows the live seated head rather than moving VR outside to the vehicle chase boom");
+        expect(same(rotate(phone.nativePose.orientation,{0,0,1}),Vec3{1,0,0}),
+            "opening the live vehicle iDroid cannot turn the seated eyes toward its unrelated native camera orbit");
+        input.vehicleViewInput={.5f,0};
+        movingChase.orientation={0,std::sin(-.9f),0,std::cos(-.9f)};
+        driver.trackStereo({},rigEyes,true,120,input);
+        driver.publishPlayerHead(31,42,movingChase,root,head,120);
+        const auto looking=driver.resolve(31,movingChase,120);
+        expect(looking.applied&&same(rotate(looking.nativePose.orientation,{0,0,1}),
+                Vec3{std::cos(.2f),0,-std::sin(.2f)}),
+            "deliberate vehicle right-stick native look retains its angular response in the seated VR view");
+        input.vehicleViewInput={};
+        root[0]=root[10]=-std::sin(.2f);root[2]=-std::cos(.2f);root[8]=std::cos(.2f);
+        movingChase.orientation={0,std::sin(-.8f),0,std::cos(-.8f)};
+        driver.trackStereo({},rigEyes,true,130,input);
+        driver.publishPlayerHead(31,42,movingChase,root,head,130);
+        const auto turning=driver.resolve(31,movingChase,130);
+        expect(turning.applied&&same(rotate(turning.nativePose.orientation,{0,0,1}),
+                Vec3{std::cos(.4f),0,-std::sin(.4f)}),
+            "vehicle heading advances once while the native look offset remains relative to the seated body");
+        input.vehicleControls=false;
+        movingChase.orientation={0,std::sin(-.2f),0,std::cos(-.2f)};
+        driver.trackStereo({},rigEyes,true,390,input);
+        driver.publishPlayerHead(31,42,movingChase,root,head,390);
+        const auto focusedPhone=driver.resolve(31,movingChase,390);
+        expect(focusedPhone.applied&&same(focusedPhone.nativePose.position,focusedPhone.playerHead)
+            &&same(rotate(focusedPhone.nativePose.orientation,{0,0,1}),
+                rotate(turning.nativePose.orientation,{0,0,1})),
+            "iDroid input focus preserves the occupied seat and facing through an unrelated native camera orbit");
+        const auto passive=passiveControllerFrame(input,2,1);
+        expect(passive.vehicleMounted&&!passive.vehicleControls,
+            "a focus overlay retains native vehicle occupancy while releasing vehicle input");
+        auto unmatched=movingChase;unmatched.position.x+=1.f;
+        driver.trackStereo({},rigEyes,true,400,input);
+        expect(!driver.resolve(31,unmatched,400).applied
+            &&driver.status().reason==HeadCameraStop::playerHeadUnavailable,
+            "moving handheld vehicle eyes reject an unmatched native camera/player transaction");
+    }
+    {
+        HeadCamera guide;guide.configure(true,1,true);
+        ControllerFrame input;input.handheldMenus=true;input.referenceEpoch=1;
+        input.predictedXrTime=1;input.presentationFocused=true;input.presentationEpoch=1;
+        guide.trackStereo({},rigEyes,true,100,input);guide.toggle();
+        expect(guide.publishPlayerHead(31,42,thirdPerson,playerRoot,headBone,100),
+            "forced-guide fixture starts with the accepted field player");
+        const auto field=guide.resolve(31,thirdPerson,100);
+        guide.setNativeMenuOpen(true,true);
+        const auto phone=guide.resolve(31,thirdPerson,100);
+        expect(field.applied&&phone.applied&&phone.menuIdroid&&!phone.menuWorldQuad,
+            "ordinary iDroid keeps its existing handheld presentation");
+        guide.setNativeMenuOpen(true,true,true);
+        input.predictedXrTime=2;
+        guide.trackStereo(Pose{{},{.04f,0,0}},rigEyes,true,400,input);
+        const auto help=guide.resolve(31,thirdPerson,400);
+        expect(help.applied&&help.menuOpen&&help.menuWorldQuad&&!help.menuIdroid
+            &&!guide.status().suspended&&help.trackingSequence>phone.trackingSequence,
+            "Help over a still-open iDroid keeps fresh head motion after native player skin pauses");
+        const PausedRigOwner owner{31,42,phone.activation,input.referenceEpoch,100,phone.menuGeneration};
+        expect(mayRefreshPausedRig(owner,31,help,400),
+            "forced-guide overlap admits the exact owned paused skin for a fresh hand solve");
+        guide.setNativeMenuOpen(true,true,false,true);
+        const auto pausedPhone=guide.resolve(31,thirdPerson,400);
+        expect(pausedPhone.applied&&pausedPhone.menuIdroid&&!pausedPhone.menuWorldQuad
+            &&!guide.status().suspended&&same(pausedPhone.nativePose.position,help.nativePose.position)
+            &&mayRefreshPausedRig(owner,31,pausedPhone,400),
+            "closing Help preserves the physical handset and fresh rig while the native guide still pauses gameplay");
+        expect(guide.publishRigFrame(31,42,thirdPerson,pausedPhone)
+            &&guide.publishedRigFrame(400).has_value(),
+            "a freshly solved paused guide rig remains available to the native handset publisher");
+        expect(!guide.publishedRigFrame(551),
+            "a paused tutorial cannot make an old tracked rig current");
+        expect(!guide.resolve(99,thirdPerson,400).applied,
+            "a tutorial pause cannot lend its accepted anchor to another camera");
+        guide.setNativeMenuOpen(true,true,false);
+        expect(!guide.resolve(31,thirdPerson,400).applied,
+            "returning from Help cannot reuse an old player head as live handheld motion");
+        guide.publishPlayerHead(31,42,thirdPerson,playerRoot,headBone,400);
+        const auto reopened=guide.resolve(31,thirdPerson,400);
+        expect(reopened.applied&&reopened.menuIdroid&&!reopened.menuWorldQuad
+            &&!guide.status().suspended,
+            "native player resumption returns the same terminal to the tracked LEFT handset");
+    }
+    for(const bool handheld:{false,true}){
+        HeadCamera cabin;cabin.configure(true,1,true);
+        ControllerFrame input;input.cabinPlay=true;input.handheldMenus=handheld;
+        input.referenceEpoch=1;input.predictedXrTime=1;
+        const Pose cabinSource{{0,-.952008f,0,.306075f},{.544129f,1198.19f,.441583f}};
+        const Pose phoneSource{{},{.04177f,1198.34f,-1.04204f}};
+        auto root=identityMatrix;root[13]=1198.f;
+        auto head=identityMatrix;head[13]=.34f;
+        cabin.trackStereo({},rigEyes,true,100,input);cabin.toggle();
+        cabin.publishPlayerHead(11,22,cabinSource,root,head,100);
+        auto walked=cabin.resolve(11,cabinSource,100);
+        walked.nativePose.position=walked.nativePose.position+Vec3{.2f,0,.1f};
+        expect(cabin.publishRigFrame(11,22,cabinSource,walked),"publish the walked ACC viewpoint before iDroid");
+        walked=cabin.resolve(11,cabinSource,100);
+        cabin.setNativeMenuOpen(true,true);cabin.trackStereo({},rigEyes,true,110,input);
+        const auto opened=cabin.resolve(11,phoneSource,110);
+        expect(opened.applied&&same(opened.nativePose.position,walked.nativePose.position)
+            &&same(rotate(opened.nativePose.orientation,{0,0,1}),rotate(walked.nativePose.orientation,{0,0,1})),
+            "both ACC iDroid modes preserve the walked view when the native phone camera changes position and heading");
+        const Pose lean{{0,.13052619f,0,.99144486f},{.12f,0,.03f}};
+        cabin.trackStereo(lean,rigEyes,true,120,input);
+        const auto moved=cabin.resolve(11,phoneSource,120);
+        const Pose basis{{0,1,0,0},{}};
+        const auto expected=compose(walked.nativePose,compose(compose(basis,lean),inverse(basis)));
+        expect(moved.applied&&same(moved.nativePose.position,expected.position)
+            &&same(rotate(moved.nativePose.orientation,{0,0,1}),rotate(expected.orientation,{0,0,1})),
+            "anchored ACC menus still follow physical HMD lean and rotation");
     }
     {
         HeadCamera cabinCamera;cabinCamera.configure(true);
@@ -2504,13 +2857,100 @@ int main(){
     vehicleEquipment.update({},false,false,TravelMode::vehicle);
     const auto vehicleAttack=vehicleEquipment.update(GamepadSample{0x4000},false,true,TravelMode::vehicle);
     expect((vehicleAttack.gamepad.buttons&0x0100)!=0,
-           "vehicle weapon or radio remains reachable while the right-hand equipment modifier is held");
+           "vehicle weapon or radio remains reachable without reopening the equipment picker");
+    {
+        RigInput driver;driver.update({},false,false,TravelMode::vehicle,100);
+        wheelMailbox().publish({.6f,true,false,100,1,3});
+        auto nearWheel=driver.update({},true,true,TravelMode::vehicle,110);
+        expect(nearWheel.rightWheelGrip&&!nearWheel.vehicleWeaponIntent&&!nearWheel.weaponReady
+            &&driver.equipmentPhase()==0&&nearWheel.gamepad.leftX==static_cast<int16_t>(.6f*32767),
+            "right squeeze near an empty wheel joins steering without equipment or weapon actions");
+        wheelMailbox().publish({0,false,false,120,0,0});
+        nearWheel=driver.update({},false,true,TravelMode::vehicle,125);
+        expect(nearWheel.rightWheelGrip&&!nearWheel.vehicleWeaponIntent,
+            "pulling away cannot reinterpret the held wheel squeeze as a weapon request");
+        driver.update({},false,false,TravelMode::vehicle,130);
+        const auto weapon=driver.update({},false,true,TravelMode::vehicle,140);
+        expect(!weapon.rightWheelGrip&&weapon.vehicleWeaponIntent&&!weapon.weaponReady&&driver.equipmentPhase()==0,
+            "fresh squeeze away from wheel requests only the native firearm adapter, not driving triggers or equipment");
+        wheelMailbox().publish({0,false,false,150,0,3});
+        const auto heldWeapon=driver.update({},false,true,TravelMode::vehicle,155);
+        expect(heldWeapon.vehicleWeaponIntent&&!heldWeapon.rightWheelGrip,
+            "a held weapon request cannot snap the right hand onto the wheel");
+        driver.update({},false,false,TravelMode::vehicle,160);
+        const auto readyBinding=driver.update({},false,true,TravelMode::vehicle,170,0,false,false,true);
+        expect(readyBinding.vehicleWeaponIntent&&!readyBinding.rightWheelGrip,
+            "remapped ready-only control stays a weapon request even beside the wheel");
+        driver.suspend();
+        expect(!driver.update({},false,true,TravelMode::vehicle,180).vehicleWeaponIntent,
+            "focus loss consumes the held squeeze until the player releases it");
+        wheelMailbox().publish({});
+    }
+    {
+        RigInput picker;picker.update({},false,false,TravelMode::vehicle,100);
+        GamepadSample controls{0x4000,255,255,20000,18000,0,0};
+        const auto opened=picker.update(controls,true,true,TravelMode::vehicle,110,0,false,true,true,true);
+        expect(picker.equipmentPhase()==1&&!opened.rightWheelGrip&&!opened.vehicleWeaponIntent
+            &&!opened.gamepad.leftTrigger&&!opened.gamepad.rightTrigger
+            &&!opened.gamepad.leftX&&!opened.gamepad.leftY&&!(opened.gamepad.buttons&0x300),
+            "an explicit vehicle picker binding consumes pedal, wheel, firearm and vehicle attack inputs");
+        const auto released=picker.update(controls,true,true,TravelMode::vehicle,120);
+        expect(!released.rightWheelGrip&&!released.vehicleWeaponIntent
+            &&!released.gamepad.leftTrigger&&!released.gamepad.rightTrigger&&!(released.gamepad.buttons&0x100),
+            "releasing a picker chord cannot reinterpret held grip, pedals or X as vehicle actions");
+        picker.update({},false,false,TravelMode::vehicle,130);
+        expect(picker.update(triggerOnly,false,false,TravelMode::vehicle,140).gamepad.rightTrigger==255,
+            "fresh pedal input resumes after the explicit vehicle picker closes");
+    }
     expect(mountedViewOwnsRightStick(TravelMode::vehicle,true,false,false)
         &&mountedViewOwnsRightStick(TravelMode::horse,true,false,false)
+        &&mountedViewOwnsRightStick(TravelMode::nativeAction,true,false,false)
         &&!mountedViewOwnsRightStick(TravelMode::onFoot,true,false,false)
         &&!mountedViewOwnsRightStick(TravelMode::vehicle,true,false,true)
         &&!mountedViewOwnsRightStick(TravelMode::vehicle,true,true,false),
            "mounted camera and turret axes stay native while menus and native input retain ownership");
+    {
+        std::array<uint32_t,5> status{};
+        const auto set=[&](unsigned bit,bool value=true){
+            if(value)status[bit/32]|=1u<<(bit%32);
+            else status[bit/32]&=~(1u<<(bit%32));
+        };
+        set(4);set(145);set(7);
+        expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,"ordinary standing action keeps tracked foot aiming");
+        set(7,false);
+        expect(travelModeFromPlayerStatus(status)==TravelMode::nativeAction,"observed mortar standing action keeps both native aiming axes");
+        for(const auto bit:{134u,87u,88u,83u,58u,56u,59u}){
+            set(bit);
+            expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,"carry, CQC, treatment and optics do not acquire stationary aim");
+            set(bit,false);
+        }
+        set(145,false);
+        expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,"inactive character parts cannot acquire stationary aim");
+        set(145);set(4,false);
+        expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,"non-standing action cannot acquire stationary aim");
+        set(4);set(26);
+        expect(travelModeFromPlayerStatus(status)==TravelMode::vehicle,"vehicle ownership remains authoritative");
+        set(26,false);set(25);
+        expect(travelModeFromPlayerStatus(status)==TravelMode::horse,"horse ownership remains authoritative");
+        set(37);
+        expect(travelModeFromPlayerStatus(status)==TravelMode::unknown,"unavailable native player status rejects aim ownership");
+        RigInput stationaryInput;
+        stationaryInput.update({},false,false,TravelMode::nativeAction);
+        GamepadSample aim{};aim.rightX=15000;aim.rightY=-17000;
+        const auto mountedAim=stationaryInput.update(aim,false,true,TravelMode::nativeAction);
+        expect(mountedAim.gamepad.rightX==15000&&mountedAim.gamepad.rightY==-17000&&mountedAim.gamepad.leftTrigger==255,
+            "stationary VR ready grip retains azimuth, elevation and native aim trigger");
+        expect(stationaryInput.update(aim,false,true,TravelMode::onFoot).gamepad.rightY==-17000,
+            "stationary action retains the on-foot button owner through entry and exit");
+        RigInput contextInput;
+        contextInput.update({},false,false,TravelMode::onFoot);
+        GamepadSample interact{};interact.buttons=0x8000;
+        expect(contextInput.update(interact,false,false,TravelMode::onFoot).gamepad.buttons==0x8000
+            &&contextInput.update(interact,false,false,TravelMode::nativeAction).gamepad.buttons==0x8000,
+            "native standing action cannot cancel the Y hold that mounts it");
+        expect(contextInput.update(interact,false,false,TravelMode::onFoot).gamepad.buttons==0x8000,
+            "native exit completes through the same on-foot interaction binding");
+    }
     expect(travelInput.update(brakeOnly,false,true,TravelMode::onFoot).gamepad==GamepadSample{},
            "exiting a vehicle releases brake and grip inputs before restoring foot controls");
     travelInput.update({},false,false,TravelMode::onFoot);
@@ -3178,6 +3618,44 @@ int main(){
         }
         expect(matchesNativeIdroidMount(0x1c68632c5c53ull,0x0004000038b1433cull,12),
             "observed retail iDroid CNP variant is decoded from its packed native anchor");
+        {
+            std::array<uint32_t,132> names{};std::array<int32_t,132> parents{};
+            names[8]=0x3e2d77e5u;
+            std::array<Pose,132> joints{};
+            for(const auto& joint:nativeIdroidLeftHand){
+                names[joint.bone]=joint.name;parents[joint.bone]=joint.parent;
+                joints[joint.bone]=compose(joints[joint.parent],joint.local);
+            }
+            expect(matchesNativeIdroidLeftHand(names,parents),"cinematic contact admits its exact left-hand skeleton");
+            names[8]=0x38b1433cu;
+            expect(!matchesNativeIdroidLeftHand(names,parents),"right wrist cannot admit left-hand cinematic contact");
+            names[8]=0x3e2d77e5u;parents[34]=8;
+            expect(!matchesNativeIdroidLeftHand(names,parents),"ring/little base mismatch cannot authorize authored fingers");
+            expect(same(joints[23].position,{.057982051f,-.033873722f,.082693118f})
+                &&same(joints[36].position,{.097089701f,-.036415569f,-.036994296f}),
+                "left thumb and little fingertip reconstruct the independently measured cinematic palette");
+            const auto wristFromGrip=nativeIdroidLeftWristFromGrip();
+            const Pose tracked{binocularGripRotation(25,-30,40),{80.2f,331.f,94.5f}};
+            const auto wrist=wristFromGrip?compose(tracked,*wristFromGrip):Pose{};
+            const auto leftContactPalm=anatomicalGrip(wrist,compose(wrist,joints[24]).position,compose(wrist,joints[34]).position);
+            expect(wristFromGrip&&leftContactPalm&&same(leftContactPalm->position,tracked.position)
+                &&same(rotate(leftContactPalm->orientation,{0,1,0}),rotate(tracked.orientation,{0,1,0})),
+                "cupped cinematic palm keeps the tracked left grip through combined rotation and translation");
+            const auto handset=compose(wrist,nativeIdroidLeftBodyInWrist);
+            const auto contact=compose(inverse(wrist),handset);
+            expect(same(contact.position,{.066569098f,-.021187740f,.004362963f})
+                &&same(rotate(contact.orientation,{0,0,1}),{.038529198f,-.999120233f,.016633254f}),
+                "left handset uses the captured native contact basis, not a mirrored ordinary right CNP");
+            const Pose leftPointing{binocularGripRotation(-10,20,5),{3,4,5}};
+            const auto naturalWrist=nativeIdroidLeftHandheldWrist(tracked,leftPointing);
+            const auto naturalBody=naturalWrist?compose(*naturalWrist,nativeIdroidLeftBodyInWrist):Pose{};
+            const auto naturalPalm=naturalWrist&&wristFromGrip?compose(*naturalWrist,inverse(*wristFromGrip)):Pose{};
+            expect(naturalWrist&&same(naturalPalm.position,tracked.position)
+                &&same(rotate(naturalBody.orientation,{0,1,0}),rotate(leftPointing.orientation,{0,1,0})),
+                "runtime grip cant keeps the authored left cup at the grip while the handset follows its aim basis");
+            expect(!nativeIdroidLeftHandheldWrist(tracked,Pose{{0,0,0,0},{}}),
+                "missing left aim cannot invent a held cinematic handset orientation");
+        }
         expect(!matchesNativeIdroidMount(0x1c68632c5c53ull,0x0003000038b1433cull,12)
             &&!matchesNativeIdroidMount(0x436a694680a8ull,0x0004000038b1433cull,12)
             &&!matchesNativeIdroidMount(0x1c68632c5c53ull,0x0004000038b1433cull,8),
@@ -3190,6 +3668,39 @@ int main(){
         expect(body&&near(body->position.y,-.087803796f)&&near(body->position.z,.500741f),
             "device root retains the measured retail connector offset instead of using the palm center");
         expect(!idroidBodyFromConnector(Pose{{0,0,0,0},{}}),"invalid native connector cannot place a device");
+        {
+            const auto matrix=[](Pose p){
+                const auto x=rotate(p.orientation,{1,0,0}),y=rotate(p.orientation,{0,1,0}),z=rotate(p.orientation,{0,0,1});
+                return std::array<float,16>{x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,p.position.x,p.position.y,p.position.z,1};
+            };
+            const Pose handsetBinding{binocularGripRotation(10,-35,5),{80,330,95}};
+            const Pose frozenBody{binocularGripRotation(-25,5,10),{.2f,1.1f,.4f}};
+            const Pose antennaLocal{binocularGripRotation(0,0,15),{0,.07f,0}};
+            const Pose desired{binocularGripRotation(20,55,-30),{80.3f,331.2f,94.8f}};
+            for(const uint8_t flags:{uint8_t{0},uint8_t{1}}){
+                const auto old=flags?frozenBody:compose(handsetBinding,frozenBody);
+                const auto oldAntenna=compose(old,antennaLocal);
+                const auto delta=nativeIdroidAttachmentDelta(matrix(old),matrix(handsetBinding),flags,desired);
+                const auto updated=delta?nativeAffinePose(nativeIdroidWorldMatrix(matrix(old),*delta,1)):std::nullopt;
+                const auto world=updated?(flags?compose(handsetBinding,*updated):*updated):Pose{};
+                expect(updated&&same(world.position,desired.position)
+                    &&same(rotate(world.orientation,{0,1,0}),rotate(desired.orientation,{0,1,0})),
+                    "paused handset delta moves the native root with the wrist in local and world bindings");
+                const auto antenna=delta?nativeAffinePose(nativeIdroidWorldMatrix(matrix(oldAntenna),*delta,1)):std::nullopt;
+                const auto relative=antenna&&updated?compose(inverse(*updated),*antenna):Pose{};
+                expect(antenna&&same(relative.position,antennaLocal.position)
+                    &&same(rotate(relative.orientation,{1,0,0}),rotate(antennaLocal.orientation,{1,0,0})),
+                    "handset refresh preserves the native internal antenna animation");
+                const auto repeated=updated?nativeIdroidAttachmentDelta(matrix(*updated),matrix(handsetBinding),flags,desired):std::nullopt;
+                expect(repeated&&same(nativeAffinePose(*repeated)->position,{})
+                    &&same(rotate(nativeAffinePose(*repeated)->orientation,{0,0,1}),{0,0,1}),
+                    "repeated paused refresh is an identity delta, not compounded attachment motion");
+            }
+            expect(!nativeIdroidAttachmentDelta({},matrix(handsetBinding),1,desired)
+                &&!nativeIdroidAttachmentDelta(matrix(frozenBody),{},1,desired)
+                &&!nativeIdroidAttachmentDelta(matrix(frozenBody),matrix(handsetBinding),1,Pose{{0,0,0,0},{}}),
+                "unverified handset or binding transforms never authorize a native delta");
+        }
         const Pose cantedGrip{{.5f,0,0,.8660254f},{.1f,-.2f,-.5f}};
         const Pose pointing{{},{.3f,.4f,.5f}};
         const auto naturalContact=idroidGripContact(cantedGrip,pointing);
@@ -3205,10 +3716,14 @@ int main(){
             "lost controller aim cannot invent a native device holding frame");
         frame.idroidDeviceTracked=true;frame.idroidDevice=body?*body:Pose{};
         const auto idroid=trackedIdroidPose(frame);
-        expect(idroid&&same(idroid->screen.position,{.1199944f,.082137202f,.593090601f})
+        expect(idroid&&same(idroid->screen.position,{.1199944f,.082137202f,.603090601f})
             &&same(rotate(idroid->screen.orientation,{0,1,0}),{0,1,0})
             &&same(rotate(idroid->screen.orientation,{0,0,1}),{0,0,1}),
             "iDroid lower edge meets the projector height instead of centering the menu through the hand");
+        const auto nativeProjectionRoot=compose(idroidHologramInBody,Pose{{},{0,0,idroidNativeProjectionDepth}});
+        expect(same(nativeProjectionRoot.position,{0,.043378498f,.102349601f})
+            &&near(frame.controllers.idroidScreenDepth,idroidNativeProjectionDepth),
+            "default projection root matches the recovered cinematic UI transform in handset space");
         const Pose nativeFromLocal{{0,1,0,0},{}};
         if(idroid)right.aim=compose(inverse(nativeFromLocal),compose(idroid->screen,Pose{{},{0,0,.25f}}));
         const auto idroidHit=trackedIdroidRay(frame);
@@ -3256,7 +3771,7 @@ int main(){
         const auto mount=compose(frame.idroidDevice,idroidHologramInBody);
         expect(shiftedDisplay&&fittedDisplay&&same(shiftedDisplay->body.position,fittedDisplay->body.position)
             &&same(compose(inverse(mount),shiftedDisplay->screen).position,
-                Vec3{.06f,-.03f,.08f}+rotate(frame.controllers.idroidScreenRotation,{0,.6f*9.f/32.f,0})),
+                Vec3{.06f,-.03f,.09f}+rotate(frame.controllers.idroidScreenRotation,{0,.6f*9.f/32.f,0})),
             "fit adjustments operate in the native hologram socket frame");
         frame.controllers.idroidScreenWidth=std::numeric_limits<float>::infinity();
         expect(!trackedIdroidPose(frame),"invalid projection size cannot publish a detached or infinite display");
@@ -3265,6 +3780,9 @@ int main(){
         expect(!trackedIdroidPose(frame),"invalid iDroid fit cannot publish a broken display transform");
         frame.controllers.idroidScreenOffset={};frame.idroidDeviceTracked=false;
         expect(!trackedIdroidPose(frame),"a stowed or unverified device cannot retain its previous projection");
+        frame.idroidDeviceTracked=true;frame.controllers.handheldIdroidStowed=true;
+        expect(!trackedIdroidPose(frame)&&!trackedIdroidRay(frame),
+            "reload/support suspension hides the projection and its pointer even while the native terminal remains open");
     }
     const Pose tilted{{0.5f,0,0,0.8660254f},{1,1.7f,2}};
     const auto screen=recenteredScreen(tilted,6);

@@ -251,7 +251,7 @@ source, so changing the width cannot stretch the map. Keep the value near the
 default first; larger values improve legibility but occupy more of the view.
 
 For handheld iDroid, **VR Settings** also exposes `idroid_screen_depth_cm`
-(8 cm by default, 0–20), `idroid_screen_x_cm` / `idroid_screen_y_cm`
+(9 cm by default, 0–20), `idroid_screen_x_cm` / `idroid_screen_y_cm`
 (sideways/up, −20–20 cm), and `idroid_screen_pitch_degrees`,
 `idroid_screen_yaw_degrees`, `idroid_screen_roll_degrees` (−90–90).
 Zero side/height offsets center the screen on its mount. Angle and size pivot
@@ -417,11 +417,20 @@ you opened it. The world pauses and Snake stays still; stereo, head tracking,
 hand tracking and menu controls stay active. It defaults to 1.2 metres wide and
 1.3 metres away. Width, distance and tilt are editable in VR Settings.
 
-By default, iDroid and its projection stay in the cupped right palm with native
-hand and device animations. Snake stays stationary while the sticks navigate
-iDroid; the surrounding world keeps running. This experimental mode still needs
-headset feedback. Pause stays in front of you. Equipment and Commands remain
-on the left wrist.
+By default, iDroid and its projection stay in the cupped left bionic palm,
+using the native arrival cinematic's finger joints and device contact.
+In ordinary field play, release left grip to walk, ride or drive while the
+projection stays visible. Hold left grip to give the sticks and buttons to
+iDroid; releasing it returns movement control. Native tutorials, popups and
+Pause retain their own restrictions. Pause stays in front of you. Equipment
+and Commands remain on the left wrist.
+
+Focus owns both axes of each stick and all ordinary face-button actions.
+Center a held stick after changing modes before using it again. A gun already
+readied before focus can keep firing with its existing right grip and trigger;
+that grip does not also change tabs, and trigger zoom stays dormant. Release
+the gun grip before using a fresh squeeze to change pages. A fresh grip inside
+focus cannot draw another gun. Root tabs cycle from the last page to the first.
 
 Set **`settings.handheld_menus = 0`** to use a world panel slightly below eye
 level. Gameplay pauses while that mode is open. Closing it releases only the
@@ -429,8 +438,10 @@ mod's own pause; other native pauses remain. An existing explicit preference
 is preserved.
 
 **Left stick** selects menu rows; **A** confirms and **B** goes back.
-The **right stick** moves the live map. **Left/right grip** change tabs as
-**LB/RB**, and triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
+The **right stick** moves the live map. In handheld mode, hold **left grip**
+for menu control; **left grip + left-stick click** selects the previous tab,
+and **right grip** selects the next tab. Ordinary spatial menus retain
+**left/right grip** as **LB/RB**. Triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
 zoom step and **Y** switches MAP/NAV. **B** closes iDroid; hold **Menu** again to
 unpause. Holding Menu *inside iDroid* opens its native Help, so close iDroid before
 opening Pause. If a native tutorial traps B, hold **B for 0.75 seconds** to
@@ -503,24 +514,39 @@ Native vehicle state changes the controls to **right trigger: accelerator**,
 **left trigger: brake/reverse**, **left stick: steering**, and **Y: enter/exit**.
 In the development candidate, bring the **left hand to the wheel and squeeze
 left grip**. Turn the controller clockwise/right or counterclockwise/left;
-release grip to let go. The native driver's hand keeps its authored contact.
+release grip to let go. Full steering uses about 35 degrees of hand rotation.
+An empty right hand can join its authored wheel contact with **right grip**,
+including while the left hand is holding it. Each squeeze keeps its assigned
+interaction until released.
 The left stick remains available when the wheel is released. **Left X** invokes
 the native vehicle weapon/call action; grabbing the wheel cannot fire it.
-**Right grip** is the equipment modifier while seated. The **right stick**
+Bare **right grip** no longer opens equipment. The optional separate
+`vehicle.equipment_open` binding is disabled by default. The **right stick**
 continues to send both native camera/turret axes, including vertical aim for
 armored vehicles and helicopter views. Release
 held controls after entry/exit or regained focus before resuming input. Truck
 entry, left-hand wheel acquisition, both steering directions and exit have SIM
 evidence. The short recording does not establish sustained driving or braking.
 Wheel acquisition gives a short haptic pulse. Native game rumble also reaches the
-controllers; actual feel needs a headset check. This mapping does not implement
-a personal gun through a driver's window. Vehicle weapons retain their native
-availability. Mounted-gun hand aiming remains unfinished.
+controllers; actual feel needs a headset check. RIGHT grip away from the wheel
+now requests the carried gun through native weapon controls. With that request
+held, center LEFT stick, then use forward/back for acceleration/braking; RIGHT
+trigger fires and tap B reloads. Release gun grip to return to ordinary pedals,
+then release the triggers before accelerating again. A fresh empty-hand grip
+at the wheel joins steering. Native vehicle/seat eligibility must acknowledge
+the gun before it is shown or fired; the current implementation still requires
+its in-game driver check. Mounted-gun hand aiming remains unfinished.
 
-The requested next behavior is left-hand steering with the carried rifle or
-pistol aimed and fired by the right hand. It needs a native driver weapon path,
-plus left-stick forward/back for the pedals while gripping the wheel so the
-right trigger can fire. This is a design target, not a current control mode.
+On return to the ACC, look at the left forearm for the effective iDroid binding
+and **MISSIONS TO DEPLOY** hint. During ordinary field-helicopter travel, cabin
+movement follows the live helicopter and checks native clearance. **Y** retains
+the native exit action when offered. Authored cinematics retain game ownership.
+
+**Use tracked gun for cover clearance** (`settings.tracked_weapon_obstruction`)
+redirects the native weapon sweep to the rendered barrel. The original native
+query radius, collision filters, ammunition rules and projectile collision are
+preserved. Disable this option to restore the native posture-derived sweep.
+The latest build's verification state is recorded in `docs/CURRENT.md`.
 
 ## Test scope
 

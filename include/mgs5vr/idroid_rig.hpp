@@ -16,6 +16,10 @@ struct IdroidPose {
 // belong to SKL_000_ROOT; the hand connector is not the projection center.
 constexpr Pose idroidConnectorInBody{{},{.0000056f,-.092196204f,-.000741f}};
 constexpr Pose idroidHologramInBody{{},{0,.043378498f,.012349601f}};
+// Native p31_010010 DemoxUiJob, idrUI_sna: its graph root shares the
+// handset orientation and is 90 mm forward of CNP_HOLOGRAM. This does not
+// assign physical dimensions to the graph's separate authored UI canvas.
+constexpr float idroidNativeProjectionDepth=.09f;
 std::optional<Pose> idroidBodyFromConnector(Pose connector) noexcept;
 // Keep contact at the grip position, orient the device with the controller's
 // own pointing basis. This accommodates runtime grip/aim cant without forcing

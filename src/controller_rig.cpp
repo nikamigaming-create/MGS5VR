@@ -1,5 +1,6 @@
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/idroid_rig.hpp"
+#include "mgs5vr/idroid_native_hold.hpp"
 #include "mgs5vr/idroid_effect_probe.hpp"
 #include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/cabin_walk.hpp"
@@ -8,6 +9,7 @@
 #include "mgs5vr/paused_rig.hpp"
 #include "mgs5vr/paused_parts.hpp"
 #include "mgs5vr/input_bridge.hpp"
+#include "mgs5vr/vehicle_weapon.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/animal_interaction.hpp"
@@ -49,6 +51,8 @@ struct PoseRestore {
 };
 using Shot=void(*)(void*,Vector4*,Vector4*,void*,uint32_t);
 Shot originalShot{};
+using WeaponObstructionQuery=bool(*)(void*,void*,uint32_t,const Vector4*,const Vector4*,float,bool);
+WeaponObstructionQuery originalWeaponObstructionQuery{};
 using ThrowOrigin=void(*)(void*,void*,uint32_t,Vector4*,Vector4*);
 using ThrowVelocity=void(*)(void*,void*,uint32_t,Vector4*);
 ThrowOrigin originalThrowOrigin{};
@@ -58,6 +62,9 @@ std::atomic_uintptr_t playerOwner{};
 std::atomic_bool enabled{};
 bool groundQueryVerified{};
 bool scopeQueryVerified{};
+bool scopePartsVerified{};
+std::atomic_uintptr_t magnifierOwnerInterface{};
+std::atomic_uint32_t magnifierOwnerIndex{};
 bool modelTransformVerified{};
 bool scopeTrace{};
 WeaponScopeZoom scopeZoom;
@@ -86,7 +93,8 @@ uint64_t activation{},updates{};
 std::array<MotionMelee,3> meleeMotion;
 uint64_t meleeTracking{};
 std::array<float,2> meleeCurl{};
-WheelSteering wheelSteering;
+std::array<WheelSteering,2> wheelSteering;
+float wheelSteeringAxis{};
 std::array<Vec3,2> bendHistory{};
 SupportContact supportContact;
 SupportPose supportPose;
@@ -110,6 +118,65 @@ template<class T> bool read(uintptr_t address,T& out){
     SIZE_T count{};return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&out,sizeof(out),&count)&&count==sizeof(out);
 }
 template<class T> T get(uintptr_t address){T out{};read(address,out);return out;}
+bool vehicleWeaponScope(const HeadCameraSample& frame){
+    return frame.controllers.vehicleControls||frame.controllers.vehicleMounted;
+}
+bool vehicleWeaponAcknowledged(const HeadCameraSample& frame,uint64_t now){
+    const auto& c=frame.controllers;
+    if(!c.vehicleControls||!c.vehicleWeaponIntent||!c.weaponReady||c.rightWheelGrip
+       ||c.nativeGamepad||!c.presentationFocused||c.equipmentOpen||c.commandControls
+       ||frame.menuOpen||!c.hands[1].gripTracked||!c.hands[1].aimTracked
+       ||now<frame.sampleTime||now-frame.sampleTime>150)return false;
+    const auto native=vehicleWeaponState();
+    return native.requested&&native.ready&&native.nativeEligible
+        &&native.player==frame.playerOwner&&native.player==playerOwner.load()
+        &&native.activation==frame.activation&&native.time&&now>=native.time&&now-native.time<=150;
+}
+struct AssembledSight {
+    Pose center{},magnifier{};
+    uint64_t centerCode{},magnifierCode{};
+    uintptr_t magnifierInterface{},magnifierModel{};
+    uint32_t magnifierIndex{};
+};
+std::optional<AssembledSight> assembledSight(uintptr_t component,uint32_t resource){
+    const auto equipment=(resource>>5)&0x7ffu;
+    if(!scopePartsVerified||equipment<871||equipment>876)return {};
+    const auto service=get<uintptr_t>(component+0x60);
+    if(get<uintptr_t>(service)!=base+0x234b840)return {};
+    const auto custom=get<uintptr_t>(service+0xf0);
+    if(get<uintptr_t>(custom)!=base+0x233ad90
+       ||get<uintptr_t>(base+0x233ad90+0x10)!=base+0xd45930)return {};
+    const uint32_t weaponIndex=equipment<873?(equipment-871)*3:
+        equipment<875?(equipment-873)*3+1:(equipment-875)*3+2;
+    using Resolve=uintptr_t(*)(void*,uint32_t,uint32_t,uint32_t*);
+    const auto resolve=reinterpret_cast<Resolve>(base+0xd45930);
+    const auto transforms=get<uintptr_t>(custom+0x40);
+    AssembledSight result;
+    for(uint32_t part:{6u,7u}){
+        uint32_t index{};
+        const auto interface=resolve(reinterpret_cast<void*>(custom),weaponIndex,part,&index);
+        if(get<uintptr_t>(interface)!=base+0x22e2970||index>=get<uint32_t>(interface+0x50)||index>=128)continue;
+        const auto models=get<uintptr_t>(interface+0x58),model=get<uintptr_t>(models+static_cast<uintptr_t>(index)*8);
+        if(get<uintptr_t>(model)!=base+0x20f4d90)continue;
+        const auto code=get<uint64_t>(model+0x120);
+        const auto count=get<uint16_t>(model+0xf8);
+        const auto names=get<uintptr_t>(model+0xe8);
+        const bool center=code==0x84a35edc984905ceull&&count==1;
+        const bool magnifier=(code==0x84a1df03c6484ee1ull||code==0x84a2233aa7f98e18ull)&&count==2;
+        if((!center&&!magnifier)||get<uint32_t>(names)!=0xf08b256e
+           ||(magnifier&&get<uint32_t>(names+4)!=0x6ef58063))continue;
+        std::array<float,16> root{};
+        if(!read(transforms+weaponIndex*0x2c0ull+(part-1)*64ull,root))continue;
+        const auto pose=nativeAffinePose(root);if(!pose)continue;
+        if(center){result.center=*pose;result.centerCode=code;}
+        else{result.magnifier=*pose;result.magnifierCode=code;
+            result.magnifierInterface=interface;result.magnifierModel=model;result.magnifierIndex=index;}
+        if(get<uintptr_t>(models+static_cast<uintptr_t>(index)*8)!=model)return {};
+    }
+    if(!result.centerCode||get<uintptr_t>(service+0xf0)!=custom
+       ||get<uintptr_t>(component+0x60)!=service)return {};
+    return result;
+}
 uint32_t refreshPausedArmParts(const PausedSkin& body,uintptr_t character){
     if(!modelTransformVerified)return 0;
     // Retail's prosthetic is a separate, player-owned modular model. Its
@@ -390,12 +457,23 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera);
     if(!frame.applied||frame.playerOwner!=owner||frame.controllers.avatarEditor
        ||(frame.controllers.frontEnd&&!frame.controllers.openingSelector&&!frame.controllers.cabinPlay))return false;
+    const bool vehicleWeaponReady=vehicleWeaponAcknowledged(frame,now);
+    if(vehicleWeaponScope(frame)&&!vehicleWeaponReady)
+        frame.controllers.weaponReady=frame.controllers.supportGrip=false;
     frame.weaponRig={};
     // Cabin locomotion belongs to the tracked head. A temporarily occluded
     // right controller must not publish an unshifted camera for one frame and
     // snap back to the walking offset when its tracking returns.
     publishNativeCabinBounds(frame);
     const auto idroidMount=frame.menuIdroid?nativeIdroidMount(driver):std::nullopt;
+    const bool idroidHeld=frame.menuOpen&&frame.menuIdroid&&frame.controllers.handheldMenus
+        &&!frame.controllers.handheldIdroidStowed
+        &&!frame.menuWorldQuad&&idroidMount.has_value()&&!frame.controllers.nativeGamepad;
+    const auto names=get<uintptr_t>(model+0xe8);
+    std::array<uint32_t,512> boneNames{};
+    const bool namesRead=names&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(names),
+        boneNames.data(),count*sizeof(uint32_t),&copied)&&copied==count*sizeof(uint32_t);
+    if(idroidHeld&&(!namesRead||!matchesNativeIdroidLeftHand({boneNames.data(),count},{parent.data(),count})))return false;
     std::lock_guard lock(rigMutex);
     const RigContinuityKey continuity{owner,model,frame.activation,frame.controllers.referenceEpoch,
         frame.controllers.presentationEpoch};
@@ -486,6 +564,11 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         if(!palm)return false;
         gripFromWrist[i]=compose(inverse(*palm),wrist);
     }
+    if(idroidHeld){
+        const auto wrist=nativeIdroidLeftWristFromGrip();
+        if(!wrist)return false;
+        gripFromWrist[0]=*wrist;
+    }
     if(boundOwner!=owner||boundModel!=model||activation!=frame.activation){
         for(size_t i=0;i<2;++i){
             bendHistory[i]=bone(q,p,wrists[i]-1).position-bone(q,p,shoulders[i]).position;
@@ -496,15 +579,42 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         supportWeapon=0;heldCloseSupport=false;
         for(auto& motion:meleeMotion)motion.reset();
         meleeTracking=0;meleeCurl={};
-        wheelSteering.reset();wheelMailbox().publish({});
+        for(auto& hand:wheelSteering)hand.reset();
+        wheelSteeringAxis=0;wheelMailbox().publish({});
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
     const auto rightAnimated=bone(q,p,12),leftAnimated=bone(q,p,8);
-    const auto nativeWheelContact=compose(*root,compose(leftAnimated,inverse(gripFromWrist[0])));
-    const auto localWheelContact=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},compose(inverse(frame.nativePose),nativeWheelContact)));
-    const auto wheel=wheelSteering.update(frame.controllers.hands[0].grip,localWheelContact,
-        frame.controllers.vehicleControls&&frame.controllers.hands[0].gripTracked,
-        frame.controllers.wheelGrip,frame.sampleTime,frame.activation,rotate(frame.headPose.orientation,{0,0,-1}));
+    WheelSample wheel{};wheel.time=frame.sampleTime;
+    unsigned wheelHands{};
+    for(size_t side=0;side<2;++side){
+        const auto animated=side?rightAnimated:leftAnimated;
+        const auto nativeContact=compose(*root,compose(animated,inverse(gripFromWrist[side])));
+        const auto localContact=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},
+            compose(inverse(frame.nativePose),nativeContact)));
+        const auto& hand=frame.controllers.hands[side];
+        // The right palm can join only while empty. Its squeeze owner is
+        // selected by the input layer from this same authored contact.
+        const bool available=frame.controllers.vehicleControls&&hand.gripTracked
+            &&(!side||(!frame.controllers.weaponReady&&!frame.controllers.vehicleWeaponIntent));
+        const auto separation=hand.grip.position-localContact.position;
+        if(available&&valid(localContact)&&dot(separation,separation)<.04f)
+            wheel.nearHands|=static_cast<uint8_t>(1u<<side);
+        const bool squeeze=side?frame.controllers.rightWheelGrip:frame.controllers.wheelGrip;
+        const auto sample=wheelSteering[side].update(hand.grip,localContact,available,squeeze,
+            frame.sampleTime,frame.activation,rotate(frame.headPose.orientation,{0,0,-1}),35.f,wheelSteeringAxis);
+        if(frame.controllers.vehicleControls)frame.driverWheelGrips[side]=localContact;
+        if(sample.gripped){
+            ++wheelHands;wheel.axis+=sample.axis;wheel.hands|=static_cast<uint8_t>(1u<<side);
+            wheel.engaged=wheel.engaged||sample.engaged;
+        }
+    }
+    wheel.gripped=wheelHands!=0;
+    if(wheelHands)wheel.axis/=static_cast<float>(wheelHands);
+    wheelSteeringAxis=wheel.axis;
+    if(frame.controllers.vehicleControls){
+        frame.driverWheelTracked=valid(frame.driverWheelGrips[0])&&valid(frame.driverWheelGrips[1]);
+        frame.driverWheelHeld=wheel.gripped;frame.driverWheelHands=wheel.hands;frame.driverWheelAxis=wheel.axis;
+    }
     {
         // The arm meshes also carry spine and clavicle weights. Reposition
         // the whole upper body with one rigid transform: independent shoulder
@@ -560,19 +670,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
     }
     auto wristTarget=compose(grips[1],gripFromWrist[1]);
-    if(frame.controllers.handheldMenus&&idroidMount){
-        // Native device axes are not anatomical palm axes. Hold the connector
-        // at the presented grip, using this controller's same-sample pointing
-        // basis rather than imposing the simulator's grip cant on every user.
-        const auto aim=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,presentationHands[1]->aim));
-        const auto contact=idroidGripContact(grips[1],aim,
-            Pose{frame.controllers.idroidGripRotation,frame.controllers.idroidGripOffset});
-        if(!contact)return false;
-        const auto body=idroidBodyFromConnector(*contact);
-        if(!body)return false;
-        wristTarget=compose(*body,inverse(*idroidMount));
-    }
-    auto rightTarget=clearWrist(wristTarget);
+    auto rightTarget=(wheel.hands&2)?rightAnimated:clearWrist(wristTarget);
     const ArmPose rightAnimatedArm{bone(q,p,10),bone(q,p,11),bone(q,p,12)};
     auto right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
     if(!right)return false;
@@ -610,7 +708,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     auto& weaponDiagnostics=frame.weaponRig;
     weaponDiagnostics.sampled=true;weaponDiagnostics.sampleTime=steadyMilliseconds();
     weaponDiagnostics.character=character;weaponDiagnostics.component=weaponComponent;weaponDiagnostics.bodyModel=model;
-    if(!frame.controllers.vehicleControls&&get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
+    if((!vehicleWeaponScope(frame)||vehicleWeaponReady)&&!frame.controllers.nativeActionControls
+       &&get<uintptr_t>(weaponComponent)==base+0x23b3e80&&get<uintptr_t>(weaponComponent+8)==character){
         weaponDiagnostics.componentAccepted=true;
         const auto instances=get<uintptr_t>(weaponComponent+0x38);
         const auto first=get<uint32_t>(instances+0x24),index=get<uint32_t>(owner+0x3a0);
@@ -656,19 +755,44 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                         const auto resource=get<uint32_t>(state+0x240);
                         if(scopeQueryVerified&&get<uintptr_t>(points)==base+0x234b840
                            &&get<uintptr_t>(base+0x234b840+0x148)==base+0xdbdc50
-                           &&(weaponDiagnostics.opticalRead=read(state+0x208,optical))&&optical[3]==1&&optical[0]>1
+                           &&(weaponDiagnostics.opticalRead=read(state+0x208,optical))
                            &&resource&&(resource>>16)!=0xffff){
                             using PointGetter=bool(*)(void*,void*,uint32_t,uint64_t);
                             const auto point=reinterpret_cast<PointGetter>(base+0xdbdc50);
                             alignas(16) std::array<float,16> rear{},front{};
-                            if(point(reinterpret_cast<void*>(points),rear.data(),resource,0x614d8847090eull)
-                               &&point(reinterpret_cast<void*>(points),front.data(),resource,0x786932704dd6ull)){
+                            // Observe the actual assembled sight pair even when
+                            // its optic profile is not supported. These are the
+                            // same read-only native queries used by gun setup;
+                            // the portal still requires a measured profile.
+                            weaponDiagnostics.sightQueryAttempted=true;
+                            weaponDiagnostics.sightRearRead=point(reinterpret_cast<void*>(points),rear.data(),resource,0x614d8847090eull);
+                            weaponDiagnostics.sightFrontRead=point(reinterpret_cast<void*>(points),front.data(),resource,0x786932704dd6ull);
+                            if(weaponDiagnostics.sightRearRead&&weaponDiagnostics.sightFrontRead){
                                 const auto rearPose=nativeAffinePose(rear),frontPose=nativeAffinePose(front);
-                                if(rearPose&&frontPose)if(auto geometry=nativeWeaponScopeGeometry(*rearPose,*frontPose,optical)){
+                                weaponDiagnostics.sightRearValid=rearPose.has_value();weaponDiagnostics.sightFrontValid=frontPose.has_value();
+                                if(rearPose){weaponDiagnostics.sightRear=*rearPose;weaponDiagnostics.sightRearInWrist=compose(*attachment,*rearPose);}
+                                if(frontPose){weaponDiagnostics.sightFront=*frontPose;weaponDiagnostics.sightFrontInWrist=compose(*attachment,*frontPose);}
+                                auto geometry=rearPose&&frontPose?nativeWeaponScopeGeometry(*rearPose,*frontPose,optical):std::nullopt;
+                                if(!geometry)if(const auto assembled=assembledSight(weaponComponent,resource)){
+                                    const uint32_t sight=assembled->magnifierCode==0x84a1df03c6484ee1ull?4u:
+                                        assembled->magnifierCode==0x84a2233aa7f98e18ull?5u:2u;
+                                    const uint64_t identity=uint64_t(resource)<<32|sight;
+                                    const float power=scopeZoom.update(identity,frame.controllers.weaponZoomSequence,
+                                        {optical[0],optical[1],optical[2]});
+                                    geometry=nativeMagnifierScopeGeometry(assembled->center,assembled->magnifier,
+                                        assembled->centerCode,assembled->magnifierCode,optical,power);
+                                    if(geometry&&assembled->magnifierModel){
+                                        weaponDiagnostics.magnifierInterface=assembled->magnifierInterface;
+                                        weaponDiagnostics.magnifierModel=assembled->magnifierModel;
+                                        weaponDiagnostics.magnifierIndex=assembled->magnifierIndex;
+                                        weaponDiagnostics.magnifierModelCode=assembled->magnifierCode;
+                                    }
+                                }
+                                if(geometry){
                                     geometry->ocular=compose(*attachment,geometry->ocular);
                                     geometry->objective=compose(*attachment,geometry->objective);
                                     scopeInWrist=*geometry;scopeResource=resource;
-                                }else if(scopeTrace){
+                                }else if(scopeTrace&&rearPose&&frontPose){
                                     static uint64_t lastUnprofiled{};
                                     const uint64_t key=uint64_t(resource)<<32|uint64_t(optical[0])<<24|uint64_t(optical[1])<<16|uint64_t(optical[2])<<8|optical[3];
                                     if(key!=lastUnprofiled){
@@ -815,7 +939,16 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // Preserve the game's animated support-hand contact while the native
         // support is requested or a native reload/bolt cycle is running.
         auto target=attached;
-        if(binocularHeld&&!binocularSupport){
+        if(idroidHeld&&presentationGrips[0]){
+            // The cinematic's LEFT wrist, palm and fingers own this contact.
+            // Handset and hologram are published from the completed wrist below.
+            const Pose fit{frame.controllers.idroidGripRotation,frame.controllers.idroidGripOffset};
+            if(!valid(fit))return false;
+            const auto aim=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,presentationHands[0]->aim));
+            const auto heldWrist=nativeIdroidLeftHandheldWrist(grips[0],aim,fit);
+            if(!heldWrist)return false;
+            target=clearWrist(*heldWrist);
+        }else if(binocularHeld&&!binocularSupport){
             // A one-handed binocular hold leaves the left hand free and
             // tracked; it must not be pulled toward the firearm support
             // offset merely because the controller is visible.
@@ -825,7 +958,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             target.position=tracked.position+(attached.position-tracked.position)*supportBlend;
             target.orientation=blendRotation(tracked.orientation,attached.orientation,supportBlend);
         }
-        if(wheel.gripped)target=leftAnimated;
+        if(wheel.hands&1)target=leftAnimated;
         else if(supportBlend<1)target=clearWrist(target);
         const auto left=groundedArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],armBasis[0]);
         if(!left)return false;
@@ -843,10 +976,6 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // These named corrective joints belong to the verified native arm mesh.
     // Recompute their native local corrections from the solved joints. Neither
     // stale animation corrections nor rigid parent copies match this skin.
-    const auto names=get<uintptr_t>(model+0xe8);
-    std::array<uint32_t,512> boneNames{};
-    const bool namesRead=names&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(names),
-        boneNames.data(),count*sizeof(uint32_t),&copied)&&copied==count*sizeof(uint32_t);
     const auto helpers=namesRead?armHelperIndices({boneNames.data(),count},{parent.data(),count}):std::nullopt;
     const bool helpersMatch=helpers.has_value();
     if(helpersMatch)for(size_t side=0;side<2;++side){
@@ -894,21 +1023,24 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     frame.controllers.strikeCurl=meleeCurl;
     // Free fingers follow controller curls. Preserve authored contact around a
     // weapon and during reloads, including when the support hand is blending.
-    // The native iDroid also owns its cupped right-hand contact animation;
-    // free-hand curl must not straighten those fingers through the handset.
+    // Use the measured cinematic LEFT-hand locals, including the ring/little
+    // base. Ordinary equipment animation cups the right hand instead.
+    if(idroidHeld&&presentationGrips[0])for(const auto& joint:nativeIdroidLeftHand)
+        replace(q,p,joint.bone,compose(bone(q,p,joint.parent),joint.local));
     // Read native locals from the saved pose so updating one joint cannot alter
     // the native reference for its children.
     constexpr std::array<std::array<size_t,5>,2> fingers{{{21,24,27,31,34},{37,40,43,47,50}}};
     unsigned articulatedHands{};
     for(size_t side=0;side<2;++side){
         const auto& hand=frame.controllers.hands[side];
+        if(idroidHeld&&side==0){++articulatedHands;continue;}
         // A binocular is a right-hand weapon-style grip even though it has no
         // firearm state. Close the primary hand around the same authored palm
         // socket, and close the optional support hand only after its grip is
         // actually held. This keeps both hands on the device rather than
         // leaving an open/free hand beside a floating model.
         const float contact=side
-            ?((binocularHeld||(frame.menuOpen&&frame.menuIdroid)||((frame.controllers.weaponReady)&&(firearmActive||throwableActive)))?1.f:0.f)
+            ?((binocularHeld||((frame.controllers.weaponReady)&&(firearmActive||throwableActive)))?1.f:0.f)
             :(binocularSupport?1.f:supportBlend);
         // Native firearm contact owns the authored hand during reloads. The
         // binocular is a VR-only physical item, so its tracked hands still
@@ -956,8 +1088,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     frame.renderedPalms=renderedPalms;frame.renderedPalmTracked=renderedPalmTracked;
     if(idroidMount){
-        frame.idroidDevice=compose(*root,compose(bone(q,p,12),*idroidMount));
-        frame.idroidDeviceTracked=presentationHands[1].has_value()&&valid(frame.idroidDevice);
+        const size_t side=idroidHeld?0:1;
+        frame.idroidDevice=compose(*root,compose(bone(q,p,wrists[side]),
+            idroidHeld?nativeIdroidLeftBodyInWrist:*idroidMount));
+        frame.idroidDeviceTracked=presentationHands[side].has_value()&&valid(frame.idroidDevice);
     }
     frame.playerHead=renderedHead;
     if(presentationHands[0]&&renderedPalmTracked[0]){
@@ -989,7 +1123,16 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         frame.weaponSupportGrip=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},
             compose(inverse(frame.nativePose),supportPalm)));
     }
-    if(scopeInWrist&&!frame.menuOpen){
+    if(weaponDiagnostics.sightRearValid&&weaponDiagnostics.sightFrontValid){
+        const auto localFromWorld=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},inverse(frame.nativePose)));
+        const auto localFromWrist=compose(localFromWorld,compose(*root,bone(q,p,12)));
+        weaponDiagnostics.sightRearLocal=compose(localFromWrist,weaponDiagnostics.sightRearInWrist);
+        weaponDiagnostics.sightFrontLocal=compose(localFromWrist,weaponDiagnostics.sightFrontInWrist);
+    }
+    magnifierOwnerIndex.store(weaponDiagnostics.magnifierIndex,std::memory_order_relaxed);
+    magnifierOwnerInterface.store(weaponDiagnostics.magnifierInterface,std::memory_order_relaxed);
+    if(scopeInWrist&&(!frame.menuOpen||(frame.menuIdroid&&frame.controllers.handheldMenus
+            &&frame.controllers.handheldMenuFree))){
         // Use the completed skin, including support/reach/collision solve.
         // Never bind the lens to an unconstrained controller or a newer pose.
         const auto wrist=compose(*root,bone(q,p,12));
@@ -998,7 +1141,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const uint64_t identity=static_cast<uint64_t>(scopeResource)<<32|scopeInWrist->sight;
         frame.weaponScope={compose(localFromWrist,scopeInWrist->ocular),compose(localFromWrist,scopeInWrist->objective),
             scopeInWrist->radius,frame.controllers.scopeEyeRelief,
-            scopeZoom.update(identity,frame.controllers.weaponZoomSequence,scopeInWrist->powers),identity,true};
+            scopeZoom.update(identity,frame.controllers.weaponZoomSequence,scopeInWrist->powers),identity,true,scopeInWrist->dotReticle};
         const auto rawScope=frame.weaponScope;
         // At full two-hand contact, deliberate support-hand guidance is part
         // of the controller owner, not attachment noise. Follow that same
@@ -1070,7 +1213,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     publishAnimalHands(frame,renderedPalms,handContacts);
     publishSmallAnimalHands(frame,renderedPalms,handContacts);
     wheelMailbox().publish(wheel);
-    if(wheel.engaged)log("Driver left hand gripped authored wheel contact");
+    if(wheel.engaged)log("Driver authored wheel contact acquired; hands="+std::to_string(wheel.hands));
     for(const auto& strike:strikes)if(strike)publishMeleeSweep(*strike);
     // The engine may reuse animated helper/finger channels next frame. Only the
     // native publication consumes our solved pose; never feed it back into the
@@ -1085,7 +1228,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
     std::memcpy(reinterpret_cast<void*>(positions),p.data(),count*16u);
     shotRig={owner,character,camera,model,nativeCamera,compose(*root,right->pose.wrist),frame.trackingSequence};
-    if(!frame.controllers.hands[1].gripTracked)shotRig={};
+    if(!frame.controllers.hands[1].gripTracked||(vehicleWeaponScope(frame)&&!vehicleWeaponReady))shotRig={};
     const auto& throwingHand=frame.controllers.hands[1];
     if(shotRig.owner&&throwableActive&&frame.controllers.weaponReady&&!frame.controllers.vehicleControls&&throwingHand.aimTracked){
         shotRig.palmWorld=compose(shotRig.wristWorld,inverse(gripFromWrist[1]));
@@ -1109,7 +1252,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         if(frame.controllers.vehicleControls){
             const auto nativePalm=compose(*root,compose(leftAnimated,inverse(gripFromWrist[0])));
             const auto target=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},compose(inverse(frame.nativePose),nativePalm)));
-            std::ostringstream w;w<<"Driver wheel grip="<<wheel.gripped<<" axis="<<wheel.axis
+            std::ostringstream w;w<<"Driver wheel grip="<<wheel.gripped<<" hands="<<unsigned(wheel.hands)<<" axis="<<wheel.axis
                 <<" local_contact="<<target.position.x<<','<<target.position.y<<','<<target.position.z;log(w.str());
         }
     }
@@ -1151,12 +1294,17 @@ void update(void* context,void* binding){
     applySmallAnimalSkin(reinterpret_cast<uintptr_t>(binding));
     original(context,binding);
     if(solved)noteCompletedAttachmentBody(context,binding,restore,false);
-    if(menuBoundary){
+    const auto& attachmentFrame=restore.attachmentDiagnosticFrame;
+    const bool heldIdroid=solved&&attachmentFrame&&attachmentFrame->menuOpen&&attachmentFrame->menuIdroid
+        &&attachmentFrame->controllers.handheldMenus&&!attachmentFrame->menuWorldQuad;
+    if(menuBoundary||heldIdroid){
         // The native skin can already publish the new menu generation before
         // the prosthetic's separate update runs. That fresh body publication
         // prevents the ordinary paused timeout from repairing this first eye
         // image. Join the exact owned modular arm to this completed palette
         // at the observed entry/exit boundary, under the same player lock.
+        // A freely walking iDroid also needs the cupped cinematic finger
+        // palette joined to the separately rendered bionic hand each solve.
         const auto character=get<uintptr_t>(restore.owner.player+0x370);
         if(get<uintptr_t>(character)==base+0x2295210)refreshPausedArmParts(pausedSkin,character);
     }
@@ -1168,6 +1316,66 @@ void update(void* context,void* binding){
         }
     }
 }
+// Only this native caller submits the player weapon's obstruction sweep. Its
+// result is consumed by 0x103b680, including the native 0.2-second clearance
+// delay. The stock endpoints are reconstructed from the animated body (with a
+// separate prone path), so they can intersect cover behind a clear tracked gun.
+// Keep the query, filters, radius, result and every firing restriction native;
+// replace just that sweep's segment with the barrel in the published hand rig.
+// The native radius is 0.03 m, or 0.01 m for state+0x3c2 bit 0; it is already
+// a firearm-sized capsule, not the character's movement collision envelope.
+bool weaponObstructionQuery(void* physics,void* query,uint32_t flags,
+                            const Vector4* start,const Vector4* end,float radius,bool temporary){
+    const auto native=[&]{return originalWeaponObstructionQuery(physics,query,flags,start,end,radius,temporary);};
+    if(reinterpret_cast<uintptr_t>(_ReturnAddress())!=base+0x1064aae||!enabled.load()||!start||!end)return native();
+    const auto now=steadyMilliseconds();
+    const auto frame=headCamera().publishedRigFrame(now);
+    if(!frame||!frame->controllers.trackedWeaponObstruction||!frame->nativeFirearmActive
+       ||!frame->controllers.weaponReady||!frame->controllers.hands[1].gripTracked
+       ||!frame->renderedPalmTracked[1]||frame->controllers.nativeGamepad
+       ||frame->controllers.nativeActionControls
+       ||now<frame->sampleTime||now-frame->sampleTime>100)return native();
+    if(vehicleWeaponScope(*frame)&&!vehicleWeaponAcknowledged(*frame,now))return native();
+    const auto& owned=frame->weaponRig;
+    const auto component=reinterpret_cast<uintptr_t>(query)-0xb0;
+    const auto owner=frame->playerOwner;
+    if(!owner||owner!=playerOwner.load()||!owned.componentAccepted||!owned.instanceIndexMatched
+       ||!owned.resourceAccepted||!owned.muzzleSolved||component!=owned.component
+       ||get<uintptr_t>(owner+0x370)!=owned.character
+       ||get<uintptr_t>(component)!=base+0x23b3e80||get<uintptr_t>(component+8)!=owned.character
+       ||get<uintptr_t>(owned.character+0x80)!=component
+       ||get<uintptr_t>(component+0x70)!=reinterpret_cast<uintptr_t>(physics)
+       ||get<uintptr_t>(reinterpret_cast<uintptr_t>(physics))!=base+0x24f3760
+       ||now<owned.sampleTime||now-owned.sampleTime>100)return native();
+    const auto first=get<uint32_t>(get<uintptr_t>(component+0x38)+0x24);
+    const auto index=get<uint32_t>(owner+0x3a0);
+    if(index!=owned.playerIndex||index<first||index-first>15
+       ||owned.state!=get<uintptr_t>(component+0x58)+(index-first)*0x610ull
+       ||get<uint32_t>(owned.state+0x240)!=owned.resourceHandle)return native();
+    const auto weaponFlags=get<uint32_t>(owned.state+0x27c);
+    const auto mode=get<uint32_t>(owned.state+0x3c0);
+    if((weaponFlags&0x1c0)!=0x40||(weaponFlags&0x400000)||(mode&0x2000)
+       ||(weaponFlags&0x200)!=(owned.flags&0x200))return native();
+    const auto getter=get<uintptr_t>(get<uintptr_t>(owned.character+0x78)+0x238);
+    const auto renderFirst=get<uint32_t>(getter+0xc);
+    if(get<uintptr_t>(getter)!=base+0x22e6070||index<renderFirst||index-renderFirst>15
+       ||get<uintptr_t>(get<uintptr_t>(getter+0x10)+(index-renderFirst)*0xc0ull+0x68)!=owned.bodyModel)
+        return native();
+    const auto& palm=frame->renderedPalms[1];
+    const auto muzzle=compose(palm,owned.muzzleInGrip);
+    if(!valid(palm)||!valid(muzzle)||!std::isfinite(radius)||radius<0.f||radius>1.f)return native();
+    const auto forward=rotate(muzzle.orientation,{0,0,1});
+    const float barrelLength=dot(muzzle.position-palm.position,forward);
+    // Reject inverted/unsupported sockets rather than inventing a weapon
+    // length. The rear endpoint lies on the barrel axis at the grip's depth;
+    // neither the player's head nor the stock extends this test into cover.
+    if(!std::isfinite(barrelLength)||barrelLength<.02f||barrelLength>2.f)return native();
+    const auto rear=muzzle.position-forward*barrelLength;
+    alignas(16) Vector4 trackedStart{rear.x,rear.y,rear.z,start->w};
+    alignas(16) Vector4 trackedEnd{muzzle.position.x,muzzle.position.y,muzzle.position.z,end->w};
+    return originalWeaponObstructionQuery(physics,query,flags,&trackedStart,&trackedEnd,radius,temporary);
+}
+
 // The native shot solver reads the rendered wrist, then converges the shot onto
 // a camera target. Supply a private copy of that target on the rendered barrel
 // axis. The live weapon state, ammo, shot seed and projectile handling stay native.
@@ -1180,6 +1388,7 @@ void shot(void* context,Vector4* origin,Vector4* direction,void* state,uint32_t 
     if(!rig.owner||get<uintptr_t>(component)!=base+0x23b3e80
        ||get<uintptr_t>(component+8)!=rig.character||get<uintptr_t>(rig.character+0x80)!=component){fallback();return;}
     const auto frame=headCamera().resolveCurrent(rig.camera,rig.sourceCamera);
+    if(vehicleWeaponScope(frame)&&!vehicleWeaponAcknowledged(frame,steadyMilliseconds())){fallback();return;}
     const auto instances=get<uintptr_t>(component+0x38);
     const auto first=get<uint32_t>(instances+0x24);
     const auto flags=get<uint32_t>(weapon+0x27c),mode=get<uint32_t>(weapon+0x3c0);
@@ -1367,6 +1576,42 @@ bool controllerThrowReady() noexcept {
     std::lock_guard lock(rigMutex);
     return shotRig.throwTracked&&shotRig.owner==playerOwner.load();
 }
+void refreshNativeWeaponMagnifier(uintptr_t interface,uint32_t index) noexcept {
+    if(!enabled.load()||!scopePartsVerified||interface!=magnifierOwnerInterface.load(std::memory_order_relaxed)
+       ||index!=magnifierOwnerIndex.load(std::memory_order_relaxed))return;
+    try{
+        const auto frame=headCamera().publishedRigFrame(steadyMilliseconds());
+        if(!frame||!frame->weaponScope.tracked||frame->weaponScope.magnification<=1
+           ||!frame->controllers.weaponReady||!frame->weaponRig.magnifierModel
+           ||frame->weaponRig.magnifierInterface!=interface||frame->weaponRig.magnifierIndex!=index)return;
+        if(vehicleWeaponScope(*frame)&&!vehicleWeaponAcknowledged(*frame,steadyMilliseconds()))return;
+        const auto& owned=frame->weaponRig;
+        const auto first=get<uint32_t>(get<uintptr_t>(owned.component+0x38)+0x24);
+        const auto playerIndex=get<uint32_t>(frame->playerOwner+0x3a0);
+        if(frame->playerOwner!=playerOwner.load()||get<uintptr_t>(frame->playerOwner+0x370)!=owned.character
+           ||get<uintptr_t>(owned.character+0x80)!=owned.component
+           ||get<uintptr_t>(owned.component)!=base+0x23b3e80||get<uintptr_t>(owned.component+8)!=owned.character
+           ||playerIndex<first||playerIndex-first>15
+           ||owned.state!=get<uintptr_t>(owned.component+0x58)+(playerIndex-first)*0x610ull
+           ||get<uint32_t>(owned.state+0x240)!=owned.resourceHandle
+           ||get<uintptr_t>(interface)!=base+0x22e2970||index>=get<uint32_t>(interface+0x50))return;
+        const auto models=get<uintptr_t>(interface+0x58),model=get<uintptr_t>(models+static_cast<uintptr_t>(index)*8);
+        if(model!=owned.magnifierModel||get<uintptr_t>(model)!=base+0x20f4d90
+           ||get<uint64_t>(model+0x120)!=owned.magnifierModelCode||get<uint16_t>(model+0xf8)!=2)return;
+        const auto names=get<uintptr_t>(model+0xe8),palette=get<uintptr_t>(model+0xe0);
+        if(get<uint32_t>(names)!=0xf08b256e||get<uint32_t>(names+4)!=0x6ef58063)return;
+        std::array<float,16> root{};
+        if(!read(palette,root))return;
+        const auto rootPose=nativeAffinePose(root);if(!rootPose)return;
+        // Retain this exact native publication's weapon transform. Only the
+        // authored magnifier hinge changes; the base, gun and hands do not.
+        const auto hinge=compose(*rootPose,Pose{{},{-.024f,.006f,0}});
+        auto aligned=root;aligned[12]=hinge.position.x;aligned[13]=hinge.position.y;aligned[14]=hinge.position.z;
+        if(get<uintptr_t>(models+static_cast<uintptr_t>(index)*8)!=model||get<uintptr_t>(model+0xe0)!=palette)return;
+        SIZE_T written{};
+        WriteProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(palette+64),aligned.data(),sizeof(aligned),&written);
+    }catch(...){}
+}
 void installControllerRig(uintptr_t imageBase,bool idroidEffectProbe,bool idroidEffectRetarget){
     base=imageBase;
     wchar_t trace[2]{};
@@ -1379,6 +1624,9 @@ void installControllerRig(uintptr_t imageBase,bool idroidEffectProbe,bool idroid
     scopeQueryVerified=matches(0xdbdc50,std::array<unsigned char,17>{
         0x4c,0x89,0x4c,0x24,0x20,0x44,0x89,0x44,0x24,0x18,0x55,0x53,0x57,0x48,0x8d,0x6c,0x24});
     log(scopeQueryVerified?"Native named sight-point adapter enabled":"Native sight-point signature differs; weapon scopes disabled");
+    scopePartsVerified=matches(0xd45930,std::array<unsigned char,10>{
+        0x41,0x83,0xf8,0x0b,0x0f,0x87,0xb9,0,0,0});
+    log(scopePartsVerified?"Native assembled magnifier adapter enabled":"Native magnifier part signature differs; flip sights disabled");
     groundQueryVerified=matches(0xa0fb50,std::array<unsigned char,9>{0x48,0x89,0x4c,0x24,0x08,0x48,0x83,0xec,0x18})
         &&matches(0x1b9b130,std::array<unsigned char,10>{0x48,0x83,0xec,0x38,0xf3,0x0f,0x10,0x44,0x24,0x60})
         &&matches(0x1b9b21e,std::array<unsigned char,18>{0xf3,0x0f,0x10,0x84,0x24,0xe0,0,0,0,0x0f,0xc6,0xc0,0,0x0f,0x29,0x44,0x24,0x50})
@@ -1400,6 +1648,21 @@ void installControllerRig(uintptr_t imageBase,bool idroidEffectProbe,bool idroid
     if(status!=MH_OK)throw std::runtime_error(std::string("Controller shot create: ")+MH_StatusToString(status));
     status=MH_EnableHook(shotAddress);
     if(status!=MH_OK)throw std::runtime_error(std::string("Controller shot enable: ")+MH_StatusToString(status));
+    // Physics interface +0x28 submits an asynchronous query; +0x30 consumes it.
+    // Verify both the wrapper and the sole weapon call site before installing
+    // a hook which leaves all other native callers byte-for-byte equivalent.
+    if(!matches(0x1bf0fc0,std::array<unsigned char,11>{0x40,0x53,0x48,0x83,0xec,0x30,0x0f,0xb6,0x44,0x24,0x70})
+       ||!matches(0x1064aa8,std::array<unsigned char,13>{0x44,0x8b,0xc7,0xff,0x50,0x28,0x83,0x8b,0x50,0x03,0,0,1})
+       ||get<uintptr_t>(base+0x24f3760+0x28)!=base+0x1bf0fc0
+       ||get<uintptr_t>(base+0x24f3760+0x30)!=base+0x1bf1040)
+        throw std::runtime_error("Controller weapon obstruction query signature differs");
+    const auto obstructionAddress=reinterpret_cast<void*>(base+0x1bf0fc0);
+    status=MH_CreateHook(obstructionAddress,reinterpret_cast<void*>(&weaponObstructionQuery),
+                         reinterpret_cast<void**>(&originalWeaponObstructionQuery));
+    if(status!=MH_OK)throw std::runtime_error(std::string("Controller weapon obstruction create: ")+MH_StatusToString(status));
+    status=MH_EnableHook(obstructionAddress);
+    if(status!=MH_OK){MH_RemoveHook(obstructionAddress);throw std::runtime_error(std::string("Controller weapon obstruction enable: ")+MH_StatusToString(status));}
+    log("Tracked barrel obstruction adapter installed for native weapon caller 0x1064aae");
     if(!matches(0x1037ba0,std::array<unsigned char,13>{0x48,0x8b,0xc4,0x55,0x53,0x56,0x57,0x41,0x54,0x41,0x56,0x41,0x57})
        ||!matches(0x1039020,std::array<unsigned char,9>{0x48,0x8b,0xc4,0x55,0x53,0x56,0x57,0x41,0x56}))
         throw std::runtime_error("Controller throw helper signatures differ");
@@ -1442,8 +1705,18 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
     static Pose worldOrigin{};
     static bool worldAnchored{};
     static CabinWalkState walk{};
+    static CabinWalkState transitWalk{};
     static uint64_t nextWalkReport{};
     const auto& c=frame.controllers;
+    if(c.cabinTransit){
+        frame.controllers.cabinBounds={};
+        frame.controllers.openingWorldAnchored=false;
+        frame.nativePose.position=advanceCabinWalk(transitWalk,frame.nativePose.position,
+            frame.nativePose.orientation,c.cabinMove,steadyMilliseconds(),frame.activation,
+            moveNativeCabin,.85f,frame.menuOpen,true);
+        return;
+    }
+    transitWalk={};
     if(!c.openingSelector&&!c.cabinPlay){
         cacheActive=false;
         measuredActivation=0;
@@ -1477,10 +1750,10 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
         const auto before=frame.nativePose.position;
         const auto previousOffset=walk.offset;
         frame.nativePose.position=advanceCabinWalk(walk,before,frame.nativePose.orientation,
-            c.cabinMove,now,frame.activation,moveNativeCabin);
+            c.cabinMove,now,frame.activation,moveNativeCabin,.85f,frame.menuOpen);
         const auto moved=frame.nativePose.position-(before+previousOffset);
         const float stickMagnitude=std::hypot(c.cabinMove[0],c.cabinMove[1]);
-        if(stickMagnitude>.2f&&dot(moved,moved)>.000001f&&now>=nextWalkReport){
+        if(!frame.menuOpen&&stickMagnitude>.2f&&dot(moved,moved)>.000001f&&now>=nextWalkReport){
             std::ostringstream s;s<<"Native title-cabin stick walk axis="<<c.cabinMove[0]<<','<<c.cabinMove[1]
                 <<" step="<<moved.x<<','<<moved.y<<','<<moved.z
                 <<" head="<<frame.nativePose.position.x<<','<<frame.nativePose.position.y<<','<<frame.nativePose.position.z;
@@ -1547,8 +1820,7 @@ TravelMode nativeTravelMode() noexcept{
             if(phase!=get<uint32_t>(base+0x2bd3fd0))continue;
             const auto difference=stateRoot-ownerRoot;
             if(!valid(Pose{{},difference})||dot(difference,difference)>4)break;
-            const auto mode=(flags[1]&(1u<<5))?TravelMode::unknown:
-                (flags[0]&(1u<<26))?TravelMode::vehicle:(flags[0]&(1u<<25))?TravelMode::horse:TravelMode::onFoot;
+            const auto mode=travelModeFromPlayerStatus(flags);
             if(mode!=cached){std::ostringstream s;s<<"Native travel mode="<<static_cast<int>(mode)
                 <<" player="<<index<<" flags="<<std::hex<<flags[0]<<','<<flags[1];log(s.str());}
             cached=mode;sampledAt=now;return mode;

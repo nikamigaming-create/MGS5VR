@@ -216,7 +216,9 @@ int main(){try{
     require(!pooled.publishStereo({left.Get(),right.Get()},producer.context.Get(),eyes),
         "producer cannot reuse consumer-pending slots even after GPU readback has completed");
     for(int n=0;n<100&&slotsIn(pool,TextureSlotState::free)!=textureMailboxSlots;++n){
-        require(!poolConsumer.consume(pool),"draining consumer events never invents a fresh or older frame");
+        poolConsumer.poll();
+        require(poolConsumer.frame()==newest&&poolConsumer.eyes()[0].sourceSequence==302,
+            "post-submit completion polling releases slots without consuming or relabeling cached pixels");
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     require(slotsIn(pool,TextureSlotState::free)==textureMailboxSlots,"consumer completion safely returns all three slots to the producer");
@@ -253,7 +255,10 @@ int main(){try{
             &&pixel(reader,receiver.texture(),0,0,1)==std::array<unsigned char,4>{255,0,0,255},"mixed completion backends preserve distinct newest stereo pixels");
         require(slotsIn(channel,TextureSlotState::consumerPending)==textureMailboxSlots,"compatibility slots await real consumer completion");
         for(int n=0;n<100&&slotsIn(channel,TextureSlotState::free)!=textureMailboxSlots;++n){
-            require(!receiver.consume(channel),"compatibility completion does not publish an old frame");std::this_thread::sleep_for(std::chrono::milliseconds(1));}
+            receiver.poll();
+            require(receiver.eyes()[0].sourceSequence==502&&receiver.eyes()[1].trackingSequence==602,
+                "post-submit polling preserves both eyes with either completion backend");
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));}
         require(slotsIn(channel,TextureSlotState::free)==textureMailboxSlots,"either consumer backend safely drains all acknowledgments");
         const auto previous=receiver.frame();compatible.invalidate();
         require(!receiver.consume(compatible.latest())&&!receiver.frame().sequence&&!receiver.texture(),"null invalidation clears either backend's retained cache");

@@ -8,6 +8,9 @@ void installControllerRig(uintptr_t imageBase,bool idroidEffectProbe=false,bool 
 void observeControllerRigOwner(uintptr_t owner) noexcept;
 void stopControllerRig() noexcept;
 bool controllerRigEnabled() noexcept;
+// After the native model's own palette publication, move only an exactly
+// owned magnifier hinge to the zoom mode from that completed body frame.
+void refreshNativeWeaponMagnifier(uintptr_t modelInterface,uint32_t index) noexcept;
 TravelMode nativeTravelMode() noexcept;
 // Called only at the native camera-publication boundary, before either eye.
 // Republishes the owned paused skin and its attachments without a game tick.

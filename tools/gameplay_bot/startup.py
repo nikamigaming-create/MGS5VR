@@ -10,16 +10,24 @@ def neutral_startup_transition(state):
     native, controls = state.get("native", {}), state.get("controls", {})
     if not isinstance(native, dict) or not isinstance(controls, dict):
         return False
-    if (type(native.get("mission")) is not int or native["mission"] != 1
-            or native.get("sequence") not in ("Seq_Demo_ConfirmAutoSave",
-                                             "Seq_Demo_CreateOrLoadSaveData",
-                                             "Seq_Demo_LogInKonamiServer")
-            or native.get("title") is not False
+    boot_notice = (type(native.get('mission')) is int and native['mission'] == 1
+                   and native.get('sequence') in ('Seq_Demo_ConfirmAutoSave',
+                       'Seq_Demo_CreateOrLoadSaveData', 'Seq_Demo_LogInKonamiServer')
+                   and native.get('title') is False and state.get('title') is False
+                   and native.get('player_life') == 0
+                   and state.get('scene') in ('cinematic', 'loading', 'unknown'))
+    # Observed after Online Information closes: the retail title cabin owner
+    # is loaded before its fade/Press Start finishes. This only allows bounded
+    # released pixel observation; it cannot acknowledge another menu or input.
+    title_fade = (type(native.get('mission')) is int and native['mission'] == 40010
+                  and native.get('sequence') is None and native.get('title') is True
+                  and native.get('popup') is False and state.get('scene') == 'title'
+                  and state.get('title') is True and state.get('title_menu') is False
+                  and state.get('press_start_ready') is False)
+    if (not (boot_notice or title_fade)
             or native.get("status_NORMAL_ACTION") is not False
-            or native.get("player_life") != 0
             or state.get("camera_active") is not False
-            or any(state.get(name) is not False for name in ("title", "menu", "idroid", "pause"))
-            or state.get("scene") not in ("cinematic", "loading", "unknown")
+            or any(state.get(name) is not False for name in ("menu", "idroid", "pause"))
             or type(controls.get("native_buttons")) is not int or controls["native_buttons"] != 0
             or type(controls.get("age_ms")) is not int or not 0 <= controls["age_ms"] <= 250):
         return False
@@ -123,8 +131,14 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
                     "native_before": guard}
             if label == "press-start":
                 step["state_before"] = {"title_menu": False, "press_start_ready": True}
-            elif label == "logged-in-notice":
-                step["state_before"] = LOGGED_IN_NOTICE
+            else:
+                # The retained cold-start run sampled controls 156 ms apart;
+                # a 120 ms A pulse expired unseen. These recognized notices
+                # have level confirmation, so span that observed sampling gap.
+                # Never replay confirmation after an ambiguous dispatch.
+                step["seconds"] = .30
+                if label == "logged-in-notice":
+                    step["state_before"] = LOGGED_IN_NOTICE
             try:
                 live.execute(step)
             except ActionPrerequisiteChanged as error:

@@ -1,0 +1,155 @@
+{
+  "schema": 2,
+  "source": "native effective bindings export",
+  "visual_style": "MGS5VR Field Terminal; original header artwork and actual 3D controller models",
+  "controls_file": "mgs5vr-controls.ini",
+  "controls_sha256": "c4cecab88fd842f8cfc09a8eab24561b2bea11fb486a0a6b64fdb9752f642425",
+  "checker_sha256": "cca600373c0387dc77e06ca1fb5d50efe3066a5138f1343b3a5caa2e1b087dca",
+  "bindings_sha256": "cd188c55ff0d50441566b641cf34cc3070e93fd2d94f0afed73c5b70824b58f9",
+  "renderer_sha256": "77249d1c480301b3b1ab70779d1da41769f643332a70cc15b3c691d1340f5c70",
+  "artwork_sha256": {
+    "docs/images/field-header.svg": "61b672dc41cb71fb2c9dee96265e0666c5cd23c83f9da729f8864dcda22551b0",
+    "tools/launcher-ui/paper-grain.svg": "13d72ffe5ddf668411d2af710ddd074e21975c2214f7ba80dc1d32b46572fc58",
+    "tools/field-guide/controller-player.js": "21e7bcea6b8877d2011b688b5673dcd19b8c64e778dad80305a948d97a12782d",
+    "tools/field-guide/assets/meta-quest-touch-plus-left.glb": "41a35b80221398d37029cbfaa9e39084ccd43e0206be72a5e8460f52e7882cb4",
+    "tools/field-guide/assets/meta-quest-touch-plus-right.glb": "5126d638fb1d03e05d16d8eec3b31b9588df88eaa8b42cc21b857fac3bd44916",
+    "tools/field-guide/assets/controller-spatial-anchors.json": "3db7e6319f3173b9a3c3fc7008b8ad1948e77ca1ad9dd0704348e7b70c81ffe0"
+  },
+  "pages": [
+    {
+      "id": "01-move-and-fight",
+      "title": "Move & fight",
+      "actions": [
+        "gameplay.run",
+        "gameplay.stance",
+        "gameplay.dive",
+        "gameplay.interact",
+        "system.idroid",
+        "system.pause",
+        "system.recenter",
+        "gameplay.ready_weapon",
+        "gameplay.fire_or_cqc",
+        "gameplay.support_grip",
+        "gameplay.reload",
+        "gameplay.switch_weapon",
+        "gameplay.pickup_carry"
+      ],
+      "axes": [
+        "axes.move",
+        "axes.turn"
+      ]
+    },
+    {
+      "id": "02-idroid-and-menus",
+      "title": "iDroid & menus",
+      "actions": [
+        "system.idroid",
+        "system.idroid_focus",
+        "menus.next_tab",
+        "idroid.previous_tab",
+        "menus.back",
+        "system.pause",
+        "gameplay.ready_weapon",
+        "gameplay.fire_or_cqc",
+        "menus.confirm",
+        "menus.action_x",
+        "menus.action_y",
+        "menus.left_trigger",
+        "menus.right_trigger",
+        "menus.right_click",
+        "menus.previous_tab"
+      ],
+      "axes": [
+        "axes.menu",
+        "axes.map"
+      ]
+    },
+    {
+      "id": "03-optics-and-equipment",
+      "title": "Optics & equipment",
+      "actions": [
+        "gameplay.ready_weapon",
+        "gameplay.zoom",
+        "gameplay.equip_binoculars",
+        "binoculars.zoom",
+        "binoculars.mark",
+        "binoculars.clear_mark",
+        "binoculars.stow",
+        "binoculars.run",
+        "binoculars.stance",
+        "binoculars.dive",
+        "equipment.open",
+        "equipment.primary",
+        "equipment.secondary",
+        "equipment.support",
+        "equipment.items",
+        "equipment.use",
+        "equipment.back",
+        "commands.open",
+        "commands.confirm",
+        "commands.back"
+      ],
+      "axes": [
+        "axes.equipment",
+        "axes.commands"
+      ]
+    },
+    {
+      "id": "04-driving-and-travel",
+      "title": "Driving & travel",
+      "actions": [
+        "vehicle.wheel_grip",
+        "vehicle.right_wheel_grip",
+        "vehicle.accelerate",
+        "vehicle.brake_reverse",
+        "vehicle.interact",
+        "horse.gallop",
+        "horse.interact",
+        "commands.mounted_open",
+        "vehicle.ready_weapon",
+        "vehicle.fire",
+        "vehicle.reload",
+        "vehicle.equipment_open",
+        "system.idroid",
+        "system.idroid_focus",
+        "system.native_buttons"
+      ],
+      "axes": [
+        "axes.vehicle_steering",
+        "axes.move",
+        "axes.vehicle_pedals",
+        "axes.equipment"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "name": "MGS5VR-01-move-and-fight.png",
+      "width": 2480,
+      "height": 3508,
+      "content_scale": 0.9379229545593262,
+      "sha256": "a8a88347b8252102af851b094435f78c63e5e0713bda8ebf24c0648ac723193a"
+    },
+    {
+      "name": "MGS5VR-02-idroid-and-menus.png",
+      "width": 2480,
+      "height": 3508,
+      "content_scale": 0.925389289855957,
+      "sha256": "925ec929437f7747a119d0ce52a9c59e7943350dcfe7fffe256ab8d300fe167a"
+    },
+    {
+      "name": "MGS5VR-03-optics-and-equipment.png",
+      "width": 2480,
+      "height": 3508,
+      "content_scale": 0.8710689544677734,
+      "sha256": "a901f74e9ab2d876c3ca16492bb12a13c187ff40739065a63e7ac2bb13eb9fc5"
+    },
+    {
+      "name": "MGS5VR-04-driving-and-travel.png",
+      "width": 2480,
+      "height": 3508,
+      "content_scale": 0.698906421661377,
+      "sha256": "db7bc63244cc8075c27fc0e5dd7cbfc7296fb6eb67c219c1cbeb9ec79cae78c0"
+    }
+  ]
+}

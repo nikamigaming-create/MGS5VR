@@ -80,21 +80,31 @@ private:
     int16_t browseX_{},browseY_{};
     unsigned category_{};
 };
-enum class TravelMode { unknown,onFoot,horse,vehicle };
+enum class TravelMode { unknown,onFoot,horse,vehicle,nativeAction };
+// A standing non-ordinary action (including stationary weapons) owns native
+// aiming. These are the retail PlayerStatus bits, not an emplacement ID.
+TravelMode travelModeFromPlayerStatus(const std::array<uint32_t,5>& flags) noexcept;
 // A mounted view/turret consumes both native right-stick axes. The on-foot
 // controller rig may suppress those axes because the tracked head owns view
 // motion; menus and native-input mode remain exclusive as usual.
 bool mountedViewOwnsRightStick(TravelMode mode,bool rigInput,bool nativeExclusive,bool stickNavigation) noexcept;
-struct WheelSample { float axis{};bool gripped{},engaged{};uint64_t time{}; };
+struct WheelSample {
+    float axis{};bool gripped{},engaged{};uint64_t time{};
+    // Bit 0 is LEFT, bit 1 RIGHT. Proximity is published while released so
+    // the input owner can choose wheel or weapon once, on the squeeze edge.
+    uint8_t hands{},nearHands{};
+};
 // Authored driver hand contact and tracked grip are in the same LOCAL frame.
 // A fresh squeeze near that contact takes the wheel; release always lets go.
 class WheelSteering {
 public:
-    WheelSample update(Pose tracked,Pose contact,bool available,bool squeeze,uint64_t time,uint64_t epoch,Vec3 forward={0,0,-1});
+    WheelSample update(Pose tracked,Pose contact,bool available,bool squeeze,uint64_t time,uint64_t epoch,
+                       Vec3 forward={0,0,-1},float fullLockDegrees=35.f,float initialAxis=0.f);
     void reset(){*this=WheelSteering{};}
 private:
     Pose start_{};
     Vec3 axis_{0,0,-1};
+    float initialAxis_{},fullLockRadians_{.610865238f};
     uint64_t time_{},epoch_{};
     bool gripped_{},held_{};
 };
@@ -183,22 +193,32 @@ private:
     uint64_t previousTime_{},startedAt_{},cooldownUntil_{},epoch_{};
     bool primed_{},moving_{},striking_{},latched_{};
 };
-struct RigInputSample { GamepadSample gamepad; bool weaponReady{}; };
+struct RigInputSample {
+    GamepadSample gamepad;bool weaponReady{};
+    bool rightWheelGrip{},vehicleWeaponIntent{};
+};
 // Mounted vehicle triggers retain the game's accelerator/brake meanings.
 // A travel-mode transition consumes held controls until they are released.
 class RigInput {
 public:
     RigInputSample update(GamepadSample raw,bool leftGrip,bool rightGrip,TravelMode mode,
-                         uint64_t time=steadyMilliseconds(),uint64_t pickerDrawTime=0,bool throwing=false);
+                         uint64_t time=steadyMilliseconds(),uint64_t pickerDrawTime=0,bool throwing=false,
+                         bool rightWheelRequested=true,bool vehicleWeaponRequested=true,bool vehicleEquipmentRequested=false);
     unsigned equipmentPhase() const {return equipment_.phase();}
     unsigned equipmentCategory() const {return equipment_.category();}
     void requireAttackRelease(){fireReleaseRequired_=true;}
-    void suspend(){releaseRequired_=true;equipment_.reset();}
-    void reset(){mode_=TravelMode::unknown;releaseRequired_=false;fireReleaseRequired_=false;wristMode_=false;equipment_.reset();}
+    // Only a verified owned handheld terminal's reload/support transition may
+    // retain its already held ready modifier. Attack still requires release.
+    void resumeHandheldHandUse(){releaseRequired_=false;fireReleaseRequired_=true;wristMode_=false;equipment_.reset();}
+    void suspend(){releaseRequired_=true;vehicleRight_=VehicleRight::released;equipment_.reset();}
+    void reset(){mode_=TravelMode::unknown;releaseRequired_=false;fireReleaseRequired_=false;vehiclePedalsReleaseRequired_=false;wristMode_=false;vehicleRight_=VehicleRight::released;equipment_.reset();}
 private:
+    enum class VehicleRight {released,wheel,weapon,unavailable};
+    VehicleRight vehicleRight_{VehicleRight::released};
     TravelMode mode_{TravelMode::unknown};
     bool releaseRequired_{};
     bool fireReleaseRequired_{};
+    bool vehiclePedalsReleaseRequired_{};
     bool wristMode_{};
     RigEquipment equipment_;
 };

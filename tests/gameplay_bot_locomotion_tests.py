@@ -6,7 +6,7 @@ import copy
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
 from gameplay_bot.core import BotFault
-from gameplay_bot.locomotion import move_local
+from gameplay_bot.locomotion import _validate_field_state, move_local
 
 
 class Clock:
@@ -34,7 +34,7 @@ class Live:
                  release_latency=0.0, native_latency_at=None, fast_latency=0.005,
                  startup_delay=0.0, collision_distance=None,
                  startup_suppressed_pulses=0, publication_stalls_at_pulse=None,
-                 consume_while_stalled=False):
+                 consume_while_stalled=False, movement_threshold=0.0):
         self.bindings = {"axes": [{"name": "axes.move", "source": "left_stick"}]}
         self.clock = clock
         self.events = Events()
@@ -53,6 +53,7 @@ class Live:
         self.publication_stalls_at_pulse = publication_stalls_at_pulse or {}
         self.publication_stalled_until = 0.0
         self.consume_while_stalled = consume_while_stalled
+        self.movement_threshold = movement_threshold
         self.last_controls = None
         self.pulse_started_at = 0.0
         self.native_reads = 0
@@ -82,7 +83,7 @@ class Live:
                 self.current_value = 0.0
             return
         if not self.dynamics:
-            if self.held and now < self.expires_at:
+            if self.held and now < self.expires_at and self.current_value >= self.movement_threshold:
                 self.position[0] += self.step * self.current_value / .30
             if now >= self.expires_at:
                 self.held = False
@@ -94,6 +95,7 @@ class Live:
             remaining -= dt
             if self.held and now - remaining < self.expires_at:
                 desired_speed = (self.current_value * 3.0 if
+                    self.current_value >= self.movement_threshold and
                     now - remaining - self.pulse_started_at >= self.startup_delay else 0.0)
                 self.velocity += (desired_speed - self.velocity) * min(1.0, dt / .25)
             else:
@@ -144,6 +146,8 @@ class Live:
         buttons = [0.0] * 11
         physical = {"buttons": buttons} if self.malformed_physical else buttons
         stick_index = 1 if self.bindings["axes"][0]["source"] == "left_stick" else 3
+        if self.input_values and self.input_values[0].get("sub_component") == "X":
+            stick_index -= 1
         sticks = [0.0, 0.0, 0.0, 0.0]
         sticks[stick_index] = self.current_value if self.held else 0.0
         context = "menus" if self.bad_context_at == self.observe_count else "gameplay"
@@ -197,8 +201,56 @@ class Live:
 
 
 class LocomotionTests(unittest.TestCase):
+    def test_cardinal_walk_uses_only_selected_axis_and_retains_sign_when_braking(self):
+        for source in ("left_stick", "right_stick"):
+            for direction in ("up", "down", "left", "right"):
+                with self.subTest(source=source, direction=direction):
+                    clock = Clock()
+                    live = Live(clock, dynamics=True, movement_threshold=-1.)
+                    live.bindings["axes"][0]["source"] = source
+                    result = self.run_move(live, clock, direction=direction,
+                                           target_distance=.55, brake_magnitude=.30)
+                    sign = -1 if direction in ("down", "left") else 1
+                    component = "X" if direction in ("left", "right") else "Y"
+                    self.assertEqual(live.input_values[0]["sub_component"], component)
+                    self.assertTrue(all(v * sign > 0 for v in live.input_history))
+                    self.assertIn(sign * .30, live.input_history)
+                    self.assertEqual(result["input"]["direction"], "stick_" + direction)
+                    self.assertFalse(live.held)
+
+    def test_carry_requires_both_explicit_witness_and_native_carry_state(self):
+        state=Live(Clock()).observe(native=True)
+        state['native'].update(status_NORMAL_ACTION=False,status_CARRY=True)
+        for witness in (False,1,'yes'):
+            with self.subTest(witness=witness),self.assertRaises(BotFault):
+                _validate_field_state(state,witnessed_carry=witness)
+        _validate_field_state(state,witnessed_carry=True)
+        state['native']['status_CARRY']=False
+        with self.assertRaises(BotFault):_validate_field_state(state,witnessed_carry=True)
+
     def run_move(self, live, clock, **kwargs):
         return move_local(live, clock=clock, sleep=clock.sleep, **kwargs)
+
+    def test_default_cruise_crosses_native_deadzone_and_releases_at_endpoint(self):
+        # The live field reproduction sampled .30 correctly but never moved;
+        # .45 moved under the same ordinary native owner. Keep endpoint and
+        # expiry checks active when choosing the usable default magnitude.
+        clock = Clock()
+        live = Live(clock, step=.025, movement_threshold=.40)
+        with self.assertRaisesRegex(BotFault, "No native movement progress"):
+            self.run_move(live, clock, cruise_magnitude=.30)
+        self.assertFalse(live.held)
+
+        clock = Clock()
+        live = Live(clock, step=.025, movement_threshold=.40)
+        result = self.run_move(live, clock)
+        self.assertTrue(result["target_reached"])
+        self.assertGreaterEqual(result["distance_native_units"], .25)
+        self.assertLessEqual(result["distance_native_units"], .75)
+        self.assertTrue(result["settled_after_release"])
+        self.assertTrue(all(lease <= .25 for lease in live.leases))
+        self.assertEqual(live.native_reads_while_held, 0)
+        self.assertFalse(live.held)
 
     def test_short_move_uses_effective_axis_and_measures_neutral_endpoint(self):
         clock = Clock()

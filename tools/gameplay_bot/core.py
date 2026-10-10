@@ -15,6 +15,11 @@ class BotFault(RuntimeError):
     pass
 
 
+class BattleResponseNeeded(BotFault):
+    """Fresh battle state preempts a neutral planning action before dispatch."""
+    pass
+
+
 class ActionPrerequisiteChanged(BotFault):
     """Fresh admission rejected an action before any input was dispatched."""
     pass
@@ -225,7 +230,10 @@ class Behaviors:
                     seen_milestones.add(name)
                     self.events.emit("milestone_reached", label=label, milestone=name,
                                      elapsed=self.clock()-started, state=state, expected=predicate)
-            if not notified and self.clock()-started >= 2.:
+            presentation = getattr(self.adapter, "presentation_guard", None)
+            expected_recovery = (presentation is not None
+                                 and presentation.awaiting_head_recovery(predicate, state))
+            if not notified and not count and self.clock()-started >= 2. and not expected_recovery:
                 captures = []
                 if not getattr(self.adapter, "held", False):
                     try:

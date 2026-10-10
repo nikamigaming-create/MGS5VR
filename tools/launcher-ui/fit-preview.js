@@ -6,7 +6,7 @@ const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 const degrees=Math.PI/180;
 const rotation=(pitch=0,yaw=0,roll=0)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch*degrees,yaw*degrees,roll*degrees,'YXZ'));
 export const fitContexts={
- idroid:['iDroid','Right hand · device · projector · screen'],
+ idroid:['iDroid','LEFT bionic hand · device · projector · screen'],
  wrist:['Left forearm','Bionic arm · weapon info · HUD · equipment'],
  hands:['Hands & weapons','Grip position · finger contact · support distance'],
  optics:['Optics','Physical binoculars · scope · eye clearance'],
@@ -72,7 +72,7 @@ export class FitPreview {
  build(){
   this.views={};for(const context of Object.keys(fitContexts)){const group=new THREE.Group();this.root.add(group);this.views[context]=group;}
   const i=this.views.idroid;this.idroidGrip=new THREE.Group();i.add(this.idroidGrip);
-  this.idroidHand=this.hand(this.idroidGrip);this.idroidHand.position.set(0,-.08,-.022);this.idroidHand.rotation.x=Math.PI/2;this.curl(this.idroidHand,65);
+  this.idroidHand=this.hand(this.idroidGrip,true);this.idroidHand.position.set(0,-.08,-.022);this.idroidHand.rotation.x=Math.PI/2;this.curl(this.idroidHand,65);
   this.device=new THREE.Group();this.idroidGrip.add(this.device);
   this.box(this.device,[.062,.14,.029],[0,-.016,0],'#455753');this.box(this.device,[.05,.018,.035],[0,.044,0],'#899478');
   const lens=this.cylinder(this.device,.016,.006,[0,.051,.012349601],'#a4f7f1');this.box(this.device,[.048,.088,.006],[0,-.014,.018],'#35433f');
@@ -120,7 +120,7 @@ export class FitPreview {
  update(values){
   this.values=values;
   for(const [key,view] of Object.entries(this.views))view.visible=key===this.context;
-  this.fit(this.idroidGrip,'right_hand_');const deviceFit=new THREE.Group();this.fit(deviceFit,'idroid_grip_');
+  this.fit(this.idroidGrip,'left_hand_');const deviceFit=new THREE.Group();this.fit(deviceFit,'idroid_grip_');
   this.idroidGrip.position.add(deviceFit.position.applyQuaternion(this.idroidGrip.quaternion));this.idroidGrip.quaternion.multiply(deviceFit.quaternion);
   const width=this.value('idroid_screen_width_cm',45)*.01,height=width*9/16;
   this.screenPivot.position.copy(this.emitter).add(V(this.value('idroid_screen_x_cm')*.01,this.value('idroid_screen_y_cm')*.01,this.value('idroid_screen_depth_cm',8)*.01));

@@ -190,16 +190,16 @@ bool AcceptedStereoFrame::accept(const std::array<EyeFrame,2>& eyes,uint64_t epo
     if(!epoch||!readyEyePair(eyes,activation,now))return false;
     eyes_=eyes;epoch_=epoch;referenceEpoch_=referenceEpoch;transitionAt_=0;transitionStarted_=false;return true;
 }
-bool AcceptedStereoFrame::presentable(uint64_t epoch,uint64_t activation,uint64_t now) const {
+bool AcceptedStereoFrame::presentable(uint64_t epoch,uint64_t activation,uint64_t now,uint64_t referenceEpoch) const {
     // Only accept() can populate this immutable pair. Do not re-admit old
     // consumer metadata or replace its poses with the latest tracked poses.
-    return epoch_&&epoch_==epoch&&activation&&eyes_[0].activation==activation
+    return epoch_&&epoch_==epoch&&referenceEpoch_==referenceEpoch&&activation&&eyes_[0].activation==activation
         &&eyes_[1].activation==activation&&now>=eyes_[0].sampleTime&&now>=eyes_[1].sampleTime;
 }
 bool AcceptedStereoFrame::transitionPresentable(uint64_t epoch,uint64_t activation,uint64_t authorizedActivation,
     uint64_t referenceEpoch,uint64_t now){
     if(!referenceEpoch||referenceEpoch!=referenceEpoch_||!authorizedActivation||activation!=authorizedActivation
-        ||activation<=eyes_[0].activation||!presentable(epoch,eyes_[0].activation,now))return false;
+        ||activation<=eyes_[0].activation||!presentable(epoch,eyes_[0].activation,now,referenceEpoch))return false;
     // Start at the handoff, not at image capture: FOX waits 500 ms before
     // adopting a retired shot camera. Repeated calls or further activation
     // changes cannot extend this deadline without admitting a new image.

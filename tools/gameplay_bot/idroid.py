@@ -52,10 +52,10 @@ def verify_palm_motion(observations):
     for state in observations:
         frame = state.get("rendered") or {}
         age = state.get("now_ms", -1) - frame.get("sample_ms", -10000)
-        if (not frame.get("rig_sequence") or not frame.get("right_palm_tracked")
+        if (not frame.get("rig_sequence") or not frame.get("left_palm_tracked")
                 or not 0 <= age <= 150 or frame.get("activation") != state.get("activation")):
             raise BotFault("Native palm publication is frozen or unavailable while XR controller poses change")
-        palm = frame.get("right_palm", {})
+        palm = frame.get("left_palm", {})
         if len(palm.get("position", [])) != 3 or len(palm.get("orientation", [])) != 4:
             raise BotFault("Native palm transform is unavailable")
         palms.append(palm)
@@ -160,20 +160,20 @@ def inspect_idroid(live, behavior, *, clock=time.monotonic, sleep=time.sleep):
         if not state.get("idroid"):
             if state.get("scene") != "gameplay":
                 raise BotFault("iDroid check requires normal field gameplay or an already open iDroid")
-            live.execute({"op": "pose", "hand": "right", "position": [.12, -.18, -.50],
+            live.execute({"op": "pose", "hand": "left", "position": [-.12, -.18, -.50],
                           "orientation": device_orientation()})
             live.execute({"op": "action", "name": "system.idroid", "state_before": {"scene": "gameplay"}})
         behavior.wait_for({"idroid": True, "idroid_menu_input_ready": True}, 8, "idroid-input-owner")
         # Native device upright, projection toward the wearer. Declared operator
         # poses for deterministic visual inspection, not a measured human pose.
-        poses = (([.12, -.18, -.50], 0), ([.22, -.12, -.48], 0),
-                 ([.02, -.23, -.55], 0), ([.12, -.18, -.50], -20),
-                 ([.12, -.18, -.50], 20), ([.12, -.18, -.50], 0))
+        poses = (([-.12, -.18, -.50], 0), ([-.22, -.12, -.48], 0),
+                 ([-.02, -.23, -.55], 0), ([-.12, -.18, -.50], -20),
+                 ([-.12, -.18, -.50], 20), ([-.12, -.18, -.50], 0))
         result["declared_poses"] = []
         result["palm_observations"] = []
         for index, (point, yaw) in enumerate(poses):
             orientation = device_orientation(yaw)
-            pose = {"op": "pose", "hand": "right", "position": point, "orientation": orientation}
+            pose = {"op": "pose", "hand": "left", "position": point, "orientation": orientation}
             result["declared_poses"].append(pose)
             live.execute(pose)
             result["captures"] += live.capture(f"idroid-palm-{index}")

@@ -1,11 +1,14 @@
 @echo off
 if not exist "%~dp0play\BUILD.json" (
-  echo Run tools\build.ps1 once to create the current test build.
+  echo The pinned play build is missing. Build development, then explicitly pin-build after review.
   pause
   exit /b 1
 )
 if not exist "%~dp0artifacts\dev" mkdir "%~dp0artifacts\dev"
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0play\tools\launch-headset.ps1" %* > "%~dp0artifacts\dev\headset-launch.log" 2>&1
+python "%~dp0tools\workspace.py" deploy --slot play > "%~dp0artifacts\dev\headset-launch.log" 2>&1
+if errorlevel 1 goto failed
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\launch-headset.ps1" %* >> "%~dp0artifacts\dev\headset-launch.log" 2>&1
+:failed
 set "MGS_HEADSET_EXIT=%ERRORLEVEL%"
 type "%~dp0artifacts\dev\headset-launch.log"
 if not "%MGS_HEADSET_EXIT%"=="0" (

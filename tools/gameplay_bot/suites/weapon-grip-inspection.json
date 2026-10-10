@@ -1,17 +1,17 @@
 {
   "schema": 1,
-  "description": "Inspect the equipped physical firearm and left-arm readout through bounded grip-only input. No fire, locomotion, menu or loadout mutation. Captures require a fresh neutral action audit and established grip modifiers.",
+  "description": "Inspect the equipped physical firearm and left-arm readout through bounded grip-only input. No fire, locomotion, menu or loadout mutation. This readiness check does not assume a round magnifying optic; sight eligibility needs its own case.",
   "cases": [
     {
       "id": "equipped-long-gun-one-hand",
-      "before": {"scene": "gameplay", "controls.context": "gameplay", "rendered.scope_tracked": false},
+      "before": {"scene": "gameplay", "controls.context": "gameplay", "controls.native_triggers": [0, 0]},
       "setup": [
         {"op": "pose", "hand": "left", "position": [-0.04, -0.16, -0.55], "orientation": [0, 0.70710678, 0, 0.70710678]},
         {"op": "pose", "hand": "right", "position": [0.22, -0.20, -0.50], "orientation": [0, 0, 0, 1]}
       ],
       "steps": [{"op": "action", "name": "gameplay.ready_weapon", "seconds": 0.8, "static_grip_capture": true}],
-      "during": {"camera_active": true, "rendered.scope_tracked": true},
-      "after": {"scene": "gameplay", "controls.context": "gameplay", "rendered.scope_tracked": false}
+      "during": {"camera_active": true, "rendered.native_firearm": true, "controls.native_triggers": [255, 0]},
+      "after": {"scene": "gameplay", "controls.context": "gameplay", "controls.native_triggers": [0, 0]}
     }
   ]
 }

@@ -227,6 +227,19 @@ void TextureConsumer::reset() {
     if(channel_)channel_->retired.store(true,std::memory_order_release);
     cached_.Reset();slots_={};completion_={};channel_.reset();frame_={};eyes_={};
 }
+void TextureConsumer::poll() {
+    if(!channel_)return;
+    if(channel_->retired.load(std::memory_order_acquire)){reset();return;}
+    FlowSample flow;
+    try{
+        for(size_t n=0;n<slots_.size();++n){auto& slot=channel_->slots[n];
+            if(slot.state.load(std::memory_order_acquire)==TextureSlotState::consumerPending
+                &&complete(context_.Get(),completion_,slots_[n].complete.Get(),slots_[n].marker,flow))
+                slot.state.store(TextureSlotState::free,std::memory_order_release);
+        }
+    }catch(...){channel_->retired.store(true,std::memory_order_release);throw;}
+    reportFlow(false,flow);
+}
 bool TextureConsumer::consume(const std::shared_ptr<TextureChannel>& channel) {
     if(channel_&&channel_->retired.load(std::memory_order_acquire))reset();
     if(!channel)return false;
@@ -250,10 +263,8 @@ bool TextureConsumer::consume(const std::shared_ptr<TextureChannel>& channel) {
     try{
         // Only the XR immediate context polls these queries. A native producer
         // sees free only after this copy/release is GPU-complete.
-        for(size_t n=0;n<slots_.size();++n){auto& slot=channel->slots[n];
-            if(slot.state.load(std::memory_order_acquire)==TextureSlotState::consumerPending
-                &&complete(context_.Get(),completion_,slots_[n].complete.Get(),slots_[n].marker,flow))slot.state.store(TextureSlotState::free,std::memory_order_release);
-        }
+        poll();
+        if(!channel_)return false;
         size_t newest=slots_.size();uint64_t sequence=frame_.sequence;
         for(size_t n=0;n<slots_.size();++n){const auto& slot=channel->slots[n];
             if(slot.state.load(std::memory_order_acquire)==TextureSlotState::ready&&slot.published.sequence>sequence){newest=n;sequence=slot.published.sequence;}}

@@ -15,6 +15,120 @@ source references and honest coverage scopes, not private captures or user data.
 
 ## Current gate
 
+The October 10 development candidate `bfa228f7bc04` repairs the reproduced
+first-open iDroid/Help camera freeze, the guide's paused camera and handset
+publication, and delayed return of GPU-completed XR shared slots. The real
+Security guide completes through VR controls with native mode/pause clearing.
+Forty-four scoped simulator field checks pass on this DLL: iDroid lifecycle,
+input contexts, Pause, stance, head/view recovery, three loaded weapons with
+native discharge/reload and one/two-hand support, and SVG-76 1x/2x/1x.
+A quiet 90 Hz field baseline now delivers 89.62-90.04 fresh XR frames per
+second, median 90.00, with no empty frames. A fixture expecting 198 ALM rounds
+was corrected against the observed 200 before any failed action dispatched;
+the failed evidence remains retained. All 54 CTest groups and installer checks
+pass on the native changes. See `docs/CURRENT.md` for the precise current scope.
+
+These are scoped results, not completion of the 47 behavior families. Full
+mission/save/configuration coverage, all 418 weapon definitions, sight/hit
+alignment, binocular acquisition/marking, vehicles, soak and physical-headset
+acceptance remain open. The selected `6ac2` play pin is unchanged; development
+contains the fixes and has not been promoted or publicly released.
+
+## Earlier candidate evidence and remaining gates
+
+The expanded private current field video contains 567 exact reviewed source
+frames across seven chapters (187 seconds). A new 39.94-second loaded-card
+sweep independently witnesses native render resources 27873, 93478 and
+159074 and individual slot discharges of two, three and one rounds. All 110
+parent frames and 24 sequential paired-eye images were reviewed. One/two-hand
+ready and SVG-76 powers 1x/2x are exercised; visible pose jumps, exact contacts,
+hits and complete fitted-sight coverage remain unaccepted. These three loaded
+cards do not clear the 418-definition catalog. The compositor wrapper's
+overlong startup request is corrected to its supported 45 seconds; the failed
+startup dispatched no weapon checks. The separate binocular/iDroid comparison
+has all 67 frames and fourteen paired images reviewed, showing the right ocular
+clear with the handset aside or stowed. A measured current truck-0002 trial
+was interrupted by native incoming fire before boarding and cleaned up.
+The earlier `3a8a` steering clip stays explicitly identified; current driving,
+the full feature/save/configuration matrix and physical headset acceptance
+remain open.
+
+The maintained bot now completes one measured current `6ac2` mortar entry,
+downrange aim, actual discharge and exit. Pinned `20261006T041836747984Z`
+retains the final-eye source and visual review: all 110 LEFT parent frames and
+four response/exit images reviewed, with launch and distant impact visible.
+The exact impact coordinate and complete curved arc remain unaccepted; white
+beam/stipple rendering defects are retained. The final streamed-fixture-ID
+and last-pulse observation repairs pass all 54 CTest groups and installer
+checks. Ordinary Mother Base/Development/Weapons/Items/Back/stow now has
+88 reviewed frames and ten paired images on the current middle save. Physical
+binocular/iDroid coexistence, zoom 2x -> 4x and a short walk have 98 reviewed
+frames and eight images; moving the handset clear of the optic restores its
+world view, while acquisition/marking remain open. The private 142-second
+combined video joins 488 exact reviewed source frames and identifies the
+earlier steering build separately. It does not accept the complete field kit
+or catalog/configuration/save matrix. Current truck entry remains failed.
+
+October 5 candidate `6ac226f4bf2c` passes all 54 CTest groups and installer
+checks. It repairs the absent 1x collimator dot observed in the real `02052`
+take. The current run completes 1x -> 2x -> 1x with the dot visible in both
+eyes at both powers; all 88 LEFT compositor frames and six paired images were
+reviewed. The left-eye off-axis 1x aperture is largely dark, and handling jumps
+remain. This does not accept complete sight/muzzle/hit alignment. The real earlier
+take completed 1x -> 2x -> 1x, and both eyes show the aligned 2x lens and dot.
+All 152 compositor parent frames and all six paired images were reviewed;
+brief separated-lens and handling jumps keep motion acceptance open.
+The previously missing SVG-76 1x/2x path now resolves the actual native
+collimator and hinged magnifier, with separate measured glass apertures and an
+existing-model hinge adapter. Complete both-eye scope/motion acceptance is pending;
+the full catalog and exact native reticle texture remain unaccepted.
+Mounted eyes now use the native seated root heading and authored head
+position; vehicle occupancy survives handheld menu input focus. The latter
+repairs an actual `3a8a` closing-frame camera jump and awaits live verification.
+The preceding private `3a8a` truck fixture moved the actual vehicle 3.414 units
+with physical hand steering and eight witnessed game input returns. Both cab
+eyes and every decoded compositor parent frame were reviewed. The complete
+case remains failed because its exit deadline stopped during the door
+animation; cleanup completed the exit. Two handheld transition frames remain
+unaccepted. Private fixture placement and native clock setup do not certify
+navigation or progression. Mounted visual acceptance remains pending.
+Retained `69cfeb25878c` final-eye review verifies a single LEFT handset
+with the actual WU S.PISTOL, native discharge/reload, and device stow/return
+when borrowing the LEFT hand for reload and weapon support. The separate rifle
+chapter still exposes native manipulation alignment failures. The bot's default
+local cruise now crosses the measured native dead zone and one pinned bounded
+walk settles correctly. These cases do not certify entire weapons, missions,
+scope permutations, exact cinematic projection bounds or a physical headset.
+The current `6ac2` WU S.PISTOL run also witnesses discharge 11 -> 10, native
+reload to 11, and single LEFT-handset stow/return for support grip. A field
+Development loading spinner and an Exit Tutorial card persisting after native
+pause closure were reproduced. Existing VR stow and focused A Close restored
+the map, but Development/all-menu acceptance remains open.
+
+Four configured weapon trials retained the same actual primary render resource
+and optical descriptor despite typed slot changes. They therefore remain
+unaccepted as four weapon/scope models. Ordinary VR Interact subsequently
+boarded native truck 0002, and reverse moved it 3.706 native units. That case
+still failed forward/handheld driving and its final eyes exposed the camera
+defect; it is not accepted cab/driving footage. The newer daytime run was
+interrupted by native entry-mode changes and incoming fire. Source-backed
+health and checkpoint recovery are retained without health/progression writes.
+Full fresh/middle/end progression, all menus, physical binocular
+acquire/mark with the current handset, complete mortar arc and the complete
+field-kit video remain open. Current scoped evidence and limitations are
+recorded in [CURRENT.md](CURRENT.md); older gates below remain historical and
+are not implicitly cleared by these new chapters.
+
+The October 3 idle/menu investigation adds a scoped repair for loss of raw
+head/view validity. Candidate `72fdf5e65ad5` retains the admitted stereo pair
+under its original camera/reference owner; actual ACC passed six bounded
+loss/recovery cases with menus closed and six with a native iDroid information
+card visible. All outcome eyes were reviewed. The information-card run's
+later Back/stow expectation failed and remains failed. Physical idle blackout,
+runtime stalls, continuous stereo and the reported helicopter-to-free-roam
+route remain open. The new reports do not clear the five blocked coverage
+families below. See [the scoped report](HELICOPTER_IDLE_REPORT.md).
+
 **Five coverage families remain blocked.** Candidate `92d1a69368bd` passed
 44 CTest groups and installer transactions, including 120 real D3D11 mailbox
 checks. These isolated checks do not accept native gameplay. Three linked
@@ -114,7 +228,7 @@ the historical R01–R55 report IDs.
 | Cutscene camera or animation bugs | Open, lower priority. Exact scene, transition and symptom are unknown. Older Mission 6 evidence does not resolve it. | Identify the native scene and review continuous entry, authored shots/animation and natural gameplay recovery in both eyes. |
 
 Historical before/after stills remain useful within their original scope. Repair
-must preserve the right-hand native iDroid, native animation, live UI and left-arm
+must preserve the left-hand native iDroid, native animation, live UI and left-arm
 ordinary HUD, then replay complete transitions with retained evidence. Exact
 process/configuration identities and private captures remain in the controlled
 local ledger. The public candidate ID remains
@@ -249,7 +363,7 @@ See each JSON entry for exact source paths, test names, scope and missing checks
 | `equipment-picker` | Wrist equipment categories, selection and cancellation | 3 groups | 2 | retained scope | unverified | unverified |
 | `item-actions` | Native throw, place, detonate and item-use routes | 2 groups | 0 | retained scope | unverified | unverified |
 | `wrist-commands` | Wrist Commands, native holds and selected buddy orders | 3 groups | 2 | retained scope | unverified | unverified |
-| `idroid-mount` | Right-hand iDroid default, native device mount and live screen | 5 groups | 4 | **BLOCKED** | **BLOCKED** | unverified |
+| `idroid-mount` | Left-hand iDroid default, native device mount and live screen | 5 groups | 4 | **BLOCKED** | **BLOCKED** | unverified |
 | `idroid-lifecycle` | Ordinary iDroid stow and immediate reopening | 3 groups | 4 | **BLOCKED** | **BLOCKED** | unverified |
 | `idroid-native-guides` | iDroid native restrictions, completed guide recovery and tutorial escape | 3 groups | 4 | **BLOCKED** | unverified | unverified |
 | `idroid-cone` | Experimental iDroid native projection-cone retargeting | 2 groups | 0 | unverified | unverified | unverified |

@@ -12,6 +12,7 @@
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/menu_surface.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/control_prompts.hpp"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -640,9 +641,25 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const bool binocularLensVisible=optic.held&&optic.pose.tracked&&std::any_of(
         source.pair.sample.views.begin(),source.pair.sample.views.end(),
         [&](const auto& eye){return mgs5vr::binocularEyeVisible(optic.pose,eye.pose,optic.maxEyeDistance);});
+    const bool collimator=scope.dotReticle&&scope.magnification==1.f;
     const auto opticView=!diagnosticLensRendering.load()?std::nullopt:binocularLensVisible?mgs5vr::binocularSceneView(optic.pose,
-        source.pair.sample.controllers.magnification):scopeView;
+        source.pair.sample.controllers.magnification):collimator?std::nullopt:scopeView;
     mgs5vr::ComPtr<ID3D11Texture2D> opticScene;
+    // Snapshot text and both-eye facing once for this stereo transaction.
+    // A live binding reload must never give the two eyes different help.
+    const auto& hintSource=source.pair.sample;
+    const auto& hintControls=hintSource.controllers;
+    const bool accHint=hintControls.cabinDeployHint&&hintControls.cabinPlay&&!hintControls.cabinTransit
+        &&!hintSource.menuOpen&&!hintSource.menuIdroid&&hintSource.wristPanelTracked
+        &&!hintControls.equipmentOpen&&!hintControls.commandControls&&!hintControls.nativeGamepad
+        &&!hintControls.frontEnd&&!hintControls.loading&&!hintControls.scriptedDemo&&!hintControls.optic.held;
+    const auto hintBindings=accHint?mgs5vr::controlPromptBindings():nullptr;
+    const std::string hintBinding=hintBindings?hintBindings->label("system.idroid"):std::string{};
+    const std::array<mgs5vr::Pose,2> hintEyes{
+        mgs5vr::nativeEyePose(hintSource.nativePose,hintSource.headPose,hintSource.views[0].pose),
+        mgs5vr::nativeEyePose(hintSource.nativePose,hintSource.headPose,hintSource.views[1].pose)};
+    const bool drawAccHint=accHint&&!hintBinding.empty()&&hintBinding!="UNBOUND"
+        &&mgs5vr::panelFacesBothEyes(hintSource.wristPanel,hintEyes);
     const uint32_t extraPass=opticView?1u:0u;
     for(uint32_t pass=0;pass<(extraPass?5u:2u);++pass){
         sceneRenderPass=pass;
@@ -792,11 +809,17 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             alignas(16) std::array<float,16> ocularWorld{},projection{};
             originalWorld(ocularValues.data(),ocularWorld.data());
             std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
-            mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get());
+            mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get(),scope.dotReticle);
         }
         const auto& wrist=source.pair.sample;
         if(!titleSurface&&!wrist.menuOpen&&mgs5vr::worldHudVisible(wrist.controllers.hudMode,hudView))
             mgs5vr::drawWorldWaypoints(afterContext,eyeView,eyeProjection,native.position,markerSnapshot);
+        if(afterContext&&drawAccHint){
+            alignas(16) auto hintPose=values(wrist.wristPanel);
+            alignas(16) std::array<float,16> hintWorld{};
+            originalWorld(hintPose.data(),hintWorld.data());
+            mgs5vr::drawAccWristHint(afterContext,hintWorld,eyeView,eyeProjection,hintBinding);
+        }
         // The equipment category screen is native UI orders 133..136. The
         // worker-side UI hook remaps those real pixels to the wrist picker;
         // there is deliberately no generated instruction-card draw here.
@@ -830,7 +853,8 @@ __declspec(noinline) float* world(void* input,float* output){
     const auto source=reinterpret_cast<uintptr_t>(input);
     if(caller==base+layout.worldReturn){
         if(const auto menu=mgs5vr::nativeMenuOpen()){
-            mgs5vr::headCamera().setNativeMenuOpen(*menu,mgs5vr::nativeIdroidOpen());
+            mgs5vr::headCamera().setNativeMenuOpen(*menu,mgs5vr::nativeIdroidOpen(),mgs5vr::nativePauseMenuOpen(),
+                mgs5vr::nativeIdroidTutorialPaused());
         }
         current={};current.camera=source-layout.cameraPose;
         current.identity=layout.publisher?publicationOwner:current.camera;

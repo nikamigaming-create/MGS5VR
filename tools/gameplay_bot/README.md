@@ -3,9 +3,25 @@
 For local work use `python tools/workspace.py launch-sim`, then
 `python tools/workspace.py bot --command continue` and
 `python tools/workspace.py bot`. Steam remains running. The current build is
-always `play/`; bot scratch runs have bounded retention. The default command
+always `build/dev/`; pinned `play/` stays unchanged. Bot scratch runs have
+bounded retention. The default command
 only observes. Use `workspace.py pin` before citing a run as acceptance evidence,
 and `workspace.py stop-sim` for exact-owned test-session cleanup.
+
+For the reviewed mortar field fixture, use
+`python tools/workspace.py bot --command mortar --policy private/mortar-fire-policy.json --record --seconds 60`.
+Run Continue first when starting a new simulator session. The policy identifies
+the authored mortar, native NAV map and observed operator position. The bot runs
+there, finishes its short approach, stands, enters, triggers once, records the
+native shell-load/discharge response, dismounts and releases inputs. Damage,
+owner changes and the selected deadline stop the case.
+The explicit policy boolean `active_camp_diagnostic` acknowledges an already
+detected camp for this firing diagnostic; damage still interrupts the run.
+Stationary mortar entry
+does not require a ridden-vehicle ID; the actual game keeps those getters empty.
+Input delivery alone leaves `shot_proven=false` until the recording is reviewed.
+The separate `emplacement` diagnostic still measures exact-ID and aiming-axis
+coverage; its vehicle-ID expectation does not establish mortar firing failure.
 The simulator launcher forwards to the existing Steam client and temporarily
 selects the runtime in the game's own `mgs5vr-runtime.ini`. Cleanup restores its
 exact prior bytes or absence; personal edits made during a test are preserved.
@@ -74,6 +90,13 @@ unrecognized popup. Prefer a suite of observed field actions for teaching takes.
   this records actual held controls and does not fabricate a held-eye capture.
   Review the final menu selection before Confirm.
 - `observe --seconds <number>` samples without gameplay actions.
+- A `gameplay.fire_or_cqc` action can explicitly use `include_ready: true`
+  for a bounded on-foot firing probe. It resolves the effective grip modifier,
+  waits for 200 ms of sampled native weapon readiness, then sends a
+  0.03–0.35 second trigger burst. Owner changes, unready weapons and unsupported
+  remaps stop before the trigger; cleanup releases both channels. This verifies
+  the input sequence. Actual firing still needs ammunition and visual evidence;
+  it does not require or certify a magnified scope.
 - `move --distance .35` performs a short forward movement through the configured
   stick, reduces the value before the target, releases and checks settling.
   The five-second/one-unit bounds reject stuck movement and scene changes. This
@@ -146,9 +169,69 @@ match, and release/capture cleanup succeeded. `depends_on` names earlier cases;
 a failed dependency skips that case. Ambiguous dispatch or release still stops
 the queue. A matching entry predicate does not prove nothing else changed.
 
-The A* graph utility currently supports supplied, validated edges. Native
-collision-query integration, general route execution, all weapons/modes, saved
-queue resumption and the complete showcase are still being implemented. See
+The route executor imports owned NAV2 data and drives ordinary VR locomotion
+over its explicit graph edges. It reads every enemy-definition page before
+choosing a posture, tracks native floor/position/life, and replans around actual
+blocked edges. NAV2 is an NPC planning prior; actual traversal establishes player
+clearance. A precise final approach can select a 0.75–3.5-unit arrival radius
+without relaxing floor tolerances. Scene passes do not establish every road or
+vehicle route.
+
+`workspace.py combat --camp NAME --seconds 30` explicitly selects bounded
+firearm combat. The bot joins authored soldier identities and native life with
+a leased observation from the native marker job. That job reads person-marker
+capsules and uses the existing signature-verified world visibility query from
+the solved weapon muzzle. Unknown/blocked terrain refuses firing. The bot turns
+its simulated headset, aims through separate VR grip/aim poses, closes the loop
+against the actual native muzzle, and uses effective ready/trigger bindings.
+Actor incapacitation and ammunition are observed separately; a buddy can affect
+attribution. Both final eyes still need visual review. This is not full combat,
+body handling, all optics, supply-drop visibility, or campaign acceptance.
+
+Reusable policy and native facts must retain their tested build/world and proof
+scope. Dynamic enemy positions and blockers must be refreshed. Internal planning
+knowledge never substitutes for the player seeing usable binoculars, markings,
+items, prompts and action results. See
 [the current delivery plan](../../docs/BOT_AND_SHOWCASE_PLAN.md) for coverage.
+
+`workspace.py autonomy --camp NAME --seconds 600 --record --stealth-loadout
+PATH --emplacement PATH` selects the bounded camp policy and an optional
+reviewed emplacement. The loadout policy must identify this fixture's wrist
+card and actual slot; customized slot numbers are not global gun identities.
+The bot runs in clear ground, crouches/crawls near observed guards, equips the
+physical binoculars and explicitly marks only after current exact-actor native
+acquisition. Its suppressed pistol range is 25 metres. Gun poses preserve both
+controller grip/aim pairs and use the rig's authored support contact. Fresh
+native barrel, view, visibility and attached support checks gate every trigger.
+Moving-target rejection can cause bounded re-aiming before dispatch; uncertain
+trigger completion never permits another shot. Damage takes priority over
+attack, with a reviewed primary-weapon fallback after detection.
+
+Cover planning probes at most eight connected NAV floor points and four actual
+person-marker points on the native marker job. Requests join the observed
+player root with a focused, fresh, same-owner native eye; missing/stale results
+cannot count as cover. Terrain obstruction ranks approach positions. A short
+crouched peek seeks a clear ray toward the selected guard while retaining
+obstruction toward others; actual muzzle visibility is checked separately.
+The bot returns to mapped cover after an observed outcome. Marker rays do
+not prove enemy vision, shadows, AI concealment or body hiding.
+
+Recorded held gun inspections use a checkpoint into continuous NativeEyeAV
+source-eye video, avoiding a reproduced blocking compositor RPC. This produces
+no still image or final-compositor pass. Neutral checkpoints still capture
+both final eyes. Twelve-second recording segments retain source lineage,
+cadence repeats/drops and actual game audio. Review those frames before making
+visual acceptance claims. A local artifact director is in
+`private/snake-director`; it observes evidence and accepts only a fresh pending
+commander waypoint with both reviewed eye hashes. Its learning file remains a
+candidate until a later action and regression verify it.
+
+The emplacement follow-up requires two native camp-incapacitation snapshots
+and no nearby active guard. Registry `gimmickType` (mortar category 5) and native
+`type` (mortar object 81) are distinct domains. Exact authored locator, dataset,
+lookup status and object ID must match. It tests one mount interaction, four
+isolated aim-axis pulses, a sampled native fire status and dismount. Packets and
+fire status do not certify barrel motion, a projectile, all emplacements, road
+driving or whole-game acceptance.
 
 Offline checks: `python tests/gameplay_bot_tests.py`.

@@ -68,7 +68,7 @@ def _validate_xr_field_state(state, *, activation=None):
     return controls, now_ms
 
 
-def _validate_field_state(state, anchor=None):
+def _validate_field_state(state, anchor=None, *, witnessed_carry=False):
     controls, now_ms = _validate_xr_field_state(state)
 
     native = state.get("native")
@@ -77,7 +77,9 @@ def _validate_field_state(state, anchor=None):
     mission, location, sequence = native.get("mission"), native.get("location"), native.get("sequence")
     if (type(mission) is not int or mission <= 0 or type(location) is not int
             or not isinstance(sequence, str) or not sequence.startswith("Seq_Game_")
-            or native.get("title") is not False or native.get("status_NORMAL_ACTION") is not True
+            or native.get("title") is not False
+            or not (native.get("status_NORMAL_ACTION") is True
+                    or (witnessed_carry is True and native.get("status_CARRY") is True))
             or native.get("saving") is not False or native.get("popup") is not False
             or type(native.get("game_over")) is not int or native["game_over"] != 0
             or type(native.get("player_vehicle_id")) is not int
@@ -112,7 +114,7 @@ def _stick_y_index(source):
     raise BotFault("Effective movement axis is not a supported controller stick")
 
 
-def _sampled_move_input(state, source, requested, *, after_sample_ms):
+def _sampled_move_input(state, source, requested, *, after_sample_ms, component="Y"):
     """Verify the fresh XR stick sample matches this movement phase.
 
     This is a control-resolver sample, not proof that the retail XInput hook or
@@ -129,9 +131,9 @@ def _sampled_move_input(state, source, requested, *, after_sample_ms):
     sticks = controls.get("sticks")
     if not isinstance(sticks, list) or len(sticks) != 4 or any(not finite_number(v) for v in sticks):
         return None
-    sampled = float(sticks[_stick_y_index(source)])
-    tolerance = max(.025, requested * .20)
-    if sampled < .05 or abs(sampled - requested) > tolerance:
+    sampled = float(sticks[_stick_y_index(source) - (component == "X")])
+    tolerance = max(.025, abs(requested) * .20)
+    if abs(sampled) < .05 or abs(sampled - requested) > tolerance:
         return None
     return {
         "sample_ms": sample_ms,
@@ -145,8 +147,8 @@ def _sampled_move_input(state, source, requested, *, after_sample_ms):
 
 
 def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5.,
-               progress_timeout=1.0, cruise_magnitude=.30, brake_magnitude=.15,
-               brake_fraction=.45, pulse_seconds=.25, max_unsampled_retries=1,
+               progress_timeout=1.0, cruise_magnitude=.45, brake_magnitude=.15,
+               brake_fraction=.45, pulse_seconds=.25, max_unsampled_retries=1, direction="up",
                clock=time.monotonic, sleep=time.sleep):
     """Measure a short walk with expiring pulses and neutral native reads.
 
@@ -173,11 +175,15 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
             or type(max_unsampled_retries) is not int or not 0 <= max_unsampled_retries <= 2):
         raise BotFault("Locomotion probe bounds require target < hard limit <= 1 unit, time <= 5 seconds, and pulse 0.03..0.25 seconds")
 
+    if direction not in ("up", "down", "left", "right"):
+        raise BotFault("Local walking requires one cardinal direction")
+    component = "Y" if direction in ("up", "down") else "X"
+    sign = -1 if direction in ("down", "left") else 1
     source = _axis_source(live.bindings, "axes.move")
     hand = source.split("_", 1)[0]
     _stick_y_index(source)
-    value = {"hand": hand, "component": "Thumbstick", "sub_component": "Y",
-             "value": cruise_magnitude}
+    value = {"hand": hand, "component": "Thumbstick", "sub_component": component,
+             "value": sign * cruise_magnitude}
     timeline = []
     pulses = []
     started = clock()
@@ -204,7 +210,7 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
     identity = (native["mission"], native["location"], native["sequence"], admission.get("activation"))
     anchor = {"identity": identity}
     live.events.emit("locomotion_started", input={"axis": "axes.move", "source": source,
-                      "hand": hand, "direction": "stick_up", "cruise_value": cruise_magnitude,
+                      "hand": hand, "direction": "stick_" + direction, "cruise_value": cruise_magnitude,
                       "brake_value": brake_magnitude},
                      admission_sample_ms=admission_ms, origin=list(origin),
                      identity={"mission": identity[0], "location": identity[1],
@@ -330,7 +336,7 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
                         continue
                     controls, _ = _validate_xr_field_state(state, activation=identity[3])
                     audit = _sampled_move_input(state, source, value["value"],
-                                                after_sample_ms=phase_floor_ms)
+                                                after_sample_ms=phase_floor_ms, component=component)
                     # The publication may have been sampled before a blocked
                     # read. Credit it only while this exact pulse is still live.
                     if (audit and read_finished < pulse_deadline
@@ -414,11 +420,11 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
             if current_phase == "cruise" and travelled >= target_distance * brake_fraction:
                 current_phase = "braking"
                 braking_started_distance = travelled
-                value = {**value, "value": brake_magnitude}
+                value = {**value, "value": sign * brake_magnitude}
                 live.events.emit("locomotion_braking", position=list(position),
                                  displacement=travelled,
                                  estimated_speed_native_units_per_second=speed_native_units_per_second,
-                                 requested_stick_value=brake_magnitude,
+                                 requested_stick_value=sign * brake_magnitude,
                                  xr_sample_floor_ms=phase_floor_ms)
         if not reached_target:
             raise BotFault("The native player did not reach the short displacement target before the deadline")
@@ -435,7 +441,7 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
     result = {
         "status": "observed_displacement",
         "input": {"axis": "axes.move", "source": source, "hand": hand,
-                  "direction": "stick_up", "cruise_value": cruise_magnitude,
+                  "direction": "stick_" + direction, "cruise_value": cruise_magnitude,
                   "brake_value": brake_magnitude, "brake_started_at_native_distance": braking_started_distance},
         "origin": list(origin),
         "endpoint": list(endpoint),

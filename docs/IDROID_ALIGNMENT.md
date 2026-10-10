@@ -1,7 +1,20 @@
 # Native handheld iDroid alignment
 
-The right-hand iDroid uses its retail device and native pixels. The left bionic
+The left-hand iDroid uses its retail device and native pixels. The left bionic
 weapon/status display and ordinary HUD keep their existing owner and layout.
+
+The October 4 user reference supersedes the earlier right-hand requirement.
+The current hold uses the native `p31_010010` ending: measured device transform
+in left wrist bone 8, plus all 16 left finger joints and their actual parents.
+It does not mirror the ordinary right-hand equipment CNP. The registered
+native device retains its exact resource/skeleton admission, then follows the
+completed left wrist publication. Tracking position comes from left grip,
+while its same-frame pointing basis makes the handset readable through the
+runtime's grip cant. All seven current fit cases, including pitch, opposing
+yaw and ordinary close/immediate reopening, were reviewed in both simulator
+eyes on `e8e3a4d3c90c`. Forced tutorial and physical headset acceptance remain
+separate. The following right-CNP discussion is the original native equipment
+identity and earlier implementation history, not a current hand selection.
 
 The old screen mount guessed a projector frame from the anatomical palm. In the
 actual game a normal controller grip presented that screen edge-on. Turning the
@@ -46,12 +59,20 @@ pitch/yaw/roll. Its centre is one half-height above that anchor. Width remains
 16:9; resizing or rotating preserves the lower-edge pivot. Extracting the
 native SAND tracks is not a claim that every animation channel was decoded.
 
-The exact authored screen distance and scale are still unresolved. The default
-8 cm depth is an approximate, configurable fit, not a measured cutscene
-distance. The matching cutscene contains animated device channels as well as
-separate UI resources. Native canvas constants are 128 by 72; they are canvas
-units, not metres. Neither those constants nor uninterpreted UI-layout floats
-justify a new physical screen size.
+The cinematic's exact graph-root distance is now measured. Native
+`DemoxUiJob` `0x10aed7a91abd`, bound to `idrUI_sna`, reaches the typed UI
+transform through its registered scene object. Getters at native RVAs
+`1dae540`, `1dae520` and `1dae530` return its position, quaternion and scale.
+During the ending hold, the root has handset orientation and lies at
+approximately `(0, 0.043378498, 0.102349601)` metres in handset space: the
+authored `CNP_HOLOGRAM` plus 9 cm forward. The configurable default now uses
+9 cm. Asynchronous observations retain their timing gaps and motion outliers.
+
+The UI canvas's physical bounds are still unresolved. Native canvas constants
+are 128 by 72; they are canvas units, not metres. Neither those constants nor
+uninterpreted UI-layout floats justify a new physical screen size. The root
+measurement alone does not certify the current lower-edge pivot or 45 cm
+width as a 100% cinematic geometry match.
 
 The recovered device parts bind the native light to `SKL_002_Kamera` and a
 lens-flare effect to `CNP_HOLOGRAM`. The flare's authored local offset is

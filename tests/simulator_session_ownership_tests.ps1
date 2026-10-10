@@ -23,6 +23,21 @@ $syntheticProc=Proc 201 200 "$root\MetaXRBedroom.exe" '2026-09-27T19:00:02Z' 'Me
 $game=ConvertTo-MgsProcessIdentity $gameProc
 $owned=Get-MgsOwnedRuntimeProcesses -Processes @($gameProc,$guiProc,$syntheticProc) -Game $game -RuntimeRoot $root
 $record=[pscustomobject]@{schema=2;game=$game;ownedRuntimeProcesses=@($owned)}
+$parsedGame=$game|ConvertTo-Json|ConvertFrom-Json
+$parsedOwned=@(Get-MgsOwnedRuntimeProcesses -Processes @($gameProc,$guiProc,$syntheticProc) -Game $parsedGame -RuntimeRoot $root)
+Assert (Test-MgsExactProcessIdentity (@($parsedOwned|Where-Object pid -eq 200)[0]).parentIdentity $game) 'JSON DateTime game owner keeps UTC and fractions in descendant parent identities'
+$lateSharing=Proc 202 200 "$root\ls_server\local_sharing_server.exe" '2026-09-27T19:00:04Z' 'local_sharing_server.exe'
+$expanded=Expand-MgsLiveRuntimeRecord -Record $record -Processes @($gameProc,$guiProc,$syntheticProc,$lateSharing) -RuntimeRoot $root
+Assert ($expanded.ownedRuntimeProcesses.Count -eq 3 -and $record.ownedRuntimeProcesses.Count -eq 2) 'late exact runtime child extends a new snapshot without changing the recorded game generation'
+Assert ((@($expanded.ownedRuntimeProcesses|Where-Object pid -eq 202)[0]).parentIdentity.pid -eq 200) 'late sharing server retains exact GUI ancestry'
+$olderSharing=Proc 203 200 "$root\ls_server\local_sharing_server.exe" '2026-09-27T18:59:59Z' 'local_sharing_server.exe'
+$olderRefused=$false
+try{Expand-MgsLiveRuntimeRecord -Record $record -Processes @($gameProc,$guiProc,$syntheticProc,$olderSharing) -RuntimeRoot $root|Out-Null}catch{$olderRefused=$_.Exception.Message -match 'predates'}
+Assert $olderRefused 'a stale child from a reused parent PID cannot become trusted'
+$replacedGui=Proc 200 100 "$root\MetaXRSimulator.exe" '2026-09-27T20:00:01Z' 'MetaXRSimulator.exe'
+$lateReuseRefused=$false
+try{Expand-MgsLiveRuntimeRecord -Record $record -Processes @($gameProc,$replacedGui,$lateSharing) -RuntimeRoot $root|Out-Null}catch{$lateReuseRefused=$_.Exception.Message -match 'generation changed'}
+Assert $lateReuseRefused 'late registration cannot adopt a changed recorded GUI generation'
 $ownClientConnections=@(
     [pscustomobject]@{LocalAddress='127.0.0.1';LocalPort=5100;RemoteAddress='127.0.0.1';RemotePort=5101;State='Established';OwningProcess=200},
     [pscustomobject]@{LocalAddress='127.0.0.1';LocalPort=5101;RemoteAddress='127.0.0.1';RemotePort=5100;State='Established';OwningProcess=201}
@@ -164,6 +179,130 @@ try {
     $mgsResolved=[IO.Path]::GetFullPath($mgsLeaseFixture)
     if(!(Test-MgsPathUnderRoot $mgsResolved ([IO.Path]::GetTempPath()))){throw 'Runtime lease fixture escaped its temporary test folder.'}
     Remove-Item -LiteralPath $mgsResolved -Recurse -Force
+}
+
+$roomProc=Proc 202 200 "$root\synthetic_env_server\synth_env_server.exe" '2026-09-27T19:00:03Z' 'synth_env_server.exe'
+$roomProc | Add-Member -NotePropertyName CommandLine -NotePropertyValue ('"'+$roomProc.ExecutablePath+'" Bedroom -batchmode')
+$roomOwned=Get-MgsOwnedRuntimeProcesses -Processes @($gameProc,$guiProc,$roomProc) -Game $game -RuntimeRoot $root
+$roomRecord=@{game=$game;ownedRuntimeProcesses=@($roomOwned)} | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+$otherGameProc=Proc 999 1 'D:\Other\other-game.exe' '2026-09-27T19:00:00Z' 'other-game.exe'
+$roomPlan=@(Get-MgsOpaqueVrEnvironmentPlan -Record $roomRecord -Processes @($gameProc,$guiProc,$roomProc,$otherGameProc) -RuntimeRoot $root -TcpConnections @() -TcpSnapshotComplete $true)
+Assert ($roomPlan.Count -eq 1 -and [int]$roomPlan[0].pid -eq 202) 'opaque VR resource cleanup selects only its recorded batch room, retaining the game, GUI and unrelated game'
+$goneRoom=@(Get-MgsOpaqueVrEnvironmentPlan -Record $roomRecord -Processes @($gameProc,$guiProc) -RuntimeRoot $root)
+Assert ($goneRoom.Count -eq 0) 'an already released room is a no-op without requiring network inspection'
+$unrecordedRoom=@(Get-MgsOpaqueVrEnvironmentPlan -Record $record -Processes @($gameProc,$guiProc,$roomProc) -RuntimeRoot $root)
+Assert ($unrecordedRoom.Count -eq 0) 'an unrecorded room is never selected even under the same simulator'
+$missingGameRefused=$false
+try{Get-MgsOpaqueVrEnvironmentPlan -Record $roomRecord -Processes @($guiProc,$roomProc) -RuntimeRoot $root -TcpConnections @() -TcpSnapshotComplete $true | Out-Null}catch{$missingGameRefused=$_.Exception.Message -match 'MGSV owner is not live'}
+Assert $missingGameRefused 'resource cleanup cannot stop a room after its recorded game owner exits'
+$reusedRoom=Proc 202 200 $roomProc.ExecutablePath '2026-09-27T19:00:04Z' 'synth_env_server.exe'
+$reusedRoom | Add-Member -NotePropertyName CommandLine -NotePropertyValue $roomProc.CommandLine
+$reuseRoomRefused=$false
+try{Get-MgsOpaqueVrEnvironmentPlan -Record $roomRecord -Processes @($gameProc,$guiProc,$reusedRoom) -RuntimeRoot $root -TcpConnections @() -TcpSnapshotComplete $true | Out-Null}catch{$reuseRoomRefused=$_.Exception.Message -match 'identity changed'}
+Assert $reuseRoomRefused 'resource cleanup rejects a reused room PID'
+$networkUnknownRefused=$false
+try{Get-MgsOpaqueVrEnvironmentPlan -Record $roomRecord -Processes @($gameProc,$guiProc,$roomProc) -RuntimeRoot $root | Out-Null}catch{$networkUnknownRefused=$_.Exception.Message -match 'inspection was incomplete'}
+Assert $networkUnknownRefused 'resource cleanup requires complete shared-client inspection'
+$outsideClient=Proc 999 1 'D:\Other\other-game.exe' '2026-09-27T19:00:00Z' 'other-game.exe'
+$outsideConnections=@(
+    [pscustomobject]@{LocalAddress='127.0.0.1';LocalPort=5100;RemoteAddress='127.0.0.1';RemotePort=5101;State='Established';OwningProcess=200},
+    [pscustomobject]@{LocalAddress='127.0.0.1';LocalPort=5101;RemoteAddress='127.0.0.1';RemotePort=5100;State='Established';OwningProcess=999}
+)
+$sharedRoomRefused=$false
+try{Get-MgsOpaqueVrEnvironmentPlan -Record $roomRecord -Processes @($gameProc,$guiProc,$roomProc,$outsideClient) -RuntimeRoot $root -TcpConnections $outsideConnections -TcpSnapshotComplete $true | Out-Null}catch{$sharedRoomRefused=$_.Exception.Message -match 'outside exact live recorded identities'}
+Assert $sharedRoomRefused 'resource cleanup cannot interrupt a simulator shared with another live application'
+$roomProc.CommandLine='"'+$roomProc.ExecutablePath+'" Bedroom'
+$interactiveRoomRefused=$false
+try{Get-MgsOpaqueVrEnvironmentPlan -Record $roomRecord -Processes @($gameProc,$guiProc,$roomProc) -RuntimeRoot $root -TcpConnections @() -TcpSnapshotComplete $true | Out-Null}catch{$interactiveRoomRefused=$_.Exception.Message -match 'not the recorded batch room'}
+Assert $interactiveRoomRefused 'resource cleanup never selects an interactive synthetic environment editor'
+
+# Exercise the bounded startup retry without touching a process. A network
+# refusal must acquire a fresh plan; all other ownership refusals stay final.
+$ownershipModule=Get-Module simulator-session-ownership
+& $ownershipModule {
+    $script:stopAttempts=0
+    function script:Stop-MgsOpaqueVrEnvironmentOnce {
+        param($Record,$RuntimeRoot)
+        $script:stopAttempts++
+        if($script:stopAttempts -eq 1){throw 'Simulator PID 200 has an established non-loopback TCP peer; shared ownership cannot be excluded, refusing cleanup.'}
+        'fresh isolated plan'
+    }
+}
+$retryResult=Stop-MgsOpaqueVrEnvironment -Record $roomRecord -RuntimeRoot $root
+$retryAttempts=& $ownershipModule { $script:stopAttempts }
+Assert ($retryResult -eq 'fresh isolated plan' -and $retryAttempts -eq 2) 'a transient outbound startup peer gets a fresh ownership plan before cleanup'
+& $ownershipModule {
+    $script:stopAttempts=0
+    function script:Stop-MgsOpaqueVrEnvironmentOnce {
+        param($Record,$RuntimeRoot)
+        $script:stopAttempts++
+        if($script:stopAttempts -eq 1){throw 'Simulator PID 200 has an established non-loopback TCP peer; refusing cleanup.'}
+        throw 'Synthetic environment identity changed; refusing VR resource cleanup.'
+    }
+}
+$changedDuringRetry=$false
+try{Stop-MgsOpaqueVrEnvironment -Record $roomRecord -RuntimeRoot $root | Out-Null}catch{$changedDuringRetry=$_.Exception.Message -match 'identity changed'}
+$retryAttempts=& $ownershipModule { $script:stopAttempts }
+Assert ($changedDuringRetry -and $retryAttempts -eq 2) 'a changed identity after a transient network refusal stops retry immediately'
+& $ownershipModule {
+    $script:stopAttempts=0
+    function script:Stop-MgsOpaqueVrEnvironmentOnce {
+        param($Record,$RuntimeRoot)
+        $script:stopAttempts++
+        throw 'Simulator PID 200 has loopback client PID 999 outside exact live recorded identities; refusing cleanup.'
+    }
+}
+$sharedRetryRefused=$false
+try{Stop-MgsOpaqueVrEnvironment -Record $roomRecord -RuntimeRoot $root | Out-Null}catch{$sharedRetryRefused=$_.Exception.Message -match 'outside exact live recorded identities'}
+$retryAttempts=& $ownershipModule { $script:stopAttempts }
+Assert ($sharedRetryRefused -and $retryAttempts -eq 1) 'a shared local client refuses startup cleanup without retry'
+
+& $ownershipModule {
+    $script:stopAttempts=0
+    function script:Stop-MgsOpaqueVrEnvironmentOnce {
+        param($Record,$RuntimeRoot)
+        $script:stopAttempts++
+        throw 'Simulator PID 200 has an established non-loopback TCP peer; shared ownership cannot be excluded, refusing cleanup.'
+    }
+}
+$expiredPeerRefused=$false
+try{Stop-MgsOpaqueVrEnvironment -Record $roomRecord -RuntimeRoot $root -StartupPeerWaitSeconds 0 | Out-Null}catch{$expiredPeerRefused=$_.Exception.Message -match 'established non-loopback TCP peer'}
+$retryAttempts=& $ownershipModule { $script:stopAttempts }
+Assert ($expiredPeerRefused -and $retryAttempts -eq 1) 'an expired startup deadline retains the live peer and refuses room cleanup'
+
+$mgsReleaseFixture=Join-Path ([IO.Path]::GetTempPath()) ('mgs5vr-room-helper-'+[Guid]::NewGuid().ToString('N'))
+try {
+    & $ownershipModule {
+        $script:helperLaunches=@()
+        function script:Start-Process {
+            param($FilePath,$ArgumentList,$WindowStyle,$RedirectStandardOutput,$RedirectStandardError)
+            $script:helperLaunches+=@{file=$FilePath;args=$ArgumentList;style=$WindowStyle;output=$RedirectStandardOutput;error=$RedirectStandardError}
+        }
+    }
+    $deferred=Start-MgsOpaqueVrEnvironmentRelease -Record $roomRecord -RuntimeRoot $root -EvidenceDirectory $mgsReleaseFixture
+    $launches=@(& $ownershipModule { $script:helperLaunches })
+    $snapshots=@(Get-ChildItem -LiteralPath $mgsReleaseFixture -Filter '*.json')
+    Assert ($launches.Count -eq 1 -and $launches[0].style -eq 'Hidden' -and $snapshots.Count -eq 1) 'a long startup peer defers to exactly one hidden bounded helper without blocking launch'
+    $immutable=Get-Content -LiteralPath $snapshots[0].FullName -Raw | ConvertFrom-Json
+    Assert (Test-MgsExactProcessIdentity $immutable.game $roomRecord.game) 'the deferred helper receives this exact game generation in an independent snapshot'
+    $roomRecord.game.pid=777
+    $unchanged=Get-Content -LiteralPath $snapshots[0].FullName -Raw | ConvertFrom-Json
+    Assert ([int]$unchanged.game.pid -ne 777) 'a later launch record cannot replace the helper owner'
+    Assert ($deferred -match 'release is pending') 'deferred launch reports pending cleanup without claiming room release'
+    & $ownershipModule {
+        function script:Stop-MgsOpaqueVrEnvironmentOnce {
+            param($Record,$RuntimeRoot)
+            throw 'Simulator PID 200 has loopback client PID 999 outside exact live recorded identities; refusing cleanup.'
+        }
+    }
+    $sharedDeferredRefused=$false
+    try{Start-MgsOpaqueVrEnvironmentRelease -Record $roomRecord -RuntimeRoot $root -EvidenceDirectory $mgsReleaseFixture | Out-Null}catch{$sharedDeferredRefused=$_.Exception.Message -match 'outside exact live recorded identities'}
+    $launches=@(& $ownershipModule { $script:helperLaunches })
+    Assert ($sharedDeferredRefused -and $launches.Count -eq 1) 'a shared client never creates a deferred cleanup helper'
+} finally {
+    $mgsResolved=[IO.Path]::GetFullPath($mgsReleaseFixture)
+    if(!(Test-MgsPathUnderRoot $mgsResolved ([IO.Path]::GetTempPath()))){throw 'Room helper fixture escaped its temporary test folder.'}
+    if(Test-Path -LiteralPath $mgsResolved){Remove-Item -LiteralPath $mgsResolved -Recurse -Force}
 }
 
 Write-Host 'All simulator session ownership and runtime lease tests passed.'

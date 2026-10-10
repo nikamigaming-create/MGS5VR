@@ -230,6 +230,7 @@ class SessionPoseTests(unittest.TestCase):
         cli = self.continue_module()
         live = PoseAdapter()
         live.scene = "title"
+        live.observe = lambda: {"scene": live.scene, "title_menu": live.scene == "title"}
         live.events = Events(live.calls)
         def capture(label):
             if label == "continue-hover":

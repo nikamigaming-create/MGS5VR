@@ -27,8 +27,34 @@ constexpr std::array<std::string_view,29> names{"a","b","x","y","menu","left_sti
     "a_touch","b_touch","x_touch","y_touch","left_stick_touch","right_stick_touch","left_trigger_touch","right_trigger_touch"};
 std::mutex auditMutex;
 ControlInputAudit audit;
+PhysicalControls synthesizeDirections(PhysicalControls input,std::array<int,2>& directions){
+    for(auto& v:input.buttons)v=std::isfinite(v)?std::clamp(v,0.f,1.f):0;
+    for(size_t side=0;side<2;++side){
+        const auto stick=side?input.rightStick:input.leftStick;
+        auto& direction=directions[side];
+        if(!std::isfinite(stick[0])||!std::isfinite(stick[1])||(std::abs(stick[0])<.35f&&std::abs(stick[1])<.35f))direction=0;
+        else if(!direction&&std::max(std::abs(stick[0]),std::abs(stick[1]))>.7f)
+            direction=std::abs(stick[1])>=std::abs(stick[0])?(stick[1]>0?1:2):(stick[0]<0?3:4);
+        for(unsigned d=1;d<=4;++d)input.buttons[11+side*4+d-1]=direction==static_cast<int>(d)?1.f:0.f;
+    }
+    return input;
+}
 }
 void publishControlInputAudit(ControlInputAudit sample){std::lock_guard lock(auditMutex);audit=sample;}
+PhysicalControls ControlAxisOwnership::update(PhysicalControls input,uint32_t owner) noexcept {
+    std::array<std::array<float,2>*,2> sticks{&input.leftStick,&input.rightStick};
+    const bool changed=!initialized_||owner!=owner_;
+    initialized_=true;owner_=owner;
+    for(size_t side=0;side<sticks.size();++side){
+        auto& stick=*sticks[side];
+        const bool neutral=std::isfinite(stick[0])&&std::isfinite(stick[1])
+            &&std::abs(stick[0])<.18f&&std::abs(stick[1])<.18f;
+        if(changed)blocked_[side]=!neutral;
+        if(neutral)blocked_[side]=false;
+        if(blocked_[side]||!std::isfinite(stick[0])||!std::isfinite(stick[1]))stick={};
+    }
+    return input;
+}
 ControlInputAudit controlInputSnapshot(){std::lock_guard lock(auditMutex);return audit;}
 std::optional<ControlInputAudit> controlInputAudit(uint64_t now){
     const auto sample=controlInputSnapshot();
@@ -71,6 +97,7 @@ const std::vector<ControlDefinition>& controlDefinitions(){
     static const std::vector<ControlDefinition> definitions=[] {
         std::vector<ControlDefinition> result{
         {"system.idroid","tap(menu,550)",normal},{"system.pause","hold(menu,550)",normal},
+        {"system.idroid_focus","left_grip",normal,true},
         {"system.recenter","press(left_grip + menu)",normal},{"system.toggle_vr","hold(menu + b,550)",all},
         {"system.native_buttons","hold(menu + a,550)",all},
         {"gameplay.run","left_stick_click",foot},{"gameplay.stance","a",foot},
@@ -104,6 +131,7 @@ const std::vector<ControlDefinition>& controlDefinitions(){
         {"binoculars.stance","right_stick_down",optic},
         {"menus.confirm","a",menus},{"menus.back","b",menus},{"menus.action_x","x",menus},{"menus.action_y","y",menus},
         {"menus.previous_tab","left_grip",menus},{"menus.next_tab","right_grip",menus},
+        {"idroid.previous_tab","press(left_grip + left_stick_click)",menus,true},
         {"menus.left_trigger","left_trigger",menus},{"menus.right_trigger","right_trigger",menus},
         {"menus.left_click","left_stick_click",menus},{"menus.right_click","right_stick_click",menus},
         {"menus.dpad_up","disabled",menus},{"menus.dpad_down","disabled",menus},
@@ -111,7 +139,11 @@ const std::vector<ControlDefinition>& controlDefinitions(){
         {"horse.gallop","x",horse},{"horse.interact","y",horse},{"horse.stance","a",horse},
         {"horse.reload","b",horse},{"horse.left_click","left_stick_click",horse},{"horse.right_click","right_stick_click",horse},
         {"vehicle.accelerate","right_trigger",vehicle},{"vehicle.brake_reverse","left_trigger",vehicle},
-        {"vehicle.wheel_grip","left_grip",vehicle|wrist,true},{"vehicle.equipment_open","right_grip",vehicle|wrist,true},
+        {"vehicle.wheel_grip","left_grip",vehicle|wrist,true},
+        {"vehicle.right_wheel_grip","right_grip",vehicle,true},
+        {"vehicle.ready_weapon","right_grip",vehicle,true},
+        {"vehicle.fire","right_trigger",vehicle,true},{"vehicle.reload","tap(b,300)",vehicle,true},
+        {"vehicle.equipment_open","disabled",vehicle|wrist,true},
         {"vehicle.interact","y",vehicle},{"vehicle.weapon_or_call","x",vehicle},
         {"vehicle.native_a","a",vehicle},{"vehicle.native_b","b",vehicle},
         {"vehicle.left_click","left_stick_click",vehicle},{"vehicle.right_click","right_stick_click",vehicle},
@@ -177,7 +209,7 @@ const std::vector<SettingDefinition>& settingDefinitions(){
         {"settings.weapon_hud_setback_cm",6,0,15},
         {"settings.wrist_text_scale",1.5f,.75f,2.f},
         {"settings.wrist_picker_width_cm",42,42,100},{"settings.idroid_screen_width_cm",45,20,60},
-        {"settings.idroid_screen_depth_cm",8,0,20},
+        {"settings.idroid_screen_depth_cm",9,0,20},
         {"settings.idroid_screen_x_cm",0,-20,20},{"settings.idroid_screen_y_cm",0,-20,20},
         {"settings.idroid_screen_pitch_degrees",0,-90,90},{"settings.idroid_screen_yaw_degrees",0,-90,90},
         {"settings.idroid_screen_roll_degrees",0,-90,90},
@@ -189,6 +221,7 @@ const std::vector<SettingDefinition>& settingDefinitions(){
         {"settings.menu_quad_distance_cm",130,75,300},{"settings.menu_quad_tilt_degrees",-10,-30,30},
         {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",1,0,2},{"settings.hud_mode",1,0,2},
         {"settings.scope_pose_stabilization",1,0,1},
+        {"settings.tracked_weapon_obstruction",1,0,1},
         {"settings.binocular_pitch_degrees",-90,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
         {"settings.binocular_roll_degrees",0,-180,180},{"settings.binocular_auto_mark",1,0,1},
         {"settings.binocular_max_eye_distance_cm",30,15,50},
@@ -209,7 +242,7 @@ ControlBindings::ControlBindings(){
         auto bindings=parse(std::string(d.binding));
         entries_.push_back({std::string(d.name),bindings,std::vector<State>(bindings.size()),d.contexts,d.modifier});
     }
-    axes_={{"axes.move",0},{"axes.equipment",1},{"axes.commands",1},{"axes.menu",0},{"axes.map",1},{"axes.vehicle_steering",0},
+    axes_={{"axes.move",0},{"axes.equipment",1},{"axes.commands",1},{"axes.menu",0},{"axes.map",1},{"axes.vehicle_steering",0},{"axes.vehicle_pedals",0},
         {"axes.native_move",0},{"axes.native_look",1},{"axes.turn",1}};
     for(const auto& d:settingDefinitions())settings_.push_back({std::string(d.name),d.value,d.minimum,d.maximum});
 }
@@ -235,6 +268,9 @@ std::vector<std::string> ControlBindings::load(std::istream& input){
             if(!seen.insert(key).second)throw std::runtime_error("duplicate action: "+key);
             if(auto entry=std::find_if(candidate.entries_.begin(),candidate.entries_.end(),[&](const auto& e){return e.name==key;});entry!=candidate.entries_.end()){
                 entry->bindings=parse(value);entry->states=std::vector<State>(entry->bindings.size());
+                if(key=="system.idroid_focus"&&std::any_of(entry->bindings.begin(),entry->bindings.end(),
+                    [](const auto& binding){return binding.gesture!=Gesture::level;}))
+                    throw std::runtime_error("system.idroid_focus must use a while-held input or chord (no press, tap, hold or release gesture)");
             }else if(auto axis=std::find_if(candidate.axes_.begin(),candidate.axes_.end(),[&](const auto& e){return e.name==key;});axis!=candidate.axes_.end()){
                 if(value!="left_stick"&&value!="right_stick"&&value!="disabled")throw std::runtime_error("axis must be left_stick, right_stick or disabled");
                 axis->source=value=="left_stick"?0:value=="right_stick"?1:-1;
@@ -255,6 +291,17 @@ std::vector<std::string> ControlBindings::load(std::istream& input){
         }catch(const std::exception& e){errors.push_back("line "+std::to_string(number)+": "+e.what());}
     }
     if(input.bad())errors.push_back("could not read the complete controls file");
+    // The old driving default assigned RG to the picker. It now belongs to
+    // the empty right hand's physical wheel contact. Migrate only that exact
+    // legacy default; the launcher exports these same effective bindings.
+    if(!seen.contains("vehicle.right_wheel_grip")){
+        const auto legacy=std::find_if(candidate.entries_.begin(),candidate.entries_.end(),
+            [](const auto& e){return e.name=="vehicle.equipment_open";});
+        if(legacy!=candidate.entries_.end()&&legacy->bindings.size()==1
+            &&legacy->bindings[0].mask==(1u<<8)&&legacy->bindings[0].gesture==Gesture::level){
+            legacy->bindings.clear();legacy->states.clear();
+        }
+    }
     // Older players may already use right-hand pitch for this same correction.
     // Preserve their chosen calibration instead of silently adding another trim.
     if(!seen.contains("settings.weapon_aim_pitch_degrees")
@@ -273,7 +320,9 @@ std::vector<std::string> ControlBindings::load(std::istream& input){
     for(size_t a=0;a<candidate.entries_.size();++a)for(size_t b=a+1;b<candidate.entries_.size();++b){
         const auto& x=candidate.entries_[a];const auto& y=candidate.entries_[b];
         const auto shared=x.contexts&y.contexts;
-        if(!shared||x.modifier||y.modifier||(shared==commands&&(commandContinuation(x.name)||commandContinuation(y.name))))continue;
+        const auto personalGun=[](std::string_view name){return name=="vehicle.ready_weapon"||name=="vehicle.fire"||name=="vehicle.reload";};
+        const bool sharedGun=personalGun(x.name)&&personalGun(y.name);
+        if(!shared||(!sharedGun&&(x.modifier||y.modifier))||(shared==commands&&(commandContinuation(x.name)||commandContinuation(y.name))))continue;
         for(const auto& xb:x.bindings)for(const auto& yb:y.bindings)if(xb.mask==yb.mask){
             const bool split=(xb.gesture==Gesture::tap&&yb.gesture==Gesture::hold)||(xb.gesture==Gesture::hold&&yb.gesture==Gesture::tap);
             if(!split)errors.push_back("conflict: "+x.name+" and "+y.name+" use the same input in the same mode");
@@ -284,8 +333,52 @@ std::vector<std::string> ControlBindings::load(std::istream& input){
     return errors;
 }
 void ControlBindings::suspend(){
-    for(auto& e:entries_){e.value=0;for(auto& state:e.states){state={};state.blocked=true;}}
+    for(auto& e:entries_){e.value=0;e.activeInputs=e.retainedInputs=e.handoffInputs=0;for(auto& state:e.states){state={};state.blocked=true;}}
     stickDirections_={};lastTime_=0;
+}
+void ControlBindings::requireRelease(uint32_t inputs,bool preserveWeapon){
+    for(auto& entry:entries_){
+        if(preserveWeapon&&commandContinuation(entry.name))continue;
+        bool affected=false;
+        for(size_t n=0;n<entry.bindings.size();++n)if(entry.bindings[n].mask&inputs){
+            entry.handoffInputs|=entry.bindings[n].mask&inputs;
+            entry.states[n]={};entry.states[n].blocked=true;affected=true;
+        }
+        if(affected){entry.value=0;entry.activeInputs=entry.retainedInputs=0;}
+    }
+}
+bool ControlBindings::heldModifier(std::string_view action,const PhysicalControls& input) const {
+    const auto entry=std::find_if(entries_.begin(),entries_.end(),
+        [&](const auto& value){return value.name==action&&value.modifier;});
+    if(entry==entries_.end())return false;
+    auto directions=stickDirections_;
+    const auto physical=synthesizeDirections(input,directions);
+    for(const auto& binding:entry->bindings){
+        if(binding.gesture!=Gesture::level)continue;
+        bool held=true;
+        for(unsigned n=0;n<physical.buttons.size();++n)if(binding.mask&(1u<<n))
+            held=held&&physical.buttons[n]>.5f;
+        if(held&&binding.mask)return true;
+    }
+    return false;
+}
+bool ControlBindings::bindingChordHeld(std::string_view action,const PhysicalControls& input) const {
+    return heldInputMask(action,input)!=0;
+}
+uint32_t ControlBindings::heldInputMask(std::string_view action,const PhysicalControls& input) const {
+    const auto entry=std::find_if(entries_.begin(),entries_.end(),
+        [&](const auto& value){return value.name==action;});
+    if(entry==entries_.end())return 0;
+    auto directions=stickDirections_;
+    const auto physical=synthesizeDirections(input,directions);
+    uint32_t result{};
+    for(const auto& binding:entry->bindings){
+        bool held=binding.mask!=0;
+        for(unsigned n=0;n<physical.buttons.size();++n)if(binding.mask&(1u<<n))
+            held=held&&physical.buttons[n]>.5f;
+        if(held)result|=binding.mask;
+    }
+    return result;
 }
 std::vector<std::string> LiveControls::stage(std::istream& input){
     pending_.reset();
@@ -310,26 +403,24 @@ bool LiveControls::apply(ControlBindings& destination,const PhysicalControls& ph
 }
 void ControlBindings::update(PhysicalControls input,ControlContext context,uint64_t time){
     if(time<lastTime_)suspend();lastTime_=time;
-    for(auto& v:input.buttons)v=std::isfinite(v)?std::clamp(v,0.f,1.f):0;
-    for(size_t side=0;side<2;++side){
-        const auto stick=side?input.rightStick:input.leftStick;
-        auto& direction=stickDirections_[side];
-        if(!std::isfinite(stick[0])||!std::isfinite(stick[1])||(std::abs(stick[0])<.35f&&std::abs(stick[1])<.35f))direction=0;
-        else if(!direction&&std::max(std::abs(stick[0]),std::abs(stick[1]))>.7f)
-            direction=std::abs(stick[1])>=std::abs(stick[0])?(stick[1]>0?1:2):(stick[0]<0?3:4);
-        for(unsigned d=1;d<=4;++d)input.buttons[11+side*4+d-1]=direction==static_cast<int>(d)?1.f:0.f;
-    }
+    input=synthesizeDirections(input,stickDirections_);
     uint32_t down{};for(unsigned n=0;n<input.buttons.size();++n)if(input.buttons[n]>.5f)down|=1u<<n;
+    uint32_t occupiedInputs=down;
+    for(unsigned n=7;n<=10;++n)if(input.buttons[n]>.09f)occupiedInputs|=1u<<n;
     const auto current=mask(context);
     for(auto& e:entries_){
-        e.value=0;const bool enabled=(e.contexts&current)!=0;
+        e.value=0;e.activeInputs=0;const bool enabled=(e.contexts&current)!=0;
+        e.handoffInputs&=occupiedInputs;
+        e.retainedInputs=enabled?(e.retainedInputs&occupiedInputs):0;
         for(size_t n=0;n<e.bindings.size();++n){
             const auto& binding=e.bindings[n];auto& state=e.states[n];
             const bool held=(down&binding.mask)==binding.mask;
+            if(enabled&&held)e.retainedInputs|=binding.mask;
             const auto singleBit=std::countr_zero(binding.mask);
             const bool analog=std::popcount(binding.mask)==1&&singleBit>=7&&singleBit<=10;
             const bool occupied=analog?input.buttons[singleBit]>.09f:held;
             if(!enabled){state={};state.blocked=occupied;continue;}
+            if(binding.mask&e.handoffInputs){state={};state.blocked=true;continue;}
             if(!state.enabled){state.enabled=true;if(occupied)state.blocked=true;}
             bool superseded=false;
             if(!e.modifier&&!(current==commands&&commandContinuation(e.name)))
@@ -354,12 +445,25 @@ void ControlBindings::update(PhysicalControls input,ControlContext context,uint6
             // A completed hold cannot repeat until every use of that chord ends.
             if(falling&&binding.gesture==Gesture::hold)state.until=0;
             state.held=held;e.value=std::max(e.value,value);
+            if(value>0)e.activeInputs|=binding.mask;
         }
     }
 }
 float ControlBindings::value(std::string_view action) const{
     const auto it=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.name==action;});
     return it==entries_.end()?0:it->value;
+}
+uint32_t ControlBindings::activeInputMask(std::string_view action) const{
+    const auto it=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.name==action;});
+    return it==entries_.end()?0:it->activeInputs;
+}
+uint32_t ControlBindings::retainedInputMask(std::string_view action) const{
+    const auto it=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.name==action;});
+    return it==entries_.end()?0:it->retainedInputs;
+}
+uint32_t ControlBindings::axisInputMask(std::string_view name) const{
+    const auto it=std::find_if(axes_.begin(),axes_.end(),[&](const auto& e){return e.name==name;});
+    return it==axes_.end()||it->source<0?0:0xfu<<(11+it->source*4);
 }
 bool ControlBindings::hasBindingInput(std::string_view input) const{
     const auto token=std::find(names.begin(),names.end(),input);

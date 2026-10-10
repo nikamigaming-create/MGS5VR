@@ -2,6 +2,7 @@
 #include "mgs5vr/control_prompts.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/native_controls.hpp"
+#include "mgs5vr/native_input_delivery.hpp"
 #include "mgs5vr/wrist_selector.hpp"
 #include "mgs5vr/game_target.hpp"
 #include <windows.h>
@@ -45,6 +46,244 @@ struct NativeFixture {
 }
 int main(int argc,char** argv){
     {
+        expect(nativeIdroidRootNextWrapTarget(0x878a0c,2,true)==1,
+            "recorded right-grip Missions boundary wraps tab 2 to Mother Base tab 1");
+        for(uint8_t tab=0;tab<5;++tab){
+            expect(nativeIdroidRootNextWrapTarget(0x8789fa,tab,true)==0,
+                "the first native shoulder query is previous-tab and must never consume a right-grip wrap");
+            if(tab!=2)expect(nativeIdroidRootNextWrapTarget(0x878a0c,tab,true)==0,
+                "native Map and Mother Base transitions are left to the retail tab update");
+        }
+        expect(nativeIdroidRootNextWrapTarget(0,2,true)==0,
+            "a query outside the verified root next-tab caller cannot wrap");
+        expect(nativeIdroidRootNextWrapTarget(0x878a0c,3,true)==0
+            &&nativeIdroidRootNextWrapTarget(0x878a0c,2,false)==0,
+            "recorded Map edge then Missions query 11 ms later cannot advance twice within one XR pulse");
+        expect(nativeIdroidRootNextWrapTarget(0x878a0c,2,false)==0
+            &&nativeIdroidRootNextWrapTarget(0x878a0c,2,true)==1,
+            "an XR publication arriving before the native edge waits for that edge before wrapping");
+        NativeIdroidTabEdge edge;
+        expect(!edge.update(false)&&edge.update(true)&&!edge.update(true)&&!edge.update(true),
+            "several tab owners or updates reading one native pressed frame receive only one event");
+        expect(!edge.update(false)&&edge.update(true),
+            "the next native press becomes eligible after the previous native edge clears");
+    }
+    {
+        Fixture f;f.mode=ControlContext::vehicle;
+        expect(f.load("[vehicle]\nreload=tap(y,300)\n"),"vehicle reload may replace the native exit control");
+        f.tick();f.input.buttons[3]=1;f.tick();
+        GamepadSample raw{};raw.buttons=0x8000;
+        auto consumed=vehicleWeaponConsumedInputs(f.controls,f.input);
+        expect(!(vehicleWeaponGamepad(raw,f.controls,consumed).buttons&0x8000),
+            "holding a remapped reload cannot exit before its tap resolves");
+        f.input.buttons[3]=0;f.tick();
+        expect(f.active("vehicle.reload"),"the completed custom reload tap still reaches the gun");
+        f.tick(100);f.input.buttons[3]=1;f.tick();f.tick(500);
+        consumed=vehicleWeaponConsumedInputs(f.controls,f.input);
+        expect(!(vehicleWeaponGamepad(raw,f.controls,consumed).buttons&0x8000),
+            "holding past the reload tap threshold never leaks into vehicle exit");
+        Fixture direction;direction.mode=ControlContext::vehicle;
+        expect(direction.load("[vehicle]\nreload=press(right_stick_up)\n"),"a vehicle reload may use an explicit stick direction");
+        direction.tick();direction.input.rightStick={.2f,.9f};direction.tick();
+        raw={};raw.leftX=12000;raw.rightX=6000;raw.rightY=29000;
+        consumed=vehicleWeaponConsumedInputs(direction.controls,direction.input);
+        auto filtered=vehicleWeaponGamepad(raw,direction.controls,consumed);
+        expect(filtered.leftX==12000&&!filtered.rightX&&!filtered.rightY,
+            "directional reload consumes its native look stick while independent steering survives");
+        direction.tick(150);
+        filtered=vehicleWeaponGamepad(raw,direction.controls,vehicleWeaponConsumedInputs(direction.controls,direction.input));
+        expect(!filtered.rightY,"a one-shot reload cannot leak upward camera motion while its direction stays held");
+        Fixture conflict;
+        expect(!conflict.load("[vehicle]\nreload=right_trigger\n"),"one vehicle input cannot fire and reload simultaneously");
+    }
+    {
+        Fixture stow;stow.mode=ControlContext::menus;stow.tick();
+        stow.input.buttons[1]=stow.input.buttons[7]=1;stow.tick();
+        expect(nativeMenuGamepad(stow.controls,stow.input,NativeMenuInput::menu).buttons==0x2100,
+            "recorded iDroid close transition reproduces Back plus focus grip as generic B/LB");
+        stow.controls.requireRelease((1u<<1)|(1u<<7));stow.tick();
+        expect(nativeMenuGamepad(stow.controls,stow.input,NativeMenuInput::menu)==GamepadSample{},
+            "terminal closure drops B/LB before the delayed native menu owner changes");
+        stow.tick(150);
+        expect(nativeMenuGamepad(stow.controls,stow.input,NativeMenuInput::menu)==GamepadSample{},
+            "a held close chord remains dormant through the generic menu fallback");
+        stow.mode=ControlContext::gameplay;stow.input.buttons[1]=0;stow.tick();
+        expect(!stow.active("gameplay.reload"),"releasing menu Back cannot complete a gameplay reload tap");
+        stow.input.buttons[1]=1;stow.tick();stow.input.buttons[1]=0;stow.tick(120);
+        expect(!stow.active("gameplay.reload"),"the old focus grip must also release before its reload chord is reused");
+        stow.input={};stow.tick();stow.tick(150);
+        stow.input.buttons[1]=stow.input.buttons[7]=1;stow.tick();
+        stow.input.buttons[1]=0;stow.tick(120);
+        expect(stow.active("gameplay.reload"),"a fresh deliberate grip plus B still reloads after complete release");
+
+        Fixture trigger;trigger.mode=ControlContext::menus;trigger.tick();
+        trigger.input.buttons[10]=1;trigger.tick();
+        trigger.controls.requireRelease(1u<<10);trigger.tick();
+        trigger.input.buttons[10]=.2f;trigger.tick();
+        expect(!nativeMenuGamepad(trigger.controls,trigger.input,NativeMenuInput::menu).rightTrigger,
+            "an analog trigger remains blocked until fully released across iDroid close");
+        trigger.input.buttons[10]=0;trigger.tick();trigger.input.buttons[10]=.3f;trigger.tick();
+        expect(nativeMenuGamepad(trigger.controls,trigger.input,NativeMenuInput::menu).rightTrigger>0,
+            "a new analog trigger press works after neutral release");
+
+        Fixture firearm;firearm.input.buttons[8]=firearm.input.buttons[10]=1;firearm.tick();
+        firearm.controls.requireRelease((1u<<8)|(1u<<10),true);firearm.tick();
+        expect(firearm.active("gameplay.ready_weapon")&&firearm.active("gameplay.fire_or_cqc"),
+            "the independently decoded already-held firearm keeps its focus exception");
+        Fixture menuGun;menuGun.mode=ControlContext::menus;menuGun.tick();
+        menuGun.input.buttons[8]=menuGun.input.buttons[10]=1;menuGun.tick();
+        menuGun.controls.requireRelease((1u<<8)|(1u<<10),true);menuGun.tick();
+        expect(nativeMenuGamepad(menuGun.controls,menuGun.input,NativeMenuInput::menu)==GamepadSample{},
+            "preserving firearm actions never preserves their menu tab or zoom aliases");
+    }
+    {
+        IdroidPadRelease release;
+        ControlInputAudit mapped{};mapped.time=579434990;mapped.nativeButtons=0x2000;
+        NativeInputDeliverySnapshot delivery{};delivery.available=true;
+        auto& packet=delivery.index0;
+        packet.deliveryCounter=75701;packet.timeMs=579435023;packet.index=0;
+        packet.packetValid=packet.xrMailboxFresh=packet.caller.inGame=true;
+        packet.source=NativeInputDeliverySource::xrMailbox;packet.buttons=0x2000;
+        using Policy=HandheldPlayerPadPolicy;
+        expect(release.update(Policy::blocked,true,mapped,delivery,579435023)==Policy::blocked,
+            "focused field iDroid owns its native player-pad exclusion");
+        mapped.time=579435035;mapped.nativeButtons=0;
+        expect(release.update(Policy::released,false,mapped,delivery,579435036)==Policy::blocked,
+            "recorded normal stow retains exclusion while the game still holds the previous Back packet");
+        mapped.time=579435045;
+        expect(release.update(Policy::released,false,mapped,delivery,579435046)==Policy::blocked,
+            "a new mapped XR zero alone cannot release native gameplay input");
+        packet.deliveryCounter+=4;packet.timeMs=579435047;
+        expect(release.update(Policy::released,true,mapped,delivery,579435048)==Policy::blocked,
+            "a quick free-handset reopen cannot release a still-delivered Back packet");
+        packet.buttons=0;delivery.available=false;
+        expect(release.update(Policy::released,false,mapped,delivery,579435049)==Policy::blocked,
+            "an unavailable delivery witness cannot acknowledge release");
+        delivery.available=true;packet.caller.inGame=false;
+        expect(release.update(Policy::released,false,mapped,delivery,579435050)==Policy::blocked,
+            "a non-game XInput caller cannot acknowledge retail release");
+        packet.caller.inGame=true;
+        expect(release.update(Policy::released,false,mapped,delivery,579435051)==Policy::released,
+            "only the actual post-close native release packet restores player input");
+        expect(!release.waiting(),"the completed stow barrier leaves no retained input exclusion");
+
+        release.reset();mapped={};mapped.time=100;
+        packet={};packet.index=0;packet.deliveryCounter=1;packet.timeMs=100;
+        packet.packetValid=packet.xrMailboxFresh=packet.caller.inGame=true;
+        packet.source=NativeInputDeliverySource::xrMailbox;
+        release.update(Policy::blocked,true,mapped,delivery,100);
+        expect(release.update(Policy::released,true,mapped,delivery,101)==Policy::released,
+            "ordinary focus-to-free iDroid locomotion does not start a stow barrier");
+        release.update(Policy::weaponOnly,true,mapped,delivery,102);
+        mapped.time=103;mapped.nativeTriggers={255,220};packet.triggers={255,220};
+        expect(release.update(Policy::released,false,mapped,delivery,104)==Policy::weaponOnly,
+            "stowing a focused held gun retains the firearm allowance instead of blocking its trigger");
+        mapped.time=105;
+        expect(release.update(Policy::released,false,mapped,delivery,106)==Policy::weaponOnly,
+            "the firearm allowance also awaits a new native delivery");
+        packet.timeMs=107;packet.deliveryCounter=2;
+        expect(release.update(Policy::released,false,mapped,delivery,108)==Policy::released,
+            "held gun triggers may continue while menu buttons are released at the native consumer");
+
+        release.reset();mapped={};mapped.time=200;packet={};
+        packet.index=0;packet.timeMs=200;packet.deliveryCounter=3;
+        packet.packetValid=packet.xrMailboxFresh=packet.caller.inGame=true;
+        packet.source=NativeInputDeliverySource::xrMailbox;
+        release.update(Policy::blocked,true,mapped,delivery,200);
+        release.update(Policy::released,false,mapped,delivery,201);
+        mapped.time=202;packet.timeMs=203;packet.deliveryCounter=4;
+        release.update(Policy::released,false,mapped,delivery,204);
+        // Re-arm and remove XR publication, as occurs on session shutdown.
+        release.update(Policy::blocked,true,mapped,delivery,205);
+        release.update(Policy::released,false,mapped,delivery,206);
+        mapped={};packet.timeMs=207;packet.deliveryCounter=5;packet.xrMailboxFresh=false;
+        expect(release.update(Policy::released,false,mapped,delivery,208)==Policy::released,
+            "a delivered neutral shutdown packet releases the mod mask even after XR stops publishing");
+    }
+    {
+        ControlAxisOwnership ownership;
+        PhysicalControls physical;
+        ownership.update(physical,0);
+        physical.leftStick={.6f,-.8f};physical.rightStick={-.7f,.9f};
+        auto routed=ownership.update(physical,0);
+        expect(routed.leftStick==physical.leftStick&&routed.rightStick==physical.rightStick,
+            "active owner retains both stick axes");
+        routed=ownership.update(physical,1);
+        expect(routed.leftStick==std::array<float,2>{}&&routed.rightStick==std::array<float,2>{},
+            "changing from movement to menu with held sticks sends no navigation");
+        physical.leftStick={};ownership.update(physical,1);
+        physical.leftStick={0,.8f};routed=ownership.update(physical,1);
+        expect(routed.leftStick[1]==.8f&&routed.rightStick==std::array<float,2>{},
+            "each stick centers independently before its new owner can use it");
+        routed=ownership.update(physical,0);
+        expect(routed.leftStick==std::array<float,2>{}&&routed.rightStick==std::array<float,2>{},
+            "closing focus with vertical navigation held cannot run or turn");
+        physical={};ownership.update(physical,0);physical.rightStick={0,-.9f};
+        expect(ownership.update(physical,0).rightStick[1]==-.9f,
+            "centering restores a deliberate new down input");
+    }
+    {
+        IdroidFocusWeapon weapon;
+        expect(!weapon.update(true,false,true,true),"ordinary ready is not a focused firearm exception");
+        expect(weapon.update(true,true,true,true),"already readied firearm survives LEFT focus");
+        expect(weapon.update(true,true,true,false),"focused firearm does not depend on next frame's menu result");
+        expect(!weapon.update(true,true,false,false),"releasing gun grip ends focused firearm ownership");
+        expect(!weapon.update(true,true,true,true),"regripping inside focus belongs to tabs, not a second weapon action");
+        weapon.update(true,false,false,false);
+        expect(!weapon.update(true,true,true,false),"focus cannot ready a previously lowered weapon");
+        weapon.update(true,false,true,true);weapon.update(true,true,true,true);
+        expect(!weapon.update(false,true,true,true),"tracking or native firearm loss immediately removes exception");
+    }
+    {
+        ControlBindings bindings;
+        std::istringstream file("[system]\nidroid_focus=left_stick_up\n[gameplay]\nready_weapon=right_stick_down\n");
+        expect(bindings.load(file).empty(),"directional ownership modifiers are valid personal bindings");
+        PhysicalControls physical;
+        bindings.update(physical,ControlContext::gameplay,100);
+        physical.leftStick={0,.8f};physical.rightStick={0,-.8f};
+        expect(bindings.heldModifier("system.idroid_focus",physical)
+            &&bindings.bindingChordHeld("system.idroid_focus",physical)
+            &&bindings.heldModifier("gameplay.ready_weapon",physical),
+            "pre-context ownership derives both sticks from raw axes");
+        bindings.update(physical,ControlContext::gameplay,120);
+        physical.leftStick[1]=.5f;
+        expect(bindings.heldModifier("system.idroid_focus",physical),
+            "ownership uses the same directional hysteresis as action decoding");
+        physical.leftStick[1]=.2f;
+        expect(!bindings.heldModifier("system.idroid_focus",physical),"centering releases directional focus");
+        bindings.update(physical,ControlContext::gameplay,140);
+        physical.leftStick[1]=.5f;
+        expect(!bindings.bindingChordHeld("system.idroid_focus",physical),"a centered stick requires a new deliberate flick");
+        physical.leftStick[1]=std::numeric_limits<float>::quiet_NaN();
+        expect(!bindings.heldModifier("system.idroid_focus",physical),"invalid stick samples cannot acquire focus");
+        for(const auto gesture:{"press(left_grip)","tap(left_grip,300)","hold(left_grip,300)","release(left_grip)"}){
+            std::istringstream invalid(std::string("[system]\nidroid_focus=")+gesture+"\n");
+            const auto errors=bindings.load(invalid);
+            expect(!errors.empty()&&errors.front().find("while-held")!=std::string::npos,
+                "focus rejects pulse gestures with a clear held-ownership validation error");
+        }
+        expect(bindings.label("system.idroid_focus")=="L STICK UP","invalid focus edits retain the prior binding");
+    }
+    {
+        IdroidTabInput tabs;
+        GamepadSample next{};next.buttons=0x200;
+        tabs.update({},true,100);
+        expect(tabs.update(next,true,110).buttons==0x200,"fresh grip reaches the native next-tab edge");
+        expect(tabs.update(next,true,169).buttons==0x200,"tab press remains sampleable for 60 milliseconds");
+        expect(tabs.update(next,true,170).buttons==0&&tabs.update(next,true,900).buttons==0,
+            "holding the grip cannot repeat and skip the Free Roam filter");
+        tabs.update({},true,910);
+        expect(tabs.update(next,true,920).buttons==0x200,"released and squeezed grip advances again");
+        tabs.update({},false,930);
+        expect(tabs.update(next,true,940).buttons==0,"focus changes cannot replay an already held grip");
+        GamepadSample back=next;back.buttons=0x2100;back.rightTrigger=128;
+        tabs.update({},true,950);
+        const auto retained=tabs.update(back,true,960);
+        expect(retained.buttons==0x2100&&retained.rightTrigger==128,
+            "previous tab retains independent Back and trigger controls");
+        expect(tabs.update(back,false,970).buttons==0x2100,"other native menus retain their original inputs");
+    }
+    {
         expect(nativeIdroidWorldPauseRequired(true,false,false,false),
             "an open spatial field iDroid retains the mod-owned world pause");
         expect(!nativeIdroidWorldPauseRequired(true,false,false,true),
@@ -66,6 +305,17 @@ int main(int argc,char** argv){
     {
         ControlBindings bindings;
         const auto map=rewriteControlPrompt("<I=G=DECISION> Place Marker  <I=G=PAD_L1>/<I=G=PAD_R1>",bindings,ControlContext::menus);
+        expect(rewriteControlPrompt("<I=G=PAD_L1>",bindings,ControlContext::menus,true).text=="[L CLICK + L GRIP]"
+            &&rewriteControlPrompt("<I=G=PAD_L1>",bindings,ControlContext::menus).text=="[L GRIP]",
+            "handheld iDroid shows its separate previous-tab chord while ordinary menus retain their shoulder");
+        expect(controlPromptAction("PAD_L1",ControlContext::nativeButtons,true)=="native.left_shoulder",
+            "handheld prompt hints cannot override native-button mode");
+        ControlBindings customPrevious;
+        std::istringstream previousFile("[idroid]\nprevious_tab=press(left_grip + x)\n");
+        expect(customPrevious.load(previousFile).empty()
+            &&rewriteControlPrompt("<I=G=PAD_L1>",customPrevious,ControlContext::menus,true).text=="[X + L GRIP]"
+            &&rewriteControlCaption("Previous","PAD_L1",customPrevious,ControlContext::menus,true).text=="[X + L GRIP] Previous",
+            "inline and separate iDroid prompts follow the effective personal previous-tab chord");
         expect(map.text=="[A] Place Marker  [L GRIP]/[R GRIP]"&&map.replaced==3,
             "native Map prompts use effective menu actions and physical grips");
         expect(rewriteControlPrompt("<I=G=DECISION>",bindings,ControlContext::binoculars).text=="[RT]",
@@ -263,6 +513,17 @@ int main(int argc,char** argv){
         original.input={};original.tick(120);
         expect(original.active("system.idroid")&&!original.active("system.pause"),
             "original left Menu tap still opens iDroid");
+        expect(freshHandheldIdroidOpenRequest({4,100},4,1099)
+            &&!freshHandheldIdroidOpenRequest({4,100},5,1099)
+            &&!freshHandheldIdroidOpenRequest({4,100},4,1101)
+            &&!freshHandheldIdroidOpenRequest({4,100},4,99)
+            &&!freshHandheldIdroidOpenRequest({},4,100),
+            "queued handheld opening cannot cross camera ownership, expiry or clock reset");
+        publishHandheldIdroidOwner(1234,4);
+        expect(handheldIdroidOwned(1234,4)&&!handheldIdroidOwned(1235,4)&&!handheldIdroidOwned(1234,5),
+            "UI-only device lease belongs to its exact native player and VR activation");
+        publishHandheldIdroidOwner(0,0);
+        expect(!handheldIdroidOwned(),"stow releases the UI-only device lease");
     }
     {
         GamepadSample menuInput{};
@@ -307,6 +568,90 @@ int main(int argc,char** argv){
         const auto handheld=nativeMenuGamepad(handheldBindings,input,NativeMenuInput::liveIdroid);
         expect(handheld.leftX>0&&handheld.leftY>0,
             "handheld iDroid uses the configured menu axis even when gameplay movement is remapped");
+        setHandheldMenuRoutingAvailable(true);
+        PhysicalControls focusInput;
+        expect(!bindings.heldModifier("system.idroid_focus",focusInput),"released iDroid focus leaves locomotion ownership");
+        focusInput.buttons[7]=1;
+        expect(bindings.heldModifier("system.idroid_focus",focusInput),"held left grip selects iDroid focus before context resolution");
+        bindings.update({},ControlContext::menus,160);
+        bindings.update(focusInput,ControlContext::menus,180);
+        expect(!(nativeMenuGamepad(bindings,focusInput,NativeMenuInput::liveIdroid).buttons&0x100),
+            "taking handheld focus does not also change the previous tab");
+        expect(nativeMenuGamepad(bindings,focusInput,NativeMenuInput::menu).buttons&0x100,
+            "ordinary Pause keeps its native left-grip previous tab");
+        focusInput.buttons[5]=1;bindings.update(focusInput,ControlContext::menus,200);
+        const auto previousTab=nativeMenuGamepad(bindings,focusInput,NativeMenuInput::liveIdroid);
+        expect((previousTab.buttons&0x100)&&!(previousTab.buttons&0x40),
+            "handheld previous-tab chord sends LB without a second stick-click operation");
+        ControlBindings customPrevious;
+        std::istringstream previousRemap("[idroid]\nprevious_tab=press(left_grip + a + right_trigger + right_stick_click + right_stick_up)\n");
+        expect(customPrevious.load(previousRemap).empty(),"custom previous-tab chord fixture is valid");
+        customPrevious.update({},ControlContext::menus,100);
+        PhysicalControls previousInput;
+        previousInput.buttons[7]=previousInput.buttons[0]=previousInput.buttons[10]=previousInput.buttons[6]=1;
+        previousInput.buttons[1]=1;previousInput.rightStick={.4f,.85f};previousInput.leftStick={.3f,-.4f};
+        customPrevious.update(previousInput,ControlContext::menus,120);
+        const auto customTab=nativeMenuGamepad(customPrevious,previousInput,NativeMenuInput::liveIdroid);
+        expect((customTab.buttons&0x100)&&!(customTab.buttons&(0x1000|0x80))&&customTab.rightTrigger==0
+            &&customTab.rightX==0&&customTab.rightY==0&&(customTab.buttons&0x2000)&&customTab.leftX>0,
+            "custom previous-tab chord consumes its face, click, trigger and both stick axes while preserving unrelated input");
+        customPrevious.update(previousInput,ControlContext::menus,250);
+        const auto heldTab=nativeMenuGamepad(customPrevious,previousInput,NativeMenuInput::liveIdroid);
+        expect(!(heldTab.buttons&(0x100|0x1000|0x80))&&heldTab.rightTrigger==0&&heldTab.rightY==0,
+            "expiry of a one-shot tab pulse cannot release its still-held inputs into other menu actions");
+        previousInput.buttons[10]=.2f;
+        customPrevious.update(previousInput,ControlContext::menus,260);
+        expect(nativeMenuGamepad(customPrevious,previousInput,NativeMenuInput::liveIdroid).rightTrigger==0,
+            "consumed analog trigger stays dormant until a full release");
+        previousInput.buttons[10]=0;
+        customPrevious.update(previousInput,ControlContext::menus,270);
+        const auto partialTab=nativeMenuGamepad(customPrevious,previousInput,NativeMenuInput::liveIdroid);
+        expect(!(partialTab.buttons&(0x1000|0x80))&&partialTab.rightY==0,
+            "partial chord release cannot turn its remaining inputs into confirm or map movement");
+        const auto ordinary=nativeMenuGamepad(customPrevious,previousInput,NativeMenuInput::menu);
+        expect((ordinary.buttons&0x1000)&&(ordinary.buttons&0x80)&&ordinary.rightY>0,
+            "iDroid chord consumption does not alter ordinary Pause mappings");
+        customPrevious.update({},ControlContext::menus,300);
+        previousInput={};previousInput.buttons[0]=1;previousInput.rightStick={0,.85f};
+        customPrevious.update(previousInput,ControlContext::menus,320);
+        const auto afterRelease=nativeMenuGamepad(customPrevious,previousInput,NativeMenuInput::liveIdroid);
+        expect((afterRelease.buttons&0x1000)&&afterRelease.rightY>0,
+            "fresh independent inputs work after the consuming chord is released");
+        ControlBindings alternatives;
+        std::istringstream alternativesFile("[idroid]\nprevious_tab=press(left_grip + a) | press(right_grip + b)\n");
+        expect(alternatives.load(alternativesFile).empty(),"previous-tab alternatives fixture is valid");
+        alternatives.update({},ControlContext::menus,100);
+        PhysicalControls alternativeInput;alternativeInput.buttons[7]=alternativeInput.buttons[0]=alternativeInput.buttons[1]=1;
+        alternatives.update(alternativeInput,ControlContext::menus,120);
+        const auto alternativeTab=nativeMenuGamepad(alternatives,alternativeInput,NativeMenuInput::liveIdroid);
+        expect((alternativeTab.buttons&0x100)&&(alternativeTab.buttons&0x2000)&&!(alternativeTab.buttons&0x1000),
+            "only the active previous-tab alternative consumes its physical inputs");
+        ControlBindings remappedFocus;std::istringstream focusRemap("[system]\nidroid_focus=right_grip\n");
+        expect(remappedFocus.load(focusRemap).empty()&&!remappedFocus.heldModifier("system.idroid_focus",focusInput),
+            "focus respects the effective personal modifier binding");
+        focusInput.buttons[8]=1;
+        expect(remappedFocus.heldModifier("system.idroid_focus",focusInput),"remapped grip can own iDroid focus");
+        expect(handheldUiInputBlocked(HandheldMenuControl::locomotion,true)
+            &&handheldUiInputBlocked(HandheldMenuControl::blocked,true)
+            &&handheldUiInputBlocked(HandheldMenuControl::blocked,false)
+            &&handheldUiInputBlocked(HandheldMenuControl::menu,false)
+            &&!handheldUiInputBlocked(HandheldMenuControl::menu,true)
+            &&!handheldUiInputBlocked(HandheldMenuControl::native,false),
+            "UI is excluded during movement and waits for native focus acknowledgement without changing legacy input");
+        const auto focusTime=steadyMilliseconds();
+        publishHandheldMenuControl(HandheldMenuControl::locomotion,focusTime);
+        acknowledgeHandheldMenuControl(HandheldMenuControl::locomotion,true,focusTime);
+        expect(handheldMenuInputReady(),"native movement handoff acknowledges the current owner");
+        publishHandheldMenuControl(HandheldMenuControl::menu,focusTime);
+        expect(!handheldMenuInputReady(),"old movement acknowledgement cannot enable new menu input");
+        acknowledgeHandheldMenuControl(HandheldMenuControl::locomotion,true,focusTime);
+        expect(!handheldMenuInputReady(),"a concurrent old native transaction cannot acknowledge the new focus owner");
+        acknowledgeHandheldMenuControl(HandheldMenuControl::menu,true,focusTime);
+        expect(handheldMenuInputReady(),"current native pad exclusion enables deliberate menu input");
+        expect(handheldMenuControl(focusTime+251)==HandheldMenuControl::native,
+            "stale focus publication expires instead of keeping a dead XR owner");
+        publishHandheldMenuControl(HandheldMenuControl::native,0);setHandheldMenuInputReady(false);
+        setHandheldMenuRoutingAvailable(false);
         auto nativeLesson=fallback;constrainCinematicInput(nativeLesson,lessonMode);
         expect(nativeLesson.rightX==fallback.rightX&&nativeLesson.rightY==fallback.rightY
             &&nativeLesson.leftX==0&&nativeLesson.leftY==0&&nativeLesson.leftTrigger==0&&nativeLesson.rightTrigger==0,
@@ -760,8 +1105,9 @@ int main(int argc,char** argv){
         f.input.rightStick={-.45f,.65f};f.tick();
         expect(f.controls.axis("axes.equipment",f.input)==f.input.rightStick,
             "vehicle camera and turret look retain both native right-stick axes");
-        f.input.buttons[8]=1;f.tick();f.mode=ControlContext::equipment;f.tick();
-        expect(f.active("vehicle.equipment_open"),"vehicle picker remains open while grip is held");
+        f.input.buttons[8]=1;f.tick();
+        expect(f.active("vehicle.right_wheel_grip")&&!f.active("vehicle.equipment_open"),
+            "right vehicle grip joins the physical wheel without opening equipment");
     }
     {
         Fixture f;
@@ -941,6 +1287,28 @@ int main(int argc,char** argv){
         expect(live.stage(mapped).empty()&&!live.apply(current,resting),
             "newly bound held stick touch waits for release before applying");
         resting={};expect(live.apply(current,resting),"new touch mapping applies after the physical contact is released");
+    }
+    {
+        Fixture f;expect(f.load("[gameplay]\nreload=tap(right_grip + x,250)\n"),"reload arbitration follows effective remapping");f.tick();
+        f.input.buttons[7]=f.input.buttons[1]=1;
+        expect(!f.controls.bindingChordHeld("gameplay.reload",f.input),"old left-grip B cannot steal a remapped reload");
+        f.input={};f.input.buttons[8]=f.input.buttons[2]=1;
+        expect(f.controls.bindingChordHeld("gameplay.reload",f.input),"held remapped reload chord selects its owner before tap release");
+        f.tick();expect(!f.active("gameplay.reload"),"arbitration does not synthesize a reload activation");
+        f.input={};f.tick(100);expect(f.active("gameplay.reload"),"actual effective tap release still owns activation");
+    }
+    {
+        RigInput rig;rig.update({},false,false,TravelMode::onFoot,100);
+        auto ready=rig.update({},false,true,TravelMode::onFoot,110);expect(ready.weaponReady,"ready modifier raises the native weapon");
+        rig.suspend();expect(!rig.update({},false,true,TravelMode::onFoot,120).weaponReady,"ordinary menu focus retains the input release gate");
+        rig.resumeHandheldHandUse();ready=rig.update({},false,true,TravelMode::onFoot,130);
+        expect(ready.weaponReady&&ready.gamepad.leftTrigger==255,"verified handheld hand-use resumes the held ready modifier");
+        rig.resumeHandheldHandUse();GamepadSample fire{};fire.rightTrigger=255;
+        expect(rig.update(fire,false,true,TravelMode::onFoot,140).gamepad.rightTrigger==0,
+            "a trigger held across handheld focus cannot become a shot");
+        rig.update({},false,true,TravelMode::onFoot,150);
+        expect(rig.update(fire,false,true,TravelMode::onFoot,160).gamepad.rightTrigger==255,
+            "an explicit trigger release rearms ordinary firing after hand-use");
     }
     std::cout<<checks<<" controls checks, "<<failures<<" failures\n";return failures?1:0;
 }

@@ -116,6 +116,36 @@ std::optional<WeaponScopeGeometry> nativeWeaponScopeGeometry(Pose rear,Pose fron
     const auto ocular=compose(rear,compose(Pose{{},{0,0,found->inset}},basis));
     return WeaponScopeGeometry{ocular,compose(front,basis),found->radius,found->sight,powers};
 }
+std::optional<WeaponScopeGeometry> nativeMagnifierScopeGeometry(Pose center,Pose magnifier,
+    uint64_t centerModel,uint64_t magnifierModel,const std::array<uint8_t,4>& optical,float power){
+    if(!finitePose(center)||centerModel!=0x84a35edc984905ceull||!std::isfinite(power))return {};
+    const std::array<uint8_t,3> powers{optical[0],optical[1],optical[2]};
+    const bool collimator=optical==std::array<uint8_t,4>{1,0,0,2};
+    const bool flip=optical[3]==1&&(powers==std::array<uint8_t,3>{1,2,0}
+        ||powers==std::array<uint8_t,3>{1,4,0}||powers==std::array<uint8_t,3>{1,2,4});
+    const uint32_t sight=magnifierModel==0x84a1df03c6484ee1ull?4u:
+        magnifierModel==0x84a2233aa7f98e18ull?5u:0u;
+    if((!collimator&&(!flip||!sight||!finitePose(magnifier)))
+       ||std::find(powers.begin(),powers.end(),static_cast<uint8_t>(power))==powers.end()
+       ||power!=std::floor(power)||power<1.f)return {};
+    const Pose basis{{0,1,0,0},{}};
+    // Native st02 glass is a ten-sided opening. These radii are the minimum
+    // polygon-edge distances less 0.2 mm, not the outer tube bounds.
+    // Its unmagnified dot uses the authored CNP_REAR_SIGHT, measured at
+    // z=-.0277473 in both current native assemblies. Keep it on the viewing
+    // side of that point; the native transparent glass retains its own view.
+    if(power==1.f)return WeaponScopeGeometry{
+        compose(center,Pose{basis.orientation,{0,.034f,-.0279473f}}),
+        compose(center,Pose{basis.orientation,{0,.034f,.133500f}}),
+        .0202493f,collimator?2u:sight,powers,true};
+    if(collimator)return {};
+    // st03's authored aligned pose is its zero-angle hinge bind. The native
+    // geometry callback below uses that same bind around (-.024,.006,0).
+    const float rear=sight==4?-.082569f:-.083498f;
+    return WeaponScopeGeometry{compose(magnifier,Pose{basis.orientation,{0,.034f,rear}}),
+        compose(magnifier,Pose{basis.orientation,{0,.034f,.074988f}}),
+        sight==4?.0147864f:.0149803f,sight,powers,true};
+}
 float WeaponScopeZoom::update(uint64_t identity,uint64_t sequence,const std::array<uint8_t,3>& powers){
     unsigned count=0;for(const auto power:powers){if(!power)break;if(power>16)return 1; ++count;}
     if(!identity||!count)return 1;

@@ -15,18 +15,23 @@ std::optional<bool> nativeMenuOpen() noexcept;
 // lets the tracked iDroid remain a live gameplay overlay without treating a
 // deliberate Pause screen as locomotion-capable.
 bool nativeIdroidOpen() noexcept;
+bool nativeIdroidOverlayOnly() noexcept;
 // Cached native Pause-menu ownership, separate from iDroid and scene menus.
 bool nativePauseMenuOpen() noexcept;
 // Closing needs native character updates to stow the device. Unknown state
 // is treated as closing so our optional pause can never trap that transition.
 bool nativeIdroidClosing() noexcept;
 std::optional<unsigned> nativeIdroidTutorialMode() noexcept;
+// Read the verified guide's own active gameplay-pause slot; never release it.
+bool nativeIdroidTutorialPaused() noexcept;
 // Strictly read-only popup identity. Unknown/current/last-result are distinct;
 // the result is not a live focus or choice publication.
 NativePopupSnapshot nativePopupSnapshot() noexcept;
 // Native tutorial pause ownership is separate from its input restriction.
 // Caller must establish the completed ACC guide in the native Lua transaction.
-bool releaseNativeIdroidTutorialPause() noexcept;
+bool releaseNativeIdroidTutorialPause(bool requestedStow=false) noexcept;
+uintptr_t captureNativeIdroidStowHelpOwner() noexcept;
+bool closeNativeIdroidStowHelp(uintptr_t owner) noexcept;
 bool nativeTitleMenuOpen() noexcept;
 void publishNativeAvatarEdit(bool active) noexcept;
 bool nativeAvatarEditActive() noexcept;
@@ -49,6 +54,8 @@ bool nativeTitleCabinMode() noexcept;
 // player rig. Keep that verified cabin scene alive until the field scene loads.
 void publishNativeCabinPlay(bool active) noexcept;
 bool nativeCabinPlay() noexcept;
+void publishNativeCabinTransit(bool active) noexcept;
+bool nativeCabinTransit() noexcept;
 // Retail sortie/customization and game-over screens have no iDroid open bit.
 void publishNativeSceneMenu(bool active) noexcept;
 bool nativeLoadingTipsOpen() noexcept;

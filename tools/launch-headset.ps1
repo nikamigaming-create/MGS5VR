@@ -6,8 +6,8 @@ param(
     [switch]$RestartSteam
 )
 $ErrorActionPreference='Stop'
+$mgsSaved=Get-ItemProperty -LiteralPath 'HKCU:\Software\Nikami\MGS5VR\Launcher' -ErrorAction SilentlyContinue
 if (-not $GameDir -and -not $Probe) {
-    $mgsSaved=Get-ItemProperty -LiteralPath 'HKCU:\Software\Nikami\MGS5VR\Launcher' -ErrorAction SilentlyContinue
     if ($mgsSaved.TppExe) { $GameDir=Split-Path -Parent $mgsSaved.TppExe }
 }
 if (-not $Probe) {
@@ -33,6 +33,10 @@ function Read-MgsRuntime([string]$mgsPath) {
 }
 if ($RuntimeManifest) {
     $mgsRuntime=Read-MgsRuntime $RuntimeManifest
+} elseif ($mgsSaved.HeadsetRuntime) {
+    # An explicit local headset choice must not silently fall back to a
+    # different provider just because it owns Windows' global registration.
+    $mgsRuntime=Read-MgsRuntime $mgsSaved.HeadsetRuntime
 } else {
     $mgsRuntimeSettings=Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Khronos\OpenXR\1' -ErrorAction SilentlyContinue
     $mgsRuntime=Read-MgsRuntime $mgsRuntimeSettings.ActiveRuntime

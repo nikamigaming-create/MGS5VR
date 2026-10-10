@@ -176,6 +176,31 @@ def activate(account, store, name):
     return result
 
 
+def reset_new_campaign(account, store):
+    """Let retail create a new campaign; never manufacture a save payload."""
+    rollback_name = 'before-new-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6]
+    snapshot(account, store, rollback_name, 'Exact closed campaign before explicitly requested fresh-game regression')
+    rollback = profile_path(store, rollback_name)
+    manifest = verify(store, rollback_name)
+    destinations = [(account / relative).resolve() for relative in FILES]
+    if any(not path.is_relative_to(account.resolve()) for path in destinations):
+        raise ValueError('Fresh campaign destination escapes the exact account')
+    try:
+        for path in destinations:
+            path.unlink()
+        if any(path.exists() for path in destinations):
+            raise RuntimeError('The exact campaign set was not cleared')
+    except BaseException:
+        for item in manifest['files']:
+            shutil.copyfile(rollback / item['path'], account / item['path'])
+        raise
+    result = {'profile':'retail-new-campaign-pending','account':str(account.resolve()),
+              'activated_utc':utc(),'rollback':rollback_name,'cleared_files':list(FILES),
+              'native_state_verified':False,'retail_created_save_required':True}
+    write_json(store / 'active.json', result)
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--store", type=pathlib.Path, default=STORE)
@@ -192,6 +217,8 @@ def main():
     switch = commands.add_parser("activate")
     switch.add_argument("name")
     switch.add_argument("--account", required=True, type=pathlib.Path)
+    fresh = commands.add_parser('reset-new', help='After a verified backup, clear only the six campaign files so retail starts from zero')
+    fresh.add_argument('--account', required=True, type=pathlib.Path)
     args = parser.parse_args()
     if args.command == "list":
         results = []
@@ -216,6 +243,10 @@ def main():
         require_stopped()
         require_live_account(args.account)
         print(json.dumps(activate(args.account, args.store, args.name), indent=2))
+    elif args.command == 'reset-new':
+        require_stopped()
+        require_live_account(args.account)
+        print(json.dumps(reset_new_campaign(args.account, args.store), indent=2))
 
 
 if __name__ == "__main__":

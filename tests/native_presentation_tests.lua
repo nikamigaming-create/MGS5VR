@@ -29,7 +29,15 @@ return function(source)
    TppDemo=tppDemo,
    s10010_sequence=options.missionSequence or false,
    gvars={ini_isTitleMode=options.title or false},
-   vars={missionCode=options.mission or 10010},
+   vars={missionCode=options.mission or 10010,playerVehicleGameObjectId=options.vehicle},
+   Player={GetGameObjectIdIsRiddenToLocal=function()
+    if options.riddenError then error('rider owner unavailable') end
+    return options.ridden
+   end},
+   Tpp={IsHelicopter=function(id)
+    if options.typeError then error('vehicle type unavailable') end
+    return id==options.ridden and options.riddenHelicopter==true
+   end},
    PlayerStatus={NORMAL_ACTION=1,PARTS_ACTIVE=2},
    PlayerInfo={AndCheckStatus=function(status)
     if options.statusError then error('player status query failed') end
@@ -153,5 +161,20 @@ return function(source)
   'native game-over menu owns UI even while the mission retains its gameplay sequence')
  check(evaluate({sequence='Seq_Game_MainGame',mission=10040,gameOver=true,activeDemo=true})=='scripted-demo',
   'authored death movies retain their cinematic presentation before the game-over menu')
+ local transit={sequence='Seq_Game_FreePlay',mission=30010,partsActive=true,
+  vehicle=7168,ridden=7168,riddenHelicopter=true}
+ check(evaluate(transit)=='cabin-flight','a current native helicopter passenger enables moving cabin controls')
+ transit.vehicle=7169
+ check(evaluate(transit)=='closed','a stale vehicle variable cannot enable cabin flight')
+ transit.vehicle=7168;transit.riddenHelicopter=false
+ check(evaluate(transit)=='closed','a wheeled vehicle keeps vehicle controls')
+ transit.riddenHelicopter=true;transit.riddenError=true
+ check(evaluate(transit)=='closed','missing passenger ownership cannot enable cabin flight')
+ transit.riddenError=false;transit.typeError=true
+ check(evaluate(transit)=='closed','missing vehicle type cannot enable cabin flight')
+ transit.typeError=false;transit.activeDemo=true
+ check(evaluate(transit)=='scripted-demo','authored helicopter cinematics retain native ownership')
+ transit.activeDemo=false;transit.gameOver=true
+ check(evaluate(transit)=='game-over','game-over UI has priority over helicopter walking')
  return 'native presentation isolated checks passed: '..checks
 end

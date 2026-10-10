@@ -54,3 +54,36 @@ Pause is exercised only by an explicitly selected case. Promote a run to
 acceptance evidence before relying on it in the ledger; scratch runs expire.
 Full-game playability is the release objective. Scoped scene passes and unit
 checks do not certify whole missions, every weapon, or headset acceptance.
+
+User direction, 4 October 2026:
+
+The handheld iDroid belongs in the LEFT bionic hand, matching Snake's native
+arrival cinematic. This supersedes the earlier right-hand iDroid direction.
+Keep ordinary status and HUD on the left forearm. Match the cinematic contact
+and projector from the owned native data, and verify handset motion together
+with its screen in both eyes.
+
+User direction, 10 October 2026:
+
+Keep exactly two retained local builds: `play/` is the pinned playable build,
+and `build/dev/` is the working build for tests and debugging. The user selected
+the installed `6ac226f4bf2c` candidate as the initial pin; headset acceptance
+is still pending. This supersedes automatic replacement of `play/` during builds.
+`tools/build.ps1` builds and checks development only. `-Deploy`, `Play-Dev.cmd`
+or `workspace.py launch-sim` explicitly installs development for testing.
+`Play.cmd` verifies and restores the pinned build before physical play.
+Only an explicit user decision to promote a reviewed candidate authorizes
+`python tools/workspace.py pin-build`. Building or debugging never implies
+permission to replace the pin. Never label pinning as headset acceptance.
+Do not keep dated packages, old binary snapshots or persistent rollback builds.
+Transactional staging/rollback exists only during an update; retain a failed
+transaction only until recovery. Compiler output belongs to development, and
+the installed game is a deployment of one slot, not another retained version.
+Use `tools/clean-local-builds.ps1 -Apply` to remove recognized obsolete builds
+after both slots verify. Keep source, personal settings, saves and test evidence.
+
+This user's physical headset uses wired Meta Quest Link and Meta OpenXR, not
+SteamVR. Honor the saved MGS5VR `HeadsetRuntime` preference before Windows'
+global runtime. Both local Play commands use the shared headset launcher;
+the pinned payload remains unchanged. Simulator leases must restore the
+per-game Meta runtime. Do not switch a physical play session to SteamVR.

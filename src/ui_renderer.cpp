@@ -3,9 +3,11 @@
 #include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/idroid_ui.hpp"
 #include "mgs5vr/idroid_attachment.hpp"
+#include "mgs5vr/native_menu_restrictions.hpp"
 #include "mgs5vr/ui_clip.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/control_prompts.hpp"
+#include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/prompt_activation_policy.hpp"
 #include "mgs5vr/prompt_trace_budget.hpp"
 #include "mgs5vr/log.hpp"
@@ -101,6 +103,7 @@ std::atomic_uint64_t titleUpdatedAt{};
 std::atomic_bool titleMode{};
 std::atomic_bool titleCabinMode{};
 std::atomic_bool cabinPlayMode{};
+std::atomic_bool cabinTransitMode{};
 std::atomic_bool sceneMenuMode{};
 std::atomic_bool avatarEditMode{};
 uintptr_t base{};
@@ -886,7 +889,9 @@ const char* promptText(const char* content,bool mapFooter){
             if(source.find("<I=G=")!=std::string::npos&&source.size()<=16384){
                 auto context=input?input->context:ControlContext::menus;
                 if(menuOpen)context=ControlContext::menus;
-                auto result=rewriteControlPrompt(source,*bindings,context);
+                const bool handheldIdroid=menuOpen&&nativeIdroidOpen()&&!nativePauseMenuOpen()
+                    &&handheldMenusSelected()&&handheldMenuRoutingAvailable();
+                auto result=rewriteControlPrompt(source,*bindings,context,handheldIdroid);
                 promptUnresolved.fetch_add(result.unresolved);
                 if(result.replaced){
                     std::lock_guard lock(promptMutex);
@@ -1457,6 +1462,8 @@ void publishNativeTitleCabinMode(bool active) noexcept {titleCabinMode.store(act
 bool nativeTitleCabinMode() noexcept {return titleCabinMode.load();}
 void publishNativeCabinPlay(bool active) noexcept {cabinPlayMode.store(active);}
 bool nativeCabinPlay() noexcept {return cabinPlayMode.load();}
+void publishNativeCabinTransit(bool active) noexcept {cabinTransitMode.store(active);}
+bool nativeCabinTransit() noexcept {return cabinTransitMode.load();}
 void publishNativeSceneMenu(bool active) noexcept {sceneMenuMode.store(active);}
 bool nativeLoadingTipsOpen() noexcept {
     if(!enabled.load()||!menuReaderVerified)return false;
@@ -1528,15 +1535,30 @@ std::optional<unsigned> nativeIdroidTutorialMode() noexcept {
        ||!read(tutorial+8,&mode,sizeof(mode))||mode>16)return {};
     return mode;
 }
+bool nativeIdroidOverlayOnly() noexcept {return menuState.load()==1;}
+bool nativeIdroidTutorialPaused() noexcept {
+    const auto mode=nativeIdroidTutorialMode();
+    if(!mode||!*mode||!nativeIdroidOpen())return false;
+    uintptr_t system{},tutorial{},handle{},type{};uint32_t level{};
+    return read(base+0x2bf1518,&system,sizeof(system))&&system
+        &&read(system,&type,sizeof(type))&&type==base+0x2242d78
+        &&read(system+0x90,&tutorial,sizeof(tutorial))&&tutorial
+        &&read(tutorial,&type,sizeof(type))&&type==base+0x2272810
+        &&read(tutorial+0xd0,&handle,sizeof(handle))
+        &&handle>=base+0x2b65d58&&handle<base+0x2b65d98&&(handle-(base+0x2b65d58))%4==0
+        &&read(base+0x2b65d40,&type,sizeof(type))&&type==base+0x20c56c0
+        &&read(handle,&level,sizeof(level))&&level==0xffffffde;
+}
 NativePopupSnapshot nativePopupSnapshot() noexcept {
     NativePopupChoiceLeases leases;
     if(enabled.load()&&popupChoiceReaderVerified){std::lock_guard lock(popupChoiceMutex);leases=popupChoiceLeases;}
     return readNativePopupSnapshot(base,enabled.load()&&popupReaderVerified,
         [](uintptr_t address,void* output,size_t size){return read(address,output,size);},leases,steadyMilliseconds());
 }
-bool releaseNativeIdroidTutorialPause() noexcept {
+bool releaseNativeIdroidTutorialPause(bool requestedStow) noexcept {
     const auto mode=nativeIdroidTutorialMode();
-    if(!mode||*mode!=0||nativePauseMenuOpen())return false;
+    if(!nativeIdroidTutorialPauseReleaseAllowed(mode,nativePauseMenuOpen(),
+        nativeIdroidClosing(),requestedStow))return false;
     uintptr_t system{},tutorial{},handle{},type{};uint32_t level{};
     if(!read(base+0x2bf1518,&system,sizeof(system))||!system
        ||!read(system+0x90,&tutorial,sizeof(tutorial))||!tutorial
@@ -1554,6 +1576,46 @@ bool releaseNativeIdroidTutorialPause() noexcept {
     using Pause=void(*)(void*,bool);
     reinterpret_cast<Pause>(base+0x932960)(reinterpret_cast<void*>(tutorial),false);
     return read(handle,&level,sizeof(level))&&(level&0x80000000)==0;
+}
+uintptr_t captureNativeIdroidStowHelpOwner() noexcept {
+    const auto mode=nativeIdroidTutorialMode();
+    // FOB, SECURITY and the Mother Base/FOB inventory lessons create a Help
+    // owner after requested terminal stow. Capture only these reproduced
+    // lessons; closeNativeIdroidStowHelp still requires that same owner,
+    // a closed terminal, mode zero and its exact native Help pause handle.
+    if(!pauseReaderVerified||!mode||(*mode!=10&&*mode!=11&&*mode!=14)||!nativeIdroidOpen()||nativePauseMenuOpen())return 0;
+    uintptr_t manager{},pause{},type{};uint32_t kind{};
+    return read(base+0x2bd3b80,&manager,sizeof(manager))&&manager
+        &&read(manager,&type,sizeof(type))&&type==base+0x218fba0
+        &&read(manager+8,&pause,sizeof(pause))&&pause
+        &&read(pause,&type,sizeof(type))&&type==base+0x218f648
+        &&read(pause+0x38,&kind,sizeof(kind))&&kind==0?pause:0;
+}
+bool closeNativeIdroidStowHelp(uintptr_t owner) noexcept {
+    if(!enabled.load()||!pauseReaderVerified||!owner)return false;
+    const auto popup=nativePopupSnapshot();
+    if(!popup.active||*popup.active)return false;
+    uintptr_t manager{},pause{},type{},handle{};uint32_t kind{},level{};
+    if(!read(base+0x2bd3b80,&manager,sizeof(manager))||!manager
+       ||!read(manager,&type,sizeof(type))||type!=base+0x218fba0
+       ||!read(manager+8,&pause,sizeof(pause))||pause!=owner
+       ||!read(pause,&type,sizeof(type))||type!=base+0x218f648
+       ||!read(pause+0x38,&kind,sizeof(kind))
+       ||!nativeIdroidStowHelpCloseAllowed(nativeIdroidTutorialMode(),nativeIdroidOpen(),kind,true)
+       ||!read(pause+0x40,&handle,sizeof(handle))
+       ||handle<base+0x2b65d58||handle>=base+0x2b65d98||(handle-(base+0x2b65d58))%4
+       ||!read(base+0x2b65d40,&type,sizeof(type))||type!=base+0x20c56c0
+       ||!read(handle,&level,sizeof(level))||(level&0x7fffffff)!=0x7ffffffe)return false;
+    constexpr std::array<unsigned char,15> signature{
+        0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x33,0xd2,0x48,0x83,0xc1,0x30};
+    std::array<unsigned char,signature.size()> actual{};
+    if(!read(base+0x5391b0,actual.data(),actual.size())||actual!=signature)return false;
+    // This is the same native close handler used by Back. It closes its UI
+    // tasks, clears its menu kind and releases only its allocated pause slot.
+    using Close=void(*)(void*);
+    reinterpret_cast<Close>(base+0x5391b0)(reinterpret_cast<void*>(pause));
+    return read(pause+0x38,&kind,sizeof(kind))&&kind==0
+        &&read(handle,&level,sizeof(level))&&(level&0x80000000)==0;
 }
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
 void requestNativeEquipmentPreview(bool visible) noexcept {equipmentPreviewRequestedAt.store(visible?steadyMilliseconds():0);}

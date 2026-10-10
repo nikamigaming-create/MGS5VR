@@ -32,7 +32,7 @@ function Invoke-Bridge([string]$Method,[string]$Revision,[hashtable]$Changes) {
     if ($null -ne $Changes) { $request.changes=$Changes }
     [IO.File]::WriteAllText($requestPath,($request | ConvertTo-Json -Depth 8 -Compress),[Text.UTF8Encoding]::new($false))
     try {
-        $raw=& $bridge -RequestPath $requestPath
+        $raw=& $bridge -RequestPath $requestPath -CheckerPath $checker
         $json=([string[]]$raw) -join "`n"
         return [pscustomobject]@{ok=$true;json=$json;state=($json | ConvertFrom-Json);error=''}
     } catch {
@@ -48,15 +48,15 @@ try {
     Copy-Item -LiteralPath $runtimeSource -Destination $runtime
 
     $loaded=Invoke-Bridge 'load' '' $null
-    Assert $loaded.ok 'load accepts a disposable MGSV path and returns a settings snapshot'
+    Assert $loaded.ok ('load accepts a disposable MGSV path and returns a settings snapshot: '+$loaded.error)
     Assert ($loaded.state.gameExe -eq $game -and $loaded.state.writable -eq $true) 'load binds the snapshot to the fixture and marks its copied controls writable'
     Assert (@($loaded.state.bindings.actions).Count -gt 0 -and @($loaded.state.runtime.PSObject.Properties).Count -gt 0) 'load returns parsed bindings and runtime settings'
     Assert ($loaded.state.runtime.'ui.map_control_prompts' -eq '1') 'reviewed Map control labels default on in the launcher runtime snapshot'
     Assert ($loaded.state.runtime.'optics.binocular_native_material' -eq '0') 'unproven binocular scene lighting defaults off in the launcher runtime snapshot'
     $settingRows=@($loaded.state.settings)
-    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 55) 'serialized settings field is a flat array containing all 55 setting rows'
+    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 56) 'serialized settings field is a flat array containing all 56 setting rows'
     $rowsValid=$true
-    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 55) { $rowsValid=$false }
+    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 56) { $rowsValid=$false }
     else {
         foreach ($row in $settingRows) {
             $numbers=@($row.value,$row.min,$row.max)
@@ -67,6 +67,7 @@ try {
     }
     Assert $rowsValid 'each setting row has a named setting and numeric value/min/max bounds'
     Assert (@($settingRows | Where-Object { $_.name -eq 'settings.wrist_text_scale' -and $_.value -eq 1.5 }).Count -eq 1) 'arm text defaults to the requested larger size'
+    Assert (@($settingRows | Where-Object { $_.name -eq 'settings.tracked_weapon_obstruction' -and $_.value -eq 1 -and $_.min -eq 0 -and $_.max -eq 1 }).Count -eq 1) 'tracked-gun cover clearance is present and defaults on'
     [IO.File]::WriteAllText((Join-Path $fixture 'mgs5vr-display.ini'),"[display]`nenabled=1`nrender_width=2960`nrender_height=3220`n")
     [IO.File]::WriteAllText((Join-Path $fixture 'mgs5vr-render-size.txt'),"0 100 1920 1080 960 540 1`n")
     $measured=Invoke-Bridge 'load' '' $null

@@ -5,6 +5,7 @@
 #include "mgs5vr/controls.hpp"
 #include "mgs5vr/control_prompts.hpp"
 #include "mgs5vr/native_controls.hpp"
+#include "mgs5vr/idroid_hand_use.hpp"
 #include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/tracking_fault.hpp"
@@ -13,6 +14,8 @@
 #include "mgs5vr/native_video.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/cabin_walk.hpp"
+#include "mgs5vr/vehicle_weapon.hpp"
+#include "mgs5vr/vehicle_pedals.hpp"
 #include "mgs5vr/eye_resampler.hpp"
 #include <Xinput.h>
 #include <openxr/openxr.h>
@@ -180,6 +183,8 @@ struct Session {
     bool openingBackend{};
     bool cabinPlay{};
     ControlBindings controls;
+    ControlBindings handheldActions;
+    ControlAxisOwnership axisOwnership;
     LiveControls liveControls;
     std::filesystem::path controlsPath;
     std::optional<std::filesystem::file_time_type> observedControlsWrite;
@@ -187,6 +192,17 @@ struct Session {
     uint64_t controlsPollAt{};
     NativeControls nativeControls;
     IdroidBackRecovery idroidBackRecovery;
+    IdroidTabInput idroidTabInput;
+    IdroidFocusWeapon idroidFocusWeapon;
+    bool lastMappedWeaponReady{},idroidTriggerReleaseRequired{};
+    IdroidHandUseController idroidHandUse;
+    IdroidHandUse priorIdroidHandUse{IdroidHandUse::device};
+    bool priorIdroidTap{};
+    bool priorHandheldFree{},priorHandheldGrip{},priorIdroidRouting{};
+    bool borrowedReloadPending{};
+    bool borrowedReloadSent{};
+    uint64_t borrowedReloadPulseUntil{};
+    std::optional<HeadCameraSample> handUseRigHistory;
     RigInput rigControls;
     RigOptics opticsControls;
     bool binocularSelected{};
@@ -207,7 +223,7 @@ struct Session {
     RigCommands commandsControls;
     float reportedMagnification{1};
     uint64_t hapticAt{};
-    bool wheelHeld{};
+    uint8_t wheelHeld{};
     XrTime pendingLocalChange{};
     uint64_t referenceEpoch{1};
     uint64_t presentationEpoch{nextRigPresentationEpoch()};
@@ -220,6 +236,7 @@ struct Session {
         wchar_t enabled[2]{};
         controllerTrackingFaultProbe().configure(
             GetEnvironmentVariableW(L"MGS5VR_TRACKING_FAULT_TEST",enabled,2)==1&&enabled[0]==L'1');
+        headTrackingFaultProbe().configure(controllerTrackingFaultProbe().enabled());
     }
     void requestRefreshRate(){
         if(!instance.refreshControl){log("OpenXR refresh rate is controlled by the headset runtime; 90 Hz target must be set there");return;}
@@ -241,6 +258,7 @@ struct Session {
         XrAction result; xrCheck(xrCreateAction(actions,&info,&result),"Create action"); return result;
     }
     void refreshControlLabels(){
+        handheldActions=controls;handheldActions.suspend();
         publishControlPromptBindings(controls);
         constexpr std::array<std::string_view,4> categories{"equipment.primary","equipment.secondary","equipment.support","equipment.items"};
         for(size_t n=0;n<categories.size();++n){
@@ -486,14 +504,20 @@ struct Session {
         return result;
     }
     WeaponGripSmoothing weaponSmoothing;
+    VehiclePedalInput vehiclePedals;
     void suspendInput(XrTime time){
         controllerTrackingFaultProbe().focused(false);
+        headTrackingFaultProbe().focused(false);
         if(priorFocused)presentationEpoch=nextRigPresentationEpoch();
         publishControlInputAudit({});
         controllerFrame=passiveControllerFrame(controllerFrame,time,referenceEpoch);
         controllerFrame.presentationEpoch=presentationEpoch;
-        idroidBackRecovery.suspend();requestNativeIdroidClose(false);nativeControls.suspend();
+        idroidBackRecovery.suspend();requestNativeIdroidClose(false);requestHandheldIdroidOpen(0);priorIdroidTap=false;nativeControls.suspend();
         snapControls.reset();smoothControls.reset();cabinTurn.reset();rigControls.suspend();controls.suspend();
+        idroidTabInput.update({},false,steadyMilliseconds());
+        idroidFocusWeapon.reset();axisOwnership.reset();lastMappedWeaponReady=false;priorIdroidRouting=false;
+        idroidTriggerReleaseRequired=true;publishHandheldFocusedWeapon(false,steadyMilliseconds());
+        vehiclePedals.reset();publishVehicleWeaponInput(false,false,false,steadyMilliseconds(),0);
         opticsControls.reset();opticGate.reset();opticStabilizer.reset();weaponSmoothing.reset();commandsControls.suspend();
         openingSelector.reset();openingFrame={};priorFocused=false;priorRecenter=false;
         gamepadMailbox().publish({},false,steadyMilliseconds());
@@ -506,6 +530,7 @@ struct Session {
         if(r==XR_SESSION_NOT_FOCUSED){suspendInput(time);return;}
         xrCheck(r,"Sync controller actions");
         controllerTrackingFaultProbe().focused(true);
+        headTrackingFaultProbe().focused(true);
         if(!priorFocused){
             presentationEpoch=nextRigPresentationEpoch();
             snapControls.reset();
@@ -552,13 +577,16 @@ struct Session {
         // 40050 helicopter scene. Enter cabin play only after the Lua reader
         // confirms that mission and TitleMode is off; loading stays front-end.
         cabinPlay=openingCabinEnabled()&&controllerRigEnabled()&&nativeCabinPlay()&&!title&&!loading;
+        const bool cabinTransit=openingCabinEnabled()&&controllerRigEnabled()&&nativeCabinTransit()
+            &&!title&&!loading&&!scriptedDemo;
         // The native loading terminal is not a playable cabin.  Never turn a
         // button press into an invented sandbox state; leave the handoff to
         // the game's own player/camera publication.
         // Only the actual title owns title UI suppression. A missing player
         // publication during loading/prologue must not latch this state.
         openingBackend=title;
-        const auto mode=cabinPlay&&!title&&detectedMode==TravelMode::unknown?TravelMode::onFoot:detectedMode;
+        const auto mode=(cabinPlay||cabinTransit)&&!title&&detectedMode==TravelMode::unknown?TravelMode::onFoot:detectedMode;
+        controllerFrame.vehicleMounted=detectedMode==TravelMode::vehicle;
         if(loading!=priorLoadingTips){
             const bool wasLoading=priorLoadingTips;
             priorLoadingTips=loading;
@@ -583,6 +611,8 @@ struct Session {
         controllerFrame.authoredCamera=(title&&!spatialTitle)||avatarEditor||scriptedDemo;
         controllerFrame.openingBackend=openingBackend;
         controllerFrame.cabinPlay=cabinPlay;
+        controllerFrame.cabinTransit=cabinTransit;
+        controllerFrame.cabinDeployHint=cabinPlay&&!cabinTransit;
         if(title!=priorTitleMenu){
             priorTitleMenu=title;
             titleUiReady=false;
@@ -633,6 +663,10 @@ struct Session {
         }
         physical.leftStick={l.x,l.y};physical.rightStick={rr.x,rr.y};
         reloadControls(physical,now);
+        // The effective reload/binocular chords must survive the LEFT grip's
+        // menu-focus edge while being formed. Observe their gestures in the
+        // gameplay context; route only those two actions from this decoder.
+        handheldActions.update(physical,ControlContext::gameplay,now);
         setHandheldMenus(controls.setting("settings.handheld_menus")>=.5f);
         // Apply controller fit once, before devices, skin and action rays fork.
         for(size_t n=0;n<2;++n){
@@ -653,14 +687,14 @@ struct Session {
         controllerFrame.authoredCamera=(title&&!spatialTitle)||avatarEditor||scriptedDemo;
         controllerFrame.openingBackend=openingBackend;
         controllerFrame.cabinPlay=cabinPlay;
+        controllerFrame.cabinTransit=cabinTransit;
+        controllerFrame.cabinDeployHint=cabinPlay&&!cabinTransit;
         const bool titleCabin=spatialTitle&&openingCabinEnabled()&&nativeTitleMenuOpen()&&!manualScreenSelected&&!nativeGamepadActive();
         if(titleCabin)openingFrame=openingSelector.update(true,openingAssetsReady,false,head,controllerFrame.hands,now,
             headCamera().openingTrackingOrigin(now));
         else if(cabinPlay)openingFrame=openingSelector.updateCabin(true,head,controllerFrame.hands,now);
         else {openingSelector.reset();openingFrame={};}
         controllerFrame.openingSelector=titleCabin&&openingFrame.active;
-        controllerFrame.cabinMove=(controllerFrame.openingSelector||cabinPlay)
-            ?std::array<float,2>{l.x,l.y}:std::array<float,2>{};
         controllerFrame.openingSelection=controllerFrame.openingSelector?openingFrame.selection:-1;
         controllerFrame.openingOrigin=(controllerFrame.openingSelector||cabinPlay)?openingFrame.origin:Pose{};
         if(openingFrame.pulse==OpeningPulse::confirm&&openingFrame.selection>=0
@@ -693,6 +727,7 @@ struct Session {
         controllerFrame.menuQuadTilt=controls.setting("settings.menu_quad_tilt_degrees");
         controllerFrame.playerHeightOffset=controls.setting("settings.player_height_offset_cm")*.01f;
         controllerFrame.supportGripRadius=controls.setting("settings.support_grip_radius_cm")*.01f;
+        controllerFrame.trackedWeaponObstruction=controls.setting("settings.tracked_weapon_obstruction")!=0;
         controllerFrame.supportDetachRadius=controls.setting("settings.support_detach_radius_cm")*.01f;
         controllerFrame.handRestCurl=controls.setting("settings.hand_rest_curl_percent")*.01f;
         controllerFrame.handTouchCurl=controls.setting("settings.hand_touch_curl_percent")*.01f;
@@ -703,25 +738,158 @@ struct Session {
         controllerFrame.binocularAutoMark=controls.setting("settings.binocular_auto_mark")>=.5f;
         controllerFrame.binocularActorGlow=controls.setting("settings.binocular_actor_glow")>=.5f;
         controllerFrame.binocularMarkDwellMs=static_cast<uint64_t>(controls.setting("settings.binocular_mark_dwell_ms"));
-        const bool cabinControlsReady=cabinPlay&&!loading;
+        const bool cabinControlsReady=(cabinPlay||cabinTransit)&&!loading;
+        const auto idroidPopup=nativePopupSnapshot();
+        const auto idroidTutorial=nativeIdroidTutorialMode();
+        const auto idroidBorrow=handheldIdroidBorrow(now);
+        const bool borrowedIdroid=idroidBorrow.player&&idroidBorrow.activation==nativeStatus.activation;
+        const bool idroidRouting=((liveIdroid&&!nativeIdroidClosing())||borrowedIdroid)
+            &&controllerFrame.handheldMenus&&handheldMenuRoutingAvailable()
+            &&!nativeControls.selected()&&!nativeGamepadActive();
+        const bool uiOnlyIdroid=handheldIdroidOwned(0,nativeStatus.activation);
+        auto handUseRig=headCamera().publishedRigFrame(now);
+        if(handUseRig)handUseRigHistory=handUseRig;
+        else if(handUseRigHistory&&nativeStatus.active&&!nativeStatus.suspended
+                &&idroidHandUseSourceFresh(handUseRigHistory->playerOwner,handUseRigHistory->activation,
+                    handUseRigHistory->controllers.referenceEpoch,handUseRigHistory->sampleTime,
+                    nativeStatus.activation,referenceEpoch,now)
+                &&handheldIdroidOwned(handUseRigHistory->playerOwner,nativeStatus.activation)){
+            // A source-camera/skin publication gap cannot steal a continuously
+            // held support/reload chord. Renderers still require fresh joined
+            // frames; this cached native contact is used only by arbitration.
+            handUseRig=handUseRigHistory;
+        }else handUseRigHistory.reset();
+        const bool handUseOwner=handUseRig&&handUseRig->activation==nativeStatus.activation
+            &&handUseRig->controllers.referenceEpoch==referenceEpoch
+            &&handheldIdroidOwned(handUseRig->playerOwner,nativeStatus.activation);
+        const bool idroidPhysicalCoexist=idroidRouting&&uiOnlyIdroid&&handUseOwner
+            &&!loading&&!scriptedDemo&&!nativePauseMenuOpen()&&idroidPopup.active&&!*idroidPopup.active
+            &&idroidTutorial&&*idroidTutorial==0;
+        controllerFrame.handheldMenuCoexist=idroidPhysicalCoexist;
+        const bool requestedIdroidFocus=idroidRouting&&controls.heldModifier("system.idroid_focus",physical);
+        const bool handUseEligible=idroidPhysicalCoexist&&!requestedIdroidFocus&&mode==TravelMode::onFoot&&!binocularSelected;
+        const bool readyHeld=controls.heldModifier("gameplay.ready_weapon",physical)
+            &&right&&controllerFrame.hands[1].aimTracked;
+        const bool reloadChord=handUseEligible&&controls.bindingChordHeld("gameplay.reload",physical);
+        const auto contactDelta=handUseRig
+            ?controllerFrame.hands[0].grip.position-handUseRig->weaponSupportGrip.position:Vec3{};
+        const auto handUse=idroidHandUse.update({handUseEligible,liveIdroid||borrowedIdroid,readyHeld,
+            controls.heldModifier("gameplay.support_grip",physical),
+            handUseOwner&&handUseRig->nativeFirearmActive&&handUseRig->weaponSupportGripTracked
+                &&controllerFrame.hands[0].gripTracked,
+            reloadChord,handUseOwner&&(handUseRig->weaponRig.flags&0x1c0)==0x40
+                &&(handUseRig->weaponRig.mode&0x04000000)!=0,
+            std::sqrt(dot(contactDelta,contactDelta)),controllerFrame.supportGripRadius,
+            controllerFrame.supportDetachRadius,handUseOwner?handUseRig->playerOwner:0,
+            nativeStatus.activation,referenceEpoch},now);
+        const bool handheldGrip=physical.buttons[7]>.5f;
+        if(liveIdroid&&handheldGrip&&!priorHandheldGrip){
+            std::ostringstream message;
+            message<<"LEFT iDroid grip arbitration eligible="<<handUseEligible<<" owner="<<handUseOwner
+                <<" ready="<<readyHeld<<" contact="<<(handUseRig&&handUseRig->weaponSupportGripTracked)
+                <<" distance="<<std::sqrt(dot(contactDelta,contactDelta))
+                <<" reload="<<reloadChord<<" use="<<static_cast<unsigned>(handUse);
+            log(message.str());
+        }
+        priorHandheldGrip=handheldGrip;
+        controllerFrame.handheldIdroidStowed=handUse!=IdroidHandUse::device;
+        const bool handUseAcquired=handUse!=IdroidHandUse::device&&priorIdroidHandUse==IdroidHandUse::device;
+        if(handUse!=priorIdroidHandUse){
+            priorIdroidHandUse=handUse;
+            std::ostringstream message;
+            message<<"LEFT iDroid hand use="<<static_cast<unsigned>(handUse)
+                <<" eligible="<<handUseEligible<<" owner="<<handUseOwner<<" ready="<<readyHeld
+                <<" rig="<<bool(handUseRig)<<" firearm="<<(handUseRig&&handUseRig->nativeFirearmActive)
+                <<" contact="<<(handUseRig&&handUseRig->weaponSupportGripTracked)
+                <<" distance="<<std::sqrt(dot(contactDelta,contactDelta));
+            log(message.str());
+        }
+        if(handUseAcquired&&handUse==IdroidHandUse::reload&&handUseOwner){
+            borrowedReloadSent=false;
+            requestHandheldIdroidBorrow(handUseRig->playerOwner,nativeStatus.activation);
+        }
+        if(idroidBorrow.player&&handUse==IdroidHandUse::device&&!idroidBorrow.returnRequested){
+            if(handUseEligible&&idroidBorrow.stopped){
+                returnHandheldIdroidBorrow(idroidBorrow);requestHandheldIdroidOpen(nativeStatus.activation);
+            }else cancelHandheldIdroidBorrow();
+        }
+        const bool idroidFocus=requestedIdroidFocus&&!controllerFrame.handheldIdroidStowed;
+        const bool focusedWeapon=idroidFocusWeapon.update(idroidPhysicalCoexist&&mode==TravelMode::onFoot
+            &&handheldFocusedWeaponRoutingAvailable()&&handUseOwner&&handUseRig->nativeFirearmActive
+            &&!binocularSelected,idroidFocus,readyHeld,lastMappedWeaponReady);
+        publishHandheldFocusedWeapon(focusedWeapon,now);
+        const bool idroidFree=idroidRouting&&!idroidFocus&&nativeIdroidOverlayOnly()
+            &&idroidPopup.active&&!*idroidPopup.active&&idroidTutorial&&*idroidTutorial==0;
+        const bool handheldGameplayResumed=idroidFree&&!priorHandheldFree;
+        priorHandheldFree=idroidFree;
+        controllerFrame.handheldMenuFree=idroidFree;
+        publishHandheldMenuControl(idroidFree?HandheldMenuControl::locomotion:
+            idroidFocus?HandheldMenuControl::menu:
+            idroidRouting?HandheldMenuControl::blocked:HandheldMenuControl::native,now);
         const bool gameplayContext=controllerRigEnabled()&&(cabinControlsReady||detectedMode!=TravelMode::unknown)&&!title&&!loading&&!avatarEditor&&!scriptedDemo
-            &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
+            &&(nativeStatus.active||nativeStatus.pending)&&(!nativeStatus.nativeMenuOpen||idroidFree);
         // Scripted prologue/cinematic gameplay may have no tracked player rig.
         // Preserve native holds and BOTH sticks instead of routing movement
         // through menu navigation while that camera adapter is unavailable.
         const bool sceneFallback=controllerRigEnabled()&&!gameplayContext&&!title&&!loading&&!avatarEditor&&!scriptedDemo&&!nativeStatus.nativeMenuOpen;
         const auto controlContext=nativeControls.selected()?ControlContext::nativeButtons:!gameplayContext?ControlContext::menus:
+            liveIdroid?(binocularSelected?ControlContext::binoculars:mode==TravelMode::vehicle?ControlContext::vehicle:mode==TravelMode::horse?ControlContext::horse:ControlContext::gameplay):
             commandsControls.active()?ControlContext::commands:
             rigControls.equipmentPhase()!=0?ControlContext::equipment:
             binocularSelected?ControlContext::binoculars:mode==TravelMode::vehicle?ControlContext::vehicle:
             mode==TravelMode::horse?ControlContext::horse:ControlContext::gameplay;
-        controls.update(physical,controlContext,now);
+        const uint32_t axisOwner=static_cast<uint32_t>(controlContext)
+            |(uint32_t(idroidFocus)<<4)|(uint32_t(idroidRouting)<<5)
+            |(uint32_t(cabinPlay||cabinTransit)<<6)|(uint32_t(scriptedDemo)<<7)|(uint32_t(loading)<<8);
+        const auto routedPhysical=axisOwnership.update(physical,axisOwner);
+        if(priorIdroidRouting&&!idroidRouting){
+            // Native closing precedes both Terminal Stop and the menu flag.
+            // A held Back/focus chord must not become generic menu
+            // B/LB and reach the now-live player as Reload/equipment input.
+            uint32_t closingInputs{};
+            for(unsigned n=0;n<physical.buttons.size();++n)
+                if(physical.buttons[n]>.09f)closingInputs|=1u<<n;
+            const bool carriedWeapon=lastMappedWeaponReady&&readyHeld;
+            controls.requireRelease(closingInputs,carriedWeapon);
+            handheldActions.requireRelease(closingInputs,carriedWeapon);
+        }
+        priorIdroidRouting=idroidRouting;
+        controls.update(routedPhysical,controlContext,now);
+        if(idroidPhysicalCoexist&&handheldActions.active("gameplay.reload")&&handUse==IdroidHandUse::reload
+                &&!borrowedReloadSent)
+            borrowedReloadPending=true;
+        if(idroidBorrow.player&&idroidBorrow.stopped&&!liveIdroid&&borrowedReloadPending){
+            borrowedReloadPending=false;borrowedReloadSent=true;
+            borrowedReloadPulseUntil=now+120;idroidHandUse.reloadRequested(now);
+            log("VR reload gesture delivered after native terminal stow");
+        }
+        if(!borrowedIdroid&&handUse!=IdroidHandUse::reload){
+            borrowedReloadPending=borrowedReloadSent=false;borrowedReloadPulseUntil=0;
+        }
         const auto nativeInput=nativeControls.update(controls,physical,manualScreenSelected);
         if(nativeInput.changed){
             controls.suspend();rigControls.suspend();commandsControls.suspend();opticsControls.reset();opticGate.reset();snapControls.reset();
             log(nativeInput.selected?"Native buttons ON: all XInput controls; release inputs before use":"Native buttons OFF: normal VR bindings; release inputs before use");
         }
-        const auto activeControl=[&](std::string_view name){return controls.active(name);};
+        const auto activeControl=[&](std::string_view name){
+            if(idroidPhysicalCoexist&&!requestedIdroidFocus&&(name=="gameplay.reload"||name=="gameplay.equip_binoculars"))
+                return handheldActions.active(name);
+            return controls.active(name);
+        };
+        const bool idroidTap=activeControl("system.idroid");
+        const bool fieldIdroidOpen=controllerFrame.handheldMenus&&handheldMenuRoutingAvailable()
+            &&gameplayContext&&!cabinPlay&&!cabinTransit&&!nativeStatus.nativeMenuOpen
+            &&rigControls.equipmentPhase()==0&&!commandsControls.active()&&!nativeInput.exclusive
+            &&!nativeGamepadActive()&&idroidPopup.active&&!*idroidPopup.active&&idroidTutorial&&*idroidTutorial==0;
+        if(idroidTap&&!priorIdroidTap){
+            if(borrowedIdroid){
+                cancelHandheldIdroidBorrow();borrowedReloadPending=false;borrowedReloadPulseUntil=0;
+                requestHandheldIdroidOpen(0);
+                if(liveIdroid)requestNativeIdroidClose(true);
+            }else if(uiOnlyIdroid&&liveIdroid)requestNativeIdroidClose(true);
+            else if(fieldIdroidOpen)requestHandheldIdroidOpen(nativeStatus.activation);
+        }
+        priorIdroidTap=idroidTap;
         if(idroidBackRecovery.update(liveIdroid,activeControl("menus.back"),!nativeInput.exclusive,now))
             requestNativeIdroidClose(true);
         if(!liveIdroid||nativeInput.exclusive)requestNativeIdroidClose(false);
@@ -739,17 +907,21 @@ struct Session {
             log(title?"Tracked VR entered for the native Title menu":"Tracked VR entered automatically on the first playable character");
         }
         const bool rigInput=controllerRigEnabled()&&(cabinControlsReady||detectedMode!=TravelMode::unknown)&&!title&&!loading&&!avatarEditor&&!scriptedDemo
-            &&(nativeStatus.active||nativeStatus.pending)&&!nativeStatus.nativeMenuOpen;
+            &&(nativeStatus.active||nativeStatus.pending)&&(!nativeStatus.nativeMenuOpen||idroidFree);
         const bool menuPressed=activeControl("system.idroid")||activeControl("system.pause");
-        const bool equipmentHeld=controls.value(mode==TravelMode::vehicle?"vehicle.equipment_open":"equipment.open")
+        const bool equipmentHeld=!liveIdroid&&mode!=TravelMode::vehicle&&controls.value("equipment.open")
             >(rigControls.equipmentPhase()!=0?.25f:.5f);
         // Quest/Virtual Desktop can report the KHR simple-controller profile
         // for a frame while the Touch face buttons are still available through
         // the isolated fallback bindings. Do not let that profile blip clear
         // an already selected optic or strand a held B equip action.
         const bool binocularMode=mode==TravelMode::onFoot||mode==TravelMode::horse;
-        const bool binocularAvailable=rigInput&&!nativeInput.exclusive&&binocularMode
-            &&!manualToggle&&!menuPressed&&!commandsControls.active()
+        // Retain the selected optic while the requested handheld terminal is
+        // opening and has not yet published its UI routing acknowledgement.
+        // Rendering/input still require their separate current owner below.
+        const bool handheldTerminal=liveIdroid&&controllerFrame.handheldMenus&&!nativeGamepadActive();
+        const bool binocularAvailable=(rigInput||handheldTerminal)&&!nativeInput.exclusive&&binocularMode
+            &&(!liveIdroid||handheldTerminal)&&!manualToggle&&(!menuPressed||fieldIdroidOpen||uiOnlyIdroid)&&!commandsControls.active()
             &&!equipmentHeld&&rigControls.equipmentPhase()==0;
         const bool wasBinocularSelected=binocularSelected;
         binocularSelected=updateBinocularSelection(binocularSelected,activeControl("gameplay.equip_binoculars"),
@@ -776,15 +948,15 @@ struct Session {
             ||activeControl("gameplay.equip_binoculars")||activeControl("binoculars.stow");
         const bool centerChord=activeControl("system.recenter")&&!binocularInteraction;
         const bool headToggle=manualToggle;
-        const uint16_t menuBits=static_cast<uint16_t>((activeControl("system.idroid")?XINPUT_GAMEPAD_START:0)
+        const uint16_t menuBits=static_cast<uint16_t>((idroidTap&&!fieldIdroidOpen&&!uiOnlyIdroid?XINPUT_GAMEPAD_START:0)
             |(activeControl("system.pause")?XINPUT_GAMEPAD_BACK:0));
         const bool utilityCenter=centerChord;
-        const bool opticSupport=activeControl("binoculars.support_grip");
+        const bool opticSupport=!liveIdroid&&activeControl("binoculars.support_grip");
         const auto binocularRotation=binocularGripRotation(controls.setting("settings.binocular_pitch_degrees"),
             controls.setting("settings.binocular_yaw_degrees"),controls.setting("settings.binocular_roll_degrees"));
         const float binocularMaxEyeDistance=controls.setting("settings.binocular_max_eye_distance_cm")*.01f;
-        const bool opticAvailable=rigInput&&binocularMode&&right
-            &&binocularSelected
+        const bool opticAvailable=(rigInput||idroidPhysicalCoexist)&&binocularMode&&right
+            &&binocularSelected&&(!liveIdroid||idroidPhysicalCoexist)
             &&!commandsControls.active()&&!headToggle
             &&(opticGate.active()||!centerChord)&&stereoTracked;
         if(opticAvailable){
@@ -843,17 +1015,36 @@ struct Session {
         if(priorFocused&&center&&!priorRecenter){recenterRequested=true;headCamera().recenter();}
         if(priorFocused&&center&&!priorRecenter)log("OpenXR recenter chord accepted");
         GamepadSample pad{};
-        const auto fallbackMode=nativeSceneInputMode(nativeStatus.nativeMenuOpen,scriptedDemo,interactiveLook,
+        const auto terms=nativeTermsMenu();
+        const auto fallbackMode=nativeSceneInputMode(nativeStatus.nativeMenuOpen||terms.ready(now),scriptedDemo,interactiveLook,
             sceneFallback,liveIdroid&&controllerFrame.handheldMenus);
         const auto bit=[&](bool enabled,WORD mask){if(enabled)pad.buttons|=mask;};
         const auto mappedButton=[&](std::string_view name,WORD mask){bit(activeControl(name),mask);};
         const auto triggerValue=[&](std::string_view name){return static_cast<uint8_t>(controls.value(name)*255);};
-        auto move=controls.axis("axes.move",physical);
-        auto navigation=controls.axis("axes.equipment",physical);
+        const bool singleIdroidTab=!nativeInput.exclusive&&!rigInput&&idroidFocus
+            &&fallbackMode==NativeMenuInput::liveIdroid&&handheldMenuInputReady();
+        if(!singleIdroidTab)idroidTabInput.update({},false,now);
+        auto move=controls.axis("axes.move",routedPhysical);
+        auto navigation=controls.axis("axes.equipment",routedPhysical);
         if(nativeInput.exclusive){
             pad=nativeInput.gamepad;move={};navigation={};
         }else if(!rigInput){
-            pad=nativeMenuGamepad(controls,physical,fallbackMode);
+            pad=nativeMenuGamepad(controls,routedPhysical,fallbackMode);
+            if(focusedWeapon)idroidTriggerReleaseRequired=true;
+            else if(!controls.bindingChordHeld("menus.left_trigger",physical)
+                &&!controls.bindingChordHeld("menus.right_trigger",physical)
+                &&physical.buttons[9]<=.09f&&physical.buttons[10]<=.09f)idroidTriggerReleaseRequired=false;
+            if(idroidTriggerReleaseRequired&&idroidRouting)pad.leftTrigger=pad.rightTrigger=0;
+            if(focusedWeapon){
+                // The held right hand belongs to its already-ready firearm,
+                // never also to Next Tab. UI trigger queries are gated at
+                // their own native consumer; face buttons and sticks remain UI.
+                pad.buttons&=~uint16_t{0x200};
+                pad.leftTrigger=255;
+                pad.rightTrigger=static_cast<uint8_t>(handheldActions.value("gameplay.fire_or_cqc")*255);
+                controllerFrame.weaponReady=true;
+            }
+            if(singleIdroidTab)pad=idroidTabInput.update(pad,true,now);
             move={float(pad.leftX)/32767.f,float(pad.leftY)/32767.f};
             navigation={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
         }else if(mode==TravelMode::vehicle){
@@ -861,9 +1052,11 @@ struct Session {
             mappedButton("vehicle.weapon_or_call",XINPUT_GAMEPAD_X);mappedButton("vehicle.interact",XINPUT_GAMEPAD_Y);
             mappedButton("vehicle.left_click",XINPUT_GAMEPAD_LEFT_THUMB);mappedButton("vehicle.right_click",XINPUT_GAMEPAD_RIGHT_THUMB);
             pad.leftTrigger=triggerValue("vehicle.brake_reverse");pad.rightTrigger=triggerValue("vehicle.accelerate");
-            move=controls.axis("axes.vehicle_steering",physical);
+            move=controls.axis("axes.vehicle_steering",routedPhysical);
         }else{
-            mappedButton("gameplay.native_a",XINPUT_GAMEPAD_A);mappedButton("gameplay.reload",XINPUT_GAMEPAD_B);
+            mappedButton("gameplay.native_a",XINPUT_GAMEPAD_A);
+            bit((borrowedIdroid||handUse==IdroidHandUse::reload)?now<borrowedReloadPulseUntil:
+                activeControl("gameplay.reload"),XINPUT_GAMEPAD_B);
             mappedButton("gameplay.native_x",XINPUT_GAMEPAD_X);mappedButton("gameplay.interact",XINPUT_GAMEPAD_Y);
             mappedButton("gameplay.native_left_shoulder",XINPUT_GAMEPAD_LEFT_SHOULDER);
             mappedButton("gameplay.native_right_shoulder",XINPUT_GAMEPAD_RIGHT_SHOULDER);
@@ -873,8 +1066,11 @@ struct Session {
             mappedButton("horse.stance",XINPUT_GAMEPAD_A);mappedButton("horse.reload",XINPUT_GAMEPAD_B);
             mappedButton("horse.gallop",XINPUT_GAMEPAD_X);mappedButton("horse.interact",XINPUT_GAMEPAD_Y);
             mappedButton("horse.left_click",XINPUT_GAMEPAD_LEFT_THUMB);mappedButton("horse.right_click",XINPUT_GAMEPAD_RIGHT_THUMB);
-            pad.leftTrigger=triggerValue("equipment.open");
-            pad.rightTrigger=right&&controllerFrame.hands[1].aimTracked?triggerValue("gameplay.fire_or_cqc"):0;
+            // The terminal retains the equipment-opening owner. A remapped
+            // support/reload chord must not also unfold the wrist picker and
+            // cancel right-hand weapon readiness.
+            pad.leftTrigger=liveIdroid?0:triggerValue("equipment.open");
+            pad.rightTrigger=(!liveIdroid||idroidFree)&&right&&controllerFrame.hands[1].aimTracked?triggerValue("gameplay.fire_or_cqc"):0;
         }
         if(rigInput&&controlContext==ControlContext::equipment){
             mappedButton("equipment.back",XINPUT_GAMEPAD_B);mappedButton("equipment.use",XINPUT_GAMEPAD_A);
@@ -906,6 +1102,7 @@ struct Session {
             rigControls.suspend();commandsControls.suspend();opticsControls.reset();opticGate.reset();
             controllerFrame.weaponReady=rigInput&&mode!=TravelMode::vehicle&&pad.leftTrigger>127;
             controllerFrame.vehicleControls=rigInput&&mode==TravelMode::vehicle;
+            controllerFrame.nativeActionControls=rigInput&&mode==TravelMode::nativeAction;
             controllerFrame.commandControls=rigInput&&(pad.buttons&XINPUT_GAMEPAD_LEFT_SHOULDER);
             controllerFrame.equipmentCategory=(pad.buttons&1)?1:(pad.buttons&2)?2:(pad.buttons&8)?3:(pad.buttons&4)?4:0;
             controllerFrame.equipmentOpen=controllerFrame.equipmentCategory!=0;
@@ -932,12 +1129,12 @@ struct Session {
                 static_cast<uint8_t>(activeControl("commands.confirm")?255:0),pad.leftX,pad.leftY};
             if(activeControl("commands.open")||activeControl("commands.mounted_open"))commandPad.buttons|=XINPUT_GAMEPAD_X;
             if(activeControl("commands.back"))commandPad.buttons|=XINPUT_GAMEPAD_B;
-            const auto commandAxis=controls.axis("axes.commands",physical);
+            const auto commandAxis=controls.axis("axes.commands",routedPhysical);
             commandPad.rightX=static_cast<int16_t>(commandAxis[0]*32767);commandPad.rightY=static_cast<int16_t>(commandAxis[1]*32767);
             const bool carryCombat=mode==TravelMode::onFoot&&right&&controllerFrame.hands[1].aimTracked
                 &&!activeControl("gameplay.dive")&&!activeControl("gameplay.stance")&&!activeControl("gameplay.pickup_carry");
             const auto commands=commandsControls.update(commandPad,(mode==TravelMode::onFoot||mode==TravelMode::horse)
-                &&!optical.exclusive&&!center&&!headToggle,now,nativeCommandsDrawTime(),
+                &&!liveIdroid&&!optical.exclusive&&!center&&!headToggle,now,nativeCommandsDrawTime(),
                 carryCombat?triggerValue("gameplay.ready_weapon"):0,carryCombat?triggerValue("gameplay.fire_or_cqc"):0);
             if(wasCommands!=commands.active)log("Wrist Commands open="+std::to_string(commands.active));
             controllerFrame.commandControls=commands.active;
@@ -956,17 +1153,29 @@ struct Session {
                 // A trigger pressed inside Commands must not become a shot on
                 // close. Only an uninterrupted pre-existing CQC hold survives.
                 if(commands.exclusive&&!commands.gamepad.rightTrigger)rigControls.requireAttackRelease();
-            }else mapped=rigControls.update(pad,activeControl("vehicle.wheel_grip")&&!center&&!headToggle,
-                mode==TravelMode::vehicle?equipmentHeld:right&&controllerFrame.hands[1].aimTracked&&activeControl("gameplay.ready_weapon"),mode,
-                now,nativeEquipmentPickerDrawTime(),controllerThrowReady());
+            }else{
+                if(handUseAcquired||(handheldGameplayResumed&&uiOnlyIdroid&&readyHeld))rigControls.resumeHandheldHandUse();
+                mapped=rigControls.update(pad,activeControl("vehicle.wheel_grip")&&!center&&!headToggle,
+                    mode==TravelMode::vehicle?(activeControl("vehicle.right_wheel_grip")||activeControl("vehicle.ready_weapon")):
+                        (!liveIdroid||idroidFree)&&right&&controllerFrame.hands[1].aimTracked
+                        &&(activeControl("gameplay.ready_weapon")
+                            ||(((uiOnlyIdroid&&idroidFree)||borrowedIdroid)&&readyHeld)),mode,
+                    now,nativeEquipmentPickerDrawTime(),controllerThrowReady(),
+                    activeControl("vehicle.right_wheel_grip"),activeControl("vehicle.ready_weapon"),
+                    activeControl("vehicle.equipment_open"));
+            }
             if(beforePhase!=rigControls.equipmentPhase())log("Wrist picker phase="+std::to_string(rigControls.equipmentPhase())
                 +" category="+std::to_string(rigControls.equipmentCategory()));
             pad=mapped.gamepad;controllerFrame.weaponReady=mapped.weaponReady;
             controllerFrame.supportGrip=activeControl("gameplay.support_grip");
             controllerFrame.vehicleControls=mode==TravelMode::vehicle;
-            controllerFrame.wheelGrip=activeControl("vehicle.wheel_grip")&&!center&&!headToggle;
-            controllerFrame.allowMotionMelee=controls.setting("settings.motion_melee")!=0;
-            controllerFrame.allowAnimalTouch=controls.setting("settings.animal_touch")!=0;
+            controllerFrame.nativeActionControls=mode==TravelMode::nativeAction;
+            controllerFrame.wheelGrip=activeControl("vehicle.wheel_grip")&&!center&&!headToggle
+                &&rigControls.equipmentPhase()==0;
+            controllerFrame.rightWheelGrip=mapped.rightWheelGrip&&!center&&!headToggle;
+            controllerFrame.vehicleWeaponIntent=mapped.vehicleWeaponIntent&&!center&&!headToggle;
+            controllerFrame.allowMotionMelee=!liveIdroid&&controls.setting("settings.motion_melee")!=0;
+            controllerFrame.allowAnimalTouch=!liveIdroid&&controls.setting("settings.animal_touch")!=0;
             controllerFrame.equipmentOpen=rigControls.equipmentPhase()!=0;
             controllerFrame.equipmentCategory=rigControls.equipmentPhase()>=2?rigControls.equipmentCategory()+1:0;
             stickNavigation=rigControls.equipmentPhase()!=0||commands.exclusive
@@ -978,7 +1187,11 @@ struct Session {
                 &&!center&&!headToggle&&!utilityCenter;
             // Native on-foot movement already consumes the published camera
             // basis. Rotating this stick again doubles physical/snap heading.
-        }else if(nativeStatus.nativeMenuOpen||nativeStatus.awaitingPlayer){rigControls.suspend();opticsControls.reset();opticGate.reset();commandsControls.suspend();}
+        }else if(nativeStatus.nativeMenuOpen||nativeStatus.awaitingPlayer){
+            rigControls.suspend();commandsControls.suspend();
+            if(idroidPhysicalCoexist&&binocularSelected)controllerFrame.magnification=reportedMagnification;
+            else {opticsControls.reset();opticGate.reset();}
+        }
         else {rigControls.reset();opticsControls.reset();opticGate.reset();commandsControls.suspend();}
         requestNativeEquipmentPreview(controllerFrame.equipmentOpen&&!controllerFrame.equipmentCategory
             &&rigInput&&!nativeInput.exclusive&&!nativeStatus.nativeMenuOpen);
@@ -1005,15 +1218,18 @@ struct Session {
         // right stick. Clearing it here was correct for the on-foot rig,
         // where the head pose owns view motion, but it dropped vertical
         // turret/camera aim for trucks, armored vehicles, and helicopters.
-        const bool mounted=mode==TravelMode::horse||mode==TravelMode::vehicle;
+        const bool mounted=mode==TravelMode::horse||mode==TravelMode::vehicle||mode==TravelMode::nativeAction;
         if(rigInput&&!nativeInput.exclusive&&!stickNavigation
            &&!mountedViewOwnsRightStick(mode,rigInput,nativeInput.exclusive,stickNavigation))
             {pad.rightX=0;pad.rightY=0;}
-        const bool cabinTurning=(controllerFrame.openingSelector||cabinPlay)&&nativeStatus.active
-            &&!nativeStatus.nativeMenuOpen&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
+        const bool cabinTurning=(controllerFrame.openingSelector||cabinPlay||cabinTransit)&&nativeStatus.active
+            &&(!nativeStatus.nativeMenuOpen||idroidFree)&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
+        // Menu navigation owns its stick. Use the effective movement binding
+        // only when the cabin owns locomotion, as it already does for turning.
+        controllerFrame.cabinMove=cabinTurning?controls.axis("axes.move",routedPhysical):std::array<float,2>{};
         const bool turnAvailable=rigInput&&!cabinTurning&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
         const auto turnMode=controls.setting("settings.turn_mode");
-        const auto smoothAxis=controls.axis("axes.turn",physical);
+        const auto smoothAxis=controls.axis("axes.turn",routedPhysical);
         // Mounted locomotion owns a native vehicle/horse heading. An artificial
         // head-camera-only snap decouples that heading from what the rider sees.
         const bool nativeTurn=turnMode==1||(mounted&&turnMode==0);
@@ -1033,26 +1249,65 @@ struct Session {
         if(turn){snapYaw=std::remainder(snapYaw+turn,6.283185307f);log("Physical snap turn degrees="+std::to_string(-turn*57.2957795f));}
         if(cabinYaw)snapYaw=std::remainder(snapYaw+cabinYaw,6.283185307f);
         controllerFrame.snapYaw=snapYaw;
+        if(controllerFrame.vehicleControls&&!nativeInput.exclusive&&!stickNavigation
+           &&!center&&!headToggle&&!utilityCenter)
+            controllerFrame.vehicleViewInput={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
         // Apply LAST: the generic menu mapping otherwise overwrites the zero
         // axes and moves native focus while the user walks around the cabin.
         pad=cabinTitleGamepad(pad,controllerFrame.openingSelector,
             openingFrame.pulse==OpeningPulse::confirm&&!utilityCenter&&!headToggle);
+        if(cabinTransit&&!nativeInput.exclusive&&!nativeStatus.nativeMenuOpen){
+            // The passenger walks/turns in the tracked cabin. Keep only the
+            // native context exit/menu controls; the same sticks must not
+            // drive the scripted passenger camera or an on-foot action.
+            pad.buttons&=XINPUT_GAMEPAD_Y|XINPUT_GAMEPAD_START|XINPUT_GAMEPAD_BACK;
+            pad.leftX=pad.leftY=pad.rightX=pad.rightY=0;
+            pad.leftTrigger=pad.rightTrigger=0;controllerFrame.weaponReady=false;
+            controllerFrame.equipmentOpen=controllerFrame.commandControls=false;
+            controllerFrame.allowMotionMelee=controllerFrame.allowAnimalTouch=false;
+        }
         if(liveIdroid&&controllerFrame.handheldMenus&&!handheldMenuInputReady())
-            pad.leftX=pad.leftY=0;
+            pad={};
+        const bool vehiclePedalInput=rigInput&&mode==TravelMode::vehicle&&!nativeInput.exclusive
+            &&!liveIdroid&&!cabinTransit&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
+        const bool vehicleGunInput=vehiclePedalInput&&right&&controllerFrame.hands[1].aimTracked;
+        const bool vehicleGunRequest=vehicleGunInput&&controllerFrame.vehicleWeaponIntent;
+        const auto vehicleReloadInputs=controls.activeInputMask("vehicle.reload")|controls.retainedInputMask("vehicle.reload")
+            |controls.heldInputMask("vehicle.reload",routedPhysical);
+        const bool vehicleFire=controls.value("vehicle.fire")>.09f
+            &&!(controls.activeInputMask("vehicle.fire")&vehicleReloadInputs);
+        publishVehicleWeaponInput(vehicleGunRequest,vehicleGunRequest&&vehicleFire,
+            vehicleGunRequest&&activeControl("vehicle.reload"),now,nativeStatus.activation);
+        if(vehicleGunInput){
+            const auto weapon=vehicleWeaponState();
+            controllerFrame.weaponReady=vehicleGunRequest&&weapon.requested&&weapon.ready
+                &&handUseRig&&weapon.player==handUseRig->playerOwner
+                &&weapon.activation==nativeStatus.activation&&weapon.time&&now>=weapon.time&&now-weapon.time<=150;
+        }
+        const auto vehicleConsumed=vehicleGunRequest?vehicleWeaponConsumedInputs(controls,routedPhysical):0u;
+        if(vehicleGunRequest)pad=vehicleWeaponGamepad(pad,controls,vehicleConsumed);
+        const auto pedalAxis=controls.axisInputMask("axes.vehicle_pedals");
+        const auto pedalVertical=(pedalAxis&vehicleConsumed)?0.f:controls.axis("axes.vehicle_pedals",routedPhysical)[1];
+        if(vehicleGunRequest&&pedalAxis==controls.axisInputMask("axes.equipment"))pad.rightY=0;
+        pad=vehiclePedals.update(pad,pedalVertical,
+            vehicleGunRequest,vehiclePedalInput);
+        if(vehicleGunInput)controllerFrame.vehicleViewInput={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
+        lastMappedWeaponReady=controllerFrame.weaponReady&&pad.leftTrigger>127;
         const auto packetTime=steadyMilliseconds();
         gamepadMailbox().publish(pad,true,packetTime,controls.hasPhysicalIntent(physical));
         publishControlInputAudit({controlContext,physical,packetTime,pad.buttons,rigInput,static_cast<int>(mode),
             {pad.leftX,pad.leftY,pad.rightX,pad.rightY},{pad.leftTrigger,pad.rightTrigger}});
         const auto hapticNow=steadyMilliseconds();
         const auto wheel=wheelMailbox().read(hapticNow);
-        const bool holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped&&controllerFrame.wheelGrip;
-        const bool tookWheel=holding&&!wheelHeld;wheelHeld=holding;
+        const uint8_t holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped
+            ?static_cast<uint8_t>(wheel.hands&((controllerFrame.wheelGrip?1:0)|(controllerFrame.rightWheelGrip?2:0))):0;
+        const uint8_t tookWheel=holding&~wheelHeld;wheelHeld=holding;
         if(tookWheel||binocularEquipped||nativeInput.changed||hapticNow-hapticAt>=50){
             hapticAt=hapticNow;
             const auto rumble=rumbleMailbox().read(hapticNow);
             for(size_t side=0;side<2;++side){
                 const float native=side?rumble.high:rumble.low;
-                const float contact=nativeInput.changed?.4f:side&&binocularEquipped?.3f:!side&&tookWheel?.25f:0.f;
+                const float contact=nativeInput.changed?.4f:side&&binocularEquipped?.3f:(tookWheel&(1u<<side))?.25f:0.f;
                 const float amplitude=std::clamp(std::max(native,contact),0.f,.75f);
                 XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};info.action=vibration;info.subactionPath=hands[side];
                 if(amplitude>0&&controllerFrame.hands[side].gripTracked){
@@ -1294,6 +1549,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         }
         XrSpaceLocation head{XR_TYPE_SPACE_LOCATION};
         xrCheck(xrLocateSpace(session.view,session.local,frame.predictedDisplayTime,&head),"Locate headset");
+        const auto headFault=headTrackingFaultProbe().mask(steadyMilliseconds());
+        if(headFault&1)head.locationFlags&=~validPoseBits;
         const bool tracking=(head.locationFlags&validPoseBits)==validPoseBits&&valid(fromXr(head.pose));
         std::array<XrView,2> views{{{XR_TYPE_VIEW},{XR_TYPE_VIEW}}};
         XrViewLocateInfo locate{XR_TYPE_VIEW_LOCATE_INFO};locate.viewConfigurationType=XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
@@ -1301,6 +1558,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         XrViewState viewState{XR_TYPE_VIEW_STATE};uint32_t viewCount{};
         xrCheck(xrLocateViews(session.handle,&locate,&viewState,2,&viewCount,views.data()),"Locate native stereo views");
         constexpr auto viewValidBits=XR_VIEW_STATE_ORIENTATION_VALID_BIT|XR_VIEW_STATE_POSITION_VALID_BIT;
+        if(headFault&2)viewState.viewStateFlags&=~viewValidBits;
         const bool stereoTracked=viewCount==2&&(viewState.viewStateFlags&viewValidBits)==viewValidBits;
         std::array<EyeView,2> trackedViews{};
         for(size_t n=0;n<2;++n)trackedViews[n]={fromXr(views[n].pose),{views[n].fov.angleLeft,views[n].fov.angleRight,views[n].fov.angleUp,views[n].fov.angleDown}};
@@ -1435,8 +1693,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         const std::array<const XrCompositionLayerBaseHeader*,2> transitionLayers{
             reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection),
             reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad)};
-        if(frame.shouldRender&&tracking){
-            if((surroundTransition||cameraTransition)&&haveSurround&&regionsValid&&leftEye.ready&&rightEye.ready
+        if(frame.shouldRender){
+            if(tracking&&(surroundTransition||cameraTransition)&&haveSurround&&regionsValid&&leftEye.ready&&rightEye.ready
                &&leftEye.copied==surroundImage&&rightEye.copied==surroundImage){
                 // A cinematic cut carries only the already uploaded stereo
                 // image and its original poses. It never adds a native quad.
@@ -1447,24 +1705,32 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
                 // A runtime/producer stall freezes the last accepted scene;
                 // it must not alternate that scene with black every 500 ms.
                 // Reproject its ORIGINAL poses/FOVs while ownership is valid.
-                // New source admission still requires freshness above.
+                // Missing head/view validity also retains this exact pair:
+                // invalid current poses never replace its valid source poses.
+                // New source admission still requires freshness above, and a
+                // reference-space change invalidates the retained coordinates.
                 const bool freshEyes=readyEyePair(eyeFrames,cameraStatus.activation,steadyMilliseconds());
-                if(mayReprojectAcceptedStereo(cameraStatus)&&regionsValid&&acceptedStereo.presentable(consumer.frame().epoch,cameraStatus.activation,steadyMilliseconds())){
+                if(mayReprojectAcceptedStereo(cameraStatus)&&regionsValid&&acceptedStereo.presentable(consumer.frame().epoch,cameraStatus.activation,steadyMilliseconds(),session.referenceEpoch)){
                     layer=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);end.layerCount=1;end.layers=&layer;++projectionFrames;
                     if(!freshEyes||cameraStatus.suspended)++retainedStereoFrames;
                     menuReturnPending=false;
-                }else if(menuReturnPending&&cameraStatus.active&&!cameraStatus.suspended&&anchored&&screen.ready){
+                }else if(tracking&&menuReturnPending&&cameraStatus.active&&!cameraStatus.suspended&&anchored&&screen.ready){
                     // Keep the last native menu quad until this return has a
                     // complete new stereo pair. Never use old gameplay eyes or
                     // fall back to a screen after gameplay tracking is lost.
                     end.layerCount=1;end.layers=&layer;++stats.submittedScreens;
                 }
-            }else if(anchored&&screen.ready){end.layerCount=1;end.layers=&layer;++stats.submittedScreens;}
+            }else if(tracking&&anchored&&screen.ready){end.layerCount=1;end.layers=&layer;++stats.submittedScreens;}
         }
         const auto stageEndFrameStart=XrStageDiagnostics::Clock::now();
         const auto endFrameResult=xrEndFrame(session.handle,&end);
         const auto stageEndFrameDone=XrStageDiagnostics::Clock::now();
         xrCheck(endFrameResult,"Submit XR frame");guard.ended=true;
+        // xrEndFrame often completes the cache copy/release on the XR device.
+        // Return only GPU-complete shared slots before the next xrWaitFrame;
+        // delaying this poll until acquisition starves the native producer.
+        // This changes neither cached pixels nor their source pose metadata.
+        consumer.poll();
         const auto stageSubmitDone=XrStageDiagnostics::Clock::now();
         const auto submitDone=steadyMilliseconds();
         const bool recordedStereo=end.layerCount&&layer==reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection);
@@ -1510,6 +1776,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             const auto& selected=surroundTransition?surroundFrames:eyeFrames;
             log("XR no layers frame="+std::to_string(stats.frames)
                 +" head_flags="+std::to_string(head.locationFlags)+" view_flags="+std::to_string(viewState.viewStateFlags)
+                +" head_fault="+std::to_string(headFault)
                 +" active="+std::to_string(cameraStatus.active)+" pending="+std::to_string(cameraStatus.pending)
                 +" suspended="+std::to_string(cameraStatus.suspended)+" reason="+std::to_string(static_cast<int>(cameraStatus.reason))
                 +" rig_reject="+std::to_string(cameraStatus.rigRejectFlags)+" rig_age_ms="+std::to_string(cameraStatus.rigAgeMs)

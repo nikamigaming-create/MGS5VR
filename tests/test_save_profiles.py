@@ -37,6 +37,31 @@ class SaveProfiles(unittest.TestCase):
         self.assertEqual(original, self.contents())
         self.assertEqual(untouched.read_bytes(), b"personal graphics")
 
+    def test_fresh_campaign_removes_only_six_files_and_can_restore_exactly(self):
+        original=self.contents()
+        graphics=self.account/'287700/local/TPP_GRAPHICS_CONFIG';graphics.write_bytes(b'graphics')
+        unrelated=self.account/'311340/remote/GZ_GAME_DATA';unrelated.write_bytes(b'ground zeroes')
+        result=profiles.reset_new_campaign(self.account,self.store)
+        self.assertTrue(result['retail_created_save_required'])
+        self.assertTrue(all(not (self.account/relative).exists() for relative in profiles.FILES))
+        self.assertEqual(graphics.read_bytes(),b'graphics')
+        self.assertEqual(unrelated.read_bytes(),b'ground zeroes')
+        manifest=profiles.verify(self.store,result['rollback'])
+        for item in manifest['files']:
+            self.assertEqual((self.store/result['rollback']/item['path']).read_bytes(),original[item['path']])
+
+    def test_partial_fresh_campaign_failure_restores_every_campaign_file(self):
+        original=self.contents();real_unlink=pathlib.Path.unlink;calls=0
+        def fail_second(path,*args,**kwargs):
+            nonlocal calls
+            calls+=1
+            if calls==2:raise OSError('simulated locked campaign file')
+            return real_unlink(path,*args,**kwargs)
+        with mock.patch.object(pathlib.Path,'unlink',fail_second):
+            with self.assertRaisesRegex(OSError,'locked campaign'):
+                profiles.reset_new_campaign(self.account,self.store)
+        self.assertEqual(self.contents(),original)
+
     def test_corrupt_source_refused_before_touching_live_files(self):
         original = self.contents()
         (self.store / "field" / profiles.FILES[0]).write_bytes(b"corrupt")

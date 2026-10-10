@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "description": "Right-hand iDroid fit with a distinct runtime grip/pointing basis, physical inspection and ordinary immediate reopening. Both final eyes still require review; this does not certify headset ergonomics or forced tutorial stow.",
+  "description": "Left-hand cinematic iDroid contact with tracked palm motion, physical inspection and ordinary immediate reopening. Both final eyes still require review; this does not certify headset ergonomics or forced tutorial stow.",
   "required_settings": {
     "settings.handheld_menus": 1
   },
@@ -14,7 +14,7 @@
       "setup": [
         {
           "op": "pose",
-          "hand": "right",
+          "hand": "left",
           "position": [
             0.02,
             -0.22,
@@ -56,7 +56,7 @@
       "steps": [
         {
           "op": "pose",
-          "hand": "right",
+          "hand": "left",
           "position": [
             0.02,
             -0.22,
@@ -80,7 +80,7 @@
         "idroid": true,
         "idroid_menu_input_ready": true,
         "rendered.idroid_device_tracked": true,
-        "rendered.right_grip.orientation": {
+        "rendered.left_grip.orientation": {
           "near": [
             0.25881904510252074,
             0.0,
@@ -100,7 +100,7 @@
       "steps": [
         {
           "op": "pose",
-          "hand": "right",
+          "hand": "left",
           "position": [
             0.12,
             -0.15,
@@ -124,7 +124,7 @@
         "idroid": true,
         "idroid_menu_input_ready": true,
         "rendered.idroid_device_tracked": true,
-        "rendered.right_grip.orientation": {
+        "rendered.left_grip.orientation": {
           "near": [
             0.4216957229064428,
             0.46531511027177885,
@@ -144,7 +144,7 @@
       "steps": [
         {
           "op": "pose",
-          "hand": "right",
+          "hand": "left",
           "position": [
             -0.02,
             -0.15,
@@ -168,7 +168,7 @@
         "idroid": true,
         "idroid_menu_input_ready": true,
         "rendered.idroid_device_tracked": true,
-        "rendered.right_grip.orientation": {
+        "rendered.left_grip.orientation": {
           "near": [
             0.4216957229064428,
             -0.46531511027177885,
@@ -206,7 +206,7 @@
       "setup": [
         {
           "op": "pose",
-          "hand": "right",
+          "hand": "left",
           "position": [
             0.02,
             -0.22,

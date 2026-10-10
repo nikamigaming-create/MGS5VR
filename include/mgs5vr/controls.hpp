@@ -23,6 +23,17 @@ struct PhysicalControls {
     std::array<float,29> buttons{};
     std::array<float,2> leftStick{},rightStick{};
 };
+// A stick held across an ownership change must be centered before it can
+// navigate, walk or aim for its new owner. Both axes transfer together.
+class ControlAxisOwnership {
+public:
+    PhysicalControls update(PhysicalControls input,uint32_t owner) noexcept;
+    void reset() noexcept {*this=ControlAxisOwnership{};}
+private:
+    uint32_t owner_{};
+    bool initialized_{};
+    std::array<bool,2> blocked_{};
+};
 struct ControlInputAudit {
     ControlContext context{};
     PhysicalControls physical{};
@@ -61,9 +72,26 @@ public:
     std::vector<std::string> load(std::istream& input);
     void update(PhysicalControls input,ControlContext context,uint64_t time);
     void suspend();
+    // Discard gestures owned by a closing UI until their physical inputs are
+    // released, even when the native menu/gameplay publication changes later.
+    // An already-held firearm can retain its separate ready/fire actions.
+    void requireRelease(uint32_t inputs,bool preserveWeapon=false);
     float value(std::string_view action) const;
     bool active(std::string_view action) const {return value(action)>.5f;}
+    // Inputs of the alternatives actually contributing to this update, not
+    // every configured alternative. Used to give a consuming UI chord priority.
+    uint32_t activeInputMask(std::string_view action) const;
+    // Inputs from a complete chord that remain down after a partial release.
+    uint32_t retainedInputMask(std::string_view action) const;
+    // Derived direction inputs owned by the configured physical stick.
+    uint32_t axisInputMask(std::string_view axis) const;
     bool hasBindingInput(std::string_view input) const;
+    // Level modifiers can choose an input owner before its context is resolved.
+    bool heldModifier(std::string_view action,const PhysicalControls& input) const;
+    // Arbitration only: the effective chord is physically held, regardless
+    // of its press/tap/hold gesture. Activation still comes from update().
+    bool bindingChordHeld(std::string_view action,const PhysicalControls& input) const;
+    uint32_t heldInputMask(std::string_view action,const PhysicalControls& input) const;
     // Physical buttons/sticks retain ordinary ownership thresholds. A touch
     // requests XR ownership only when an effective binding uses that sensor.
     bool hasPhysicalIntent(const PhysicalControls& input) const;
@@ -77,7 +105,7 @@ private:
     enum class Gesture { level,press,release,tap,hold };
     struct Binding {uint32_t mask{};Gesture gesture{};uint64_t milliseconds{300};};
     struct State {uint64_t since{},until{};bool held{},blocked{},enabled{};};
-    struct Entry {std::string name;std::vector<Binding> bindings;std::vector<State> states;uint32_t contexts{};bool modifier{};float value{};};
+    struct Entry {std::string name;std::vector<Binding> bindings;std::vector<State> states;uint32_t contexts{};bool modifier{};float value{};uint32_t activeInputs{},retainedInputs{},handoffInputs{};};
     struct Setting {std::string name;float value{},minimum{},maximum{};};
     struct Axis {std::string name;int source{};};
     std::vector<Entry> entries_;

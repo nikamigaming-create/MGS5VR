@@ -47,4 +47,45 @@ WristSelectorImage makeWristSelectorImage(const EquipmentLabels& labels){
     for(auto& pixel:image.bgra)pixel|=0xff000000u;
     return image;
 }
+WristSelectorImage makeAccWristHintImage(std::string_view idroidBinding){
+    constexpr int width=1024,height=256;
+    WristSelectorImage image{width,height,std::vector<uint32_t>(width*height)};
+    struct Canvas {
+        HDC dc{CreateCompatibleDC(nullptr)};HBITMAP bitmap{};HGDIOBJ prior{};
+        ~Canvas(){if(prior)SelectObject(dc,prior);if(bitmap)DeleteObject(bitmap);if(dc)DeleteDC(dc);}
+    } canvas;
+    if(!canvas.dc)return {};
+    BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+    info.bmiHeader.biWidth=width;info.bmiHeader.biHeight=-height;info.bmiHeader.biPlanes=1;
+    info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;void* pixels{};
+    canvas.bitmap=CreateDIBSection(canvas.dc,&info,DIB_RGB_COLORS,&pixels,nullptr,0);
+    if(!canvas.bitmap||!pixels)return {};
+    canvas.prior=SelectObject(canvas.dc,canvas.bitmap);SetBkMode(canvas.dc,TRANSPARENT);
+    const auto fill=[&](RECT rect,COLORREF color){
+        auto brush=CreateSolidBrush(color);FillRect(canvas.dc,&rect,brush);DeleteObject(brush);
+    };
+    const auto line=[&](std::wstring value,RECT rect,int size,COLORREF color){
+        // Long personal chords retain their complete text. Fit the glyphs to
+        // this line instead of clipping the actual configured gesture.
+        for(;size>=22;size-=2){
+            auto font=CreateFontW(-size,0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
+                OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,L"Segoe UI");
+            if(!font)return;
+            const auto prior=SelectObject(canvas.dc,font);RECT measure{};
+            DrawTextW(canvas.dc,value.c_str(),static_cast<int>(value.size()),&measure,DT_CALCRECT|DT_SINGLELINE|DT_NOPREFIX);
+            const bool fits=measure.right<=rect.right-rect.left||size==22;
+            if(fits){SetTextColor(canvas.dc,color);DrawTextW(canvas.dc,value.c_str(),static_cast<int>(value.size()),&rect,
+                DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX);}
+            SelectObject(canvas.dc,prior);DeleteObject(font);if(fits)return;
+        }
+    };
+    fill({0,0,width,height},RGB(12,22,27));
+    fill({0,0,12,height},RGB(235,199,110));
+    const std::string gesture(idroidBinding);
+    line(std::wstring(gesture.begin(),gesture.end())+L" : iDROID",{30,22,width-22,126},62,RGB(239,245,239));
+    line(L"MISSIONS TO DEPLOY",{30,130,width-22,236},52,RGB(235,199,110));
+    GdiFlush();std::memcpy(image.bgra.data(),pixels,image.bgra.size()*sizeof(uint32_t));
+    for(auto& pixel:image.bgra)pixel|=0xff000000u;
+    return image;
+}
 }

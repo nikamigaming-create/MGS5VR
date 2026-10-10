@@ -46,6 +46,7 @@ field('player_y', function() return vars.playerPosY end)
 field('player_z', function() return vars.playerPosZ end)
 field('player_yaw', function() return vars.playerRotY end)
 field('player_camera_yaw', function() return vars.playerCameraRotation[1] end)
+field('player_camera_pitch', function() return vars.playerCameraRotation[0] end)
 field('demo', function() return DemoDaemon.IsDemoPlaying() end)
 field('demo_nonplayable', function() return TppDemo.IsNotPlayable() end)
 field('checkpoint', function() return gvars.mis_checkPoint end)
@@ -55,6 +56,9 @@ field('mission6_bridge_demo', function()
 end)
 field('saving', function() return TppSave.IsSaving() end)
 field('player_life', function() return vars.playerLife end)
+-- Count is read by the owned helicopter sequence. It is retained separately
+-- from the current critical-wound flags; it need not clear after field aid.
+field('player_injury_count', function() return vars.playerInjuryCount end)
 field('not_alert', function() return Tpp.IsNotAlert() end)
 field('game_over', function() return svars.mis_gameOverType end)
 field('popup', function() return TppUiCommand.IsShowPopup() end)
@@ -80,7 +84,13 @@ field('mission_prepared', function() return TppSequence.IsMissionPrepareFinished
 -- the error as "unavailable:..." instead of silently dropping it or saying
 -- false. NORMAL_ACTION and PARTS_ACTIVE are broad engine statuses, not aim,
 -- CQC, cover, or mounted-state proofs.
-for _, name in ipairs({'CARRY', 'CRAWL', 'NORMAL_ACTION', 'PARTS_ACTIVE', 'SQUAT', 'STAND'}) do
+-- INJURY_LOWER/UPPER and CURE are registered native PlayerStatus identifiers
+-- (80/81/83) in this supported executable; no guessed injury getter is used.
+-- CQC_HOLD/CONTINUOUS are registered native values 87/88. Neither alone
+-- identifies the held actor; actor identity needs a separate joined read.
+for _, name in ipairs({'CARRY', 'CRAWL', 'NORMAL_ACTION', 'PARTS_ACTIVE', 'SQUAT', 'STAND',
+                       'INJURY_LOWER', 'INJURY_UPPER', 'CURE', 'GUN_FIRE', 'GUN_FIRE_SUPPRESSOR',
+                       'CQC_HOLD', 'CQC_CONTINUOUS', 'INTRUDE', 'SUBJECT', 'ON_VEHICLE', 'ON_HORSE'}) do
     field('status_' .. name, function()
         assert(type(PlayerStatus) == 'table', 'PlayerStatus API unavailable')
         assert(type(PlayerInfo) == 'table' and type(PlayerInfo.AndCheckStatus) == 'function',
@@ -91,6 +101,14 @@ for _, name in ipairs({'CARRY', 'CRAWL', 'NORMAL_ACTION', 'PARTS_ACTIVE', 'SQUAT
         assert(type(active) == 'boolean', name .. ' status result unavailable')
         return active
     end)
+end
+-- Native registrations expose three uint16 customization entries and 36
+-- uint8 part entries. These are identity evidence, never a model-name guess.
+for index=0,2 do
+    field('customized_weapon_'..index,function() return vars.customizedWeapon[index] end)
+end
+for index=0,35 do
+    field('chimera_part_'..index,function() return vars.chimeraParts[index] end)
 end
 -- Preserve this separately seeded native binocular status. The retail Lua
 -- source has no equivalent validated readback for weapon-aim/subject state.
@@ -190,6 +208,22 @@ end)
 field('player_vehicle_id', function()
     assert(type(vars.playerVehicleGameObjectId) == 'number', 'vars.playerVehicleGameObjectId unavailable')
     return vars.playerVehicleGameObjectId
+end)
+-- Independently recovered native read (RVA 0x9d2510 -> 0x1e02920,
+-- player-status ushort +0xb6). Stationary inclusion is observed, not assumed.
+local riddenObjectId
+field('player_ridden_game_object_id', function()
+    assert(type(Player)=='table' and type(Player.GetGameObjectIdIsRiddenToLocal)=='function',
+        'native local ridden-object read unavailable')
+    local id=Player.GetGameObjectIdIsRiddenToLocal()
+    assert(type(id)=='number' and id>=0 and id<=65535 and id==math.floor(id), 'native ridden ID invalid')
+    riddenObjectId=id
+    return id
+end)
+field('player_ridden_game_object_type', function()
+    assert(type(riddenObjectId)=='number' and type(GameObject.GetTypeIndex)=='function',
+        'native ridden ID/type unavailable')
+    return GameObject.GetTypeIndex(riddenObjectId)
 end)
 for _, mode in ipairs({'Horse', 'Vehicle', 'Helicopter'}) do
     field('player_vehicle_is_' .. string.lower(mode), function()

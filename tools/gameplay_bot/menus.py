@@ -41,9 +41,19 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     from .live import authoritative_controls, channel, fresh_control_observation
     from .core import ActionPrerequisiteChanged, matches
     owner = step.get("owner", "idroid")
+    focus_keep = getattr(live, '_menu_focus_keep', ()) if owner == 'idroid' else ()
+    if not isinstance(focus_keep, tuple):
+        focus_keep = ()
+    def release_navigation():
+        if focus_keep:
+            live.release(keep=focus_keep)
+        else:
+            live.release()
     selector = owner in ("customization", "customization_popup")
+    sortie = owner == "sortie"
     help_owner = owner == "mother_base_help"
-    if owner not in ("idroid", "pause", "pause_popup", "customization", "customization_popup", "mother_base_help"):
+    terms_owner = owner == "terms"
+    if owner not in ("idroid", "pause", "pause_popup", "customization", "customization_popup", "sortie", "mother_base_help", "terms"):
         raise BotFault("Menu navigation requires an explicit supported owner")
     native_guard = step.get("native_before")
     state_guard = step.get("state_before")
@@ -77,6 +87,10 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
                    if key in {"popup_observer." + field for field in popup_fields}}
     if owner != "idroid" and (not isinstance(native_guard, dict) or not native_guard):
         raise BotFault("Spatial menu navigation requires native scene prerequisites")
+    if terms_owner and (native_guard.get('mission') != 1
+            or native_guard.get('sequence') != 'Seq_Demo_LogInKonamiServer'
+            or native_guard.get('popup') is not False or native_guard.get('saving') is not False):
+        raise BotFault('Fresh Terms navigation requires the exact native first-run owner')
     if owner in ("pause_popup", "customization_popup") and native_guard.get("popup") is not True:
         raise BotFault("Popup navigation requires an explicit reviewed popup prerequisite")
     if selector and (native_guard.get("mission") != 40010
@@ -84,6 +98,13 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
                      or native_guard.get("sequence") != "Seq_Game_WeaponCustomize"
                      or native_guard.get("customization_kind") not in ("weapon", "helicopter", "vehicle")):
         raise BotFault("Customization navigation requires the exact native ACC selector target")
+    if sortie and (native_guard.get("mission") not in (40010, 40020)
+                   or native_guard.get("helicopter_space") is not True
+                   or native_guard.get("sequence") not in (
+                       "Seq_Game_MissionPreparationTop", "Seq_Game_MissionPreparation_SelectItem",
+                       "Seq_Game_MissionPreparation_SelectSlot", "Seq_Game_MissionPreparation_SelectDetail")
+                   or native_guard.get("popup") is not False or native_guard.get("saving") is not False):
+        raise BotFault("Sortie navigation requires the exact current ACC preparation owner")
     native_sample = owner != "idroid"
     mode = step.get("mode", "edge")
     if mode not in ("edge", "hold") or (native_sample and mode != "edge"):
@@ -108,12 +129,26 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     payload = channel(token)
     axis = (0 if source == "left_stick" else 2) + (1 if direction in ("up", "down") else 0)
     admitted_idroid_mode = None
+    admitted_terms_owner = None
 
     def sample(state, *, check_native=True):
         if help_owner:
             if (not matches(state, help_state)
                     or (check_native and not matches(state.get("native", {}), help_native))):
                 raise BotFault("Mother Base Help navigation lost its reviewed owner or native scene prerequisite")
+        elif terms_owner:
+            terms = state.get('terms_menu', {})
+            now, sampled = state.get('now_ms'), terms.get('sample_ms')
+            if (terms.get('verified') is not True or terms.get('active') is not True
+                    or terms.get('ready') is not True or terms.get('phase') != 5
+                    or type(terms.get('owner')) is not int or not terms['owner']
+                    or (admitted_terms_owner is not None and terms['owner'] != admitted_terms_owner)
+                    or type(now) is not int or type(sampled) is not int or not 0 <= now - sampled <= 250
+                    or state.get('idroid') is not False or state.get('pause') is not False
+                    or state.get('title') is not False or state.get('loading') is not False
+                    or state.get('gamepad') is not False
+                    or (check_native and not matches(state.get('native', {}), native_guard))):
+                raise BotFault('Terms navigation lost its typed, ready native owner')
         elif owner == "idroid":
             handheld, ready = state.get("idroid_handheld"), state.get("idroid_menu_input_ready")
             # Readiness describes the live handheld pad lease. A native
@@ -131,7 +166,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
         else:
             native = state.get("native", {})
             if (state.get("scene") != "menu" or state.get("menu") is not True
-                    or state.get("pause") is not (not selector) or state.get("idroid") is not False
+                    or state.get("pause") is not (not (selector or sortie)) or state.get("idroid") is not False
                     or state.get("title") is not False or state.get("loading") is not False
                     or (check_native and (native.get("popup") is not expected_popup
                                           or (selector and native.get("saving") is not False)
@@ -168,7 +203,9 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     admitted = sample(initial)["sample_ms"]
     if owner == "idroid":
         admitted_idroid_mode = initial["idroid_handheld"]
-    live.release()
+    if terms_owner:
+        admitted_terms_owner = initial['terms_menu']['owner']
+    release_navigation()
     live.events.emit("semantic_menu_navigation", source=source, direction=direction, owner=owner,
                      mode="sampled_" + mode,
                      sampled_milliseconds=math.ceil(seconds * 1000))
@@ -188,7 +225,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
             if current["sample_ms"] > admitted and abs(current["sticks"][axis] - payload["value"]) < .08:
                 first = current["sample_ms"] if first is None else first
                 elapsed = current["sample_ms"] - first
-                if mode == "edge" or elapsed >= math.ceil(seconds * 1000):
+                if (mode == "edge" and not terms_owner) or elapsed >= math.ceil(seconds * 1000):
                     if during and not matches(state, during):
                         raise BotFault("Requested navigation held outcome was not observed")
                     held_state = state
@@ -202,7 +239,7 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
         else:
             raise BotFault("Native menu navigation was not sampled before expiry")
     finally:
-        live.release()
+        release_navigation()
     # An RPC release is not evidence that the game sampled neutral input.
     deadline = clock() + 1.
     neutral_since = None

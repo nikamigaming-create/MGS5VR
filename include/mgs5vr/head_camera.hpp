@@ -19,7 +19,7 @@ constexpr bool mayAcceptNewStereoPair(HeadCameraStatus status) noexcept {
 // This only permits reprojecting an image already admitted with its exact rig
 // and eye poses. A rejected or delayed source rig is never published as new pixels.
 constexpr bool mayReprojectAcceptedStereo(HeadCameraStatus status) noexcept {
-    return status.active&&(!status.suspended||status.reason==HeadCameraStop::staleTracking
+    return status.active&&(!status.suspended||status.reason==HeadCameraStop::trackingLost||status.reason==HeadCameraStop::staleTracking
         ||status.reason==HeadCameraStop::playerHeadUnavailable||status.reason==HeadCameraStop::staleRig
         ||(status.reason==HeadCameraStop::rigFrameMismatch&&status.rigRejectFlags==10&&status.rigAgeMs>150));
 }
@@ -48,8 +48,16 @@ struct ControllerFrame {
     bool weaponReady{};
     bool supportGrip{};
     bool vehicleControls{};
+    // Native occupancy survives iDroid focus and presentation-only frames.
+    // Input availability must not move seated eyes back to the chase camera.
+    bool vehicleMounted{};
+    // Actual native look input from this XR packet. A vehicle's chase-camera
+    // orbit does not set the driver's initial seated facing.
+    std::array<float,2> vehicleViewInput{};
+    bool nativeActionControls{}; // Native stationary/action aim; no handheld firearm replacement.
     bool nativeGamepad{}; // Physical XInput owns actions and native animated hands.
     bool wheelGrip{};
+    bool rightWheelGrip{},vehicleWeaponIntent{};
     bool allowMotionMelee{true},allowAnimalTouch{true};
     bool equipmentOpen{}; // Includes the unfolded chooser before any category is selected.
     unsigned equipmentCategory{}; // 0 closed/choosing; 1..4 native category.
@@ -60,7 +68,7 @@ struct ControllerFrame {
     // Native iDroid display width; height remains 16:9 so the map never
     // stretches when the user chooses a more comfortable panel size.
     float idroidScreenWidth{.45f};
-    float idroidScreenDepth{.08f},playerHeightOffset{};
+    float idroidScreenDepth{.09f},playerHeightOffset{};
     // Display fit relative to the native hologram socket, not the hand rig.
     Vec3 idroidScreenOffset{};
     Quat idroidScreenRotation{};
@@ -69,8 +77,12 @@ struct ControllerFrame {
     Vec3 idroidGripOffset{};
     Quat idroidGripRotation{};
     bool handheldMenus{}; // Effective handheld iDroid preference. Pause always uses the world panel.
+    bool handheldMenuFree{}; // Native UI-only terminal leaves gameplay input live.
+    bool handheldMenuCoexist{}; // Keep the right physical binocular while the LEFT terminal is focused.
+    bool handheldIdroidStowed{}; // LEFT hand temporarily owns reload/support; keep the terminal's resource.
     float menuQuadWidth{1.2f},menuQuadDistance{1.3f},menuQuadTilt{-10.f};
     float supportGripRadius{.10f},supportDetachRadius{.30f};
+    bool trackedWeaponObstruction{true};
     float handRestCurl{.08f},handTouchCurl{.20f};
     HudMode hudMode{HudMode::binocularsOnly};
     float magnification{1};
@@ -97,6 +109,8 @@ struct ControllerFrame {
     bool openingSelector{}; // Physical title tape rack owns a native pulse.
     bool openingBackend{}; // Actual title only; never suppress loading/prologue UI.
     bool cabinPlay{}; // Post-loading helicopter cabin sandbox owns tracked interaction.
+    bool cabinDeployHint{}; // Actual ACC, not field transit; render only on the source LEFT forearm.
+    bool cabinTransit{}; // Verified passenger of the moving support helicopter.
     std::array<float,2> cabinMove{}; // Title-cabin thumbstick locomotion; does not enter the native gamepad.
     NativeRoomBounds cabinBounds{}; // Sampled native actor envelope, not a walking boundary.
     int openingSelection{-1}; // Hovered/active tape, in openingTapeLabels order.
@@ -109,7 +123,10 @@ struct ControllerFrame {
 inline ControllerFrame passiveControllerFrame(ControllerFrame frame,int64_t time,uint64_t epoch){
     frame.hands={};frame.optic={};frame.strikeCurl={};frame.cabinMove={};
     frame.presentationFocused=false;
-    frame.weaponReady=frame.supportGrip=frame.vehicleControls=frame.wheelGrip=false;
+    frame.weaponReady=frame.supportGrip=frame.vehicleControls=frame.nativeActionControls=frame.wheelGrip=false;
+    frame.rightWheelGrip=frame.vehicleWeaponIntent=false;
+    frame.cabinDeployHint=false;
+    frame.vehicleViewInput={};
     frame.allowMotionMelee=frame.allowAnimalTouch=frame.commandControls=frame.equipmentOpen=false;
     frame.equipmentCategory=0;frame.openingSelection=-1;
     frame.predictedXrTime=time;frame.referenceEpoch=epoch;
@@ -124,8 +141,13 @@ struct WeaponRigDiagnostics {
     uint32_t instanceFirst{},playerIndex{},resourceHandle{},flags{},mode{};
     std::array<uint8_t,4> optical{};
     Pose muzzleInGrip{};
+    Pose sightRear{},sightFront{},sightRearInWrist{},sightFrontInWrist{},sightRearLocal{},sightFrontLocal{};
+    bool sightQueryAttempted{},sightRearRead{},sightFrontRead{},sightRearValid{},sightFrontValid{};
     bool sampled{},componentAccepted{},instanceIndexMatched{},resourceAccepted{};
     bool muzzleAttempted{},muzzleMatrixRead{},attachmentValid{},muzzleSocketValid{},muzzleSolved{},opticalRead{};
+    uintptr_t magnifierInterface{},magnifierModel{};
+    uint32_t magnifierIndex{};
+    uint64_t magnifierModelCode{};
 };
 struct HeadCameraSample {
     Pose nativePose{}, headPose{};
@@ -153,6 +175,12 @@ struct HeadCameraSample {
     bool nativeFirearmActive{}; // Native weapon class, excludes throwables/placement and mounted weapons.
     Pose weaponSupportGrip{}; // Authored native support contact in this exact LOCAL rig frame.
     bool weaponSupportGripTracked{},weaponSupportAttached{};
+    // Unmodified native steering-wheel palm contacts, joined to these eyes.
+    // These are LOCAL controller grip frames, not guessed cab positions.
+    std::array<Pose,2> driverWheelGrips{};
+    bool driverWheelTracked{},driverWheelHeld{};
+    uint8_t driverWheelHands{};
+    float driverWheelAxis{};
     // Final native anatomical palm frames from the published first-person
     // skin. Handheld devices use these instead of guessing a palm side from
     // the controller grip alone.
@@ -182,7 +210,7 @@ public:
                      ControllerFrame controllers={});
     void toggle();
     void recenter();
-    void setNativeMenuOpen(bool open,bool idroid=false);
+    void setNativeMenuOpen(bool open,bool idroid=false,bool pause=false,bool idroidPaused=false);
     // Present can continue while a native loading screen publishes no camera.
     // Keep the user's VR choice but expose mono menu pixels until that exact
     // camera resumes; this is not permission to adopt a different owner.
@@ -230,6 +258,7 @@ private:
     bool awaitingPlayer_{};
     bool nativeMenuOpen_{};
     bool nativeIdroidOpen_{};
+    bool nativeIdroidPaused_{};
     uint64_t menuGeneration_{};
     bool awaitingScene_{};
     HeadCameraSample lastView_{};
@@ -247,6 +276,12 @@ private:
         uint64_t time{},activation{};
         bool valid{};
     } cinematicFollow_;
+    struct DriverViewState {
+        float nativeYaw{},rootYaw{},lookYaw{};
+        uintptr_t camera{},owner{};
+        uint64_t time{},activation{},referenceEpoch{},lookUntil{};
+        bool valid{};
+    } driverView_;
     std::array<EyeView,2> views_{};
     ControllerFrame controllers_{};
     struct RigFrame { uintptr_t camera{},owner{}; Pose sourceCamera{}; HeadCameraSample sample{}; } rig_;

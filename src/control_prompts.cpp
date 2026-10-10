@@ -50,8 +50,9 @@ void publishControlPromptBindings(const ControlBindings& bindings){
     promptBindings.store(std::make_shared<const ControlBindings>(bindings));
 }
 std::shared_ptr<const ControlBindings> controlPromptBindings(){return promptBindings.load();}
-std::string_view controlPromptAction(std::string_view token,ControlContext context) noexcept {
+std::string_view controlPromptAction(std::string_view token,ControlContext context,bool handheldIdroid) noexcept {
     if(context==ControlContext::nativeButtons)return find(token,nativeRoutes);
+    if(context==ControlContext::menus&&handheldIdroid&&token=="PAD_L1")return "idroid.previous_tab";
     if(context==ControlContext::menus)if(const auto route=find(token,menuRoutes);!route.empty())return route;
     if(token=="MBDEVICE")return "system.idroid";
     if(token=="PAUSE")return "system.pause";
@@ -118,7 +119,7 @@ std::string_view controlPromptAction(std::string_view token,ControlContext conte
     }
     return {};
 }
-ControlPromptText rewriteControlPrompt(std::string_view text,const ControlBindings& bindings,ControlContext context){
+ControlPromptText rewriteControlPrompt(std::string_view text,const ControlBindings& bindings,ControlContext context,bool handheldIdroid){
     ControlPromptText result;
     if(text.size()>16384){result.text=text;return result;}
     constexpr std::string_view prefix="<I=G=";
@@ -131,7 +132,7 @@ ControlPromptText rewriteControlPrompt(std::string_view text,const ControlBindin
         const auto end=text.find('>',begin+prefix.size());
         if(end==std::string_view::npos){result.text.append(text.substr(begin));break;}
         const auto token=text.substr(begin+prefix.size(),end-begin-prefix.size());
-        const auto action=controlPromptAction(token,context);
+        const auto action=controlPromptAction(token,context,handheldIdroid);
         if(action.empty()){
             result.text.append(text.substr(begin,end-begin+1));++result.unresolved;previousToken={};
         }else{
@@ -146,9 +147,9 @@ ControlPromptText rewriteControlPrompt(std::string_view text,const ControlBindin
     }
     return result;
 }
-ControlPromptText rewriteControlCaption(std::string_view caption,std::string_view token,const ControlBindings& bindings,ControlContext context){
+ControlPromptText rewriteControlCaption(std::string_view caption,std::string_view token,const ControlBindings& bindings,ControlContext context,bool handheldIdroid){
     ControlPromptText result;
-    const auto action=controlPromptAction(token,context);
+    const auto action=controlPromptAction(token,context,handheldIdroid);
     if(caption.empty()||caption.size()>16384||action.empty()){
         result.text=caption;result.unresolved=action.empty()?1:0;return result;
     }

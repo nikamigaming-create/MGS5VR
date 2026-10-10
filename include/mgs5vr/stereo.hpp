@@ -67,7 +67,7 @@ bool readyEyePair(const std::array<EyeFrame,2>& eyes,uint64_t activation,uint64_
 class AcceptedStereoFrame {
 public:
     bool accept(const std::array<EyeFrame,2>& eyes,uint64_t epoch,uint64_t activation,uint64_t now,uint64_t referenceEpoch=0);
-    bool presentable(uint64_t epoch,uint64_t activation,uint64_t now) const;
+    bool presentable(uint64_t epoch,uint64_t activation,uint64_t now,uint64_t referenceEpoch=0) const;
     // A positively identified native shot handoff may display the PREVIOUS
     // image with its original poses for at most 250 ms while new eyes arrive.
     // This does not admit pixels or make them valid for the new activation.

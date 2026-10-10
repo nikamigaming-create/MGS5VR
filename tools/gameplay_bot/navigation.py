@@ -12,10 +12,15 @@ import json
 import math
 import re
 import struct
-from collections import defaultdict
+import time
+from collections import OrderedDict, defaultdict
 from pathlib import Path
 
 from .core import BotFault, atomic_json
+
+
+class NoConnectedNativeRoute(BotFault):
+    pass
 
 
 class NavigationAtlas:
@@ -134,6 +139,36 @@ def read_nav2(path):
             'groups': groups}
 
 
+class _ThreatCosts:
+    """Evaluate the unchanged 65m risk sum in original threat order.
+
+    Threats outside neighbouring 65m X/Z cells have zero contribution. Height
+    and Euclidean distance still use the original expressions; duplicates and
+    floating-point addition order are retained.
+    """
+    def __init__(self, threats):
+        self.threats = tuple(threats)
+        self.buckets = None
+        if len(self.threats) >= 16 and all(
+                isinstance(point, (list, tuple)) and len(point) == 3 and
+                all(isinstance(value, (int, float)) and math.isfinite(value) for value in point)
+                for point in self.threats):
+            self.buckets = defaultdict(list)
+            for index, point in enumerate(self.threats):
+                self.buckets[(math.floor(point[0]/65.), math.floor(point[2]/65.))].append(index)
+
+    def penalty(self, point):
+        if self.buckets is None:
+            candidates = self.threats
+        else:
+            x, z = math.floor(point[0]/65.), math.floor(point[2]/65.)
+            indices = sorted(index for dx in (-1, 0, 1) for dz in (-1, 0, 1)
+                             for index in self.buckets.get((x+dx, z+dz), ()))
+            candidates = (self.threats[index] for index in indices)
+        return sum(max(0., 1. - math.dist(point, threat)/65.)**2*12.
+                   for threat in candidates if abs(point[1]-threat[1]) < 12.)
+
+
 class NativeMap:
     def __init__(self, tiles):
         self.positions, self.adj, self.sources = [], defaultdict(dict), []
@@ -184,6 +219,10 @@ class NativeMap:
         self.identity = hashlib.sha256('\n'.join(sorted(s['sha256'] for s in self.sources)).encode()).hexdigest()
         if not self.positions:
             raise BotFault("No owned navigation tiles")
+        # Owned topology is fixed for this map identity. Dynamic obstacles stay
+        # in each path's blocked-edge set and cannot authorize a missing edge.
+        # Keep only two exact directed-reachability bitmaps, not map-size sets.
+        self._reachability = OrderedDict()
 
     @classmethod
     def from_files(cls, paths):
@@ -197,27 +236,60 @@ class NativeMap:
             raise BotFault("Player/goal is outside the mapped supporting floor")
         return node
 
-    def path(self, start, goal, *, blocked=(), threats=()):
+    def _require_connected(self, start, goal, check_abort=None):
+        if start == goal:
+            return
+        reachable = self._reachability.get(start)
+        if reachable is None:
+            reachable = bytearray(len(self.positions))
+            reachable[start] = 1
+            stack = [start]
+            next_check = time.monotonic()+.1 if check_abort is not None else None
+            while stack:
+                if check_abort is not None and time.monotonic() >= next_check:
+                    check_abort(); next_check = time.monotonic()+.1
+                node = stack.pop()
+                for target in self.adj.get(node, ()):
+                    if not reachable[target]:
+                        reachable[target] = 1; stack.append(target)
+            # A cancelled/incomplete traversal must never become a cached
+            # assertion that an endpoint is unreachable.
+            if check_abort is not None: check_abort()
+            self._reachability[start] = reachable
+            while len(self._reachability) > 2:
+                self._reachability.popitem(last=False)
+        else:
+            self._reachability.move_to_end(start)
+            if check_abort is not None: check_abort()
+        if not reachable[goal]:
+            raise NoConnectedNativeRoute("No connected native route in the owned directed topology")
+
+    def path(self, start, goal, *, blocked=(), threats=(), check_abort=None):
         blocked = set(map(tuple, blocked))
         positions = self.positions
         if not 0 <= start < len(positions) or not 0 <= goal < len(positions):
             raise BotFault("Unknown route endpoint")
+        if check_abort is not None: check_abort()
+        self._require_connected(start, goal, check_abort)
         # A threat cost encourages cover/avoidance without pretending that
         # distance alone proves enemy line of sight.
+        threat_costs = _ThreatCosts(threats)
         risk = {}
         def penalty(node):
             if node not in risk:
-                p = positions[node]
-                risk[node] = sum(max(0., 1. - math.dist(p, t) / 65.) ** 2 * 12.
-                                 for t in threats if abs(p[1] - t[1]) < 12.)
+                risk[node] = threat_costs.penalty(positions[node])
             return risk[node]
         queue = [(math.dist(positions[start], positions[goal]), 0., start)]
         costs, previous = {start: 0.}, {}
+        next_check=time.monotonic()+.1
         while queue:
+            if check_abort is not None and time.monotonic()>=next_check:
+                check_abort();next_check=time.monotonic()+.1
             _, cost, node = heapq.heappop(queue)
             if cost != costs[node]:
                 continue
             if node == goal:
+                if check_abort is not None:check_abort()
                 route = [node]
                 while node in previous:
                     node = previous[node]
@@ -230,7 +302,7 @@ class NativeMap:
                 if candidate < costs.get(target, math.inf):
                     costs[target], previous[target] = candidate, node
                     heapq.heappush(queue, (candidate + math.dist(positions[target], positions[goal]), candidate, target))
-        raise BotFault("No connected native route after current obstacles/threats")
+        raise NoConnectedNativeRoute("No connected native route after current obstacles/threats")
 
 
 def arrived(point, target, radius=1.4, max_height=2.5):
@@ -252,7 +324,7 @@ class RouteProgress:
         return now - self.last_progress > 2.
 
 
-def movement_mode(native, enemies, previous_life=None, previous_mode=None):
+def movement_mode(native, enemies, previous_life=None, previous_mode=None, *, stealth=False):
     """Choose a physical posture/speed from observed danger, never fire blind."""
     point = tuple(native['player_' + axis] for axis in 'xyz')
     life = native['player_life']
@@ -265,8 +337,10 @@ def movement_mode(native, enemies, previous_life=None, previous_mode=None):
         return 'evade'
     # Separate entry/exit distances keep a walking patrol from making the bot
     # stand and crouch repeatedly at a single distance threshold.
-    crawl_limit = 40 if previous_mode == 'crawl' else 30
-    crouch_limit = 75 if previous_mode in ('crawl','crouch') else 65
+    crawl_limit = (60 if previous_mode == 'crawl' else 55) if stealth else (40 if previous_mode == 'crawl' else 30)
+    # Sprint in the clear, then retain stealth near observed live guards. The
+    # old infinite threshold made the entire staging-to-camp route crouched.
+    crouch_limit = (100 if previous_mode in ('crawl','crouch') else 90) if stealth else (75 if previous_mode in ('crawl','crouch') else 65)
     if native.get('not_alert') is not True or distance < crawl_limit:
         return 'crawl'
     if distance < crouch_limit:

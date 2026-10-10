@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <string_view>
 #include "core.hpp"
 
 struct ID3D11DeviceContext;
@@ -37,7 +38,7 @@ void drawWorldWaypoints(ID3D11DeviceContext* context,
 bool drawPhysicalWeaponScope(ID3D11DeviceContext* context,
     const std::array<float,16>& ocularWorld,const std::array<float,16>& view,
     const std::array<float,16>& projection,float radius,float magnification,
-    ID3D11Texture2D* sceneSource) noexcept;
+    ID3D11Texture2D* sceneSource,bool dotReticle=false) noexcept;
 
 // Draw the physical binocular housing into the current native eye scene.
 // `world` is the retail FOX world matrix for the tracked optic body, `view`
@@ -75,6 +76,12 @@ bool drawOpeningProps(ID3D11DeviceContext* context,
     const std::array<std::array<float,16>,7>& worlds,
     const std::array<float,16>& view,
     const std::array<float,16>& projection,int selection=-1) noexcept;
+
+// Small ACC guidance attached to the LEFT forearm's exact source publication.
+// The world matrix is the source wristPanel, not a current head/palm pose.
+bool drawAccWristHint(ID3D11DeviceContext* context,
+    const std::array<float,16>& world,const std::array<float,16>& view,
+    const std::array<float,16>& projection,std::string_view idroidBinding) noexcept;
 
 void stopPhysicalOpticRenderer() noexcept;
 

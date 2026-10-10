@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 from PIL import Image
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
-from gameplay_bot.core import BotFault
+from gameplay_bot.core import AttentionRequired, Behaviors, BotFault
 from gameplay_bot.live import Live
 from gameplay_bot.presentation import PresentationGuard
 
@@ -39,6 +39,83 @@ class PresentationTests(unittest.TestCase):
     def test_stationary_gameplay_cannot_freeze_indefinitely(self):
         self.now = 3.
         self.assertFalse(self.guard.admit(self.before, self.state))
+
+    def head_loss_state(self):
+        return {**self.state, "camera_suspended": True, "camera_reason": 2,
+                "head_tracking_fault_mask": 1,
+                "controls": {"native_buttons": 0, "physical": [0]*11, "sticks": [0]*4}}
+
+    def test_head_loss_fixture_allows_frozen_pixels_only_inside_active_lease(self):
+        self.guard.expect_head_tracking_loss(1, 7000)
+        lost = self.head_loss_state()
+        self.now = 3.
+        self.assertTrue(self.guard.admit(self.before, lost))
+        self.now = 7.
+        self.assertFalse(self.guard.expected_head_loss(lost, self.now))
+        self.now = 9.
+        self.assertFalse(self.guard.admit(self.before, lost))
+        self.assertTrue(self.guard.admit(self.pair('recovered', (100, 100)),
+            {**lost, 'camera_suspended': False, 'camera_reason': 0, 'head_tracking_fault_mask': 0}))
+
+    def test_unarmed_or_changed_tracking_fault_does_not_waive_frozen_guard(self):
+        self.now = 3.
+        self.assertFalse(self.guard.admit(self.before, self.head_loss_state()))
+        self.guard.expect_head_tracking_loss(1, 7000)
+        for changes in ({'head_tracking_fault_mask': 2}, {'head_tracking_fault_mask': True},
+                        {'camera_reason': 3}, {'camera_active': False}, {'camera_suspended': False},
+                        {'controls': {'native_buttons': 4096, 'physical': [1]+[0]*10, 'sticks': [0]*4}}):
+            self.assertFalse(self.guard.expected_head_loss({**self.head_loss_state(), **changes}, self.now))
+        for changes in ({'menu': True}, {'activation': 2},
+                        {'rendered': {'binocular_held': False, 'presentation_epoch': 2}},
+                        {'native': {'mission': 30010, 'sequence': 'Seq_Game_FreePlay'}}):
+            self.assertFalse(self.guard.admit(self.before, {**self.head_loss_state(), **changes}))
+
+    def recovery_wait(self, *, armed=True, recover=True, popup=False):
+        lost = {**self.head_loss_state(), 'scene': 'menu', 'menu': True, 'idroid': True}
+        self.guard.admit(self.pair('reviewed-menu', (100, 100)), lost)
+        if armed:
+            self.guard.expect_head_tracking_loss(1, 7000)
+        recovered = {**lost, 'camera_suspended': False, 'camera_reason': 0,
+                     'head_tracking_fault_mask': 0}
+        adapter = Mock(supervised=True, held=False, presentation_guard=self.guard)
+        def observe():
+            if popup and self.now >= 3.:
+                return {**lost, 'native': {'popup': True}}
+            return recovered if recover and self.now >= 7. else lost
+        adapter.observe.side_effect = observe
+        def sleep(seconds):
+            self.now += seconds
+        events = Mock()
+        behavior = Behaviors(adapter, events, clock=lambda: self.now, sleep=sleep)
+        return behavior, events
+
+    def test_supervised_menu_recovery_waits_for_exact_armed_lease(self):
+        behavior, events = self.recovery_wait()
+        result = behavior.wait_for({'camera_active': True, 'camera_suspended': False,
+                                    'head_tracking_fault_mask': 0}, 12, 'head-recovery')
+        self.assertFalse(result['camera_suspended'])
+        self.assertGreaterEqual(self.now, 7.)
+        self.assertLess(self.now, 8.)
+        self.assertNotIn('attention_required', [call.args[0] for call in events.emit.call_args_list])
+
+    def test_supervised_unarmed_or_expired_loss_still_requires_review(self):
+        for armed, deadline in ((False, 2.), (True, 7.)):
+            with self.subTest(armed=armed):
+                self.now = 0.
+                behavior, _ = self.recovery_wait(armed=armed, recover=False)
+                with self.assertRaises(AttentionRequired):
+                    behavior.wait_for({'camera_active': True, 'camera_suspended': False,
+                                       'head_tracking_fault_mask': 0}, 12, 'head-recovery')
+                self.assertGreaterEqual(self.now, deadline)
+                self.assertLess(self.now, deadline + .2)
+
+    def test_unexpected_popup_cannot_hide_inside_tracking_recovery_wait(self):
+        behavior, _ = self.recovery_wait(popup=True)
+        with self.assertRaises(AttentionRequired):
+            behavior.wait_for({'camera_active': True, 'camera_suspended': False,
+                               'head_tracking_fault_mask': 0}, 12, 'head-recovery')
+        self.assertGreaterEqual(self.now, 3.)
+        self.assertLess(self.now, 4.)
 
     def test_one_eye_freezing_during_gameplay_is_rejected(self):
         self.now = 3.

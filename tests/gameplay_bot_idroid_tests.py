@@ -47,7 +47,7 @@ class Live:
         context = "gameplay" if self.held and self.fault == "ownership" else "menus"
         return {"scene": "menu" if self.menu else "gameplay", "idroid": self.menu, "activation": 1,
             "rendered": {"sample_ms": sample, "activation": 1, "rig_sequence": 0 if self.fault == "frozen" else self.serial,
-                         "right_palm_tracked": True, "right_palm": self.palm},
+                         "left_palm_tracked": True, "left_palm": self.palm},
             "idroid_menu_input_ready": self.menu, "now_ms": sample,
             "native": {"player_x": pos, "player_y": 2., "player_z": 3., "player_yaw": yaw},
             "controls": {"context": context, "sample_ms": sample, "age_ms": 0, "sticks": sticks}}

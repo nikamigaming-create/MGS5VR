@@ -77,8 +77,20 @@ def build(output,checker=None):
     bundle_community(ROOT,ROOT/'docs/COMMUNITY_VERIFICATION_2026-09-27.json',output)
     catalog['defaultValues']=ini(ROOT/'config/mgs5vr-controls.ini')
     catalog['runtimeDefaults']=ini(ROOT/'config/mgs5vr.ini')
-    checker=checker or ROOT/'build/Release/mgs5vr_controls.exe'
-    catalog['previewState']={'bindings':json.loads(subprocess.check_output([str(checker),'--bindings-json'],text=True)),
+    checker=checker or ROOT/'build/dev/mgs5vr_controls.exe'
+    bindings=json.loads(subprocess.check_output([str(checker),'--bindings-json'],text=True))
+    for action in bindings['actions']:
+        alternatives=[]
+        for binding in action['bindings']:
+            chord=' + '.join(binding['inputs'])
+            gesture=binding['gesture']
+            alternatives.append(chord if gesture=='level' else
+                f"{gesture}({chord},{binding['milliseconds']})" if gesture in ('tap','hold') else
+                f'{gesture}({chord})')
+        catalog['defaultValues'][action['name']]=' | '.join(alternatives) or 'disabled'
+    for axis in bindings['axes']:
+        catalog['defaultValues'][axis['name']]=axis['source']
+    catalog['previewState']={'bindings':bindings,
         'settings':json.loads(subprocess.check_output([str(checker),'--settings-json'],text=True)),
         'values':catalog['defaultValues'],'runtime':catalog['runtimeDefaults'],'writable':False}
     subprocess.run([sys.executable,str(ROOT/'tools/field-guide/audit_numeric_tuning.py'),

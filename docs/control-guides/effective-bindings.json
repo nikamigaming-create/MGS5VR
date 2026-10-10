@@ -1,0 +1,1986 @@
+{
+  "schema": 1,
+  "actions": [
+    {
+      "name": "system.idroid",
+      "label": "TAP MENU",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "equipment",
+        "commands",
+        "binoculars",
+        "menus",
+        "horse",
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "tap",
+          "milliseconds": 550,
+          "inputs": [
+            "menu"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "system.pause",
+      "label": "HOLD MENU",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "equipment",
+        "commands",
+        "binoculars",
+        "menus",
+        "horse",
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "hold",
+          "milliseconds": 550,
+          "inputs": [
+            "menu"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "system.idroid_focus",
+      "label": "L GRIP",
+      "modifier": true,
+      "contexts": [
+        "gameplay",
+        "equipment",
+        "commands",
+        "binoculars",
+        "menus",
+        "horse",
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "system.recenter",
+      "label": "MENU + L GRIP",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "equipment",
+        "commands",
+        "binoculars",
+        "menus",
+        "horse",
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "menu",
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "system.toggle_vr",
+      "label": "HOLD B + MENU",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "equipment",
+        "commands",
+        "binoculars",
+        "menus",
+        "horse",
+        "vehicle",
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "hold",
+          "milliseconds": 550,
+          "inputs": [
+            "b",
+            "menu"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "system.native_buttons",
+      "label": "HOLD A + MENU",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "equipment",
+        "commands",
+        "binoculars",
+        "menus",
+        "horse",
+        "vehicle",
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "hold",
+          "milliseconds": 550,
+          "inputs": [
+            "a",
+            "menu"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.run",
+      "label": "L CLICK",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.stance",
+      "label": "A",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.dive",
+      "label": "R CLICK",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.interact",
+      "label": "Y",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "y"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.reload",
+      "label": "TAP B + L GRIP",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": [
+        {
+          "gesture": "tap",
+          "milliseconds": 300,
+          "inputs": [
+            "b",
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.ready_weapon",
+      "label": "R GRIP",
+      "modifier": true,
+      "contexts": [
+        "gameplay",
+        "commands",
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.pickup_carry",
+      "label": "B",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.support_grip",
+      "label": "L GRIP",
+      "modifier": true,
+      "contexts": [
+        "gameplay",
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.switch_weapon",
+      "label": "R CLICK + R GRIP",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_click",
+            "right_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.zoom",
+      "label": "R STICK UP",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_up"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.fire_or_cqc",
+      "label": "R TRIGGER",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "commands",
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.equip_binoculars",
+      "label": "HOLD Y + L GRIP",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "hold",
+          "milliseconds": 300,
+          "inputs": [
+            "y",
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gameplay.native_a",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "gameplay.native_x",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "gameplay.native_left_shoulder",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "gameplay.native_right_shoulder",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "gameplay.native_right_click",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "gameplay.native_dpad_up",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "gameplay.native_dpad_down",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "gameplay.native_dpad_left",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "gameplay.native_dpad_right",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "gameplay"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "equipment.open",
+      "label": "L TRIGGER",
+      "modifier": true,
+      "contexts": [
+        "gameplay",
+        "equipment",
+        "commands",
+        "binoculars",
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "equipment.primary",
+      "label": "R STICK UP",
+      "modifier": false,
+      "contexts": [
+        "equipment"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_up"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "equipment.secondary",
+      "label": "R STICK DOWN",
+      "modifier": false,
+      "contexts": [
+        "equipment"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_down"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "equipment.support",
+      "label": "R STICK RIGHT",
+      "modifier": false,
+      "contexts": [
+        "equipment"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_right"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "equipment.items",
+      "label": "R STICK LEFT",
+      "modifier": false,
+      "contexts": [
+        "equipment"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_left"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "equipment.back",
+      "label": "B",
+      "modifier": false,
+      "contexts": [
+        "equipment"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "equipment.use",
+      "label": "A",
+      "modifier": false,
+      "contexts": [
+        "equipment"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "commands.open",
+      "label": "X",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "equipment"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "commands.keep_open",
+      "label": "X",
+      "modifier": true,
+      "contexts": [
+        "gameplay",
+        "equipment",
+        "commands"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "commands.mounted_open",
+      "label": "X + L TRIGGER",
+      "modifier": false,
+      "contexts": [
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "x",
+            "left_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "commands.mounted_keep_open",
+      "label": "L TRIGGER",
+      "modifier": true,
+      "contexts": [
+        "commands",
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "commands.confirm",
+      "label": "A",
+      "modifier": false,
+      "contexts": [
+        "commands"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "commands.back",
+      "label": "B",
+      "modifier": false,
+      "contexts": [
+        "commands"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "binoculars.stow",
+      "label": "B",
+      "modifier": false,
+      "contexts": [
+        "binoculars"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "binoculars.zoom",
+      "label": "L CLICK",
+      "modifier": false,
+      "contexts": [
+        "binoculars"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "left_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "binoculars.mark",
+      "label": "R TRIGGER",
+      "modifier": false,
+      "contexts": [
+        "binoculars"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "right_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "binoculars.clear_mark",
+      "label": "A",
+      "modifier": false,
+      "contexts": [
+        "binoculars"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "binoculars.intel",
+      "label": "X",
+      "modifier": false,
+      "contexts": [
+        "binoculars"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "binoculars.support_grip",
+      "label": "L GRIP",
+      "modifier": true,
+      "contexts": [
+        "binoculars"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "binoculars.run",
+      "label": "R STICK UP",
+      "modifier": false,
+      "contexts": [
+        "binoculars"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_up"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "binoculars.dive",
+      "label": "R CLICK",
+      "modifier": false,
+      "contexts": [
+        "binoculars"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "binoculars.stance",
+      "label": "R STICK DOWN",
+      "modifier": false,
+      "contexts": [
+        "binoculars"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_down"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.confirm",
+      "label": "A",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.back",
+      "label": "B",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.action_x",
+      "label": "X",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.action_y",
+      "label": "Y",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "y"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.previous_tab",
+      "label": "L GRIP",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.next_tab",
+      "label": "R GRIP",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "idroid.previous_tab",
+      "label": "L CLICK + L GRIP",
+      "modifier": true,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "press",
+          "milliseconds": 300,
+          "inputs": [
+            "left_stick_click",
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.left_trigger",
+      "label": "L TRIGGER",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.right_trigger",
+      "label": "R TRIGGER",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.left_click",
+      "label": "L CLICK",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.right_click",
+      "label": "R CLICK",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menus.dpad_up",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "menus.dpad_down",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "menus.dpad_left",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "menus.dpad_right",
+      "label": "UNBOUND",
+      "modifier": false,
+      "contexts": [
+        "menus"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "horse.gallop",
+      "label": "X",
+      "modifier": false,
+      "contexts": [
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "horse.interact",
+      "label": "Y",
+      "modifier": false,
+      "contexts": [
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "y"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "horse.stance",
+      "label": "A",
+      "modifier": false,
+      "contexts": [
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "horse.reload",
+      "label": "B",
+      "modifier": false,
+      "contexts": [
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "horse.left_click",
+      "label": "L CLICK",
+      "modifier": false,
+      "contexts": [
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "horse.right_click",
+      "label": "R CLICK",
+      "modifier": false,
+      "contexts": [
+        "horse"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.accelerate",
+      "label": "R TRIGGER",
+      "modifier": false,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.brake_reverse",
+      "label": "L TRIGGER",
+      "modifier": false,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.wheel_grip",
+      "label": "L GRIP",
+      "modifier": true,
+      "contexts": [
+        "equipment",
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.right_wheel_grip",
+      "label": "R GRIP",
+      "modifier": true,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.ready_weapon",
+      "label": "R GRIP",
+      "modifier": true,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.fire",
+      "label": "R TRIGGER",
+      "modifier": true,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.reload",
+      "label": "TAP B",
+      "modifier": true,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "tap",
+          "milliseconds": 300,
+          "inputs": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.equipment_open",
+      "label": "UNBOUND",
+      "modifier": true,
+      "contexts": [
+        "equipment",
+        "vehicle"
+      ],
+      "bindings": []
+    },
+    {
+      "name": "vehicle.interact",
+      "label": "Y",
+      "modifier": false,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "y"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.weapon_or_call",
+      "label": "X",
+      "modifier": false,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.native_a",
+      "label": "A",
+      "modifier": false,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.native_b",
+      "label": "B",
+      "modifier": false,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.left_click",
+      "label": "L CLICK",
+      "modifier": false,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle.right_click",
+      "label": "R CLICK",
+      "modifier": false,
+      "contexts": [
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "turn.left",
+      "label": "R STICK LEFT",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "binoculars",
+        "horse",
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_left"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "turn.right",
+      "label": "R STICK RIGHT",
+      "modifier": false,
+      "contexts": [
+        "gameplay",
+        "binoculars",
+        "horse",
+        "vehicle"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_right"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.left_trigger",
+      "label": "L TRIGGER",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.right_trigger",
+      "label": "R TRIGGER",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_trigger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.dpad_hold",
+      "label": "MENU",
+      "modifier": true,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "menu"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.a",
+      "label": "A",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.b",
+      "label": "B",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.x",
+      "label": "X",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.y",
+      "label": "Y",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "y"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.left_shoulder",
+      "label": "L GRIP",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.right_shoulder",
+      "label": "R GRIP",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.left_click",
+      "label": "L CLICK",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "left_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.right_click",
+      "label": "R CLICK",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "right_stick_click"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.start",
+      "label": "MENU + L GRIP",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "menu",
+            "left_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.back",
+      "label": "MENU + R GRIP",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "menu",
+            "right_grip"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.dpad_up",
+      "label": "MENU + R STICK UP",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "menu",
+            "right_stick_up"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.dpad_down",
+      "label": "MENU + R STICK DOWN",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "menu",
+            "right_stick_down"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.dpad_left",
+      "label": "MENU + R STICK LEFT",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "menu",
+            "right_stick_left"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native.dpad_right",
+      "label": "MENU + R STICK RIGHT",
+      "modifier": false,
+      "contexts": [
+        "nativeButtons"
+      ],
+      "bindings": [
+        {
+          "gesture": "level",
+          "milliseconds": 300,
+          "inputs": [
+            "menu",
+            "right_stick_right"
+          ]
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "name": "axes.move",
+      "source": "left_stick"
+    },
+    {
+      "name": "axes.equipment",
+      "source": "right_stick"
+    },
+    {
+      "name": "axes.commands",
+      "source": "right_stick"
+    },
+    {
+      "name": "axes.menu",
+      "source": "left_stick"
+    },
+    {
+      "name": "axes.map",
+      "source": "right_stick"
+    },
+    {
+      "name": "axes.vehicle_steering",
+      "source": "left_stick"
+    },
+    {
+      "name": "axes.vehicle_pedals",
+      "source": "left_stick"
+    },
+    {
+      "name": "axes.native_move",
+      "source": "left_stick"
+    },
+    {
+      "name": "axes.native_look",
+      "source": "right_stick"
+    },
+    {
+      "name": "axes.turn",
+      "source": "right_stick"
+    }
+  ],
+  "settings": [
+    {
+      "name": "settings.snap_turn_degrees",
+      "value": 30
+    },
+    {
+      "name": "settings.motion_melee",
+      "value": 1
+    },
+    {
+      "name": "settings.animal_touch",
+      "value": 1
+    },
+    {
+      "name": "settings.wrist_surface_lift_cm",
+      "value": 2
+    },
+    {
+      "name": "settings.wrist_selector_height_cm",
+      "value": 15
+    },
+    {
+      "name": "settings.weapon_hud_setback_cm",
+      "value": 6
+    },
+    {
+      "name": "settings.wrist_text_scale",
+      "value": 1.5
+    },
+    {
+      "name": "settings.wrist_picker_width_cm",
+      "value": 42
+    },
+    {
+      "name": "settings.idroid_screen_width_cm",
+      "value": 45
+    },
+    {
+      "name": "settings.idroid_screen_depth_cm",
+      "value": 9
+    },
+    {
+      "name": "settings.idroid_screen_x_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_screen_y_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_screen_pitch_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_screen_yaw_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_screen_roll_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_grip_x_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_grip_y_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_grip_z_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_grip_pitch_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_grip_yaw_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.idroid_grip_roll_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.handheld_menus",
+      "value": 1
+    },
+    {
+      "name": "settings.menu_quad_width_cm",
+      "value": 120
+    },
+    {
+      "name": "settings.menu_quad_distance_cm",
+      "value": 130
+    },
+    {
+      "name": "settings.menu_quad_tilt_degrees",
+      "value": -10
+    },
+    {
+      "name": "settings.scope_eye_relief_cm",
+      "value": 10
+    },
+    {
+      "name": "settings.turn_mode",
+      "value": 1
+    },
+    {
+      "name": "settings.hud_mode",
+      "value": 1
+    },
+    {
+      "name": "settings.scope_pose_stabilization",
+      "value": 1
+    },
+    {
+      "name": "settings.tracked_weapon_obstruction",
+      "value": 1
+    },
+    {
+      "name": "settings.binocular_pitch_degrees",
+      "value": -90
+    },
+    {
+      "name": "settings.binocular_yaw_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.binocular_roll_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.binocular_auto_mark",
+      "value": 1
+    },
+    {
+      "name": "settings.binocular_max_eye_distance_cm",
+      "value": 30
+    },
+    {
+      "name": "settings.binocular_actor_glow",
+      "value": 1
+    },
+    {
+      "name": "settings.binocular_mark_dwell_ms",
+      "value": 650
+    },
+    {
+      "name": "settings.player_height_offset_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.left_hand_x_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.left_hand_y_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.left_hand_z_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.left_hand_pitch_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.left_hand_yaw_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.left_hand_roll_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.right_hand_x_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.right_hand_y_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.right_hand_z_cm",
+      "value": 0
+    },
+    {
+      "name": "settings.right_hand_pitch_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.right_hand_yaw_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.right_hand_roll_degrees",
+      "value": 0
+    },
+    {
+      "name": "settings.weapon_smoothing_ms",
+      "value": 0
+    },
+    {
+      "name": "settings.weapon_aim_pitch_degrees",
+      "value": -30
+    },
+    {
+      "name": "settings.support_grip_radius_cm",
+      "value": 10
+    },
+    {
+      "name": "settings.support_detach_radius_cm",
+      "value": 30
+    },
+    {
+      "name": "settings.hand_rest_curl_percent",
+      "value": 8
+    },
+    {
+      "name": "settings.hand_touch_curl_percent",
+      "value": 20
+    }
+  ]
+}

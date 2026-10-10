@@ -102,12 +102,12 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     if(!std::isfinite(units)||units<=0)throw std::invalid_argument("Camera scale must be finite and positive");
     std::lock_guard lock(mutex_);enabled_=enabled;units_=units;active_=pending_=awaitingPlayer_=false;camera_=playerOwner_=0;reason_=HeadCameraStop::none;
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=ownerHeadTime_=0;suspended_=false;
-    controllers_={};rig_={};nativeMenuOpen_=false;nativeIdroidOpen_=false;awaitingScene_=false;lastView_={};cameraRenderTime_=0;menuAnchored_=false;trackingEpoch_=0;
+    controllers_={};rig_={};nativeMenuOpen_=false;nativeIdroidOpen_=false;nativeIdroidPaused_=false;awaitingScene_=false;lastView_={};cameraRenderTime_=0;menuAnchored_=false;trackingEpoch_=0;
     menuGeneration_=0;
     staleDemoRecoveryDwell_.reset();
     lastTitleSource_={};avatarEditorBackdrop_={};lastTitleSourceValid_=avatarEditorBackdropValid_=false;
     scriptedDemoActive_=false;cinematicFollow_={};sceneTransitionActivation_=0;
-    snapYaw_=0;snapTranslation_={};recenterPending_=false;
+    snapYaw_=0;snapTranslation_={};recenterPending_=false;driverView_={};
     clearPlayerRootSamples();
     resetStabilization(this);
 }
@@ -239,12 +239,17 @@ void HeadCamera::recenter(){
     std::lock_guard lock(mutex_);
     if(enabled_&&(active_||pending_||awaitingPlayer_)){recenterPending_=true;rig_={};resetStabilization(this);}
 }
-void HeadCamera::setNativeMenuOpen(bool open,bool idroid){
+void HeadCamera::setNativeMenuOpen(bool open,bool idroid,bool pause,bool idroidPaused){
     std::lock_guard lock(mutex_);
-    const auto nextIdroid=open&&idroid;
-    if(open==nativeMenuOpen_&&nextIdroid==nativeIdroidOpen_)return;
+    // Native Help can cover an iDroid terminal without closing it. Its pause
+    // stops player skin jobs, so it must own the spatial menu/camera policy.
+    // Treating that overlap as a moving handheld menu waits forever for the
+    // very player-head publication the guide has paused.
+    const auto nextIdroid=open&&idroid&&!pause;
+    const auto nextPaused=nextIdroid&&idroidPaused;
+    if(open==nativeMenuOpen_&&nextIdroid==nativeIdroidOpen_&&nextPaused==nativeIdroidPaused_)return;
     const bool retainMenuAnchor=open&&nativeMenuOpen_&&menuAnchored_;
-    nativeMenuOpen_=open;nativeIdroidOpen_=nextIdroid;++menuGeneration_;rig_={};
+    nativeMenuOpen_=open;nativeIdroidOpen_=nextIdroid;nativeIdroidPaused_=nextPaused;++menuGeneration_;rig_={};
     if(open)staleDemoRecoveryDwell_.reset();
     if(open){
         sceneTransitionActivation_=0;
@@ -321,7 +326,13 @@ std::optional<HeadCameraSample> HeadCamera::publishedRigFrame(uint64_t now) cons
         ||frame.activation!=activation_||frame.trackingSequence>sequence_
         ||frame.controllers.referenceEpoch!=controllers_.referenceEpoch||frame.menuGeneration!=menuGeneration_
         ||now<frame.sampleTime||now-frame.sampleTime>150)return {};
-    if(requirePlayerHead_){
+    // A completed paused skin solve has current tracking and a current rig
+    // generation even though native animation has stopped publishing heads.
+    // Device attachment must consume that same solve; rejecting it here lets
+    // the hand move while the native handset keeps its preceding transform.
+    const bool anchoredMenu=frame.menuOpen&&nativeMenuOpen_&&menuAnchored_
+        &&(!nativeIdroidOpen_||nativeIdroidPaused_||!frame.controllers.handheldMenus||frame.controllers.cabinPlay);
+    if(requirePlayerHead_&&!anchoredMenu){
         const auto current=std::find_if(playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){
             return p.camera==rig_.camera&&p.owner==rig_.owner&&p.sequence;
         });
@@ -404,12 +415,18 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     // immediately reactivate stereo and cover the native confirmation screen.
     if(controllers_.loading){awaitPlayerLocked();return result;}
     const bool spatialMenu=nativeMenuOpen_&&menuAnchored_&&active_;
+    const bool liveHandheldMenu=spatialMenu&&nativeIdroidOpen_&&!nativeIdroidPaused_&&controllers_.handheldMenus
+        &&!controllers_.cabinPlay&&!controllers_.frontEnd&&!controllers_.avatarEditor;
     if(nativeMenuOpen_&&!spatialMenu){awaitPlayerLocked();return result;}
     if(spatialMenu){
         if(camera!=camera_)return result;
-        // Default menus pause the native world but keep fresh stereo head
-        // tracking. Only the opt-in handheld iDroid follows live locomotion.
-        if(!nativeIdroidOpen_||!controllers_.handheldMenus)nativePose=menuNative_;
+        // Field handheld iDroid follows live locomotion. In the ACC, the
+        // native phone camera switches to the seated player's facing; keep
+        // the accepted cabin view and apply fresh HMD motion below instead.
+        // A guide can retain its own gameplay pause after its Help closes.
+        // Keep the physical handset and fresh tracked rig, using the accepted
+        // world anchor until that exact native tutorial releases its pause.
+        if(!nativeIdroidOpen_||nativeIdroidPaused_||!controllers_.handheldMenus||controllers_.cabinPlay)nativePose=menuNative_;
         result.menuOpen=true;result.menuIdroid=nativeIdroidOpen_;result.menuPanel=menuPanel_;
         result.menuWorldQuad=!nativeIdroidOpen_||!controllers_.handheldMenus;
         result.playerOwner=playerOwner_;result.playerHead=lastView_.playerHead;
@@ -421,6 +438,27 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         result.renderedPalmTracked=lastView_.renderedPalmTracked;
         result.wristPanel=lastView_.wristPanel;
         result.wristPanelTracked=lastView_.wristPanelTracked;
+        if(liveHandheldMenu&&requirePlayerHead_){
+            // A handheld terminal keeps the field and vehicle moving. The
+            // native vehicle camera is a chase boom, not the driver's eyes.
+            // Join the live handset camera to its exact current player skin,
+            // just as ordinary first-person rendering does below.
+            const auto found=std::find_if(playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){
+                const auto& source=p.sourceCamera;
+                return p.camera==camera&&p.owner==playerOwner_&&p.sequence
+                    &&time>=p.time&&time-p.time<=150
+                    &&source.position.x==sourceCamera.position.x&&source.position.y==sourceCamera.position.y
+                    &&source.position.z==sourceCamera.position.z
+                    &&source.orientation.x==sourceCamera.orientation.x&&source.orientation.y==sourceCamera.orientation.y
+                    &&source.orientation.z==sourceCamera.orientation.z&&source.orientation.w==sourceCamera.orientation.w;
+            });
+            if(found==playerHeads_.end()){
+                rig_={};suspendLocked(HeadCameraStop::playerHeadUnavailable);return result;
+            }
+            nativePose.position=found->position;
+            result.playerSequence=found->sequence;result.playerHead=found->position;
+            ownerHeadTime_=found->time;
+        }
     }else if(authoredScene&&awaitingPlayer_&&(camera_||controllers_.scriptedDemo)){
         // This is the verified primary render publication of a native scripted
         // shot. Its camera remains valid when the demo stops publishing the
@@ -546,6 +584,35 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     // applied afterwards without filtering. Pause owns its separate anchor.
     if(!spatialMenu&&controllers_.scriptedDemo&&!controllers_.scriptedLook)nativePose=followCinematicLocked(nativePose,time,useRig);
     else if(useRig&&(!controllers_.scriptedDemo||controllers_.scriptedLook))cinematicFollow_={};
+    if((!spatialMenu||liveHandheldMenu)&&!controllers_.authoredCamera){
+        if(controllers_.vehicleMounted&&!controllers_.nativeGamepad){
+            PlayerRootSample root;
+            if(!getPlayerRootSample(camera,result.playerOwner,result.playerSequence,time,root)){
+                rig_={};suspendLocked(HeadCameraStop::playerHeadUnavailable);return result;
+            }
+            const float nativeYaw=horizontalYaw(sourceCamera.orientation);
+            const float rootYaw=horizontalYaw(root.orientation);
+            auto& view=driverView_;
+            const bool same=view.valid&&view.camera==camera&&view.owner==result.playerOwner
+                &&view.activation==activation_&&view.referenceEpoch==controllers_.referenceEpoch
+                &&time>=view.time&&time-view.time<=500;
+            if(!same)view={nativeYaw,rootYaw,0,camera,result.playerOwner,time,activation_,
+                controllers_.referenceEpoch,0,true};
+            const bool looking=std::abs(controllers_.vehicleViewInput[0])>.18f
+                ||std::abs(controllers_.vehicleViewInput[1])>.18f;
+            if(looking)view.lookUntil=time+250;
+            if(same&&time>view.time&&time<=view.lookUntil){
+                // Preserve deliberate native right-stick look, including its
+                // brief settling motion. Body/vehicle turns supply the base
+                // heading; unrelated chase-camera auto-orbit does not.
+                const float delta=std::remainder(nativeYaw-view.nativeYaw,6.283185307f)
+                    -std::remainder(rootYaw-view.rootYaw,6.283185307f);
+                if(std::abs(delta)<.9f)view.lookYaw=std::remainder(view.lookYaw+delta,6.283185307f);
+            }
+            view.nativeYaw=nativeYaw;view.rootYaw=rootYaw;view.time=time;
+            nativePose.orientation=yawRotation(rootYaw+view.lookYaw);
+        }else driverView_={};
+    }
     // The native camera can look down, lean, recoil or bank. Its yaw supplies
     // gameplay heading; gravity and physical HMD pitch/roll supply the VR view.
     // A full native/activation rotation tilts the tracking space when turning.
@@ -588,7 +655,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         rig_={};
     }
     suspended_=false;reason_=HeadCameraStop::none;
-    if(!spatialMenu&&!controllers_.frontEnd&&!controllers_.avatarEditor&&!controllers_.cabinPlay
+    if((!spatialMenu||liveHandheldMenu)&&!controllers_.frontEnd&&!controllers_.avatarEditor&&!controllers_.cabinPlay
        &&requirePlayerHead_&&result.playerSequence){
         PlayerRootSample rootSample;
         if(getPlayerRootSample(camera,result.playerOwner,result.playerSequence,time,rootSample)){
@@ -625,16 +692,25 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 }
             }
             state.time=time;
-            auto cameraAnchor=rootSample.position+rotate(rootSample.orientation,state.headLocalOffset);
-            const auto backward=rotate(rootSample.orientation,{0,0,-cameraBackwardOffset});
-            cameraAnchor=cameraAnchor+backward;
-            cameraAnchor.y+=cameraHeightOffset;
-            nativePose.position=cameraAnchor;
+            if(controllers_.vehicleMounted&&!controllers_.nativeGamepad){
+                // The standing shoulder fit moves eyes .35 m behind and
+                // .25 m above the native head. In a fixed cab that puts the
+                // wheel outside arm reach and the shoulder mesh at the eyes.
+                // A seated driver uses this exact authored head publication;
+                // physical HMD motion remains relative to it below.
+                nativePose.position=result.playerHead;
+            }else{
+                auto cameraAnchor=rootSample.position+rotate(rootSample.orientation,state.headLocalOffset);
+                const auto backward=rotate(rootSample.orientation,{0,0,-cameraBackwardOffset});
+                cameraAnchor=cameraAnchor+backward;
+                cameraAnchor.y+=cameraHeightOffset;
+                nativePose.position=cameraAnchor;
+            }
         }
     }
     // FOX's camera-local forward/right candidates are +Z/-X. The explicit
     // 180-degree basis rotation keeps handedness intact; validate in live motion.
-    if(!spatialMenu&&!controllers_.authoredCamera)nativePose.position.y+=controllers_.playerHeightOffset;
+    if((!spatialMenu||liveHandheldMenu)&&!controllers_.authoredCamera)nativePose.position.y+=controllers_.playerHeightOffset;
     const Pose basis{{0,1,0,0},{}};
     auto relative=compose(inverse(spatialMenu?menuHead_:origin_),head_);
     relative.position=relative.position*units_;
@@ -670,7 +746,8 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         result.controllers=controllers_;
         // Menu state can arrive between input publications. The iDroid owns
         // the hand immediately, even if the last input still held an optic.
-        if(result.menuOpen)result.controllers.optic={};
+        if(result.menuOpen&&!(result.menuIdroid&&result.controllers.handheldMenus
+                &&result.controllers.handheldMenuCoexist))result.controllers.optic={};
         // Skin preparation can keep evaluating a retired player camera while
         // a demo renders from another camera. Only the render publication may
         // advance the accepted view used for camera liveness and handoffs.

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "audited_on": "2026-10-02",
+  "audited_on": "2026-10-03",
   "title": "MGS5VR implemented behavior regression catalog",
   "scope": "Behavior families found in current source and retained public ledgers. This is an explicit audit denominator, not an exhaustive list of every weapon, action, mission, report or supported environment.",
   "baseline": {
@@ -102,6 +102,8 @@
     "tools/gameplay_bot/suites/acc-completed-rival-roundtrip.json",
     "tools/gameplay_bot/suites/acc-helicopter-customization-back.json",
     "tools/gameplay_bot/suites/field-context-roundtrip.json",
+    "tools/gameplay_bot/suites/head-tracking-recovery.json",
+    "tools/gameplay_bot/suites/head-tracking-idroid-recovery.json",
     "tools/gameplay_bot/suites/idroid-continuous-roundtrip.json",
     "tools/gameplay_bot/suites/idroid-fit-open.json",
     "tools/gameplay_bot/suites/idroid-fit.json",
@@ -133,12 +135,12 @@
     "runtime": 6,
     "tooling": 5,
     "baseline_ctest_groups": 41,
-    "current_ctest_groups": 44,
-    "public_native_fixture_files": 17,
+    "current_ctest_groups": 54,
+    "public_native_fixture_files": 19,
     "features_with_registered_automated_tests": 44,
     "features_with_auxiliary_tests_only": 1,
     "features_without_automated_tests": 2,
-    "features_with_public_native_fixtures": 12,
+    "features_with_public_native_fixtures": 13,
     "current_candidate_continuous_passes": 0,
     "current_candidate_headset_passes": 0,
     "automated": {
@@ -199,25 +201,34 @@
         "include/mgs5vr/render_layout.hpp",
         "include/mgs5vr/scene_capture.hpp",
         "include/mgs5vr/stereo.hpp",
+        "include/mgs5vr/tracking_fault.hpp",
         "include/mgs5vr/xr_runtime.hpp"
       ],
       "automated_tests": [
         "contracts",
         "d3d11_mailbox",
-        "camera_observer_passthrough"
+        "camera_observer_passthrough",
+        "gameplay_bot_contracts",
+        "gameplay_presentation"
       ],
       "test_sources": [
         "tests/core_tests.cpp",
         "tests/gpu_tests.cpp",
         "tests/camera_observer_tests.cpp",
-        "tests/optic_renderer_checks.cpp"
+        "tests/optic_renderer_checks.cpp",
+        "tests/gameplay_bot_tests.py",
+        "tests/gameplay_presentation_tests.py"
       ],
       "auxiliary_tests": [],
-      "native_fixtures": [],
+      "native_fixtures": [
+        "tools/gameplay_bot/suites/head-tracking-recovery.json",
+        "tools/gameplay_bot/suites/head-tracking-idroid-recovery.json"
+      ],
       "evidence_sources": [
         "docs/ACCEPTANCE.md",
         "docs/CURRENT.md",
-        "docs/HEADSET_REVIEW.md"
+        "docs/HEADSET_REVIEW.md",
+        "docs/HELICOPTER_IDLE_REPORT.md"
       ],
       "community_reports": [
         "R05",
@@ -249,7 +260,11 @@
       },
       "missing_checks": [
         "Continuous matched head/hand/world motion across gameplay, loading and camera changes.",
-        "Both-eye generation checks and physical headset comfort on the same candidate."
+        "Both-eye generation checks and physical headset comfort on the same candidate.",
+        "Physical idle/removal/resume and simulator blinking report, with the actual runtime identified; bounded synthetic validity-loss recovery does not close this report."
+      ],
+      "open_user_report_ids": [
+        "oct3-idle-stereo-blackout"
       ],
       "sustained_regression": {
         "status": "missing",
@@ -2047,7 +2062,7 @@
       },
       "missing_checks": [
         "Current continuous independent head/arm motion in both eyes.",
-        "Status stays left while right-hand iDroid opens; all popup/status layer visibility and text.",
+        "Status stays left while left-hand iDroid opens; all popup/status layer visibility and text.",
         "Physical readability and culling."
       ],
       "sustained_regression": {
@@ -2360,7 +2375,7 @@
     },
     {
       "id": "idroid-mount",
-      "title": "Right-hand iDroid default, native device mount and live screen",
+      "title": "Left-hand iDroid default, native device mount and live screen",
       "kind": "gameplay",
       "source_paths": [
         "src/idroid_rig.cpp",
@@ -2373,9 +2388,11 @@
         "include/mgs5vr/controls.hpp",
         "include/mgs5vr/head_camera.hpp",
         "include/mgs5vr/idroid_rig.hpp",
+        "include/mgs5vr/idroid_native_hold.hpp",
         "include/mgs5vr/ui_renderer.hpp",
         "src/idroid_attachment.cpp",
         "include/mgs5vr/idroid_attachment.hpp",
+        "include/mgs5vr/idroid_hand_use.hpp",
         "include/mgs5vr/idroid_ui.hpp"
       ],
       "automated_tests": [
@@ -2662,7 +2679,8 @@
         }
       },
       "open_user_report_ids": [
-        "oct2-acc-development-freeze"
+        "oct2-acc-development-freeze",
+        "oct3-acc-free-roam-guidance"
       ]
     },
     {
@@ -3450,6 +3468,9 @@
       "title": "Physical wheel steering and native mounted weapon/control contexts",
       "kind": "gameplay",
       "source_paths": [
+        "src/vehicle_weapon.cpp",
+        "include/mgs5vr/vehicle_weapon.hpp",
+        "include/mgs5vr/vehicle_pedals.hpp",
         "src/input_bridge.cpp",
         "src/head_camera.cpp",
         "src/controller_rig.cpp",
@@ -3484,7 +3505,7 @@
       "coverage": {
         "automated": {
           "status": "partial",
-          "scope": "Travel ownership, wheel/control mapping and input neutralization across exit/focus changes."
+          "scope": "Travel ownership, independent wheel grips, pedal/fire ownership, release after tracking/context changes and remapped reload consumption. Native driver firearm eligibility remains unverified."
         },
         "native": {
           "status": "retained_scoped",
@@ -4296,7 +4317,20 @@
         "tools/gameplay_bot/motion.py",
         "src/native_video.cpp",
         "include/mgs5vr/native_video.hpp",
-        "include/mgs5vr/native_video_timing.hpp"
+        "include/mgs5vr/native_video_timing.hpp",
+        "include/mgs5vr/cover_probe.hpp",
+        "tools/gameplay_bot/cover.py",
+        "tools/gameplay_bot/bodies.py",
+        "tools/gameplay_bot/commander.py",
+        "tools/gameplay_bot/autonomy.py",
+        "tools/gameplay_bot/tactics.py",
+        "tools/gameplay_bot/cqc.py",
+        "tools/gameplay_bot/idroid_film.py",
+        "tools/gameplay-idroid-film.py",
+        "tools/gameplay_bot/binocular_presentation.py",
+        "include/mgs5vr/native_input_delivery.hpp",
+        "tools/gameplay_bot/recon.py",
+        "tools/gameplay-mortar.py"
       ],
       "automated_tests": [
         "simulator_session_ownership",
@@ -4310,7 +4344,17 @@
         "field_kit_evidence",
         "workspace_transactions",
         "vr_regression_catalog",
-        "native_video_timing"
+        "native_video_timing",
+        "gameplay_bot_combat_contracts",
+        "native_cover_probe_contracts",
+        "gameplay_bot_bodies_contracts",
+        "gameplay_bot_tactics_contracts",
+        "gameplay_bot_cqc_contracts",
+        "gameplay_bot_idroid_film_contracts",
+        "gameplay_bot_binocular_presentation_contracts",
+        "native_input_delivery_contracts",
+        "gameplay_bot_recon_contracts",
+        "gameplay_bot_mortar_contracts"
       ],
       "test_sources": [
         "tests/simulator_session_ownership_tests.ps1",
@@ -4327,7 +4371,17 @@
         "tests/operator_recovery_tests.py",
         "tests/regression_catalog_tests.py",
         "tests/gameplay_motion_tests.py",
-        "tests/native_video_timing_tests.cpp"
+        "tests/native_video_timing_tests.cpp",
+        "tests/cover_probe_tests.cpp",
+        "tests/gameplay_bot_bodies_tests.py",
+        "tests/gameplay_bot_combat_tests.py",
+        "tests/gameplay_bot_tactics_tests.py",
+        "tests/gameplay_bot_cqc_tests.py",
+        "tests/gameplay_bot_idroid_film_tests.py",
+        "tests/gameplay_bot_binocular_presentation_tests.py",
+        "tests/native_input_delivery_tests.cpp",
+        "tests/gameplay_bot_recon_tests.py",
+        "tests/gameplay_bot_mortar_tests.py"
       ],
       "auxiliary_tests": [
         "tests/record_simulator_tests.py",
@@ -4343,7 +4397,7 @@
       "coverage": {
         "automated": {
           "status": "partial",
-          "scope": "Mocked ownership, state, failure/cleanup, campaign, navigation and evidence contracts; recorder tests are auxiliary to the registered CTest groups. Catalog tests reject stale source/test/fixture references and release blockers. Motion tests are imported by gameplay_bot_contracts. Strict supervised Confirm tests distinguish sampled physical input and neutral release from an unproven page outcome, require both current review hashes, and reject plans or replay after uncertain completion. Native recorder timing tests check rational deadlines, missed cadence, oldest-first staging order, monotonic source clocks/capture slots and explicit CFR repeats; they do not certify native video output."
+          "scope": "Mocked ownership, state, failure/cleanup, campaign, navigation and evidence contracts; recorder tests are auxiliary to the registered CTest groups. Catalog tests reject stale source/test/fixture references and release blockers. Motion tests are imported by gameplay_bot_contracts. Strict supervised Confirm tests distinguish sampled physical input and neutral release from an unproven page outcome, require both current review hashes, and reject plans or replay after uncertain completion. Native recorder timing tests check rational deadlines, missed cadence, oldest-first staging order, monotonic source clocks/capture slots and explicit CFR repeats; they do not certify native video output. Combat tests verify native/XR basis inversion, exported aim calibration, actual barrel direction and refusal of occluded, incapacitated or non-soldier targets; they do not prove a native hit or player-visible interaction. Native cover-probe tests reject stale/mismatched owners, invalid roots, unbounded requests and invalid terrain hits. They do not certify concealment, shadows or live cover use."
         },
         "native": {
           "status": "not_applicable",
@@ -4513,10 +4567,68 @@
     "native_frame_rate_adapter",
     "vr_regression_catalog",
     "native_video_timing",
-    "native_idroid_attachment"
+    "native_idroid_attachment",
+    "gameplay_bot_combat_contracts",
+    "native_cover_probe_contracts",
+    "gameplay_bot_bodies_contracts",
+    "gameplay_bot_tactics_contracts",
+    "gameplay_bot_cqc_contracts",
+    "gameplay_bot_idroid_film_contracts",
+    "gameplay_bot_binocular_presentation_contracts",
+    "native_input_delivery_contracts",
+    "gameplay_bot_recon_contracts",
+    "gameplay_bot_mortar_contracts"
   ],
   "source_inventory_rule": "Every current file under src/ and include/ must have at least one feature source_paths reference. Public source additions/deletions require explicit catalog review.",
   "current_user_reports": [
+    {
+      "id": "oct3-idle-stereo-blackout",
+      "status": "open",
+      "priority": "release_blocker",
+      "feature_ids": [
+        "tpp-stereo"
+      ],
+      "reported_behavior": "After idle, the simulator blinks and the physical headset goes black.",
+      "reproduction_status": "partial_current_scope",
+      "observations": [
+        "Synthetic seven-second raw head validity loss reproduced black compositor output and empty XR layers in actual ACC before the repair.",
+        "The repair retains the original admitted stereo pair. Six diagnostic loss/recovery cases passed in closed-menu ACC and six with an actual Daily Bonus Received iDroid information card visible; all outcome eyes were reviewed.",
+        "The information-card run's later Back/stow case failed and remains failed; individual stereo diagnostic cases do not pass the whole run.",
+        "A twenty-minute no-input simulator observation did not reproduce the original idle symptom. Short low-cadence recordings do not certify continuous stereo."
+      ],
+      "unknowns": [
+        "Physical runtime/connection, actual focus/session/pose-validity state during idle, and whether a runtime or transport stall contributes to blinking."
+      ],
+      "required_regression": [
+        "Physical idle, headset removal/resume, focus and reference-space transitions with both final eyes, original pose ownership and native control recovery.",
+        "Continuous stereo through gameplay and menu transitions; keep the runtime's recommended eyes/FOV separate from the 1280 by 720 desktop preview."
+      ],
+      "resolution": "Scoped raw-validity-loss repair; original physical/simulator idle report remains open."
+    },
+    {
+      "id": "oct3-acc-free-roam-guidance",
+      "status": "open",
+      "priority": "release_blocker",
+      "feature_ids": [
+        "idroid-native-guides"
+      ],
+      "reported_behavior": "After loading into the helicopter, the player cannot clearly determine the next step toward free roam; all menu/state/item branches must work without guessing.",
+      "reproduction_status": "partial_current_scope",
+      "observations": [
+        "Reviewed Choose a Rival dismissal, Missions/Map tab changes, Mission List entry/Back and an ordinary root Back restored the ACC cabin.",
+        "Native area selection was active but invisible in the observed ACC state. The native story-dependent helicopter setup did not restore it; no forced menu visibility or guessed callback was added.",
+        "A later iDroid opening showed Daily Bonus Received. Back advanced to Skulls Attack, rather than satisfying a stow expectation. Native popup=false did not identify these information cards."
+      ],
+      "unknowns": [
+        "Exact originally failing page/checkpoint, the complete legal free-roam route and native information-card/page ownership.",
+        "Undeveloped helicopter grades and unfinished tutorial fixtures; the current save already completed all nineteen helicopter definitions."
+      ],
+      "required_regression": [
+        "Actual page/choice-reviewed Continue-to-ACC-to-free-roam flow, including every encountered information card and control restoration.",
+        "All discovered menu child pages, native game states and eligible item grades/locks/costs/results on isolated verified fixtures; no generic confirmation of unknown pages."
+      ],
+      "resolution": "Open. Scoped menu observations and stereo repairs do not establish full-game playability."
+    },
     {
       "id": "oct2-acc-development-freeze",
       "status": "open",
