@@ -130,48 +130,48 @@
     "Zero frame drops or sustained native refresh-rate acceptance."
   ],
   "summary": {
-    "feature_families": 47,
-    "gameplay": 36,
+    "feature_families": 48,
+    "gameplay": 37,
     "runtime": 6,
     "tooling": 5,
     "baseline_ctest_groups": 41,
-    "current_ctest_groups": 54,
+    "current_ctest_groups": 55,
     "public_native_fixture_files": 19,
-    "features_with_registered_automated_tests": 44,
+    "features_with_registered_automated_tests": 45,
     "features_with_auxiliary_tests_only": 1,
     "features_without_automated_tests": 2,
     "features_with_public_native_fixtures": 13,
     "current_candidate_continuous_passes": 0,
     "current_candidate_headset_passes": 0,
     "automated": {
-      "partial": 45,
+      "partial": 46,
       "none": 2
     },
     "native": {
       "retained_scoped": 30,
       "scoped_observation": 1,
       "blocked": 5,
-      "unverified": 6,
+      "unverified": 7,
       "not_applicable": 5
     },
     "continuous": {
       "historical_partial": 3,
-      "unverified": 36,
+      "unverified": 37,
       "blocked": 3,
       "not_applicable": 5
     },
     "headset": {
       "historical_feedback": 6,
-      "unverified": 36,
+      "unverified": 37,
       "not_applicable": 5
     },
     "release_gate": {
-      "pending": 34,
+      "pending": 35,
       "blocked": 5,
       "experimental": 3,
       "tooling_only": 5
     },
-    "features_missing_sustained_native_regression": 42,
+    "features_missing_sustained_native_regression": 43,
     "current_candidate_integrated_soak_passes": 0
   },
   "features": [
@@ -1307,7 +1307,8 @@
         "include/mgs5vr/arm_ik.hpp",
         "include/mgs5vr/controller_rig.hpp",
         "include/mgs5vr/input_bridge.hpp",
-        "include/mgs5vr/render_camera.hpp"
+        "include/mgs5vr/render_camera.hpp",
+        "include/mgs5vr/weapon_obstruction.hpp"
       ],
       "automated_tests": [
         "contracts",
@@ -1341,7 +1342,7 @@
       "coverage": {
         "automated": {
           "status": "partial",
-          "scope": "Grip/socket/muzzle transform and aim-trim math; the public inspection fixture does not fire or reload."
+          "scope": "Grip/socket/muzzle transform and aim-trim math; the public inspection fixture does not fire or reload. Cover-preference contracts preserve native signed result semantics and require the exact local weapon/physics owner, caller, fresh rig, readiness and tracking before bypassing only a positive pre-fire proximity result; they do not prove native projectile collision or gameplay acceptance."
         },
         "native": {
           "status": "retained_scoped",
@@ -2496,7 +2497,9 @@
         "include/mgs5vr/xr_runtime.hpp",
         "src/ui_renderer.cpp",
         "include/mgs5vr/idroid_ui.hpp",
-        "include/mgs5vr/native_controls.hpp"
+        "include/mgs5vr/native_controls.hpp",
+        "src/native_idroid_interruption.lua",
+        "src/native_idroid_interruption_script.hpp.in"
       ],
       "automated_tests": [
         "contracts",
@@ -2509,9 +2512,13 @@
         "tests/gameplay_bot_idroid_tests.py",
         "tests/gameplay_bot_tests.py",
         "tests/gameplay_motion_tests.py",
-        "tests/controls_tests.cpp"
+        "tests/controls_tests.cpp",
+        "tests/native_mod_policy_tests.lua",
+        "tools/test-native-mod-policy.py"
       ],
-      "auxiliary_tests": [],
+      "auxiliary_tests": [
+        "tools/test-native-mod-policy.py"
+      ],
       "native_fixtures": [
         "tools/gameplay_bot/suites/idroid-fit.json",
         "tools/gameplay_bot/suites/idroid-native-mount.json",
@@ -2588,21 +2595,26 @@
       "source_paths": [
         "src/native_actions.cpp",
         "include/mgs5vr/native_menu_restrictions.hpp",
+        "include/mgs5vr/native_game_status.hpp",
         "tools/gameplay_bot/idroid.py",
         "include/mgs5vr/native_actions.hpp",
         "tools/gameplay_bot/core.py",
         "tools/gameplay_bot/live.py",
-        "tools/gameplay_bot/supervisor.py"
+        "tools/gameplay_bot/supervisor.py",
+        "tools/gameplay_bot/menu_coverage.py",
+        "tools/gameplay_bot/catalogs/vr-menu-paths.json"
       ],
       "automated_tests": [
         "contracts",
         "gameplay_bot_idroid_contracts",
-        "gameplay_bot_contracts"
+        "gameplay_bot_contracts",
+        "gameplay_menu_variant_contracts"
       ],
       "test_sources": [
         "tests/core_tests.cpp",
         "tests/gameplay_bot_idroid_tests.py",
-        "tests/gameplay_bot_tests.py"
+        "tests/gameplay_bot_tests.py",
+        "tests/menu_coverage_variants_tests.py"
       ],
       "auxiliary_tests": [],
       "native_fixtures": [
@@ -2614,7 +2626,8 @@
       "evidence_sources": [
         "docs/ACC_MENU_REGRESSION.md",
         "docs/CURRENT.md",
-        "docs/REGRESSION_COVERAGE.md"
+        "docs/REGRESSION_COVERAGE.md",
+        "docs/VR_MENU_COVERAGE.md"
       ],
       "community_reports": [
         "R18",
@@ -2624,7 +2637,7 @@
       "coverage": {
         "automated": {
           "status": "partial",
-          "scope": "Exact owner/status restoration, preservation of independent disabled entries, stationary navigation and guarded escape. Pure contracts distinguish unknown, inactive and active tutorial modes; unknown rejects forced terminal recovery and remains JSON null. Mocked short ACC Confirm tests require current two-eye supervisor review, one effective face-button edge, a sampled mapped A packet and subsequent neutral release; they reject unreviewed/chained actions, late or missing input proof, remapped holds/chords and changed native owners. This input-only result explicitly does not prove page navigation."
+          "scope": "Exact owner/status restoration, preservation of independent disabled entries, stationary navigation and guarded escape. Pure contracts distinguish unknown, inactive and active tutorial modes; unknown rejects forced terminal recovery and remains JSON null. Mocked short ACC Confirm tests require current two-eye supervisor review, one effective face-button edge, a sampled mapped A packet and subsequent neutral release; they reject unreviewed/chained actions, late or missing input proof, remapped holds/chords and changed native owners. This input-only result explicitly does not prove page navigation. Menu variant contracts preserve existing MENU IDs and independent first/unfinished/completed guidance, normal/confirmation/help and Development-state obligations. Unknown applicability remains unproven; parent-row evidence cannot promote variants or imply every legal native menu combination."
         },
         "native": {
           "status": "blocked",
@@ -4330,7 +4343,10 @@
         "tools/gameplay_bot/binocular_presentation.py",
         "include/mgs5vr/native_input_delivery.hpp",
         "tools/gameplay_bot/recon.py",
-        "tools/gameplay-mortar.py"
+        "tools/gameplay-mortar.py",
+        "tools/gameplay_bot/menu_coverage.py",
+        "tools/gameplay_bot/state_graph.py",
+        "tools/gameplay-coverage.py"
       ],
       "automated_tests": [
         "simulator_session_ownership",
@@ -4354,7 +4370,8 @@
         "gameplay_bot_binocular_presentation_contracts",
         "native_input_delivery_contracts",
         "gameplay_bot_recon_contracts",
-        "gameplay_bot_mortar_contracts"
+        "gameplay_bot_mortar_contracts",
+        "gameplay_menu_variant_contracts"
       ],
       "test_sources": [
         "tests/simulator_session_ownership_tests.ps1",
@@ -4381,7 +4398,8 @@
         "tests/gameplay_bot_binocular_presentation_tests.py",
         "tests/native_input_delivery_tests.cpp",
         "tests/gameplay_bot_recon_tests.py",
-        "tests/gameplay_bot_mortar_tests.py"
+        "tests/gameplay_bot_mortar_tests.py",
+        "tests/menu_coverage_variants_tests.py"
       ],
       "auxiliary_tests": [
         "tests/record_simulator_tests.py",
@@ -4391,13 +4409,14 @@
       "evidence_sources": [
         "docs/BOT_AND_SHOWCASE_PLAN.md",
         "docs/NATIVE_CONTEXT_COVERAGE.md",
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/VR_MENU_COVERAGE.md"
       ],
       "community_reports": [],
       "coverage": {
         "automated": {
           "status": "partial",
-          "scope": "Mocked ownership, state, failure/cleanup, campaign, navigation and evidence contracts; recorder tests are auxiliary to the registered CTest groups. Catalog tests reject stale source/test/fixture references and release blockers. Motion tests are imported by gameplay_bot_contracts. Strict supervised Confirm tests distinguish sampled physical input and neutral release from an unproven page outcome, require both current review hashes, and reject plans or replay after uncertain completion. Native recorder timing tests check rational deadlines, missed cadence, oldest-first staging order, monotonic source clocks/capture slots and explicit CFR repeats; they do not certify native video output. Combat tests verify native/XR basis inversion, exported aim calibration, actual barrel direction and refusal of occluded, incapacitated or non-soldier targets; they do not prove a native hit or player-visible interaction. Native cover-probe tests reject stale/mismatched owners, invalid roots, unbounded requests and invalid terrain hits. They do not certify concealment, shadows or live cover use."
+          "scope": "Mocked ownership, state, failure/cleanup, campaign, navigation and evidence contracts; recorder tests are auxiliary to the registered CTest groups. Catalog tests reject stale source/test/fixture references and release blockers. Motion tests are imported by gameplay_bot_contracts. Strict supervised Confirm tests distinguish sampled physical input and neutral release from an unproven page outcome, require both current review hashes, and reject plans or replay after uncertain completion. Native recorder timing tests check rational deadlines, missed cadence, oldest-first staging order, monotonic source clocks/capture slots and explicit CFR repeats; they do not certify native video output. Combat tests verify native/XR basis inversion, exported aim calibration, actual barrel direction and refusal of occluded, incapacitated or non-soldier targets; they do not prove a native hit or player-visible interaction. Native cover-probe tests reject stale/mismatched owners, invalid roots, unbounded requests and invalid terrain hits. They do not certify concealment, shadows or live cover use. Menu inventory and declared-model contracts preserve independent variant obligations and missing checks without creating native-page IDs, accepted navigation edges or whole-game percentages."
         },
         "native": {
           "status": "not_applicable",
@@ -4437,6 +4456,101 @@
           "scope": "External tools require their own transaction and environment matrix."
         }
       }
+    },
+    {
+      "id": "god-mode",
+      "title": "Optional native single-player damage protection",
+      "kind": "gameplay",
+      "source_paths": [
+        "src/native_god_mode.lua",
+        "src/native_god_mode_script.hpp.in",
+        "src/native_actions.cpp",
+        "src/controls.cpp",
+        "config/mgs5vr-controls.ini",
+        "tools/launcher-ui/launcher.js"
+      ],
+      "automated_tests": [
+        "launcher_3d_settings_bridge"
+      ],
+      "test_sources": [
+        "tests/launcher_bridge_tests.ps1",
+        "tests/native_mod_policy_tests.lua",
+        "tools/test-native-mod-policy.py"
+      ],
+      "auxiliary_tests": [
+        "tools/test-native-mod-policy.py"
+      ],
+      "native_fixtures": [],
+      "evidence_sources": [
+        "docs/CONTROLS.md",
+        "docs/CURRENT.md",
+        "docs/QUEST3_TESTER_FEEDBACK.md",
+        "docs/REGRESSION_COVERAGE.md"
+      ],
+      "community_reports": [
+        "R20",
+        "R21",
+        "R22",
+        "R38",
+        "R39"
+      ],
+      "coverage": {
+        "automated": {
+          "status": "partial",
+          "scope": "Parser/defaults, chord priority, native mode, export and Xbox/VR owner changes; separate touch tokens are covered in configuration."
+        },
+        "native": {
+          "status": "unverified",
+          "scope": "Current toggle has not yet passed native damage acceptance."
+        },
+        "continuous": {
+          "status": "unverified",
+          "scope": "No current-candidate continuous acceptance of this complete behavior is claimed."
+        },
+        "headset": {
+          "status": "unverified",
+          "scope": "No current-candidate physical-headset acceptance is established."
+        }
+      },
+      "release_gate": {
+        "status": "pending",
+        "reason": "Native toggle damage verification is pending."
+      },
+      "missing_checks": [
+        "Native damage with the toggle On and Off, preserving other native status owners.",
+        "Mission transition and physical headset regression."
+      ],
+      "sustained_regression": {
+        "status": "missing",
+        "minimum_duration_seconds": 180,
+        "minimum_repetitions": 5,
+        "accepted_current_duration_seconds": null,
+        "accepted_current_repetitions": 0,
+        "repetition_scope": "Repeat five complete reversible interactions or pose/context cycles appropriate to this feature. One-shot progression or consumable actions require their own identified state and must not be retried blindly. Shared runs can cover multiple feature families.",
+        "movement": [
+          "Independent head yaw/pitch/roll and translation.",
+          "Independent left/right hand motion, slow and brisk poses, near and far inspection.",
+          "Native locomotion or context-appropriate movement before and after the action; do not move through menu ownership."
+        ],
+        "interruptions": [
+          "Neutral release and natural re-entry between cycles.",
+          "An applicable tracking/focus interruption with bounded recovery, distinguished from a physical headset test.",
+          "An applicable menu or presentation transition, followed by proven native gameplay/control recovery."
+        ],
+        "transitions": [
+          "Record and inspect opening/activation, steady use, stow/exit and immediate reuse.",
+          "Review dense source-eye frames and final composited motion around every transition.",
+          "Verify native animation, both hands, device/weapon, ordinary left-arm HUD and world continuity where relevant."
+        ],
+        "soak": {
+          "minimum_duration_seconds": 600,
+          "status": "missing",
+          "scope": "At least one integrated ten-minute candidate soak with repeated natural interactions, movement and interruptions. It may cover several features; retain their individual outcomes and actual measured cadence."
+        }
+      },
+      "open_user_report_ids": [
+        "oct2-intermittent-weapon-selection"
+      ]
     }
   ],
   "community_reports": {
@@ -4577,7 +4691,8 @@
     "gameplay_bot_binocular_presentation_contracts",
     "native_input_delivery_contracts",
     "gameplay_bot_recon_contracts",
-    "gameplay_bot_mortar_contracts"
+    "gameplay_bot_mortar_contracts",
+    "gameplay_menu_variant_contracts"
   ],
   "source_inventory_rule": "Every current file under src/ and include/ must have at least one feature source_paths reference. Public source additions/deletions require explicit catalog review.",
   "current_user_reports": [

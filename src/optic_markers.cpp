@@ -34,6 +34,8 @@ CoverProbeSnapshot coverResult;
 uint64_t consumed{},consumedClear{};
 uint64_t consumedIntel{};
 ReconDwell reconDwell;
+ReconClearPolicy reconClears;
+std::atomic_bool resetReconClears{};
 OpticUseEdge opticUseEdge;
 OpticEventQueue opticEvents;
 OpticEvent queuedUse;
@@ -298,8 +300,9 @@ void snapshot(uintptr_t markers,uint64_t now,uint64_t activation){
         const auto flags=std::to_integer<uint8_t>(record[0x1f]);
         if(std::to_integer<uint8_t>(record[0x1e])!=1||(flags&7)!=3)continue;
         Vec3 position{};std::memcpy(&position,record+0x10,sizeof(position));
+        uint16_t actor{};std::memcpy(&actor,record+0x1c,sizeof(actor));
         if(valid(Pose{{},position})&&dot(position,position)>1)
-            result.points[result.count++]={position,0};
+            result.points[result.count++]={position,0,actor};
     }
     std::lock_guard lock(mutex);waypoints=result;
 }
@@ -474,6 +477,7 @@ void update(void* job,void* input,const void* output){
     // Execute on the native marker-update job, never on the XR/render thread.
     original(job,input,output);
     if(!enabled.load())return;
+    if(resetReconClears.exchange(false))reconClears.reset();
     HeadCameraSample frame;bool requested{},clearRequested{};
     {std::lock_guard lock(mutex);
         frame=latest;
@@ -490,6 +494,7 @@ void update(void* job,void* input,const void* output){
     const auto ui=read<uintptr_t>(services+0x98);
     const auto markers=read<uintptr_t>(ui+0x80);
     if(read<uintptr_t>(markers)!=base+0x21addf0){reconDwell.reset();return;}
+    reconClears.scene(frame.playerOwner,read<uintptr_t>(markers+0x88));
     snapshot(markers,now,status.activation);
     sampleCombatSight(markers,frame,now);
     sampleCoverProbe(markers,frame,now);
@@ -502,8 +507,11 @@ void update(void* job,void* input,const void* output){
     if(!automatic&&!requested&&!clearRequested)return;
     if(clearRequested){
         const auto target=personTarget(markers,frame,{},false);
-        if(clearWaypoint(markers,frame)||(target&&markPerson(services,*target,false))){
-            if(target){
+        const bool waypointCleared=clearWaypoint(markers,frame);
+        const bool personCleared=!waypointCleared&&target&&markPerson(services,*target,false);
+        if(waypointCleared||personCleared){
+            if(personCleared){
+                reconClears.clear(target->id);
                 reconDwell.update(target->id,frame.sampleTime,frame.activation,frame.controllers.binocularMarkDwellMs);
                 reconDwell.suppress();
             }
@@ -520,8 +528,9 @@ void update(void* job,void* input,const void* output){
         acquiredByLook=reconDwell.update(target?std::optional<uint16_t>{target->id}:std::nullopt,
             frame.sampleTime,frame.activation,frame.controllers.binocularMarkDwellMs);
     }
-    if(target&&(requested||(acquiredByLook&&!target->marked))){
+    if(target&&(requested||(acquiredByLook&&!target->marked&&reconClears.automaticAllowed(target->id)))){
         if(markPerson(services,*target,true)){
+            if(requested)reconClears.explicitMark(target->id);
             reconDwell.suppress();
             snapshot(markers,now,status.activation);rumbleMailbox().publish({0,.45f,now});
             if(acquiredByLook)log("Physical optic automatically acquired visible person id="+std::to_string(target->id));
@@ -635,6 +644,7 @@ void installOpticMarkers(uintptr_t moduleBase){
 }
 void publishOpticMarkerFrame(const HeadCameraSample& frame){
     std::lock_guard lock(mutex);
+    if(frame.controllers.loading||frame.controllers.frontEnd)resetReconClears.store(true);
     if(!frame.applied||frame.menuOpen||!frame.controllers.optic.active||frame.activation!=latest.activation)queuedUse={};
     latest=frame;
 }

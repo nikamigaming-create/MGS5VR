@@ -45,6 +45,14 @@ std::string promptLabel(std::string label){
     }
     return label;
 }
+std::string promptLabel(const ControlBindings& bindings,std::string_view action,bool handheld){
+    auto label=bindings.label(action);
+    if(handheld&&action=="menus.next_tab"){
+        const auto stick=bindings.label("idroid.next_tab");
+        if(stick!="UNBOUND")label=stick+(label=="UNBOUND"?"":" / "+label);
+    }
+    return promptLabel(std::move(label));
+}
 }
 void publishControlPromptBindings(const ControlBindings& bindings){
     promptBindings.store(std::make_shared<const ControlBindings>(bindings));
@@ -140,7 +148,7 @@ ControlPromptText rewriteControlPrompt(std::string_view text,const ControlBindin
             // infer chord/alternative semantics for other adjacent icons.
             if(context==ControlContext::menus&&previousToken=="PAD_L2"&&token=="PAD_R2"&&begin==position){result.text.pop_back();result.text+='/';}
             else result.text+='[';
-            result.text+=promptLabel(bindings.label(action));result.text+=']';++result.replaced;
+            result.text+=promptLabel(bindings,action,handheldIdroid);result.text+=']';++result.replaced;
             previousToken=token;
         }
         position=end+1;
@@ -153,7 +161,7 @@ ControlPromptText rewriteControlCaption(std::string_view caption,std::string_vie
     if(caption.empty()||caption.size()>16384||action.empty()){
         result.text=caption;result.unresolved=action.empty()?1:0;return result;
     }
-    result.text='['+promptLabel(bindings.label(action))+"] ";
+    result.text='['+promptLabel(bindings,action,handheldIdroid)+"] ";
     result.text.append(caption);result.replaced=1;
     return result;
 }

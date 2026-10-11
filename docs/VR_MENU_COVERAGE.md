@@ -46,7 +46,7 @@ as proof that the intended row/page was reached.
    physical-headset readability and usability separately.
 
 Ordinary status/HUD remains on the **left bionic arm**. Handheld iDroid remains
-in the **right hand**. Pause and selected off-wrist presentation use a spatial
+in the **LEFT bionic hand**. Pause and selected off-wrist presentation use a spatial
 stereo panel. Handheld and spatial variants are separate obligations. Native
 integration stays behind VR actions; stock gamepad-only operation is not acceptance.
 VR uses runtime-recommended eyes/FOVs independently of the 1280 × 720 desktop.
@@ -123,6 +123,22 @@ menu/state pairs start with availability and page discovery unestablished;
 missing adapters do not disappear. These counts are not a percent of the game.
 Evidence from another DLL/configuration stays historical. Evidence for one mode
 or presentation does not certify any other mode or presentation.
+
+Each menu row now exposes separate first-time, unfinished/resumed and completed
+guidance obligations, alongside ordinary-page, confirmation and Help ownership.
+Development rows additionally track locked, insufficient-resource, eligible
+undeveloped, in-progress, newly completed and already-developed item states.
+The report groups these obligations by dimension and shows their missing checks.
+They start unproven with applicability and native page identity undiscovered;
+an ordinary completed-save pass does not accept the other variants. These are
+independent discovery obligations, not every Cartesian combination or a count
+of native pages. Discover and retain actual legal combinations in the game.
+
+The latest Development/upgrading report covers ACC and on-foot contexts, with
+the exact category, grade, step and progression state still unknown. Retained
+mode-11 spinner evidence used a developed save (story 33, 454 developed items),
+and the staged first-game candidate was only an existing-save clone. Genuine
+first-time and unfinished Development-guidance coverage remains missing.
 
 Available automated recipes cover bounded open/close and iDroid fitting; they do
 not yet walk every page. Run only an explicitly selected recipe in an owned test

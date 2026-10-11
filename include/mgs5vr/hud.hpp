@@ -29,7 +29,12 @@ constexpr bool worldHudVisible(HudMode mode,HudView view) noexcept {
         ||(view==HudView::binoculars&&(mode==HudMode::full||mode==HudMode::binocularsOnly));
 }
 constexpr bool reconModelVisible(HudMode mode,HudView view,bool glow) noexcept {
-    return glow&&worldHudVisible(mode,view);
+    return glow&&view==HudView::binoculars&&worldHudVisible(mode,view);
+}
+// Acquired enemy labels use the current eye's world projection. Native recon
+// body shaders remain in the physical binocular view, independently of labels.
+constexpr bool worldMarkerVisible(HudMode mode,bool enemyMarkers,uint8_t letter) noexcept {
+    return mode!=HudMode::off&&(letter?mode==HudMode::full:enemyMarkers);
 }
 // Native scene silhouettes and the independent layout-camera person cue.
 // Draw-order numbers alone are not enough: other UI cameras reuse them.

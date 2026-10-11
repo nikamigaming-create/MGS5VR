@@ -136,14 +136,23 @@ HandheldPlayerPadPolicy IdroidPadRelease::update(HandheldPlayerPadPolicy request
         return policy_;
     }
     const bool weaponOnly=policy_==HandheldPlayerPadPolicy::weaponOnly;
-    const bool mappedNeutral=freshControlInputAudit(mapped,now)&&mapped.time>since_&&!mapped.nativeButtons
-        &&mapped.nativeAxes==std::array<int16_t,4>{}
+    const bool freshMapped=freshControlInputAudit(mapped,now)&&mapped.time>since_;
+    // Axis ownership already quarantines a held menu stick until centering.
+    // A fresh gameplay movement after that handoff must not keep the player
+    // excluded until the user stops walking again. Back/buttons and trigger
+    // release still require a real subsequent retail XInput return.
+    const bool locomotion=freshMapped&&mapped.rigInput
+        &&(mapped.context==ControlContext::gameplay||mapped.context==ControlContext::horse
+            ||mapped.context==ControlContext::vehicle||mapped.context==ControlContext::binoculars);
+    const bool mappedNeutral=freshMapped&&!mapped.nativeButtons
+        &&(locomotion||mapped.nativeAxes==std::array<int16_t,4>{})
         &&(weaponOnly||mapped.nativeTriggers==std::array<uint8_t,2>{});
     if(!mappedNeutral)neutralMappedAt_=0;
     else if(!neutralMappedAt_)neutralMappedAt_=mapped.time;
     const bool deliveredNeutral=delivered.available&&packet.index==0&&packet.packetValid&&!packet.resultCode
         &&packet.caller.inGame&&packet.deliveryCounter>afterDelivery_&&packet.timeMs>since_
-        &&now>=packet.timeMs&&now-packet.timeMs<=250&&!packet.buttons&&packet.axes==std::array<int16_t,4>{}
+        &&now>=packet.timeMs&&now-packet.timeMs<=250&&!packet.buttons
+        &&(packet.axes==std::array<int16_t,4>{}||(locomotion&&packet.source==NativeInputDeliverySource::xrMailbox))
         &&(weaponOnly||packet.triggers==std::array<uint8_t,2>{});
     const bool xrRelease=packet.source==NativeInputDeliverySource::xrMailbox
         &&neutralMappedAt_&&packet.timeMs>=neutralMappedAt_;
@@ -191,11 +200,14 @@ GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalCo
     GamepadSample pad;
     const bool handheld=mode==NativeMenuInput::liveIdroid&&handheldMenuRoutingAvailable();
     const bool previous=handheld&&bindings.active("idroid.previous_tab");
+    const bool next=handheld&&bindings.active("idroid.next_tab");
     // A one-shot tab pulse can expire while its physical chord remains down.
     // Keep those inputs consumed until release; do not turn that same hold
     // into Confirm, another tab, map movement or trigger zoom afterwards.
     const auto consumed=handheld?(bindings.activeInputMask("idroid.previous_tab")
-        |bindings.retainedInputMask("idroid.previous_tab")):uint32_t{};
+        |bindings.retainedInputMask("idroid.previous_tab")
+        |bindings.activeInputMask("idroid.next_tab")
+        |bindings.retainedInputMask("idroid.next_tab")):uint32_t{};
     const auto available=[&](std::string_view name){return !(bindings.activeInputMask(name)&consumed);};
     struct Button {std::string_view name;uint16_t mask;};
     constexpr Button buttons[]{
@@ -207,6 +219,7 @@ GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalCo
         if(bindings.active(name)&&available(name))pad.buttons|=mask;
     }
     if(previous)pad.buttons|=0x100;
+    if(next)pad.buttons|=0x200;
     pad.leftTrigger=available("menus.left_trigger")?static_cast<uint8_t>(bindings.value("menus.left_trigger")*255):0;
     pad.rightTrigger=available("menus.right_trigger")?static_cast<uint8_t>(bindings.value("menus.right_trigger")*255):0;
     const bool menu=mode==NativeMenuInput::menu||mode==NativeMenuInput::liveIdroid;

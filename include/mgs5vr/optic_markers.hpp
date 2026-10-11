@@ -3,7 +3,7 @@
 #include "cover_probe.hpp"
 
 namespace mgs5vr {
-struct OpticWaypoint {Vec3 position{};uint8_t letter{};};
+struct OpticWaypoint {Vec3 position{};uint8_t letter{};uint16_t actor{0xffff};};
 struct OpticWaypoints {
     std::array<OpticWaypoint,128> points{}; // Letter zero denotes a native marked person.
     size_t count{};

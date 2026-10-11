@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -21,6 +22,65 @@ DEV = ROOT / "build/dev"
 SCRATCH = ROOT / "artifacts/bot"
 SUPPORTED_EXE = "085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45"
 BINARIES = ("dinput8.dll", "mgs5vr_controls.exe")
+RETAINED_CONTROL = '; MGS5VR newer-build preference '
+
+
+def project_controls(text, supported):
+    """Retain unavailable settings as comments; restore them for a newer slot."""
+    result = []
+    section = ''
+    for line in text.splitlines(keepends=True):
+        retained = re.fullmatch(r'; MGS5VR newer-build preference \[([a-z0-9_]+)\]: (.*?)(\r?\n)?', line)
+        if retained:
+            owner, original, ending = retained.groups()
+            if owner != section:
+                raise ValueError('Retained control preference moved outside its section')
+            candidate = original + (ending or '')
+        else:
+            candidate = line
+        header = re.fullmatch(r'\s*\[([^]]+)\]\s*', candidate.lstrip('\ufeff'))
+        if header:
+            section = header[1].strip().lower()
+        entry = re.match(r'\s*([^;#=]+?)\s*=', candidate)
+        if entry:
+            name = section + '.' + entry[1].strip().lower()
+            if name not in supported:
+                candidate = RETAINED_CONTROL + '[' + section + ']: ' + candidate
+        result.append(candidate)
+    return ''.join(result)
+
+
+def control_catalog(checker):
+    bindings = json.loads(run([checker, '--bindings-json'], capture_output=True, text=True).stdout)
+    settings_rows = json.loads(run([checker, '--settings-json'], capture_output=True, text=True).stdout)
+    return {row['name'] for row in (*bindings['actions'], *bindings['axes'], *settings_rows)}
+
+
+def compatible_controls(build, path):
+    original = path.read_bytes()
+    text = original.decode('utf-8-sig')
+    checked = False
+    try:
+        run([build / 'mgs5vr_controls.exe', '--check', path], capture_output=True, text=True)
+        checked = True
+    except subprocess.CalledProcessError:
+        pass
+    if checked and RETAINED_CONTROL not in text:
+        return original
+    # The checked development parser validates every preference before the
+    # published parser sees a projection. Typos cannot silently become comments.
+    checked_build(DEV)
+    full = project_controls(text, control_catalog(DEV / 'mgs5vr_controls.exe'))
+    if RETAINED_CONTROL in full:
+        raise ValueError('Personal controls contain a preference unknown to checked development')
+    projected = project_controls(full, control_catalog(build / 'mgs5vr_controls.exe'))
+    with __import__('tempfile').TemporaryDirectory(prefix='mgs5vr-controls-') as temporary:
+        full_path, projected_path = Path(temporary) / 'full.ini', Path(temporary) / 'slot.ini'
+        full_path.write_text(full, encoding='utf-8', newline='')
+        projected_path.write_text(projected, encoding='utf-8', newline='')
+        run([DEV / 'mgs5vr_controls.exe', '--check', full_path])
+        run([build / 'mgs5vr_controls.exe', '--check', projected_path])
+    return projected.encode('utf-8')
 
 
 def digest(path):
@@ -264,18 +324,21 @@ def deploy(value, known_old=None, build=None):
                 allowed.add(digest(base / name))
         if digest(game / name).lower() not in {h.lower() for h in allowed if h}:
             raise ValueError(f"Installed {name} has unknown provenance; preserved")
-    run([build / "mgs5vr_controls.exe", "--check", game / "mgs5vr-controls.ini"])
+    controls = compatible_controls(build, game / "mgs5vr-controls.ini")
+    controls_changed = controls != (game / "mgs5vr-controls.ini").read_bytes()
+    if running and controls_changed:
+        raise ValueError("Close MGSV before changing the build's control-settings compatibility")
     personal = {name: digest(game / name) for name in ("mgs5vr.ini", "mgs5vr-controls.ini")}
     slot = "play" if build == PLAY else "dev"
     if (all(digest(game / name) == digest(build / name) for name in BINARIES)
-            and record.get("development_build") == manifest["source"] and record.get("build_slot") == slot):
+            and record.get("development_build") == manifest["source"] and record.get("build_slot") == slot and not controls_changed):
         print(f"Installed game already matches {slot}.")
         return
     rollback = ROOT / "build/install-rollback"
     if rollback.exists():
         raise ValueError(f"Unfinished install transaction preserved: {rollback}")
     rollback.mkdir(parents=True)
-    for name in (*BINARIES, "mgs5vr-install.json"):
+    for name in (*BINARIES, "mgs5vr-install.json", "mgs5vr-controls.ini"):
         shutil.copy2(game / name, rollback / name)
     recovered = False
     try:
@@ -293,19 +356,25 @@ def deploy(value, known_old=None, build=None):
             if digest(game / name) != expected:
                 raise ValueError(f"Personal settings changed during sync: {name}")
             record["files"][name] = expected
+        if controls_changed:
+            temporary = game / 'mgs5vr-controls.ini.mgs5vr-tmp'
+            safe_tree(temporary, game)
+            temporary.write_bytes(controls)
+            os.replace(temporary, game / 'mgs5vr-controls.ini')
+            record['files']['mgs5vr-controls.ini'] = digest(game / 'mgs5vr-controls.ini')
         record["installed_utc"] = utc()
         record["development_build"] = manifest["source"]
         record["build_slot"] = slot
         write_json(record_path, record)
         recovered = True
     except BaseException:
-        for name in (*BINARIES, "mgs5vr-install.json"):
+        for name in (*BINARIES, "mgs5vr-install.json", "mgs5vr-controls.ini"):
             if not (game / name).is_file() or digest(rollback / name) != digest(game / name):
                 shutil.copy2(rollback / name, game / name)
         recovered = True
         raise
     finally:
-        for name in BINARIES:
+        for name in (*BINARIES, 'mgs5vr-controls.ini'):
             temporary = game / (name + ".mgs5vr-tmp")
             if temporary.exists():
                 temporary.unlink()

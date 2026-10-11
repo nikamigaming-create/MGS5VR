@@ -38,6 +38,9 @@ def declared_model(root):
             "mode": row["mode"], "presentation": row["presentation"], "missing": row["acceptance"]}
         if row.get("latest_report"):
             model["states"][row["id"]]["latest_report"] = row["latest_report"]
+        for name in ("variant_obligations", "variant_policy", "reports"):
+            if name in row:
+                model["states"][row["id"]][name] = copy.deepcopy(row[name])
         model["transitions"].append({"id": "enter." + row["id"], "from": "MODE.TPP." + row["mode"] ,
             "to": row["id"], "cost": 1, "blocked_reason": "Exact page/choice identity and guarded native recipe not implemented"})
     for row in contexts["records"]:
@@ -220,12 +223,19 @@ class StateGraph:
 
 
 def observation_key(state):
-    """Retain incomplete observations without merging unknown pages into one state."""
+    """Key recorded dimensions; incomplete keys cannot identify native pages."""
     required = ["native.mission", "native.location", "native.sequence", "scene", "menu", "idroid",
+                "pause", "gamepad", "idroid_tutorial_mode", "idroid_tutorial_paused", "idroid_handheld",
+                "idroid_menu_control", "idroid_menu_input_ready", "idroid_menu_routing_available",
+                "idroid_ui_only_owner", "idroid_focused_weapon", "idroid_focused_weapon_available",
+                "idroid_closing", "controls.physical.7", "controls.physical.8",
                 "controls.context", "controls.travel_mode", "native.player_vehicle_id",
                 "native.demo", "native.tutorial_pause", "native.game_over", "native.story",
+                "native.popup", "native.fob_tutorial_state", "native.idroid_development_active",
                 "native.status_CRAWL", "native.status_SQUAT", "native.status_STAND", "native.status_CARRY"]
     native = state.get("native", {})
+    if not isinstance(native, dict):
+        native = {}
     sequence = native.get('sequence')
     acc_selector = isinstance(sequence, str) and sequence.startswith(('Seq_Game_WeaponCustomize', 'Seq_Game_MissionPreparation'))
     if state.get("menu") is True or state.get("idroid") is True or acc_selector:
@@ -238,11 +248,19 @@ def observation_key(state):
     for path in required:
         value = state
         for part in path.split('.'):
-            value = value.get(part) if isinstance(value, dict) else None
+            if isinstance(value, dict):
+                value = value.get(part)
+            elif isinstance(value, list) and part.isdecimal() and int(part) < len(value):
+                # Physical channels 7/8 are observed LEFT/RIGHT grip values,
+                # not an inference about the user's remapped focus binding.
+                value = value[int(part)]
+            else:
+                value = None
+        # Keep absent/null and unavailable observations explicit in the key.
+        # Neither is evidence for a completed guide, released grip or ready UI.
+        values[path] = copy.deepcopy(value)
         if value is None or (isinstance(value, str) and value.startswith('unavailable:')):
             missing.append(path)
-        else:
-            values[path] = value
     encoded = json.dumps(values, sort_keys=True)
     return {"key": hashlib.sha256(encoded.encode()).hexdigest(), "dimensions": values,
             "identity_complete": not missing, "missing": missing,

@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "game": "TPP",
   "discovery_complete": false,
   "description": "Planned menu-family × native-state × VR-presentation obligations. These are not an enumeration of every native page. Discover and retain each child page, legal choice and transition before claiming complete menu coverage.",
@@ -28,7 +28,7 @@
     "on_foot": ["mother_base", "free_roam_afghanistan", "free_roam_africa", "mission", "side_op"]
   },
   "presentations": {
-    "handheld": "Physical right-hand iDroid",
+    "handheld": "Physical LEFT-hand iDroid",
     "left_arm": "Left bionic arm interface",
     "spatial": "Spatial stereo panel"
   },
@@ -41,6 +41,122 @@
     "Confirm physical-headset reading, controller usability, scale and comfort separately from simulator observations."
   ],
   "safety": "Read-only discovery first. Purchases, upgrades, deployment, abort/retry and progression-changing confirmations require an isolated verified save/checkpoint fixture. An ambiguous page never admits generic Confirm or repeated Back.",
+  "variant_policy": "These are independent discovery obligations, not a Cartesian enumeration or a count of the game's menus. Applicability and legal combinations remain unknown until witnessed in the native game. Retain each discovered combination with its actual page, progression, owner and build; one ordinary-page pass does not cover another variant.",
+  "default_variant_dimensions": ["progression_guidance", "menu_owner"],
+  "variant_dimensions": {
+    "progression_guidance": {
+      "title": "Progression and guidance",
+      "values": [
+        {
+          "key": "first_guidance",
+          "title": "First-time guidance",
+          "acceptance": [
+            "Establish whether this menu has a first-time branch from genuine native campaign history; an existing-save clone or reset flag is not first-play evidence.",
+            "Record the actual mission/sequence, tutorial mode/name and prerequisites; use effective VR bindings for the required entry, selection and permitted exit without bypassing guidance."
+          ]
+        },
+        {
+          "key": "unfinished_guidance",
+          "title": "Unfinished or resumed guidance",
+          "acceptance": [
+            "Identify an actually unfinished lesson and its restricted choices, native input owner and permitted continuation/stow behavior.",
+            "Closing a Help card may leave guidance active: native mode 14 SERVER_WALLET continues through the highlighted Resources branch and a second card. Discover the complete native sequence before expecting mode zero or ordinary tab navigation; see docs/ACC_MENU_REGRESSION.md.",
+            "Exercise the legal VR continuation, acknowledgment or cancel/stow and immediate reopen; retain native progression and reject leaked gameplay inputs."
+          ]
+        },
+        {
+          "key": "completed_guidance",
+          "title": "Completed guidance",
+          "acceptance": [
+            "Witness the native completed state independently of an empty tutorial-mode field or a high-progress save.",
+            "Verify ordinary navigation, retained Help/notice dismissal, Back, stow and immediate reopen; confirm input ownership returns without reapplying completed guidance."
+          ]
+        }
+      ]
+    },
+    "menu_owner": {
+      "title": "Page and modal owner",
+      "values": [
+        {
+          "key": "normal",
+          "title": "Ordinary page",
+          "acceptance": [
+            "Identify the actual settled page, parent and selectable/disabled choices with no unresolved confirmation or Help owner.",
+            "Observe VR selection, navigation, tabs and legal Back/stow/reopen responses; mapped input alone is not a page outcome."
+          ]
+        },
+        {
+          "key": "confirmation",
+          "title": "Confirmation or cancellation",
+          "acceptance": [
+            "Discover whether this path presents a confirmation and record its purpose, exact choice owner, default selection and legal confirm/cancel branches.",
+            "Use effective VR navigation and review the actual resulting state/resource change or cancellation. Progression-changing confirmation requires the verified isolated fixture stated in the safety policy."
+          ]
+        },
+        {
+          "key": "help",
+          "title": "Help, tutorial or acknowledgment",
+          "acceptance": [
+            "Identify the actual Help/tutorial/notice and its pause/input owner; a generic popup flag does not identify the card or authorize acknowledgment.",
+            "Exercise its permitted VR acknowledgment or exit, then verify the underlying page and immediate reopen with fresh neutral input and no stale modal ownership."
+          ]
+        }
+      ]
+    },
+    "development_state": {
+      "title": "Development item state",
+      "values": [
+        {
+          "key": "locked",
+          "title": "Locked by prerequisites",
+          "acceptance": [
+            "Record the native item/grade and unmet prerequisite that locks it; discover whether selection is disabled or opens a requirements page.",
+            "Verify its legal VR inspection and Back/cancel/reopen without granting prerequisites or spending resources."
+          ]
+        },
+        {
+          "key": "insufficient_resources",
+          "title": "Insufficient resources",
+          "acceptance": [
+            "Witness actual costs and balances for an otherwise identified item/grade; distinguish resource insufficiency from other locked prerequisites.",
+            "Observe the native disabled/rejection response and legal VR Back/cancel/reopen without fabricating resource balances."
+          ]
+        },
+        {
+          "key": "eligible_undeveloped",
+          "title": "Eligible and undeveloped",
+          "acceptance": [
+            "Verify the exact native item/grade is eligible and not developed; record prerequisites, costs, time and the actual confirmation owner.",
+            "Exercise cancellation separately from an authorized isolated-fixture purchase, verifying actual resource changes and native development start rather than input delivery."
+          ]
+        },
+        {
+          "key": "in_progress",
+          "title": "Development in progress",
+          "acceptance": [
+            "Witness native development-in-progress state and its displayed timer/status without forcing time or completion.",
+            "Verify available VR inspection/navigation and legal Back/reopen while retaining the same development transaction."
+          ]
+        },
+        {
+          "key": "newly_completed",
+          "title": "Newly completed development",
+          "acceptance": [
+            "Retain an actual native transition to completed development, including any notification and changed item availability; a completion write is not evidence.",
+            "Use effective VR acknowledgment and revisit the item/grade, checking its new state and recovery of underlying input ownership."
+          ]
+        },
+        {
+          "key": "already_developed",
+          "title": "Already developed",
+          "acceptance": [
+            "Verify the exact native item/grade was already developed before entry, separately from requirements-met or a neighboring grade.",
+            "Inspect its native detail/selection behavior with VR controls and verify legal Back/reopen without an unintended duplicate transaction."
+          ]
+        }
+      ]
+    }
+  },
   "families": [
     {"id": "FRONT_END", "title": "Title choices, Continue and setup branches", "modes": ["title"], "presentations": ["spatial"]},
     {"id": "PAUSE", "title": "Pause choices and all nested options", "mode_set": "playable", "modes": ["cinematic", "tutorial"], "presentations": ["spatial"]},
@@ -50,8 +166,8 @@
     {"id": "MISSIONS_SIDE_OPS", "title": "Mission / Side Ops lists and nested details", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
     {"id": "SUPPORT", "title": "Support requests, drops, strikes and helicopter choices", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
     {"id": "MOTHER_BASE_MANAGEMENT", "title": "Mother Base management, staff and resource branches", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
-    {"id": "DEVELOPMENT", "title": "Development categories, grades and confirmation branches", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
-    {"id": "HELICOPTER_DEVELOPMENT", "title": "Helicopter development list, upgrades, cancel and Back", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
+    {"id": "DEVELOPMENT", "title": "Development categories, grades and confirmation branches", "mode_set": "playable", "presentations": ["handheld", "spatial"], "variant_dimensions": ["development_state"]},
+    {"id": "HELICOPTER_DEVELOPMENT", "title": "Helicopter development list, upgrades, cancel and Back", "mode_set": "playable", "presentations": ["handheld", "spatial"], "variant_dimensions": ["development_state"]},
     {"id": "CASSETTES_INTEL", "title": "Cassette / intel lists, playback and return", "mode_set": "playable", "presentations": ["handheld", "spatial"]},
     {"id": "EQUIPMENT", "title": "Equipment picker, categories and weapon/item options", "mode_set": "playable", "presentations": ["left_arm", "spatial"]},
     {"id": "COMMANDS", "title": "Buddy command choices for each eligible buddy/ability", "mode_set": "playable", "presentations": ["left_arm", "spatial"]},
@@ -63,6 +179,29 @@
     {"id": "RESULTS_RETRY", "title": "Clear, abort, death, retry and return branches", "modes": ["results", "death"], "presentations": ["spatial"]},
     {"id": "LOADING_CONFIRMATION", "title": "Loading and visible start/continue confirmations", "modes": ["loading"], "presentations": ["spatial"]},
     {"id": "ONLINE_ENTRY", "title": "Online / FOB menu eligibility and entry/cancel branches; network gameplay unaccepted", "modes": ["acc", "mother_base"], "presentations": ["handheld", "spatial"]}
+  ],
+  "reports": [
+    {
+      "id": "acc_upgrade_lock",
+      "title": "ACC upgrade-menu lock-up",
+      "families": ["HELICOPTER_DEVELOPMENT", "ACC_CUSTOMIZATION"],
+      "modes": ["acc"],
+      "status": "unproven",
+      "exact_step": "unknown",
+      "progression_state": "not_established",
+      "summary": "Another player reports an upgrade-menu lock-up in the ACC. Exact development/customization screen is unknown; field list/Back evidence does not reproduce it."
+    },
+    {
+      "id": "development_upgrade_lock",
+      "title": "Development upgrade lock-up in ACC or on foot",
+      "families": ["DEVELOPMENT"],
+      "modes": ["acc"],
+      "mode_set": "on_foot",
+      "status": "unproven",
+      "exact_step": "unknown",
+      "progression_state": "not_established",
+      "summary": "The latest report concerns Development/upgrading in the ACC and on foot. The exact category, grade, step and guidance state remain unknown. Earlier or incomplete campaign progress is suspected, not established; an ordinary completed-save menu pass does not close this report."
+    }
   ],
   "limits": [
     "Applicability is not established for planned menu/state pairs. Native unavailability must be observed; it is never inferred from a missing adapter.",

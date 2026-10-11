@@ -812,8 +812,10 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get(),scope.dotReticle);
         }
         const auto& wrist=source.pair.sample;
-        if(!titleSurface&&!wrist.menuOpen&&mgs5vr::worldHudVisible(wrist.controllers.hudMode,hudView))
-            mgs5vr::drawWorldWaypoints(afterContext,eyeView,eyeProjection,native.position,markerSnapshot);
+        if(!titleSurface&&!wrist.menuOpen&&hudView==mgs5vr::HudView::world
+                &&wrist.controllers.hudMode!=mgs5vr::HudMode::off)
+            mgs5vr::drawWorldWaypoints(afterContext,eyeView,eyeProjection,native.position,markerSnapshot,
+                wrist.controllers.hudMode,wrist.controllers.enemyWorldMarkers);
         if(afterContext&&drawAccHint){
             alignas(16) auto hintPose=values(wrist.wristPanel);
             alignas(16) std::array<float,16> hintWorld{};

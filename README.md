@@ -9,12 +9,15 @@ binoculars and scopes, and equipment on your left wrist.
 integration and native A* navigation are retained. Full-game, weapon coverage,
 iDroid tutorial recovery and physical-headset acceptance remain open. Native
 handheld iDroid alignment passes scoped simulator checks. Local work keeps two
-builds: pinned `play/` for playing and `build/dev/` for development.
-`tools/build.ps1` refreshes development; `Play.cmd` restores the pinned version.
+builds: pinned `play/` matching the last published release and `build/dev/`
+holding the checked candidate for testing. `tools/build.ps1` refreshes
+development; `Play.cmd` restores the published pin and `Play-Dev.cmd` selects
+the development candidate. Successful publication advances the pin to the
+exact verified release payload.
 [Current build workflow, remaining reports and next tests](docs/CURRENT.md).
 
 **[Download the public build](https://github.com/nikamigaming-create/MGS5VR/releases)**
-· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-10-10.md)
+· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-10-10.1.md)
 · [Live native actions](docs/NATIVE_ACTIONS.md)
 
 Experimental Windows mod. Requires your own **TPP 1.0.15.4** and a PC-connected

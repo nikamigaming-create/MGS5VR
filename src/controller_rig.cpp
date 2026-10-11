@@ -10,6 +10,7 @@
 #include "mgs5vr/paused_parts.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/vehicle_weapon.hpp"
+#include "mgs5vr/weapon_obstruction.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/animal_interaction.hpp"
@@ -28,6 +29,8 @@
 
 namespace {
 using namespace mgs5vr;
+std::mutex obstructionWitnessMutex;
+WeaponObstructionWitness obstructionWitness;
 using Update=void(*)(void*,void*);
 Update original{};
 struct Vector4{float x{},y{},z{},w{};};
@@ -53,6 +56,8 @@ using Shot=void(*)(void*,Vector4*,Vector4*,void*,uint32_t);
 Shot originalShot{};
 using WeaponObstructionQuery=bool(*)(void*,void*,uint32_t,const Vector4*,const Vector4*,float,bool);
 WeaponObstructionQuery originalWeaponObstructionQuery{};
+using WeaponObstructionResult=int32_t(*)(void*,void*);
+WeaponObstructionResult originalWeaponObstructionResult{};
 using ThrowOrigin=void(*)(void*,void*,uint32_t,Vector4*,Vector4*);
 using ThrowVelocity=void(*)(void*,void*,uint32_t,Vector4*);
 ThrowOrigin originalThrowOrigin{};
@@ -1316,51 +1321,62 @@ void update(void* context,void* binding){
         }
     }
 }
-// Only this native caller submits the player weapon's obstruction sweep. Its
-// result is consumed by 0x103b680, including the native 0.2-second clearance
-// delay. The stock endpoints are reconstructed from the animated body (with a
-// separate prone path), so they can intersect cover behind a clear tracked gun.
-// Keep the query, filters, radius, result and every firing restriction native;
-// replace just that sweep's segment with the barrel in the published hand rig.
-// The native radius is 0.03 m, or 0.01 m for state+0x3c2 bit 0; it is already
-// a firearm-sized capsule, not the character's movement collision envelope.
-bool weaponObstructionQuery(void* physics,void* query,uint32_t flags,
-                            const Vector4* start,const Vector4* end,float radius,bool temporary){
-    const auto native=[&]{return originalWeaponObstructionQuery(physics,query,flags,start,end,radius,temporary);};
-    if(reinterpret_cast<uintptr_t>(_ReturnAddress())!=base+0x1064aae||!enabled.load()||!start||!end)return native();
-    const auto now=steadyMilliseconds();
+std::optional<HeadCameraSample> weaponObstructionFrame(void* physics,void* query,uint64_t now,
+                                                      bool exactCaller,WeaponObstructionMode& policy){
+    policy=WeaponObstructionMode::native;
+    if(!exactCaller||!enabled.load()||reinterpret_cast<uintptr_t>(query)<0xb0)return {};
     const auto frame=headCamera().publishedRigFrame(now);
-    if(!frame||!frame->controllers.trackedWeaponObstruction||!frame->nativeFirearmActive
-       ||!frame->controllers.weaponReady||!frame->controllers.hands[1].gripTracked
-       ||!frame->renderedPalmTracked[1]||frame->controllers.nativeGamepad
-       ||frame->controllers.nativeActionControls
-       ||now<frame->sampleTime||now-frame->sampleTime>100)return native();
-    if(vehicleWeaponScope(*frame)&&!vehicleWeaponAcknowledged(*frame,now))return native();
+    if(!frame||!frame->nativeFirearmActive)return {};
     const auto& owned=frame->weaponRig;
     const auto component=reinterpret_cast<uintptr_t>(query)-0xb0;
     const auto owner=frame->playerOwner;
-    if(!owner||owner!=playerOwner.load()||!owned.componentAccepted||!owned.instanceIndexMatched
-       ||!owned.resourceAccepted||!owned.muzzleSolved||component!=owned.component
+    if(!owner||!owned.componentAccepted||!owned.instanceIndexMatched||!owned.resourceAccepted
        ||get<uintptr_t>(owner+0x370)!=owned.character
        ||get<uintptr_t>(component)!=base+0x23b3e80||get<uintptr_t>(component+8)!=owned.character
        ||get<uintptr_t>(owned.character+0x80)!=component
-       ||get<uintptr_t>(component+0x70)!=reinterpret_cast<uintptr_t>(physics)
-       ||get<uintptr_t>(reinterpret_cast<uintptr_t>(physics))!=base+0x24f3760
-       ||now<owned.sampleTime||now-owned.sampleTime>100)return native();
+       ||get<uintptr_t>(reinterpret_cast<uintptr_t>(physics))!=base+0x24f3760)return {};
     const auto first=get<uint32_t>(get<uintptr_t>(component+0x38)+0x24);
     const auto index=get<uint32_t>(owner+0x3a0);
-    if(index!=owned.playerIndex||index<first||index-first>15
-       ||owned.state!=get<uintptr_t>(component+0x58)+(index-first)*0x610ull
-       ||get<uint32_t>(owned.state+0x240)!=owned.resourceHandle)return native();
-    const auto weaponFlags=get<uint32_t>(owned.state+0x27c);
-    const auto mode=get<uint32_t>(owned.state+0x3c0);
+    if(index<first||index-first>15)return {};
+    const auto state=get<uintptr_t>(component+0x58)+(index-first)*0x610ull;
+    const auto weaponFlags=get<uint32_t>(state+0x27c);
+    const auto mode=get<uint32_t>(state+0x3c0);
     if((weaponFlags&0x1c0)!=0x40||(weaponFlags&0x400000)||(mode&0x2000)
-       ||(weaponFlags&0x200)!=(owned.flags&0x200))return native();
+       ||(weaponFlags&0x200)!=(owned.flags&0x200))return {};
     const auto getter=get<uintptr_t>(get<uintptr_t>(owned.character+0x78)+0x238);
     const auto renderFirst=get<uint32_t>(getter+0xc);
     if(get<uintptr_t>(getter)!=base+0x22e6070||index<renderFirst||index-renderFirst>15
        ||get<uintptr_t>(get<uintptr_t>(getter+0x10)+(index-renderFirst)*0xc0ull+0x68)!=owned.bodyModel)
-        return native();
+        return {};
+    WeaponObstructionSample sample;
+    sample.published={owner,owned.component,owned.state,reinterpret_cast<uintptr_t>(physics),
+                      owned.playerIndex,owned.resourceHandle};
+    sample.current={playerOwner.load(),component,state,get<uintptr_t>(component+0x70),
+                    index,get<uint32_t>(state+0x240)};
+    sample.frameTime=frame->sampleTime;sample.weaponTime=owned.sampleTime;
+    sample.exactCaller=exactCaller;sample.enabled=enabled.load();sample.verified=true;
+    sample.ready=frame->controllers.weaponReady;
+    sample.tracked=frame->controllers.hands[1].gripTracked&&frame->renderedPalmTracked[1];
+    sample.nativeControls=frame->controllers.nativeGamepad||frame->controllers.nativeActionControls;
+    sample.vehicleAllowed=!vehicleWeaponScope(*frame)||vehicleWeaponAcknowledged(*frame,now);
+    policy=weaponObstructionMode(sample,now,frame->controllers.blockFiringNearCover,
+                                 frame->controllers.trackedWeaponObstruction);
+    return frame;
+}
+
+// With blocking enabled, use the authored tracked barrel for this native
+// firearm-sized sweep (radius 0.03 m, or 0.01 m for state+0x3c2 bit 0).
+// With blocking disabled, still submit/consume the native asynchronous query;
+// only its proximity hit count is ignored by the exact pre-fire consumer below.
+bool weaponObstructionQuery(void* physics,void* query,uint32_t flags,
+                            const Vector4* start,const Vector4* end,float radius,bool temporary){
+    const auto native=[&]{return originalWeaponObstructionQuery(physics,query,flags,start,end,radius,temporary);};
+    if(!start||!end)return native();
+    WeaponObstructionMode policy;
+    const auto frame=weaponObstructionFrame(physics,query,steadyMilliseconds(),
+        reinterpret_cast<uintptr_t>(_ReturnAddress())==base+0x1064aae,policy);
+    if(!frame||policy!=WeaponObstructionMode::trackedBarrel||!frame->weaponRig.muzzleSolved)return native();
+    const auto& owned=frame->weaponRig;
     const auto& palm=frame->renderedPalms[1];
     const auto muzzle=compose(palm,owned.muzzleInGrip);
     if(!valid(palm)||!valid(muzzle)||!std::isfinite(radius)||radius<0.f||radius>1.f)return native();
@@ -1374,6 +1390,21 @@ bool weaponObstructionQuery(void* physics,void* query,uint32_t flags,
     alignas(16) Vector4 trackedStart{rear.x,rear.y,rear.z,start->w};
     alignas(16) Vector4 trackedEnd{muzzle.position.x,muzzle.position.y,muzzle.position.z,end->w};
     return originalWeaponObstructionQuery(physics,query,flags,&trackedStart,&trackedEnd,radius,temporary);
+}
+
+int32_t weaponObstructionResult(void* physics,void* query){
+    const bool exactCaller=reinterpret_cast<uintptr_t>(_ReturnAddress())==base+0x103b6d4;
+    // This wait and native job cleanup must happen even when cover blocking is
+    // off. Do not return early or edit the persistent query/weapon flags.
+    const auto nativeCount=originalWeaponObstructionResult(physics,query);
+    if(!exactCaller)return nativeCount;
+    WeaponObstructionMode policy;
+    const auto now=steadyMilliseconds();
+    const auto frame=weaponObstructionFrame(physics,query,now,exactCaller,policy);
+    const auto applied=weaponObstructionHitCount(nativeCount,policy);
+    if(frame){std::lock_guard lock(obstructionWitnessMutex);
+        obstructionWitness={now,frame->sampleTime,frame->activation,frame->playerOwner,nativeCount,applied,policy};}
+    return applied;
 }
 
 // The native shot solver reads the rendered wrist, then converges the shot onto
@@ -1518,6 +1549,7 @@ void throwVelocity(void* context,void* state,uint32_t index,Vector4* velocity){
 }
 }
 namespace mgs5vr {
+WeaponObstructionWitness weaponObstructionWitness(){std::lock_guard lock(obstructionWitnessMutex);return obstructionWitness;}
 bool refreshPausedControllerRig(uintptr_t camera,Pose nativeCamera) noexcept {
     if(!enabled.load()||!modelTransformVerified)return false;
     try{
@@ -1653,6 +1685,10 @@ void installControllerRig(uintptr_t imageBase,bool idroidEffectProbe,bool idroid
     // a hook which leaves all other native callers byte-for-byte equivalent.
     if(!matches(0x1bf0fc0,std::array<unsigned char,11>{0x40,0x53,0x48,0x83,0xec,0x30,0x0f,0xb6,0x44,0x24,0x70})
        ||!matches(0x1064aa8,std::array<unsigned char,13>{0x44,0x8b,0xc7,0xff,0x50,0x28,0x83,0x8b,0x50,0x03,0,0,1})
+       ||!matches(0x1bf1040,std::array<unsigned char,8>{0x48,0x8b,0xca,0xe9,0x48,0xa7,0xfa,0xff})
+       ||!matches(0x1b9b790,std::array<unsigned char,10>{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20})
+       ||!matches(0x103b6c3,std::array<unsigned char,22>{0x48,0x8b,0x49,0x70,0x48,0x8d,0x96,0xb0,0,0,0,
+           0x48,0x8b,0x01,0xff,0x50,0x30,0x85,0xc0,0x0f,0x4f,0xef})
        ||get<uintptr_t>(base+0x24f3760+0x28)!=base+0x1bf0fc0
        ||get<uintptr_t>(base+0x24f3760+0x30)!=base+0x1bf1040)
         throw std::runtime_error("Controller weapon obstruction query signature differs");
@@ -1662,7 +1698,13 @@ void installControllerRig(uintptr_t imageBase,bool idroidEffectProbe,bool idroid
     if(status!=MH_OK)throw std::runtime_error(std::string("Controller weapon obstruction create: ")+MH_StatusToString(status));
     status=MH_EnableHook(obstructionAddress);
     if(status!=MH_OK){MH_RemoveHook(obstructionAddress);throw std::runtime_error(std::string("Controller weapon obstruction enable: ")+MH_StatusToString(status));}
-    log("Tracked barrel obstruction adapter installed for native weapon caller 0x1064aae");
+    const auto obstructionResultAddress=reinterpret_cast<void*>(base+0x1bf1040);
+    status=MH_CreateHook(obstructionResultAddress,reinterpret_cast<void*>(&weaponObstructionResult),
+                         reinterpret_cast<void**>(&originalWeaponObstructionResult));
+    if(status!=MH_OK)throw std::runtime_error(std::string("Controller weapon obstruction result create: ")+MH_StatusToString(status));
+    status=MH_EnableHook(obstructionResultAddress);
+    if(status!=MH_OK){MH_RemoveHook(obstructionResultAddress);throw std::runtime_error(std::string("Controller weapon obstruction result enable: ")+MH_StatusToString(status));}
+    log("Weapon cover setting adapter installed for native submit 0x1064aae and result 0x103b6d4");
     if(!matches(0x1037ba0,std::array<unsigned char,13>{0x48,0x8b,0xc4,0x55,0x53,0x56,0x57,0x41,0x54,0x41,0x56,0x41,0x57})
        ||!matches(0x1039020,std::array<unsigned char,9>{0x48,0x8b,0xc4,0x55,0x53,0x56,0x57,0x41,0x56}))
         throw std::runtime_error("Controller throw helper signatures differ");
@@ -1711,9 +1753,13 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
     if(c.cabinTransit){
         frame.controllers.cabinBounds={};
         frame.controllers.openingWorldAnchored=false;
+        if(!frame.cabinBaseTracked){
+            transitWalk.lastUpdateMs=steadyMilliseconds();
+            return;
+        }
         frame.nativePose.position=advanceCabinWalk(transitWalk,frame.nativePose.position,
             frame.nativePose.orientation,c.cabinMove,steadyMilliseconds(),frame.activation,
-            moveNativeCabin,.85f,frame.menuOpen,true);
+            moveNativeCabin,.85f,frame.menuOpen,true,frame.cabinBasePose);
         return;
     }
     transitWalk={};

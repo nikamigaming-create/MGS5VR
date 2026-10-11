@@ -6,6 +6,165 @@ left-arm HUD popups, and the left-hand iDroid requested on October 4. Pause uses
 panel. Floating firearm aiming overlays stay off. No desktop/input automation
 or Steam shutdown is needed by the local workflow.
 
+## October 11 field iDroid and combat preferences
+
+D-Dog's cabin disappearance is corrected on checked development DLL
+`3e6e3d6e9818`. The actual native fade writer used the stock camera position
+instead of the rendered tracked cabin view; iDroid bypassed that fade. The
+correction supplies the tracked camera point to the native dog query. Five
+closed/open/stowed/turn/lean checkpoints retained opacity 1.0 and were reviewed
+in both compositor eyes. The same scene also reproduced on the published pin.
+Read [the correction and evidence](CABIN_DOG_VISIBILITY_FIX.md).
+
+Checked development (recorded in `build/dev/BUILD.json`) adds launcher toggles for god mode and acquired
+enemy world markers, and retains the close-cover firing preference (Off by
+default). The launcher passed 217 checks across all 59 settings and 104 actions.
+Actual native enemy fire left health at 7,801 with god mode On and reduced it to
+7,330 after Off. Marker On/Off/On and head-motion outcomes were reviewed in both
+eyes with no native world recon silhouette shader. A stable native obstruction
+blocked the VR pistol trigger with cover blocking On (10 rounds unchanged); Off
+allowed the shot (10 → 9). These are scoped simulator checks.
+Combat and page-loop takes used `e1dc46d11bc7`; the later candidate retains
+those implementations and adds an exact handset pad-owner diagnostic. Its build passed
+55/55 automated groups (including actual shader marker pixels) and installer
+checks.
+
+Two field iDroid defects were reproduced before correction: opening the handheld
+changed the head's orientation reference, and an owned pad-release block delayed
+fresh movement after stow. Matched actual-game repeats demonstrate both fixes.
+Left grip + right-stick left/right now sends LB/RB. Without left grip the left
+stick retains movement; with grip it navigates menu lists. Left stick click and
+the existing right-grip page loop are retained. Personal handheld mode stays selected.
+
+Fresh ordinary field checks on `3e6e3d6e9818` passed current RIGHT-stick tabs,
+the retained RIGHT-grip loop, focused LEFT-stick row navigation, 2.42 m of
+LEFT-stick movement with the handset open and grip released, and stow/next-tap
+reopening. The same physical binocular take passed A clear, look-away/return
+without reacquisition and explicit RIGHT-trigger re-marking. The smaller world
+label and all 14 outcome pairs were reviewed in both eyes. Evidence is in
+`artifacts/dev/idroid-stick-dog-current/markers-tabs-final/`.
+
+The intermittent reported checkpoint hang has not been reproduced on a matching
+save. The source clip ends during loading. Native failure cleanup closed the
+owned handset, but the isolated failure panel was black and retry did not enter
+loading; native failure-menu/retry acceptance remains open. An aggregate native
+pad-protection diagnostic was mistaken for the mod's registration; the extra
+handoff change was removed and an exact owner readout added. Read
+[the changes, tests and limits](FIELD_IDROID_COMBAT_FIXES.md). Physical headset
+acceptance and remaining full-game cases stay open. The published pin is unchanged.
+
+## October 11 NVG obstruction fix
+
+The reported practically blind NVG view was reproduced at safe offline Mother
+Base, mission 30050. With native NVG equipped, its own goggles model filled both
+eyes with black/yellow geometry. The green night-vision effect was already
+working. Earlier picker captures never equipped NVG and do not qualify as this
+reproduction.
+
+Development DLL `02b9d914dd8c` hides only the normal and rain-cover goggles
+resources in the current character's typed native item interface before draw
+preparation. Native equip/on/off state and the night-vision filter are retained.
+Ordinary hands, the bionic forearm, iDroid and physical binoculars retain their
+existing behavior. Visibility restoration uses the existing owned-model lease.
+
+The normal NVG model passed actual-game simulator checks in both eyes: clear
+view while on, yaw ±45 degrees, pitch ±35 degrees, positional lean, native None
+selection to turn off, and immediate native re-equip. The retained 35-second
+composited-eye video contains 102 actual frames (about 2.89 capture fps); that is
+capture cadence, not game frame rate. Both-eye images and the decoded video were
+reviewed. The build passed 55/55 automated groups and installer checks. The safe
+test uses already-owned native equipment through a bounded Lua fixture; it does
+not certify the physical wrist picker's NVG slot, rain-weather presentation or
+physical headset comfort. Read [the fix and evidence](NVG_VISIBILITY_FIX.md).
+
+Your original six paired save files were restored and verified after testing.
+The game/simulator is closed, Steam retained, wired Link's Meta OpenXR runtime
+restored, and personal handheld iDroid mode remains selected. `play/` is unchanged.
+
+## October 11 helicopter and Rewards corrections
+
+The Rewards confirmation failure was reproduced using the retail bonus-popup
+UI without granting a reward. Its separate bonus-popup owner was missing from
+menu routing. Development now recognizes that native modal, presents it on the
+existing stereo panel and routes the existing Confirm binding. On checked DLL
+`da914b1531d7`, the settled native Rewards popup accepted A and dismissed; both
+outcome eyes were reviewed. The later NVG build retains this correction.
+
+The helicopter passenger camera now keeps its authored seated offset on the
+native passenger root. Cabin movement is transported using the carrier pose
+before HMD rotation, so turning or pitching the head does not rotate that walk
+offset around the seat. Native outbound flight and grounded passenger recordings
+exercised yaw, pitch, lean and cabin walking on `da914b1531d7`; both outcome eyes
+were reviewed. Pickup/return and physical headset comfort remain open. Evidence
+is retained in `artifacts/dev/helicopter-rewards-current/`.
+
+D-Dog's initial bone-only observations did not establish visibility. The later
+typed native opacity trace and both-eye closed/open/stowed repeat establish the
+handheld cabin correction described above. The user's handheld mode is saved.
+
+## October 11 wired Link runtime correction
+
+The user's 08:48 Play-Dev launch selected SteamVR, confirmed by both its
+launch receipt and the actual game's runtime log. Windows' global runtime
+registration still pointed to SteamVR. Both local Play commands now explicitly
+request Meta Quest Link through `-MetaLink`, so their default no longer depends
+on that registration or a missing launcher preference. Explicit runtime
+arguments remain available in the shared launcher.
+
+At the user's request, Windows' 64-bit OpenXR default was changed to Meta
+Quest Link with the validated installed Oculus runtime. A fresh native OpenXR
+probe detected runtime `Oculus` and system `Meta Quest 3`, with a recommended
+1872 x 2016 pixels per eye. This verifies runtime/headset discovery; physical
+gameplay acceptance remains the user's upcoming test. Steam was retained, no
+game was launched for this correction, and the published pin is unchanged.
+Receipts are in `artifacts/dev/meta-openxr-default-elevated-result.json` and
+`artifacts/dev/meta-headset-launch-recovery-before.json`.
+
+## October 11 published pin and testing candidate
+
+`play/` retains the last successfully published release and its matching
+launcher. The current pin is `experimental-2026-10-10.1`, DLL `ba5c0ccbf406`;
+its recorded archive SHA-256 matches the published GitHub asset. `Play.cmd`
+verifies and restores that slot before launching with the saved Meta OpenXR
+headset runtime. All 394 recorded pin files verified on October 11.
+
+`build/dev/` holds the latest completed, checked candidate recorded in its
+`BUILD.json`, for testing with `Play-Dev.cmd`. Both launch paths are available
+without changing the other slot. The launcher executable is included in each
+slot. Development tests and simulator sessions do not advance the published
+pin. Headset launch checks passed; physical headset acceptance remains open.
+
+For an authorized release, package checked development while preserving the
+existing published pin. After the requested server/GitHub publication succeeds
+and its uploaded payload is verified, pin that exact candidate. Both slots
+match at that point, then development can diverge again. A source push, draft
+release or package preparation does not change the pin.
+
+## October 11 controller mapping review
+
+The complete launcher catalog passed 208 checks across 103 actions, 29 inputs,
+10 contact inputs, 10 axes and eight contexts. The development automated suite
+passed 55/55 groups and installer checks. Retained ACC runs
+`20261011T134433036774Z` and `20261011T134534399362Z` passed two entry and 18
+supervised cases, including LEFT-hand handheld iDroid motion, focus, Next and
+Previous pages, stow and next-tap reopening. Both outcome eyes were reviewed.
+Equipment/Commands ownership and binocular latch/stow are scoped ACC passes.
+
+The narrated controller-mapping film, complete saved-action index and evidence
+report are in `artifacts/dev/controller-mapping/`. The film uses actual browser
+remapping, zoom boxes, arrows, side-by-side comparisons, wipes and a separately
+labeled actual-game final-eye clip. Read
+[the mapping review](CONTROLLER_MAPPING_REGRESSION.md) for reproduction and
+remaining coverage. The runner recognizes the typed Online Information
+Next/Close selector, with at most eight released confirmation edges. It still
+rejects first-run agreements with their different native owner.
+
+The test game/simulator is stopped, personal settings restored and `play/`
+unchanged. Physical wired Meta Quest Link touch/headset acceptance, complete
+missions and all native contexts/items/weapons/vehicles remain open. The
+earlier rapid-close-during-reopening observation also remains open; the fresh
+settled stow/reopen pass does not resolve that timing case.
+
 ## October 10.1 spatial Development hotfix
 
 The hotfix target is `experimental-2026-10-10.1`. Its gameplay changes remove
@@ -1614,9 +1773,9 @@ the launcher tour is verified and synchronized into the same play tree.
 
 ## One place to work
 
-Use this checkout. `play/` is the pinned playable tree, and `build/dev/` is the
-only development tree. Each `BUILD.json` identifies its source, checks and
-files. `Play.cmd` restores pinned binaries before physical headset launch;
+Use this checkout. `play/` is the last published release, and `build/dev/` is
+the checked testing candidate and only development tree. Each `BUILD.json`
+identifies its source, checks and files. `Play.cmd` restores pinned binaries before physical headset launch;
 `Play-Dev.cmd` installs development instead. Personal game settings remain
 authoritative. Close MGSV before switching between different binaries.
 
@@ -1630,7 +1789,7 @@ tools/build.ps1 -Deploy
 # Compare both build slots, the pin, installed DLL and current source.
 python tools/workspace.py status
 
-# Only after the user chooses to promote the reviewed development build:
+# After an authorized release is published and its exact payload verified:
 python tools/workspace.py pin-build
 
 # Inventory old copies; add -Apply to remove them after both slots verify.
@@ -1668,12 +1827,18 @@ exact cleanup. The pinned build remains at `play/` throughout. Use `Play.cmd`
 for the next physical play session to restore its binaries automatically.
 
 For an explicitly requested GitHub release, commit the public source, run the
-same build/checks, explicitly promote the approved candidate with `pin-build`,
-then use `python tools/package-release.py --tag experimental-YYYY-MM-DD`.
-The packager verifies the checked play tree and public defaults, includes the
+same build/checks, then use
+`python tools/package-release.py --tag experimental-YYYY-MM-DD`.
+The packager verifies checked development and public defaults, includes the
 committed source and per-file hashes, and writes to the fixed `build/github-release/`
-directory. Private game data and simulator dependencies are rejected. Publishing
-a prerelease does not close the remaining gameplay/headset acceptance queue.
+directory without replacing the published play pin. After successful publication
+to the requested destinations, verify the uploaded archive against its recorded
+checksum and verify that development still matches the packaged candidate before
+running `python tools/workspace.py pin-build`. Both slots then match the release;
+subsequent development builds change only `build/dev/`. Remove temporary release
+archives after verification. Private game data and simulator dependencies are
+rejected. Publishing a prerelease does not close the remaining gameplay/headset
+acceptance queue.
 
 The local settings file is `private/workspace.json`. The operator dependency
 is imported once to `.deps/meta-xr-operator`, removing the other-repository

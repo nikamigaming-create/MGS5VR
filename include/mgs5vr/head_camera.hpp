@@ -82,9 +82,11 @@ struct ControllerFrame {
     bool handheldIdroidStowed{}; // LEFT hand temporarily owns reload/support; keep the terminal's resource.
     float menuQuadWidth{1.2f},menuQuadDistance{1.3f},menuQuadTilt{-10.f};
     float supportGripRadius{.10f},supportDetachRadius{.30f};
+    bool blockFiringNearCover{};
     bool trackedWeaponObstruction{true};
     float handRestCurl{.08f},handTouchCurl{.20f};
     HudMode hudMode{HudMode::binocularsOnly};
+    bool enemyWorldMarkers{};
     float magnification{1};
     uint64_t weaponZoomSequence{};
     float weaponAimPitch{-30.f}; // Firearms only, in the runtime pointing frame.
@@ -160,6 +162,8 @@ struct HeadCameraSample {
     uint64_t playerSequence{};
     uintptr_t playerOwner{};
     Vec3 playerHead{};
+    Pose cabinBasePose{}; // Passenger anchor before tracked head motion, from this exact player publication.
+    bool cabinBaseTracked{};
     ControllerFrame controllers{};
     uint64_t rigSequence{};
     Pose wristPanel{}; // World-space forearm surface from this skin publication.
@@ -281,6 +285,8 @@ private:
         uintptr_t camera{},owner{};
         uint64_t time{},activation{},referenceEpoch{},lookUntil{};
         bool valid{};
+        bool passenger{};
+        Vec3 headLocalOffset{};
     } driverView_;
     std::array<EyeView,2> views_{};
     ControllerFrame controllers_{};

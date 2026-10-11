@@ -27,6 +27,7 @@ return function(source)
    end},
    DemoDaemon=daemon,
    TppDemo=tppDemo,
+   TppUiCommand=options.ui or false,
    s10010_sequence=options.missionSequence or false,
    gvars={ini_isTitleMode=options.title or false},
    vars={missionCode=options.mission or 10010,playerVehicleGameObjectId=options.vehicle},
@@ -161,9 +162,35 @@ return function(source)
   'native game-over menu owns UI even while the mission retains its gameplay sequence')
  check(evaluate({sequence='Seq_Game_MainGame',mission=10040,gameOver=true,activeDemo=true})=='scripted-demo',
   'authored death movies retain their cinematic presentation before the game-over menu')
+ for _,query in ipairs({'IsShowBonusPopup','IsShowPopup'}) do
+  for _,mission in ipairs({30010,30050,40020}) do
+   for _,value in ipairs({true,1}) do
+    check(evaluate({sequence='Seq_Game_MainGame',mission=mission,helicopter=mission==40020,
+     ui={[query]=function() return value end}})==(mission==40020 and 'native-popup:cabin' or 'native-popup:closed'),
+     'a positively visible native popup owns Confirm in the field, Mother Base and ACC')
+   end
+  end
+  check(evaluate({sequence='Seq_Game_MainGame',mission=30050,activeDemo=true,notPlayable=true,
+   ui={[query]=function() return true end}})=='native-popup:scripted-demo',
+   'the foreground modal owns Confirm over a retained cinematic flag')
+  for _,value in ipairs({false,0,'unknown'}) do
+   check(evaluate({sequence='Seq_Game_MainGame',mission=30050,
+    ui={[query]=function() return value end}})=='closed',
+    'a false, zero or malformed UI query cannot claim gameplay')
+  end
+  check(evaluate({sequence='Seq_Game_MainGame',mission=30050,activeDemo=true,
+   ui={[query]=function() error('UI unavailable') end}})=='scripted-demo',
+   'a failing popup query preserves authored demo ownership')
+ end
+ check(evaluate({sequence='Seq_Game_Helicopter',mission=40020,helicopter=true,
+  ui={IsShowBonusPopup=function() return false end}})=='cabin',
+  'closing the reward popup restores cabin ownership')
  local transit={sequence='Seq_Game_FreePlay',mission=30010,partsActive=true,
   vehicle=7168,ridden=7168,riddenHelicopter=true}
  check(evaluate(transit)=='cabin-flight','a current native helicopter passenger enables moving cabin controls')
+ transit.ui={IsShowBonusPopup=function() return true end}
+ check(evaluate(transit)=='native-popup:cabin-flight','a modal preserves the moving cabin owner across Confirm')
+ transit.ui=nil
  transit.vehicle=7169
  check(evaluate(transit)=='closed','a stale vehicle variable cannot enable cabin flight')
  transit.vehicle=7168;transit.riddenHelicopter=false

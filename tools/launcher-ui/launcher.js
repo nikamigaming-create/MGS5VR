@@ -205,12 +205,15 @@ const settingCopy={
  menu_quad_tilt_degrees:['World menu tilt','Negative values tilt the menu panel upward.'],
  scope_eye_relief_cm:['Scope eye distance','Preferred distance from your eye to the scope glass.'],
  scope_pose_stabilization:['Steady scope glass','Remove small scope attachment shakes. The glass and its view move together; intentional hand movement follows immediately.'],
- tracked_weapon_obstruction:['Use tracked gun for cover clearance','Check cover clearance from the tracked gun barrel. Native collision filters, clearance radius and projectile collision remain active. Off restores the legacy weapon sweep.'],
+ block_firing_near_cover:['Block firing near cover','Off by default: nearby cover does not veto firing your tracked gun. Bullets still hit the world normally; ammunition and reload rules stay active.'],
+ enemy_world_markers:['Enemy markers in the world','Show enemies you have already marked at their world positions in both eyes. Binocular marking and the iDroid map keep working. HUD Off hides these labels.'],
+ god_mode:['God mode','Prevent damage to Snake in single-player gameplay. Turning this off restores normal damage. Mission and target failure rules still apply.'],
+ tracked_weapon_obstruction:['Use tracked gun for cover clearance','Applies when Block firing near cover is On. Check clearance from the tracked barrel with native filters and radius. Off uses the original body/posture sweep.'],
  binocular_pitch_degrees:['Binocular tilt','Tilt the binoculars in your hand. The lenses and grip move together.'],
  binocular_yaw_degrees:['Binocular angle','Turn the binoculars left or right in your grip.'],
  binocular_roll_degrees:['Binocular roll','Rotate the binoculars to level them in your grip.'],
  binocular_max_eye_distance_cm:['Binocular viewing distance','Maximum distance from your eye at which the binocular view opens.'],
- binocular_auto_mark:['Automatic binocular marking','Keep the binocular sight on a visible person to mark them.'],
+ binocular_auto_mark:['Automatic binocular marking','Keep the binocular sight on a visible person to mark them. A cleared target stays cleared until you explicitly mark it again.'],
  binocular_actor_glow:['Binocular target glow','Highlight targets with a glow. Turning this off keeps their labels.'],
  binocular_mark_dwell_ms:['Time before automatic marking','How long to keep a person in your sights before marking them.'],
  player_height_offset_cm:['Eye height adjustment','Raise or lower your viewpoint without changing the size of the world.'],
@@ -226,7 +229,7 @@ for(const side of ['left','right']) {
  for(const [axis,label,description] of [['x','left / right','Positive values move the hand right.'],['y','up / down','Positive values move the hand up.'],['z','forward / back','Positive values move the hand toward you.']]) settingCopy[side+'_hand_'+axis+'_cm']=[hand+': '+label,description+' Held objects and aim move with it.'];
  for(const [axis,label,description] of [['pitch','tilt','Tilt the hand up or down.'],['yaw','angle','Turn the hand left or right.'],['roll','roll','Rotate the hand around the grip.']]) settingCopy[side+'_hand_'+axis+'_degrees']=[hand+': '+label,description+' Held objects and aim rotate with it.'];
 }
-function settingGroup(name){if(/idroid|handheld|menu_quad/.test(name))return 'iDroid & menus';if(/wrist|weapon_hud|hud_mode/.test(name))return 'Wrist & HUD';if(/binocular|scope/.test(name))return 'Optics';if(/hand_|support_|smoothing|weapon_aim|tracked_weapon/.test(name))return 'Hands & weapons';return 'Movement & interaction'}
+function settingGroup(name){if(/idroid|handheld|menu_quad/.test(name))return 'iDroid & menus';if(/wrist|weapon_hud|hud_mode|enemy_world_markers/.test(name))return 'Wrist & HUD';if(/binocular|scope/.test(name))return 'Optics';if(/hand_|support_|smoothing|weapon_aim|tracked_weapon|block_firing_near_cover/.test(name))return 'Hands & weapons';return 'Movement & interaction'}
 function runtimeRows(){const ranges={'theatre.width_cm':[100,3000],'theatre.distance_cm':[100,3000]};return Object.keys(state.runtime).map(name=>{const bool=name==='ui.map_control_prompts'||name==='optics.binocular_native_material'||/enabled$|native_actions$|camera_observer$|experiment$|interactive_cabin$/.test(name);const [min,max]=ranges[name]|| (bool?[0,1]:[undefined,undefined]);return {name,value:state.runtime[name],min,max,default:catalog.runtimeDefaults?.[name]??state.runtime[name]}})}
 function paintSettings(){
  if(!state?.settings){$('settings-grid').innerHTML='<p>Choose your game installation to edit its settings.</p>';return;}

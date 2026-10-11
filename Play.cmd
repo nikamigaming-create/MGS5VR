@@ -7,7 +7,7 @@ if not exist "%~dp0play\BUILD.json" (
 if not exist "%~dp0artifacts\dev" mkdir "%~dp0artifacts\dev"
 python "%~dp0tools\workspace.py" deploy --slot play > "%~dp0artifacts\dev\headset-launch.log" 2>&1
 if errorlevel 1 goto failed
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\launch-headset.ps1" %* >> "%~dp0artifacts\dev\headset-launch.log" 2>&1
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\launch-headset.ps1" -MetaLink %* >> "%~dp0artifacts\dev\headset-launch.log" 2>&1
 :failed
 set "MGS_HEADSET_EXIT=%ERRORLEVEL%"
 type "%~dp0artifacts\dev\headset-launch.log"

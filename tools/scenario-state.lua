@@ -31,8 +31,9 @@ field('customization_kind', function()
     end
     return 'unrecognized'
 end)
--- Read our own player-pad registration separately from the retail selector's
--- mask. A terminal-close recovery is not a selector Cancel/End transition.
+-- Legacy aggregate diagnostic: IsSet does not distinguish named owners.
+-- Use inspect-bot-state.idroid_player_pad_owner for the verified mod owner.
+-- A true aggregate during native Game Over must not be treated as a mod leak.
 field('vr_idroid_player_pad_block', function()
     return TppGameStatus.IsSet('MGS5VR_iDroid', 'S_DISABLE_PLAYER_PAD')
 end)

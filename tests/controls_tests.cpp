@@ -199,6 +199,27 @@ int main(int argc,char** argv){
         mapped={};packet.timeMs=207;packet.deliveryCounter=5;packet.xrMailboxFresh=false;
         expect(release.update(Policy::released,false,mapped,delivery,208)==Policy::released,
             "a delivered neutral shutdown packet releases the mod mask even after XR stops publishing");
+
+        release.reset();mapped={};mapped.time=300;packet={};packet.index=0;
+        packet.deliveryCounter=6;packet.timeMs=300;
+        packet.packetValid=packet.xrMailboxFresh=packet.caller.inGame=true;
+        packet.source=NativeInputDeliverySource::xrMailbox;
+        release.update(Policy::blocked,true,mapped,delivery,300);
+        release.update(Policy::released,false,mapped,delivery,301);
+        mapped.time=302;mapped.nativeAxes={0,32767,0,0};packet.axes=mapped.nativeAxes;
+        mapped.context=ControlContext::menus;
+        packet.timeMs=303;packet.deliveryCounter=7;
+        expect(release.update(Policy::released,false,mapped,delivery,304)==Policy::blocked,
+            "a still-routed menu direction cannot acknowledge the field stow handoff");
+        mapped.time=305;mapped.context=ControlContext::gameplay;mapped.rigInput=true;
+        packet.buttons=0x2000;packet.timeMs=306;packet.deliveryCounter=8;
+        expect(release.update(Policy::released,false,mapped,delivery,307)==Policy::blocked,
+            "fresh walking cannot bypass Back still held at the native consumer");
+        packet.buttons=0;packet.timeMs=308;packet.deliveryCounter=9;
+        expect(release.update(Policy::released,false,mapped,delivery,309)==Policy::released,
+            "released menu buttons with fresh gameplay locomotion restore movement without another stick-centering cycle");
+        expect(!release.waiting(),"walking after stow leaves no retained native player-pad block");
+
     }
     {
         ControlAxisOwnership ownership;
@@ -286,9 +307,11 @@ int main(int argc,char** argv){
     {
         ControlBindings bindings;
         const auto map=rewriteControlPrompt("<I=G=DECISION> Place Marker  <I=G=PAD_L1>/<I=G=PAD_R1>",bindings,ControlContext::menus);
-        expect(rewriteControlPrompt("<I=G=PAD_L1>",bindings,ControlContext::menus,true).text=="[L CLICK + L GRIP]"
+        expect(rewriteControlPrompt("<I=G=PAD_L1>",bindings,ControlContext::menus,true).text=="[L GRIP + R STICK LEFT / L CLICK + L GRIP]"
             &&rewriteControlPrompt("<I=G=PAD_L1>",bindings,ControlContext::menus).text=="[L GRIP]",
             "handheld iDroid shows its separate previous-tab chord while ordinary menus retain their shoulder");
+        expect(rewriteControlPrompt("<I=G=PAD_R1>",bindings,ControlContext::menus,true).text=="[L GRIP + R STICK RIGHT / R GRIP]",
+            "handheld next-tab prompt shows the stick chord and retained personal page-loop binding");
         expect(controlPromptAction("PAD_L1",ControlContext::nativeButtons,true)=="native.left_shoulder",
             "handheld prompt hints cannot override native-button mode");
         ControlBindings customPrevious;
@@ -564,6 +587,35 @@ int main(int argc,char** argv){
         const auto previousTab=nativeMenuGamepad(bindings,focusInput,NativeMenuInput::liveIdroid);
         expect((previousTab.buttons&0x100)&&!(previousTab.buttons&0x40),
             "handheld previous-tab chord sends LB without a second stick-click operation");
+        focusInput.buttons[5]=0;bindings.update(focusInput,ControlContext::menus,320);
+        focusInput.rightStick={-.85f,0};bindings.update(focusInput,ControlContext::menus,340);
+        const auto flickLeft=nativeMenuGamepad(bindings,focusInput,NativeMenuInput::liveIdroid);
+        expect(flickLeft.buttons==0x100&&flickLeft.rightX==0&&flickLeft.rightY==0,
+            "focused right-stick left flick sends only LB, without map motion");
+        bindings.update(focusInput,ControlContext::menus,450);
+        const auto heldLeft=nativeMenuGamepad(bindings,focusInput,NativeMenuInput::liveIdroid);
+        expect(heldLeft.buttons==0&&heldLeft.rightX==0,
+            "holding the tab direction cannot repeat or become map navigation after its pulse");
+        focusInput.rightStick={};bindings.update(focusInput,ControlContext::menus,470);
+        focusInput.rightStick={.85f,0};focusInput.leftStick={.4f,.6f};bindings.update(focusInput,ControlContext::menus,490);
+        const auto flickRight=nativeMenuGamepad(bindings,focusInput,NativeMenuInput::liveIdroid);
+        expect(flickRight.buttons==0x200&&flickRight.rightX==0&&flickRight.rightY==0
+            &&flickRight.leftX>0&&flickRight.leftY>0,
+            "right-stick next tab preserves focused left-stick list navigation under the same grip");
+        focusInput.rightStick={};focusInput.leftStick={};bindings.update(focusInput,ControlContext::menus,600);
+        focusInput.leftStick={0,.85f};bindings.update(focusInput,ControlContext::menus,620);
+        expect(nativeMenuGamepad(bindings,focusInput,NativeMenuInput::liveIdroid).leftY>0,
+            "focused left-stick list navigation works independently of right-stick tab flicks");
+        focusInput.leftStick={};focusInput.buttons[8]=1;bindings.update(focusInput,ControlContext::menus,640);
+        expect(nativeMenuGamepad(bindings,focusInput,NativeMenuInput::liveIdroid).buttons==0x200,
+            "the existing right-grip page-loop binding remains available");
+        focusInput.buttons[8]=0;
+        focusInput.buttons[7]=0;focusInput.leftStick={.5f,.7f};focusInput.rightStick={.85f,0};
+        bindings.update(focusInput,ControlContext::gameplay,660);
+        expect(!bindings.heldModifier("system.idroid_focus",focusInput)
+            &&!bindings.active("idroid.previous_tab")&&!bindings.active("idroid.next_tab")
+            &&bindings.axis("axes.move",focusInput)==focusInput.leftStick,
+            "released focus leaves the left movement stick and right turning stick outside iDroid tab routing");
         ControlBindings customPrevious;
         std::istringstream previousRemap("[idroid]\nprevious_tab=press(left_grip + a + right_trigger + right_stick_click + right_stick_up)\n");
         expect(customPrevious.load(previousRemap).empty(),"custom previous-tab chord fixture is valid");

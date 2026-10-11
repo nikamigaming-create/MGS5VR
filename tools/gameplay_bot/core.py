@@ -288,7 +288,7 @@ class Behaviors:
             during = case.get("during")
             before = self.wait_for(case["before"], case.get("entry_timeout", 8), case_id + ":entry",
                                    native=bool(during and any(key.startswith("native.") for key in during)))
-            if during and (case["steps"][-1].get("op") not in ("action", "menu_navigate") or matches(before, during)):
+            if during and (case["steps"][-1].get("op") not in ("action", "menu_navigate", "menu_focus_sequence") or matches(before, during)):
                 raise BotFault("While-held case needs a final action and an initially unsatisfied during predicate")
             if not during and not observation_only and matches(before, case["after"]):
                 raise BotFault("Outcome already satisfied before action; no action effect proven")

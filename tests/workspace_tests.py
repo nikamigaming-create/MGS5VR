@@ -66,6 +66,33 @@ class WorkspaceTests(unittest.TestCase):
         for name in workspace.BINARIES:
             self.assertEqual(record["files"][name], workspace.digest(self.game / name))
         self.assertFalse((self.root / "build/install-rollback").exists())
+
+    def test_new_preferences_roundtrip_through_published_parser_projection(self):
+        text = '[settings]\r\nhud_mode = 1\r\ngod_mode = 1 ; personal\r\n[idroid]\r\nnext_tab = press(left_grip + left_stick_right) | press(right_grip)\r\n'
+        older = {'settings.hud_mode'}
+        newer = older | {'settings.god_mode', 'idroid.next_tab'}
+        projected = workspace.project_controls(text, older)
+        self.assertIn('; MGS5VR newer-build preference [settings]: god_mode = 1 ; personal', projected)
+        self.assertEqual(workspace.project_controls(projected, newer), text)
+        self.assertEqual(workspace.project_controls(projected, older), projected)
+
+    def test_retained_preference_cannot_move_into_another_section(self):
+        with self.assertRaisesRegex(ValueError, 'outside its section'):
+            workspace.project_controls('[idroid]\n; MGS5VR newer-build preference [settings]: god_mode = 1\n', {'settings.god_mode'})
+
+    def test_control_projection_and_binary_update_roll_back_together(self):
+        projected = b'[settings]\n; MGS5VR newer-build preference [settings]: god_mode = 1\n'
+        real_write = workspace.write_json
+        def fail_record(path, value):
+            if Path(path) == self.game / 'mgs5vr-install.json':
+                raise OSError('simulated install receipt failure')
+            return real_write(path, value)
+        with patch.object(workspace, 'compatible_controls', return_value=projected), \
+                patch.object(workspace, 'write_json', side_effect=fail_record):
+            with self.assertRaisesRegex(OSError, 'receipt failure'):
+                workspace.deploy(self.value)
+        for name, content in self.old.items():
+            self.assertEqual((self.game / name).read_bytes(), content)
         workspace.deploy(self.value)
         self.assertFalse((self.root / "build/install-rollback").exists())
 

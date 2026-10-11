@@ -4,12 +4,13 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from gameplay_bot.campaign import fingerprint, run_campaign, summarize_runs, validate_campaign, unstarted_campaign
 from gameplay_bot.core import BotFault
 from gameplay_bot.menu_coverage import menu_inventory
-from gameplay_bot.state_graph import StateGraph, observation_key
+from gameplay_bot.state_graph import StateGraph, declared_model, observation_key
 
 IDENTITY = {name: letter * 64 for name, letter in zip(
     ("exe_sha256", "dll_sha256", "controls_sha256", "config_sha256"), "abcd")}
@@ -211,6 +212,123 @@ class StateGraphTests(unittest.TestCase):
         key=observation_key({'menu':True,'idroid':True,'native':{'mission':10040,'location':10}})
         self.assertFalse(key['identity_complete'])
         self.assertIn('native.menu_page',key['missing'])
+
+    @staticmethod
+    def idroid_observation():
+        # Exact page/cursor identity deliberately remains undiscovered.
+        return {'scene':'menu', 'menu':True, 'idroid':True, 'pause':False, 'gamepad':False,
+                'idroid_tutorial_mode':0, 'idroid_tutorial_paused':False, 'idroid_handheld':True,
+                'idroid_menu_control':2, 'idroid_menu_input_ready':True,
+                'idroid_menu_routing_available':True, 'idroid_closing':False,
+                'idroid_ui_only_owner':False, 'idroid_focused_weapon':False,
+                'idroid_focused_weapon_available':True,
+                'controls':{'context':'menus', 'travel_mode':1,
+                            'physical':[0,0,0,0,0,0,0,1,0,0,0]},
+                'native':{'mission':40010, 'location':10, 'sequence':'Seq_Game_MainGame',
+                          'player_vehicle_id':65535, 'demo':False, 'tutorial_pause':False,
+                          'game_over':0, 'story':33, 'popup':False, 'fob_tutorial_state':127,
+                          'idroid_development_active':True, 'status_CRAWL':False,
+                          'status_SQUAT':False, 'status_STAND':True, 'status_CARRY':False}}
+
+    def test_observation_keeps_tutorial_and_focus_ownership_distinct(self):
+        base=self.idroid_observation();original=observation_key(base)
+        for name,value in [('idroid_tutorial_mode',1), ('idroid_tutorial_paused',True),
+                           ('idroid_menu_control',3), ('idroid_menu_input_ready',False),
+                           ('idroid_handheld',False), ('idroid_menu_routing_available',False),
+                           ('idroid_ui_only_owner',True), ('idroid_focused_weapon',True),
+                           ('idroid_focused_weapon_available',False),
+                           ('idroid_closing',True), ('pause',True), ('gamepad',True)]:
+            with self.subTest(dimension=name):
+                observed=observation_key({**base,name:value})
+                self.assertNotEqual(observed['key'],original['key'])
+                self.assertEqual(observed['dimensions'][name],value)
+        self.assertFalse(original['identity_complete'])
+        self.assertTrue({'native.menu_page','native.menu_parent','native.menu_focus'} <= set(original['missing']))
+        self.assertEqual(original['dimensions']['idroid_tutorial_mode'],0)
+        self.assertNotIn('idroid_tutorial_mode',original['missing'])
+
+    def test_observation_keeps_each_physical_grip_without_inferring_focus(self):
+        base=self.idroid_observation();original=observation_key(base)
+        for index,value in [(7,0),(8,1)]:
+            with self.subTest(grip=index):
+                changed=copy.deepcopy(base);changed['controls']['physical'][index]=value
+                observed=observation_key(changed)
+                self.assertNotEqual(observed['key'],original['key'])
+                self.assertEqual(observed['dimensions'][f'controls.physical.{index}'],value)
+                self.assertEqual(observed['dimensions']['idroid_menu_control'],2)
+
+    def test_same_grips_do_not_merge_focused_firearm_and_ui_only_ownership(self):
+        held=self.idroid_observation()
+        held['controls']['physical'][8]=1
+        held['idroid_focused_weapon']=True
+        tab=copy.deepcopy(held)
+        tab['idroid_focused_weapon']=False
+        self.assertEqual(held['controls']['physical'],tab['controls']['physical'])
+        self.assertNotEqual(observation_key(held)['key'],observation_key(tab)['key'])
+        unknown=copy.deepcopy(held)
+        del unknown['idroid_focused_weapon']
+        key=observation_key(unknown)
+        self.assertIsNone(key['dimensions']['idroid_focused_weapon'])
+        self.assertIn('idroid_focused_weapon',key['missing'])
+        self.assertFalse(key['identity_complete'])
+
+    def test_completed_and_guided_progression_cannot_share_menu_key(self):
+        base=self.idroid_observation();original=observation_key(base)
+        for name,value in [('fob_tutorial_state',0),('idroid_development_active',False)]:
+            with self.subTest(progression=name):
+                changed=copy.deepcopy(base);changed['native'][name]=value
+                observed=observation_key(changed)
+                self.assertNotEqual(observed['key'],original['key'])
+                self.assertEqual(observed['dimensions']['native.'+name],value)
+                self.assertNotIn('native.'+name,observed['missing'])
+
+    def test_unknown_menu_observations_remain_explicit_and_incomplete(self):
+        base=self.idroid_observation()
+        for name in ('idroid_tutorial_mode','idroid_menu_control','idroid_menu_input_ready'):
+            known=observation_key(base)
+            for value in (None,'unavailable:native owner not sampled'):
+                with self.subTest(dimension=name,value=value):
+                    observed=observation_key({**base,name:value})
+                    self.assertNotEqual(observed['key'],known['key'])
+                    self.assertEqual(observed['dimensions'][name],value)
+                    self.assertIn(name,observed['missing'])
+                    self.assertFalse(observed['identity_complete'])
+        missing=copy.deepcopy(base)
+        del missing['native']['fob_tutorial_state']
+        missing['controls']['physical']=[]
+        observed=observation_key(missing)
+        for name in ('native.fob_tutorial_state','controls.physical.7','controls.physical.8',
+                     'native.menu_page','native.menu_parent','native.menu_focus'):
+            self.assertIsNone(observed['dimensions'][name])
+            self.assertIn(name,observed['missing'])
+        unavailable=observation_key({**base,'native':None})
+        self.assertIsNone(unavailable['dimensions']['native.idroid_development_active'])
+        self.assertIn('native.idroid_development_active',unavailable['missing'])
+
+    def test_menu_variant_metadata_stays_unproven_and_cannot_create_a_route(self):
+        root=Path(__file__).resolve().parents[1]
+        row={'id':'MENU.TPP.DEVELOPMENT.acc.handheld', 'title':'Development',
+             'mode':'acc', 'presentation':'handheld', 'acceptance':['Discover the actual page'],
+             'variant_obligations':[{'id':'first_guidance', 'status':'unproven', 'evidence':[]}],
+             'variant_policy':'Independent discovery obligations, not navigation eligibility',
+             'reports':[{'id':'development_upgrade_lock', 'status':'unproven',
+                         'exact_step':'unknown', 'progression_state':'not_established'}]}
+        with patch('gameplay_bot.state_graph.menu_inventory',return_value=[row]):
+            model=declared_model(root)
+        node=model['states'][row['id']]
+        self.assertEqual(node['variant_obligations'],row['variant_obligations'])
+        self.assertEqual(node['variant_policy'],row['variant_policy'])
+        self.assertEqual(node['reports'],row['reports'])
+        self.assertIsNone(node['predicate'])
+        node['variant_obligations'][0]['evidence'].append('fixture-only')
+        self.assertEqual(row['variant_obligations'][0]['evidence'],[])
+        node['reports'][0]['exact_step']='fixture-only'
+        self.assertEqual(row['reports'][0]['exact_step'],'unknown')
+        graph=StateGraph(root,model,IDENTITY,{'actions':[]})
+        edge=next(e for e in graph.edges if e['id']=='enter.'+row['id'])
+        self.assertFalse(edge['ready'])
+        with self.assertRaisesRegex(BotFault,'No validated route'):
+            graph.path('MODE.TPP.acc',row['id'],identity=IDENTITY)
 
     def test_explicit_probe_keeps_dependencies_and_exit_and_refuses_missing_return(self):
         graph=self.graph()

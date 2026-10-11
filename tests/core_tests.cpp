@@ -18,8 +18,10 @@
 #include "mgs5vr/optic_radio.hpp"
 #include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/native_menu_restrictions.hpp"
+#include "mgs5vr/native_game_status.hpp"
 #include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/vehicle_pedals.hpp"
+#include "mgs5vr/weapon_obstruction.hpp"
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -32,6 +34,107 @@ static void expect(bool ok,const char* name){++checks;if(!ok){++failures;std::ce
 static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
+    {
+        constexpr uint64_t ours=0xc1dbf5bd3008ull;
+        NativeGameStatusRecord record{};
+        const auto slot=[&](unsigned index,uint64_t hash){
+            for(unsigned byte=0;byte<8;++byte)
+                record[0x10+index*0x18+byte]=static_cast<uint8_t>(hash>>(8*byte));
+        };
+        for(unsigned index=0;index<4;++index)slot(index,nativeGameStatusEmptyOwner);
+        expect(nativeGameStatusHasOwner(record,ours)==std::optional<bool>{false},
+            "empty native status acknowledges our release");
+        slot(0,0x123456789abcull);record[0x70]=1;
+        expect(nativeGameStatusHasOwner(record,ours)==std::optional<bool>{false},
+            "another native pad owner does not prevent our release acknowledgement");
+        slot(3,ours|0xabcd000000000000ull);record[0x70]=2;
+        expect(nativeGameStatusHasOwner(record,ours)==std::optional<bool>{true},
+            "our registration is found beside another owner with native metadata intact");
+        slot(1,0x23456789abcdull);slot(2,0x3456789abcdeull);record[0x70]=4;
+        expect(nativeGameStatusHasOwner(record,ours)==std::optional<bool>{true},
+            "full native status table still recognizes our existing registration");
+        slot(3,0x456789abcdefull);
+        expect(nativeGameStatusHasOwner(record,ours)==std::optional<bool>{false},
+            "full table without our owner cannot acknowledge an attempted exclusion");
+        record[0x70]=3;
+        expect(!nativeGameStatusHasOwner(record,ours).has_value(),
+            "mismatched native count cannot acknowledge a policy");
+        record[0x70]=5;
+        expect(!nativeGameStatusHasOwner(record,ours).has_value(),
+            "out-of-range native count fails closed");
+        record[0x70]=4;slot(3,0x123456789abcull);
+        expect(!nativeGameStatusHasOwner(record,ours).has_value(),
+            "duplicate occupied owners reject a torn or invalid native table");
+        expect(!nativeGameStatusHasOwner(record,nativeGameStatusEmptyOwner).has_value(),
+            "empty-slot sentinel is never an owner");
+    }
+    {
+        const ControllerFrame defaults;
+        expect(!defaults.blockFiringNearCover&&defaults.trackedWeaponObstruction,
+            "cover firing blocking defaults off while the optional tracked sweep remains selected");
+        WeaponObstructionSample sample;
+        sample.published=sample.current={11,22,33,44,5,0x10006};
+        sample.frameTime=1000;sample.weaponTime=990;
+        sample.exactCaller=sample.enabled=sample.verified=sample.ready=sample.tracked=true;
+        const auto choose=[&](const WeaponObstructionSample& s,bool block=false,bool tracked=true,uint64_t now=1050){
+            return weaponObstructionMode(s,now,block,tracked);
+        };
+        expect(choose(sample)==WeaponObstructionMode::ignoreProximity
+            &&choose(sample,false,false)==WeaponObstructionMode::ignoreProximity,
+            "cover Off suppresses the local proximity veto independently of tracked-sweep preference");
+        expect(choose(sample,true)==WeaponObstructionMode::trackedBarrel
+            &&choose(sample,true,false)==WeaponObstructionMode::native,
+            "cover On selects tracked or original clearance without bypassing its result");
+        for(const auto mode:{WeaponObstructionMode::native,WeaponObstructionMode::trackedBarrel,
+                             WeaponObstructionMode::ignoreProximity}){
+            expect(weaponObstructionHitCount(-1,mode)==-1&&weaponObstructionHitCount(0,mode)==0,
+                "native incomplete/error and zero-hit results are never fabricated into positive results");
+            expect(weaponObstructionHitCount(3,mode)==(mode==WeaponObstructionMode::ignoreProximity?0:3),
+                "only cover Off removes a consumed positive proximity count");
+        }
+        for(int fault=0;fault<6;++fault){
+            auto other=sample;
+            switch(fault){
+            case 0:++other.current.player;break;
+            case 1:++other.current.component;break;
+            case 2:++other.current.state;break;
+            case 3:++other.current.physics;break;
+            case 4:++other.current.playerIndex;break;
+            case 5:++other.current.resource;break;
+            }
+            expect(choose(other)==WeaponObstructionMode::native
+                &&weaponObstructionHitCount(2,choose(other))==2,
+                "a switched player, gun instance, physics owner or resource cannot inherit the bypass");
+        }
+        for(int fault=0;fault<8;++fault){
+            auto unavailable=sample;
+            switch(fault){
+            case 0:unavailable.exactCaller=false;break;
+            case 1:unavailable.enabled=false;break;
+            case 2:unavailable.verified=false;break;
+            case 3:unavailable.ready=false;break;
+            case 4:unavailable.tracked=false;break;
+            case 5:unavailable.nativeControls=true;break;
+            case 6:unavailable.vehicleAllowed=false;break;
+            case 7:unavailable.published.player=unavailable.current.player=0;break;
+            }
+            expect(choose(unavailable)==WeaponObstructionMode::native
+                &&choose(unavailable,true)==WeaponObstructionMode::native,
+                "unrelated callers, unavailable tracking/readiness and unacknowledged vehicles retain native collision");
+        }
+        expect(choose(sample,false,true,1090)==WeaponObstructionMode::ignoreProximity
+            &&choose(sample,false,true,1091)==WeaponObstructionMode::native,
+            "the older weapon sample stops authorizing the bypass beyond 100 milliseconds");
+        auto stale=sample;stale.frameTime=949;
+        expect(choose(stale)==WeaponObstructionMode::native,"a stale rig cannot use a newer weapon sample to bypass cover");
+        auto future=sample;future.frameTime=1051;
+        expect(choose(future)==WeaponObstructionMode::native,"future rig timestamps refuse the bypass");
+        future=sample;future.weaponTime=1051;
+        expect(choose(future)==WeaponObstructionMode::native,"future weapon timestamps refuse the bypass");
+        sample.ready=false;
+        expect(weaponObstructionHitCount(1,choose(sample))==1,
+            "releasing the gun immediately restores the native result on the same owned instance");
+    }
     {
         NativeTermsMenu terms{100,41,5,1,0,2,3,true,true};
         expect(terms.ready(100)&&terms.ready(350),"a current typed Terms owner can retain native menu navigation");
@@ -443,6 +546,12 @@ int main(){
         expect(!reconModelVisible(HudMode::binocularsOnly,HudView::otherOptic,true),"rifle scopes cannot reveal recon bodies");
         expect(!reconModelVisible(HudMode::full,HudView::binoculars,false),"glow switch leaves body effect disabled even in full HUD mode");
         expect(!reconModelVisible(HudMode::off,HudView::binoculars,true),"HUD off disables recon body rendering");
+        expect(!reconModelVisible(HudMode::full,HudView::world,true),"world enemy labels cannot enable native recon-body shaders");
+        expect(worldMarkerVisible(HudMode::binocularsOnly,true,0),"world enemy labels are independently enabled");
+        expect(!worldMarkerVisible(HudMode::full,false,0),"enemy labels can be disabled independently of full HUD");
+        expect(worldMarkerVisible(HudMode::full,false,1),"enemy toggle preserves native waypoint labels");
+        expect(!worldMarkerVisible(HudMode::binocularsOnly,true,1),"enemy toggle does not enable every world HUD layer");
+        expect(!worldMarkerVisible(HudMode::off,true,0),"HUD Off also disables world enemy labels");
     }
     {
         ReconDwell dwell;constexpr uint16_t person=42,other=43;
@@ -462,6 +571,26 @@ int main(){
         expect(!dwell.update(other,3200,2,100),"a clock reversal restarts observation");
         expect(!dwell.update(other,3300,2,0),"disabled dwell cannot acquire");
         expect(!dwell.update(other,3400,2,100),"re-enabling requires a fresh dwell");
+    }
+    {
+        ReconClearPolicy clears;constexpr uint16_t person=42,other=43;
+        clears.scene(10,20);
+        expect(clears.automaticAllowed(person),"new native people remain available for binocular acquisition");
+        clears.clear(person);
+        expect(!clears.automaticAllowed(person)&&clears.automaticAllowed(other),"explicit clear suppresses only that actor");
+        ReconDwell dwell;dwell.update(person,1000,1,100);dwell.suppress();
+        dwell.update(std::nullopt,1100,1,100);dwell.update(person,1200,1,100);
+        expect(dwell.update(person,1300,1,100)&&!clears.automaticAllowed(person),"looking away cannot undo an explicit clear");
+        dwell.update(person,2000,2,100);dwell.update(person,2100,2,100);clears.scene(10,20);
+        expect(!clears.automaticAllowed(person),"tracking gaps and new eye activations keep the native scene clear policy");
+        clears.explicitMark(person);
+        expect(clears.automaticAllowed(person),"deliberate remark permits acquisition again");
+        clears.clear(person);clears.scene(11,20);
+        expect(clears.automaticAllowed(person),"a new native player starts a new scene clear policy");
+        clears.clear(person);clears.scene(11,21);
+        expect(clears.automaticAllowed(person),"replaced native actor records cannot retain another scene's clears");
+        clears.clear(person);clears.reset();clears.scene(11,21);
+        expect(clears.automaticAllowed(person)&&!clears.automaticAllowed(0xffff),"loading reset releases prior clears and rejects an invalid actor");
     }
     {
         expect(hudLayer(151,100,false,false)==HudLayer::general,"subtitles/notification layers are not wrist status");
@@ -2211,6 +2340,64 @@ int main(){
         expect(near(turn.update({1,0},1,30,true,2170,2),0),"new cabin generation discards an armed stick");
     }
     {
+        CabinWalkState cabin{};
+        const auto clear=[](Vec3,Vec3 to)->std::optional<Vec3>{return to;};
+        const Pose carrier{{},{10,20,30}};
+        advanceCabinWalk(cabin,carrier.position,{},{},1000,1,clear,1.f,false,true,carrier);
+        const auto walked=advanceCabinWalk(cabin,carrier.position,{},{0,1},1050,1,clear,1.f,false,true,carrier);
+        const Quat yaw{0,.70710678f,0,.70710678f};
+        const auto looked=advanceCabinWalk(cabin,carrier.position,yaw,{},1100,1,clear,1.f,false,true,carrier);
+        expect(same(looked,walked),"looking sideways cannot swing a passenger's walk offset around the seat");
+        const Quat pitch{.38268343f,0,0,.92387953f};
+        const auto pitched=advanceCabinWalk(cabin,carrier.position,pitch,{},1150,1,clear,1.f,false,true,carrier);
+        expect(same(pitched,walked),"looking up cannot lift or lower the accepted cabin walking position");
+        const auto leaned=advanceCabinWalk(cabin,carrier.position+Vec3{.1f,0,0},yaw,{},1200,1,clear,1.f,false,true,carrier);
+        expect(same(leaned,walked+Vec3{.1f,0,0}),"tracked leaning adds translation without rotating the accepted walk offset");
+        const Pose turningCarrier{yaw,{12,21,35}};
+        const auto carried=advanceCabinWalk(cabin,turningCarrier.position,pitch,{},1250,1,clear,1.f,false,true,turningCarrier);
+        expect(same(carried,Vec3{12.05f,21,35}),"the actual helicopter carries and rotates a passenger offset exactly once");
+    }
+    {
+        HeadCamera passenger;passenger.configure(true,1,true);
+        ControllerFrame input;input.cabinTransit=true;input.handheldMenus=true;
+        input.referenceEpoch=1;input.predictedXrTime=1;
+        auto root=identityMatrix;root[12]=100.f;
+        auto head=identityMatrix;head[13]=1.2f;
+        const Pose orbit{{0,std::sin(.3f),0,std::cos(.3f)},{94,3,-8}};
+        passenger.trackStereo({},rigEyes,true,100,input);passenger.toggle();
+        expect(passenger.publishPlayerHead(31,42,orbit,root,head,100),"passenger joins the actual native camera and seated player");
+        const auto seated=passenger.resolve(31,orbit,100);
+        expect(seated.applied&&same(seated.nativePose.position,seated.playerHead)&&seated.cabinBaseTracked,
+            "helicopter passengers start at the authored seated head without a standing shoulder/height offset");
+        const Quat yaw{0,.70710678f,0,.70710678f};
+        const Pose nativeOrbit{{0,std::sin(-1.f),0,std::cos(-1.f)},{92,4,8}};
+        head[12]=-.2f;head[13]=1.5f;head[14]=.18f;
+        passenger.trackStereo(Pose{yaw,{}},rigEyes,true,110,input);
+        passenger.publishPlayerHead(31,42,nativeOrbit,root,head,110);
+        const auto looking=passenger.resolve(31,nativeOrbit,110);
+        expect(looking.applied&&same(looking.nativePose.position,seated.nativePose.position),
+            "HMD turning, native camera orbit and seated idle animation cannot displace the passenger viewpoint");
+        expect(same(looking.cabinBasePose.position,seated.cabinBasePose.position)
+            &&same(rotate(looking.cabinBasePose.orientation,{0,0,1}),rotate(seated.cabinBasePose.orientation,{0,0,1})),
+            "the carrier pose retains the same native seat transaction before HMD rotation");
+        root[12]=103;root[13]=2;root[0]=root[10]=0;root[2]=-1;root[8]=1;
+        auto movingOrbit=nativeOrbit;movingOrbit.position.x+=3;
+        passenger.trackStereo({},rigEyes,true,120,input);
+        expect(passenger.publishPlayerHead(31,42,movingOrbit,root,head,120),"the moving camera remains within its native player ownership bound");
+        const auto carried=passenger.resolve(31,movingOrbit,120);
+        expect(carried.applied&&same(carried.nativePose.position,Vec3{103,3.2f,0}),
+            "native helicopter translation and turning carry the authored seat rather than a world anchor or animated head");
+        passenger.setNativeMenuOpen(true,true);
+        root[12]+=3;
+        movingOrbit.position.x+=3;
+        passenger.trackStereo({},rigEyes,true,130,input);
+        expect(passenger.publishPlayerHead(31,42,movingOrbit,root,head,130),"handheld cabin motion retains native camera/player ownership");
+        const auto phone=passenger.resolve(31,movingOrbit,130);
+        expect(phone.applied&&phone.menuIdroid&&phone.cabinBaseTracked
+            &&same(phone.nativePose.position,carried.nativePose.position+Vec3{3,0,0}),
+            "a passenger's handheld iDroid follows the same moving cabin and preserves the seated fit");
+    }
+    {
         HeadCamera driver;driver.configure(true,1,true);
         ControllerFrame input;input.vehicleControls=true;input.vehicleMounted=true;input.handheldMenus=true;
         input.referenceEpoch=1;input.predictedXrTime=1;
@@ -2271,6 +2458,31 @@ int main(){
         expect(!driver.resolve(31,unmatched,400).applied
             &&driver.status().reason==HeadCameraStop::playerHeadUnavailable,
             "moving handheld vehicle eyes reject an unmatched native camera/player transaction");
+    }
+    {
+        HeadCamera handset;handset.configure(true,1,true);
+        ControllerFrame input;input.handheldMenus=true;input.snapYaw=.5f;
+        const Pose lookingUp{{.258819f,0,0,.965926f},{.1f,0,.2f}};
+        handset.trackStereo(lookingUp,rigEyes,true,100,input);handset.toggle();
+        handset.publishPlayerHead(31,42,thirdPerson,playerRoot,headBone,100);
+        const auto before=handset.resolve(31,thirdPerson,100);
+        handset.setNativeMenuOpen(true,true);
+        const auto opened=handset.resolve(31,thirdPerson,100);
+        expect(before.applied&&opened.applied
+            &&same(rotate(before.nativePose.orientation,{0,0,1}),rotate(opened.nativePose.orientation,{0,0,1}))
+            &&same(before.nativePose.position,opened.nativePose.position),
+            "opening a live handheld iDroid retains physical pitch, snap heading and roomscale position");
+        handset.trackStereo({},rigEyes,true,110,input);
+        const Pose nativeTilt{{.5f,0,0,.8660254f},thirdPerson.position};
+        handset.publishPlayerHead(31,42,nativeTilt,playerRoot,headBone,110);
+        const auto level=handset.resolve(31,nativeTilt,110);
+        const auto levelForward=rotate(level.nativePose.orientation,{0,0,1});
+        expect(level.applied&&near(levelForward.y,0)&&near(levelForward.x,std::sin(.5f)),
+            "returning the HMD to level while handheld is open stays level despite native camera pitch");
+        handset.setNativeMenuOpen(false,false);
+        const auto closed=handset.resolve(31,nativeTilt,110);
+        expect(closed.applied&&same(rotate(closed.nativePose.orientation,{0,0,1}),levelForward),
+            "stowing the live handset preserves the same gameplay facing");
     }
     {
         HeadCamera guide;guide.configure(true,1,true);

@@ -56,6 +56,13 @@ For example, `-Action Set -Setting settings.support_detach_radius_cm=35` changes
 only that setting. Add `-Runtime` to edit runtime options.
 The bindings below describe the defaults, not a hard-coded layout.
 
+For handheld iDroid tabs, hold **left grip** and flick the **right stick left**
+for LB / Previous or **right** for RB / Next. Center the stick before repeating;
+keep the grip held. Each flick changes one tab without moving the menu cursor
+or Snake. The **left stick moves Snake with focus released**, and navigates
+lists/cursors while left grip focuses iDroid. The existing **right-grip page loop** remains, as does left grip +
+left-stick click for Previous. Both iDroid tab chords are editable in the launcher.
+
 `[settings] hud_mode = binoculars_only` is the default: enhanced world cues
 appear only in the binocular scene while the device is aligned with an eye.
 Holding binoculars down does not enable them, and firearm scopes do not reveal
@@ -338,6 +345,9 @@ keeps the same left/right orientation as the unzoomed world. Waypoint letters an
 drawn inside this view. With `binocular_auto_mark = 1`, holding the sight on a
 visible person acquires their native marker after the configured dwell. Intel
 radio remains an explicit X action.
+Press A to clear a target. It stays cleared when you look away and back, lower
+or stow the binoculars, or open iDroid. Press the marking trigger deliberately
+to mark it again. Clears reset when entering a new native scene.
 The default `binocular_pitch_degrees = -90` tilts the device down 90° around the
 right palm position. Both palms face the housing sides, with the fingers curling
 over its top, not pointing back at the eye. Housing, lens, aiming ray and cupped
@@ -439,8 +449,9 @@ is preserved.
 
 **Left stick** selects menu rows; **A** confirms and **B** goes back.
 The **right stick** moves the live map. In handheld mode, hold **left grip**
-for menu control; **left grip + left-stick click** selects the previous tab,
-and **right grip** selects the next tab. Ordinary spatial menus retain
+for menu control; **right-stick left/right** selects previous/next tabs,
+**left-stick click** remains an alternative for Previous, and **right grip**
+keeps the next-tab loop. Release focus for left-stick movement. Ordinary spatial menus retain
 **left/right grip** as **LB/RB**. Triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
 zoom step and **Y** switches MAP/NAV. **B** closes iDroid; hold **Menu** again to
 unpause. Holding Menu *inside iDroid* opens its native Help, so close iDroid before
@@ -542,11 +553,34 @@ and **MISSIONS TO DEPLOY** hint. During ordinary field-helicopter travel, cabin
 movement follows the live helicopter and checks native clearance. **Y** retains
 the native exit action when offered. Authored cinematics retain game ownership.
 
-**Use tracked gun for cover clearance** (`settings.tracked_weapon_obstruction`)
-redirects the native weapon sweep to the rendered barrel. The original native
-query radius, collision filters, ammunition rules and projectile collision are
-preserved. Disable this option to restore the native posture-derived sweep.
+**Block firing near cover** (`settings.block_firing_near_cover`) defaults to
+**Off**. For a currently held, tracked local firearm, nearby cover no longer
+vetoes firing through the native proximity check. Bullets still collide with the
+world; ammunition, reload and other weapon restrictions remain active.
+
+When cover blocking is **On**, **Use tracked gun for cover clearance**
+(`settings.tracked_weapon_obstruction`, default **On**) redirects the native
+weapon sweep to the rendered barrel. Its native radius and collision filters
+are preserved. Turn the tracked-clearance option Off to use the original
+posture-derived sweep while retaining cover blocking. Missing or stale tracking
+and unverified weapon ownership retain native behavior.
 The latest build's verification state is recorded in `docs/CURRENT.md`.
+
+**Enemy markers in the world** (`settings.enemy_world_markers`, default **Off**)
+shows already acquired native enemy tags at their world positions in each eye.
+It does not reveal unmarked enemies. Physical binocular acquisition and marking
+and the native iDroid map remain available. **HUD Off** hides these world labels.
+Native recon silhouette shaders remain inside the physical binocular view.
+
+**God mode** (`settings.god_mode`, default **Off**) disables damage to Snake in
+single-player gameplay. Turning it off releases only the mod's damage protection;
+native cinematic and tutorial protection remain under the game's ownership.
+Title, hospital opening and FOB missions are excluded. Target deaths and other
+mission-failure conditions still apply. This setting does not change saves,
+equipment, ammunition or health values directly.
+
+Both toggles are in the launcher's **VR settings**. Save changes, release all
+buttons and grips and center both sticks for two seconds to apply them in game.
 
 ## Test scope
 

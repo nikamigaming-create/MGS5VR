@@ -13,7 +13,7 @@ from gameplay_bot.core import ActionPrerequisiteChanged, Behaviors, BlankComposi
 from gameplay_bot.live import Live, NativeReader, authoritative_context, channel, fresh_control_observation, held_input_evidence, released_startup_observation, require_presentation_transition, rotate, static_grip_capture_allowed
 from gameplay_bot.recording import Recording, after_verified_arrival, mux_timeline, validate_raw_video
 from gameplay_bot.session import run_suite
-from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack, capture_continue_rack
+from gameplay_bot.startup import advance_startup, capture_startup_baseline, wait_for_continue_rack, capture_continue_rack, online_information_close
 from gameplay_bot.startup_evidence import StartupEvidence
 from gameplay_bot.menus import navigate as navigate_menu, observe as observe_menu
 from gameplay_bot.optic_exposure import require_independent_luminance
@@ -411,6 +411,176 @@ class HandheldFocusHandoffTests(unittest.TestCase):
         live._execute.assert_not_called()
 
 
+class ContinuousMenuFocusTests(unittest.TestCase):
+    def fixture(self, *, focus='left_grip', axis='left_stick', confirm='a', fault=None):
+        self.clock = Clock()
+        live = Live.__new__(Live)
+        live.events = mock.Mock()
+        live.held = {}
+        live.transport_error = None
+        live.bindings = {'actions':[
+            {'name':'system.idroid_focus','modifier':True,'contexts':['gameplay','menus'],
+             'bindings':[{'gesture':'level','inputs':[focus],'milliseconds':300}]},
+            *[{'name':name,'label':name,'contexts':['menus'],'bindings':[
+                {'gesture':'level','inputs':[token],'milliseconds':300}]}
+              for name,token in [('menus.confirm',confirm),('menus.back','b')]]],
+            'axes':[{'name':'axes.menu','source':axis}]}
+        active, commands, observations = {}, [], []
+        def key(c):
+            return c['hand'], c['component'], c.get('sub_component')
+        def call(tool, args):
+            self.assertEqual(tool, 'set_controller_input')
+            commands.append((self.clock(), copy.deepcopy(args)))
+            token = key(args)
+            if args['value']:
+                active[token] = (args['value'], self.clock()+args['hold_duration'])
+            else:
+                active.pop(token, None)
+            self.clock.sleep(.001)
+        def observe(native=False, *, fast_only=False):
+            self.clock.sleep(.01)
+            for token, (_, expiry) in list(active.items()):
+                if self.clock() >= expiry:
+                    del active[token]
+            physical, sticks = [0.]*11, [0.]*4
+            tokens = ['a','b','x','y','menu','left_stick_click','right_stick_click',
+                      'left_grip','right_grip','left_trigger','right_trigger']
+            for index, token in enumerate(tokens):
+                physical[index] = active.get(key(channel(token)), (0.,0))[0]
+            for index, token in enumerate(['left_stick_left','left_stick_up','right_stick_left','right_stick_up']):
+                sticks[index] = active.get(key(channel(token)), (0.,0))[0]
+            held = bool(physical[7 if focus == 'left_grip' else 8])
+            observations.append((self.clock(), native, fast_only, held))
+            stamp = 1000+int(self.clock()*1000)
+            packet = sum(mask for value,mask in zip(physical[:4], [0x1000,0x2000,0x4000,0x8000]) if value)
+            state = {'now_ms':stamp,'scene':'menu','menu':True,'idroid':True,'idroid_closing':False,
+                'pause':False,'title':False,'loading':False,'demo':False,'gamepad':False,
+                'camera_active':True,'idroid_handheld':True,'idroid_menu_routing_available':True,
+                'idroid_tutorial_mode':0,'idroid_menu_control':2 if held else 1,
+                'idroid_menu_input_ready':True,'popup_observer':{'active':False},
+                'rendered':{'player_owner':1234,'activation':7},'transport':{'seconds':.001},
+                'native':{'mission':40010,'sequence':'Seq_Game_MainGame','helicopter_space':True,'popup':False,'saving':False},
+                'controls':{'context':'menus' if held else 'gameplay','sample_ms':stamp,'age_ms':0,'rig_input':True,
+                    'physical':physical,'sticks':sticks,'native_buttons':packet,'native_axes':[int(v*32767) for v in sticks],
+                    'native_triggers':[0,0],'native_packet_source':'xr_runtime_final_mapped_packet'}}
+            if held and self.clock() > .8:
+                if fault == 'ready':state['idroid_menu_input_ready'] = False
+                elif fault == 'owner':state['rendered']['activation'] = 8
+                elif fault == 'grip':state['controls']['physical'][7 if focus == 'left_grip' else 8] = 0.
+                elif fault == 'extra':state['controls']['physical'][10] = 1.
+                elif fault == 'tutorial':state['idroid_tutorial_mode'] = 1
+            if fault == 'cleanup' and self.clock() > 5.5 and not held:
+                state['controls']['physical'][0] = 1.
+            return state
+        live.call, live.observe = call, observe
+        def execute(recipe):
+            if recipe['op'] == 'menu_navigate':
+                return navigate_menu(live, recipe, clock=self.clock, sleep=self.clock.sleep)
+            return Live._execute(live, recipe)
+        live._execute = execute
+        return live, active, commands, observations
+
+    @staticmethod
+    def sequence():
+        return {'op':'menu_focus_sequence','seconds':5.5,
+            'native_before':{'mission':40010,'sequence':'Seq_Game_MainGame','helicopter_space':True,'popup':False,'saving':False},
+            'steps':[{'op':'menu_navigate','direction':'down','mode':'hold','seconds':1.1},
+                     {'op':'action','name':'menus.confirm','seconds':.12},
+                     {'op':'action','name':'menus.back','seconds':.12}]}
+
+    def run_sequence(self, live, step=None):
+        with mock.patch('gameplay_bot.live.time.monotonic', self.clock), \
+                mock.patch('gameplay_bot.live.time.sleep', self.clock.sleep):
+            return live.execute(step or self.sequence())
+
+    def test_real_actions_and_scroll_keep_focus_for_five_seconds_and_finally_verify_neutral(self):
+        live, active, commands, observations = self.fixture()
+        result = self.run_sequence(live)
+        self.assertEqual(result['steps_completed'], 3)
+        self.assertGreaterEqual(result['sampled_focus_milliseconds'], 5500)
+        self.assertLess(self.clock(), 10.)
+        self.assertEqual(active, {})
+        self.assertEqual(live.held, {})
+        self.assertFalse(live._menu_focus_sequence_active)
+        self.assertEqual(live._menu_focus_keep, ())
+        grip = [(t,c) for t,c in commands if c['component']=='Grip' and c['hand']=='left']
+        positive = [(t,c) for t,c in grip if c['value']]
+        self.assertGreaterEqual(len(positive), 2)
+        self.assertTrue(all(c['auto_release'] and 0 < c['hold_duration'] <= 5 for _,c in positive))
+        self.assertFalse(any(c['value']==0 for t,c in grip if positive[0][0] < t < positive[-1][0]))
+        self.assertTrue(all(not native and fast for _,native,fast,held in observations if held))
+        self.assertEqual(sum(native for _,native,_,_ in observations), 1)
+        kinds = [c.args[0] for c in live.events.emit.call_args_list]
+        self.assertIn('menu_focus_sequence_neutral', kinds)
+        self.assertEqual(kinds.count('menu_focus_sequence_step_completed'), 3)
+        self.assertFalse(result['page_outcome_proven'])
+
+    def test_effective_focus_stick_and_face_remaps_are_resolved(self):
+        live, active, commands, _ = self.fixture(focus='right_grip', axis='right_stick', confirm='x')
+        self.run_sequence(live)
+        pressed = [c for _,c in commands if c['value']]
+        self.assertTrue(any(c['hand']=='right' and c['component']=='Grip' for c in pressed))
+        self.assertTrue(any(c['hand']=='right' and c['component']=='Thumbstick' for c in pressed))
+        self.assertTrue(any(c == {**channel('x'),'auto_release':True,'hold_duration':c['hold_duration']} for c in pressed if c['component']==channel('x')['component']))
+        self.assertEqual(active, {})
+
+    def test_readiness_owner_grip_tutorial_or_foreign_input_loss_aborts_before_confirm_and_cleans(self):
+        for fault in ('ready','owner','grip','tutorial','extra'):
+            with self.subTest(fault=fault):
+                live, active, commands, _ = self.fixture(fault=fault)
+                with self.assertRaises(BotFault):self.run_sequence(live)
+                self.assertEqual(active, {})
+                self.assertFalse(any(c['value'] and c['component']==channel('a')['component'] for _,c in commands))
+                self.assertIn('menu_focus_sequence_neutral', [c.args[0] for c in live.events.emit.call_args_list])
+
+    def test_nested_arbitrary_multi_confirm_invalid_durations_and_lua_guards_are_rejected_before_input(self):
+        variants=[]
+        for seconds in (4.99,8.01,True,float('nan'),float('inf')):
+            s=self.sequence();s['seconds']=seconds;variants.append(s)
+        s=self.sequence();s['steps'][2]['name']='menus.confirm';variants.append(s)
+        s=self.sequence();s['steps'][0]['native_before']={'mission':40010};variants.append(s)
+        s=self.sequence();s['steps'][1]['name']='gameplay.fire_or_cqc';variants.append(s)
+        s=self.sequence();s['steps'][0]['op']='menu_focus_sequence';variants.append(s)
+        s=self.sequence();s['steps']=s['steps'][:2];variants.append(s)
+        for s in variants:
+            live, _, commands, _=self.fixture()
+            with self.assertRaises(BotFault):self.run_sequence(live,s)
+            self.assertEqual(commands, [])
+
+    def test_changed_initial_native_scene_prevents_grip(self):
+        live, _, commands, _=self.fixture()
+        s=self.sequence();s['native_before']['mission']=30010
+        with self.assertRaises(ActionPrerequisiteChanged):self.run_sequence(live,s)
+        self.assertEqual(commands, [])
+
+    def test_lua_request_or_independent_lease_expiry_inside_step_releases_everything(self):
+        for fault in ('lua','stall'):
+            live, active, _, _=self.fixture()
+            def interrupted(recipe):
+                if fault=='lua':return live.observe(native=True)
+                self.clock.sleep(5.1)
+                return live.observe()
+            live._execute=interrupted
+            with self.assertRaisesRegex(BotFault, 'Lua observation|lease expired'):self.run_sequence(live)
+            self.assertEqual(active,{})
+
+    def test_cleanup_requires_observed_neutral_not_just_release_rpc(self):
+        live, active, _, _=self.fixture(fault='cleanup')
+        with self.assertRaisesRegex(BotFault,'cleanup did not establish|fresh neutral XR sample'):self.run_sequence(live)
+        self.assertEqual(active,{})
+        self.assertLess(self.clock(),10.)
+
+    def test_fast_only_live_observation_cannot_fall_back_to_lua_after_owner_loss(self):
+        live=Live.__new__(Live)
+        live.background_check=None;live.process_handle=1;live.last_tick=None;live.held={}
+        live.kernel=mock.Mock();live.kernel.WaitForSingleObject.return_value=258
+        live.events=mock.Mock();live.native=mock.Mock();live.lua_script='must not run'
+        live.native.read.return_value=({'now_ms':1,'camera_active':False,'controls':{'context':'nativeButtons'}},{'seconds':.001})
+        live.observe(fast_only=True)
+        live.native.read.assert_called_once_with('inspect-bot-state')
+        with self.assertRaises(BotFault):live.observe(native=True,fast_only=True)
+
+
 class AtomicStatusTests(unittest.TestCase):
     def test_transient_windows_sharing_conflict_preserves_then_replaces_complete_status(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -745,6 +915,79 @@ class MenuNavigationTests(unittest.TestCase):
                       clock=clock, sleep=clock.sleep)
         self.assertGreaterEqual(clock.now, .28)
         self.assertEqual(active, [])
+
+    def test_idroid_long_scroll_samples_the_whole_hold_then_neutral(self):
+        live, clock, active = self.fixture()
+        original = live.observe.side_effect
+        held_samples, held_lua_reads = [], []
+        def state(native=False):
+            value = original(native)
+            if active:
+                held_samples.append(value["controls"]["sample_ms"])
+                if native:
+                    held_lua_reads.append(True)
+            return value
+        live.observe.side_effect = state
+        result = navigate_menu(live, {"direction":"down", "mode":"hold", "seconds":1.1},
+                               clock=clock, sleep=clock.sleep)
+        live.input.assert_called_once_with([channel("left_stick_down")], 1.1, lease_seconds=2.)
+        self.assertGreaterEqual(held_samples[-1] - held_samples[0], 1100)
+        self.assertLess(held_samples[-1] - held_samples[0], 1150)
+        # Ordinary native repeat intervals remain held; a cursor edge would
+        # have released on the first sample and cannot satisfy this contract.
+        self.assertGreater(len(set(stamp // 150 for stamp in held_samples)), 7)
+        self.assertEqual(held_lua_reads, [])
+        self.assertGreaterEqual(result["controls"]["sample_ms"] - held_samples[-1], 100)
+        self.assertEqual(result["controls"]["sticks"], [0.] * 4)
+        self.assertEqual(active, [])
+        self.assertEqual(live.release.call_count, 2)
+        self.assertLess(clock.now, 1.4)
+
+    def test_menu_duration_boundaries_preserve_short_edges_and_explicit_scroll(self):
+        for mode, seconds in (("edge", .08), ("edge", .25), ("hold", .08), ("hold", 1.25)):
+            with self.subTest(mode=mode, seconds=seconds):
+                live, clock, active = self.fixture()
+                navigate_menu(live, {"direction":"down", "mode":mode, "seconds":seconds},
+                              clock=clock, sleep=clock.sleep)
+                self.assertEqual(active, [])
+                self.assertEqual(live.input.call_args.kwargs, {"lease_seconds":2.})
+                self.assertLess(clock.now, 2.)
+        for mode, seconds in (("edge", .079), ("edge", .251), ("edge", 1.1),
+                              ("hold", .079), ("hold", 1.251), ("hold", True),
+                              ("hold", float("nan")), ("hold", float("inf"))):
+            with self.subTest(mode=mode, seconds=seconds):
+                live, clock, _ = self.fixture()
+                with self.assertRaisesRegex(BotFault, "sampled milliseconds"):
+                    navigate_menu(live, {"direction":"down", "mode":mode, "seconds":seconds},
+                                  clock=clock, sleep=clock.sleep)
+                live.observe.assert_not_called()
+                live.input.assert_not_called()
+        live, clock, _ = self.pause_fixture()
+        with self.assertRaisesRegex(BotFault, "only iDroid"):
+            navigate_menu(live, {"owner":"pause", "direction":"down", "mode":"hold", "seconds":1.1,
+                                "native_before":{"mission":10040}}, clock=clock, sleep=clock.sleep)
+        live.input.assert_not_called()
+
+    def test_long_scroll_still_releases_on_owner_loss_and_retains_expiry(self):
+        for fault in ("owner_loss", "unsampled", "stuck_release"):
+            with self.subTest(fault=fault):
+                live, clock, active = self.fixture(fault=fault)
+                original = live.observe.side_effect
+                def state(native=False):
+                    value = original(native)
+                    if fault == "owner_loss" and active and clock.now >= .5:
+                        value["idroid_menu_input_ready"] = False
+                    return value
+                live.observe.side_effect = state
+                message = {"owner_loss":"native input owner", "unsampled":"before expiry",
+                           "stuck_release":"stayed held"}[fault]
+                with self.assertRaisesRegex(BotFault, message):
+                    navigate_menu(live, {"direction":"down", "mode":"hold", "seconds":1.1},
+                                  clock=clock, sleep=clock.sleep)
+                self.assertEqual(active, [])
+                self.assertEqual(live.release.call_count, 2)
+                self.assertEqual(live.input.call_args.kwargs, {"lease_seconds":2.})
+                self.assertLess(clock.now, 2.3)
 
     def test_idroid_native_guard_is_checked_before_dispatch(self):
         live, clock, _ = self.fixture()
@@ -3126,6 +3369,64 @@ class MenuCleanupTests(unittest.TestCase):
 
 
 class StartupTests(unittest.TestCase):
+    @staticmethod
+    def information_close():
+        return {'now_ms':1000,'scene':'cinematic','camera_active':False,
+                'title':False,'menu':False,'idroid':False,'pause':False,'title_menu':False,
+                'terms_menu':{'verified':True,'active':True,'ready':True,'owner':41,
+                    'sample_ms':990,'phase':5,'mode':2,'horizontal':1,'vertical':0,'action':1},
+                'native':{'mission':1,'sequence':'Seq_Demo_LogInKonamiServer',
+                          'title':False,'popup':False,'saving':False}}
+
+    def test_reviewed_information_close_advances_once_with_typed_selection_guard(self):
+        information=self.information_close()
+        menu=self.stage('Seq_Demo_StartHasTitleMission',menu=True)
+        live=mock.Mock();live.observe.side_effect=[information,information,menu];clock=Clock()
+        self.assertTrue(online_information_close(information))
+        self.assertIs(advance_startup(live,clock=clock,sleep=clock.sleep),menu)
+        live.execute.assert_called_once()
+        step=live.execute.call_args.args[0]
+        self.assertEqual(step['name'],'menus.confirm')
+        self.assertEqual(step['seconds'],.3)
+        self.assertEqual(step['state_before']['terms_menu.mode'],2)
+        self.assertEqual(step['state_before']['terms_menu.action'],1)
+        self.assertFalse(step['native_before']['popup'])
+
+    def test_information_next_pages_finish_before_title_without_idle_timeout(self):
+        information=self.information_close()
+        menu=self.stage('Seq_Demo_StartHasTitleMission',menu=True)
+        live=mock.Mock();clock=Clock();pages=[]
+        live.observe.side_effect=lambda **_: information if len(pages)<3 else menu
+        live.execute.side_effect=lambda step: pages.append(step)
+        self.assertIs(advance_startup(live,clock=clock,sleep=clock.sleep),menu)
+        self.assertEqual(len(pages),3)
+        self.assertTrue(all(p['state_before']['terms_menu.mode']==2 for p in pages))
+        self.assertGreaterEqual(clock.now,2.)
+
+    def test_information_confirmation_stops_after_eight_pages_on_stuck_screen(self):
+        live=mock.Mock();clock=Clock()
+        live.observe.return_value=self.information_close()
+        with self.assertRaisesRegex(BotFault,'Native startup deadline'):
+            advance_startup(live,timeout=10.,clock=clock,sleep=clock.sleep)
+        self.assertEqual(live.execute.call_count,8)
+
+    def test_information_close_rejects_agreements_stale_owner_other_choices_and_scenes(self):
+        for change in ({'mode':3},{'action':0},{'horizontal':0},{'vertical':1},
+                       {'phase':4},{'owner':0},{'owner':True},{'verified':False},
+                       {'ready':False},{'active':False},{'sample_ms':749},{'sample_ms':1001}):
+            with self.subTest(change=change):
+                state=self.information_close();state['terms_menu'].update(change)
+                self.assertFalse(online_information_close(state))
+        for change in ({'scene':'gameplay'},{'idroid':True},{'menu':True},{'pause':True},
+                       {'camera_active':True},{'title':True}):
+            with self.subTest(change=change):
+                self.assertFalse(online_information_close({**self.information_close(),**change}))
+        for change in ({'mission':40010},{'sequence':'Seq_Game_MainGame'},
+                       {'popup':True},{'saving':True},{'title':True}):
+            with self.subTest(change=change):
+                state=self.information_close();state['native'].update(change)
+                self.assertFalse(online_information_close(state))
+
     @staticmethod
     def stage(sequence, popup=False, menu=False):
         return {"scene": "title", "title_menu": menu, "press_start_ready": True,

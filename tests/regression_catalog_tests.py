@@ -220,8 +220,12 @@ class CatalogTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         (self.root / catalog.CATALOG).write_text(json.dumps(self.data), encoding="utf-8")
-        play = self.root / "play"
-        play.mkdir()
+        play = self.root / "build/dev"
+        play.mkdir(parents=True)
+        published = self.root / "play"
+        published.mkdir()
+        (published / "dinput8.dll").write_bytes(b"last published release")
+        (published / "BUILD.json").write_text('{"published": true}', encoding="utf-8")
         names = {"docs/RELEASE_2026-10-02.1.md", "dinput8.dll", "MGS5VR-Launcher.exe",
                  "MGS5VR-FieldKit.exe", "mgs5vr_import.exe", "mgs5vr_controls.exe", "mgs5vr_probe.exe",
                  "Install.cmd", "Launch-Headset.cmd", "tools/setup.ps1", "tools/install.ps1", "LICENSE",
@@ -241,7 +245,7 @@ class CatalogTests(unittest.TestCase):
                  "files": {name: module.digest(play / name) for name in names},
                  "validation": {"automated": "passed", "full_game": "unproven", "headset": "unproven"}}
         (play / "BUILD.json").write_text(json.dumps(build), encoding="utf-8")
-        for field, value in (("ROOT", self.root), ("PLAY", play)):
+        for field, value in (("ROOT", self.root), ("DEV", play)):
             patcher = patch.object(module, field, value)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -263,10 +267,15 @@ class CatalogTests(unittest.TestCase):
 
     def test_patch_package_discloses_waiver_and_keeps_exact_patch_notes(self):
         module, play, source, build, output, archive_mock = self.package_fixture()
+        published = self.root / "play"
+        published_before = {path.name: path.read_bytes() for path in published.iterdir()}
         with redirect_stdout(io.StringIO()):
             module.package("experimental-2026-10-02.1", output, allow_known_issues=True)
         archive_mock.assert_called_once()
+        self.assertEqual({path.name: path.read_bytes() for path in published.iterdir()}, published_before)
         with zipfile.ZipFile(output / "MGS5VR-experimental-2026-10-02.1.zip") as archive:
+            self.assertEqual(archive.read("MGS5VR/dinput8.dll"), (play / "dinput8.dll").read_bytes())
+            self.assertNotEqual(archive.read("MGS5VR/dinput8.dll"), published_before["dinput8.dll"])
             release = json.loads(archive.read("MGS5VR/RELEASE.json"))
             self.assertEqual(release["notes"], "docs/RELEASE_2026-10-02.1.md")
             self.assertEqual(release["source_commit"], source["commit"])
@@ -309,7 +318,7 @@ class CatalogTests(unittest.TestCase):
         dll = play / "dinput8.dll"
         original = dll.read_bytes()
         dll.write_bytes(b"unchecked binary")
-        with self.assertRaisesRegex(ValueError, "Checked play file changed"):
+        with self.assertRaisesRegex(ValueError, "Checked development file changed"):
             module.package("experimental-2026-10-02.1", output, allow_known_issues=True)
         dll.write_bytes(original)
         (self.root / "config/mgs5vr.ini").write_text("different public defaults", encoding="utf-8")

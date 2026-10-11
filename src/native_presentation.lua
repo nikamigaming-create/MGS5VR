@@ -41,6 +41,20 @@ end
 if sequenceName == 'Seq_Game_AvatarEdit' then return 'avatar-edit' end
 if title and helicopterSpace then return 'title-cabin' end
 
+-- Rewards have their own BonusPopup controller, separate from both the
+-- iDroid and IsShowPopup. A live foreground popup owns Confirm even when
+-- the mission keeps its gameplay sequence or a background demo is active.
+-- Only affirmative native UI queries can claim this owner; player status
+-- and sequence names alone cannot create a modal menu.
+local popup = not title and (queryBoolean(TppUiCommand, 'IsShowBonusPopup') == true
+        or queryBoolean(TppUiCommand, 'IsShowPopup') == true)
+local function presentation(owner)
+    -- Keep the underlying cabin/cinematic owner across the modal boundary.
+    -- Closing a reward must not reset a passenger's accepted walking offset.
+    if popup then return 'native-popup:' .. owner end
+    return owner
+end
+
 -- These hospital lessons read PlayerVars.rightStickX/Y while an authored
 -- scene can still be playing. They need native look input, not locomotion or
 -- combat input. Match both the mission and exact interactive sequence; a
@@ -48,8 +62,8 @@ if title and helicopterSpace then return 'title-cabin' end
 local lookLesson = missionCode == 10010 and
     (sequenceName == 'Seq_Game_FewDaysLater0' or sequenceName == 'Seq_Game_FewDaysLater1')
 if lookLesson then
-    if title then return 'scripted-look-title' end
-    return 'scripted-look'
+    if title then return presentation('scripted-look-title') end
+    return presentation('scripted-look')
 end
 
 local namedDemo = type(sequenceName) == 'string' and string.sub(sequenceName, 1, 9) == 'Seq_Demo_'
@@ -64,29 +78,29 @@ local nonPlayableDemo = queryBoolean(TppDemo, 'IsNotPlayable')
 -- state; any missing query/status keeps the authored presentation conservative.
 if activeDemo == true then
     if lookLesson then
-        if title then return 'scripted-look-title' end
-        return 'scripted-look'
+        if title then return presentation('scripted-look-title') end
+        return presentation('scripted-look')
     end
     if not title and nonPlayableDemo == false then
         local normalAction = checkStatus('NORMAL_ACTION')
         local partsActive = checkStatus('PARTS_ACTIVE')
         if normalAction == true and partsActive == true then
-            return 'closed'
+            return presentation('closed')
         end
     end
-    if title then return 'scripted-demo-title' end
-    return 'scripted-demo'
+    if title then return presentation('scripted-demo-title') end
+    return presentation('scripted-demo')
 end
 
 -- A positive non-playable result means an authored/paused cinematic even if
 -- the active-demo API has a transient false result.
 if nonPlayableDemo == true then
-    if title then return 'scripted-demo-title' end
-    return 'scripted-demo'
+    if title then return presentation('scripted-demo-title') end
+    return presentation('scripted-demo')
 end
 
 if namedDemo then
-    if title then return 'scripted-demo-title' end
+    if title then return presentation('scripted-demo-title') end
     -- Never infer gameplay from a sequence name alone. Missing/error native
     -- queries, incomplete mission prep, or unavailable player-control state
     -- retain the conservative authored-demo presentation.
@@ -95,17 +109,17 @@ if namedDemo then
     local partsActive = checkStatus('PARTS_ACTIVE')
     if activeDemo == false and nonPlayableDemo == false and missionPrepared == true
             and normalAction == true and partsActive == true and type(missionCode) == 'number' then
-        return 'stale-demo-candidate:' .. tostring(missionCode) .. ':' .. sequenceName
+        return presentation('stale-demo-candidate:' .. tostring(missionCode) .. ':' .. sequenceName)
     end
-    if title then return 'scripted-demo-title' end
-    return 'scripted-demo'
+    if title then return presentation('scripted-demo-title') end
+    return presentation('scripted-demo')
 end
 
 -- An unavailable demo API is not evidence that an ordinary game sequence is
 -- playable: demos can run inside Seq_Game_* names too. Stay conservative.
 if activeDemo == nil or nonPlayableDemo == nil then
-    if title then return 'scripted-demo-title' end
-    return 'scripted-demo'
+    if title then return presentation('scripted-demo-title') end
+    return presentation('scripted-demo')
 end
 
 if title then return 'title' end
@@ -118,13 +132,13 @@ if helicopterSpace then
             or sequenceName == 'Seq_Game_MissionPreparation_SelectSlot'
             or sequenceName == 'Seq_Game_MissionPreparation_SelectDetail'
             or sequenceName == 'Seq_Game_WeaponCustomize' then
-        return 'cabin-menu'
+        return presentation('cabin-menu')
     end
-    return 'cabin'
+    return presentation('cabin')
 end
 -- The mission keeps Seq_Game_MainGame on its failure screen. Check the
 -- retail game-over state only after authored demos have retained ownership.
-if queryBoolean(TppMission, 'IsGameOver') == true then return 'game-over' end
+if queryBoolean(TppMission, 'IsGameOver') == true then return presentation('game-over') end
 -- The streamed field helicopter is not the static ACC space. Resolve the
 -- actual local passenger owner, rather than a stale vehicle variable alone.
 -- Authored cinematics and loading have already kept their own owners above.
@@ -135,7 +149,7 @@ if checkStatus('PARTS_ACTIVE') == true and type(Player) == 'table'
     if ok and type(ridden) == 'number' and ridden ~= 65535
             and type(vars) == 'table' and vars.playerVehicleGameObjectId == ridden then
         local kindOk, helicopter = pcall(Tpp.IsHelicopter, ridden)
-        if kindOk and helicopter == true then return 'cabin-flight' end
+        if kindOk and helicopter == true then return presentation('cabin-flight') end
     end
 end
-return 'closed'
+return presentation('closed')

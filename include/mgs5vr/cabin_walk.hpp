@@ -81,7 +81,8 @@ std::optional<Vec3> resolveCabinMovement(Vec3 from,Vec3 target,Sweep sweep,Suppo
 template<class Resolve>
 Vec3 advanceCabinWalk(CabinWalkState& state,Vec3 basePosition,Quat heading,
     std::array<float,2> axis,uint64_t nowMs,uint64_t sceneGeneration,Resolve resolve,
-    float metersPerSecond=.85f,bool menuOpen=false,bool movingBase=false) {
+    float metersPerSecond=.85f,bool menuOpen=false,bool movingBase=false,
+    std::optional<Pose> transportFrame=std::nullopt) {
     if(!valid(Pose{heading,basePosition})||!sceneGeneration
        ||!std::isfinite(metersPerSecond)||metersPerSecond<0){
         state={};
@@ -89,19 +90,22 @@ Vec3 advanceCabinWalk(CabinWalkState& state,Vec3 basePosition,Quat heading,
     }
     if(state.sceneGeneration!=sceneGeneration){
         state={Vec3{},basePosition,nowMs,sceneGeneration};
-        state.lastBase={heading,basePosition};state.baseTracked=true;
+        state.lastBase=transportFrame.value_or(Pose{heading,basePosition});state.baseTracked=true;
         return basePosition;
     }
     if(movingBase){
         // Carry the accepted offset with the live cabin before sweeping a
         // walking step. A world-anchored position would trail a moving heli.
-        const Pose currentBase{heading,basePosition};
+        // Walking follows the viewer's heading; transport follows the cabin.
+        // Using HMD rotation here swings an accepted walk offset around the
+        // seat whenever the passenger looks around, even on the ground.
+        const Pose currentBase=transportFrame.value_or(Pose{heading,basePosition});
         if(state.baseTracked){
-            const auto delta=basePosition-state.lastBase.position;
+            const auto delta=currentBase.position-state.lastBase.position;
             if(dot(delta,delta)>900.f||nowMs<state.lastUpdateMs||nowMs-state.lastUpdateMs>500){
                 state.offset={};state.position=basePosition;
             }else{
-                const auto turn=compose(Pose{heading,{}},inverse(Pose{state.lastBase.orientation,{}})).orientation;
+                const auto turn=compose(Pose{currentBase.orientation,{}},inverse(Pose{state.lastBase.orientation,{}})).orientation;
                 state.offset=rotate(turn,state.offset);
                 state.position=basePosition+state.offset;
             }

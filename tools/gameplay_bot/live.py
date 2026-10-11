@@ -725,7 +725,9 @@ class Live:
         self.events.emit("rpc_completed", tool=suffix, seconds=time.monotonic()-started)
         return result
 
-    def observe(self, native=False):
+    def observe(self, native=False, *, fast_only=False):
+        if native and fast_only:
+            raise BotFault("Fast-only observation cannot request a Lua snapshot")
         if self.background_check:
             self.background_check()
         if self.kernel.WaitForSingleObject(self.process_handle, 0) != 258:
@@ -741,7 +743,7 @@ class Live:
             state.update(self.startup_evidence.read())
         controls = state.get("controls") or {}
         native_presentation = state.get("camera_active") is False and controls.get("context") == "nativeButtons"
-        if native or native_presentation:
+        if (native or native_presentation) and not fast_only:
             if released_startup_observation(state, getattr(self, "held", {})):
                 state["native"], state["lua_transport"] = self.native.read_startup_observation(self.lua_script)
                 if state["lua_transport"]["seconds"] > self.native.timeout:
@@ -1018,6 +1020,9 @@ class Live:
         return self.observe()
 
     def execute(self, step):
+        if step.get('op') == 'menu_focus_sequence':
+            from .menus import focus_sequence
+            return focus_sequence(self, step)
         name = step.get('name', '')
         menu_action = step.get('op') == 'action' and (name.startswith('menus.') or name.startswith('idroid.'))
         menu_navigation = step.get('op') == 'menu_navigate' and step.get('owner', 'idroid') == 'idroid'
@@ -1427,7 +1432,10 @@ class Live:
                     break
                 time.sleep(min(.025, remaining))
         finally:
-            self.release()
+            if getattr(self, '_menu_focus_sequence_active', False):
+                self.release(keep=self._menu_focus_keep)
+            else:
+                self.release()
         if evidence is None:
             raise BotFault("Requested physical input was never observed held by the native XR control sampler")
         if reviewed_only:

@@ -86,6 +86,8 @@ def capture_startup_baseline(live, timeout=15., clock=time.monotonic, sleep=time
 def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
     deadline = clock() + timeout
     acknowledged = set()
+    information_steps = 0
+    information_next_at = 0.
     previous = None
     while True:
         state = live.observe(native=True)
@@ -113,11 +115,22 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
               and logged_in_notice(state)):
             action = ("logged-in-notice", {"mission": 1, "sequence": "Seq_Demo_LogInKonamiServer",
                                           "title": False, "popup": True})
+        elif online_information_close(state):
+            action = ("online-information-close", {"mission": 1,
+                "sequence": "Seq_Demo_LogInKonamiServer", "title": False,
+                "popup": False, "saving": False})
         elif (state["scene"] == "title" and not state.get("title_menu")
               and state.get("press_start_ready") is True
               and native.get("sequence") == "Seq_Demo_StartHasTitleMission"
               and native.get("title") is True and native.get("popup") is False):
             action = ("press-start", {"sequence": "Seq_Demo_StartHasTitleMission", "title": True, "popup": False})
+        # Retail Online Information can contain several Next pages before
+        # Close. This witnessed mode is informational; mode 3 agreement is
+        # still excluded. Bound page confirmations and space their release
+        # edges, rather than leaving the same known information screen idle.
+        if (action and action[0] == "online-information-close"
+                and information_steps < 8 and clock() >= information_next_at):
+            acknowledged.discard(action[0])
         if action and action[0] not in acknowledged:
             label, guard = action
             live.capture(label)
@@ -139,6 +152,8 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
                 step["seconds"] = .30
                 if label == "logged-in-notice":
                     step["state_before"] = LOGGED_IN_NOTICE
+                elif label == "online-information-close":
+                    step["state_before"] = ONLINE_INFORMATION_CLOSE
             try:
                 live.execute(step)
             except ActionPrerequisiteChanged as error:
@@ -148,6 +163,9 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
                 live.events.emit("startup_admission_changed", label=label, error=str(error))
             else:
                 acknowledged.add(label)
+                if label == "online-information-close":
+                    information_steps += 1
+                    information_next_at = clock() + 1.
         if clock() >= deadline:
             live.capture("startup-wait-failure")
             raise BotFault("Native startup deadline; last sequence=" + str(native.get("sequence")))
@@ -173,6 +191,32 @@ def logged_in_notice(state):
     return (type(popup.get("numeric_id")) is int
             and all(popup.get(key) is True for key in ("reader_verified", "owner_verified", "active"))
             and matches(state, LOGGED_IN_NOTICE))
+
+
+# First observed in 20261011T133504852686Z; the retained fresh confirmation
+# evidence is online-information-close in 20261011T134433036774Z. Both eyes
+# show the sole Close choice in mode 2, distinct from first-run agreement
+# mode 3. The popup bit is false while this information selector is live.
+ONLINE_INFORMATION_CLOSE = {
+    "scene": "cinematic", "camera_active": False, "title": False,
+    "menu": False, "idroid": False, "pause": False,
+    "terms_menu.verified": True, "terms_menu.active": True,
+    "terms_menu.ready": True, "terms_menu.phase": 5, "terms_menu.mode": 2,
+    "terms_menu.horizontal": 1, "terms_menu.vertical": 0, "terms_menu.action": 1,
+}
+
+
+def online_information_close(state):
+    """Admit witnessed information Next/Close, never agreement consent."""
+    from .core import matches
+    native = state.get('native') or {}
+    terms = state.get('terms_menu') or {}
+    now, sample, owner = state.get('now_ms'), terms.get('sample_ms'), terms.get('owner')
+    return (matches(state, ONLINE_INFORMATION_CLOSE)
+            and matches(native, {'mission': 1, 'sequence': 'Seq_Demo_LogInKonamiServer',
+                                 'title': False, 'popup': False, 'saving': False})
+            and type(owner) is int and owner > 0
+            and type(now) is int and type(sample) is int and 0 <= now-sample <= 250)
 
 
 def wait_for_continue_rack(live, initial_state, timeout=5., clock=time.monotonic, sleep=time.sleep):

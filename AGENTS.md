@@ -87,3 +87,23 @@ SteamVR. Honor the saved MGS5VR `HeadsetRuntime` preference before Windows'
 global runtime. Both local Play commands use the shared headset launcher;
 the pinned payload remains unchanged. Simulator leases must restore the
 per-game Meta runtime. Do not switch a physical play session to SteamVR.
+
+User direction, 11 October 2026:
+
+`play/` must always contain the last successfully published release and its
+matching launcher, available for local play through `Play.cmd`. `build/dev/`
+contains the latest completed, checked candidate for the user's testing through
+`Play-Dev.cmd`. Keep both launch paths ready while development continues.
+An authorized release is packaged from checked development without replacing
+the published pin. After publication to the requested server/GitHub destinations
+succeeds and the uploaded payload is verified, pin that exact candidate. Both
+slots then match until the next development changes. Preparing a package,
+pushing source or creating a draft release does not advance the pin. This
+supersedes the earlier choice of an unpublished candidate as the normal play
+pin; publication and pinning still do not imply physical-headset acceptance.
+
+The user explicitly requested fixing the PC's physical-headset default after
+a Play-Dev launch selected SteamVR. Windows' 64-bit OpenXR ActiveRuntime is
+now Meta Quest Link, and both local Play commands explicitly pass `-MetaLink`
+to the shared headset launcher. Preserve this choice through development and
+simulator cleanup. Do not switch the physical session back to SteamVR.

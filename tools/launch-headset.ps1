@@ -1,11 +1,17 @@
 param(
     [string]$GameDir,
     [string]$RuntimeManifest,
+    [switch]$MetaLink,
     [switch]$CheckOnly,
     [switch]$Probe,
     [switch]$RestartSteam
 )
 $ErrorActionPreference='Stop'
+if ($MetaLink -and -not $RuntimeManifest) {
+    $mgsLinkProgramFiles=$env:ProgramW6432
+    if (-not $mgsLinkProgramFiles) { $mgsLinkProgramFiles=[Environment]::GetFolderPath('ProgramFiles') }
+    $RuntimeManifest=Join-Path $mgsLinkProgramFiles 'Oculus\Support\oculus-runtime\oculus_openxr_64.json'
+}
 $mgsSaved=Get-ItemProperty -LiteralPath 'HKCU:\Software\Nikami\MGS5VR\Launcher' -ErrorAction SilentlyContinue
 if (-not $GameDir -and -not $Probe) {
     if ($mgsSaved.TppExe) { $GameDir=Split-Path -Parent $mgsSaved.TppExe }

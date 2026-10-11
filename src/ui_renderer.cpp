@@ -965,6 +965,7 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
             ++suppressedDraws;return 0;
         }
         const bool worldIntel=nativeReconLayer(order,sceneCamera,layoutCamera);
+        if(worldIntel&&executing.hudView==HudView::world)return 0;
         // Native scene-camera target cues follow the device view. Flat HUD
         // labels are replaced by native world-position labels in the lens.
         if(executing.eye.eye==2)return sceneCamera&&worldIntel&&worldHudVisible(executing.hudMode,executing.hudView)?originalNode(state,item):0;

@@ -3,6 +3,7 @@
 #include <array>
 #include <string_view>
 #include "core.hpp"
+#include "hud.hpp"
 
 struct ID3D11DeviceContext;
 struct ID3D11Texture2D;
@@ -31,7 +32,7 @@ bool capturePhysicalOpticScene(ID3D11DeviceContext* context,
 // this exact eye. Both eyes receive one immutable marker snapshot.
 void drawWorldWaypoints(ID3D11DeviceContext* context,
     const std::array<float,16>& view,const std::array<float,16>& projection,
-    Vec3 cameraPosition,const OpticWaypoints& markers) noexcept;
+    Vec3 cameraPosition,const OpticWaypoints& markers,HudMode mode,bool enemyMarkers) noexcept;
 
 // Only the aperture is drawn: the equipped game's scope already supplies its
 // housing and lighting. No binocular asset is required by this path.

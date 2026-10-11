@@ -9,15 +9,20 @@
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/controls.hpp"
+#include "mgs5vr/control_prompts.hpp"
+#include "mgs5vr/weapon_obstruction.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/native_menu_restrictions.hpp"
+#include "mgs5vr/native_game_status.hpp"
 #include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/optic_events.hpp"
 #include "mgs5vr/optic_markers.hpp"
 #include "native_cabin_script.hpp"
 #include "native_presentation_script.hpp"
+#include "native_god_mode_script.hpp"
+#include "native_idroid_interruption_script.hpp"
 #include <windows.h>
 #include <MinHook.h>
 #include <intrin.h>
@@ -170,6 +175,20 @@ template<class T> std::optional<T> readKnown(uintptr_t address){
     if(!address||!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&value,sizeof(value),&size)
        ||size!=sizeof(value))return {};
     return value;
+}
+std::optional<bool> idroidPadOwner(){
+    // Exact supported inline manager, S_DISABLE_PLAYER_PAD record, and the
+    // low48 hash of MGS5VR_iDroid. Never reset another native owner's entry.
+    constexpr uintptr_t managerRva=0x2bd6160,managerTypeRva=0x2191a90;
+    constexpr uint64_t ownerHash=0xc1dbf5bd3008ull;
+    if(!imageBase||readKnown<uintptr_t>(imageBase+managerRva)
+            !=std::optional<uintptr_t>{imageBase+managerTypeRva})return {};
+    const auto record=imageBase+managerRva+0x10+2*0x78;
+    const auto before=readKnown<NativeGameStatusRecord>(record);
+    const auto after=readKnown<NativeGameStatusRecord>(record);
+    if(!before||!after||*before!=*after||readKnown<uintptr_t>(imageBase+managerRva)
+            !=std::optional<uintptr_t>{imageBase+managerTypeRva})return {};
+    return nativeGameStatusHasOwner(*before,ownerHash);
 }
 struct CabinStowPlayer {
     uintptr_t player{},character{},context{};
@@ -718,6 +737,18 @@ bool publishFastInput(const std::string& request,std::string& result){
         out<<"]}";result=out.str();return true;
     }
     constexpr std::string_view combatPrefix="diagnostics:combat-sight:";
+    if(request=="inspect-optic-markers"){
+        const auto markers=opticWaypoints();const auto now=steadyMilliseconds();
+        const auto status=headCamera().status();
+        const bool available=status.active&&markers.activation==status.activation
+            &&now>=markers.sampleTime&&now-markers.sampleTime<=150;
+        std::ostringstream out;out<<std::boolalpha<<"{\"source\":\"native_acquired_marker_records\",\"available\":"<<available
+            <<",\"now_ms\":"<<now<<",\"sample_ms\":"<<markers.sampleTime<<",\"activation\":"<<markers.activation<<",\"points\":[";
+        if(available)for(size_t i=0;i<markers.count;++i){const auto& point=markers.points[i];if(i)out<<',';
+            out<<"{\"actor\":"<<point.actor<<",\"letter\":"<<unsigned(point.letter)
+                <<",\"position\":["<<point.position.x<<','<<point.position.y<<','<<point.position.z<<"]}";}
+        out<<"]}";result=out.str();return true;
+    }
     if(request.starts_with(combatPrefix)||request=="inspect-combat-sight"){
         const auto now=steadyMilliseconds();bool armed=false;
         if(request.starts_with(combatPrefix)){
@@ -843,6 +874,14 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"input_ms\":"<<v.inputTime<<",\"buttons\":"<<v.buttons<<",\"context\":\""<<controlContextName(v.context)<<"\"}";}
         out<<"]}";result=out.str();return true;
     }
+    if(request=="inspect-weapon-obstruction"){
+        const auto witness=weaponObstructionWitness();
+        std::ostringstream out;out<<"{\"sample_ms\":"<<witness.sampleTime<<",\"now_ms\":"<<steadyMilliseconds()
+            <<",\"frame_ms\":"<<witness.frameTime<<",\"activation\":"<<witness.activation
+            <<",\"player_owner\":"<<witness.player<<",\"native_hits\":"<<witness.nativeHits
+            <<",\"applied_hits\":"<<witness.appliedHits<<",\"mode\":"<<static_cast<unsigned>(witness.mode)<<"}";
+        result=out.str();return true;
+    }
     if(request=="inspect-bot-state"){
         // Read-only transport/scene diagnostics must also work while Lua is
         // suspended at title/loading/Pause. These are individually sampled
@@ -857,6 +896,7 @@ bool publishFastInput(const std::string& request,std::string& result){
         const auto delivery=nativeInputDeliveryAudit().snapshot();
         const auto now=steadyMilliseconds();
         const auto terms=nativeTermsMenu();
+        const auto ownedIdroidPad=idroidPadOwner();
         std::ostringstream out;out<<std::boolalpha;
         out<<"{\"schema\":1,\"now_ms\":"<<now
            <<",\"lua_ready\":"<<nativeLuaReady.load()
@@ -871,6 +911,7 @@ bool publishFastInput(const std::string& request,std::string& result){
            <<",\"pause\":"<<(menu?(nativePauseMenuOpen()?"true":"false"):"null")
            <<",\"idroid\":"<<nativeIdroidOpen()<<",\"gamepad\":"<<nativeGamepadActive()
            <<",\"idroid_ui_only_owner\":"<<handheldIdroidOwned()
+           <<",\"idroid_player_pad_owner\":"<<(ownedIdroidPad?(*ownedIdroidPad?"true":"false"):"null")
            <<",\"idroid_closing\":"<<nativeIdroidClosing()<<",\"idroid_tutorial_mode\":";
         writeNativeIdroidTutorialModeJson(out,tutorialMode);
         out<<",\"tracking_fault_mask\":"<<controllerTrackingFaultProbe().mask(steadyMilliseconds())
@@ -886,6 +927,8 @@ bool publishFastInput(const std::string& request,std::string& result){
            <<",\"camera_active\":"<<camera.active<<",\"camera_available\":"<<headCamera().available()
            <<",\"camera_pending\":"<<camera.pending<<",\"camera_suspended\":"<<camera.suspended
            <<",\"camera_awaiting_player\":"<<camera.awaitingPlayer
+           <<",\"camera_native_menu\":"<<camera.nativeMenuOpen
+           <<",\"camera_native_idroid\":"<<camera.nativeIdroidOpen
            <<",\"camera_reason\":"<<static_cast<unsigned>(camera.reason)
            <<",\"activation\":"<<camera.activation<<",\"opening_assets\":"<<openingPropsAvailable();
         out<<",\"popup_observer\":";writeNativePopupSnapshotJson(out,popup,popupSampleMs);
@@ -927,6 +970,10 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"raw_right_aim_tracked\":"<<frame.controllers.hands[1].aimTracked
                <<",\"idroid_stowed\":"<<frame.controllers.handheldIdroidStowed
                <<",\"handheld_menu_free\":"<<frame.controllers.handheldMenuFree;
+            out<<",\"cabin_play\":"<<frame.controllers.cabinPlay
+               <<",\"handheld_menus\":"<<frame.controllers.handheldMenus
+               <<",\"menu_open\":"<<frame.menuOpen
+               <<",\"menu_idroid\":"<<frame.menuIdroid;
             const auto pose=[&](const char* name,Pose value){
                 const auto p=value.position;const auto q=value.orientation;
                 out<<",\""<<name<<"\":{\"position\":["<<p.x<<','<<p.y<<','<<p.z
@@ -1054,6 +1101,17 @@ void pump(void* state){
     // player under a new camera activation. Neither is a terminal-owner change.
     // Keep the UI-only resource until a verified different player or UI exit.
     if(handheldIdroidOwned()){
+        if(luaReady(state)){
+            const int top=getTop(state);
+            int status=load(state,nativeIdroidInterruptionScript.data(),nativeIdroidInterruptionScript.size(),"@mgs5vr-idroid-interruption");
+            if(!status)status=original(state,0,1,0);
+            size_t length{};const auto* value=getString(state,-1,&length);
+            if(!status&&value&&std::string_view(value,length)=="closed"){
+                cancelHandheldIdroidBorrow();publishHandheldIdroidOwner(0,0);nativeMenuOpen();
+                log("Handheld iDroid: owned terminal closed for native mission failure");
+            }
+            setTop(state,top);
+        }
         const auto rig=headCamera().publishedRigFrame(steadyMilliseconds());
         const auto borrow=handheldIdroidBorrow();
         if((!nativeIdroidOpen()&&!borrow.player)||nativeLoadingTipsOpen()||nativeTitleModeActive()||nativeScriptedDemoActive()
@@ -1079,6 +1137,17 @@ void pump(void* state){
     }
     if(controllerRigEnabled()&&luaReady(state)){
         const int top=getTop(state);
+        if(const auto bindings=controlPromptBindings()){
+            const std::string godScript=std::string("local requested=")
+                +(bindings->setting("settings.god_mode")!=0?"true\n":"false\n")+std::string(nativeGodModeScript);
+            int godStatus=load(state,godScript.data(),godScript.size(),"@mgs5vr-god-mode");
+            if(!godStatus)godStatus=original(state,0,1,0);
+            size_t length{};const auto* value=getString(state,-1,&length);
+            const std::string report=std::to_string(godStatus)+":"+(value?std::string(value,std::min(length,size_t{80})):"no result");
+            static std::string previousGodReport;
+            if(report!=previousGodReport){log("Native god mode "+report);previousGodReport=report;}
+            setTop(state,top);
+        }
         const auto cameraStatus=headCamera().status();
         const auto currentRig=headCamera().publishedRigFrame(steadyMilliseconds());
         const auto borrow=handheldIdroidBorrow();
@@ -1213,11 +1282,9 @@ void pump(void* state){
         const bool excludePlayer=appliedPolicy==HandheldPlayerPadPolicy::blocked;
         bool idroidPadAcknowledged=false;
         if(idroidPadPolicyKnown){
-            // The named game registration can survive a mission/Lua-state
-            // replacement while the C++ cache is reset. Read its actual state
-            // in this same transaction; a cached match cannot acknowledge a
-            // free route or leave the player disabled after stowing.
-            const std::string desired=excludePlayer?"true":"false";
+            // Set/Reset are idempotent for this owner. IsSet is an aggregate
+            // and cannot confirm our registration or release: another native
+            // owner would otherwise keep all handheld menu input blocked.
             const std::string script=
                 std::string("local weapon=")+(focusedWeapon?"true ":"false ")+
                 "if type(Player)~='table' or type(Player.ResetPadMask)~='function' then return 'unavailable' end "
@@ -1228,15 +1295,15 @@ void pump(void* state){
                 "Player.SetPadMask{settingName='MGS5VR_iDroidFocus',except=true,buttons=PlayerPad.HOLD+PlayerPad.FIRE,"
                 "triggers=PlayerPad.TRIGGER_L+PlayerPad.TRIGGER_R} "
                 "else Player.ResetPadMask{settingName='MGS5VR_iDroidFocus'} end "
-                "if type(TppGameStatus)=='table' and type(TppGameStatus.IsSet)=='function' "
-                "and type(TppGameStatus.Set)=='function' and type(TppGameStatus.Reset)=='function' then "
-                "if TppGameStatus.IsSet('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD')~="+desired+" then TppGameStatus."
-                +(excludePlayer?"Set":"Reset")+"('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD') end "
-                "if TppGameStatus.IsSet('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD')=="+desired+" then return 'ok' end end return 'unavailable'";
+                "if type(TppGameStatus)=='table' and type(TppGameStatus.Set)=='function' "
+                "and type(TppGameStatus.Reset)=='function' then TppGameStatus."
+                +(excludePlayer?"Set":"Reset")+"('MGS5VR_iDroid','S_DISABLE_PLAYER_PAD'); return 'ok' end return 'unavailable'";
             int padStatus=load(state,script.data(),script.size(),"@mgs5vr-idroid-player-pad");
             if(!padStatus)padStatus=original(state,0,1,0);
             size_t length{};const auto* result=getString(state,-1,&length);
-            if(!padStatus&&result&&length==2&&std::memcmp(result,"ok",2)==0){
+            const auto ownedPad=idroidPadOwner();
+            if(!padStatus&&result&&length==2&&std::memcmp(result,"ok",2)==0
+                    &&ownedPad.has_value()&&*ownedPad==excludePlayer){
                 idroidPadAcknowledged=true;
                 if(excludePlayer!=idroidPadRegistered){
                     idroidPadRegistered=excludePlayer;
@@ -1390,6 +1457,10 @@ void pump(void* state){
         int presentationStatus=load(state,nativePresentationScript.data(),nativePresentationScript.size(),"@mgs5vr-presentation-state");
         if(!presentationStatus)presentationStatus=original(state,0,1,0);
         size_t presentationLength{};const auto* presentationValue=getString(state,-1,&presentationLength);
+        constexpr std::string_view popupPrefix="native-popup:";
+        const bool nativePopupActive=!presentationStatus&&presentationValue&&presentationLength>popupPrefix.size()
+            &&std::memcmp(presentationValue,popupPrefix.data(),popupPrefix.size())==0;
+        if(nativePopupActive){presentationValue+=popupPrefix.size();presentationLength-=popupPrefix.size();}
         const bool avatarEditorActive=!presentationStatus&&presentationValue&&presentationLength==11
             &&std::memcmp(presentationValue,"avatar-edit",11)==0;
         const bool titleCabinActive=!presentationStatus&&presentationValue&&presentationLength==11
@@ -1413,7 +1484,7 @@ void pump(void* state){
         const bool cabinTransit=!presentationStatus&&presentationValue&&presentationLength==12
             &&std::memcmp(presentationValue,"cabin-flight",12)==0;
         const bool sceneMenuActive=!presentationStatus&&presentationValue
-            &&((presentationLength==10&&std::memcmp(presentationValue,"cabin-menu",10)==0)
+            &&(nativePopupActive||(presentationLength==10&&std::memcmp(presentationValue,"cabin-menu",10)==0)
                 ||(presentationLength==9&&std::memcmp(presentationValue,"game-over",9)==0));
         const bool scriptedDemoActive=scriptedDemoTitleActive||(!presentationStatus&&presentationValue&&presentationLength==13
             &&std::memcmp(presentationValue,"scripted-demo",13)==0);

@@ -1,9 +1,11 @@
 #include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include <windows.h>
 #include <MinHook.h>
+#include <intrin.h>
 #include <array>
 #include <algorithm>
 #include <atomic>
@@ -16,10 +18,16 @@ using GroupFn=void(*)(void*,uint32_t);
 GroupFn hideVisibleGroup{},showVisibleGroup{};
 using VisualUpdate=void(*)(void*,uint32_t);
 VisualUpdate originalVisualUpdate{};
+struct alignas(16) FadePoint {float x{},y{},z{},w{};};
+using ActorCameraFade=float(*)(void*,uint32_t,void*,const void*,const FadePoint*,float,float);
+ActorCameraFade originalActorCameraFade{};
 std::atomic_uintptr_t fadeOwner{};
 std::mutex hiddenMutex;
 std::atomic_uint64_t lastFirstPersonUpdateMs{};
 constexpr uint32_t headName=0xa9e88501,bodyName=0x1a166b34,armName=0x4e74fd8c;
+// Owned EquipIdTable's normal and rain-cover NVG models. These are renderer
+// resource codes, independent of the native night-vision filter/equip state.
+constexpr std::array<uint64_t,2> nvgModels{0x84a1ee5ee0254be2ull,0x84a12e91e8362fe1ull};
 std::atomic_bool visibilityTraceEnabled{},visibilityTraceArmed{},visibilityTraceWindow{},visibilityTraceNeedsOwner{true};
 std::atomic_uintptr_t visibilitySourceOwner{};
 std::atomic_uintptr_t visibilityPublisherPool{};
@@ -89,6 +97,58 @@ bool inspectVisibilityBounded(uintptr_t owner,uintptr_t pool,uint32_t visualId,V
     return inspectVisibility(owner,pool,visualId,value);
 }
 void restoreStaleVisibilityIfAllowed() noexcept;
+float actorCameraFade(void* owner,uint32_t index,void* character,const void* transform,
+        const FadePoint* camera,float inner,float outer){
+    // The native buddy publisher (c5e860/c5ea15) owns the model's opacity.
+    // Its camera-nearness query still receives the stock ACC camera even
+    // though our cabin renderer uses the tracked VR view. iDroid temporarily
+    // bypasses that query, which made the same dog appear only with it open.
+    // Join the existing native calculation to the view we actually render.
+    if(reinterpret_cast<uintptr_t>(_ReturnAddress())!=base+0xc5e99a||!camera
+        ||!mgs5vr::nativeCabinPlay())
+        return originalActorCameraFade(owner,index,character,transform,camera,inner,outer);
+    const auto registry=get<uintptr_t>(base+0x2c389a0);
+    const auto registration=get<uintptr_t>(registry+0x30+19*8);
+    const auto definition=get<uintptr_t>(registration+8);
+    const auto interface=get<uintptr_t>(definition+0x20);
+    if(get<uintptr_t>(interface)!=base+0x22bdf30)
+        return originalActorCameraFade(owner,index,character,transform,camera,inner,outer);
+    const auto module=get<uintptr_t>(get<uintptr_t>(interface+0x80)+0x10);
+    const auto system=module+0x20;
+    if(get<uintptr_t>(module)!=base+0x2315d80||get<uintptr_t>(system)!=base+0x2315db0
+        ||get<uint32_t>(get<uintptr_t>(system+0x10)+0x44)!=1||get<uint32_t>(system+0x108)!=1)
+        return originalActorCameraFade(owner,index,character,transform,camera,inner,outer);
+    const auto body=get<uintptr_t>(get<uintptr_t>(system+0x110));
+    const auto pool=reinterpret_cast<uintptr_t>(owner);
+    // The write breakpoint at c5ea15 joined this exact current dog owner:
+    // its Character+8 is the publisher's embedded +0x38 interface. R8 is
+    // the publisher's native character service, not the Character itself.
+    if(get<uintptr_t>(body)!=base+0x22f0830||get<uintptr_t>(body+8)!=pool+0x38
+        ||get<uintptr_t>(pool+0xa0)!=reinterpret_cast<uintptr_t>(character))
+        return originalActorCameraFade(owner,index,character,transform,camera,inner,outer);
+    const auto frame=mgs5vr::headCamera().publishedRigFrame(mgs5vr::steadyMilliseconds());
+    if(frame&&frame->applied&&frame->controllers.cabinPlay){
+        const auto component=get<uintptr_t>(body+0x10);
+        const auto model=get<uintptr_t>(get<uintptr_t>(component+0x10)+0x68);
+        if(get<uintptr_t>(component)==base+0x22e6070&&get<uintptr_t>(model)==base+0x20f4d90
+            &&get<uint64_t>(model+0x120)==0x84a0e671b02ebb56ull){
+            const auto position=frame->nativePose.position;
+            const FadePoint tracked{position.x,position.y,position.z,camera->w};
+            const auto alpha=originalActorCameraFade(owner,index,character,transform,&tracked,inner,outer);
+            static std::atomic_bool reported{};
+            if(!reported.exchange(true)){
+                std::ostringstream out;out<<"Cabin D-Dog camera fade uses tracked view: native="
+                    <<camera->x<<','<<camera->y<<','<<camera->z<<" tracked="
+                    <<tracked.x<<','<<tracked.y<<','<<tracked.z<<" preceding_alpha="
+                    <<get<float>(model+0x1b8)
+                    <<" tracked_alpha="<<alpha;
+                mgs5vr::log(out.str());
+            }
+            return alpha;
+        }
+    }
+    return originalActorCameraFade(owner,index,character,transform,camera,inner,outer);
+}
 void suppressOwnedArmFade(void* object,uint32_t visualId){
     restoreStaleVisibilityIfAllowed();
     if(!mgs5vr::headCamera().active())return;
@@ -152,6 +212,9 @@ struct GroupChange {uint32_t name{};uint8_t previousFlags{};};
 struct Binding {
     uintptr_t owner{},character{},parts{},record{},renderer{},model{};
     bool body{},hideArms{};
+    bool equipment{};
+    uintptr_t service{},itemInterface{};
+    uint32_t itemIndex{};
     std::array<GroupChange,128> groups{};
     uint16_t changed{};
 };
@@ -165,6 +228,20 @@ bool names(uintptr_t model,std::array<uint32_t,128>& result,uint16_t& count){
 bool owned(const Binding& b){
     if(get<uintptr_t>(b.owner)!=base+0x23b8218||get<uintptr_t>(b.owner+0x370)!=b.character
         ||get<uintptr_t>(b.character)!=base+0x2295210)return false;
+    if(b.equipment){
+        const auto component=get<uintptr_t>(b.character+0x80);
+        if(get<uintptr_t>(component)!=base+0x23b3e80||get<uintptr_t>(component+8)!=b.character
+            ||get<uintptr_t>(component+0x60)!=b.service||get<uintptr_t>(b.service)!=base+0x234b840
+            ||get<uintptr_t>(b.service+0x190)!=b.itemInterface
+            ||get<uintptr_t>(b.itemInterface)!=base+0x22e2970)return false;
+        const auto count=get<uint32_t>(b.itemInterface+0x50);
+        const auto models=get<uintptr_t>(b.itemInterface+0x58);
+        if(!models||!count||count>256||b.itemIndex>=count
+            ||get<uintptr_t>(models+static_cast<uintptr_t>(b.itemIndex)*8)!=b.model
+            ||get<uintptr_t>(b.model)!=base+0x20f4d90)return false;
+        const auto code=get<uint64_t>(b.model+0x120);
+        return std::find(nvgModels.begin(),nvgModels.end(),code)!=nvgModels.end();
+    }
     if(b.body){
         const auto component=get<uintptr_t>(b.character+0x10);
         return component&&get<uintptr_t>(component+0x10)==b.parts&&get<uintptr_t>(b.parts+0x68)==b.model;
@@ -250,7 +327,7 @@ void conceal(Binding candidate){
         slot=std::find_if(hidden.begin(),hidden.end(),[](const auto& b){return !b.model;});
         if(slot==hidden.end())return;
         *slot=candidate;
-        mgs5vr::log(candidate.hideArms?"Front-end player arms hidden before draw preparation; native shadow retained":candidate.body?"First-person player body hidden from main view; native shadow retained":"First-person player head hidden from main view; native shadow retained");
+        mgs5vr::log(candidate.equipment?"First-person NVG goggles hidden before draw preparation; native vision filter and shadow retained":candidate.hideArms?"Front-end player arms hidden before draw preparation; native shadow retained":candidate.body?"First-person player body hidden from main view; native shadow retained":"First-person player head hidden from main view; native shadow retained");
     }
     std::array<uint32_t,128> groups{};uint16_t count{};
     if(!names(candidate.model,groups,count))return;
@@ -379,6 +456,16 @@ void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
         if(MH_EnableHook(target)==MH_OK)log("Native first-person arm opacity suppression connected before visual publication");
         else MH_RemoveHook(target);
     }
+    constexpr std::array<unsigned char,12> fadeSignature{
+        0x48,0x8b,0xc4,0x48,0x89,0x58,8,0x48,0x89,0x70,0x20,0x57};
+    std::array<unsigned char,12> fadeBytes{};
+    auto* fadeTarget=reinterpret_cast<void*>(base+0xc8c300);
+    if(read(base+0xc8c300,fadeBytes)&&fadeBytes==fadeSignature
+        &&MH_CreateHook(fadeTarget,reinterpret_cast<void*>(&actorCameraFade),
+            reinterpret_cast<void**>(&originalActorCameraFade))==MH_OK){
+        if(MH_EnableHook(fadeTarget)==MH_OK)log("Native buddy camera-nearness query connected to tracked cabin view");
+        else MH_RemoveHook(fadeTarget);
+    }
 }
 void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms) noexcept {
     if(!base)return;
@@ -396,6 +483,30 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms) noex
     // A scene-only hide is too late for already-prepared arm geometry.
     body.hideArms=hideArms;
     if(bodyModel&&groupIndex(body,bodyName)>=0&&groupIndex(body,armName)>=0)conceal(body);
+    // NVG is native equipment, outside the modular head list. Conceal only its
+    // exact already-loaded model in this character's typed item interface.
+    // Keep equip/on/off and the green vision effect under normal game control.
+    const auto weapon=get<uintptr_t>(character+0x80);
+    if(get<uintptr_t>(weapon)==base+0x23b3e80&&get<uintptr_t>(weapon+8)==character){
+        const auto service=get<uintptr_t>(weapon+0x60);
+        if(get<uintptr_t>(service)==base+0x234b840){
+            const auto interface=get<uintptr_t>(service+0x190);
+            if(get<uintptr_t>(interface)==base+0x22e2970){
+                const auto models=get<uintptr_t>(interface+0x58);
+                const auto count=get<uint32_t>(interface+0x50);
+                if(models&&count&&count<=256)for(uint32_t i=0;i<count;++i){
+                    const auto model=get<uintptr_t>(models+static_cast<uintptr_t>(i)*8);
+                    if(get<uintptr_t>(model)!=base+0x20f4d90)continue;
+                    const auto code=get<uint64_t>(model+0x120);
+                    if(std::find(nvgModels.begin(),nvgModels.end(),code)==nvgModels.end())continue;
+                    Binding goggles{owner,character,0,0,0,model};
+                    goggles.equipment=true;goggles.service=service;
+                    goggles.itemInterface=interface;goggles.itemIndex=i;
+                    conceal(goggles);
+                }
+            }
+        }
+    }
     const auto parts=get<uintptr_t>(character+0x610);
     if(!parts||get<uintptr_t>(parts)!=base+0x22e56c0||get<uintptr_t>(parts+0x38)!=character)return;
     const auto list=get<uintptr_t>(parts+0x48);

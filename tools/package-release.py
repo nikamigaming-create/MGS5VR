@@ -1,4 +1,4 @@
-"""Package the checked fixed play tree and its committed source for GitHub."""
+"""Package checked development for GitHub while preserving the published play pin."""
 from __future__ import annotations
 
 import argparse
@@ -10,7 +10,7 @@ import re
 import subprocess
 import zipfile
 
-from workspace import ROOT, PLAY, digest, read_json, safe_tree, source_identity
+from workspace import ROOT, DEV, digest, read_json, safe_tree, source_identity
 from regression_catalog import require_release_ready
 
 
@@ -34,13 +34,13 @@ def package(tag, output, *, allow_known_issues=False):
     output = safe_tree(output, ROOT / "build")
     if output.resolve() == (ROOT / "build/Release").resolve():
         raise ValueError("Keep release archives separate from compiler output; use build/github-release")
-    safe_tree(PLAY, ROOT)
-    build = read_json(PLAY / "BUILD.json")
+    safe_tree(DEV, ROOT)
+    build = read_json(DEV / "BUILD.json")
     source = source_identity()
     if source["changes"] or source != build["source"]:
-        raise ValueError("Commit the public source, run tools/build.ps1, then explicitly pin-build the reviewed candidate before packaging")
+        raise ValueError("Commit the public source, run tools/build.ps1, then package the reviewed development candidate; keep the published play pin unchanged")
     if build["validation"]["automated"] != "passed":
-        raise ValueError("The play build has not passed its automated checks")
+        raise ValueError("The development build has not passed its automated checks")
     notes = f"docs/RELEASE_{tag.removeprefix('experimental-')}.md"
     required = {notes, "dinput8.dll", "MGS5VR-Launcher.exe", "MGS5VR-FieldKit.exe", "mgs5vr_import.exe",
                 "mgs5vr_controls.exe", "mgs5vr_probe.exe", "Install.cmd", "Launch-Headset.cmd",
@@ -51,14 +51,14 @@ def package(tag, output, *, allow_known_issues=False):
         raise ValueError("Incomplete checked installation tree")
     for name, expected in build["files"].items():
         checked_name(name)
-        if digest(PLAY / name) != expected:
-            raise ValueError(f"Checked play file changed: {name}")
+        if digest(DEV / name) != expected:
+            raise ValueError(f"Checked development file changed: {name}")
     for name in ("mgs5vr.ini", "mgs5vr-controls.ini"):
-        if digest(PLAY / name) != digest(ROOT / "config" / name):
+        if digest(DEV / name) != digest(ROOT / "config" / name):
             raise ValueError("Release must contain public defaults, not personal INIs")
-    actual = {p.relative_to(PLAY).as_posix() for p in PLAY.rglob("*") if p.is_file()}
+    actual = {p.relative_to(DEV).as_posix() for p in DEV.rglob("*") if p.is_file()}
     if actual != set(build["files"]) | {"BUILD.json"}:
-        raise ValueError("Unmanaged files in play tree; review them before packaging")
+        raise ValueError("Unmanaged files in development tree; review them before packaging")
     output.mkdir(parents=True, exist_ok=True)
     source_zip = output / "MGS5VR-source.zip"
     archive = output / f"MGS5VR-{tag}.zip"
@@ -80,7 +80,7 @@ def package(tag, output, *, allow_known_issues=False):
                "dll_sha256": build["files"]["dinput8.dll"], "source_archive_sha256": digest(source_zip),
                "validation": build["validation"], "regression_coverage": regression_coverage,
                "notes": notes}
-    payload = {"BUILD.json": (PLAY / "BUILD.json").read_bytes(),
+    payload = {"BUILD.json": (DEV / "BUILD.json").read_bytes(),
                "RELEASE.json": (json.dumps(release, indent=2) + "\n").encode(),
                "SOURCE_REVISION.txt": (source["commit"] + "\n").encode()}
     hashes = dict(build["files"])
@@ -89,7 +89,7 @@ def package(tag, output, *, allow_known_issues=False):
     manifest = {"schema": 1, "source_commit": source["commit"], "files": hashes}
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
         for name in sorted(build["files"]):
-            bundle.write(PLAY / name, "MGS5VR/" + name)
+            bundle.write(DEV / name, "MGS5VR/" + name)
         bundle.write(source_zip, "MGS5VR/MGS5VR-source.zip")
         for name, data in payload.items():
             bundle.writestr("MGS5VR/" + name, data)

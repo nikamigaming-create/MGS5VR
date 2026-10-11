@@ -728,10 +728,12 @@ struct Session {
         controllerFrame.playerHeightOffset=controls.setting("settings.player_height_offset_cm")*.01f;
         controllerFrame.supportGripRadius=controls.setting("settings.support_grip_radius_cm")*.01f;
         controllerFrame.trackedWeaponObstruction=controls.setting("settings.tracked_weapon_obstruction")!=0;
+        controllerFrame.blockFiringNearCover=controls.setting("settings.block_firing_near_cover")!=0;
         controllerFrame.supportDetachRadius=controls.setting("settings.support_detach_radius_cm")*.01f;
         controllerFrame.handRestCurl=controls.setting("settings.hand_rest_curl_percent")*.01f;
         controllerFrame.handTouchCurl=controls.setting("settings.hand_touch_curl_percent")*.01f;
         controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
+        controllerFrame.enemyWorldMarkers=controls.setting("settings.enemy_world_markers")!=0;
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         controllerFrame.scopePoseStabilization=controls.setting("settings.scope_pose_stabilization")!=0;
         controllerFrame.weaponAimPitch=controls.setting("settings.weapon_aim_pitch_degrees");
@@ -1040,6 +1042,11 @@ struct Session {
                 // never also to Next Tab. UI trigger queries are gated at
                 // their own native consumer; face buttons and sticks remain UI.
                 pad.buttons&=~uint16_t{0x200};
+                // The independent focus/right-stick chord can still
+                // select Next without borrowing the gun's held ready input.
+                if(controls.active("idroid.next_tab")
+                    &&!(controls.activeInputMask("idroid.next_tab")
+                        &controls.heldInputMask("gameplay.ready_weapon",physical)))pad.buttons|=0x200;
                 pad.leftTrigger=255;
                 pad.rightTrigger=static_cast<uint8_t>(handheldActions.value("gameplay.fire_or_cqc")*255);
                 controllerFrame.weaponReady=true;

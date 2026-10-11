@@ -1,0 +1,5 @@
+#pragma once
+#include <string_view>
+namespace mgs5vr {
+inline constexpr std::string_view nativeGodModeScript=R"mgs5vr_lua(@MGS5VR_NATIVE_GOD_MODE_LUA@)mgs5vr_lua";
+}

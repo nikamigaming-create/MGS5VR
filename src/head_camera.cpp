@@ -585,7 +585,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(!spatialMenu&&controllers_.scriptedDemo&&!controllers_.scriptedLook)nativePose=followCinematicLocked(nativePose,time,useRig);
     else if(useRig&&(!controllers_.scriptedDemo||controllers_.scriptedLook))cinematicFollow_={};
     if((!spatialMenu||liveHandheldMenu)&&!controllers_.authoredCamera){
-        if(controllers_.vehicleMounted&&!controllers_.nativeGamepad){
+        if((controllers_.vehicleMounted||controllers_.cabinTransit)&&!controllers_.nativeGamepad){
             PlayerRootSample root;
             if(!getPlayerRootSample(camera,result.playerOwner,result.playerSequence,time,root)){
                 rig_={};suspendLocked(HeadCameraStop::playerHeadUnavailable);return result;
@@ -595,11 +595,19 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             auto& view=driverView_;
             const bool same=view.valid&&view.camera==camera&&view.owner==result.playerOwner
                 &&view.activation==activation_&&view.referenceEpoch==controllers_.referenceEpoch
+                &&view.passenger==controllers_.cabinTransit
                 &&time>=view.time&&time-view.time<=500;
-            if(!same)view={nativeYaw,rootYaw,0,camera,result.playerOwner,time,activation_,
-                controllers_.referenceEpoch,0,true};
-            const bool looking=std::abs(controllers_.vehicleViewInput[0])>.18f
-                ||std::abs(controllers_.vehicleViewInput[1])>.18f;
+            if(!same){
+                view={nativeYaw,rootYaw,0,camera,result.playerOwner,time,activation_,
+                    controllers_.referenceEpoch,0,true};
+                view.passenger=controllers_.cabinTransit;
+                if(view.passenger){
+                    view.lookYaw=std::remainder(nativeYaw-rootYaw,6.283185307f);
+                    view.headLocalOffset=rotate(inverseQuat(root.orientation),result.playerHead-root.position);
+                }
+            }
+            const bool looking=!view.passenger&&(std::abs(controllers_.vehicleViewInput[0])>.18f
+                ||std::abs(controllers_.vehicleViewInput[1])>.18f);
             if(looking)view.lookUntil=time+250;
             if(same&&time>view.time&&time<=view.lookUntil){
                 // Preserve deliberate native right-stick look, including its
@@ -611,12 +619,16 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             }
             view.nativeYaw=nativeYaw;view.rootYaw=rootYaw;view.time=time;
             nativePose.orientation=yawRotation(rootYaw+view.lookYaw);
+            // A passenger's authored seated fit rides the native player root.
+            // Native camera orbit and idle head animation do not move the VR
+            // seat; HMD turning/leaning and cabin walking are applied below.
+            if(view.passenger)nativePose.position=root.position+rotate(root.orientation,view.headLocalOffset);
         }else driverView_={};
     }
     // The native camera can look down, lean, recoil or bank. Its yaw supplies
     // gameplay heading; gravity and physical HMD pitch/roll supply the VR view.
     // A full native/activation rotation tilts the tracking space when turning.
-    if(!spatialMenu){
+    if(!spatialMenu||liveHandheldMenu){
         if(!controllers_.authoredCamera)
             nativePose=(controllers_.frontEnd||controllers_.cabinPlay)?frontEndOrigin_:uprightOrigin(nativePose);
         if(recenterPending_){
@@ -656,6 +668,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     }
     suspended_=false;reason_=HeadCameraStop::none;
     if((!spatialMenu||liveHandheldMenu)&&!controllers_.frontEnd&&!controllers_.avatarEditor&&!controllers_.cabinPlay
+       &&!controllers_.cabinTransit
        &&requirePlayerHead_&&result.playerSequence){
         PlayerRootSample rootSample;
         if(getPlayerRootSample(camera,result.playerOwner,result.playerSequence,time,rootSample)){
@@ -711,12 +724,20 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     // FOX's camera-local forward/right candidates are +Z/-X. The explicit
     // 180-degree basis rotation keeps handedness intact; validate in live motion.
     if((!spatialMenu||liveHandheldMenu)&&!controllers_.authoredCamera)nativePose.position.y+=controllers_.playerHeightOffset;
+    if(controllers_.cabinTransit&&driverView_.valid&&driverView_.passenger
+       &&(!spatialMenu||liveHandheldMenu)){
+        result.cabinBasePose=nativePose;result.cabinBaseTracked=true;
+    }
     const Pose basis{{0,1,0,0},{}};
-    auto relative=compose(inverse(spatialMenu?menuHead_:origin_),head_);
+    // A live field handset shares the gameplay tracking origin. Using the
+    // head pose captured at menu entry zeroes the current pitch/snap heading
+    // and tilts the world when the player looks back up from the handset.
+    const bool anchoredMenu=spatialMenu&&!liveHandheldMenu;
+    auto relative=compose(inverse(anchoredMenu?menuHead_:origin_),head_);
     relative.position=relative.position*units_;
     const auto nativeDelta=compose(compose(basis,relative),inverse(basis));
     result.nativePose=compose(nativePose,nativeDelta);
-    if(!spatialMenu){
+    if(!anchoredMenu){
         const float turn=std::isfinite(controllers_.snapYaw)?controllers_.snapYaw:0;
         const Quat rotation{0,std::sin(turn*.5f),0,std::cos(turn*.5f)};
         // Keep the turn-pivot translation in the native heading's frame.
