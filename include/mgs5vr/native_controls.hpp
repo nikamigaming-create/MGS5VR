@@ -127,12 +127,7 @@ void cancelHandheldIdroidBorrow() noexcept;
 constexpr bool freshHandheldIdroidOpenRequest(HandheldIdroidOpenRequest request,uint64_t activation,uint64_t now) noexcept {
     return request.activation&&request.activation==activation&&request.time&&now>=request.time&&now-request.time<=1000;
 }
-// Only the mod's spatial field terminal owns this world pause. Verified ACC
-// cabin play already owns the seated player and must keep its native tasks live.
-constexpr bool nativeIdroidWorldPauseRequired(bool open,bool closing,bool handheld,bool cabinPlay) noexcept {
-    return open&&!closing&&!handheld&&!cabinPlay;
-}
-// The native Lua job owns the pause registration; XR only publishes the mode.
+// XR publishes the selected presentation; native Lua owns its input policy.
 void setHandheldMenus(bool enabled) noexcept;
 bool handheldMenusSelected() noexcept;
 // The native Lua job acknowledges its own player-pad exclusion. Until then,

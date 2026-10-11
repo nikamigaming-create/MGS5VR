@@ -165,6 +165,95 @@ template<class T> T read(uintptr_t address){
     if(address)ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&value,sizeof(value),&size);
     return size==sizeof(value)?value:T{};
 }
+template<class T> std::optional<T> readKnown(uintptr_t address){
+    T value{};SIZE_T size{};
+    if(!address||!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&value,sizeof(value),&size)
+       ||size!=sizeof(value))return {};
+    return value;
+}
+struct CabinStowPlayer {
+    uintptr_t player{},character{},context{};
+    uint64_t activation{};
+    uint32_t index{};
+    bool operator==(const CabinStowPlayer&) const=default;
+};
+std::optional<CabinStowPlayer> cabinStowPlayer(){
+    const auto now=steadyMilliseconds();
+    const auto frame=headCamera().publishedRigFrame(now);
+    const auto status=headCamera().status();
+    if(!frame||!frame->applied||!frame->playerOwner||!frame->activation||!frame->rigSequence
+       ||!frame->sampleTime||now<frame->sampleTime||now-frame->sampleTime>150
+       ||!status.active||status.suspended||status.activation!=frame->activation
+       ||!nativeCabinPlay()||nativeTitleModeActive()||nativeLoadingTipsOpen()||nativeScriptedDemoActive())return {};
+    CabinStowPlayer result{frame->playerOwner,0,0,frame->activation,0};
+    if(readKnown<uintptr_t>(result.player)!=std::optional<uintptr_t>{imageBase+0x23b8218})return {};
+    const auto character=readKnown<uintptr_t>(result.player+0x370);
+    const auto index=readKnown<uint32_t>(result.player+0x3a0);
+    if(!character||!*character||!index||*index>15
+       ||readKnown<uintptr_t>(*character)!=std::optional<uintptr_t>{imageBase+0x2295210})return {};
+    const auto context=readKnown<uintptr_t>(*character+0x138);
+    if(!context||!*context||readKnown<uint32_t>(*context+0x218)!=index)return {};
+    result.character=*character;result.context=*context;result.index=*index;
+    if(readKnown<uintptr_t>(result.player+0x370)!=character
+       ||readKnown<uint32_t>(result.player+0x3a0)!=index
+       ||readKnown<uintptr_t>(result.character+0x138)!=context)return {};
+    return result;
+}
+std::optional<bool> cabinStowSubject(const CabinStowPlayer& owner){
+    // This is the same current phase selected by PlayerInfo.AndCheckStatus
+    // (53c990 / 53ca40). Its SUBJECT enum is bit 56. Unlike the Lua boolean,
+    // an unavailable player/status record must not look like an exited owner.
+    for(unsigned attempt=0;attempt<2;++attempt){
+        if(readKnown<uint32_t>(imageBase+0x2bd3fd4)!=std::optional<uint32_t>{owner.index})return {};
+        const auto phase=readKnown<uint32_t>(imageBase+0x2bd3fd0);
+        if(!phase||*phase>1)return {};
+        const auto status=imageBase+0x2bd3ff0+(*phase*16ull+owner.index)*0xe0;
+        const auto flags=readKnown<std::array<uint32_t,5>>(status+0xc0);
+        const auto stateRoot=readKnown<Vec3>(status+0x40);
+        const auto playerRoot=readKnown<Vec3>(owner.player+0x60);
+        if(readKnown<uintptr_t>(status)!=std::optional<uintptr_t>{imageBase+0x2190b28}
+           ||!flags||!stateRoot||!playerRoot)return {};
+        const auto difference=*stateRoot-*playerRoot;
+        if(!valid(Pose{{},difference})||dot(difference,difference)>4)return {};
+        if(readKnown<uint32_t>(imageBase+0x2bd3fd0)!=phase)continue;
+        if(readKnown<uint32_t>(imageBase+0x2bd3fd4)!=std::optional<uint32_t>{owner.index}
+           ||cabinStowPlayer()!=std::optional<CabinStowPlayer>{owner})return {};
+        return ((*flags)[1]&(1u<<24))!=0;
+    }
+    return {};
+}
+struct CabinStowTerminal {
+    uintptr_t system{},terminal{};
+    bool open{},closing{};
+    bool operator==(const CabinStowTerminal&) const=default;
+};
+std::optional<CabinStowTerminal> cabinStowTerminal(){
+    const auto system=readKnown<uintptr_t>(imageBase+0x2bf1518);
+    if(!system||!*system||readKnown<uintptr_t>(*system)!=std::optional<uintptr_t>{imageBase+0x2242d78})return {};
+    const auto terminal=readKnown<uintptr_t>(*system+0x7c0);
+    if(!terminal||!*terminal||readKnown<uintptr_t>(*terminal)!=std::optional<uintptr_t>{imageBase+0x22705a8})return {};
+    const auto open=readKnown<uint8_t>(*terminal+0x20);
+    const auto closing=readKnown<uint8_t>(*terminal+0x25);
+    if(!open||*open>1||!closing||*closing>1
+       ||readKnown<uintptr_t>(imageBase+0x2bf1518)!=system
+       ||readKnown<uintptr_t>(*system+0x7c0)!=terminal)return {};
+    return CabinStowTerminal{*system,*terminal,*open==1,*closing==1};
+}
+std::string cabinStowPlayerGuard(const CabinStowPlayer& owner){
+    // AndCheckStatus alone returns false when the local player is unavailable.
+    // Match its native local index to the current typed render/player owner.
+    return "if type(TppMission)~='table' or type(TppMission.IsHelicopterSpace)~='function' "
+        "or type(vars)~='table' or type(vars.missionCode)~='number' or not TppMission.IsHelicopterSpace(vars.missionCode) "
+        "or type(TppSequence)~='table' or type(TppSequence.GetCurrentSequenceName)~='function' "
+        "or TppSequence.GetCurrentSequenceName()~='Seq_Game_MainGame' "
+        "or type(PlayerInfo)~='table' or type(PlayerInfo.GetLocalPlayerIndex)~='function' "
+        "or type(PlayerInfo.AndCheckStatus)~='function' or type(PlayerStatus)~='table' "
+        "or type(PlayerStatus.SUBJECT)~='number' then return 'unknown owner' end "
+        "local playerIndex=PlayerInfo.GetLocalPlayerIndex(); if type(playerIndex)~='number' or playerIndex~="
+        +std::to_string(owner.index)+" then return 'different owner' end "
+        "local subject=PlayerInfo.AndCheckStatus{PlayerStatus.SUBJECT}; "
+        "if type(subject)~='boolean' then return 'unknown owner' end ";
+}
 MenuMaskRead menuInputMask(uintptr_t object){
     MenuMaskRead value;SIZE_T bytes{};
     if(!object||!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(object),&value.type,sizeof(value.type),&bytes)
@@ -1159,34 +1248,10 @@ void pump(void* state){
         }
         acknowledgeHandheldMenuControl(idroidControl,
             handheldIdroid&&idroidPadAcknowledged&&appliedPolicy==requestedPolicy,steadyMilliseconds(),focusedWeapon);
-        // This is the retail pause API used by TppMain and TppException.
-        // Own one named registration and release only that registration;
-        // another menu, loading transition or script may also hold a pause.
-        static bool idroidPauseRegistered{};
-        // A native close request precedes IsMbDvcTerminalOpened becoming
-        // false: the character must run its stow animation in between.
-        // Keeping our pause until the open bit clears deadlocks that exit.
-        const bool pauseIdroid=nativeIdroidWorldPauseRequired(nativeIdroidOpen(),nativeIdroidClosing(),
-            handheldMenusSelected(),nativeCabinPlay());
-        if(pauseIdroid!=idroidPauseRegistered){
-            // The ordinary menu mask also freezes the iDroid's own update:
-            // opening stops halfway and Back/tab input never runs. Retail's
-            // iDroid tutorial mask pauses gameplay while leaving UI active.
-            const std::string script=pauseIdroid
-                ?"if type(TppPause)=='table' and type(TppPause.RegisterPause)=='function' "
-                 "and type(TppPause.PAUSE_LEVEL_MB_DVC_TUTORIAL)=='number' then "
-                 "TppPause.RegisterPause('MGS5VR_iDroid',TppPause.PAUSE_LEVEL_MB_DVC_TUTORIAL); return 'ok' end return 'unavailable'"
-                :"if type(TppPause)=='table' and type(TppPause.UnregisterPause)=='function' then "
-                 "TppPause.UnregisterPause('MGS5VR_iDroid'); return 'ok' end return 'unavailable'";
-            int pauseStatus=load(state,script.data(),script.size(),"@mgs5vr-idroid-pause");
-            if(!pauseStatus)pauseStatus=original(state,0,1,0);
-            size_t length{};const auto* result=getString(state,-1,&length);
-            if(!pauseStatus&&result&&length==2&&std::memcmp(result,"ok",2)==0){
-                idroidPauseRegistered=pauseIdroid;
-                log(pauseIdroid?"iDroid quad: native gameplay paused; stereo retained":"iDroid quad: owned pause released");
-            }
-            setTop(state,top);
-        }
+        // Spatial presentation keeps the retail iDroid's native world-update
+        // policy. A mod-owned tutorial pause also freezes the Development
+        // child's model/exit work: Back arrives but the page cannot return.
+        // Native lessons and the explicit Pause menu retain their own owners.
         // Mode 10 is the native FOB_MISSION restriction (name hash f835f633).
         // Cold ACC can retain it after the campaign reports FINISH. Let the
         // player dismiss its informational Help first; then release only that
@@ -1214,72 +1279,113 @@ void pump(void* state){
         const bool heldBackClose=takeNativeIdroidClose();
         const auto tutorialMode=nativeIdroidTutorialMode();
         const auto recovery=nativeIdroidRecoveryForTutorialMode(tutorialMode);
-        // ACC has no ordinary player terminal/stow task to consume +0x25.
-        // Finish only a close already requested by native root Back. Other
-        // game modes retain their native player animation/terminal lifecycle.
+        // Native root Back and held Back share the ordinary ACC close
+        // lifecycle. Its player must leave SUBJECT before terminal Stop;
+        // hiding the terminal first leaves the next Menu tap exiting that
+        // player action instead of opening the device.
         const bool cabinClose=nativeCabinPlay()&&nativeIdroidOpen()&&nativeIdroidClosing()
             &&recovery==NativeIdroidRecovery::ordinary&&!nativePauseMenuOpen();
         const bool uiOnlyClose=handheldIdroidOwned()&&nativeIdroidOpen()&&nativeIdroidClosing()
             &&recovery!=NativeIdroidRecovery::refuse&&!nativePauseMenuOpen();
         if((heldBackClose||cabinClose||uiOnlyClose)&&recovery!=NativeIdroidRecovery::refuse&&!nativePauseMenuOpen()){
-            // Field players consume the deferred close in their native stow
-            // task. Calling Stop directly there leaves the equipped-device
-            // task alive and can reopen Help. ACC has no such player task.
-            // Do not mark any tutorial complete or write progression variables.
-            const bool immediateStop=nativeCabinPlay()||handheldIdroidOwned();
-            // SECURITY also opens its post-close Help when a UI-only terminal
-            // stops immediately. Capture that exact tutorial owner before Stop
-            // resets its mode; the pump can release only its resulting Help.
-            const auto requestedHelpOwner=(heldBackClose||uiOnlyClose)
-                ?captureNativeIdroidStowHelpOwner():0;
-            const std::string closeFunction=immediateStop?"StopMbDvcTerminal":"CloseMbDvcTerminal";
-            const std::string closeScript=
-                "if type(TppUiCommand)=='table' and type(TppUiCommand.IsMbDvcTerminalOpened)=='function' "
-                "and type(TppUiCommand."+closeFunction+")== 'function' and TppUiCommand.IsMbDvcTerminalOpened() "
-                "and type(TppUiCommand.IsShowPopup)=='function' and not TppUiCommand.IsShowPopup() then local completedGuide=false; "
-                +std::string(cabinClose
-                    ?"if not (TppMission.IsHelicopterSpace(vars.missionCode) and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame') then return 'different owner' end "
-                    :"")
-                // Only the reproduced completed ACC guide permits clearing its
-                // tutorial mode here. Other lessons retain progression; held
-                // Back requests only the native terminal's stow operation.
-                +std::string(heldBackClose&&nativeCabinPlay()&&tutorialMode&&*tutorialMode==10&&haveGuideRestrictionLease()
-                    ?"if TppMission.IsHelicopterSpace(vars.missionCode) and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame' "
-                     "and gvars.trm_fobTutorialState==127 and not mvars.heliSpace_nowMissionListGuidance "
-                     "and type(TppUiCommand.SetTutorialMode)=='function' then TppUiCommand.SetTutorialMode(false); completedGuide=true end "
-                    :"")
-                +"TppUiCommand."+closeFunction+"(); return completedGuide and 'completed guide closed' or 'requested' end return 'already closed or overlay'";
-            int closeStatus=load(state,closeScript.data(),closeScript.size(),"@mgs5vr-idroid-back-recovery");
-            if(!closeStatus)closeStatus=original(state,0,1,0);
-            size_t length{};const auto* result=getString(state,-1,&length);
-            constexpr std::string_view completedGuide="completed guide closed";
-            if(!closeStatus&&result&&length==completedGuide.size()&&std::memcmp(result,completedGuide.data(),length)==0){
-                const auto restored=restoreCompletedGuideRestrictions();
-                log(std::string("Requested ACC recovery: native tutorial pause released=")+(releaseNativeIdroidTutorialPause()?"1":"0")
-                    +"; prior menu restrictions restored="+(restored?"1":"0"));
+            const bool cabinLifecycle=nativeCabinPlay()&&!handheldIdroidOwned()
+                &&recovery==NativeIdroidRecovery::ordinary;
+            const auto player=cabinLifecycle?cabinStowPlayer():std::optional<CabinStowPlayer>{};
+            const auto terminal=cabinLifecycle?cabinStowTerminal():std::optional<CabinStowTerminal>{};
+            const auto subject=player?cabinStowSubject(*player):std::optional<bool>{};
+            const auto cabinAction=cabinLifecycle?nativeCabinIdroidStow(true,false,tutorialMode,
+                terminal&&terminal->open,terminal?std::optional<bool>{terminal->closing}:std::nullopt,
+                heldBackClose,player.has_value(),subject):NativeCabinIdroidStow::unchanged;
+            static std::string previousCabinStow;
+            if(cabinLifecycle){
+                std::ostringstream diagnostic;
+                diagnostic<<"Native ACC iDroid stow action="<<static_cast<unsigned>(cabinAction)
+                    <<" player="<<(player?player->player:0)<<" index="<<(player?std::to_string(player->index):"unknown")
+                    <<" activation="<<(player?player->activation:0)<<" terminal="<<(terminal?terminal->terminal:0)
+                    <<" open="<<(terminal?std::to_string(terminal->open):"unknown")
+                    <<" closing="<<(terminal?std::to_string(terminal->closing):"unknown")
+                    <<" subject="<<(subject?std::to_string(*subject):"unknown");
+                const auto message=diagnostic.str();
+                if(message!=previousCabinStow){log(message);previousCabinStow=message;}
+            }else previousCabinStow.clear();
+            if(cabinAction!=NativeCabinIdroidStow::wait){
+                // Field players consume the deferred close in their native stow
+                // task. Calling Stop directly there leaves the equipped-device
+                // task alive and can reopen Help. Ordinary ACC must also let its
+                // native player release the device owner before terminal Stop.
+                // Do not mark any tutorial complete or write progression variables.
+                const bool immediateStop=cabinLifecycle?cabinAction==NativeCabinIdroidStow::finishStop
+                    :nativeCabinPlay()||handheldIdroidOwned();
+                // SECURITY also opens its post-close Help when a UI-only terminal
+                // stops immediately. Capture that exact tutorial owner before Stop
+                // resets its mode; the pump can release only its resulting Help.
+                const auto requestedHelpOwner=(heldBackClose||uiOnlyClose)
+                    ?captureNativeIdroidStowHelpOwner():0;
+                const std::string closeFunction=immediateStop?"StopMbDvcTerminal":"CloseMbDvcTerminal";
+                const std::string closeScript=
+                    "if type(TppUiCommand)=='table' and type(TppUiCommand.IsMbDvcTerminalOpened)=='function' "
+                    "and type(TppUiCommand."+closeFunction+")== 'function' and TppUiCommand.IsMbDvcTerminalOpened() "
+                    "and type(TppUiCommand.IsShowPopup)=='function' and not TppUiCommand.IsShowPopup() then local completedGuide=false; "
+                    +(cabinLifecycle?cabinStowPlayerGuard(*player)
+                        +std::string(immediateStop?"if subject then return 'waiting player owner' end ":""):std::string{})
+                    +std::string(cabinClose&&!cabinLifecycle
+                        ?"if not (TppMission.IsHelicopterSpace(vars.missionCode) and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame') then return 'different owner' end "
+                        :"")
+                    // Only the reproduced completed ACC guide permits clearing its
+                    // tutorial mode here. Other lessons retain progression; held
+                    // Back requests only the native terminal's stow operation.
+                    +std::string(heldBackClose&&nativeCabinPlay()&&tutorialMode&&*tutorialMode==10&&haveGuideRestrictionLease()
+                        ?"if TppMission.IsHelicopterSpace(vars.missionCode) and TppSequence.GetCurrentSequenceName()=='Seq_Game_MainGame' "
+                         "and gvars.trm_fobTutorialState==127 and not mvars.heliSpace_nowMissionListGuidance "
+                         "and type(TppUiCommand.SetTutorialMode)=='function' then TppUiCommand.SetTutorialMode(false); completedGuide=true end "
+                        :"")
+                    +"TppUiCommand."+closeFunction+"(); return completedGuide and 'completed guide closed' or 'requested' end return 'already closed or overlay'";
+                int closeStatus=load(state,closeScript.data(),closeScript.size(),"@mgs5vr-idroid-back-recovery");
+                // Loading the chunk must not turn an earlier owner/status sample
+                // into authority over a replacement player or terminal. The Lua
+                // transaction also rechecks the exact local index and SUBJECT.
+                if(!closeStatus&&cabinLifecycle){
+                    const auto currentPlayer=cabinStowPlayer();
+                    const auto currentTerminal=cabinStowTerminal();
+                    const auto currentSubject=currentPlayer?cabinStowSubject(*currentPlayer):std::optional<bool>{};
+                    if(nativePauseMenuOpen()||currentPlayer!=player||currentTerminal!=terminal
+                       ||nativeCabinIdroidStow(nativeCabinPlay(),handheldIdroidOwned(),nativeIdroidTutorialMode(),
+                           currentTerminal&&currentTerminal->open,
+                           currentTerminal?std::optional<bool>{currentTerminal->closing}:std::nullopt,
+                           heldBackClose,currentPlayer.has_value(),currentSubject)!=cabinAction)
+                        closeStatus=-1;
+                }
+                if(!closeStatus)closeStatus=original(state,0,1,0);
+                size_t length{};const auto* result=getString(state,-1,&length);
+                constexpr std::string_view completedGuide="completed guide closed";
+                if(!closeStatus&&result&&length==completedGuide.size()&&std::memcmp(result,completedGuide.data(),length)==0){
+                    const auto restored=restoreCompletedGuideRestrictions();
+                    log(std::string("Requested ACC recovery: native tutorial pause released=")+(releaseNativeIdroidTutorialPause()?"1":"0")
+                        +"; prior menu restrictions restored="+(restored?"1":"0"));
+                }
+                if(!closeStatus&&heldBackClose&&!immediateStop&&!cabinLifecycle&&nativeIdroidClosing()){
+                    // Deliberate stow must run the native player task even while
+                    // a lesson has paused the field. Release only the verified
+                    // tutorial object's own pause handle, retaining its mode,
+                    // restrictions, allocated handle and progression.
+                    log(std::string("Requested field iDroid stow: tutorial pause released=")
+                        +(releaseNativeIdroidTutorialPause(true)?"1":"0")
+                        +"; post-close Help owner captured="+(requestedHelpOwner?"1":"0"));
+                }
+                if(!closeStatus&&requestedHelpOwner){
+                    stowHelpOwner=requestedHelpOwner;stowHelpRequestedAt=now;
+                }
+                if(!closeStatus&&heldBackClose&&nativeIdroidRecoveryForTutorialMode(nativeIdroidTutorialMode())==NativeIdroidRecovery::ordinary){
+                    // Restore only entry disables captured before this lesson
+                    // borrowed them. An independent later disable remains owned
+                    // by the game, and no completion/save variable is changed.
+                    restoreCompletedGuideRestrictions();
+                    releaseNativeIdroidTutorialPause();
+                }
+                log(std::string(cabinClose?"Native ACC iDroid root-Back cleanup status=":"Native iDroid held-Back recovery status=")+std::to_string(closeStatus)+": "
+                    +(result?std::string(result,std::min(length,size_t{300})):"no result"));
+                setTop(state,top);
             }
-            if(!closeStatus&&heldBackClose&&!immediateStop&&nativeIdroidClosing()){
-                // Deliberate stow must run the native player task even while
-                // a lesson has paused the field. Release only the verified
-                // tutorial object's own pause handle, retaining its mode,
-                // restrictions, allocated handle and progression.
-                log(std::string("Requested field iDroid stow: tutorial pause released=")
-                    +(releaseNativeIdroidTutorialPause(true)?"1":"0")
-                    +"; post-close Help owner captured="+(requestedHelpOwner?"1":"0"));
-            }
-            if(!closeStatus&&requestedHelpOwner){
-                stowHelpOwner=requestedHelpOwner;stowHelpRequestedAt=now;
-            }
-            if(!closeStatus&&heldBackClose&&nativeIdroidRecoveryForTutorialMode(nativeIdroidTutorialMode())==NativeIdroidRecovery::ordinary){
-                // Restore only entry disables captured before this lesson
-                // borrowed them. An independent later disable remains owned
-                // by the game, and no completion/save variable is changed.
-                restoreCompletedGuideRestrictions();
-                releaseNativeIdroidTutorialPause();
-            }
-            log(std::string(cabinClose?"Native ACC iDroid root-Back cleanup status=":"Native iDroid held-Back recovery status=")+std::to_string(closeStatus)+": "
-                +(result?std::string(result,std::min(length,size_t{300})):"no result"));
-            setTop(state,top);
         }
         int presentationStatus=load(state,nativePresentationScript.data(),nativePresentationScript.size(),"@mgs5vr-presentation-state");
         if(!presentationStatus)presentationStatus=original(state,0,1,0);

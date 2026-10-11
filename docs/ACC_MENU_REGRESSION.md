@@ -1,4 +1,120 @@
-# ACC menu regression — October 1
+# ACC menu regression
+
+## October 10.1 spatial Development fix
+
+The report concerns **spatial** iDroid Development: scroll to an upgrade, then
+the menu freezes and cannot close while the game continues. Weapons, gear,
+helicopter and buddy pages were reported in the ACC and on Mother Base.
+
+Mother Base Helicopter Development reproduced the native child-exit failure
+on DLL `3a35173cfa9d`. Both eyes remained on the grid after short Back despite
+verified input delivery and ordinary mode-zero, cancel-enabled UI state.
+Retained run `20261011T012808922592Z` removed only the mod-owned
+`MGS5VR_iDroid` pause registration; the same child immediately returned with
+short Back. Run `20261011T013115702794Z` restored that original tutorial pause
+and reproduced the stuck child. The registration is now removed from ordinary
+spatial presentation. Retail tutorial and explicit Pause owners are preserved.
+
+Working DLL `278e218e1291` passed 55/55 automated groups and installer checks.
+Retained run `20261011T014251563347Z` verifies the Mother Base weapon dialog,
+Cancel, sustained Weapons/Items/Buddy/Helicopter scrolling, short Back, stow
+and first-tap reopen. Retained ACC run `20261011T021354946660Z` verifies those
+three child grids and Back, weapon instant-completion Cancel, and suit/gear
+navigation plus the native equip notice. The run's final queued close/reopen
+plan arrived after its bounded shutdown and did not execute. It is not counted
+as passed. The separate retained four-case run `20261011T022616783621Z`
+verifies ACC complete native stow and first-tap reopening twice. Its final
+state has SUBJECT false, iDroid and Pause closed, and all inputs neutral.
+Both eyes were reviewed through these stated page outcomes.
+
+Ordinary ACC Close now releases the verified seated player's SUBJECT action
+before an optional terminal Stop. This addresses the earlier `8a045ef47a8a`
+case where Stop hid the menu but the first Menu tap only exited the remaining
+player action. The current four-case ACC check passes without a second tap.
+
+The archived paired save was also late-game (story 33, 454 developed items).
+Earlier-account Development lessons, every upgrade transaction and headset
+acceptance remain unverified. No MB Coins or GMP were spent in the candidate
+ACC checks. The original six save files were restored and verified after the
+owned simulator/game session closed; Steam stayed running. Release binaries
+are built separately from the committed hotfix and identify themselves in
+BUILD.json. Private scoped evidence is recorded in
+`artifacts/dev/acc-development-current/spatial-investigation.json`.
+
+### Earlier investigation and published-build observations
+
+The following entries describe earlier binaries and do not replace the current
+spatial fix findings above. The 8a candidate began a timed grenade upgrade,
+but its later stow left SUBJECT true. The runner's earlier rejection of a
+1.1-second cursor step was a tooling limit, not a game freeze; the working
+harness subsequently accepted explicit 80..1250 ms holds with neutral cleanup.
+
+
+Retained actual-game simulator runs `20261010T214345580432Z` and
+`20261010T214926027283Z` on published DLL `1b8c1ee43e29` reviewed both eyes through
+ACC Development,
+Weapons/Items loading/navigation/short Back, stow/reopen, and an actual weapon
+development confirmation followed by Cancel. Buddy Equipment entry was also
+exercised, but a settled stereo Buddy list is not accepted.
+The normal LEFT-grip focus and effective VR mappings were used. No purchase
+was made. All test inputs were released and cleanup closed the owned menus.
+
+The confirmation is an iDroid-owned dialog: native `IsShowPopup()` remains false.
+The case expecting that flag therefore remains failed; its failure must not be
+reported as a reproduced game lock. Two tab inputs over an intervening event
+notice likewise did not establish page changes. The tested paths do not close
+the community report or establish completed upgrades or current field coverage.
+
+The older Development-spinner evidence with tutorial mode 11 is a distinct
+case. The owned native tutorial-name table identifies mode 11 as **SECURITY**;
+its child waits for Security-specific events. Do not call it a Development
+tutorial or assume it explains a new mode-zero failure. Native menu control,
+readiness, tutorial state, UI restrictions and actual consumer input must be
+captured at a player's failure before changing the established interaction.
+
+## Native Inventory guide contract: mode 14
+
+This is a source-supported lifecycle contract, not menu or headset acceptance.
+The owned native tutorial table identifies mode **14** as `SERVER_WALLET`
+(name hash `0x33a71b37`). Its first Help card is presented as Inventory. Closing
+that card does not complete the guide or imply that its gameplay pause and
+navigation restrictions should disappear.
+
+The native child registered at tutorial index 14 has vtable RVA `0x2392e40`,
+begin function `0xf42780` and update function `0xf44a60`. Its begin transaction
+permits Mother Base menu index 1 and index **22** (`0x16`), and highlights
+index 22. The native menu constructor maps index 22 to `MBM_RESOURCE`
+(`0x201b40b2`), the Resources/Inventory branch; this is not Development.
+
+The verified update has these stages:
+
+1. Show the first Help card, accept its native result, and wait for the card
+   to finish closing.
+2. Keep mode 14 active while waiting for native tutorial event `0x1e`.
+   The highlighted Resources branch is the intended continuation; the exact
+   event name has not been recovered and must not be invented by a fixture.
+3. After that event and the native delay, show a second Help card. Accept it
+   and wait for its closure before returning the native completion result.
+4. The manager processes completion through `0xf44f10` / `0xf41fa0`: it records
+   completion, clears the active mode, restores its menu restrictions and
+   schedules release of its own tutorial pause.
+
+Field investigation run `20261010T223829329019Z` on published DLL
+`1b8c1ee43e29` observed the first card close while mode 14 and the tutorial
+pause remained active. The Mother Base root was visible. With LEFT-grip menu
+focus and input readiness acknowledged, the native next-tab query at return
+RVA `0x878a0c` returned false. This distinguishes guide-owned input restriction
+from an accepted grip being advanced twice. It does not establish completion
+of this guide or resolve the separate Mother Base tab-skipping report.
+
+The VR root-wrap hook requires tutorial mode zero, so it must not wrap around
+this unfinished guide. Tests must identify the actual guide stage and legal
+choice; a first-card acknowledgment cannot require an immediately unpaused,
+mode-zero state. Keep the native guided action and subsequent acknowledgment
+in the unfinished-guidance coverage obligation until their complete VR path,
+Back/stow/reopen behavior and both-eye presentation are reviewed.
+
+## October 1 report and repair history
 
 The community report concerns helicopter upgrading in the ACC. It is still
 open: the exact reported screen and transaction have not been identified.
@@ -6,7 +122,7 @@ Development through iDroid and the native helicopter customization selector
 are separate paths. Neither a field-list pass nor an open-terminal flag closes
 that report.
 
-## Current repair and actual game result
+## October 1 repair and actual game result
 
 The completed ACC **Tutorials / Choose a Rival** restriction is repaired on
 candidate DLL `d893eb437a06`. Native observation found two separate leftovers:

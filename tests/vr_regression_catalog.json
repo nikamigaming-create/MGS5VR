@@ -2628,7 +2628,7 @@
         },
         "native": {
           "status": "blocked",
-          "scope": "Current user report says ACC Development windows can freeze selection, navigation and Back. Candidate 4df has a scoped first Weapons/Items Down/Up navigation and three short Back observations so far; all four window paths remain open. Historical completed-FOB Rival guide recovery and selected ACC Back paths do not supersede this report."
+          "scope": "A/B in actual Mother Base Helicopter Development proved the mod-owned tutorial pause stopped the child exit; removing it recovered Back and restoring it reproduced the failure. Candidate 278 checked spatial ACC/Mother Base Weapons/Items, Buddy and Helicopter scroll/Back plus weapon dialogs, ACC suit/gear interaction and native stow/first-tap reopen. These are late-game scoped observations, not early-account, every transaction or full guide acceptance. See docs/ACC_MENU_REGRESSION.md."
         },
         "continuous": {
           "status": "unverified",
@@ -2641,7 +2641,7 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Current ACC Development freeze report requires page-reviewed coverage of all four windows and their exit/re-entry paths; exact reproduced scope remains partial."
+        "reason": "Spatial Development freeze fixed and scoped late-game ACC/Mother Base exit/reopen paths checked. Earlier-account lessons, all four upgrade transactions and complete guide lifecycle acceptance remain open."
       },
       "missing_checks": [
         "Forced unfinished tutorial stow and immediate reopening with native progression preserved.",

@@ -6,7 +6,48 @@ left-arm HUD popups, and the left-hand iDroid requested on October 4. Pause uses
 panel. Floating firearm aiming overlays stay off. No desktop/input automation
 or Steam shutdown is needed by the local workflow.
 
-## October 10 headset-feedback implementation
+## October 10.1 spatial Development hotfix
+
+The hotfix target is `experimental-2026-10-10.1`. Its gameplay changes remove
+the mod-owned spatial iDroid world pause and finish ordinary ACC native stow
+before a first-tap reopen. The retail pause owners for actual lessons and the
+explicit Pause menu keep their existing behavior.
+
+The spatial freeze was reproduced on Mother Base with development DLL
+`3a35173cfa9d`: short Back reached the native pad/UI but Helicopter Development
+remained on the child grid. Unregistering only `MGS5VR_iDroid` immediately
+restored Back; restoring its tutorial pause reproduced the failure. The mask
+was stopping the child's model/exit work, not its rendered UI.
+
+Working candidate DLL `278e218e1291`, built **2026-10-11 01:33:56 UTC**, passed
+**55/55** automated groups and installer checks. Retained actual-game spatial
+run `20261011T014251563347Z` checked Mother Base Weapons/Items sustained
+scrolling, a weapon upgrade dialog and Cancel, Buddy and Helicopter scrolling
+and Back, complete native stow and first-tap reopening. Run
+`20261011T021354946660Z` checked the corresponding ACC grids and Back, a weapon
+instant-completion dialog and Cancel, and suit/gear scrolling with the native
+equip notice. No MB Coins were spent. The final ACC four-case run
+`20261011T022616783621Z` passed stow and first-tap reopening twice and ended with
+native SUBJECT false, iDroid/Pause closed and all inputs neutral. Both eyes
+were reviewed through the stated outcomes. Final release binaries are rebuilt
+from the isolated committed hotfix; their identity is recorded in BUILD.json.
+
+The archived `regression-middle-20261005` fixture proved another save's ACC
+path, but native story 33 and 454 developed items showed the same late-game
+progression. It does **not** establish earlier-account or first Development
+lesson coverage. The original six paired save files were restored and verified.
+The owned simulator/game session is stopped; Steam remains running and the
+physical-play runtime is restored to Meta OpenXR. The investigation receipt is
+`artifacts/dev/acc-development-current/spatial-investigation.json`.
+
+Headset, first-playthrough lessons, all transactions, continuous full missions,
+free-roam Mother Base tab wrap and invisible vehicle long guns remain open.
+The separate near-cover block toggle and expanded coverage tooling remain
+working changes and are outside this hotfix. No whole-game certification is
+claimed by scoped menu checks. Earlier build and pin statements below are
+historical.
+
+## October 10 headset-feedback implementation (before publication)
 
 The development candidate, `0a0d5f0f26cf`, passes all 54 automated test groups
 and installer checks (`driver-ready-freshness-build.log`). Retained run

@@ -29,6 +29,21 @@ inline bool nativeIdroidStowHelpCloseAllowed(std::optional<unsigned> mode,bool i
     return ownedRequest&&mode&&*mode==0&&!idroidOpen&&pauseKind==32;
 }
 
+enum class NativeCabinIdroidStow { unchanged, wait, requestClose, finishStop };
+// An ordinary ACC terminal is also owned by the native seated player's
+// subjective/device action. Stop alone hides the UI but leaves that action
+// open; the next Menu tap then exits it instead of reopening the terminal.
+// Let native Close release that owner before completing the UI shutdown.
+inline NativeCabinIdroidStow nativeCabinIdroidStow(bool cabin,bool uiOnly,
+    std::optional<unsigned> mode,bool open,std::optional<bool> closing,bool requested,
+    bool playerVerified,std::optional<bool> subject) noexcept {
+    if(!cabin||uiOnly||mode!=std::optional<unsigned>{0})return NativeCabinIdroidStow::unchanged;
+    if(!open||!closing.has_value()||(!requested&&!*closing)||!playerVerified||!subject.has_value())
+        return NativeCabinIdroidStow::wait;
+    if(!*closing)return NativeCabinIdroidStow::requestClose;
+    return *subject?NativeCabinIdroidStow::wait:NativeCabinIdroidStow::finishStop;
+}
+
 // A native tutorial borrows the menu's disabled bit. Keep the prior values
 // from its ordered begin transaction; progression and other flag bits remain
 // owned by the game. A later independent disable invalidates that entry.

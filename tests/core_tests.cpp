@@ -195,6 +195,27 @@ int main(){
             &&!nativeIdroidStowHelpCloseAllowed(0,false,32,false)
             &&!nativeIdroidStowHelpCloseAllowed(std::nullopt,false,32,true),
             "active lessons, open terminals, ordinary Pause and absent owners remain untouched");
+        expect(nativeCabinIdroidStow(true,false,0,true,false,true,true,true)==NativeCabinIdroidStow::requestClose,
+            "held Back in ordinary ACC requests native Close before terminal Stop");
+        expect(nativeCabinIdroidStow(true,false,0,true,true,false,true,true)==NativeCabinIdroidStow::wait,
+            "native closing alone never permits Stop while the seated player still owns SUBJECT");
+        expect(nativeCabinIdroidStow(true,false,0,true,true,false,true,false)==NativeCabinIdroidStow::finishStop,
+            "native root Back or held Back completes only after the verified seated owner exits SUBJECT");
+        expect(nativeCabinIdroidStow(true,false,0,false,true,false,true,false)==NativeCabinIdroidStow::wait,
+            "a terminal already closed by the native actor needs no further Stop");
+        expect(nativeCabinIdroidStow(true,false,0,true,true,true,false,false)==NativeCabinIdroidStow::wait
+            &&nativeCabinIdroidStow(true,false,0,true,true,true,true,std::nullopt)==NativeCabinIdroidStow::wait
+            &&nativeCabinIdroidStow(true,false,0,true,std::nullopt,true,true,false)==NativeCabinIdroidStow::wait,
+            "missing or replaced player, unread status and unread terminal cannot masquerade as completed stow");
+        expect(nativeCabinIdroidStow(true,false,0,true,false,false,true,false)==NativeCabinIdroidStow::wait,
+            "a live terminal without a native or deliberate close request remains open");
+        expect(nativeCabinIdroidStow(false,false,0,true,true,true,true,false)==NativeCabinIdroidStow::unchanged
+            &&nativeCabinIdroidStow(true,true,0,true,true,true,true,false)==NativeCabinIdroidStow::unchanged
+            &&nativeCabinIdroidStow(true,false,std::nullopt,true,true,true,true,false)==NativeCabinIdroidStow::unchanged,
+            "ordinary ACC ownership does not change field, UI-only or unknown-mode recovery policy");
+        for(unsigned mode=1;mode<=16;++mode)
+            expect(nativeCabinIdroidStow(true,false,mode,true,true,true,true,false)==NativeCabinIdroidStow::unchanged,
+                "forced lessons retain their existing deliberate stow and post-close Help lifecycle");
         std::ostringstream state;state<<std::boolalpha;
         state<<"{\"unknown\":";writeNativeIdroidTutorialModeJson(state,std::nullopt);
         state<<",\"ordinary\":";writeNativeIdroidTutorialModeJson(state,0);
