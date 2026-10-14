@@ -81,10 +81,22 @@ def read_nav2(path):
     magic, length, entry, count = unpack('<4I', 0)
     origin = unpack('<3f', 32)
     divisors = unpack('<3H', 68)
-    if magic != 201403242 or length != len(data) or not 0 < count <= 64 or not all(divisors):
+    # The owned Africa corpus includes older date codes with the same bounded
+    # NavWorld records, and 112-byte split tiles with no sections. Empty tiles
+    # contribute provenance only; they must never create traversable nodes.
+    if (magic not in (201403240, 201403241, 201403242) or length != len(data)
+            or not 0 <= count <= 64 or not 112 <= entry <= length or not all(divisors)):
         raise BotFault("Unsupported or truncated NAV2 header")
     if not all(math.isfinite(v) for v in origin):
         raise BotFault("Nonfinite NAV2 origin")
+    identity = {'source': str(Path(path).resolve()), 'sha256': hashlib.sha256(data).hexdigest(),
+                'version': magic}
+    if not count:
+        if length != 112 or entry != length:
+            raise BotFault("Empty NAV2 tile has unexplained payload")
+        return {**identity, 'groups': [], 'empty': True}
+    if magic == 201403241:
+        raise BotFault("Nonempty NAV2 201403241 layout is unverified")
     groups = []
     for _ in range(count):
         kind, _, advance, payload, group, _, _ = unpack('<HHIIBBH', entry)
@@ -135,8 +147,7 @@ def read_nav2(path):
         entry += advance
     if not groups:
         raise BotFault("NAV2 file contains no navigation graph")
-    return {'source': str(Path(path).resolve()), 'sha256': hashlib.sha256(data).hexdigest(),
-            'groups': groups}
+    return {**identity, 'groups': groups, 'empty': False}
 
 
 class _ThreatCosts:

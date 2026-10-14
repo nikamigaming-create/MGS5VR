@@ -28,6 +28,17 @@ ID `65535`, normal action and a saved checkpoint. Both after eyes were reviewed
 with visible terrain and connected hands/sleeves. Objectives, moving-body and
 optics interactions, and the reported results handoff remain pending.
 
+The first field route stopped before dispatch because the reader rejected
+17 hash-checked Africa NAV2 tiles. The owned corpus contains fifteen exact
+112-byte empty split tiles and two nonempty `201403240` graphs with the same
+bounded NavWorld layout. Development now admits those records; empty tiles
+preserve provenance and supply no nodes or edges. Unknown date codes and
+unverified nonempty `201403241` layouts still fail. All 725 Africa tiles now
+parse, with 1,371,861 nodes and 4,331,494 explicit edges; 2,049 unresolved
+portals remain non-traversable. All 39 navigation checks pass, including
+directed topology, malformed records and empty-tile refusal to create routes.
+The actual field approach repeat is pending.
+
 The 1.0 source work survives the interrupted `Find mod download count` task.
 The published October 11 source is commit `87e51f2`, still present on
 `origin/main` after a fresh fetch. Later implementation, tests, licensed

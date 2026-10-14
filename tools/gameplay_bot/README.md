@@ -18,6 +18,12 @@ obstructions expire and cause bounded replanning. NPC topology is a planning
 prior, and predicted player clearance remains unknown until actual traversal.
 God-mode debug traversal does not certify ordinary-difficulty playability.
 
+The NAV2 reader retains hash-checked empty split tiles as provenance without
+inventing nodes. The owned Africa corpus validates `201403240` and `201403242`
+NavWorld records under the same bounds, index, flag and portal checks;
+`201403241` is admitted only for exact 112-byte empty tiles. Unknown versions,
+unexplained empty payloads and unsupported nonempty layouts stop planning.
+
 For the reviewed mortar field fixture, use
 `python tools/workspace.py bot --command mortar --policy private/mortar-fire-policy.json --record --seconds 60`.
 Run Continue first when starting a new simulator session. The policy identifies

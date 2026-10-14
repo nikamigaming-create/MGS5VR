@@ -27,6 +27,67 @@ def tile(name, points, edges, *, boundaries=(), cross=(), group=4):
 
 
 class NavigationTests(unittest.TestCase):
+    def nav2_bytes(self, version, *, empty=False):
+        data = bytearray(112 if empty else 224)
+        struct.pack_into('<4I', data, 0, version, len(data), 112, 0 if empty else 1)
+        struct.pack_into('<3f', data, 32, 3., 4., 5.)
+        struct.pack_into('<3H', data, 68, 2, 3, 4)
+        if not empty:
+            struct.pack_into('<HHIIBBH', data, 112, 0, 0, 112, 16, 4, 0, 0)
+            struct.pack_into('<9I', data, 128, 48, 60, 80, 72, 0, 0, 86, 0, 88)
+            struct.pack_into('<2H', data, 164, 2, 1)
+            struct.pack_into('<H', data, 174, 1)
+            struct.pack_into('<6H', data, 176, 0, 0, 0, 2, 0, 8)
+            struct.pack_into('<HHBB', data, 188, 0, 0, 1, 0)
+            struct.pack_into('<HHBB', data, 194, 2, 0, 0, 0)
+            struct.pack_into('<2H', data, 200, 1, 0)
+            struct.pack_into('<HHBB', data, 208, 4, 0, 0, 1)
+            struct.pack_into('<H', data, 214, 1249)
+        return data
+
+    def test_native_empty_split_tiles_preserve_identity_without_creating_routes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for version in (201403240, 201403241, 201403242):
+                path = pathlib.Path(directory)/str(version)
+                data = self.nav2_bytes(version, empty=True)
+                path.write_bytes(data)
+                empty = read_nav2(path)
+                self.assertTrue(empty['empty'])
+                self.assertEqual(empty['groups'], [])
+                self.assertEqual(empty['sha256'], hashlib.sha256(data).hexdigest())
+                nav = NativeMap([empty, tile('a', [(0,0,0),(1,0,0)], [(0,1)])])
+                self.assertEqual(nav.positions, [(0,0,0),(1,0,0)])
+                self.assertEqual(nav.path(0,1), [0,1])
+                self.assertEqual(len(nav.sources), 2)
+
+    def test_owned_legacy_navworld_keeps_positions_direction_and_flags(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory)/'graph.nav2'
+            for version in (201403240, 201403242):
+                path.write_bytes(self.nav2_bytes(version))
+                graph = read_nav2(path)
+                self.assertFalse(graph['empty'])
+                self.assertEqual(graph['groups'][0]['nodes'], [(3.,4.,5.),(4.,4.,7.)])
+                nav = NativeMap([graph])
+                self.assertEqual(nav.path(0,1), [0,1])
+                self.assertEqual(nav.adj[0][1][1], 1249)
+                with self.assertRaises(NoConnectedNativeRoute): nav.path(1,0)
+
+    def test_nav2_unknown_version_empty_payload_and_corrupt_adjacency_are_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory)/'invalid.nav2'
+            for data in (self.nav2_bytes(201403239, empty=True), self.nav2_bytes(201403241)):
+                path.write_bytes(data)
+                with self.assertRaises(BotFault): read_nav2(path)
+            data = self.nav2_bytes(201403242, empty=True) + bytes(16)
+            struct.pack_into('<I', data, 4, len(data))
+            path.write_bytes(data)
+            with self.assertRaisesRegex(BotFault, 'unexplained payload'): read_nav2(path)
+            data = self.nav2_bytes(201403240)
+            struct.pack_into('<H', data, 200, 2)
+            path.write_bytes(data)
+            with self.assertRaisesRegex(BotFault, 'absent node/edge'): read_nav2(path)
+
     def hospital_manifest(self, directory, center):
         directory=pathlib.Path(directory)
         source=directory/'owned-source';source.write_bytes(b'owned-fixture')
