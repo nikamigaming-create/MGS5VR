@@ -8,6 +8,14 @@ or Steam shutdown is needed by the local workflow.
 
 ## October 14 recovery checkpoint
 
+The recovered source and subsequent tooling checkpoints through `2dcc960` are
+now on `origin/codex/october-11-patch`, with the remote commit verified against
+local Git. The checked development build at that commit passed all 56 CTest
+groups and installer checks. `play/` remains the published October 11 payload
+and unchanged manifest. Both slots verify; the obsolete-build inventory is
+empty. Local receipts are in `artifacts/dev/one-zero-current/`, including
+`recovery-off-machine-verification.json` and the checked-slot verification.
+
 Mission 18 continuation on DLL `0daabcf78b03`: the actual mission list showed
 18: Blood Runs Deep, and both the native pending sortie and loaded field code
 are `10100`. The earlier `10091` assignment incorrectly treated a registry
@@ -75,6 +83,37 @@ guard. All 47 combat checks pass. The closer repeats
 actors already incapacitated and dispatched no trigger; live acceptance of
 the paired-motion correction remains pending.
 
+The native enemy-check centre near the rescue door is
+`[1427.132,126.410,-1519.600]`; it is **not a measured door transform**.
+Retained `20261014T215800913605Z` refused that endpoint before input because
+the imported directed graph has no connected route to it. A supported exterior
+approach is reachable. Retained `20261014T220145559410Z` traversed 506 waypoints
+before releasing input during a native action at an outer fence; ordinary
+foot controls subsequently returned without further input. Retained
+`20261014T221033508427Z` completed the next 210-waypoint route to the mine
+approach, with both final eyes reviewed. All five exact native children
+`hos_diamond_0000` through `0004` were present and alive (IDs 2048 through 2052).
+
+Retained `20261014T221744229814Z` published the requested bounded headset turn
+while keeping both controller poses in LOCAL space; both final eyes show the
+rock face between this approach and the hostage area. The earlier look case
+`20261014T221547694439Z` had identical entry/exit predicates and was correctly
+rejected before pose dispatch. The corrected repeat requires the measured
+head rotation. No rescue-door action, child extraction, or result-page pass
+has occurred. The current navigation import is a partial planning prior, not
+proof that the game's entrance is unreachable.
+
+Before cleanup, the last native state was mission `10100`,
+`Seq_Game_BeforeRescueBoy`, position `[1387.221,129.985,-1491.565]`, adult
+objective true, zero children rescued, and `gvars.mis_checkPoint == 0`.
+No reload at that field position has been verified. The exact stopped state
+is retained in `mission18-recovery-final-native.json`; source-eye recordings
+are distinct from the reviewed final compositor stills. Cleanup closed the
+owned MGSV and simulator processes with zero sampled buttons/axes/triggers
+and no open Pause/iDroid menu. Steam stayed running and Windows' 64-bit
+OpenXR runtime remains Meta Quest Link. The cleanup log is
+`mission18-recovery-session-cleanup.log`.
+
 The 1.0 source work survives the interrupted `Find mod download count` task.
 The published October 11 source is commit `87e51f2`, still present on
 `origin/main` after a fresh fetch. Later implementation, tests, licensed
@@ -90,11 +129,12 @@ installer checks. `play/` still matches the published `experimental-2026-10-11`
 pin, DLL `3e6e3d6e9818`; `Play.cmd` restores that release, and `Play-Dev.cmd`
 selects checked development. No publication or pin promotion occurred.
 
-**Resume point:** continue actual mission `10100`, `Seq_Game_BeforeRescueBoy`,
-from the Bampapeve approach toward the authored child-rescue door. The adult
-objective is complete; the five rescues and reported results-to-cutscene
-handoff remain pending. Sortie canvas padding/motion and the paired-rifle bot
-correction still need their own repeats. The interrupted thread's retained
+**Resume point:** reopen the native Mission 18 saved entry, then locate the
+actual rescue-door approach around the observed rock face. The last test's
+adult objective was complete, but its field state is not a verified reload
+checkpoint. The five rescues and reported results-to-cutscene handoff remain
+pending. Sortie canvas padding/motion and the paired-rifle bot correction
+still need their own repeats. The interrupted thread's retained
 run, `20261014T192109259237Z`, opened the left-hand
 iDroid in the Africa ACC (`40020`, story 33). Its action was observed, but
 visual review is pending and cleanup failed with `Observed action prerequisite

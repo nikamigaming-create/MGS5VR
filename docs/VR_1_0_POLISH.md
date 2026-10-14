@@ -22,10 +22,14 @@ The prologue genuinely reached results and mission 1 under requested damage
 protection; normal-difficulty completion remains open. The mission 1 checkpoint
 is preserved. Stationary mounted body views were reviewed, while riding motion,
 larger leans, outfits and vehicle/cabin bodies remain open. The current direct
-regression is Mission 18 (`10100`): its sortie/loadout spatial-canvas correction
-needs an actual repeat before field objectives and the reported results-to-scene
-handoff. The last Africa ACC iDroid-open run failed cleanup and has pending
-visual review. [MISSION_ACCEPTANCE.json](MISSION_ACCEPTANCE.json) inventories
+regression is Mission 18 (`10100`): its static sortie/loadout repeat exposed
+the complete authored preview, with canvas padding and motion still open.
+Actual VR deployment reached the field and the adult objective became clear.
+The retained mine approach has all five children alive; the rescue door,
+extractions and reported results-to-scene handoff remain pending. No reload at
+the last test position is verified. Source checkpoints are now on the remote
+development branch, and the owned simulator session has been closed with Meta
+Link restored. [MISSION_ACCEPTANCE.json](MISSION_ACCEPTANCE.json) inventories
 all 51 required missions; none has full-mission acceptance. Physical Quest
 acceptance remains pending. The October 13 findings below retain their original
 scope and are superseded only by the exact later results in CURRENT.md.
