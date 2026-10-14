@@ -24,10 +24,20 @@ ActorCameraFade originalActorCameraFade{};
 std::atomic_uintptr_t fadeOwner{};
 std::mutex hiddenMutex;
 std::atomic_uint64_t lastFirstPersonUpdateMs{};
+std::atomic_bool fullBodyRequested{};
+struct FullBodyReady {
+    uintptr_t owner{},model{};
+    uint64_t time{},activation{},referenceEpoch{},presentationEpoch{};
+    uint64_t trackingSequence{},playerSequence{},rigSequence{},sampleTime{},menuGeneration{};
+} fullBodyReady;
 constexpr uint32_t headName=0xa9e88501,bodyName=0x1a166b34,armName=0x4e74fd8c;
 // Owned EquipIdTable's normal and rain-cover NVG models. These are renderer
 // resource codes, independent of the native night-vision filter/equip state.
 constexpr std::array<uint64_t,2> nvgModels{0x84a1ee5ee0254be2ull,0x84a12e91e8362fe1ull};
+// Owned hospital /Assets/tpp/item/msk/Scenes/msk0_main0_cov.fmdl.
+// Its bandage is a modular player attachment with independently visible
+// children and no "head" group, so head-name classification cannot find it.
+constexpr uint64_t hospitalFaceCoverModel=0x84a06ebcd692bb87ull;
 std::atomic_bool visibilityTraceEnabled{},visibilityTraceArmed{},visibilityTraceWindow{},visibilityTraceNeedsOwner{true};
 std::atomic_uintptr_t visibilitySourceOwner{};
 std::atomic_uintptr_t visibilityPublisherPool{};
@@ -186,6 +196,9 @@ void suppressOwnedArmFade(void* object,uint32_t visualId){
     if(!reported.exchange(true))mgs5vr::log("Native first-person arm opacity preserved before visual publication");
 }
 void visualUpdate(void* object,uint32_t visualId){
+    // A shot may have no player-camera publisher. Restore our concealment at
+    // the native visual boundary before its first actor draw, not 250 ms later.
+    if(mgs5vr::nativeScriptedDemoActive())mgs5vr::updateAuthoredPlayerVisibility();
     suppressOwnedArmFade(object,visualId);
     VisibilitySnapshot before;
     bool trace=false;
@@ -211,7 +224,7 @@ void visualUpdate(void* object,uint32_t visualId){
 struct GroupChange {uint32_t name{};uint8_t previousFlags{};};
 struct Binding {
     uintptr_t owner{},character{},parts{},record{},renderer{},model{};
-    bool body{},hideArms{};
+    bool body{},hideArms{},headOnly{};
     bool equipment{};
     uintptr_t service{},itemInterface{};
     uint32_t itemIndex{};
@@ -219,6 +232,8 @@ struct Binding {
     uint16_t changed{};
 };
 std::array<Binding,32> hidden{};
+std::mutex authoredHeadMutex;
+mgs5vr::AuthoredHeadVisibility authoredHead;
 bool names(uintptr_t model,std::array<uint32_t,128>& result,uint16_t& count){
     if(get<uintptr_t>(model)!=base+0x20f4d90)return false;
     if(!read(model+0x1e8,count)||!count||count>result.size())return false;
@@ -291,6 +306,18 @@ bool bodyBranches(uintptr_t model,const std::array<uint32_t,128>& groups,uint16_
         conceal[i]=!keep[i]&&(parents[i]<0||keep[parents[i]]);
     return true;
 }
+bool headBranches(uintptr_t model,const std::array<uint32_t,128>& groups,uint16_t count,std::array<bool,128>& conceal){
+    const auto asset=get<uintptr_t>(model+0x188),records=get<uintptr_t>(asset+8);
+    if(!asset||!records)return false;
+    bool found=false;
+    for(uint16_t i=0;i<count;++i){
+        int16_t parent{};
+        if(!read(records+i*8+4,parent)||parent<-1||parent>=i)return false;
+        conceal[i]=groups[i]==headName||(parent>=0&&conceal[static_cast<uint16_t>(parent)]);
+        found=found||groups[i]==headName;
+    }
+    return found;
+}
 void restore(Binding& b){
     if(b.model&&owned(b)&&showVisibleGroup){
         for(uint16_t i=0;i<b.changed;++i){const auto& group=b.groups[i];
@@ -327,15 +354,17 @@ void conceal(Binding candidate){
         slot=std::find_if(hidden.begin(),hidden.end(),[](const auto& b){return !b.model;});
         if(slot==hidden.end())return;
         *slot=candidate;
-        mgs5vr::log(candidate.equipment?"First-person NVG goggles hidden before draw preparation; native vision filter and shadow retained":candidate.hideArms?"Front-end player arms hidden before draw preparation; native shadow retained":candidate.body?"First-person player body hidden from main view; native shadow retained":"First-person player head hidden from main view; native shadow retained");
+        mgs5vr::log(candidate.equipment?"First-person NVG goggles hidden before draw preparation; native vision filter and shadow retained":candidate.headOnly?"Integrated player head subtree hidden from main view; native body and shadow retained":candidate.hideArms?"Front-end player arms hidden before draw preparation; native shadow retained":candidate.body?"First-person player body hidden from main view; native shadow retained":"First-person player head hidden from main view; native shadow retained");
     }
     std::array<uint32_t,128> groups{};uint16_t count{};
     if(!names(candidate.model,groups,count))return;
     std::array<bool,128> bodyConceal{};
-    if(candidate.body&&!candidate.hideArms&&!bodyBranches(candidate.model,groups,count,bodyConceal))return;
+    if(candidate.headOnly){
+        if(!headBranches(candidate.model,groups,count,bodyConceal))return;
+    }else if(candidate.body&&!candidate.hideArms&&!bodyBranches(candidate.model,groups,count,bodyConceal))return;
     const auto flags=get<uintptr_t>(candidate.model+0x170);if(!flags)return;
     for(uint16_t i=0;i<count;++i){
-        if(candidate.body&&!candidate.hideArms&&!bodyConceal[i])continue;
+        if((candidate.headOnly||(candidate.body&&!candidate.hideArms))&&!bodyConceal[i])continue;
         uint8_t previous{};if(!read(flags+i,previous)||!(previous&4))continue;
         auto change=std::find_if(slot->groups.begin(),slot->groups.begin()+slot->changed,
             [&](const auto& g){return g.name==groups[i];});
@@ -349,6 +378,46 @@ void conceal(Binding candidate){
 }
 }
 namespace mgs5vr {
+void requestFullBodyVisibility(bool enabled) noexcept{
+    fullBodyRequested.store(enabled);
+    if(!enabled){std::lock_guard lock(hiddenMutex);fullBodyReady={};}
+}
+void publishFullBodyVisibility(uintptr_t owner,uintptr_t model,bool ready) noexcept{
+    // Read the admitted skin transaction before taking the visibility lock,
+    // keeping camera/visibility lock order independent of native callbacks.
+    const auto frame=ready&&fullBodyRequested.load()
+        ?headCamera().publishedRigFrame(steadyMilliseconds()):std::nullopt;
+    FullBodyReady candidate{};
+    if(frame&&frame->applied&&frame->body.valid&&frame->controllers.fullBody
+       &&owner&&model&&frame->playerOwner==owner&&frame->activation
+       &&frame->controllers.referenceEpoch&&frame->controllers.presentationEpoch
+       &&frame->trackingSequence&&frame->playerSequence&&frame->rigSequence){
+        candidate={owner,model,GetTickCount64(),frame->activation,
+            frame->controllers.referenceEpoch,frame->controllers.presentationEpoch,
+            frame->trackingSequence,frame->playerSequence,frame->rigSequence,
+            frame->sampleTime,frame->menuGeneration};
+    }
+    std::lock_guard lock(hiddenMutex);
+    fullBodyReady=fullBodyRequested.load()?candidate:FullBodyReady{};
+    // A new native camera publication can retire the preceding skin before
+    // this solve arrives. Reveal this exact admitted body at its own skin
+    // publication, before draw preparation, rather than waiting for the next
+    // camera callback. Modular head/NVG and shadow ownership stay untouched.
+    if(fullBodyReady.owner)for(auto& b:hidden)
+        if(b.model&&b.body&&!b.hideArms&&!b.headOnly&&b.owner==fullBodyReady.owner
+           &&b.model==fullBodyReady.model&&owned(b))restore(b);
+    // Restoring the body's normal draw bits also restores an integrated head.
+    // Reapply its exclusion at this same admitted skin publication; the next
+    // camera callback has already retired this solve and cannot do this for it.
+    if(fullBodyReady.owner&&get<uintptr_t>(owner)==base+0x23b8218){
+        const auto character=get<uintptr_t>(owner+0x370);
+        const auto component=get<uintptr_t>(character+0x10);
+        const auto bodyParts=get<uintptr_t>(component+0x10);
+        Binding head{owner,character,bodyParts,0,0,model,true};
+        head.headOnly=true;
+        if(owned(head)&&groupIndex(head,headName)>=0)conceal(head);
+    }
+}
 void observePlayerVisibilityForSource(const HeadCameraSample& frame,uint64_t sourceSequence) noexcept {
     if(!visibilityTraceEnabled.load())return;
     if(!frame.applied||!frame.stereoTracked||!frame.rigSequence||!frame.playerOwner
@@ -467,12 +536,59 @@ void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
         else MH_RemoveHook(fadeTarget);
     }
 }
-void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms) noexcept {
+void publishAuthoredPlayerHead(uintptr_t owner,uintptr_t model,Pose head,uint64_t activation) noexcept {
+    if(!owner||!model||!activation||!valid(head))return;
+    std::lock_guard lock(authoredHeadMutex);
+    authoredHead={owner,model,head,{},steadyMilliseconds(),activation,false};
+}
+AuthoredHeadVisibility authoredHeadVisibility() noexcept {
+    std::lock_guard lock(authoredHeadMutex);return authoredHead;
+}
+void updateAuthoredPlayerVisibility() noexcept {
+    const auto frame=headCamera().publishedView();
+    const auto now=steadyMilliseconds();
+    auto head=authoredHeadVisibility();
+    const bool joined=frame&&frame->applied&&frame->controllers.scriptedDemo&&frame->activation==head.activation
+        &&head.time&&now>=head.time&&now-head.time<=150&&now>=frame->sampleTime&&now-frame->sampleTime<=150;
+    const auto offset=joined?frame->nativePose.position-head.head.position:Vec3{1,1,1};
+    const bool headNearby=joined&&dot(offset,offset)<.09f;
+    {
+        std::lock_guard lock(authoredHeadMutex);
+        if(authoredHead.owner==head.owner&&authoredHead.time==head.time){
+            authoredHead.viewer=joined?frame->nativePose:Pose{};authoredHead.concealed=headNearby;
+        }
+    }
+    // A first-person authored shot keeps native torso/limbs and their shadow.
+    // Only the local player's own modular head/NVG can obstruct these eyes.
+    // Outside that head volume the complete authored actor is restored.
+    updatePlayerVisibility(headNearby?head.owner:0,headNearby,false,true);
+}
+void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool authoredBody) noexcept {
     if(!base)return;
-    fadeOwner.store(firstPerson&&!hideArms?owner:0);
+    fadeOwner.store(firstPerson&&!hideArms&&!authoredBody?owner:0);
+    // A recent solve from this model alone is insufficient after a tracking,
+    // activation or presentation boundary. Use the current admitted rig and
+    // never acquire the camera lock while holding hiddenMutex.
+    const auto frame=firstPerson&&!authoredBody&&fullBodyRequested.load()
+        ?headCamera().publishedRigFrame(steadyMilliseconds()):std::nullopt;
     std::lock_guard lock(hiddenMutex);
     lastFirstPersonUpdateMs.store(firstPerson?GetTickCount64():0);
-    for(auto& b:hidden)if(b.model&&(!firstPerson||b.owner!=owner||!owned(b)||(b.body&&b.hideArms!=hideArms)))restore(b);
+    const auto now=GetTickCount64();
+    if(!firstPerson||!fullBodyRequested.load())fullBodyReady={};
+    const bool ready=frame&&frame->applied&&frame->body.valid&&frame->controllers.fullBody
+        &&fullBodyRequested.load()&&fullBodyReady.owner==owner&&frame->playerOwner==owner
+        &&now>=fullBodyReady.time&&now-fullBodyReady.time<=250
+        &&frame->activation==fullBodyReady.activation
+        &&frame->controllers.referenceEpoch==fullBodyReady.referenceEpoch
+        &&frame->controllers.presentationEpoch==fullBodyReady.presentationEpoch
+        &&frame->trackingSequence==fullBodyReady.trackingSequence
+        &&frame->playerSequence==fullBodyReady.playerSequence
+        &&frame->rigSequence==fullBodyReady.rigSequence
+        &&frame->sampleTime==fullBodyReady.sampleTime
+        &&frame->menuGeneration==fullBodyReady.menuGeneration;
+    for(auto& b:hidden)if(b.model&&(!firstPerson||b.owner!=owner||!owned(b)||(b.body&&(
+        b.headOnly?!(authoredBody||(ready&&!hideArms&&b.model==fullBodyReady.model)):
+        (authoredBody||b.hideArms!=hideArms||(ready&&!hideArms&&b.model==fullBodyReady.model))))))restore(b);
     if(!firstPerson||get<uintptr_t>(owner)!=base+0x23b8218)return;
     const auto character=get<uintptr_t>(owner+0x370);
     if(!character||get<uintptr_t>(character)!=base+0x2295210)return;
@@ -482,7 +598,15 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms) noex
     // Do this at player publication, before FOX builds the visible draw list.
     // A scene-only hide is too late for already-prepared arm geometry.
     body.hideArms=hideArms;
-    if(bodyModel&&groupIndex(body,bodyName)>=0&&groupIndex(body,armName)>=0)conceal(body);
+    // Hospital Snake keeps his head in the body model. Its head group is
+    // already hidden natively, but independently visible child groups still
+    // enter the near eyes. Conceal only that verified subtree; retain torso,
+    // arms and every group's shadow bit.
+    if((authoredBody||(ready&&!hideArms&&bodyModel==fullBodyReady.model))&&groupIndex(body,headName)>=0){
+        body.headOnly=true;body.hideArms=false;conceal(body);
+    }
+    if(!authoredBody&&bodyModel&&groupIndex(body,bodyName)>=0&&groupIndex(body,armName)>=0
+       &&!(ready&&!hideArms&&bodyModel==fullBodyReady.model))conceal(body);
     // NVG is native equipment, outside the modular head list. Conceal only its
     // exact already-loaded model in this character's typed item interface.
     // Keep equip/on/off and the green vision effect under normal game control.
@@ -518,7 +642,8 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms) noex
         if(!renderer||get<uintptr_t>(renderer)!=base+0x20f9460)continue;
         const auto model=get<uintptr_t>(renderer+0x40);
         Binding head{owner,character,parts,record,renderer,model};
-        if(model&&groupIndex(head,headName)>=0&&groupIndex(head,bodyName)<0&&groupIndex(head,armName)<0)conceal(head);
+        if(model&&groupIndex(head,bodyName)<0&&groupIndex(head,armName)<0
+           &&(groupIndex(head,headName)>=0||get<uint64_t>(model+0x120)==hospitalFaceCoverModel))conceal(head);
     }
 }
 }

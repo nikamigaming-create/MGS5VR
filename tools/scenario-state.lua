@@ -13,7 +13,26 @@ local function field(name, fn)
 end
 field('mission', function() return vars.missionCode end)
 field('location', function() return vars.locationCode end)
+field('hospital_volgin_ride', function()
+    if vars.missionCode ~= 10010 or vars.locationCode ~= 30 then return nil end
+    return mvars.doesPlayerVolginRide == true
+end)
 field('sequence', function() return TppSequence.GetCurrentSequenceName() end)
+field('title_shown', function() return mvars.titleShown end)
+field('title_started', function() return mvars.titleStarted end)
+field('look_lesson_succeeded', function() return mvars.stickCheckSucceeded end)
+field('look_lesson_right_x', function() return PlayerVars.rightStickX end)
+field('look_lesson_right_y', function() return PlayerVars.rightStickY end)
+field('player_pad_direct', function() return PlayerVars.scannedButtonsDirect end)
+field('player_pad_fire', function() return bit.band(PlayerVars.scannedButtonsDirect, PlayerPad.FIRE) ~= 0 end)
+field('player_pad_hold', function() return bit.band(PlayerVars.scannedButtonsDirect, PlayerPad.HOLD) ~= 0 end)
+field('player_pad_action', function() return bit.band(PlayerVars.scannedButtonsDirect, PlayerPad.ACTION) ~= 0 end)
+field('player_pad_reload', function() return bit.band(PlayerVars.scannedButtonsDirect, PlayerPad.RELOAD) ~= 0 end)
+field('mission_clear_state', function() return TppMission.GetMissionClearState() end)
+field('mission_clear_type', function() return TppMission.GetMissionClearType() end)
+field('next_mission_on_clear', function() return TppMission.GetNextMissionCodeForMissionClear() end)
+field('result_block_loaded', function() return TppUiCommand.IsResultBlockLoaded() end)
+field('video_stopped', function() return TppVideoPlayer.IsVideoStopped() end)
 -- ACC weapon, helicopter and vehicle selectors share WeaponCustomize sequence
 -- names. Preserve the authored target separately; nil is unknown, never a
 -- default helicopter target. This read does not change native menu ownership.
@@ -51,6 +70,16 @@ field('player_camera_pitch', function() return vars.playerCameraRotation[0] end)
 field('demo', function() return DemoDaemon.IsDemoPlaying() end)
 field('demo_nonplayable', function() return TppDemo.IsNotPlayable() end)
 field('checkpoint', function() return gvars.mis_checkPoint end)
+field('hospital_gun_route_unlocked', function()
+    if vars.missionCode == 10010 and vars.locationCode == 30 then
+        return mvars.extinguisherFinished == true
+    end
+end)
+field('hospital_volgin_fatal_attack', function()
+    if vars.missionCode == 10010 and vars.locationCode == 30 then
+        return mvars.killedByVolgin == true
+    end
+end)
 field('mission6_event_sequence', function() if vars.missionCode == 10040 then return svars.eventSequenceNum end end)
 field('mission6_bridge_demo', function()
     if vars.missionCode == 10040 then return DemoDaemon.IsPlayingDemoId('p31_020020_000') end

@@ -1,6 +1,7 @@
 #include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/native_input_delivery.hpp"
 #include <cmath>
+#include <algorithm>
 #include <atomic>
 #include <mutex>
 
@@ -195,6 +196,29 @@ void constrainCinematicInput(GamepadSample& sample,NativeMenuInput mode) noexcep
     if(mode!=NativeMenuInput::cinematic&&mode!=NativeMenuInput::cinematicLook)return;
     sample.leftX=sample.leftY=0;sample.leftTrigger=sample.rightTrigger=0;
     if(mode==NativeMenuInput::cinematic)sample.rightX=sample.rightY=0;
+}
+std::array<float,2> HospitalHeadLook::update(Quat head,bool available,uint64_t now,uint64_t epoch,uint64_t key) noexcept {
+    if(!available||!now||!epoch||(key!=1&&key!=2)||!valid(Pose{head,{}})){reset();return {};}
+    if(!last_||epoch_!=epoch||key_!=key||now<last_||now-last_>250){
+        head_=head;last_=now;epoch_=epoch;key_=key;gesture_={};until_=0;armed_=true;return {};
+    }
+    // Retail averages a window of stick history. A brief angular velocity
+    // sample is diluted by neutral frames, even after a deliberate head turn.
+    // Use a held physical look gesture for at most two seconds. The authored
+    // eye anchor stays fixed while retail consumes it, so this cannot double
+    // the player's head motion. Returning to neutral releases and rearms it.
+    const auto delta=compose(inverse(Pose{head_,{}}),Pose{head,{}}).orientation;
+    const auto forward=rotate(delta,Vec3{0,0,-1});
+    const float yaw=std::atan2(forward.x,-forward.z);
+    const float pitch=std::asin(std::clamp(forward.y,-1.f,1.f));
+    const float angle=std::max(std::abs(yaw),std::abs(pitch));
+    if(angle<.08f){armed_=true;gesture_={};until_=0;}
+    else if(armed_&&angle>=.18f){
+        gesture_=std::abs(pitch)>=std::abs(yaw)?std::array<float,2>{0,std::copysign(1.f,pitch)}:
+            std::array<float,2>{std::copysign(1.f,yaw),0};
+        until_=now+2000;armed_=false;
+    }
+    last_=now;return now<until_?gesture_:std::array<float,2>{};
 }
 GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalControls& physical,NativeMenuInput mode){
     GamepadSample pad;

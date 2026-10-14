@@ -135,7 +135,7 @@
     "runtime": 6,
     "tooling": 5,
     "baseline_ctest_groups": 41,
-    "current_ctest_groups": 55,
+    "current_ctest_groups": 56,
     "public_native_fixture_files": 19,
     "features_with_registered_automated_tests": 45,
     "features_with_auxiliary_tests_only": 1,
@@ -656,7 +656,10 @@
         "include/mgs5vr/native_actions.hpp",
         "include/mgs5vr/native_demo_state.hpp",
         "include/mgs5vr/player_visibility.hpp",
-        "include/mgs5vr/stale_demo_recovery.hpp"
+        "include/mgs5vr/stale_demo_recovery.hpp",
+        "include/mgs5vr/native_text_input.hpp",
+        "src/native_text_input.cpp",
+        "src/native_text_keyboard.cpp"
       ],
       "automated_tests": [
         "contracts",
@@ -758,7 +761,13 @@
         "src/native_cabin_script.hpp.in",
         "include/mgs5vr/head_camera.hpp",
         "include/mgs5vr/native_actions.hpp",
-        "include/mgs5vr/opening_selector.hpp"
+        "include/mgs5vr/opening_selector.hpp",
+        "src/cabin_props.cpp",
+        "include/mgs5vr/cabin_props.hpp",
+        "src/cabin_studio.cpp",
+        "include/mgs5vr/cabin_studio.hpp",
+        "src/cabin_studio_store.cpp",
+        "include/mgs5vr/cabin_studio_store.hpp"
       ],
       "automated_tests": [
         "contracts",
@@ -806,7 +815,8 @@
       },
       "missing_checks": [
         "Public physical-cassette native fixture and continuous title-to-field cleanup.",
-        "All title submenus and alternate saves; headset reach/readability."
+        "All title submenus and alternate saves; headset reach/readability.",
+        "Native seat contact; full pickup/drop/insert/eject loop; camera-posed photos, Sharpie text/freehand, board placement and persistence in both eyes."
       ],
       "sustained_regression": {
         "status": "missing",
@@ -3830,19 +3840,25 @@
         "include/mgs5vr/controls.hpp",
         "include/mgs5vr/input_bridge.hpp",
         "include/mgs5vr/native_controls.hpp",
-        "include/mgs5vr/xr_runtime.hpp"
+        "include/mgs5vr/xr_runtime.hpp",
+        "src/controls_editor.cpp",
+        "src/controls_panel_renderer.cpp",
+        "include/mgs5vr/controls_editor.hpp",
+        "include/mgs5vr/controls_panel_renderer.hpp"
       ],
       "automated_tests": [
         "controls_config",
         "configurable_controls",
         "community_regressions",
-        "effective_bindings_export"
+        "effective_bindings_export",
+        "headset_controls_editor"
       ],
       "test_sources": [
         "tools/controls-check.cpp",
         "tests/controls_tests.cpp",
         "tests/community_tests.cpp",
-        "tests/bindings_export_tests.py"
+        "tests/bindings_export_tests.py",
+        "tests/controls_editor_tests.cpp"
       ],
       "auxiliary_tests": [],
       "native_fixtures": [],
@@ -3850,7 +3866,8 @@
         "docs/CONTROLS.md",
         "docs/CURRENT.md",
         "docs/QUEST3_TESTER_FEEDBACK.md",
-        "docs/REGRESSION_COVERAGE.md"
+        "docs/REGRESSION_COVERAGE.md",
+        "docs/HEADSET_CONTROLS_EDITOR.md"
       ],
       "community_reports": [
         "R20",
@@ -3862,7 +3879,7 @@
       "coverage": {
         "automated": {
           "status": "partial",
-          "scope": "Parser/defaults, chord priority, native mode, export and Xbox/VR owner changes; separate touch tokens are covered in configuration."
+          "scope": "Parser/defaults, chord priority, native mode, export and Xbox/VR owner changes; separate touch tokens are covered in configuration. Headset editor covers release-before-capture, two-hand chords, context filtering, confirmation, stale-file protection and closing input handoff; native visuals remain separate."
         },
         "native": {
           "status": "retained_scoped",
@@ -4692,7 +4709,8 @@
     "native_input_delivery_contracts",
     "gameplay_bot_recon_contracts",
     "gameplay_bot_mortar_contracts",
-    "gameplay_menu_variant_contracts"
+    "gameplay_menu_variant_contracts",
+    "headset_controls_editor"
   ],
   "source_inventory_rule": "Every current file under src/ and include/ must have at least one feature source_paths reference. Public source additions/deletions require explicit catalog review.",
   "current_user_reports": [

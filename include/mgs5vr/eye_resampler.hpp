@@ -8,13 +8,14 @@ namespace mgs5vr {
 // filter in linear light and retain each source eye's complete angular canvas.
 class EyeResampler {
 public:
-    void copy(ID3D11DeviceContext* context,ID3D11Texture2D* source,unsigned slice,ID3D11Texture2D* destination);
+    void copy(ID3D11DeviceContext* context,ID3D11Texture2D* source,unsigned slice,ID3D11Texture2D* destination,bool blur=false);
     void reset(){*this=EyeResampler{};}
 private:
     template<class T>using Ptr=Microsoft::WRL::ComPtr<T>;
     Ptr<ID3D11Device> device_;
     Ptr<ID3D11VertexShader> vertex_;
-    Ptr<ID3D11PixelShader> linear_,encoded_;
+    Ptr<ID3D11PixelShader> linear_,encoded_,blurLinear_,blurEncoded_;
+    Ptr<ID3D11Buffer> filter_;
     Ptr<ID3D11SamplerState> sampler_;
     Ptr<ID3D11RasterizerState> raster_;
     Ptr<ID3D11DepthStencilState> depth_;

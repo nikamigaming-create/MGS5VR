@@ -216,6 +216,14 @@ class BinocularTests(unittest.TestCase):
     def test_static_capture_contract_rejects_native_leaks_missing_tracking_and_binding_collisions(self):
         live = Live(); helper = self.helper(live); helper.raise_to_eye(); live.held_optic = True; helper.hold_support()
         good = live.observe(); self.assertTrue(static_support_capture_allowed(live.held, good, live.bindings))
+        shared_focus = copy.deepcopy(live.bindings)
+        shared_focus['actions'].append({'name': 'system.idroid_focus', 'modifier': True,
+            'contexts': ['gameplay','binoculars'], 'bindings': [{'gesture': 'level', 'inputs': ['left_grip']}]})
+        self.assertTrue(static_support_capture_allowed(live.held, good, shared_focus))
+        open_handset = copy.deepcopy(good); open_handset['idroid'] = True
+        self.assertFalse(static_support_capture_allowed(live.held, open_handset, shared_focus))
+        shared_focus['actions'][-1]['bindings'][0]['gesture'] = 'press'
+        self.assertFalse(static_support_capture_allowed(live.held, good, shared_focus))
         for key, value in [('native_buttons', 1), ('native_axes', [0, 0, 10, 0]),
                            ('native_triggers', [0, 255]), ('sticks', [0, 1, 0, 0])]:
             bad = copy.deepcopy(good); bad['controls'][key] = value

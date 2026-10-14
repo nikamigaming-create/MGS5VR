@@ -1,0 +1,21 @@
+{
+  "source": "Existing MIT WebXR Input Profiles assets",
+  "models": [
+    {
+      "hand": "left",
+      "source": "tools\\field-guide\\assets\\meta-quest-touch-plus-left.glb",
+      "source_sha256": "41a35b80221398d37029cbfaa9e39084ccd43e0206be72a5e8460f52e7882cb4",
+      "parts": 8,
+      "vertices": 3378,
+      "indices": 13506
+    },
+    {
+      "hand": "right",
+      "source": "tools\\field-guide\\assets\\meta-quest-touch-plus-right.glb",
+      "source_sha256": "5126d638fb1d03e05d16d8eec3b31b9588df88eaa8b42cc21b857fac3bd44916",
+      "parts": 7,
+      "vertices": 3358,
+      "indices": 13458
+    }
+  ]
+}

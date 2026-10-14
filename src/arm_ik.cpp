@@ -171,6 +171,72 @@ std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprig
     const auto target=compose(uprightHead,Pose{{},{0,-.23f,-.04f}});
     return compose(target,inverse(Pose{chest.orientation,shoulderCenter}));
 }
+std::optional<Quat> anatomicalTorsoHeading(Quat locomotionHeading,Quat view,bool prone){
+    if(!valid(Pose{locomotionHeading,{}})||!valid(Pose{view,{}}))return {};
+    const auto yaw=[](Quat q){
+        const auto forward=rotate(q,{0,0,1}),right=rotate(q,{1,0,0});
+        return std::hypot(forward.x,forward.z)>.001f
+            ?std::atan2(forward.x,forward.z):std::atan2(-right.z,right.x);
+    };
+    float heading=yaw(locomotionHeading);
+    if(!prone){
+        constexpr float neckYaw=.872664626f; // 50 degrees; the torso owns the excess.
+        const float look=std::remainder(yaw(view)-heading,6.283185307f);
+        heading+=look-std::clamp(look,-neckYaw,neckYaw);
+    }
+    return Quat{0,std::sin(heading*.5f),0,std::cos(heading*.5f)};
+}
+std::optional<Pose> fullBodyPlacement(Pose chest,Pose nativeHead,Pose uprightHead){
+    if(!valid(chest)||!valid(uprightHead)||!valid(nativeHead))return {};
+    const auto nativeHeading=nativeTorsoHeading(chest);if(!nativeHeading)return {};
+    const auto forward=rotate(*nativeHeading,{0,0,1});
+    const auto heading=rotate(uprightHead.orientation,{0,0,1});
+    if(std::hypot(heading.x,heading.z)<.001f)return {};
+    const float oldYaw=std::atan2(forward.x,forward.z);
+    const float yaw=std::remainder(std::atan2(heading.x,heading.z)-oldYaw,6.283185307f);
+    const Quat turn{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
+    // Anchor the measured eyes, including the authored prone head pitch.
+    // Looking down must not use a yaw-only offset to move the head joint.
+    const auto nativeEye=compose(nativeHead,Pose{{},nativeEyeFromHead}).position;
+    return Pose{turn,uprightHead.position-rotate(turn,nativeEye)};
+}
+std::optional<Quat> nativeTorsoHeading(Pose chest){
+    if(!valid(chest))return {};
+    const auto right=rotate(chest.orientation,{1,0,0}),forward=rotate(chest.orientation,{0,0,1});
+    const float yaw=std::hypot(right.x,right.z)>.1f?std::atan2(-right.z,right.x)
+        :std::atan2(forward.x,forward.z);
+    return Quat{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
+}
+std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 eye,float radius){
+    if(!valid(Pose{{},point})||!valid(Pose{{},eye})||!std::isfinite(radius)||radius<=0||radius>.2f)return {};
+    const auto delta=point-eye;const float distance=length(delta);
+    if(distance>=radius)return {};
+    const auto normal=distance>.001f?delta*(1/distance):Vec3{0,0,1};
+    // A tangent plane at the camera envelope keeps the solved elbow circle
+    // outside the eye without changing either bone length or the HMD pose.
+    return ArmSurface{eye+normal*radius,normal,0};
+}
+std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface){
+    const auto hint=native.elbow.position-native.shoulder.position;
+    // Lumbar -> chest -> neck is the anatomical chain. WAIST -> SPINE is
+    // an authored 3 mm pivot, not an independently solvable torso segment.
+    // The caller retains the pelvis and the lumbar anchor's position.
+    auto result=solveArm(native,neckTarget,hint,nullptr,chestSurface);
+    if(!result)return {};
+    const auto requested=compose(Pose{neckTarget.orientation,{}},inverse(Pose{native.wrist.orientation,{}})).orientation;
+    const auto fit=[&](Pose joint,Vec3 nativeAxis,Vec3 solvedAxis){
+        const auto localAxis=rotate(inverse(Pose{joint.orientation,{}}).orientation,nativeAxis);
+        const auto requestedOrientation=turn(requested,joint.orientation);
+        return basisRotation(localAxis,{0,0,1},solvedAxis,rotate(requestedOrientation,{0,0,1}));
+    };
+    const auto lumbar=fit(native.shoulder,native.elbow.position-native.shoulder.position,
+                         result->pose.elbow.position-result->pose.shoulder.position);
+    const auto chest=fit(native.elbow,native.wrist.position-native.elbow.position,
+                        result->pose.wrist.position-result->pose.elbow.position);
+    if(!lumbar||!chest)return {};
+    result->pose.shoulder.orientation=*lumbar;result->pose.elbow.orientation=*chest;
+    return result;
+}
 std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const ArmBasis* basis,const ArmSurface* surface){
     if(!valid(a.shoulder)||!valid(a.elbow)||!valid(a.wrist)||!valid(target)||!valid(Pose{{},hint}))return {};
     const auto upper=a.elbow.position-a.shoulder.position,lower=a.wrist.position-a.elbow.position;

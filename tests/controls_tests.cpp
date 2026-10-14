@@ -694,6 +694,16 @@ int main(int argc,char** argv){
         expect(nativeSceneInputMode(false,true,false,false,false)==NativeMenuInput::cinematic
             &&nativeSceneInputMode(false,false,false,true,false)==NativeMenuInput::scriptedScene,
             "movies and ordinary scripted gameplay retain distinct input policies");
+        HospitalHeadLook headLesson;
+        expect(headLesson.update({},true,1000,1,2)==std::array<float,2>{},"head look seeds a fresh native lesson without input");
+        const Quat lookingUp{std::sin(.1f),0,0,std::cos(.1f)};
+        const auto headLook=headLesson.update(lookingUp,true,1100,1,2);
+        expect(headLook[1]>.5f&&std::abs(headLook[0])<.01f,"physical upward head motion reaches the native hospital input-history threshold");
+        expect(headLesson.update(lookingUp,true,1230,1,2)[1]>.5f,"a held head gesture survives the native input averaging window");
+        for(uint64_t time=1430;time<3300;time+=200)headLesson.update(lookingUp,true,time,1,2);
+        expect(headLesson.update(lookingUp,true,3300,1,2)==std::array<float,2>{},"a held head gesture ends after its bounded native pulse");
+        expect(headLesson.update({},false,3340,1,2)==std::array<float,2>{},"menu or tracking loss releases tutorial look");
+        expect(headLesson.update(lookingUp,true,3400,2,2)==std::array<float,2>{},"a new tracking space never reuses old head motion");
         input={};bindings.update(input,ControlContext::menus,160);
         input.buttons[4]=1;bindings.update(input,ControlContext::menus,180);
         bindings.update(input,ControlContext::menus,740);

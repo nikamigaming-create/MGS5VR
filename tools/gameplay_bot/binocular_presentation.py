@@ -118,8 +118,8 @@ def _blend(a, b, fraction):
 def static_support_capture_allowed(held, state, bindings):
     """A narrow integration predicate for a stationary binocular side cup.
 
-    The current Live.capture does not call this predicate. A recording checkpoint
-    also remains source-eye evidence unless actual compositor pixels are saved.
+    Live.capture checks this predicate before each compositor eye. A recording
+    checkpoint remains source-eye evidence unless compositor pixels are saved.
     """
     if (set(held) != {('left', 'Grip', None)} or state.get('camera_active') is not True
             or state.get('scene') != 'gameplay' or state.get('gamepad') is not False
@@ -164,10 +164,16 @@ def static_support_capture_allowed(held, state, bindings):
         for binding in action.get('bindings', []):
             inputs = set(binding.get('inputs', []))
             if inputs and inputs <= {'left_grip'}:
-                if (action.get('name') != 'binoculars.support_grip' or action.get('modifier') is not True
-                        or binding.get('gesture') != 'level'):
+                name=action.get('name')
+                # The established iDroid focus modifier shares LG in normal
+                # contexts, but xr_runtime gates it on idroidRouting. This
+                # predicate already requires the handset closed and a neutral
+                # native packet. Admit that exact inert modifier only.
+                if (name not in ('binoculars.support_grip','system.idroid_focus')
+                        or action.get('modifier') is not True or binding.get('gesture') != 'level'
+                        or binding.get('inputs') != ['left_grip']):
                     return False
-                matched = True
+                if name=='binoculars.support_grip':matched = True
     return matched
 
 

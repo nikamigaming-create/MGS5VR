@@ -1,4 +1,5 @@
 #include "mgs5vr/ui_renderer.hpp"
+#include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/idroid_ui.hpp"
@@ -100,12 +101,17 @@ std::atomic_uint64_t equipmentPreviewRequestedAt{};
 void* equipmentPreviewOwner{}; // Accessed only on the native equipment update.
 std::atomic_uintptr_t titleMenu{};
 std::atomic_uint64_t titleUpdatedAt{};
+std::atomic_uint64_t titleFocusBits{};
 std::atomic_bool titleMode{};
 std::atomic_bool titleCabinMode{};
+std::atomic_bool openingCinematic{};
+std::atomic_uint64_t hospitalTitleMenuTime{};
 std::atomic_bool cabinPlayMode{};
 std::atomic_bool cabinTransitMode{};
 std::atomic_bool sceneMenuMode{};
+std::atomic_bool nativeSceneCanvasMode{};
 std::atomic_bool avatarEditMode{};
+std::atomic_uint64_t sceneClearUntil{};
 uintptr_t base{};
 std::atomic_bool enabled{};
 // Diagnostic source tags travel through the existing native queue join. They
@@ -449,6 +455,29 @@ void titleUpdate(void* object){
     const auto address=reinterpret_cast<uintptr_t>(object);uintptr_t type{};
     if(read(address,&type,sizeof(type))&&type==base+0x23d7e58){
         if(!titleMenu.exchange(address))log("Native Title live update observed");
+        // Owned retail 1.15: the initializer counts rows at base+78 and the
+        // title update dispatches selection B0 through its action table 120.
+        // Gate both instruction contracts before interpreting this object.
+        static const bool layoutVerified=[] {
+            constexpr unsigned char dispatch[]{0x8b,0x86,0xb0,0,0,0,0x0f,0xb6,0x8c,0x86,0x20,1,0,0,0x88,0x4e,0x12};
+            constexpr unsigned char count[]{0x89,0x41,0x78,0x48,0x8b,0x49,0x58};
+            return !std::memcmp(reinterpret_cast<void*>(base+0x12d8c6b),dispatch,sizeof(dispatch))
+                &&!std::memcmp(reinterpret_cast<void*>(base+0x12d7551),count,sizeof(count));
+        }();
+        uint32_t count{},row{},flags{};uint8_t phase{};std::array<uint32_t,7> actions{};
+        uint64_t bits{};
+        if(layoutVerified&&read(address+0x10,&phase,1)&&phase==3
+           &&read(address+0x88,&flags,4)&&(flags&2)&&!(flags&1)
+           &&read(address+0x58,&count,4)&&count>=4&&count<=7
+           &&read(address+0xb0,&row,4)&&row<count
+           &&read(address+0x120,actions.data(),count*4)){
+            uint32_t seen{};bool valid=true;
+            for(size_t i=0;i<count;++i){const auto a=actions[i];
+                if(a<1||a>8||(seen&(1u<<a))){valid=false;break;}seen|=1u<<a;}
+            if(valid){bits=count|(uint64_t{row}<<4);
+                for(size_t i=0;i<count;++i)bits|=uint64_t{actions[i]}<<(8+4*i);}
+        }
+        titleFocusBits.store(bits);
         titleUpdatedAt.store(steadyMilliseconds());
     }
 }
@@ -1437,6 +1466,8 @@ void installUiRenderer(uintptr_t moduleBase){
 }
 bool nativeTitleMenuOpen() noexcept {
     if(!enabled.load()||!titleMode.load())return false;
+    const auto hospitalUpdated=hospitalTitleMenuTime.load(),hospitalNow=steadyMilliseconds();
+    if(hospitalUpdated&&hospitalNow>=hospitalUpdated&&hospitalNow-hospitalUpdated<=250)return true;
     const auto object=titleMenu.load();uintptr_t type{};
     // The reset callback and state zero also occur during entry. Only a
     // current native update establishes that this menu owns the front end.
@@ -1444,10 +1475,22 @@ bool nativeTitleMenuOpen() noexcept {
     return updated&&now>=updated&&now-updated<=250
         &&object&&read(object,&type,sizeof(type))&&type==base+0x23d7e58;
 }
+OpeningNativeFocus nativeTitleFocus() noexcept {
+    OpeningNativeFocus focus{};if(!nativeTitleMenuOpen())return focus;
+    const auto bits=titleFocusBits.load();focus.count=bits&15;focus.row=(bits>>4)&7;
+    focus.ready=focus.count>=4&&focus.count<=7&&focus.row<focus.count;
+    for(size_t i=0;i<focus.actions.size();++i)focus.actions[i]=(bits>>(8+4*i))&15;
+    return focus;
+}
+void publishNativeHospitalTitleMenu(bool active) noexcept {
+    hospitalTitleMenuTime.store(active?steadyMilliseconds():0);
+}
 void publishNativeAvatarEdit(bool active) noexcept {avatarEditMode.store(active);}
 bool nativeAvatarEditActive() noexcept {return avatarEditMode.load();}
-void publishNativeDemoMode(NativeDemoMode mode,uint64_t candidateKey) noexcept {
-    publishNativeDemoSnapshot(mode,candidateKey,steadyMilliseconds());
+void publishNativeSceneClear(bool visible) noexcept {sceneClearUntil.store(visible?steadyMilliseconds()+250:0);}
+bool nativeSceneClear() noexcept {const auto until=sceneClearUntil.load();return until&&steadyMilliseconds()<=until;}
+void publishNativeDemoMode(NativeDemoMode mode,uint64_t candidateKey,uint64_t lookLessonKey) noexcept {
+    publishNativeDemoSnapshot(mode,candidateKey,steadyMilliseconds(),lookLessonKey);
 }
 NativeDemoMode nativeDemoMode() noexcept {return nativeDemoSnapshot().mode;}
 uint64_t nativeDemoCandidateKey() noexcept {return nativeDemoSnapshot().candidateKey;}
@@ -1459,6 +1502,8 @@ bool nativeScriptedDemoActive() noexcept {
 }
 void publishNativeTitleMode(bool active) noexcept {titleMode.store(active);}
 bool nativeTitleModeActive() noexcept {return titleMode.load();}
+void publishNativeOpeningCinematic(bool active) noexcept {openingCinematic.store(active);}
+bool nativeOpeningCinematic() noexcept {return openingCinematic.load();}
 void publishNativeTitleCabinMode(bool active) noexcept {titleCabinMode.store(active);}
 bool nativeTitleCabinMode() noexcept {return titleCabinMode.load();}
 void publishNativeCabinPlay(bool active) noexcept {cabinPlayMode.store(active);}
@@ -1466,6 +1511,8 @@ bool nativeCabinPlay() noexcept {return cabinPlayMode.load();}
 void publishNativeCabinTransit(bool active) noexcept {cabinTransitMode.store(active);}
 bool nativeCabinTransit() noexcept {return cabinTransitMode.load();}
 void publishNativeSceneMenu(bool active) noexcept {sceneMenuMode.store(active);}
+void publishNativeSceneCanvas(bool active) noexcept {nativeSceneCanvasMode.store(active);}
+bool nativeSceneCanvasActive() noexcept {return nativeSceneCanvasMode.load();}
 bool nativeLoadingTipsOpen() noexcept {
     if(!enabled.load()||!menuReaderVerified)return false;
     // IsEndLoadingTips obtains this UiSystem and its loading-tip terminal.

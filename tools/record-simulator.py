@@ -352,6 +352,8 @@ def stream_capture(client, capture, args):
         sequence_thread.start()
     try:
         while time.monotonic() - started < args.seconds:
+            if args.stop_file and args.stop_file.is_file():
+                break
             before = time.monotonic()
             result = client.call(capture, {"eye": args.eye})
             after = time.monotonic()
@@ -364,6 +366,9 @@ def stream_capture(client, capture, args):
             process.stdin.write(data)
             process.stdin.flush()
             frames.append({"request_seconds": before - started, "response_seconds": after - started})
+            if len(frames)==1 and args.ready_file:
+                args.ready_file.write_text(json.dumps({'ready':True,'started_monotonic_seconds':started,
+                    'first_response_seconds':after-started,'eye':args.eye}),encoding='utf-8')
             if movie.exists() and movie.stat().st_size >= 12 * 1024 * 1024:
                 raise RuntimeError("Capture reached its 12 MiB media budget")
             time.sleep(max(0, min(1 / args.max_fps - (time.monotonic() - before),
@@ -409,6 +414,8 @@ def main():
     parser.add_argument("--proxy", required=True, type=pathlib.Path)
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--seconds", type=float, default=10)
+    parser.add_argument("--stop-file", type=pathlib.Path, help="Finish this owned take when the file appears")
+    parser.add_argument("--ready-file", type=pathlib.Path, help="Write first composited-frame readiness for a coordinated take")
     parser.add_argument("--eye", choices=["left", "right"], default="left")
     parser.add_argument("--output", type=pathlib.Path)
     parser.add_argument("--max-fps", type=float, default=30)

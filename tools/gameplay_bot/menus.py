@@ -276,7 +276,9 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
     sortie = owner == "sortie"
     help_owner = owner == "mother_base_help"
     terms_owner = owner == "terms"
-    if owner not in ("idroid", "pause", "pause_popup", "customization", "customization_popup", "sortie", "mother_base_help", "terms"):
+    profile_owner = owner == "hospital_profile"
+    avatar_owner = owner == "hospital_avatar"
+    if owner not in ("idroid", "pause", "pause_popup", "customization", "customization_popup", "sortie", "mother_base_help", "terms", "hospital_profile", "hospital_avatar"):
         raise BotFault("Menu navigation requires an explicit supported owner")
     native_guard = step.get("native_before")
     state_guard = step.get("state_before")
@@ -310,7 +312,19 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
                    if key in {"popup_observer." + field for field in popup_fields}}
     if owner != "idroid" and (not isinstance(native_guard, dict) or not native_guard):
         raise BotFault("Spatial menu navigation requires native scene prerequisites")
-    if terms_owner and (native_guard.get('mission') != 1
+    if profile_owner and any(type(native_guard.get(key)) is not type(value)
+                             or native_guard[key] != value for key, value in {
+                                 'mission':10010, 'sequence':'Seq_Game_FewDaysLater2',
+                                 'story':0, 'popup':False, 'saving':False}.items()):
+        raise BotFault('Profile navigation requires the exact native hospital name/birthday form')
+    if avatar_owner and any(type(native_guard.get(key)) is not type(value)
+                            or native_guard[key] != value for key, value in {
+                                'mission':10010, 'sequence':'Seq_Game_AvatarEdit',
+                                'story':0, 'popup':False, 'saving':False}.items()):
+        raise BotFault('Avatar navigation requires the exact native hospital appearance editor')
+    # Retail can publish the pending prologue ID while first-run agreements
+    # still belong to the login sequence. Both were observed from cleared saves.
+    if terms_owner and (native_guard.get('mission') not in (1, 10010)
             or native_guard.get('sequence') != 'Seq_Demo_LogInKonamiServer'
             or native_guard.get('popup') is not False or native_guard.get('saving') is not False):
         raise BotFault('Fresh Terms navigation requires the exact native first-run owner')
@@ -373,6 +387,13 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
                     or state.get('gamepad') is not False
                     or (check_native and not matches(state.get('native', {}), native_guard))):
                 raise BotFault('Terms navigation lost its typed, ready native owner')
+        elif avatar_owner:
+            if (state.get('menu') is not False or state.get('pause') is not False
+                    or state.get('idroid') is not False or state.get('title') is not False
+                    or state.get('loading') is not False or state.get('demo') is not False
+                    or state.get('gamepad') is not False
+                    or (check_native and not matches(state.get('native',{}),native_guard))):
+                raise BotFault('Avatar navigation lost its native appearance editor')
         elif owner == "idroid":
             handheld, ready = state.get("idroid_handheld"), state.get("idroid_menu_input_ready")
             # Readiness describes the live handheld pad lease. A native
@@ -390,12 +411,14 @@ def navigate(live, step, *, clock=time.monotonic, sleep=time.sleep):
         else:
             native = state.get("native", {})
             if (state.get("scene") != "menu" or state.get("menu") is not True
-                    or state.get("pause") is not (not (selector or sortie)) or state.get("idroid") is not False
+                    or state.get("pause") is not (not (selector or sortie or profile_owner)) or state.get("idroid") is not False
                     or state.get("title") is not False or state.get("loading") is not False
                     or (check_native and (native.get("popup") is not expected_popup
                                           or (selector and native.get("saving") is not False)
                                           or not matches(native, native_guard)))):
                 raise BotFault("Spatial menu navigation lost its native input owner or scene prerequisite")
+            if profile_owner and (state.get('demo') is not True or state.get('gamepad') is not False):
+                raise BotFault('Profile navigation lost its authored VR presentation')
         controls = authoritative_controls(state)
         if controls["context"] != "menus":
             raise BotFault("Navigation requires the current menu context")

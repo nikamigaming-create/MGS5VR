@@ -841,6 +841,27 @@ class MenuNavigationTests(unittest.TestCase):
                           clock=clock,sleep=clock.sleep)
         live.input.assert_not_called()
 
+    def test_hospital_profile_navigation_retains_native_owner_and_rejects_other_scenes(self):
+        live, clock, active = self.fixture()
+        original = live.observe.side_effect
+        guard = {'mission':10010, 'sequence':'Seq_Game_FewDaysLater2',
+                 'story':0, 'popup':False, 'saving':False}
+        def state(native=False):
+            value = original(native)
+            value.update(scene='menu',menu=True,idroid=False,pause=False,title=False,
+                         loading=False,demo=True,gamepad=False,native=dict(guard))
+            return value
+        live.observe.side_effect = state
+        navigate_menu(live, {'owner':'hospital_profile','direction':'down','native_before':guard},
+                      clock=clock,sleep=clock.sleep)
+        self.assertEqual(active, [])
+        live.input.reset_mock()
+        for changed in ({'mission':10020}, {'sequence':'Seq_Game_FewDaysLater1'}, {'popup':True}):
+            with self.subTest(changed=changed), self.assertRaisesRegex(BotFault, 'exact native hospital'):
+                navigate_menu(live, {'owner':'hospital_profile','direction':'down',
+                                    'native_before':{**guard,**changed}},clock=clock,sleep=clock.sleep)
+            live.input.assert_not_called()
+
     def test_idroid_cursor_edge_releases_before_native_list_repeat(self):
         live, clock, active = self.fixture()
         original = live.observe.side_effect
@@ -1519,6 +1540,29 @@ class BotTests(unittest.TestCase):
 
     def behavior(self, adapter):
         return Behaviors(adapter, self.events, self.clock, self.clock.sleep)
+
+    def test_authored_loading_fade_keeps_original_deadline_without_replaying_input(self):
+        pending = {"demo": True, "camera_active": False, "menu": False, "pause": False,
+                   "idroid": False, "loading": False, "gamepad": False,
+                   "native": {"demo": True, "demo_nonplayable": True, "game_over": 0, "popup": False},
+                   "controls": {"native_buttons": 0, "age_ms": 5, "physical": [0]*11,
+                                "sticks": [0]*4, "native_axes": [0]*4, "native_triggers": [0]*2}}
+        predicate = {"demo": True, "native.demo": True, "camera_active": True}
+        ready = copy.deepcopy(pending); ready["camera_active"] = True
+        adapter = Adapter([pending]*24 + [ready]*2)
+        adapter.capture = mock.Mock(side_effect=BlankCompositorFrame("retained authored fade", pending))
+        result = self.behavior(adapter).wait_for(predicate, 4., "arrival")
+        self.assertTrue(result["camera_active"])
+        self.assertEqual(adapter.actions, 0)
+        self.assertEqual(adapter.capture.call_count, 1)
+        from gameplay_bot.core import neutral_authored_scene_transition
+        for path, value in (("menu", True), ("native.demo_nonplayable", False), ("controls.native_buttons", 4096)):
+            broken = copy.deepcopy(pending)
+            target = broken
+            parts = path.split('.')
+            for key in parts[:-1]: target = target[key]
+            target[parts[-1]] = value
+            self.assertFalse(neutral_authored_scene_transition(predicate, broken))
 
     def test_acc_helicopter_back_cannot_dispatch_on_field_idroid_weapon_or_unknown_target(self):
         path=pathlib.Path(__file__).resolve().parents[1]/'tools/gameplay_bot/suites/acc-helicopter-customization-back.json'
@@ -3394,6 +3438,7 @@ class StartupTests(unittest.TestCase):
 
     def test_information_next_pages_finish_before_title_without_idle_timeout(self):
         information=self.information_close()
+        information['native']['mission']=10010
         menu=self.stage('Seq_Demo_StartHasTitleMission',menu=True)
         live=mock.Mock();clock=Clock();pages=[]
         live.observe.side_effect=lambda **_: information if len(pages)<3 else menu
@@ -3401,6 +3446,7 @@ class StartupTests(unittest.TestCase):
         self.assertIs(advance_startup(live,clock=clock,sleep=clock.sleep),menu)
         self.assertEqual(len(pages),3)
         self.assertTrue(all(p['state_before']['terms_menu.mode']==2 for p in pages))
+        self.assertTrue(all(p['native_before']['mission']==10010 for p in pages))
         self.assertGreaterEqual(clock.now,2.)
 
     def test_information_confirmation_stops_after_eight_pages_on_stuck_screen(self):
@@ -3450,6 +3496,20 @@ class StartupTests(unittest.TestCase):
         self.assertEqual(live.execute.call_args_list[-1].args[0]["state_before"],
                          {"title_menu": False, "press_start_ready": True})
         self.assertLess(clock.now, 1.)
+
+    def test_hospital_show_title_uses_start_without_cabin_start_hook(self):
+        title = {**self.stage('Seq_Demo_StartHasTitleMission'),
+            'title':True, 'press_start_ready':False, 'opening_cinematic':False,
+            'gamepad':False, 'controls':{'context':'menus'}}
+        title['native'].update(mission=10010,location=30,story=0,
+            title_shown=True,title_started=True,demo=False,saving=False)
+        menu = {**title,'title_menu':True}
+        live = Adapter([title,title,menu]);live.events=mock.Mock();live.execute=mock.Mock()
+        clock = Clock()
+        self.assertIs(advance_startup(live,clock=clock,sleep=clock.sleep),menu)
+        live.execute.assert_called_once()
+        self.assertEqual(live.execute.call_args.args[0]['name'],'system.idroid')
+        self.assertEqual(live.execute.call_args.args[0]['native_before']['title_shown'],True)
 
     def test_login_progress_and_results_complete_without_bot_confirmation(self):
         login = {"scene": "cinematic", "title_menu": False,

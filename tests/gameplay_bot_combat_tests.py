@@ -103,6 +103,28 @@ class CombatTests(unittest.TestCase):
             with self.assertRaisesRegex(BotFault,'carry'):admit(live,anchor)
         live.input.assert_not_called();live.execute.assert_not_called()
 
+    def test_native_scripted_horse_shotgun_admits_non_normal_action_only_in_its_owner(self):
+        import copy
+        from gameplay_bot_locomotion_tests import Clock, Live
+        state=Live(Clock()).observe(native=True)
+        state['native'].update(mission=10010,location=30,story=0,
+            sequence='Seq_Game_VolginRide',hospital_volgin_ride=True,weapon_PRIMARY_HIP=70,
+            status_NORMAL_ACTION=False,status_PARTS_ACTIVE=True,status_SQUAT=True,
+            status_CARRY=False,status_INTRUDE=False,status_SUBJECT=False,player_life=6000)
+        state['rendered']={'presentation_focused':True,'sample_ms':state['now_ms'],
+            'raw_right_grip_tracked':True,'raw_right_aim_tracked':True}
+        anchor=(10010,30,3,4,5);live=Mock()
+        with patch('gameplay_bot.combat.fresh_rig',return_value=(state,anchor)):
+            actual,_=admit(live,anchor,witnessed_hospital_ride=True)
+        self.assertIs(actual,state)
+        for change in ({'hospital_volgin_ride':False},{'mission':30010},
+                       {'sequence':'Seq_Game_VolginInEntrance'},{'weapon_PRIMARY_HIP':3}):
+            wrong=copy.deepcopy(state);wrong['native'].update(change)
+            with self.subTest(change=change),patch('gameplay_bot.combat.fresh_rig',return_value=(wrong,anchor)):
+                with self.assertRaisesRegex(BotFault,'ride and shotgun owner'):
+                    admit(live,anchor,witnessed_hospital_ride=True)
+        live.input.assert_not_called();live.execute.assert_not_called()
+
     def test_battle_recording_checkpoint_never_blocks_on_compositor_or_claims_stereo(self):
         live=Mock();live.held_action_recording=Mock()
         self.assertEqual(battle_checkpoint(live,'detected',{'native':{'not_alert':False}}),[])

@@ -3,10 +3,14 @@ import pathlib
 import sys
 import unittest
 import copy
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
 from gameplay_bot.core import BotFault
-from gameplay_bot.locomotion import _validate_field_state, move_local
+from gameplay_bot.locomotion import _validate_field_state, crawl_hospital, move_local
+from gameplay_bot.interval import observe_interval
+from gameplay_bot.hospital import follow_rail
+from gameplay_bot.combat import RigPublicationDelay
 
 
 class Clock:
@@ -227,6 +231,176 @@ class LocomotionTests(unittest.TestCase):
         _validate_field_state(state,witnessed_carry=True)
         state['native']['status_CARRY']=False
         with self.assertRaises(BotFault):_validate_field_state(state,witnessed_carry=True)
+
+    def test_hospital_move_lesson_keeps_exact_crawl_ownership(self):
+        state=Live(Clock()).observe(native=True)
+        state['native'].update(mission=10010,location=30,story=0,
+            sequence='Seq_Game_EscapeFromAwakeRoom',status_NORMAL_ACTION=False,
+            status_CRAWL=True,status_PARTS_ACTIVE=True)
+        _validate_field_state(state)
+        state['native']['sequence']='Seq_Game_AfterHeliDemo'
+        _validate_field_state(state)
+        state['native']['sequence']='Seq_Game_AfterVolginDemo'
+        with self.assertRaises(BotFault):_validate_field_state(state)
+        _validate_field_state(state,witnessed_hospital_rail=True)
+        for posture in ('SQUAT','STAND'):
+            changed=copy.deepcopy(state)
+            changed['native'].update(status_CRAWL=False,status_STAND=False,status_SQUAT=False)
+            changed['native']['status_'+posture]=True
+            with self.subTest(posture=posture):
+                with self.assertRaises(BotFault):_validate_field_state(changed)
+                _validate_field_state(changed,witnessed_hospital_rail=True)
+        changed=copy.deepcopy(state)
+        changed['native'].update(status_CRAWL=False,status_STAND=False,status_SQUAT=False)
+        with self.assertRaises(BotFault):_validate_field_state(changed,witnessed_hospital_rail=True)
+        state['native']['sequence']='Seq_Game_AfterHeliDemo'
+        for field,value in [('mission',10195),('sequence','Seq_Game_MainGame'),
+                            ('story',1),('status_CRAWL',False),('status_PARTS_ACTIVE',False)]:
+            changed=copy.deepcopy(state);changed['native'][field]=value
+            with self.subTest(field=field),self.assertRaises(BotFault):
+                _validate_field_state(changed)
+
+    def hospital_live(self, clock, *, cutscene_at=None):
+        live=Live(clock,dynamics=True)
+        observe=live.observe
+        def hospital_observation(native=False):
+            state=observe(native=native)
+            state['native'].update(mission=10010,location=30,story=0,
+                sequence='Seq_Game_AfterHeliDemo',status_NORMAL_ACTION=False,
+                status_CRAWL=True,status_PARTS_ACTIVE=True)
+            if cutscene_at is not None and clock()>=cutscene_at:
+                state['native']['sequence']='Seq_Demo_Heli'
+                state['demo']=True
+            return state
+        live.observe=hospital_observation
+        return live
+
+    def test_hospital_hold_waits_while_the_async_input_remains_active(self):
+        clock=Clock();live=self.hospital_live(clock)
+        result=crawl_hospital(live,2.,clock=clock,sleep=clock.sleep)
+        self.assertGreaterEqual(result['held_seconds'],2.)
+        self.assertGreater(live.native_reads_while_held,10)
+        self.assertGreater(result['native_displacement'],.5)
+
+    def test_free_smoke_corridor_hold_requires_its_explicit_witness_and_crawl_owner(self):
+        clock=Clock();live=self.hospital_live(clock)
+        observe=live.observe
+        def smoke_observation(native=False):
+            state=observe(native=native)
+            state['native'].update(sequence='Seq_Game_EnterSmokeRoom',status_CRAWL=True,
+                                   status_SQUAT=False,status_NORMAL_ACTION=False)
+            return state
+        live.observe=smoke_observation
+        with self.assertRaises(BotFault):crawl_hospital(live,1.,clock=clock,sleep=clock.sleep)
+        self.assertIsNone(live.input_values)
+        result=crawl_hospital(live,1.,witnessed_smoke_corridor=True,clock=clock,sleep=clock.sleep)
+        self.assertGreaterEqual(result['held_seconds'],1.)
+        self.assertGreater(result['native_displacement'],.2)
+        self.assertFalse(live.held)
+
+    def test_witnessed_hospital_route_keeps_medication_and_cover_movement(self):
+        clock=Clock();state=self.hospital_live(clock).observe(native=True)
+        state['native'].update(sequence='Seq_Game_AfterHeliKillMobDemo',status_CRAWL=False,
+                               status_SQUAT=True,status_NORMAL_ACTION=False)
+        with self.assertRaises(BotFault):_validate_field_state(state)
+        _validate_field_state(state,witnessed_hospital_route=True)
+        for field,value in [('mission',10180),('location',20),('story',1),('status_PARTS_ACTIVE',False)]:
+            changed=copy.deepcopy(state);changed['native'][field]=value
+            with self.subTest(field=field),self.assertRaises(BotFault):
+                _validate_field_state(changed,witnessed_hospital_route=True)
+
+    def test_volgin_fatal_animation_refuses_movement_despite_protected_health(self):
+        state=self.hospital_live(Clock()).observe(native=True)
+        state['native'].update(sequence='Seq_Game_VolginInEntrance',player_life=6000,
+                               status_CRAWL=False,status_STAND=True,
+                               hospital_volgin_fatal_attack=True)
+        with self.assertRaisesRegex(BotFault,'fatal attack'):
+            _validate_field_state(state,witnessed_hospital_route=True)
+
+    def test_hospital_crouched_rail_releases_and_reacquires_after_a_rig_delay(self):
+        clock=Clock();live=self.hospital_live(clock)
+        observe=live.observe
+        def crouched_observation(native=False):
+            state=observe(native=native)
+            state['native'].update(sequence='Seq_Game_AfterVolginDemo',status_CRAWL=False,status_SQUAT=True)
+            state['rendered']={'native_pose':{'position':[0,0,0],'orientation':[0,0,0,1]},
+                               'head_pose':{'position':[0,0,0],'orientation':[0,0,0,1]}}
+            state['native']['player_yaw']=0
+            return state
+        live.observe=crouched_observation
+        # The operator's latest request is ahead of the rendered head pose.
+        pose={'position':[0,0,0],'orientation':[0,.5,0,.8660254]}
+        live.call=Mock(return_value={'pose':pose})
+        live.text_result=lambda value:value
+        live.native=Mock()
+        live.native.read.return_value=({'mission':10010,'location':30,'rail_active':True},{})
+        calls=[0]
+        def fresh(*args,**kwargs):
+            calls[0]+=1
+            if calls[0]==2:raise RigPublicationDelay('delayed publication')
+            return live.observe(native=True),(10010,30,1,99,4)
+        with patch('gameplay_bot.hospital.fresh_rig',side_effect=fresh), \
+             patch('gameplay_bot.hospital.looking_head',return_value=[0,0,0,1]) as steer:
+            result=follow_rail(live,1.,clock=clock,sleep=clock.sleep)
+        self.assertEqual(steer.call_args_list[0].args[0],[0,0,0,1])
+        self.assertEqual(result['recoveries'],1)
+        self.assertGreaterEqual(live.releases,3)
+        self.assertFalse(live.held)
+        delay=next(fields for event,fields in live.events.values if event=='hospital_rail_publication_delay')
+        self.assertFalse(delay['input_replayed'])
+        self.assertFalse(live.held)
+
+    def test_hospital_scene_handoff_during_rig_acquisition_releases_normally(self):
+        clock=Clock();live=self.hospital_live(clock)
+        observe=live.observe
+        def sample(native=False):
+            state=observe(native=native)
+            state['native']['player_yaw']=0
+            state['rendered']={'native_pose':{'position':[0,0,0],'orientation':[0,0,0,1]}}
+            return state
+        live.observe=sample
+        live.call=Mock(return_value={'pose':{'position':[0,0,0],'orientation':[0,0,0,1]}})
+        live.text_result=lambda value:value
+        live.native=Mock()
+        live.native.read.return_value=({'mission':10010,'location':30,'rail_active':True},{})
+        count=[0]
+        def fresh(*args,**kwargs):
+            count[0]+=1
+            state=live.observe(native=True)
+            if count[0]>1:
+                state['native']['sequence']='Seq_Demo_UnderBed'
+                state['demo']=True
+            return state,(10010,30,1,99,4)
+        with patch('gameplay_bot.hospital.fresh_rig',side_effect=fresh):
+            result=follow_rail(live,1.,clock=clock,sleep=clock.sleep)
+        self.assertEqual(result['reason'],'native_scene_transition')
+        self.assertFalse(live.held)
+        self.assertIsNone(live.input_values)
+
+    def test_under_bed_movement_cue_requires_the_exact_witnessed_owner(self):
+        clock=Clock();live=self.hospital_live(clock)
+        observe=live.observe
+        def sample(native=False):
+            state=observe(native=native)
+            state['native'].update(sequence='Seq_Game_UnderBed',status_NORMAL_ACTION=True)
+            if clock()>=.4:
+                state['native']['sequence']='Seq_Demo_UnderBed2'
+                state['demo']=True
+            return state
+        live.observe=sample
+        with self.assertRaises(BotFault):crawl_hospital(live,1.,clock=clock,sleep=clock.sleep)
+        self.assertIsNone(live.input_values)
+        result=crawl_hospital(live,1.,witnessed_under_bed=True,clock=clock,sleep=clock.sleep)
+        self.assertLess(result['held_seconds'],1.)
+        self.assertEqual(result['after']['native']['sequence'],'Seq_Demo_UnderBed2')
+        self.assertFalse(live.held)
+
+    def test_hospital_hold_releases_early_when_the_cutscene_takes_over(self):
+        clock=Clock();live=self.hospital_live(clock,cutscene_at=.8)
+        result=crawl_hospital(live,2.,clock=clock,sleep=clock.sleep)
+        self.assertLess(result['held_seconds'],1.)
+        self.assertEqual(result['after']['native']['sequence'],'Seq_Demo_Heli')
+        self.assertFalse(live.held)
 
     def run_move(self, live, clock, **kwargs):
         return move_local(live, clock=clock, sleep=clock.sleep, **kwargs)
@@ -660,6 +834,43 @@ class LocomotionTests(unittest.TestCase):
 
         self.assertFalse(live.held)
         self.assertEqual(live.releases, 2)
+
+
+class IntervalTests(unittest.TestCase):
+    def fixture(self, clock, failed_at=None):
+        class Observer:
+            held = False
+            events = Events()
+
+            def observe(self, native=False):
+                return {'camera_active': failed_at is None or clock() < failed_at,
+                        'native': {'mission': 10010}}
+        return Observer()
+
+    def test_observes_complete_loss_window(self):
+        clock = Clock()
+        live = self.fixture(clock)
+        result = observe_interval(live, {'seconds': 6, 'state_during': {
+            'camera_active': True, 'native.mission': 10010}}, clock=clock, sleep=clock.sleep)
+        self.assertEqual(result['observed_seconds'], 6)
+        self.assertGreaterEqual(result['samples'], 60)
+
+    def test_rejects_mid_interval_camera_failure(self):
+        clock = Clock()
+        live = self.fixture(clock, failed_at=2.5)
+        with self.assertRaisesRegex(BotFault, 'invariant failed'):
+            observe_interval(live, {'seconds': 6, 'state_during': {'camera_active': True}},
+                             clock=clock, sleep=clock.sleep)
+        self.assertLess(clock(), 3)
+
+    def test_refuses_observation_with_held_input(self):
+        clock = Clock()
+        live = self.fixture(clock)
+        live.held = True
+        with self.assertRaisesRegex(BotFault, 'released input'):
+            observe_interval(live, {'seconds': 6, 'state_during': {'camera_active': True}},
+                             clock=clock, sleep=clock.sleep)
+        self.assertFalse(live.events.values)
 
 
 if __name__ == "__main__":

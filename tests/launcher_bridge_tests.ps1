@@ -54,9 +54,9 @@ try {
     Assert ($loaded.state.runtime.'ui.map_control_prompts' -eq '1') 'reviewed Map control labels default on in the launcher runtime snapshot'
     Assert ($loaded.state.runtime.'optics.binocular_native_material' -eq '0') 'unproven binocular scene lighting defaults off in the launcher runtime snapshot'
     $settingRows=@($loaded.state.settings)
-    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 59) 'serialized settings field is a flat array containing all 59 setting rows'
+    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 61) 'serialized settings field is a flat array containing all 61 setting rows'
     $rowsValid=$true
-    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 59) { $rowsValid=$false }
+    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 61) { $rowsValid=$false }
     else {
         foreach ($row in $settingRows) {
             $numbers=@($row.value,$row.min,$row.max)

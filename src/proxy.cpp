@@ -3,6 +3,7 @@
 #include <dinput.h>
 #include <bcrypt.h>
 #include "mgs5vr/capture_hook.hpp"
+#include "mgs5vr/cabin_studio_store.hpp"
 #include "mgs5vr/xr_runtime.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/input_bridge.hpp"
@@ -85,6 +86,7 @@ void cleanupBeforeExit() noexcept {
     stopCameraObserver();
     stopRenderCamera();
     stopCapture();
+    stopCabinStudioStore();
     log(finished?"MGS5VR cleanup completed before process exit":"MGS5VR cleanup incomplete at process exit");
 }
 HMODULE systemDinput(){

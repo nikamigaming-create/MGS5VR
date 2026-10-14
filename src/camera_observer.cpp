@@ -150,8 +150,8 @@ extern "C" void MgsCameraObserved(void* object,const float* source,uintptr_t cal
                     // Scripted cutscenes use the authored camera and must show
                     // the complete player model. Reveal it during the demo;
                     // restore first-person concealment when the demo ends.
-                    mgs5vr::updatePlayerVisibility(context[0],mgs5vr::hidePlayerInFirstPerson(
-                        status.active||status.pending,mgs5vr::nativeScriptedDemoActive()),false);
+                    if(mgs5vr::nativeScriptedDemoActive())mgs5vr::updateAuthoredPlayerVisibility();
+                    else mgs5vr::updatePlayerVisibility(context[0],status.active||status.pending,false);
                 }
             }
         }

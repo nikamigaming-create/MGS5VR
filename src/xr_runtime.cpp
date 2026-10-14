@@ -1,15 +1,20 @@
 #include "mgs5vr/xr_runtime.hpp"
+#include "mgs5vr/cabin_studio_store.hpp"
 #include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/controls.hpp"
 #include "mgs5vr/control_prompts.hpp"
+#include "mgs5vr/controls_editor.hpp"
+#include "mgs5vr/controls_panel_renderer.hpp"
 #include "mgs5vr/native_controls.hpp"
+#include "mgs5vr/native_text_input.hpp"
 #include "mgs5vr/idroid_hand_use.hpp"
 #include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/native_video.hpp"
 #include "mgs5vr/opening_selector.hpp"
@@ -184,6 +189,9 @@ struct Session {
     bool cabinPlay{};
     ControlBindings controls;
     ControlBindings handheldActions;
+    ControlBindings editorActivation;
+    ControlsEditor controlsEditor;
+    bool editorOpeningHeld{},editorInputOwned{};
     ControlAxisOwnership axisOwnership;
     LiveControls liveControls;
     std::filesystem::path controlsPath;
@@ -210,6 +218,8 @@ struct Session {
     SnapTurn snapControls;
     NativeSmoothTurn smoothControls;
     CabinTurn cabinTurn;
+    CabinTurn cinematicTurn;
+    HospitalHeadLook hospitalHeadLook;
     OpticStabilizer opticStabilizer;
     float snapYaw{};
     OpticGate opticGate;
@@ -229,10 +239,13 @@ struct Session {
     uint64_t presentationEpoch{nextRigPresentationEpoch()};
     ControllerFrame controllerFrame{};
     OpeningSelector openingSelector;
+    CabinStudio cabinStudio;
+    NativeTextKeyboard textKeyboard;
     OpeningSelectorFrame openingFrame{};
     bool openingAssetsReady{};
     uint64_t openingAssetPollAt{};
     explicit Session(Instance& i):instance(i){
+        cabinStudio.restore(loadCabinStudio());
         wchar_t enabled[2]{};
         controllerTrackingFaultProbe().configure(
             GetEnvironmentVariableW(L"MGS5VR_TRACKING_FAULT_TEST",enabled,2)==1&&enabled[0]==L'1');
@@ -259,6 +272,7 @@ struct Session {
     }
     void refreshControlLabels(){
         handheldActions=controls;handheldActions.suspend();
+        editorActivation=controls;editorActivation.suspend();
         publishControlPromptBindings(controls);
         constexpr std::array<std::string_view,4> categories{"equipment.primary","equipment.secondary","equipment.support","equipment.items"};
         for(size_t n=0;n<categories.size();++n){
@@ -506,6 +520,10 @@ struct Session {
     WeaponGripSmoothing weaponSmoothing;
     VehiclePedalInput vehiclePedals;
     void suspendInput(XrTime time){
+        controlsEditor.close();publishControlsEditor(controlsEditor.frame());editorActivation.suspend();
+        requestCameraFreeze(false);
+        cabinStudio.update(false,false,{}, {},{},steadyMilliseconds());
+        textKeyboard.update(false,{}, {},0);publishNativeTextPanel(false);cancelNativeTextKeys();
         controllerTrackingFaultProbe().focused(false);
         headTrackingFaultProbe().focused(false);
         if(priorFocused)presentationEpoch=nextRigPresentationEpoch();
@@ -513,7 +531,7 @@ struct Session {
         controllerFrame=passiveControllerFrame(controllerFrame,time,referenceEpoch);
         controllerFrame.presentationEpoch=presentationEpoch;
         idroidBackRecovery.suspend();requestNativeIdroidClose(false);requestHandheldIdroidOpen(0);priorIdroidTap=false;nativeControls.suspend();
-        snapControls.reset();smoothControls.reset();cabinTurn.reset();rigControls.suspend();controls.suspend();
+        snapControls.reset();smoothControls.reset();cabinTurn.reset();cinematicTurn.reset();rigControls.suspend();controls.suspend();
         idroidTabInput.update({},false,steadyMilliseconds());
         idroidFocusWeapon.reset();axisOwnership.reset();lastMappedWeaponReady=false;priorIdroidRouting=false;
         idroidTriggerReleaseRequired=true;publishHandheldFocusedWeapon(false,steadyMilliseconds());
@@ -606,6 +624,7 @@ struct Session {
         controllerFrame.frontEnd=title||loading;
         controllerFrame.loading=loading;
         controllerFrame.avatarEditor=avatarEditor;
+        controllerFrame.nativeSceneCanvas=nativeSceneCanvasActive();
         controllerFrame.scriptedDemo=scriptedDemo;
         controllerFrame.scriptedLook=interactiveLook;
         controllerFrame.authoredCamera=(title&&!spatialTitle)||avatarEditor||scriptedDemo;
@@ -624,7 +643,7 @@ struct Session {
             log(title?"Native Title presentation active":"Native Title presentation closed; preserving VR/screen choice");
         }
         if(title&&nativeTitleMenuOpen())titleUiReady=true;
-        const bool startupScreen=title&&!titleUiReady;
+        const bool startupScreen=title&&!titleUiReady&&!nativeOpeningCinematic();
         // Startup logos/Press Start belong to one stable native screen. The
         // title backdrop can publish a player before its real menu exists;
         // accepting that camera early makes logos jump onto a near VR panel.
@@ -663,6 +682,46 @@ struct Session {
         }
         physical.leftStick={l.x,l.y};physical.rightStick={rr.x,rr.y};
         reloadControls(physical,now);
+        const auto editorPhysical=physical;
+        const auto editorMode=nativeControls.selected()?ControlsMode::nativeButtons:
+            nativePauseMenuOpen()?ControlsMode::menus:scriptedDemo?ControlsMode::cinematic:liveIdroid?ControlsMode::idroid:
+            binocularSelected?ControlsMode::binoculars:rigControls.equipmentPhase()?ControlsMode::equipment:
+            commandsControls.active()?ControlsMode::commands:cabinPlay?ControlsMode::acc:title?ControlsMode::title:
+            detectedMode==TravelMode::vehicle?ControlsMode::driving:detectedMode==TravelMode::horse?ControlsMode::horse:
+            nativeStatus.nativeMenuOpen?ControlsMode::menus:ControlsMode::field;
+        editorActivation.update(editorPhysical,controlsModeContext(editorMode),now);
+        const bool editorAllowed=stereoTracked&&!loading&&!avatarEditor&&!nativeGamepadActive();
+        const bool editorChord=editorAllowed&&editorActivation.bindingChordHeld("system.controls",editorPhysical);
+        const bool editorOpen=editorAllowed&&editorActivation.active("system.controls");
+        if(editorOpen&&!editorOpeningHeld&&!controlsEditor.visible()){
+            controlsEditor.open(head,editorMode,controls,controlsPath,referenceEpoch);
+            log("VR controls editor opened: "+std::string(controlsModeName(editorMode)));
+        }
+        editorOpeningHeld=editorOpen;
+        if(!editorAllowed&&controlsEditor.visible())controlsEditor.close();
+        controlsEditor.update(editorPhysical,{controllerFrame.hands[0].aim,controllerFrame.hands[1].aim},
+            {controllerFrame.hands[0].aimTracked,controllerFrame.hands[1].aimTracked},editorMode,controls,now,referenceEpoch,!manualScreenSelected);
+        if(const auto enabled=controlsEditor.takeVrRequest()){
+            manualScreenSelected=!*enabled;
+            const auto state=headCamera().status();
+            if(*enabled!=(state.active||state.pending||state.awaitingPlayer))headCamera().toggle();
+            // This explicit request already owns entry. Refresh the status
+            // used below so automatic entry cannot toggle it a second time.
+            nativeStatus=headCamera().status();automaticEntryDone=true;recenterRequested=manualScreenSelected;
+            log(*enabled?"Live VR setting: immersive VR":"Live VR setting: spatial screen");
+        }
+        publishControlsEditor(controlsEditor.frame());editorInputOwned=controlsEditor.ownsInput();
+        if(editorInputOwned)physical={};
+        else if(editorChord){
+            // Reserve the editor chord before its hold threshold: MENU and L3
+            // must not open native Pause/iDroid or start running underneath it.
+            const auto consumed=editorActivation.heldInputMask("system.controls",editorPhysical);
+            // Chords are formed over separate XR samples. Cancel any pending
+            // Menu tap before masking it, and keep it blocked through release.
+            controls.requireRelease(consumed);
+            handheldActions.requireRelease(consumed);
+            for(size_t n=0;n<physical.buttons.size();++n)if(consumed&(1u<<n))physical.buttons[n]=0;
+        }
         // The effective reload/binocular chords must survive the LEFT grip's
         // menu-focus edge while being formed. Observe their gestures in the
         // gameplay context; route only those two actions from this decoder.
@@ -690,13 +749,57 @@ struct Session {
         controllerFrame.cabinTransit=cabinTransit;
         controllerFrame.cabinDeployHint=cabinPlay&&!cabinTransit;
         const bool titleCabin=spatialTitle&&openingCabinEnabled()&&nativeTitleMenuOpen()&&!manualScreenSelected&&!nativeGamepadActive();
-        if(titleCabin)openingFrame=openingSelector.update(true,openingAssetsReady,false,head,controllerFrame.hands,now,
-            headCamera().openingTrackingOrigin(now));
-        else if(cabinPlay)openingFrame=openingSelector.updateCabin(true,head,controllerFrame.hands,now);
+        const auto openingFocus=nativeTitleFocus();
+        const auto cabinPublished=headCamera().publishedView();
+        const auto openingLayout=cabinPublished?cabinPublished->controllers.openingLayout:CabinLayout{};
+        auto propHands=controllerFrame.hands;
+        if(editorInputOwned)for(auto& hand:propHands)hand.squeeze=hand.trigger=0;
+        if(titleCabin)openingFrame=openingSelector.update(true,openingAssetsReady,false,head,propHands,now,
+            headCamera().openingTrackingOrigin(now),openingFocus,openingLayout);
+        else if(cabinPlay)openingFrame=openingSelector.updateCabin(true,head,propHands,now,
+            headCamera().openingTrackingOrigin(now),openingLayout);
         else {openingSelector.reset();openingFrame={};}
-        controllerFrame.openingSelector=titleCabin&&openingFrame.active;
+        controllerFrame.openingPropsActive=openingAssetsReady&&openingLayout.verified&&(openingFrame.active||openingFrame.cabinActive);
+        controllerFrame.openingSelector=titleCabin&&openingFrame.active&&openingFocus.ready;
         controllerFrame.openingSelection=controllerFrame.openingSelector?openingFrame.selection:-1;
+        controllerFrame.openingBench=openingFrame.bench;
         controllerFrame.openingOrigin=(controllerFrame.openingSelector||cabinPlay)?openingFrame.origin:Pose{};
+        std::array<StudioHand,2> studioHands{};
+        for(size_t side=0;side<2;++side){const auto& hand=controllerFrame.hands[side];
+            studioHands[side]={hand.grip,hand.aim,hand.gripTracked,hand.aimTracked,hand.squeeze,hand.trigger};}
+        const bool studioCabin=controllerFrame.openingPropsActive;
+        const bool studioAllowed=!editorInputOwned&&!loading&&!scriptedDemo&&!avatarEditor&&!nativeGamepadActive()&&!manualScreenSelected
+            &&!nativeStatus.nativeMenuOpen&&!binocularSelected
+            &&(studioCabin||(nativeStatus.active&&!title&&!nativeStatus.nativeMenuOpen
+                &&!controllerFrame.vehicleMounted&&!controllerFrame.optic.held));
+        const auto studioRoom=studioCabin?compose(openingFrame.origin,openingLayout.room):Pose{};
+        std::optional<Pose> studioHolster;
+        if(studioAllowed&&!studioCabin&&!cabinPlay&&!cabinTransit&&mode==TravelMode::onFoot){
+            // The pickup target uses the holster from the latest admitted
+            // body/skin transaction in this LOCAL reference space. The next
+            // native skin publication rejoins its camera to its own hip pose.
+            const auto source=headCamera().publishedRigFrame(now);
+            if(source&&source->body.valid&&source->activation==nativeStatus.activation
+                &&source->controllers.referenceEpoch==referenceEpoch
+                &&source->controllers.presentationEpoch==presentationEpoch
+                &&source->controllers.presentationFocused&&source->controllers.studio
+                &&source->controllers.studio->available&&!source->controllers.studio->cabin)
+                studioHolster=source->controllers.studio->fieldCameraHolster;
+        }
+        controllerFrame.studio=cabinStudio.update(studioAllowed,studioCabin,head,studioRoom,studioHands,now,completedStudioPhoto(),
+            studioAllowed&&nativeStatus.active&&!title,cameraFreezeState(),studioHolster);
+        // Reuse the established mod-owned world-pause lease; tracking, skin,
+        // the native eye renderer and the editor keep publishing while paused.
+        requestCameraFreeze(controllerFrame.studio->freezeRequested||controlsEditor.visible(),nativeStatus.activation,referenceEpoch);
+        controllerFrame.cameraWorldFrozen=cameraWorldFrozen();
+        saveCabinStudio(controllerFrame.studio);
+        const bool profileKeyboard=stereoTracked&&!editorInputOwned&&!loading&&!manualScreenSelected&&!nativeGamepadActive()
+            &&nativeStatus.active&&nativeProfileMenuActive()&&nativeTextInputReady();
+        const auto keyboard=textKeyboard.update(profileKeyboard,head,studioHands,presentationEpoch,referenceEpoch,nativeStatus.activation);
+        if(keyboard->available){controllerFrame.studio=keyboard;
+            if(const auto key=textKeyboard.takeKey();key.character)
+                queueNativeTextKey(key.character,presentationEpoch,referenceEpoch,nativeStatus.activation);
+        }else {publishNativeTextPanel(false);cancelNativeTextKeys();}
         if(openingFrame.pulse==OpeningPulse::confirm&&openingFrame.selection>=0
            &&static_cast<size_t>(openingFrame.selection)<openingTapeLabels.size())
             log("Opening tape confirmed native title action: "+std::string(openingTapeLabels[openingFrame.selection]));
@@ -726,6 +829,10 @@ struct Session {
         controllerFrame.menuQuadDistance=controls.setting("settings.menu_quad_distance_cm")*.01f;
         controllerFrame.menuQuadTilt=controls.setting("settings.menu_quad_tilt_degrees");
         controllerFrame.playerHeightOffset=controls.setting("settings.player_height_offset_cm")*.01f;
+        controllerFrame.playerPosture=nativePlayerPosture();
+        controllerFrame.fullBody=controls.setting("settings.full_body")!=0;
+        controllerFrame.cinematicFreeMove=controls.setting("settings.cinematic_free_move")!=0;
+        requestFullBodyVisibility(controllerFrame.fullBody);
         controllerFrame.supportGripRadius=controls.setting("settings.support_grip_radius_cm")*.01f;
         controllerFrame.trackedWeaponObstruction=controls.setting("settings.tracked_weapon_obstruction")!=0;
         controllerFrame.blockFiringNearCover=controls.setting("settings.block_firing_near_cover")!=0;
@@ -1097,9 +1204,20 @@ struct Session {
         // because its underlying cutscene is still active.
         if(scriptedDemo){
             constrainCinematicInput(pad,fallbackMode);
+            const auto lesson=nativeDemoSnapshot();
+            const bool headLesson=fallbackMode==NativeMenuInput::cinematicLook&&interactiveLook
+                &&lesson.lookLessonKey&&lesson.publishedAtMs&&now>=lesson.publishedAtMs&&now-lesson.publishedAtMs<=250
+                &&nativeStatus.active&&stereoTracked&&!editorInputOwned&&!nativeStatus.nativeMenuOpen
+                &&!nativeInput.exclusive&&!nativeGamepadActive()&&!manualScreenSelected&&!center&&!headToggle&&!utilityCenter;
+            const auto look=hospitalHeadLook.update(head.orientation,headLesson,now,referenceEpoch,lesson.lookLessonKey);
+            controllerFrame.headLookLessonKey=headLesson?lesson.lookLessonKey:0;
+            if(headLesson){
+                if(std::abs(look[0])>std::abs(float(pad.rightX)/32767.f))pad.rightX=static_cast<int16_t>(look[0]*32767.f);
+                if(std::abs(look[1])>std::abs(float(pad.rightY)/32767.f))pad.rightY=static_cast<int16_t>(look[1]*32767.f);
+            }
             move={float(pad.leftX)/32767.f,float(pad.leftY)/32767.f};
             navigation={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
-        }
+        }else hospitalHeadLook.reset();
         if(utilityCenter||headToggle)pad={};
         bool stickNavigation=false;
         bool locomotionAvailable=false;
@@ -1190,7 +1308,10 @@ struct Session {
             // Right-stick browsing owns turning, but it must not steal the
             // left-stick movement already carried by equipment/Commands.
             const bool nativeMenuButton=pad.buttons&(XINPUT_GAMEPAD_START|XINPUT_GAMEPAD_BACK);
-            locomotionAvailable=mode==TravelMode::onFoot&&!nativeMenuButton
+            // Stationary on-foot actions retain native A/B/L3 meanings too.
+            // Dropping stance here strands the hospital player in STAND when
+            // NORMAL_ACTION clears; RigInput already preserves these buttons.
+            locomotionAvailable=(mode==TravelMode::onFoot||mode==TravelMode::nativeAction)&&!nativeMenuButton
                 &&!center&&!headToggle&&!utilityCenter;
             // Native on-foot movement already consumes the published camera
             // basis. Rotating this stick again doubles physical/snap heading.
@@ -1230,11 +1351,17 @@ struct Session {
            &&!mountedViewOwnsRightStick(mode,rigInput,nativeInput.exclusive,stickNavigation))
             {pad.rightX=0;pad.rightY=0;}
         const bool cabinTurning=(controllerFrame.openingSelector||cabinPlay||cabinTransit)&&nativeStatus.active
+            &&!controllerFrame.cameraWorldFrozen&&!controllerFrame.studio->freezeRequested
             &&(!nativeStatus.nativeMenuOpen||idroidFree)&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
         // Menu navigation owns its stick. Use the effective movement binding
         // only when the cabin owns locomotion, as it already does for turning.
         controllerFrame.cabinMove=cabinTurning?controls.axis("axes.move",routedPhysical):std::array<float,2>{};
-        const bool turnAvailable=rigInput&&!cabinTurning&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
+        const bool cinematicMoving=scriptedDemo&&!interactiveLook&&controllerFrame.cinematicFreeMove&&nativeStatus.active
+            &&!editorInputOwned&&!nativeStatus.nativeMenuOpen&&!nativeInput.exclusive&&!nativeGamepadActive()
+            &&!controllerFrame.cameraWorldFrozen&&!center&&!headToggle&&!utilityCenter&&priorFocused;
+        controllerFrame.cinematicMove=cinematicMoving?controls.axis("axes.move",routedPhysical):std::array<float,2>{};
+        const bool turnAvailable=rigInput&&!cabinTurning&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter
+            &&!controllerFrame.cameraWorldFrozen&&!controllerFrame.studio->freezeRequested;
         const auto turnMode=controls.setting("settings.turn_mode");
         const auto smoothAxis=controls.axis("axes.turn",routedPhysical);
         // Mounted locomotion owns a native vehicle/horse heading. An artificial
@@ -1251,10 +1378,13 @@ struct Session {
         if(!priorFocused)cabinTurn.reset();
         const auto cabinYaw=cabinTurn.update(smoothAxis,static_cast<int>(turnMode),
             controls.setting("settings.snap_turn_degrees"),cabinTurning,now,nativeStatus.activation);
+        const auto cinematicYaw=cinematicTurn.update(smoothAxis,static_cast<int>(turnMode),
+            controls.setting("settings.snap_turn_degrees"),cinematicMoving,now,nativeStatus.activation);
         if(!nativeStatus.active&&!nativeStatus.pending&&!nativeStatus.awaitingPlayer)snapYaw=0;
         if(mounted&&!cabinTurning)snapYaw=0;
         if(turn){snapYaw=std::remainder(snapYaw+turn,6.283185307f);log("Physical snap turn degrees="+std::to_string(-turn*57.2957795f));}
         if(cabinYaw)snapYaw=std::remainder(snapYaw+cabinYaw,6.283185307f);
+        if(cinematicYaw)snapYaw=std::remainder(snapYaw+cinematicYaw,6.283185307f);
         controllerFrame.snapYaw=snapYaw;
         if(controllerFrame.vehicleControls&&!nativeInput.exclusive&&!stickNavigation
            &&!center&&!headToggle&&!utilityCenter)
@@ -1263,6 +1393,10 @@ struct Session {
         // axes and moves native focus while the user walks around the cabin.
         pad=cabinTitleGamepad(pad,controllerFrame.openingSelector,
             openingFrame.pulse==OpeningPulse::confirm&&!utilityCenter&&!headToggle);
+        if(controllerFrame.openingSelector&&!utilityCenter&&!headToggle){
+            if(openingFrame.pulse==OpeningPulse::up)pad.buttons=XINPUT_GAMEPAD_DPAD_UP;
+            if(openingFrame.pulse==OpeningPulse::down)pad.buttons=XINPUT_GAMEPAD_DPAD_DOWN;
+        }
         if(cabinTransit&&!nativeInput.exclusive&&!nativeStatus.nativeMenuOpen){
             // The passenger walks/turns in the tracked cabin. Keep only the
             // native context exit/menu controls; the same sticks must not
@@ -1300,22 +1434,43 @@ struct Session {
             vehicleGunRequest,vehiclePedalInput);
         if(vehicleGunInput)controllerFrame.vehicleViewInput={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
         lastMappedWeaponReady=controllerFrame.weaponReady&&pad.leftTrigger>127;
+        // Seated stock aim is not a second binocular flow. The physical VR
+        // optic has its own input path; ordinary right grip belongs to props.
+        if(cabinPlay&&!nativeStatus.nativeMenuOpen&&!binocularSelected&&!nativeInput.exclusive){
+            pad.leftTrigger=pad.rightTrigger=0;controllerFrame.weaponReady=false;
+        }
+        if(controllerFrame.studio&&controllerFrame.studio->inputMask&&!nativeInput.exclusive){
+            const auto mask=controllerFrame.studio->inputMask;
+            if(mask&1){pad.leftTrigger=0;pad.buttons&=~XINPUT_GAMEPAD_LEFT_SHOULDER;controllerFrame.supportGrip=false;}
+            if(mask&2){pad.rightTrigger=0;pad.leftTrigger=0;pad.buttons&=~XINPUT_GAMEPAD_RIGHT_SHOULDER;
+                controllerFrame.weaponReady=false;}
+            controllerFrame.allowMotionMelee=false;controllerFrame.allowAnimalTouch=false;
+        }
+        if(controllerFrame.cameraWorldFrozen||controllerFrame.studio->freezeRequested){
+            pad={};controllerFrame.cabinMove={};controllerFrame.weaponReady=controllerFrame.supportGrip=false;
+            controllerFrame.allowMotionMelee=controllerFrame.allowAnimalTouch=false;
+        }
         const auto packetTime=steadyMilliseconds();
+        if(editorInputOwned){
+            pad={};controllerFrame.cabinMove={};controllerFrame.weaponReady=controllerFrame.supportGrip=false;
+            controllerFrame.allowMotionMelee=controllerFrame.allowAnimalTouch=false;
+        }
         gamepadMailbox().publish(pad,true,packetTime,controls.hasPhysicalIntent(physical));
-        publishControlInputAudit({controlContext,physical,packetTime,pad.buttons,rigInput,static_cast<int>(mode),
+        publishControlInputAudit({controlContext,editorInputOwned?editorPhysical:physical,packetTime,pad.buttons,rigInput,static_cast<int>(mode),
             {pad.leftX,pad.leftY,pad.rightX,pad.rightY},{pad.leftTrigger,pad.rightTrigger}});
         const auto hapticNow=steadyMilliseconds();
         const auto wheel=wheelMailbox().read(hapticNow);
         const uint8_t holding=rigInput&&controllerFrame.vehicleControls&&wheel.gripped
             ?static_cast<uint8_t>(wheel.hands&((controllerFrame.wheelGrip?1:0)|(controllerFrame.rightWheelGrip?2:0))):0;
         const uint8_t tookWheel=holding&~wheelHeld;wheelHeld=holding;
-        if(tookWheel||binocularEquipped||nativeInput.changed||hapticNow-hapticAt>=50){
+        const auto tapeContact=openingFrame.bench.hapticMask|(controllerFrame.studio?controllerFrame.studio->hapticMask:0);
+        if(tookWheel||binocularEquipped||nativeInput.changed||tapeContact||hapticNow-hapticAt>=50){
             hapticAt=hapticNow;
             const auto rumble=rumbleMailbox().read(hapticNow);
             for(size_t side=0;side<2;++side){
                 const float native=side?rumble.high:rumble.low;
                 const float contact=nativeInput.changed?.4f:side&&binocularEquipped?.3f:(tookWheel&(1u<<side))?.25f:0.f;
-                const float amplitude=std::clamp(std::max(native,contact),0.f,.75f);
+                const float amplitude=std::clamp(std::max({native,contact,(tapeContact&(1u<<side))?.3f:0.f}),0.f,.75f);
                 XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};info.action=vibration;info.subactionPath=hands[side];
                 if(amplitude>0&&controllerFrame.hands[side].gripTracked){
                     XrHapticVibration pulse{XR_TYPE_HAPTIC_VIBRATION};pulse.amplitude=amplitude;
@@ -1356,11 +1511,11 @@ struct Screen {
     uint32_t width{},height{},pendingIndex{};
     uint32_t sourceWidth{},sourceHeight{},fixedWidth{},fixedHeight{};
     DXGI_FORMAT sourceFormat{DXGI_FORMAT_UNKNOWN};
-    bool pending{},waited{},ready{};
+    bool pending{},waited{},ready{},blurred{};
     NativeVideoRecorder uploadProof{L"mgs5vr-xr-recording.txt"};
     EyeResampler resampler;
     FrameId copied{};
-    explicit Screen(Session& s,uint32_t outputWidth=0,uint32_t outputHeight=0):session(s),fixedWidth(outputWidth),fixedHeight(outputHeight){}
+    explicit Screen(Session& s,uint32_t outputWidth=0,uint32_t outputHeight=0,bool blur=false):session(s),fixedWidth(outputWidth),fixedHeight(outputHeight),blurred(blur){}
     ~Screen(){reset();}
     void reset(){resampler.reset();if(handle)xrDestroySwapchain(handle);handle=XR_NULL_HANDLE;images.clear();pending=waited=ready=false;copied={};}
     void create(D3D11_TEXTURE2D_DESC desc){
@@ -1421,9 +1576,9 @@ struct Screen {
     void publishPrepared(ID3D11Texture2D* source,FrameId id,uint32_t sourceSlice=0){
         if(ready&&copied==id)return;
         if(!pending||!waited)throw std::logic_error("XR image publication requires a waited acquisition");
-        if(sourceWidth==width&&sourceHeight==height)
+        if(!blurred&&sourceWidth==width&&sourceHeight==height)
             session.context->CopySubresourceRegion(images.at(pendingIndex).texture,0,0,0,0,source,sourceSlice,nullptr);
-        else resampler.copy(session.context.Get(),source,sourceSlice,images.at(pendingIndex).texture);
+        else resampler.copy(session.context.Get(),source,sourceSlice,images.at(pendingIndex).texture,blurred);
         // Optional private proof of the runtime-owned image while this app
         // still owns its acquired slot. This is separate from the source take.
         if(sourceSlice==1)uploadProof.frame(session.device.Get(),session.context.Get(),images.at(pendingIndex).texture,0,nullptr,id);
@@ -1500,17 +1655,25 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         log("Stable simulator eye output "+std::to_string(outputViews[0].recommendedImageRectWidth)+"x"
             +std::to_string(outputViews[0].recommendedImageRectHeight)+"; native render resolution remains independent");
     }
+    ControlsPanelRenderer controlsPanel;Screen controlsScreen(session);uint64_t controlsPanelSequence{};
+    NativeTextPanelRenderer textPanel;Screen textScreen(session,1760,640);uint64_t textPanelSequence{};
+    NativeCanvasRenderer avatarCanvas;
     TextureConsumer consumer(session.device.Get());Screen screen(session,
         outputViews[0].recommendedImageRectWidth,outputViews[0].recommendedImageRectHeight),
         leftEye(session,outputViews[0].recommendedImageRectWidth,outputViews[0].recommendedImageRectHeight),
-        rightEye(session,outputViews[1].recommendedImageRectWidth,outputViews[1].recommendedImageRectHeight);RuntimeStats stats;
+        rightEye(session,outputViews[1].recommendedImageRectWidth,outputViews[1].recommendedImageRectHeight),
+        frozenLeft(session,outputViews[0].recommendedImageRectWidth,outputViews[0].recommendedImageRectHeight,true),
+        frozenRight(session,outputViews[1].recommendedImageRectWidth,outputViews[1].recommendedImageRectHeight,true);RuntimeStats stats;
     NativeVideoRecorder video;
     const std::array<Screen*,2> eyeScreens{&leftEye,&rightEye};
+    const std::array<Screen*,2> frozenScreens{&frozenLeft,&frozenRight};
     AcceptedStereoFrame acceptedStereo;
     const auto& eyeFrames=acceptedStereo.eyes();
     std::array<EyeFrame,2> surroundFrames{};
     FrameId surroundImage{};
-    bool haveSurround{},surroundTransition{},surroundWithScreen{true},priorNativeMenuOpen{};
+    FrameId liveImage{};
+    uint64_t surroundReferenceEpoch{},surroundCachedAt{};
+    bool haveSurround{},surroundTransition{},surroundWithScreen{true},priorNativeMenuOpen{},avatarPanelAnchored{},surroundPanelPending{};
     uint64_t eyeEpoch{},projectionFrames{},emptyStereoFrames{},retainedStereoFrames{};
     uint64_t performanceAt{},windowSubmissions{},windowNewPairs{},windowEmpty{},lastProjectionSource{};
     XrStageDiagnostics stageDiagnostics;
@@ -1596,10 +1759,21 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         // surroundings. Keep their original eye poses: this is an explicitly
         // frozen scene, not an old frame relabeled as current gameplay.
         const bool plannedLoading=session.controllerFrame.loading&&cameraStatus.reason==HeadCameraStop::sceneUnavailable;
+        const bool avatarPanel=session.controllerFrame.avatarEditor&&!session.manualScreenSelected;
+        const bool plannedAvatar=avatarPanel&&cameraStatus.reason==HeadCameraStop::sceneUnavailable;
+        const bool plannedNativeCanvas=session.controllerFrame.nativeSceneCanvas
+            &&cameraStatus.reason==HeadCameraStop::sceneUnavailable;
+        // The native fade can precede the loading/editor owner by several
+        // frames. Keep only a previously admitted, clear stereo scene across
+        // that identified handoff; failed camera/pose transactions still clear it.
+        if(plannedLoading||plannedAvatar||plannedNativeCanvas||(haveSurround&&!nativeSceneClear()&&cameraStatus.active&&!cameraStatus.suspended))
+            surroundPanelPending=true;
+        const bool plannedGap=surroundPanelPending&&cameraStatus.reason==HeadCameraStop::sceneUnavailable;
         if(session.manualScreenSelected
-           ||(!mayRetainStereoSurround(cameraStatus)&&!plannedLoading)){
+           ||(haveSurround&&surroundReferenceEpoch!=session.referenceEpoch)
+           ||(!mayRetainStereoSurround(cameraStatus)&&!plannedLoading&&!plannedAvatar&&!plannedNativeCanvas&&!plannedGap)){
             if(surroundTransition)screenPose=recenteredScreen(trackedHead,config.distanceMeters);
-            haveSurround=false;surroundFrames={};surroundTransition=false;
+            haveSurround=false;surroundFrames={};surroundTransition=false;surroundPanelPending=false;
         }
         if(session.manualScreenSelected)surroundTransition=false;
         else if(leavingMenu&&haveSurround){
@@ -1611,7 +1785,15 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         else if(haveSurround&&!cameraStatus.active&&!surroundTransition){
             surroundTransition=true;surroundWithScreen=true;screenPose=recenteredScreen(trackedHead,config.distanceMeters);
         }
-        if(surroundTransition&&plannedLoading)surroundWithScreen=true;
+        if(surroundTransition&&(plannedLoading||plannedNativeCanvas))surroundWithScreen=true;
+        if(avatarPanel){
+            if(!avatarPanelAnchored&&tracking&&stereoTracked){
+                const float tilt=session.controllerFrame.menuQuadTilt*.00872664626f;
+                screenPose=compose(trackedHead,Pose{{std::sin(tilt),0,0,std::cos(tilt)},
+                    {0,-.05f,-session.controllerFrame.menuQuadDistance}});
+                avatarPanelAnchored=true;
+            }
+        }else avatarPanelAnchored=false;
         if(cameraStatus.awaitingPlayer)menuReturnPending=true;
         else if(!cameraStatus.active&&!cameraStatus.pending)menuReturnPending=false;
         if(frame.shouldRender&&consumer.frame().sequence){
@@ -1620,7 +1802,8 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             // is accepted; boot can report an on-foot player before any scene
             // is drawn. An active camera still owns tracking-loss recovery.
             if(!cameraStatus.active){
-                screen.upload(consumer.texture(),consumer.frame());acceptedStereo.clear();
+                auto* pixels=avatarPanel?avatarCanvas.crop(session.device.Get(),session.context.Get(),consumer.texture()):consumer.texture();
+                if(pixels)screen.upload(pixels,consumer.frame());acceptedStereo.clear();
                 // The first title/cabin activation also starts on this screen.
                 // Keep it until the first complete stereo pair is submitted;
                 // awaitingPlayer alone only covered returns from native menus.
@@ -1637,12 +1820,28 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
                     if(leftReady&&rightReady&&acceptedStereo.accept(metadata,consumer.frame().epoch,cameraStatus.activation,steadyMilliseconds(),session.referenceEpoch)){
                         acceptOpticNativeLightingFrame(metadata);
                         for(size_t n=0;n<2;++n)eyeScreens[n]->publishPrepared(consumer.texture(),consumer.frame(),static_cast<uint32_t>(n));
+                        liveImage=consumer.frame();
                         // The loading panel moved nearer while the frozen scene
                         // was retained. Restore its normal distance before
                         // clearing that state, or a later menu uses theatre
                         // dimensions on the old near plane and crops its edges.
                         if(surroundTransition)screenPose=recenteredScreen(trackedHead,config.distanceMeters);
-                        surroundFrames=metadata;surroundImage=consumer.frame();haveSurround=true;surroundTransition=false;
+                        surroundTransition=false;
+                        if(nativeSceneClear()&&!session.controllerFrame.loading&&!avatarPanel){
+                            surroundPanelPending=false;
+                            // These swapchains are independent of live eyes:
+                            // retail fades must never overwrite the retained bed.
+                            const auto cacheAt=steadyMilliseconds();
+                            if(!haveSurround||cacheAt-surroundCachedAt>=100){
+                                const bool frozenLeftReady=frozenLeft.prepare(consumer.texture(),consumer.frame(),0);
+                                const bool frozenRightReady=frozenRight.prepare(consumer.texture(),consumer.frame(),1);
+                                if(frozenLeftReady&&frozenRightReady){
+                                    for(size_t n=0;n<2;++n)frozenScreens[n]->publishPrepared(consumer.texture(),consumer.frame(),static_cast<uint32_t>(n));
+                                    surroundFrames=metadata;surroundImage=consumer.frame();haveSurround=true;
+                                    surroundReferenceEpoch=session.referenceEpoch;surroundCachedAt=cacheAt;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1663,14 +1862,15 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         // BOTH asymmetric eye frusta. A theatre-wide quad cropped loading
         // prompts even at neutral gaze. Manual screen mode keeps its sizing.
         const float sourceAspect=screen.sourceHeight?static_cast<float>(screen.sourceWidth)/screen.sourceHeight:16.f/9.f;
-        float screenWidth=config.widthMeters;
+        float screenWidth=avatarPanel?session.controllerFrame.menuQuadWidth:config.widthMeters;
         if(!session.manualScreenSelected&&(session.controllerFrame.frontEnd||menuReturnPending)){
             float eyeRadius{};
             for(const auto& eye:trackedViews){
                 const auto offset=eye.pose.position-trackedHead.position;
                 eyeRadius=std::max(eyeRadius,std::sqrt(dot(offset,offset)));
             }
-            if(const auto fitted=fittedScreenWidth(screenWidth,config.distanceMeters,sourceAspect,
+            const float screenDistance=avatarPanel?session.controllerFrame.menuQuadDistance:config.distanceMeters;
+            if(const auto fitted=fittedScreenWidth(screenWidth,screenDistance,sourceAspect,
                 {trackedViews[0].fov,trackedViews[1].fov},eyeRadius))screenWidth=*fitted;
         }
         quad.size={screenWidth,screenWidth/sourceAspect};
@@ -1680,15 +1880,16 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         projection.viewCount=2;projection.views=projectionViews.data();
         bool regionsValid=true;
         for(size_t n=0;n<2;++n){auto& v=projectionViews[n];const auto& sourceEye=surroundTransition?surroundFrames[n]:eyeFrames[n];
+            const auto* sourceScreen=surroundTransition?frozenScreens[n]:eyeScreens[n];
             // The centered source covers the full native sky. Select this
             // eye's requested angular region without stretching or changing
             // its rays. Optical zoom is already inside the world-space lens.
             const auto region=eyeImageRegion(sourceEye.view.fov,sourceEye.displayFov,
-                eyeScreens[n]->width,eyeScreens[n]->height);
+                sourceScreen->width,sourceScreen->height);
             if(!region){regionsValid=false;continue;}
             v.pose=toXr(sourceEye.view.pose);v.fov={region->fov.left,region->fov.right,
                 region->fov.up,region->fov.down};
-            v.subImage.swapchain=eyeScreens[n]->handle;
+            v.subImage.swapchain=sourceScreen->handle;
             v.subImage.imageRect.offset={region->x,region->y};
             v.subImage.imageRect.extent={region->width,region->height};
             if(!layoutLogged)log("XR eye "+std::to_string(n)+" image crop="
@@ -1701,8 +1902,11 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
             reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection),
             reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad)};
         if(frame.shouldRender){
-            if(tracking&&(surroundTransition||cameraTransition)&&haveSurround&&regionsValid&&leftEye.ready&&rightEye.ready
-               &&leftEye.copied==surroundImage&&rightEye.copied==surroundImage){
+            const bool frozenReady=haveSurround&&frozenLeft.ready&&frozenRight.ready
+                &&frozenLeft.copied==surroundImage&&frozenRight.copied==surroundImage;
+            const bool liveTransitionReady=liveImage.sequence&&leftEye.ready&&rightEye.ready
+                &&leftEye.copied==liveImage&&rightEye.copied==liveImage;
+            if(tracking&&regionsValid&&((surroundTransition&&frozenReady)||(cameraTransition&&!surroundTransition&&liveTransitionReady))){
                 // A cinematic cut carries only the already uploaded stereo
                 // image and its original poses. It never adds a native quad.
                 end.layerCount=surroundTransition&&surroundWithScreen&&screen.ready?2u:1u;end.layers=transitionLayers.data();
@@ -1729,10 +1933,48 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
                 }
             }else if(tracking&&anchored&&screen.ready){end.layerCount=1;end.layers=&layer;++stats.submittedScreens;}
         }
+        XrCompositionLayerQuad controlsQuad{XR_TYPE_COMPOSITION_LAYER_QUAD};
+        XrCompositionLayerQuad textQuad{XR_TYPE_COMPOSITION_LAYER_QUAD};
+        std::array<const XrCompositionLayerBaseHeader*,4> composedLayers{};
+        if(frame.shouldRender&&end.layerCount&&session.controlsEditor.visible()){
+            const auto& editor=session.controlsEditor.frame();
+            if(auto* pixels=controlsPanel.draw(session.device.Get(),session.context.Get(),editor,session.controlsPath.parent_path())){
+                controlsScreen.upload(pixels,{session.presentationEpoch,++controlsPanelSequence});
+                if(controlsScreen.ready){
+                    controlsQuad.space=session.local;controlsQuad.eyeVisibility=XR_EYE_VISIBILITY_BOTH;
+                    controlsQuad.pose=toXr(editor.panel);controlsQuad.size={1.2f,.75f};
+                    controlsQuad.subImage.swapchain=controlsScreen.handle;
+                    controlsQuad.subImage.imageRect.extent={static_cast<int32_t>(controlsScreen.width),static_cast<int32_t>(controlsScreen.height)};
+                    for(uint32_t n=0;n<end.layerCount;++n)composedLayers[n]=end.layers[n];
+                    composedLayers[end.layerCount++]=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&controlsQuad);
+                    end.layers=composedLayers.data();
+                }
+            }else {session.controlsEditor.close();log("VR controls editor closed: panel pixels unavailable");}
+        }
+        bool textPanelSubmitted{};
+        const auto keyboard=session.controllerFrame.studio;
+        if(frame.shouldRender&&end.layerCount&&tracking&&stereoTracked&&session.focused
+            &&keyboard&&keyboard->available&&keyboard->keyboardOnly&&nativeProfileMenuActive()){
+            if(auto* pixels=textPanel.draw(session.device.Get(),session.context.Get(),*keyboard)){
+                textScreen.upload(pixels,{session.presentationEpoch,++textPanelSequence});
+                if(textScreen.ready){
+                    textQuad.space=session.local;textQuad.eyeVisibility=XR_EYE_VISIBILITY_BOTH;
+                    // The 11 x 4 cells cover the same LOCAL key centers and
+                    // 43 mm hit targets used by the controller ray test.
+                    textQuad.pose=toXr(compose(keyboard->keyboard,Pose{{},{0,-.045f,0}}));
+                    textQuad.size={.495f,.18f};textQuad.subImage.swapchain=textScreen.handle;
+                    textQuad.subImage.imageRect.extent={static_cast<int32_t>(textScreen.width),static_cast<int32_t>(textScreen.height)};
+                    for(uint32_t n=0;n<end.layerCount;++n)composedLayers[n]=end.layers[n];
+                    composedLayers[end.layerCount++]=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&textQuad);
+                    end.layers=composedLayers.data();textPanelSubmitted=true;
+                }
+            }
+        }
         const auto stageEndFrameStart=XrStageDiagnostics::Clock::now();
         const auto endFrameResult=xrEndFrame(session.handle,&end);
         const auto stageEndFrameDone=XrStageDiagnostics::Clock::now();
         xrCheck(endFrameResult,"Submit XR frame");guard.ended=true;
+        publishNativeTextPanel(textPanelSubmitted,session.presentationEpoch,session.referenceEpoch,cameraStatus.activation);
         // xrEndFrame often completes the cache copy/release on the XR device.
         // Return only GPU-complete shared slots before the next xrWaitFrame;
         // delaying this poll until acquisition starves the native producer.

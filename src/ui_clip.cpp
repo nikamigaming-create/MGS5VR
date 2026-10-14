@@ -50,6 +50,8 @@ using DrawInstanced=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT,UINT
 using DrawIndexedInstanced=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT,UINT,INT,UINT);
 Draw originalDraw{};DrawIndexed originalIndexed{};
 DrawInstanced originalInstanced{};DrawIndexedInstanced originalIndexedInstanced{};
+Draw originalImmediateDraw{};DrawIndexed originalImmediateIndexed{};
+DrawInstanced originalImmediateInstanced{};DrawIndexedInstanced originalImmediateIndexedInstanced{};
 std::atomic_uint64_t clipped{},unavailable{},shadersSeen{},signaturesSeen{},scissored{};
 std::string geometrySource(const void* bytes,SIZE_T length){
     ComPtr<ID3D11ShaderReflection> reflection;
@@ -172,6 +174,10 @@ void STDMETHODCALLTYPE draw(ID3D11DeviceContext* c,UINT a,UINT b){ClipDraw clip(
 void STDMETHODCALLTYPE indexed(ID3D11DeviceContext* c,UINT a,UINT b,INT d){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalIndexed(c,a,b,d);}
 void STDMETHODCALLTYPE instanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,UINT e){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalInstanced(c,a,b,d,e);}
 void STDMETHODCALLTYPE indexedInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,INT e,UINT f){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalIndexedInstanced(c,a,b,d,e,f);}
+void STDMETHODCALLTYPE immediateDraw(ID3D11DeviceContext* c,UINT a,UINT b){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalImmediateDraw(c,a,b);}
+void STDMETHODCALLTYPE immediateIndexed(ID3D11DeviceContext* c,UINT a,UINT b,INT d){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalImmediateIndexed(c,a,b,d);}
+void STDMETHODCALLTYPE immediateInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,UINT e){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalImmediateInstanced(c,a,b,d,e);}
+void STDMETHODCALLTYPE immediateIndexedInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,INT e,UINT f){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalImmediateIndexedInstanced(c,a,b,d,e,f);}
 }
 UiClipScope::UiClipScope(const std::array<float,16>& canvas) noexcept:saved_(active),savedBounds_(activeBounds){
     active=uiClipPlanes(canvas);if(!active)return;
@@ -195,6 +201,14 @@ void installUiClip(ID3D11Device* device){
     hook(c[13],reinterpret_cast<void*>(&draw),reinterpret_cast<void**>(&originalDraw));
     hook(c[20],reinterpret_cast<void*>(&indexedInstanced),reinterpret_cast<void**>(&originalIndexedInstanced));
     hook(c[21],reinterpret_cast<void*>(&instanced),reinterpret_cast<void**>(&originalInstanced));
-    log("Native menu canvas clipping hooks installed");
+    ComPtr<ID3D11DeviceContext> immediate;device->GetImmediateContext(&immediate);
+    auto** i=*reinterpret_cast<void***>(immediate.Get());
+    // FOX draws cabin geometry on the immediate context and composites on a
+    // deferred context. Their entry points can differ on the active driver.
+    if(i[12]!=c[12])hook(i[12],reinterpret_cast<void*>(&immediateIndexed),reinterpret_cast<void**>(&originalImmediateIndexed));
+    if(i[13]!=c[13])hook(i[13],reinterpret_cast<void*>(&immediateDraw),reinterpret_cast<void**>(&originalImmediateDraw));
+    if(i[20]!=c[20])hook(i[20],reinterpret_cast<void*>(&immediateIndexedInstanced),reinterpret_cast<void**>(&originalImmediateIndexedInstanced));
+    if(i[21]!=c[21])hook(i[21],reinterpret_cast<void*>(&immediateInstanced),reinterpret_cast<void**>(&originalImmediateInstanced));
+    log("Native menu canvas clipping and scene observation hooks installed for both context types");
 }
 }

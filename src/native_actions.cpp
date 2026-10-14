@@ -1,5 +1,6 @@
 #include "mgs5vr/native_actions.hpp"
 #include "mgs5vr/native_controls.hpp"
+#include "mgs5vr/native_text_input.hpp"
 #include "mgs5vr/vehicle_weapon.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/animal_interaction.hpp"
@@ -7,9 +8,11 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/native_input_delivery.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/controls.hpp"
 #include "mgs5vr/control_prompts.hpp"
+#include "mgs5vr/controls_editor.hpp"
 #include "mgs5vr/weapon_obstruction.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/render_camera.hpp"
@@ -61,6 +64,7 @@ std::mutex traceMutex;
 std::unordered_set<uint64_t> traced;
 std::atomic_bool enabled{};
 std::atomic_bool nativeLuaReady{};
+uint64_t cameraFreezeActivation{},cameraFreezeReference{};
 std::mutex requestMutex;
 std::filesystem::path requestPath,resultPath,tracePath;
 bool externalCommands{};
@@ -902,6 +906,7 @@ bool publishFastInput(const std::string& request,std::string& result){
            <<",\"lua_ready\":"<<nativeLuaReady.load()
            <<",\"title\":"<<nativeTitleModeActive()<<",\"title_menu\":"<<nativeTitleMenuOpen()
            <<",\"title_cabin\":"<<nativeTitleCabinMode()<<",\"cabin\":"<<nativeCabinPlay()
+           <<",\"opening_cinematic\":"<<nativeOpeningCinematic()
            <<",\"cabin_transit\":"<<nativeCabinTransit()
            <<",\"loading\":"<<nativeLoadingTipsOpen()<<",\"demo\":"<<nativeScriptedDemoActive()
            <<",\"demo_candidate\":"<<(nativeDemoMode()==NativeDemoMode::staleCandidate)
@@ -970,17 +975,72 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"raw_right_aim_tracked\":"<<frame.controllers.hands[1].aimTracked
                <<",\"idroid_stowed\":"<<frame.controllers.handheldIdroidStowed
                <<",\"handheld_menu_free\":"<<frame.controllers.handheldMenuFree;
+            reportControlsEditor(out);
             out<<",\"cabin_play\":"<<frame.controllers.cabinPlay
                <<",\"handheld_menus\":"<<frame.controllers.handheldMenus
                <<",\"menu_open\":"<<frame.menuOpen
+               <<",\"camera_world_frozen\":"<<frame.controllers.cameraWorldFrozen
                <<",\"menu_idroid\":"<<frame.menuIdroid;
             const auto pose=[&](const char* name,Pose value){
                 const auto p=value.position;const auto q=value.orientation;
                 out<<",\""<<name<<"\":{\"position\":["<<p.x<<','<<p.y<<','<<p.z
                    <<"],\"orientation\":["<<q.x<<','<<q.y<<','<<q.z<<','<<q.w<<"]}";
             };
+            const auto authoredHead=authoredHeadVisibility();
+            out<<",\"authored_head\":{\"owner\":"<<authoredHead.owner<<",\"model\":"<<authoredHead.model
+               <<",\"sample_ms\":"<<authoredHead.time<<",\"activation\":"<<authoredHead.activation
+               <<",\"concealed\":"<<authoredHead.concealed<<'}';
+            pose("authored_head_pose",authoredHead.head);pose("authored_head_viewer",authoredHead.viewer);
             pose("native_pose",frame.nativePose);
+            out<<",\"player_posture\":"<<static_cast<unsigned>(frame.controllers.playerPosture)
+               <<",\"full_body_requested\":"<<frame.controllers.fullBody
+               <<",\"full_body\":{\"valid\":"<<frame.body.valid<<",\"spine_clamped\":"<<frame.body.spineClamped
+               <<",\"mounted\":"<<frame.body.mounted
+               <<",\"rejection\":"<<frame.body.rejection
+               <<",\"floor_queries\":"<<frame.body.floorQueries<<",\"floor_contacts\":"<<frame.body.floorContacts
+               <<",\"floor_clearance\":["<<frame.body.floorClearance[0]<<','<<frame.body.floorClearance[1]<<']'
+               <<",\"native_floor_clearance\":["<<frame.body.nativeFloorClearance[0]<<','<<frame.body.nativeFloorClearance[1]<<']'
+               <<",\"eye_error\":["<<frame.body.eyeError.x<<','<<frame.body.eyeError.y<<','<<frame.body.eyeError.z<<']'
+               <<",\"head_contacts\":"<<frame.body.headContacts<<'}'
+               <<",\"head_look_lesson\":"<<frame.controllers.headLookLessonKey
+               <<",\"cinematic_free_move\":"<<frame.controllers.cinematicFreeMove
+               <<",\"cinematic_move\":["<<frame.controllers.cinematicMove[0]<<','<<frame.controllers.cinematicMove[1]<<']'
+               <<",\"cinematic_follow_valid\":"<<frame.cinematicFollowValid
+               <<",\"cinematic_free_offset\":["<<frame.cinematicFreeOffset.x<<','<<frame.cinematicFreeOffset.y<<','<<frame.cinematicFreeOffset.z<<']';
+            pose("cinematic_base",frame.cinematicBasePose);
+            pose("body_pelvis",frame.body.pelvis);pose("body_chest",frame.body.chest);
+            pose("body_head",frame.body.head);pose("body_eye",frame.body.eye);
+            pose("left_foot",frame.body.feet[0]);pose("right_foot",frame.body.feet[1]);
             pose("head_pose",frame.headPose);
+            pose("locomotion_heading",Pose{frame.locomotionHeading,{}});
+            out<<",\"locomotion_heading_tracked\":"<<frame.locomotionHeadingTracked;
+            out<<",\"eyes\":[";
+            for(size_t eye=0;eye<2;++eye){if(eye)out<<',';const auto& v=frame.views[eye];const auto p=v.pose.position;const auto q=v.pose.orientation;
+                out<<"{\"position\":["<<p.x<<','<<p.y<<','<<p.z<<"],\"orientation\":["<<q.x<<','<<q.y<<','<<q.z<<','<<q.w
+                   <<"],\"fov\":["<<v.fov.left<<','<<v.fov.right<<','<<v.fov.up<<','<<v.fov.down<<"]}";}
+            out<<']';
+            if(const auto studio=frame.controllers.studio){
+                out<<",\"studio\":{\"available\":"<<studio->available<<",\"cabin\":"<<studio->cabin
+                   <<",\"camera_hand\":"<<studio->cameraHand<<",\"marker_hand\":"<<studio->markerHand
+                   <<",\"editor\":"<<studio->editor<<",\"shutter\":"<<studio->shutter<<",\"photo\":"<<studio->lastPhoto
+                   <<",\"input_mask\":"<<unsigned(studio->inputMask)<<",\"keyboard_only\":"<<studio->keyboardOnly;
+                out<<",\"selected_photo\":"<<studio->selectedPhoto<<",\"review\":"<<studio->review
+                   <<",\"confirm_photo\":"<<studio->confirmPhoto<<",\"confirm_paper\":"<<studio->confirmPaper
+                   <<",\"hover_control\":"<<studio->hoverControl<<",\"hover_key\":"<<studio->hoverKey
+                   <<",\"freeze_requested\":"<<studio->freezeRequested<<",\"freeze_supported\":"<<studio->freezeSupported
+                   <<",\"freeze_state\":"<<unsigned(studio->freezeState)
+                   <<",\"library\":[";
+                for(size_t i=0;i<studio->photos.size();++i){if(i)out<<',';out<<studio->photos[i];}out<<']';
+                pose("room",studio->roomTracking);pose("camera",studio->camera);pose("marker",studio->marker);pose("keyboard",studio->keyboard);
+                pose("board",cabinNativeBoard);pose("notes_home",Pose{{-.70710678f,0,0,.70710678f},studioNotesHome});
+                pose("camera_home",Pose{{},studioCameraHome});pose("marker_home",Pose{{},studioMarkerHome});
+                out<<",\"papers\":[";bool first=true;
+                for(const auto& paper:studio->papers){if(!first)out<<',';first=false;out<<"{\"id\":"<<paper.id<<",\"photo\":"<<paper.photo
+                    <<",\"hand\":"<<paper.hand<<",\"pinned\":"<<paper.pinned<<",\"text\":"<<std::quoted(paper.ink->text)
+                    <<",\"strokes\":"<<paper.ink->strokes.size()<<",\"field\":"<<paper.field;
+                    pose("pose",paper.pose);pose("field_pose",paper.fieldPose);out<<'}';}
+                out<<"]}";
+            }
             pose("left_palm",frame.renderedPalms[0]);
             pose("left_grip",frame.controllers.hands[0].grip);
             pose("right_palm",frame.renderedPalms[1]);
@@ -1027,6 +1087,9 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"magnifier_interface\":"<<weapon.magnifierInterface<<",\"magnifier_model\":"<<weapon.magnifierModel
                <<",\"magnifier_index\":"<<weapon.magnifierIndex<<",\"magnifier_model_code\":"<<weapon.magnifierModelCode
                <<",\"flags\":"<<weapon.flags<<",\"mode\":"<<weapon.mode<<",\"muzzle_attempted\":"<<weapon.muzzleAttempted
+               <<",\"native_aim_target_read\":"<<weapon.nativeAimTargetRead;
+            out<<",\"native_aim_target\":["<<weapon.nativeAimTarget.x<<','<<weapon.nativeAimTarget.y<<','<<weapon.nativeAimTarget.z<<']';
+            out
                <<",\"muzzle_matrix_read\":"<<weapon.muzzleMatrixRead<<",\"attachment_valid\":"<<weapon.attachmentValid
                <<",\"muzzle_socket_valid\":"<<weapon.muzzleSocketValid<<",\"muzzle_solved\":"<<weapon.muzzleSolved
                <<",\"optical_descriptor_read\":"<<weapon.opticalRead<<",\"optical_descriptor\":[";
@@ -1040,10 +1103,32 @@ bool publishFastInput(const std::string& request,std::string& result){
             pose("sight_rear_local",weapon.sightRearLocal);pose("sight_front_local",weapon.sightFrontLocal);out<<'}';
             out<<'}';
         }else out<<",\"rendered\":null";
+        // Presentation settings stay operable with immersive rendering off.
+        // Their diagnostics must not depend on an active native eye camera.
+        reportControlsEditor(out);
+        const auto textInput=nativeTextInputStatus();
+        out<<",\"text_input\":{\"ready\":"<<textInput.ready<<",\"active\":"<<textInput.active
+           <<",\"visible\":"<<textInput.visible
+           <<",\"down\":"<<textInput.down<<",\"up\":"<<textInput.up<<",\"converted\":"<<textInput.converted
+           <<",\"discarded\":"<<textInput.discarded<<",\"pending\":"<<textInput.pending<<'}';
         if(const auto anchor=headCamera().openingTrackingOrigin(now)){
             const auto p=anchor->position;const auto q=anchor->orientation;
             out<<",\"opening_position\":["<<p.x<<','<<p.y<<','<<p.z
                <<"],\"opening_orientation\":["<<q.x<<','<<q.y<<','<<q.z<<','<<q.w<<']';
+            const auto focus=nativeTitleFocus();const auto bench=rendered?rendered->controllers.openingBench:CabinBenchFrame{};
+            out<<",\"opening_focus\":{\"ready\":"<<focus.ready<<",\"row\":"<<unsigned(focus.row)<<",\"actions\":[";
+            for(size_t i=0;i<focus.count;++i){if(i)out<<',';out<<unsigned(focus.actions[i]);}
+            out<<"]},\"opening_bench\":{\"inserted\":"<<bench.inserted<<",\"lid\":"<<bench.lidOpen<<",\"tapes\":[";
+            for(size_t i=0;i<bench.tapes.size();++i){if(i)out<<',';const auto& tape=bench.tapes[i];
+                out<<"{\"hand\":"<<tape.hand<<",\"state\":"<<unsigned(tape.state)
+                   <<",\"position\":["<<tape.pose.position.x<<','<<tape.pose.position.y<<','<<tape.pose.position.z
+                   <<"],\"orientation\":["<<tape.pose.orientation.x<<','<<tape.pose.orientation.y<<','<<tape.pose.orientation.z<<','<<tape.pose.orientation.w<<"]}";}
+            out<<"],\"layout\":{\"verified\":"<<bench.layout.verified<<",\"generation\":"<<bench.layout.generation;
+            const auto layoutPose=[&](const char* name,Pose value){const auto p=value.position;const auto q=value.orientation;
+                out<<",\""<<name<<"\":{\"position\":["<<p.x<<','<<p.y<<','<<p.z<<"],\"orientation\":["<<q.x<<','<<q.y<<','<<q.z<<','<<q.w<<"]}";};
+            layoutPose("seat",bench.layout.seat);layoutPose("player",bench.layout.player);layoutPose("slot",bench.layout.slot);
+            layoutPose("eject",Pose{bench.layout.seat.orientation,bench.layout.eject});
+            out<<"}}";
         }
         out<<'}';result=out.str();return true;
     }
@@ -1092,11 +1177,46 @@ void drainFastActions(void* state){
     }
 }
 void pump(void* state){
+    pumpNativeTextInput();
     drainFastActions(state);
     std::unique_lock lock(requestMutex,std::try_to_lock);
     const auto now=GetTickCount64();
     if(!lock.owns_lock()||now-checkedAt<100)return;
     checkedAt=now;
+    if(luaReady(state)){
+        const auto request=cameraFreezeRequest();
+        const auto leaseNow=steadyMilliseconds();
+        const auto camera=headCamera().status();
+        const bool wanted=request.requested&&leaseNow>=request.at&&leaseNow-request.at<500
+            &&request.activation&&request.referenceEpoch&&camera.active&&camera.activation==request.activation
+            &&!nativeLoadingTipsOpen()&&!nativeTitleModeActive()&&!nativeScriptedDemoActive()
+            &&!camera.nativeMenuOpen&&!nativeGamepadActive();
+        const bool changedOwner=cameraWorldFrozen()&&(cameraFreezeActivation!=request.activation
+            ||cameraFreezeReference!=request.referenceEpoch);
+        // End an old lease before a new owner can request a freeze. Never
+        // unregister retail pause owners or open the stock Pause screen.
+        const bool pause=wanted&&!changedOwner;
+        if(pause!=cameraWorldFrozen()){
+            const int top=getTop(state);
+            const std::string_view script=pause
+                ?"if type(TppPause)=='table' and type(TppPause.RegisterPause)=='function' "
+                 "and type(TppPause.PAUSE_LEVEL_MB_DVC_TUTORIAL)=='number' then "
+                 "TppPause.RegisterPause('MGS5VR_Camera',TppPause.PAUSE_LEVEL_MB_DVC_TUTORIAL); return 'ok' end return 'unavailable'"
+                :"if type(TppPause)=='table' and type(TppPause.UnregisterPause)=='function' then "
+                 "TppPause.UnregisterPause('MGS5VR_Camera'); return 'ok' end return 'unavailable'";
+            int status=load(state,script.data(),script.size(),"@mgs5vr-camera-freeze");
+            if(!status)status=original(state,0,1,0);
+            size_t length{};const auto* value=getString(state,-1,&length);
+            if(!status&&value&&std::string_view(value,length)=="ok"){
+                cameraFreezeActivation=pause?request.activation:0;
+                cameraFreezeReference=pause?request.referenceEpoch:0;
+                acknowledgeCameraFreeze(pause?StudioFreeze::frozen:StudioFreeze::live,pause);
+                log(pause?"Camera Freeze: named native world pause acquired; tracked rendering retained"
+                    :"Camera Freeze: named native world pause released");
+            }else acknowledgeCameraFreeze(StudioFreeze::unavailable,cameraWorldFrozen());
+            setTop(state,top);
+        }else if(!wanted&&!cameraWorldFrozen())acknowledgeCameraFreeze(StudioFreeze::live,false);
+    }
     // Menu entry/Help can briefly lack a fresh rig and can re-admit the same
     // player under a new camera activation. Neither is a terminal-owner change.
     // Keep the UI-only resource until a verified different player or UI exit.
@@ -1454,19 +1574,36 @@ void pump(void* state){
                 setTop(state,top);
             }
         }
-        int presentationStatus=load(state,nativePresentationScript.data(),nativePresentationScript.size(),"@mgs5vr-presentation-state");
-        if(!presentationStatus)presentationStatus=original(state,0,1,0);
-        size_t presentationLength{};const auto* presentationValue=getString(state,-1,&presentationLength);
+        static const std::string presentationObservation="local function presentation()\n"+std::string(nativePresentationScript)
+            +"\nend\nlocal visible=false; if type(FadeFunction)=='table' and type(FadeFunction.IsFadeOut)=='function' "
+             "and type(FadeFunction.IsFadeProcessing)=='function' then "
+             "local a,out=pcall(FadeFunction.IsFadeOut); local b,processing=pcall(FadeFunction.IsFadeProcessing); "
+             "visible=a and b and out==false and processing==false end; return presentation(),visible and 'clear' or 'covered'";
+        int presentationStatus=load(state,presentationObservation.data(),presentationObservation.size(),"@mgs5vr-presentation-state");
+        if(!presentationStatus)presentationStatus=original(state,0,2,0);
+        size_t fadeLength{};const auto* fadeValue=!presentationStatus?getString(state,-1,&fadeLength):nullptr;
+        publishNativeSceneClear(fadeValue&&fadeLength==5&&std::memcmp(fadeValue,"clear",5)==0);
+        size_t presentationLength{};const auto* presentationValue=!presentationStatus?getString(state,-2,&presentationLength):nullptr;
         constexpr std::string_view popupPrefix="native-popup:";
         const bool nativePopupActive=!presentationStatus&&presentationValue&&presentationLength>popupPrefix.size()
             &&std::memcmp(presentationValue,popupPrefix.data(),popupPrefix.size())==0;
         if(nativePopupActive){presentationValue+=popupPrefix.size();presentationLength-=popupPrefix.size();}
+        const bool nativeCanvasActive=nativePopupActive&&
+            ((presentationLength==11&&std::memcmp(presentationValue,"mission-end",11)==0)
+             ||(presentationLength==6&&std::memcmp(presentationValue,"sortie",6)==0));
         const bool avatarEditorActive=!presentationStatus&&presentationValue&&presentationLength==11
             &&std::memcmp(presentationValue,"avatar-edit",11)==0;
         const bool titleCabinActive=!presentationStatus&&presentationValue&&presentationLength==11
             &&std::memcmp(presentationValue,"title-cabin",11)==0;
+        const bool hospitalTitleMenuActive=!presentationStatus&&presentationValue&&presentationLength==19
+            &&std::memcmp(presentationValue,"title-hospital-menu",19)==0;
         const bool scriptedDemoTitleActive=!presentationStatus&&presentationValue&&presentationLength==19
             &&std::memcmp(presentationValue,"scripted-demo-title",19)==0;
+        const bool openingDemoActive=!presentationStatus&&presentationValue&&presentationLength==21
+            &&std::memcmp(presentationValue,"scripted-opening-demo",21)==0;
+        const bool openingLookActive=!presentationStatus&&presentationValue&&presentationLength==23
+            &&std::memcmp(presentationValue,"scripted-opening-look-",22)==0
+            &&(presentationValue[22]=='0'||presentationValue[22]=='1');
         constexpr std::string_view staleCandidatePrefix="stale-demo-candidate:";
         const bool staleDemoCandidate=!presentationStatus&&presentationValue
             &&presentationLength>staleCandidatePrefix.size()
@@ -1475,21 +1612,27 @@ void pump(void* state){
             ?candidateKey(presentationValue+staleCandidatePrefix.size(),presentationLength-staleCandidatePrefix.size()):0;
         const bool scriptedLookTitleActive=!presentationStatus&&presentationValue&&presentationLength==19
             &&std::memcmp(presentationValue,"scripted-look-title",19)==0;
-        const bool scriptedLookActive=scriptedLookTitleActive||(!presentationStatus&&presentationValue&&presentationLength==13
-            &&std::memcmp(presentationValue,"scripted-look",13)==0);
-        const bool titleActive=titleCabinActive||scriptedDemoTitleActive||scriptedLookTitleActive||(!presentationStatus&&presentationValue&&presentationLength==5
+        const bool hospitalLookActive=!presentationStatus&&presentationValue&&presentationLength==15
+            &&std::memcmp(presentationValue,"scripted-look-",14)==0
+            &&(presentationValue[14]=='0'||presentationValue[14]=='1');
+        const bool scriptedLookActive=openingLookActive||scriptedLookTitleActive||hospitalLookActive;
+        const uint64_t lookLessonKey=(openingLookActive||hospitalLookActive)
+            ?uint64_t(presentationValue[presentationLength-1]-'0')+1:0;
+        const bool titleActive=titleCabinActive||hospitalTitleMenuActive||openingDemoActive||openingLookActive||scriptedDemoTitleActive||scriptedLookTitleActive||(!presentationStatus&&presentationValue&&presentationLength==5
             &&std::memcmp(presentationValue,"title",5)==0);
         const bool cabinActive=!presentationStatus&&presentationValue&&presentationLength==5
             &&std::memcmp(presentationValue,"cabin",5)==0;
         const bool cabinTransit=!presentationStatus&&presentationValue&&presentationLength==12
             &&std::memcmp(presentationValue,"cabin-flight",12)==0;
+        const bool profileMenuActive=!presentationStatus&&presentationValue&&presentationLength==12
+            &&std::memcmp(presentationValue,"profile-menu",12)==0;
         const bool sceneMenuActive=!presentationStatus&&presentationValue
-            &&(nativePopupActive||(presentationLength==10&&std::memcmp(presentationValue,"cabin-menu",10)==0)
+            &&(nativePopupActive||profileMenuActive||(presentationLength==10&&std::memcmp(presentationValue,"cabin-menu",10)==0)
                 ||(presentationLength==9&&std::memcmp(presentationValue,"game-over",9)==0));
-        const bool scriptedDemoActive=scriptedDemoTitleActive||(!presentationStatus&&presentationValue&&presentationLength==13
+        const bool scriptedDemoActive=profileMenuActive||openingDemoActive||scriptedDemoTitleActive||(!presentationStatus&&presentationValue&&presentationLength==13
             &&std::memcmp(presentationValue,"scripted-demo",13)==0);
         publishNativeAvatarEdit(avatarEditorActive);
-        const bool knownDemoPresentation=scriptedLookActive||scriptedDemoActive||staleDemoCandidate
+        const bool knownDemoPresentation=hospitalTitleMenuActive||scriptedLookActive||scriptedDemoActive||staleDemoCandidate
             ||(presentationValue&&((presentationLength==5&&std::memcmp(presentationValue,"title",5)==0)
                 ||(presentationLength==5&&std::memcmp(presentationValue,"cabin",5)==0)
                 ||(presentationLength==6&&std::memcmp(presentationValue,"closed",6)==0)
@@ -1500,12 +1643,16 @@ void pump(void* state){
             publishNativeDemoMode(scriptedLookActive?NativeDemoMode::interactiveLook:
                 scriptedDemoActive?NativeDemoMode::cinematic:
                 staleDemoCandidate?NativeDemoMode::staleCandidate:NativeDemoMode::none,
-                staleCandidateIdentity);
+                staleCandidateIdentity,lookLessonKey);
         publishNativeTitleMode(titleActive);
+        publishNativeHospitalTitleMenu(hospitalTitleMenuActive);
+        publishNativeOpeningCinematic(openingDemoActive||openingLookActive);
         publishNativeTitleCabinMode(titleCabinActive);
         publishNativeCabinPlay(cabinActive);
         publishNativeCabinTransit(cabinTransit);
         publishNativeSceneMenu(sceneMenuActive);
+        publishNativeSceneCanvas(nativeCanvasActive);
+        publishNativeProfileMenu(profileMenuActive&&!nativePopupActive);
         setTop(state,top);
         const bool requested=openingCabinEnabled()&&nativeTitleMenuOpen()&&headCamera().status().active;
         const std::string script=std::string("local requested=")+(requested?"true\n":"false\n")+std::string(nativeCabinScript);
@@ -1578,6 +1725,7 @@ void installNativeActions(uintptr_t base,const std::filesystem::path& folder,boo
     setTop=reinterpret_cast<SetTop>(base+0x1a11f70);getString=reinterpret_cast<String>(base+0x1a12150);
     requestPath=folder/L"mgs5vr-native-actions.lua";resultPath=folder/L"mgs5vr-native-actions-result.txt";
     imageBase=base;tracePath=folder/L"mgs5vr-animal-trace.txt";
+    installNativeTextInput(base);
     // UiPad vtable slot 0x120 is the native input-mask predicate. All ordinary
     // button/axis getters consult it; retain its existing tutorial count.
     const bool inputMaskAbi=matches(base+0x1dd7eb0,std::array<unsigned char,9>{0x33,0xc0,0x39,0x41,0x18,0x0f,0x97,0xc0,0xc3})
@@ -1650,6 +1798,8 @@ void installNativeActions(uintptr_t base,const std::filesystem::path& folder,boo
     log(externalCommands?"Native title reader and local action queue installed":"Native title reader installed; external actions disabled");
 }
 void stopNativeActions() noexcept{
+    stopNativeTextInput();
+    requestCameraFreeze(false);
     enabled.store(false);setHandheldMenuRoutingAvailable(false);
     publishHandheldMenuControl(HandheldMenuControl::native,0);
     publishHandheldFocusedWeapon(false,0);setHandheldFocusedWeaponRoutingAvailable(false);

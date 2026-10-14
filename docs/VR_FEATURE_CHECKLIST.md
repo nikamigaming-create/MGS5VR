@@ -25,14 +25,14 @@ Built does not mean every issue is fixed. Source paths, bounded simulator runs, 
 21. **Vehicles:** truck entry, wheel steering and exit observed; other vehicles and mounted roles incomplete.
 22. **Powered prosthetic arm:** native access path exists; special abilities and guided-camera return are incomplete.
 23. **HUD and world cues:** wrist status and selected cues exist; captions, notifications and marker issues remain.
-24. **Controls editor:** external launcher/editor remapping and save work in tested scope; no in-headset editor.
+24. **Controls editor:** external and in-headset remapping exist. The spatial editor has contextual 3D controller feedback and confirmed live remapping; ACC, conflict rejection and automatic binocular mode passed a bounded simulator run. Physical-headset fit and broader mode coverage remain open.
 25. **Native gamepad:** XInput/native-button mode and VR handoff exist; full context matrix not accepted.
 26. **Ground Zeroes:** third-person stereo preview and selected actions exist; first-person rig and HUD are absent.
 27. **Pause redesign:** a large centered quad over paused stereo gameplay is the new requirement; block game movement while retaining live head/hand tracking. Root is implementing it, with no test result yet. Prior wrist-panel clipping applies to the old design.
 28. **Presentation toggle:** immersive VR and large-screen modes have a held-button switch.
-29. **Settings:** external launcher exposes bounded VR tuning, binding validation and backups; headset editing absent.
+29. **Settings:** the launcher exposes VR tuning, validation and backups. The headset panel edits action/button/chord/axis bindings; general tuning still uses the launcher.
 30. **Training lessons:** ten recorded lessons sit beside interactive 3D controllers; cues use current bindings.
-31. **Control coverage:** eight contexts and 96 semantic actions are exported from native config; not every action is gameplay-tested.
+31. **Control coverage:** eight decoder contexts and 97 semantic actions are exported from native config; the headset editor distinguishes ACC, launch cabin and iDroid presentation modes. Not every action is gameplay-tested.
 32. **Field terminal:** 3D lesson playback, controller inspection and settings UI are implemented; product flow still receives QA.
 33. **Install/update tools:** launcher install, update, backup and recovery paths exist; full user-environment matrix remains open.
 34. **Runtime diagnostics:** native snapshots, captures, bounded cases and evidence sidecars exist; they do not replace visual review.

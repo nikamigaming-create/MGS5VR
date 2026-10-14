@@ -20,6 +20,10 @@ class AimProbeUnavailable(BotFault):
     """One target cannot currently be inspected; other targets remain eligible."""
 
 
+class RigPublicationDelay(BotFault):
+    """The same live owner has not produced a fresh rig within the deadline."""
+
+
 def mul(a, b):
     x,y,z,w=a; u,v,t,s=b
     return [w*u+x*s+y*t-z*v, w*v-x*t+y*s+z*u,
@@ -168,18 +172,25 @@ def fresh_rig(live, anchor=None, *, clock=time.monotonic, sleep=time.sleep):
         stamp=frame.get('sample_ms')
         if type(stamp) is int and 0<=state['now_ms']-stamp<=150:return state,identity
         live.events.emit('field_publication_wait',state=state,anchor=identity,input_replayed=False)
-        if clock()>=until:raise BotFault('The same-owner VR rig did not publish a fresh pose before the bounded deadline')
+        if clock()>=until:raise RigPublicationDelay('The same-owner VR rig did not publish a fresh pose before the bounded deadline')
         sleep(.025)
 
 
-def admit(live, anchor=None, *, clock=time.monotonic, sleep=time.sleep):
+def admit(live, anchor=None, *, witnessed_hospital_ride=False, clock=time.monotonic, sleep=time.sleep):
     # A released sprint/hit animation can briefly clear NORMAL_ACTION. Wait
     # with observation only; no gameplay action may use that transition state.
     until=clock()+1.5;expected=anchor
     while True:
         state,identity=fresh_rig(live,expected,clock=clock,sleep=sleep)
         expected=identity
-        try:_validate_field_state(state)
+        ride = (witnessed_hospital_ride is True
+            and tuple(state['native'].get(k) for k in ('mission','location','story','sequence'))
+                == (10010,30,0,'Seq_Game_VolginRide')
+            and state['native'].get('hospital_volgin_ride') is True
+            and state['native'].get('weapon_PRIMARY_HIP') == 70)
+        if witnessed_hospital_ride and not ride:
+            raise BotFault('Scripted horse combat lost its native ride and shotgun owner')
+        try:_validate_field_state(state,witnessed_hospital_route=ride)
         except BotFault:
             native=state['native']
             waiting=(native.get('status_NORMAL_ACTION') is False and native.get('status_CARRY') is False
@@ -207,7 +218,7 @@ def admit(live, anchor=None, *, clock=time.monotonic, sleep=time.sleep):
     return state,identity
 
 
-def sight(live, anchor, *, clock=time.monotonic):
+def sight(live, anchor, *, witnessed_hospital_ride=False, clock=time.monotonic):
     # Actual 20261005-truck-active-driver-69cf fired the WU correctly, then
     # its native bolt animation withdrew the muzzle after arm() had sampled
     # readiness. The same-owner publication remained fresh throughout. Allow
@@ -217,7 +228,7 @@ def sight(live, anchor, *, clock=time.monotonic):
     while True:
         started=clock()
         data,timing=live.native.read('inspect-combat-sight')
-        state,_=admit(live,anchor)
+        state,_=admit(live,anchor,**({'witnessed_hospital_ride':True} if witnessed_hospital_ride else {}))
         frame=state['rendered']
         owner_valid=(data.get('activation')==anchor[2] and data.get('player_owner')==anchor[3]
                      and data.get('presentation_epoch')==anchor[4])
@@ -281,8 +292,8 @@ def active_targets(enemies, geometry, *, camp=None, radius=80, require_clear=Tru
     return sorted(candidates,key=lambda row:(row['sight']['distance'],row['id']))
 
 
-def arm(live, ready_inputs, anchor, *, healthy_life=None, clock=time.monotonic, sleep=time.sleep):
-    state,_=admit(live,anchor)
+def arm(live, ready_inputs, anchor, *, healthy_life=None, witnessed_hospital_ride=False, clock=time.monotonic, sleep=time.sleep):
+    state,_=admit(live,anchor,**({'witnessed_hospital_ride':True} if witnessed_hospital_ride else {}))
     if healthy_life is not None and needs_recovery(state['native'],healthy_life):
         raise HealthRecoveryNeeded('Damage takes priority before weapon readiness')
     already=held_input_evidence(state,ready_inputs)
@@ -300,7 +311,7 @@ def arm(live, ready_inputs, anchor, *, healthy_life=None, clock=time.monotonic, 
     # wait within the existing independent 3 s grip lease instead of aborting.
     deadline=clock()+2.8;since=None
     while clock()<deadline:
-        raised,_=admit(live,anchor)
+        raised,_=admit(live,anchor,**({'witnessed_hospital_ride':True} if witnessed_hospital_ride else {}))
         if healthy_life is not None and needs_recovery(raised['native'],healthy_life):
             raise HealthRecoveryNeeded('Damage takes priority while waiting for the native weapon cycle')
         audit=held_input_evidence(raised,ready_inputs,after_sample_ms=state['now_ms'])

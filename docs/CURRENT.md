@@ -6,6 +6,579 @@ left-arm HUD popups, and the left-hand iDroid requested on October 4. Pause uses
 panel. Floating firearm aiming overlays stay off. No desktop/input automation
 or Steam shutdown is needed by the local workflow.
 
+## October 14 recovery checkpoint
+
+The 1.0 source work survives the interrupted `Find mod download count` task.
+The published October 11 source is commit `87e51f2`, still present on
+`origin/main` after a fresh fetch. Later implementation, tests, licensed
+controller/font assets, icons and acceptance documents had remained
+uncommitted; the recovery checkpoint on `codex/october-11-patch` preserves
+those changes in Git. Saves, owned game data and retained test evidence remain
+local in their existing private/ignored trees. The stray
+`cinematic-transfer-eye/` diagnostic directory is now ignored and preserved.
+
+At recovery, development DLL `0daabcf78b03` matched the working source and
+installed test game. Its October 14 build passed all 56 CTest groups and
+installer checks. `play/` still matches the published `experimental-2026-10-11`
+pin, DLL `3e6e3d6e9818`; `Play.cmd` restores that release, and `Play-Dev.cmd`
+selects checked development. No publication or pin promotion occurred.
+
+**Resume point:** repeat the corrected Mission 18 sortie/loadout spatial canvas,
+then complete its actual field objectives and reported results-to-cutscene
+handoff. The last retained run, `20261014T192109259237Z`, opened the left-hand
+iDroid in the Africa ACC (`40020`, story 33). Its action was observed, but
+visual review is pending and cleanup failed with `Observed action prerequisite
+changed`; the run remains failed and does not verify deployment. Recovery
+closed the exact recorded test session through `workspace.py stop-sim`,
+retaining Steam and restoring the per-game Meta runtime.
+
+The genuine fresh campaign is preserved at mission 1 checkpoint `2448458239`.
+The prologue reached results and mission 1 under requested damage protection;
+normal-difficulty completion remains open. Stationary mounted body views were
+reviewed on `92014e6012e5`; moving, larger leans, outfits and vehicle/cabin
+bodies remain open. Mission 1's handheld iDroid tutorial repeat also remains
+failed. [VR_1_0_POLISH.md](VR_1_0_POLISH.md) carries the full acceptance scope,
+and [MISSION_ACCEPTANCE.json](MISSION_ACCEPTANCE.json) records all 51 required
+missions with zero full-mission acceptance passes. Physical Quest acceptance
+remains pending. These are the continuing 1.0 obligations.
+
+October 14 mission coverage: `MISSION_ACCEPTANCE.json` records all 51 released
+TPP mission codes from the live native registry, excluding its 11 unavailable
+entries. Mission 18 (`10091`) has an explicit results/input/cutscene regression
+obligation. No entire mission or physical-headset pass is inferred from this
+inventory.
+
+Checked DLL `580e0afd8ff9` reproduced native score and Heroism in both eyes over
+the retained stereo surround. Retained `20261014T172413728112Z` visibly advanced
+Score to Heroism with VR Confirm; `20261014T172531428385Z` exited to actual
+`Seq_Demo_Bridge2`/clear state 4, although its immediate capture hit the authored
+black fade. `20261014T172634443183Z` observed native head/viewer movement in that
+scene; its forward eye pair is reviewed, with the authored dark/blurred world.
+The native cassette reward and vehicle report remained visible. Confirm in
+`20261014T174149617727Z` genuinely reached mission `10020`, story 1 and its
+loading confirmation. No desktop focus or progression writes were used.
+
+Native mission 1 Resume reached `Seq_Demo_ArrivalInAfghanistan`, then genuine
+horseback tutorials and `Seq_Game_RescueMiller`, checkpoint `2448458239`.
+The loading case's optional two-second attention capture rejected an authored
+fade before its outcome deadline. The bounded observer now retains such a
+noninteractive, neutral authored fade and continues the same deadline without
+replaying input; its 296 bot checks pass. The iDroid tutorial-open repeat
+`20261014T175039775796Z` failed its expected handheld outcome and remains
+unaccepted, despite later native tutorial progression.
+
+Mounted inspection `20261014T175744358588Z` reproduced absent rider legs with
+visible tracked hands/sleeves. Its down-view eye pair is reviewed; a camera prop
+also appears as a floating grey box. Development now admits an original-skin
+horse body with native saddle/pelvis/leg animation, limited spine/arm solving
+and the existing 2 cm eye bound. It does not apply on-foot grounding or head
+turning to the rider's lower body. This change still needs the actual-game
+repeat; vehicle/cabin bodies and the camera prop remain separate open defects.
+The owned test session was closed with Steam retained and no test menu open.
+
+Checked DLL `92014e6012e5` genuinely reloaded the saved mission 1 checkpoint.
+Mounted run `20261014T180946420591Z` retained an admitted body in four down/side/
+8 cm lean phases, with at most 8 mm anatomical eye displacement. All eight
+eye images were reviewed: visible native poncho/body and connected hands/sleeves;
+the earlier right-side camera fallback no longer floats there. Moving, larger
+leans, other outfits, vehicles and cabin bodies remain unaccepted.
+
+The existing `helicopter-rewards-user-20261011` profile has native story 33 and
+all 51 released missions open, including `10091`. It was loaded for direct
+Mission 18 testing; the genuine fresh mission 1 profile remains preserved.
+Retained VR menu runs `20261014T182648000323Z`, `20261014T183415809591Z`,
+`20261014T183709804442Z` and `20261014T183922775024Z` closed the real Choose a
+Rival Help, selected the visibly confirmed 18: Blood Runs Deep and accepted it.
+Native landing-zone confirmation reached `Seq_Game_MissionPreparation_SelectItem`.
+Settled both-eye run `20261014T184533245258Z` exposed the loadout UI stretched
+into the cabin and a wrong backdrop. Development now classifies those exact
+native sortie states as a complete native spatial canvas, retaining active
+3D scene ownership and the established handheld iDroid. Actual sortie repeat,
+Mission 18 objectives and its reported results handoff remain pending.
+
+## October 13 fresh campaign and body motion
+
+October 14 continuation: actual native traversal cleared the lobby rubble and
+the QTE in retained run `20261014T125836680908Z`, then naturally reached the
+ambulance, outside and `Seq_Game_VolginRide` checkpoint `1787647407`. The chase
+driver was aborting on an unspent shot and lowering the weapon between pulls.
+Retaining its physical grip through the initial gun handoff and between pulls
+produced twelve observed native discharges and shell reloads in recorded run
+`20261014T144339620170Z`; native shot logs retain `barrel_dot=1`. That attempt
+died and does not accept the chase. Development adds the original native gun
+aim target as a read-only observer and honors requested God mode only in the
+actual hospital combat ride. Hospital lesson damage and retail sequence/event
+ownership stay intact. Current chase completion and normal-difficulty aiming
+remain pending. Earlier temporary hospital scripted-failure suppression was
+removed; it is not active in this session. Published `play/` remains unchanged.
+
+On checked DLL `37e63eff3eae`, the requested native damage protection kept
+Snake alive and the game naturally entered `Seq_Demo_Bridge`, advanced story
+to 1, established Cyprus clear type 11 and selected next mission 10020. It
+then remained in native `MISSION_GAME_END` with loaded result resources and
+an ended scene while VR still classified the screen as a stale cinematic.
+The captured eye was black. Development now recognizes the native end UI
+from its public phase, definite clear and loaded result queries, retaining
+active 3D and recorded cinematic ownership. This is a reproduced transition
+defect; its actual-game repeat and the next mission remain unaccepted.
+
+The live original-renderer comparison in `20261014T165310133151Z` exposed the
+actual Heroism result page and its A: Exit Results control. Immersive VR was
+restored; the comparison's final hidden-editor inspection hit a null rendered
+publication and remained failed. The following genuine VR Confirm in
+`20261014T165539771392Z` advanced native clear state to `SHOW_CREDIT_END` and
+`Seq_Demo_Bridge2`; its old held-phase assertion failed after that real change.
+Retained run `20261014T165921013669Z` observed the subsequent native 3D scene
+with independent head/spectator motion and video; visual review remains pending.
+Development now sends native mission-end canvases through the same retained
+stereo-world/native-screen path used by other non-world surfaces, leaving
+immersed 3D scenes under their existing owner. The current repeat is pending.
+
+The hospital bot now reads hash-checked owned NAV2 topology and trigger bounds
+for floor-aware A* routes. It follows every intermediate node, measures progress
+toward the current node, and remembers failed directed edges for five minutes
+before replanning. Player roots above the floor no longer select isolated bed
+nodes. Sparse nodes beyond a trigger are allowed when the actual route crosses
+its volume. The stair route uses the witnessed hospital root-to-floor offsets
+and native edges between both floors. Ordinary VR stick input remains the only
+movement actuator; collision and actor transforms are unchanged.
+
+The user explicitly requested God mode for campaign debugging. The personal
+setting is now On. The existing release excludes hospital damage protection,
+so this live test also uses a temporary hospital-only damage owner and scripted
+failure guard. These are debug runs, not normal-difficulty or release acceptance.
+Run `20261014T000909465393Z` entered the actual soldier encounter and genuinely
+saved checkpoint `2024168408`; run `20261014T001736179650Z` reached the Stairway
+cinematic. Run `20261014T010001480002Z` traversed both stair flights and entered
+`Seq_Demo_Corridor0`; both captured eyes were reviewed with visible actors and
+world. It naturally continued into `Seq_Game_Corridor1`. The owned Corridor1
+callback requires a VR movement cue; run `20261014T010536551461Z` started
+`Seq_Demo_Corridor1`, but its immediate capture was a black fade, so that case
+remains failed. Outside, horse/car handoff and subsequent reload checks remain
+pending. The normal-difficulty searchlight defect remains open.
+
+The saved hospital campaign was genuinely reloaded through VR Continue, and
+the stair traversal passed again in retained run `20261014T021057852109Z`,
+saving checkpoint `2981112761`. The Corridor1 movement cue passed in
+`20261014T021444473871Z`. Ended corridor scenes return real player control
+while their sequence names still start with `Seq_Demo_`; the bot now reads
+that actual control state and the native `canSkip` gate. Retained runs
+`20261014T025807605154Z` and `20261014T030425482881Z` advanced segments 1--6
+through the effective VR movement stick. The final curtain scenes completed
+naturally and saved checkpoint `2401495818`, reaching
+`Seq_Game_AfterCurtainRoom`. Only the Corridor2 after-eye pair has been reviewed
+in this newer segment chain; other visual acceptance remains pending.
+
+The curtain exit is traversed. The native graph's closest Volgin event node
+was disconnected; the planner now selects the closest reachable candidate via
+existing directed portals. Steering joins the published camera to its associated
+HMD pose. Posture changes update root-to-floor offsets; dense waypoints use a
+45 cm arrival radius and allow two bounded crawl-turn recoveries per waypoint.
+These changes preserve native collision, actor transforms and sequence ownership.
+
+Retained run `20261014T043316454905Z` crawled 7.48 metres from the ward corner,
+respected the native movement lock and entered the corpse-corridor trap. Its
+35-second scene expectation expired before the authored execution finished, so
+that run remains failed. `Seq_Demo_VolginVsSkullSoldier` then began naturally.
+Retained run `20261014T043517994527Z` verified head turns, physical lean and 39 cm
+of viewer movement with zero native actor axes. All twelve phase eye images were
+reviewed, with visible world, soldiers and bodies. The 7.37-second source-eye
+recording has a phone-sized H.264/AAC copy at
+`artifacts/dev/one-zero-current/hospital-scene-mobile.mp4`; it is a scene sample,
+not the requested complete showcase. Native foreground depth of field remains.
+The scene completed naturally and saved checkpoint `2088951606` in
+`Seq_Game_AfterCorridor`. Retained run `20261014T043936430296Z` healed the leg
+through the effective VR interact binding; native `mvars.cureFinished` also
+confirms the healing animation's completion.
+
+Retained run `20261014T045110569874Z` reproduced dropped VR stance in the native
+stationary standing mode. Development DLL `2eba47c8d6b7` retains on-foot
+stance/run/dive mapping there; the native game still owns its action masks.
+The 56 build checks and installer checks pass. Exact stationary-mode live
+retest remains pending. Ordinary crouch passed in scratch run
+`20261014T045954642733Z`, whose artifacts expired before retention; it is not
+retained acceptance evidence.
+Saved checkpoint reload passed through the native VR title/loading confirmations
+in scratch run `20261014T045752515606Z`; its artifacts expired before retention,
+so it is not retained acceptance evidence. The saved hospital disclosure requires a stable
+owner before its single A pulse; a premature pulse in `20261014T045540041508Z`
+was ignored and that run correctly failed.
+
+The post-corridor gate and both stair flights are traversed. Native inspection
+confirmed the authored closed-gate collision was already disabled; geometry
+was not changed. Retained `20261014T052057883866Z` passed the real gate opening.
+Retained `20261014T053935637105Z` aligned at the lower doorway's outer NAV2 node
+before crossing its jamb. Its later gun expectation failed at an NPC pause;
+that run establishes only the observed doorway movement.
+
+Retained `20261014T054111417785Z` followed eighteen connected lower-floor nodes
+and entered `Seq_Demo_GetGun` through 9.91 metres of actual movement. Its after
+capture caught the native black fade, so the case remains failed. The scene
+finished naturally in `Seq_Game_GunTutorial`, checkpoint `3803578635`.
+Retained `20261014T054813791197Z` passed physical pistol readiness; both held
+eye images were reviewed, with visible world, hands and authored gun.
+`20261014T055227482161Z` established three hand-aimed native discharges, seven
+rounds to four. Its prop-hit observer was wrong: `extinguisherFinished` is set
+by the next route trap, not proof of hitting the prop. That case remains failed;
+the diagnostic now calls this field `hospital_gun_route_unlocked`, and the
+shot helper explicitly reports discharge only. Extinguisher collision remains
+unverified.
+
+Retained `20261014T055922644267Z` followed the pistol-to-entrance route and passed
+`Seq_Demo_BeforeEntrance`; both after eyes were reviewed. The following entrance
+scene saved checkpoint `214801881`. Its dedicated cinematic test started after
+that scene had ended and correctly failed. The entrance hides Ishmael during
+sneaking, so owned-route navigation now reads the mission movement lock without
+requiring an NPC it is not following. The native main-hall stair route reached
+the bottom but cut across a railing. Retained `20261014T060721684177Z` passed the
+short player route beyond it. `20261014T060809243978Z` then passed the connected
+main-floor route into `Seq_Demo_HijackAmbulance`.
+
+Retained `20261014T060911680453Z` passed head turns, 12 cm lean and 38.47 cm of
+viewer movement during the ambulance ambush, with zero native actor axes. All
+twelve phase eye images were reviewed: the world, floating child and soldiers
+remain visible. Its 13.8-second source-eye recording is a progress sample,
+not the complete showcase or physical-headset acceptance.
+
+The ambush genuinely reached `Seq_Game_VolginInEntrance`, checkpoint
+`990761331`. The next evade prompt requires walking into `trap_HeliRotor`;
+waiting for it was an operator error. Volgin completed his fatal grab while
+the operator inspected data. Debug damage protection retained 6000 health but
+did not prevent the native death animation, so subsequent movement failed.
+The bot now reads that native fatal-attack flag and refuses movement rather
+than mistaking protected health for a usable actor. The owned temporary guard
+was removed and the session closed for a genuine checkpoint reload. Its six
+blocked GunTutorial failures mean these runs are campaign debugging only.
+Normal-difficulty prologue, evade, hospital exit, car/horse handoff, subsequent
+reloads, all missions and physical Quest acceptance remain open. The published
+play pin remains unchanged.
+
+The field body correction on DLL `ed5ce9e88d7b` passed 96 fixed-hand head-turn
+samples across standing and prone, with no rejected body and a maximum eye
+component error of 0.733 mm. All sixteen head-turn eye images and all sixteen
+standing/crouched/prone/lean/walk eye images in retained run
+`20261013T144526899192Z` were reviewed. Prone torso heading now follows the
+native crawl heading. The fixed-neck solve advances the rendered pelvis by
+only the minimum required clearance, bounded to 12 cm, while retaining the
+original foot targets. Unexpected overhead gear in the rightward prone view
+still needs its own correction. This is one field body/outfit, not complete
+body or physical-headset acceptance.
+
+The user explicitly authorizes accepting first-launch agreements and using
+disposable campaign saves. The six original save files remain backed up;
+continued test progress need not be rolled back between sessions. Genuine
+cleared-save startup exposed native mission 10010 during first-launch Terms,
+a 3D opening while retail TitleMode remains set, and a hospital title menu
+that bypasses the saved-game helicopter widget. The guarded startup reader
+now handles these exact native owners through the effective VR bindings.
+Retained run `20261013T154044028662Z` reached the first hospital title on DLL
+`e0cd10465c37`; both actual START GAME menu eyes in
+`20261013T154757255671Z` were reviewed. Retained run
+`20261013T154848295896Z` confirmed START GAME through VR and entered the actual
+hospital campaign without writing story or sequence state.
+
+All twelve acted-scene eye images in `20261013T154923145244Z` were reviewed:
+the doctor and world remain visible during head turns, a 12 cm physical lean
+and 41 cm of viewer movement, with zero native actor-control axes. The bed
+view also exposed foreground geometry clipping. Looking upward in retained
+run `20261013T160157618627Z` reached `Seq_Game_FewDaysLater1` but left the
+retail look history at zero and did not advance the lesson. This is a failure,
+not prologue completion. The locally owned lesson bytecode confirms the native
+right-stick history and greater-than-0.5 direction threshold.
+
+The two-second physical head-look gesture passed in the actual hospital on
+DLL `cc2182251e28` and again on `0bc5c0cb8ddf`. Retained run
+`20261013T171822548115Z` entered `Seq_Demo_FewDaysLater2` through the retail
+lesson outcome, with no story or sequence writes. All eight eye images were
+reviewed. Near-head concealment still did not remove the foreground obstruction;
+that visible defect remains open.
+
+The native name/birthday form previously lost its authored scene owner after
+the instruction popup closed. Candidate `0bc5c0cb8ddf` preserves that exact
+hospital profile owner, its native body animation and its spatial menu.
+Both form eyes in retained run `20261013T172106652105Z` were reviewed. Selecting
+Enter Name through VR in `20261013T172621139128Z` opened the native text editor,
+but its expected popup observation was wrong; that run is not a completed
+name-entry pass. The native form still requires text input.
+
+Development candidate `cc52a0345ef4` entered AHAB through the controller-operated
+keyboard and the verified retail Fox character/down/up path. Retained runs
+`20261013T182456338863Z` and `20261013T182559257520Z` show five balanced down/up
+events and ten conversions; both after-eye pairs were reviewed. Native profile
+confirmation then advanced into the one-week-later scene and the actual
+`Seq_Game_AvatarEdit` checkpoint. Keyboard occlusion remained a visible failure.
+
+Candidate `3056df4c8304` moves that keyboard into a final compositor layer with
+matching physical hit targets and submission/ownership guards. Its new keyboard
+visibility repeat is pending. The original avatar preview was reproduced as a
+broken narrow strip in retained run `20261013T183946188177Z`. Preserving the
+native editor's own camera restores its complete preset grid and live head
+preview. Retained runs `20261013T185355708367Z` and `20261013T190044728082Z`
+show Resume Game and VR preset Confirm working; both after-eye pairs were
+reviewed. The editor still had a black surround and an oversized portrait canvas.
+
+Checked candidate `1043b4c09aa0` separates a clear-scene stereo backdrop from
+live fade frames, blurs that retained backdrop, and crops the native centered
+16:9 editor canvas without stretching it. Retained editor runs
+`20261013T192526145968Z`, `20261013T192928857966Z` and
+`20261013T193232823297Z` show the full preview, physical controls and anchored
+panel in both eyes. The retained bed image stays head-locked during head turns;
+that surround is still a visible failure. Avatar confirmation legitimately
+advanced through Quiet's appearance/exit to `Seq_Game_EscapeFromAwakeRoom`.
+The named Quiet demo was incorrectly classified as ordinary gameplay because
+retail marks it playable. The classifier now preserves named acted scenes;
+its actual Quiet repeat remains pending.
+
+Candidate `b8fe59e6bbd9` fixes the reported hospital hair/bandage obstruction.
+The owned hospital body has an integrated head, restored by each successful
+body publication; the separate `msk0_main0_cov` face cover has no head group.
+The admitted skin now conceals the integrated head after restoring the body,
+and the exact owned face cover is included in modular concealment. Only normal
+draw membership changes; native shadow bits, torso and arms are retained.
+Genuine saved-game Resume in retained run `20261013T195650118957Z` returned
+directly to the hospital crawl with a clear view in both eyes. All ten after-eye
+images in `20261013T200102842571Z` were reviewed across opposing 22-degree head
+turns, looking 40 degrees down, an 8 cm lean and return. Both movement eyes in
+`20261013T200348377788Z` were reviewed after 35.1 cm of native crawl displacement
+through the effective physical movement axis. The obstruction stays absent,
+and the body and head shadow remain visible. The bounded runner now recognizes
+this exact hospital crawl lesson despite retail `NORMAL_ACTION` being false;
+other incapacitated owners remain refused. The receipt is
+`artifacts/dev/one-zero-current/head-obstruction-after/verification.json`.
+
+The campaign has since genuinely advanced through `Seq_Demo_Heli` and
+`Seq_Demo_Volgin` to `Seq_Game_AfterVolginDemo`, checkpoint `2474680955`.
+The runner's new crawl helper originally scheduled asynchronous stick input
+and released it immediately; it now holds and observes the requested interval.
+The hospital rail executor reads the retail rail state, follows the actual
+native body heading at turns, carries the simulated hands with that body turn,
+renews independently expiring input, measures progress, and releases on scene
+handoff. Two bounded released recoveries precede a reported obstruction; it
+never disables collision, changes the rail, writes transforms, or opens Pause.
+Retained run `20261013T204225226670Z` advanced 8.0 metres in 20 seconds with no
+recovery. Its expected cutscene name was wrong, so the case remains failed;
+the actual next scene was Volgin. Both captured cutscene eyes were reviewed:
+Snake's complete native actor and Ishmael are visible in the stereo corridor.
+The prologue is still incomplete. The rail runner now admits the witnessed
+retail crouch/stand states as well as crawling, and releases movement while
+reacquiring a delayed same-owner rig. Retained run `20261013T211230936459Z`
+advanced another 8.98 metres in 16.34 seconds with zero recoveries, naturally
+entered `Seq_Demo_Cure`, and passed the native scene handoff case. Both final
+eyes were reviewed: Snake and Ishmael remain visible in the hospital world.
+An earlier turn in `20261013T210353598527Z` stalled rig publication and produced
+camera reason 8; movement was released. That renderer interruption remains an
+acceptance gap even though the next run resumed and the bot now has bounded
+released recovery. The locomotion suite has 44 passing checks, including real
+hold duration, early cinematic release, full-interval observation and rail
+posture/delayed-publication guards.
+
+Retained Cure viewing run `20261013T211340127914Z` completed head turns,
+12 cm physical lean and independent viewer input with neutral native actor
+axes/buttons. All twelve final-eye images were reviewed. Actors and world
+remain visible; authored depth of field blurs the nearer actors in several
+phases, so this is not crisp-image or complete cinematic acceptance.
+The campaign genuinely saved checkpoint `1550134470` and resumed into
+`Seq_Game_EnterSmokeRoom`. Reviewing captures while that live scene was idle
+led to native game-over; genuine VR Continue/Start Mission recovered the
+checkpoint. Recovery and motion are now queued together.
+
+The owned smoke-room sequence explicitly requires CRAWL, and the effective
+VR stance hold passed the real prone transition in subsequent runs. Direct
+steering to Ishmael was obstructed. A bounded corridor waypoint in
+`20261013T214003067799Z` passed the observed entrance and approached the real
+Ishmael actor, but Snake returned to crouching and movement stopped. The next
+run `20261013T214408685866Z` tried two bounded VR prone requests and stopped
+for review without completing that native handoff. These smoke-room runs
+remain failed; the route and stance/mask handoff are not accepted. The bot
+records an obstruction and releases for replanning instead of repeatedly
+renewing the same free-movement edge. No collision, actor transform, story
+or sequence state was changed by these executors.
+
+The supplied `02_controller_rig.patch` targets an older controller rig. Current
+development already retains complete grip/aim presentation pairs through idle
+tracking loss and blends recovery for 100 ms, scoped to owner/model/camera and
+OpenXR reference/focus epochs. Raw tracking remains separate from presentation.
+Run `20261013T204722318319Z` correctly refused to arm without the explicit
+diagnostic session flag. The subsequent retained run `20261013T210220765734Z`
+on DLL `b8fe59e6bbd9` injected five seconds of right grip/aim raw tracking loss
+in the actual hospital. Both cases passed. Forty-five observations over a
+continuous 6.047-second interval included loss and recovery; every sample kept
+first person active, suspension off, camera reason zero, the right palm tracked
+for presentation, and body rejection zero. Raw grip/aim tracking recovered.
+Both eyes during loss and after recovery were reviewed with a connected right
+hand/forearm and visible world. See
+`artifacts/dev/one-zero-current/right-controller-loss-verification.json`.
+This stationary simulator diagnostic does not verify physical Oculus controller
+inactivity, locomotion during loss, or other modes. The supplied patch has not
+been applied wholesale; existing production tracking behavior is preserved.
+
+The subsequent hospital run recovered the owned `s10010_sequence.fox2` trigger
+bounds and imported both native Cyprus stage navigation tiles. Following
+Ishmael directly was the wrong route: it led into a counter or an occupied
+scripted detection region. Native floor nodes now guide the side-room doorway.
+Run `20261013T224525256939Z` genuinely entered `Seq_Demo_UnderBed`; the old
+executor rejected a legitimate scene change during fresh-rig acquisition.
+That handoff is now checked again after acquisition, and scripted movement
+locks keep inputs released during a bounded wait. The focused locomotion suite
+has 47 passing checks. These Python changes do not alter production hand tracking.
+
+The effective VR crawl stick advanced the real `Seq_Game_UnderBed` cue to
+`Seq_Demo_UnderBed2` in `20261013T225101556830Z`. Its immediate capture was a
+black fade and is not visual acceptance. The native campaign then saved
+checkpoint `2498716581` and entered `Seq_Game_EscapeFromSmokeRoom`.
+Its initial `INTRUDE`/`SUBJECT` crawl constrains heading. Run
+`20261013T225829620190Z` passed a bounded physical diagonal crawl with actual
+native displacement. Subsequent backward VR movement in `20261013T230348359204Z`
+cleared the bed constraint, and native movement in `20261013T230709674225Z`
+reached the helicopter encounter and saved checkpoint `4085983624`.
+The rest of the hospital remains pending. Raised bed-top navigation nodes must not be used as
+the supporting floor for this crawl. No actor, collision, story or sequence
+state was written. Failed exploratory routes remain failed.
+
+A new player report describes VR input ceasing after Mission 18, Blood Runs
+Deep: repeated desktop clicks are needed before VR A can advance successive
+results screens. This specific results/loading/cutscene input handoff still
+requires an actual Mission 18 reproduction. The delivered-XInput audit can
+distinguish continued XR polling from a stalled native poll or incorrect
+action owner. No desktop focus workaround has been added.
+
+All 56 automated groups and installer checks passed for this runtime candidate.
+Recorded-movie presentation, the head-locked editor surround, the compositor
+keyboard repeat, full prologue/mission coverage, remaining body variants and
+physical Quest acceptance stay open. Both local launch slots remain available;
+the published `play/` pin is unchanged.
+
+## October 12 headset controls editor
+
+Development adds a context-aware spatial controller editor. Hold Menu + left
+thumbstick click for 650 ms, select an action, record a physical button/chord or
+stick axis, and confirm the proposal. The live native mode selects the action
+list; other modes can be inspected explicitly. Licensed 3D Quest controller
+drawings highlight assigned, pressed and touched inputs. Parser conflicts,
+external-edit protection, neutral live application and the closing input gate
+keep the working personal layout intact. Read [the controls](HEADSET_CONTROLS_EDITOR.md).
+Retained simulator run `20261013T004804322796Z` verifies ACC opening, both-eye
+head movement, physical chord recording, cancellation, confirmed live remapping,
+conflict rejection, closing and reopening, and automatic binocular mode. The
+saved binocular binding equips the physical prop after closing the panel.
+Driving was inspected explicitly from ACC; that is not a native driving pass.
+The final checked-DLL and cleanup receipt is kept in
+`artifacts/dev/controls-editor-current/verification.json`. Physical-headset fit
+and broader mode/mission acceptance remain open. The published play pin stays unchanged.
+
+## October 12 camera gallery, Freeze and ACC grip routing
+
+Development adds physical rear Back, Next, Print, Delete, Live and Freeze
+controls to the camera. The latest presentation uses small arrows, printer,
+trash, camera and pause/play icons, keeping the existing press targets and
+hover feedback. Delete asks first with check/X confirmation buttons.
+The saved-photo library is separate from physical prints: deletion preserves
+every printed copy and its own caption, drawing and placement. Notes have no
+digital history; Trash asks before permanently disposing of the current object.
+The shared library supports the launch cabin, native ACC and ordinary fields,
+including Mother Base. Read [the camera controls](CABIN_STUDIO.md).
+
+Freeze registers only the mod's `MGS5VR_Camera` native world pause. A previously
+accepted native camera/player anchor is retained while current OpenXR eyes and
+native tracked skin continue publishing. The lens and held props consume that
+same completed skin. Resume/stow release the pause; focus/tracking/scene loss
+also cancel the request. Ordinary photos leave the world live. The title cabin
+does not offer world Freeze. No stock Pause menu is opened by these controls.
+
+The reported ACC right-grip leak was reproduced as native aim trigger 255.
+Ordinary ACC grip now consumes stock aim/fire triggers while the physical VR
+binocular equip, hand aim, zoom, acquisition, explicit mark and stow paths are
+preserved. The dropped camera's repeated room conversion also accumulated
+quaternion drift and prevented later pickup; stored rigid transforms now retain
+unit rotations.
+
+Retained actual-game runs cover title gallery/deletion (`20261012T225613720658Z`),
+fresh title reload (`20261012T230333328503Z`), ACC Freeze (`20261012T230738812387Z`)
+and ACC gallery/note disposal (`20261012T230818831460Z`). On DLL `137e40b62b47`,
+field mission 10195 (`20261012T231500469722Z`) held native clock 76684 unchanged
+through opposing head/camera motion and a photo; Resume advanced 76688 to 76700.
+Mother Base 30050 (`20261012T231848654031Z`) passed live photos, browse/reprint,
+Confirm/Cancel, digital deletion preserving prints, and physical field-print
+pickup/stow. Both eyes of those motion/control/print checkpoints were reviewed.
+Fresh native ACC reload (`20261012T232347216217Z`) restored the exact five saved
+photos and eleven physical prints without reviving deleted photos or notes.
+Final ACC run `20261012T232525121439Z` on that DLL held right grip with zero
+native aim/fire triggers and stock BINOCLE false, then equipped/stowed the
+physical VR binoculars. Both-eye stowed and equipped pairs were reviewed.
+
+The earlier word-button phone video is `artifacts/dev/camera-manager-current/MGS5VR-Camera-Phone.mp4`:
+22.152 seconds, 720 x 1280, 76 actual right-eye frames in two labeled takes.
+Every source frame was reviewed. Capture cadence was 3.4--3.5 fps; the silent
+portrait edit keeps original timing without cropping or interpolating gameplay.
+This does not certify high-rate motion, physical headset ergonomics, every
+mission or whole-game acceptance. `build/dev/` is the checked candidate for
+`Play-Dev.cmd`; the published `play/` pin stays unchanged. The final receipt is
+`artifacts/dev/camera-manager-current/verification.json`.
+
+## October 12 physical cabin props and hand contact
+
+Development replaces the floating cassette rack/radio with six physical tapes
+on the native brown seat and insertion/ejection at the helicopter's existing
+embedded player. The separate cutscene player is no longer drawn as a duplicate.
+Tape weight/contact, casing labels, pickup, drop/recovery and native Continue
+are implemented. The embedded lid's native animation binding remains unknown.
+Read [the workbench controls and limits](CABIN_STUDIO.md).
+
+The reported detached camera/paper hand presentation was reproduced. New held
+props followed the raw controller after the anatomical arm had limited its
+reach or contacted a surface. Camera, marker, papers and held tapes now join
+the solved native palms in the same skin publication. Camera contact uses an
+authored side socket; paper uses an edge grip and appropriate finger curl.
+Native firearm wrist aiming no longer overrides a held studio prop. A separate
+quad triangulation error caused half-missing box faces and was corrected.
+The native left bionic iDroid and left forearm HUD retain their existing fit.
+
+The mod-authored instant camera uses its actual lens for a separate native
+scene pass, live finder and PNG/physical print; its shutter consumes firearm
+input. Notes support Permanent Marker captions, spatial keyboard and freehand
+marker strokes. Papers attach/detach on the measured native photo wall and
+persist with their photos, captions and drawings outside MGSV save files.
+Props use verified depth from the matching native eye camera/projection.
+World enemy labels are masked by the physical binocular housing; the native
+acquired marks and reticle remain in the actual optic.
+
+Retained workbench run `20261012T191009165360Z` on DLL `7cf6b1b01747` passed all
+16 functional phases, with both camera and board eyes reviewed. Later DLL
+`369a855abe1c` enlarges short captions. Its fresh-launch board run
+`20261012T193243872218Z` restored the exact pinned note/drawing/Polaroid in both
+eyes. Field run `20261012T193635692919Z` passed native Continue, zoom/acquire,
+clear with no automatic return mark, explicit moving-target re-mark and a real
+field photograph with no native weapon trigger. The clear/return/zoom/mark and
+camera pairs were reviewed. Run `20261012T193959514809Z` additionally reviewed
+left-hand iDroid contact at two reachable poses, ordinary stow and immediate
+reopen in both eyes. These are scoped simulator checks, not physical headset,
+every wrist angle, every mission or all foreground-occlusion acceptance.
+
+The bot now approaches native furniture before reaching, refreshes the cabin
+anchor after motion and preserves measured grip/aim pairs. Binocular captures
+retain the sampled left support grip; the free hand rests below the camera
+after stow. Earlier failed or unnatural test poses remain investigation data.
+No production binocular or iDroid flow was replaced by stock gamepad operation.
+
+The [owned item catalog](ITEM_CATALOG.md) indexes 15 asset archives and five
+media files with zero scan errors: 780 equipment definitions, 139 item-folder
+models and 416 animation resources. It retains variants, rigs, references and
+scoped interaction observations, and exposes unverified behavior/clip bindings.
+No native instant-camera model has been confirmed. The searchable private view
+is `private/item-catalog/index.html`; it is not release game data.
+
+The game and Config icons use the supplied Snake portrait with a VR headset,
+exactly one VR (red V, ivory R) and a gear badge for Config. Matching icons are
+embedded in the launchers and used by the local shortcuts. The desktop preview
+remains 1280 Ã— 720. This simulator uses its 1680 Ã— 1760 eye recommendation and
+runtime FOVs; its enclosing native canvas is 2368 Ã— 2576. Historical 2520 Ã— 2640
+checks below describe earlier settings, not a headset requirement.
+
+`build/dev/` contains the checked candidate for `Play-Dev.cmd`; `play/` remains
+the last published `experimental-2026-10-11` payload for `Play.cmd`. No release
+or play-pin promotion is authorized by this development work. The final local
+verification receipt is `artifacts/dev/world-contact-current/verification.json`.
+
 ## October 11 field iDroid and combat preferences
 
 D-Dog's cabin disappearance is corrected on checked development DLL
@@ -23,7 +596,7 @@ Actual native enemy fire left health at 7,801 with god mode On and reduced it to
 7,330 after Off. Marker On/Off/On and head-motion outcomes were reviewed in both
 eyes with no native world recon silhouette shader. A stable native obstruction
 blocked the VR pistol trigger with cover blocking On (10 rounds unchanged); Off
-allowed the shot (10 → 9). These are scoped simulator checks.
+allowed the shot (10 â†’ 9). These are scoped simulator checks.
 Combat and page-loop takes used `e1dc46d11bc7`; the later candidate retains
 those implementations and adds an exact handset pad-owner diagnostic. Its build passed
 55/55 automated groups (including actual shader marker pixels) and installer
@@ -68,7 +641,7 @@ Ordinary hands, the bionic forearm, iDroid and physical binoculars retain their
 existing behavior. Visibility restoration uses the existing owned-model lease.
 
 The normal NVG model passed actual-game simulator checks in both eyes: clear
-view while on, yaw ±45 degrees, pitch ±35 degrees, positional lean, native None
+view while on, yaw Â±45 degrees, pitch Â±35 degrees, positional lean, native None
 selection to turn off, and immediate native re-equip. The retained 35-second
 composited-eye video contains 102 actual frames (about 2.89 capture fps); that is
 capture cadence, not game frame rate. Both-eye images and the decoded video were
@@ -123,10 +696,11 @@ Receipts are in `artifacts/dev/meta-openxr-default-elevated-result.json` and
 ## October 11 published pin and testing candidate
 
 `play/` retains the last successfully published release and its matching
-launcher. The current pin is `experimental-2026-10-10.1`, DLL `ba5c0ccbf406`;
+launcher. The current pin is `experimental-2026-10-11`, DLL `3e6e3d6e9818`;
 its recorded archive SHA-256 matches the published GitHub asset. `Play.cmd`
 verifies and restores that slot before launching with the saved Meta OpenXR
-headset runtime. All 394 recorded pin files verified on October 11.
+headset runtime. The published pin remains separate from October 12 workbench
+and camera development; local tests never authorize replacing it.
 
 `build/dev/` holds the latest completed, checked candidate recorded in its
 `BUILD.json`, for testing with `Play-Dev.cmd`. Both launch paths are available
@@ -393,7 +967,7 @@ Exactly two builds are retained: `play/` stays the selected `6ac2` pin and
 The current result, exact identities, retained runs and cleanup status are in
 `artifacts/dev/readiness-current/report.json`.
 
-## October 10 original pinned-build simulator check — blocked
+## October 10 original pinned-build simulator check â€” blocked
 
 The pinned `6ac226f4bf2c` DLL was tested in the real Meta XR Simulator before
 headset handoff. **Do not call this candidate release-ready or headset-accepted.**
@@ -421,7 +995,7 @@ that recovered session. Held wrist-popup visual acceptance, weapon sight/hit
 alignment, binocular acquisition/marking, sustained soak and headset comfort
 remain unproven by this check.
 
-During the recorded clean run, logged fresh stereo rates were 77.0–86.5 FPS
+During the recorded clean run, logged fresh stereo rates were 77.0â€“86.5 FPS
 (window median 81.4) against the 90 Hz simulator runtime. Concurrent source-eye
 and compositor recording was active; these figures do not establish physical
 headset performance or an unrecorded baseline. Performance remains unaccepted.
@@ -949,7 +1523,7 @@ placement rather than departure. The free-roam route remains unresolved.
 An isolated save fixture is used for firing, vehicle and emplacement checks;
 the user's exact prior save is preserved as `before-cockpit-arsenal-audit`.
 Retained `20261004T101905227429Z` reviewed native Continue, a readable
-`A — Resume Game` loading card and entry to Afghanistan free play. The first
+`A â€” Resume Game` loading card and entry to Afghanistan free play. The first
 weapon inspection in retained `20261004T102059202073Z` failed its unsupported
 assumption that the selected AM M48 must publish a tracked round scope. It
 does not establish a missing fitted sight. Gun readiness/firing and optic
@@ -958,14 +1532,14 @@ vehicle subtype, enemy mortar/turret and physical headset acceptance remains
 open until its actual native use and visual outcome are retained.
 
 Retained `20261004T104632827998Z` confirms native ammunition changes after
-bounded VR ready/trigger input: AM M48 198→194, SVG-76 31→28 and WU S.PISTOL
-9→8. Their held firearm and released wrist presentations were reviewed in both
+bounded VR ready/trigger input: AM M48 198â†’194, SVG-76 31â†’28 and WU S.PISTOL
+9â†’8. Their held firearm and released wrist presentations were reviewed in both
 eyes. A small-number reading error was corrected with an inspection crop:
 the M48 wrist display correctly shows 194/400; no stale-display repair was made.
 Scratch IDs calling the SVG-76 an MRS-4 are corrected by its actual visible
 name in the review manifest. This establishes these discharges, not impact,
 hand/sight alignment, every variant or every optic. The SVG-76 fixture publishes
-native optical powers 1×/2× with no admitted scope portal. Native CNP queries
+native optical powers 1Ã—/2Ã— with no admitted scope portal. Native CNP queries
 now consider every listed power; unknown geometry still requires calibration.
 
 The bot's owned small-block navigation import now contains 659 Afghanistan
@@ -1049,7 +1623,7 @@ observer records actual XInput returns, separately retaining index zero, exact
 packet values, caller, source and timestamps. It changes no input mapping or
 gameplay mask. The new bot binocular presentation preserves the measured
 grip/aim pairs, places the left hand at the authored support cup and samples
-head/hand movement instead of the previous 133–162 degree single-packet turns.
+head/hand movement instead of the previous 133â€“162 degree single-packet turns.
 Live support, motion and eye acceptance remain pending.
 
 Retained `20261004T194951821331Z` published full physical/mapped forward input
@@ -1142,7 +1716,7 @@ The corrected private fixture uses `pause=false` and retains all other guards.
 
 Retained `20261003T114817998847Z` passed 12 tracking state cases, including
 five independent injected raw-pose loss/recovery periods after iDroid opened.
-The measured loss holds span 5.500–5.891 seconds; loss observations remain
+The measured loss holds span 5.500â€“5.891 seconds; loss observations remain
 inside the eight-second leases. All ten loss and ten recovery PNGs were
 reviewed, showing both arms, the full-size phone, Map and world. The audit
 confirms restored raw tracking flags, stable activation/epoch, active/focused
@@ -1679,7 +2253,7 @@ the graph-root measurement is not a claim of a 100% cinematic display match.
 | Stop making dated local distributions | Implemented; 37 old generated folders/archives removed, 2.904 GiB reclaimed. |
 | Keep Steam running; no computer control | Preserved throughout this work. Only owned test sessions and explicitly authorized unused simulator helpers are closed. |
 | Left bionic forearm weapon display and ordinary HUD | Restored authored layout; both eyes and head/hand motion reviewed on the display baseline. Physical headset reading and every HUD context remain open. |
-| Crisp high-resolution VR, stereo; desktop 720p | Native 2520 × 2640 per eye, distinct updating final eyes, desktop 1280 × 720. Continuous physical refresh and comfort remain open. |
+| Crisp high-resolution VR, stereo; desktop 720p | Native 2520 Ã— 2640 per eye, distinct updating final eyes, desktop 1280 Ã— 720. Continuous physical refresh and comfort remain open. |
 | Stop simulator blinking and stale test loops | Large swapchain failure repaired; decoded-eye blank/freeze checks and bounded cleanup implemented. Reviewed recordings contain no observed blank frame; sub-sample flicker is unproven. |
 | Pause and optional off-wrist HUD as spatial stereo | Paired off-wrist baseline passes retained. Current iDroid build passes native pause open/close and both-eye review. Physical headset and all off-wrist contexts remain open. |
 | Optional scope stabilization | Installed at personal 100 ms; measured sampled-grip yaw jitter fell 72.5%. Public default remains off. Physical comfort and sight/muzzle/hit checks remain open. |
@@ -1728,15 +2302,15 @@ personal INIs retain their recorded hashes.
 
 The display baseline DLL is `f8dda93e8d1d4aec`. All 38 automated
 checks and the installer transaction checks passed on that baseline. Fresh Mission 6 gameplay at
-**2520 × 2640 per eye** now produces updating, distinct final compositor eyes.
+**2520 Ã— 2640 per eye** now produces updating, distinct final compositor eyes.
 The compact readout is back on the **left forearm**, with readable weapon,
-ammo and suppressor text. The fix restores the native HUD's authored 128 × 72
+ammo and suppressor text. The fix restores the native HUD's authored 128 Ã— 72
 layout; it does not move arm bones or replace personal bindings.
 
 Both final eyes were inspected through wrist translation/rotation and opposing
 head/hand motion. Four 24-second recordings contain 308 decoded, distinct
 frames with no blank frame or detached readout observed. These are sequential
-left/right compositor captures at 3.0–3.4 samples/second, not synchronous stereo
+left/right compositor captures at 3.0â€“3.4 samples/second, not synchronous stereo
 video or a measurement of headset refresh. Flicker between samples, physical
 comfort and the rest of the game still require acceptance.
 
@@ -1910,11 +2484,11 @@ September 30 prerelease; it does not claim full-game acceptance.
 
 ## Display and test-loop recovery
 
-The desktop preview is **1280 × 720**, independently of VR quality. Preserve the
+The desktop preview is **1280 Ã— 720**, independently of VR quality. Preserve the
 active runtime's per-eye FOVs; a square target is not a substitute for correct
-optics. Meta XR Simulator v207 recommends 1680 × 1760 here. The current test
-renders native eyes at 2520 × 2640 (150% in each dimension) and filters each
-eye separately into fixed 1680 × 1760 simulator swapchains, in linear light.
+optics. Meta XR Simulator v207 recommends 1680 Ã— 1760 here. The current test
+renders native eyes at 2520 Ã— 2640 (150% in each dimension) and filters each
+eye separately into fixed 1680 Ã— 1760 simulator swapchains, in linear light.
 Physical runtimes retain the direct native-resolution path. This avoids the
 simulator's failed large-swapchain path without lowering native scene detail
 to desktop resolution. Earlier stale large-target takes remain failed evidence.
@@ -1945,3 +2519,98 @@ Historical display evidence and current iDroid evidence are pinned under
 The local build cleanup reclaimed 2.904 GiB from 37 generated distribution
 folders/ZIPs, retaining unique binaries and their inventory in
 `artifacts/dev/retired-builds`. Local iterations use the same `play/` tree.
+# October 12 live settings, body and camera repair
+
+Development adds the headset gear tab for all supported live VR gameplay
+settings and a VR on/off switch that keeps the panel available. Mapping
+retains its existing capture, conflict, confirmation and release ownership.
+The camera filter no longer reseeds from animation when two publishers share
+a timestamp; native PlayerStatus now owns stance transitions. On-foot body
+visibility requires a complete admitted native spine/arm/leg solve with
+camera clearance and native ground constraints. Cinematics preserve authored actor skins and add
+independent spectator movement in noninteractive shots. See
+`docs/NATIVE_BODY_VIEW.md` and `docs/HEADSET_CONTROLS_EDITOR.md`.
+
+The unchanged installed baseline's native posture roundtrip is
+`artifacts/bot/runs/20261013T010851425099Z`; walking sway samples are in
+`20261013T011336052710Z`. A fresh story profile stopped at the native Terms
+owner (`20261013T011650365936Z`), so it does not establish cinematic visibility
+acceptance. Current build, final-eye inspection and exact cleanup receipts
+are collected in `artifacts/dev/live-vr-body-current/`. The published `play/`
+pin stays unchanged. Full-body field, outfit coverage, seated avatars, complete
+cutscene sequences and physical Quest acceptance remain separate gates.
+
+On checked DLL `9c8ef2716159`, retained run `20261013T024522086164Z` applied and
+restored boolean, numeric and enum settings, switched VR off/on with the editor
+available, confirmed/cancelled a physical remap, rejected a conflict and equipped/
+stowed physical binoculars. Both eyes of sixteen setting/remap/VR checkpoints
+were reviewed; panel closure is supported by the native bot assertions. The
+previous VR-on duplicate automatic-entry toggle was reproduced and corrected.
+
+The measured owned eye fit removed the earlier stretched cloth and near-face
+intrusion in both eyes of all eight phases of `20261013T023620914011Z` on
+`2bbe736a023a`. The clearer `artifacts/dev/live-vr-body-current/eye-boots/`
+inspection on `9c8ef2716159` still failed lower-body visibility and exposed a
+near-169-degree pelvis/upper-body heading split. Coherent full-body render yaw
+and published anatomical eye diagnostics were exercised in retained eight-phase run
+`20261013T030910923796Z` on `11c8ba4614c5`. Eighteen final-eye images, including
+`coherent-body-boots/`, were reviewed: hands/sleeves remain connected, the old
+cloth tears are absent and the deeper view exposes both boots. Camera/body/grass
+still obscure sole-to-floor contact; large-lean clipping and physical comfort
+remain unaccepted. These field fixes do not admit seated or mounted bodies.
+
+The final eye diagnostics exposed 7--10 cm of head displacement: rotating around
+a fixed pelvis made the eyes orbit and exceeded the nearly straight native spine
+reach. The complete render pose now receives eye-centered yaw and translation
+before the limited spine/contact solve. Both early and final admission require
+an anatomical eye error at most 2 cm; failure retains the established hand rig.
+Native game actor movement/collision remain unchanged. The actual prone repeat
+then exposed a separate 107.6 mm eye-basis discrepancy: the cached camera HEAD
+transform and the actual animated bone-4 eye calculation agree in standing but
+differ in prone. The final correction supplies anatomical eyes from the owned
+original skin transaction rather than treating the cached camera basis as the
+animated head. A prone ankle above the eyes also needs a foot-specific native
+ray ceiling; arm/head contact policy stays unchanged. Floor contact, genuine
+stance transitions and body appearance still require the final actual-game
+repeat recorded in the verification receipt below.
+
+One legitimate loading Resume confirmation started native mission 10020's
+authored arrival scene and naturally returned to `Seq_Game_IDroidTutorial`.
+`artifacts/dev/live-vr-body-current/cinematic-native-arrival/` contains reviewed
+both-eye Snake/Ocelot visibility. The harness stopped at the changed sequence;
+that take does not establish spectator movement or complete scene acceptance.
+The later `cinematic-native-immediate-viewer/` take on `11c8ba4614c5` used that
+same natural arrival, with zero replay requests. All fourteen final-eye images
+were reviewed: native Snake/Ocelot/horse heads and bodies remain visible, HMD
+motion changes the framing and the return restores both hands without Pause.
+Four spectator-axis samples reached the viewer with fresh neutral retail XInput.
+The later `cinematic-final-immediate/` take on `efeb56da218e` confirms actual
+extra viewer translation: submitted follow offset moved 6.18 cm with fixed HMD,
+four real stick samples and fresh neutral retail gamepad delivery. It completed
+naturally and restored hands/controls without replay requests or Pause. Its
+authored dust obscures face detail; earlier clear actor pairs remain separate
+visual evidence. The result does not accept every movie or geometry clearance.
+
+The unheld field instant camera was reproduced at lower-chest height: its
+documented hip placement actually followed HMD yaw/position. It now joins the
+admitted right hip, with render and pickup sharing the same guarded LOCAL
+socket. Held camera, cabin resting/drop behavior, gallery and independent prints
+retain their existing paths. Unadmitted body frames retain the reachable fallback.
+The focused core contract passed; the actual-game repeat is recorded in the final
+`artifacts/dev/live-vr-body-current/verification.json` receipt. That receipt also
+records final development checks and exact save/settings/runtime/session cleanup.
+
+The practical whole-game queue is [VR_1_0_POLISH.md](VR_1_0_POLISH.md).
+
+The owned-eye repeat `20261013T044750075435Z` on DLL `7e4c780a36cd` completed
+all eight stance/lean/walking checkpoints, with both native terrain hits in
+prone and a maximum fitted-eye error below 0.5 mm. All sixteen eyes were
+reviewed: connected sleeves/hands and restored standing legs/boot tops, with
+the initial left inner strap triangles still unresolved. The requested prone
+side/down checkpoint retained a neutral head pose and supplies no prone
+torso/leg acceptance. Terrain-hit counts do not establish sole contact.
+The same DLL passed retained settings/remap/binocular run
+`20261013T045032866973Z` and physical camera pickup/release in
+`hip-camera-owned-eye/`. Held camera contact is clear in both eyes; storage
+was mostly hidden by the belt. An outward/front hip correction retains the
+measured native arm reach and is repeated in the final verification receipt.

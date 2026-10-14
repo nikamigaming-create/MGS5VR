@@ -22,6 +22,12 @@ return function(godSource, interruptionSource)
     check(run(godSource, env) == 'disabled', 'Title cannot acquire protection')
     env.gvars.ini_isTitleMode = false; env.vars.missionCode = 10010
     check(run(godSource, env) == 'disabled', 'Hospital authored damage remains retail')
+    env.vars.locationCode = 30; env.mvars = {doesPlayerVolginRide = true}
+    local sequence = 'Seq_Game_VolginRide'
+    env.TppSequence = {GetCurrentSequenceName = function() return sequence end}
+    check(run(godSource, env) == 'enabled' and owners.MGS5VR_GodMode, 'Requested God mode protects the native horse escape')
+    sequence = 'Seq_Game_GunTutorial'
+    check(run(godSource, env) == 'disabled' and not owners.MGS5VR_GodMode, 'Returning to a hospital lesson releases only the mod owner')
     local open, stops, failure = true, 0, false
     local interruption = {type = type,
         TppMission = {IsGameOver = function() return failure end},

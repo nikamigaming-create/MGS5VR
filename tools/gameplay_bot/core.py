@@ -199,6 +199,26 @@ def reviewed_action_contract(case):
     return step
 
 
+def neutral_authored_scene_transition(predicate, state):
+    """An authored fade can delay pixels; it never authorizes more input."""
+    native, controls = state.get("native") or {}, state.get("controls") or {}
+    if (predicate.get("demo") is not True or predicate.get("native.demo") is not True
+            or state.get("demo") is not True or native.get("demo") is not True
+            or native.get("demo_nonplayable") is not True
+            or native.get("game_over") != 0 or native.get("popup") is not False
+            or any(state.get(key) is not False for key in ("menu", "pause", "idroid", "loading", "gamepad"))
+            or controls.get("native_buttons") != 0
+            or type(controls.get("age_ms")) is not int or not 0 <= controls["age_ms"] <= 250):
+        return False
+    for key, count in (("physical", 11), ("sticks", 4), ("native_axes", 4), ("native_triggers", 2)):
+        values = controls.get(key)
+        if (not isinstance(values, list) or len(values) != count
+                or any(type(value) not in (int, float) or not math.isfinite(value) or abs(value) > .001
+                       for value in values)):
+            return False
+    return True
+
+
 class Behaviors:
     def __init__(self, adapter, events, clock=time.monotonic, sleep=time.sleep):
         self.adapter, self.events = adapter, events
@@ -240,12 +260,13 @@ class Behaviors:
                         captures = self.adapter.capture(label.replace(":", "-")[:90]+"-attention")
                     except BlankCompositorFrame as error:
                         from .startup import neutral_startup_transition
-                        if not neutral_startup_transition(error.state):
+                        authored_fade = neutral_authored_scene_transition(predicate, error.state)
+                        if not authored_fade and not neutral_startup_transition(error.state):
                             raise
                         # The sampled action has already ended. A retail save
                         # load fade is observation failure, not another input
                         # opportunity; keep the original outcome deadline.
-                        self.events.emit("startup_transition_pixels_wait", label=label,
+                        self.events.emit("authored_transition_pixels_wait" if authored_fade else "startup_transition_pixels_wait", label=label,
                                          state=error.state, error=str(error), input_replayed=False)
                         notified = True
                         remaining = deadline-self.clock()

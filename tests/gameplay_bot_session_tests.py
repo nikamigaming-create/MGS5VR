@@ -51,6 +51,7 @@ class PoseAdapter:
     def __init__(self):
         self.pose = {"position": [-.02, -.3, -.38],
                      "orientation": [-.7071, .7071, 0., 0.]}
+        self.head = {"position": [0., 0., 0.], "orientation": [0., 0., 0., 1.]}
         self.calls = []
         self.owned = True
         self.valid = True
@@ -63,6 +64,10 @@ class PoseAdapter:
         if not self.owned:
             raise BotFault("original game generation no longer owned")
         self.calls.append((tool, dict(arguments)))
+        if tool == "get_head_pose":
+            return {"pose": self.head, "flags": {"position_valid": self.valid, "orientation_valid": self.valid}}
+        if tool == "set_head_pose":
+            self.head = {"position": list(arguments["position"]), "orientation": list(arguments["orientation"])}
         if tool == "get_controller_pose":
             return {"pose": {"position": list(self.pose["position"]),
                               "orientation": list(self.pose["orientation"])},
@@ -76,6 +81,17 @@ class PoseAdapter:
 
 
 class SessionPoseTests(unittest.TestCase):
+    @staticmethod
+    def continue_rack():
+        rotation = [-.7071067812, 0., 0., .7071067812]
+        return {"scene": "title", "title_menu": True,
+                "opening_position": [0., 0., 0.], "opening_orientation": [0., 0., 0., 1.],
+                "opening_focus": {"ready": True},
+                "opening_bench": {"layout": {"verified": True,
+                    "seat": {"position": [-.12, -.601586, -.59], "orientation": rotation},
+                    "slot": {"position": [.47, -.5838, -.72], "orientation": rotation}},
+                    "tapes": [{"position": [-.12, -.601586, -.59], "orientation": rotation, "hand": 1}]*6}}
+
     @staticmethod
     def continue_module():
         path = pathlib.Path(__file__).resolve().parents[1] / "tools/gameplay-bot.py"
@@ -195,7 +211,7 @@ class SessionPoseTests(unittest.TestCase):
             return original_capture(tool, arguments)
         live.call = call
         def observe(native=False):
-            state = {"scene": live.scene, "title_menu": live.scene == "title",
+            state = {**self.continue_rack(), "scene": live.scene, "title_menu": live.scene == "title",
                      "loading": False, "cabin": False}
             if native:
                 state["native"] = {"title": live.scene == "title", "mission": 30010}
@@ -205,7 +221,8 @@ class SessionPoseTests(unittest.TestCase):
             live.captures.append((label, live.pose["position"][:]))
             return [label + "-left.png", label + "-right.png"]
         live.capture = capture
-        live.input = lambda *args: live.inputs.append(args)
+        live.input = lambda *args, **kwargs: live.inputs.append(args)
+        live.execute = lambda step: live.call('set_controller_pose',step)
 
         class BehaviorStub:
             def wait_for(self, predicate, *_args):
@@ -213,15 +230,15 @@ class SessionPoseTests(unittest.TestCase):
                     live.scene = "gameplay"
 
         with mock.patch.object(cli, "advance_startup", return_value={"scene": "title"}), \
-             mock.patch.object(cli, "wait_for_continue_rack", return_value={
-                 "scene": "title", "title_menu": True, "opening_position": [0., 0., 0.],
-                 "opening_orientation": [0., 0., 0., 1.]}):
+             mock.patch.object(cli, "wait_for_continue_rack", return_value=self.continue_rack()), \
+             mock.patch.object(cli.time,"sleep") :
             result = cli.continue_game(live, BehaviorStub())
 
         self.assertEqual(result["status"], "observed_arrival")
         self.assertTrue(result["controller_pose_restored"])
         self.assertEqual(result["controller_pose_restore"]["position"], [-.02, -.3, -.38])
         self.assertEqual(live.pose["position"], [-.02, -.3, -.38])
+        self.assertEqual(live.head, {"position": [0., 0., 0.], "orientation": [0., 0., 0., 1.]})
         arrival_capture = next(pose for label, pose in live.captures if label == "gameplay-arrival")
         self.assertEqual(arrival_capture, [-.02, -.3, -.38])
         self.assertEqual(len(live.inputs), 1)
@@ -230,21 +247,22 @@ class SessionPoseTests(unittest.TestCase):
         cli = self.continue_module()
         live = PoseAdapter()
         live.scene = "title"
-        live.observe = lambda: {"scene": live.scene, "title_menu": live.scene == "title"}
+        live.observe = lambda: {**self.continue_rack(), "scene": live.scene, "title_menu": live.scene == "title"}
         live.events = Events(live.calls)
+        live.execute = lambda step: live.call("set_controller_pose",step)
         def capture(label):
             if label == "continue-hover":
                 raise BotFault("capture failed")
             return []
         live.capture = capture
         with mock.patch.object(cli, "advance_startup", return_value={"scene": "title"}), \
-             mock.patch.object(cli, "wait_for_continue_rack", return_value={
-                 "scene": "title", "title_menu": True, "opening_position": [0., 0., 0.],
-                 "opening_orientation": [0., 0., 0., 1.]}):
+             mock.patch.object(cli, "wait_for_continue_rack", return_value=self.continue_rack()), \
+             mock.patch.object(cli.time,"sleep") :
             with self.assertRaisesRegex(BotFault, "capture failed"):
                 cli.continue_game(live, mock.Mock())
         self.assertEqual(live.pose["position"], [-.02, -.3, -.38])
         self.assertEqual(live.pose["orientation"], [-.7071, .7071, 0., 0.])
+        self.assertEqual(live.head, {"position": [0., 0., 0.], "orientation": [0., 0., 0., 1.]})
 
     def test_non_session_suite_does_not_reset_warm_poses(self):
         behavior = Behavior()

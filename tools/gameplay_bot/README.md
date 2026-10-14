@@ -8,6 +8,16 @@ bounded retention. The default command
 only observes. Use `workspace.py pin` before citing a run as acceptance evidence,
 and `workspace.py stop-sim` for exact-owned test-session cleanup.
 
+Hospital event movement uses `hospital_navigate_event` with an exact native
+sequence, event name, and private manifest containing hashes of the owned scene
+and NAV2 tiles. The manifest supplies the authored trigger bounds, destination
+floor and witnessed root-to-floor calibration. The executor follows the full
+directed A* path, including intermediate doorway and stair nodes, through the
+effective VR stick bindings. Native movement locks release input; observed
+obstructions expire and cause bounded replanning. NPC topology is a planning
+prior, and predicted player clearance remains unknown until actual traversal.
+God-mode debug traversal does not certify ordinary-difficulty playability.
+
 For the reviewed mortar field fixture, use
 `python tools/workspace.py bot --command mortar --policy private/mortar-fire-policy.json --record --seconds 60`.
 Run Continue first when starting a new simulator session. The policy identifies

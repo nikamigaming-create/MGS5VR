@@ -2,6 +2,7 @@
 
 #include <array>
 #include <string_view>
+#include <vector>
 #include "core.hpp"
 #include "hud.hpp"
 
@@ -13,6 +14,7 @@ namespace mgs5vr {
 struct OpticWaypoints;
 struct OpticNativeLightingSource;
 struct EyeFrame;
+struct CabinStudioFrame;
 
 // Native material insertion is legal only at the exact verified 4MT shader's
 // three-MRT/writable-depth head draw. The caller must independently prove its
@@ -32,7 +34,8 @@ bool capturePhysicalOpticScene(ID3D11DeviceContext* context,
 // this exact eye. Both eyes receive one immutable marker snapshot.
 void drawWorldWaypoints(ID3D11DeviceContext* context,
     const std::array<float,16>& view,const std::array<float,16>& projection,
-    Vec3 cameraPosition,const OpticWaypoints& markers,HudMode mode,bool enemyMarkers) noexcept;
+    Vec3 cameraPosition,const OpticWaypoints& markers,HudMode mode,bool enemyMarkers,
+    const std::array<float,16>* binocularWorld=nullptr) noexcept;
 
 // Only the aperture is drawn: the equipped game's scope already supplies its
 // housing and lighting. No binocular asset is required by this path.
@@ -76,7 +79,18 @@ bool drawPhysicalIdroidCursor(ID3D11DeviceContext* context,
 bool drawOpeningProps(ID3D11DeviceContext* context,
     const std::array<std::array<float,16>,7>& worlds,
     const std::array<float,16>& view,
-    const std::array<float,16>& projection,int selection=-1) noexcept;
+    const std::array<float,16>& projection,const std::array<float,16>& cabinWorld,
+    const EyeFrame& eye,float lidOpen,int selection=-1) noexcept;
+struct CabinStudioMatrices {
+    std::array<float,16> camera{},marker{},notes{};
+    std::vector<std::array<float,16>> papers;
+    std::array<std::array<float,16>,44> keys{};
+    std::array<std::array<float,16>,6> controls{};
+    std::array<float,16> cameraStatus{},paperConfirmation{};
+};
+bool drawCabinStudio(ID3D11DeviceContext*,const CabinStudioFrame&,const CabinStudioMatrices&,
+    const std::array<float,16>& view,const std::array<float,16>& projection,
+    const EyeFrame&,ID3D11Texture2D* cameraScene=nullptr) noexcept;
 
 // Small ACC guidance attached to the LEFT forearm's exact source publication.
 // The world matrix is the source wristPanel, not a current head/palm pose.

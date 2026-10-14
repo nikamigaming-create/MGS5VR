@@ -10,6 +10,7 @@
 struct ID3D11Device;
 struct ID3D11DeviceContext;
 struct ID3D11PixelShader;
+struct ID3D11DepthStencilView;
 
 namespace mgs5vr {
 using OpticLightingMatrix=std::array<float,16>;
@@ -65,6 +66,10 @@ struct OpticNativeLightingSource {
     OpticLightingMatrix binocularWorld{};
     bool binocularWorldValid{};
 };
+// The geometry pass and upload verifier retain only depth from this exact
+// replay. A snapshot is copied before an optic lens can reuse native targets.
+bool snapshotNativeEyeDepth(ID3D11DeviceContext*,const EyeFrame&) noexcept;
+bool nativeEyeDepthView(const EyeFrame&,ID3D11Device*,ID3D11DepthStencilView**) noexcept;
 inline bool opticLightingBodyWorldEligible(const OpticLightingMatrix& world) noexcept {
     for(const auto v:world)if(!std::isfinite(v))return false;
     if(std::abs(world[3])>.0001f||std::abs(world[7])>.0001f||std::abs(world[11])>.0001f
@@ -136,8 +141,25 @@ struct OpticLightingSceneUpload {
     uint64_t generation{};
     uint32_t byteWidth{},firstConstant{},constantCount{};
     OpticLightingMatrix view{},projection{};
-    bool complete{};
+    bool complete{},viewIsWorld{};
 };
+inline float opticLightingInverseViewError(const OpticLightingMatrix& actual,
+    const OpticLightingMatrix& view,bool transposed=false) noexcept {
+    float error{};
+    for(size_t row=0;row<4;++row)for(size_t column=0;column<4;++column){
+        float left{},right{};
+        for(size_t k=0;k<4;++k){
+            const auto a=actual[transposed?k*4+column:column*4+k];
+            const auto b=actual[transposed?row*4+k:k*4+row];
+            if(!std::isfinite(a)||!std::isfinite(b))return std::numeric_limits<float>::infinity();
+            left+=view[k*4+row]*a;right+=b*view[column*4+k];
+        }
+        if(!std::isfinite(left)||!std::isfinite(right))return std::numeric_limits<float>::infinity();
+        const auto identity=row==column?1.f:0.f;
+        error=std::max({error,std::abs(left-identity),std::abs(right-identity)});
+    }
+    return error;
+}
 inline bool opticLightingSceneUploadMatches(const OpticLightingSceneUpload& upload,
     const OpticNativeLightingSource& current,uintptr_t context,uintptr_t buffer,
     uint64_t generation,uint32_t first,uint32_t count) noexcept {
@@ -150,6 +172,17 @@ inline bool opticLightingSceneUploadMatches(const OpticLightingSceneUpload& uplo
         ||(current.binocularWorldValid&&opticLightingMatrixError(upload.source.binocularWorld,current.binocularWorld)!=0)
         ||opticLightingMatrixError(upload.source.view,current.view)!=0
         ||opticLightingMatrixError(upload.source.projection,current.projection)!=0)return false;
+    // FOX cPSScene.m_view reconstructs world positions: the captured native
+    // camera-to-world matrix is the inverse of cVSScene's world-to-view.
+    // Verify both multiplication orders, retaining the exact source/range
+    // gates above. This is not a tolerance for a different eye or origin.
+    if(upload.viewIsWorld){
+        const auto view=std::min(opticLightingInverseViewError(upload.view,current.view),
+            opticLightingInverseViewError(upload.view,current.view,true));
+        const auto projection=std::min(opticLightingMatrixError(upload.projection,current.projection),
+            opticLightingMatrixError(upload.projection,current.projection,true));
+        return view<=.003f&&projection<=.003f;
+    }
     const auto direct=std::max(opticLightingMatrixError(upload.view,current.view),
         opticLightingMatrixError(upload.projection,current.projection));
     const auto transpose=std::max(opticLightingMatrixError(upload.view,current.view,true),
@@ -164,7 +197,7 @@ struct OpticNativeGeometryPass {
     uint32_t firstConstant{},constantCount{};
     uint64_t generation{};
     bool nativeBindingVerified{},cameraUploadVerified{};
-    bool nativePairVerified{},materialFamilyVerified{};
+    bool nativePairVerified{},materialFamilyVerified{},pixelScene{};
 };
 inline bool opticLightingGeometryPassEligible(const OpticNativeGeometryPass& pass) noexcept {
     return pass.pixelShader&&pass.vertexShader&&pass.sceneBuffer&&pass.generation
@@ -209,6 +242,7 @@ public:
     OpticNativeLightingScope(const EyeFrame&,uintptr_t nativeCamera,
         const OpticLightingMatrix& nativeView,const OpticLightingMatrix& nativeProjection,
         bool headPass,const OpticLightingMatrix* binocularWorld=nullptr) noexcept;
+    void refreshProjection(const OpticLightingMatrix&) noexcept;
     ~OpticNativeLightingScope();
     OpticNativeLightingScope(const OpticNativeLightingScope&)=delete;
     OpticNativeLightingScope& operator=(const OpticNativeLightingScope&)=delete;

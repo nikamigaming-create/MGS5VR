@@ -27,7 +27,7 @@ $csc=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 $savedLib=$env:LIB
 try {
     Remove-Item Env:LIB -ErrorAction SilentlyContinue
-    & $csc /nologo /target:winexe /platform:x64 /optimize+ /warnaserror+ /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll "/r:$core" "/r:$forms" "/out:$exe" (Join-Path $PSScriptRoot 'launcher-3d.cs')
+    & $csc /nologo /target:winexe /platform:x64 /optimize+ /warnaserror+ /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll "/r:$core" "/r:$forms" "/win32icon:$(Join-Path $PSScriptRoot 'icons/mgs5vr-config.ico')" "/out:$exe" (Join-Path $PSScriptRoot 'launcher-3d.cs')
     if($LASTEXITCODE -ne 0){throw 'Embedded launcher compilation failed.'}
 } finally { $env:LIB=$savedLib }
 Copy-Item -LiteralPath $core,$forms -Destination $OutputDir -Force

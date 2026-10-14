@@ -4,6 +4,7 @@
 #include "mgs5vr/idroid_effect_probe.hpp"
 #include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/cabin_walk.hpp"
+#include "mgs5vr/cabin_studio.hpp"
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/paused_rig.hpp"
@@ -15,6 +16,7 @@
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/animal_interaction.hpp"
 #include "mgs5vr/small_animal.hpp"
+#include "mgs5vr/player_visibility.hpp"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -29,6 +31,7 @@
 
 namespace {
 using namespace mgs5vr;
+constexpr float fullBodyEyeErrorLimit=.02f;
 std::mutex obstructionWitnessMutex;
 WeaponObstructionWitness obstructionWitness;
 using Update=void(*)(void*,void*);
@@ -459,7 +462,28 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const auto root=nativeAffinePose(matrix);if(!root)return false;
     const Pose nativeCamera{{cameraValues[0],cameraValues[1],cameraValues[2],cameraValues[3]},
                             {cameraValues[4],cameraValues[5],cameraValues[6]}};
-    auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera);
+    std::optional<NativeBodyHead> nativeHead;
+    const auto nativeHeadNames=get<uintptr_t>(model+0xe8);
+    if(nativeHeadNames&&get<uint32_t>(nativeHeadNames+4*sizeof(uint32_t))==0xc3a88a1b
+       &&parent[0]==-1&&parent[1]==0&&parent[2]==1&&parent[3]==2&&parent[4]==3){
+        // Q/P still contains the native animation under skinPublicationMutex.
+        // The owner's cached HEAD affine has a different prone eye basis.
+        nativeHead=NativeBodyHead{owner,model,compose(*root,bone(q,p,4)),*root,
+            compose(*root,bone(q,p,2)),true};
+    }
+    auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera,nativeHead);
+    if(frame.applied&&frame.controllers.scriptedDemo){
+        // The camera is an observer during a movie, not Snake's body anchor.
+        // Leave the entire authored actor skin in its native animation frame.
+        if(nativeHead)publishAuthoredPlayerHead(owner,model,nativeHead->worldFromHead,frame.activation);
+        updateAuthoredPlayerVisibility();
+        publishFullBodyVisibility(owner,model,false);
+        if(frame.playerOwner==owner){
+            frame.controllers.hands={};frame.controllers.optic={};frame.controllers.weaponReady=frame.controllers.supportGrip=false;
+            return headCamera().publishRigFrame(camera,owner,nativeCamera,frame);
+        }
+        return false;
+    }
     if(!frame.applied||frame.playerOwner!=owner||frame.controllers.avatarEditor
        ||(frame.controllers.frontEnd&&!frame.controllers.openingSelector&&!frame.controllers.cabinPlay))return false;
     const bool vehicleWeaponReady=vehicleWeaponAcknowledged(frame,now);
@@ -521,9 +545,19 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     const auto renderedHead=compose(*root,bone(q,p,4)).position;
     const auto originalQ=q;const auto originalP=p;
+    std::array<Pose,2> propInputPalms{frame.controllers.hands[0].grip,frame.controllers.hands[1].grip};
+    std::array<bool,2> propHands{};
+    if(const auto& studio=frame.controllers.studio;studio&&studio->available){
+        for(size_t side=0;side<2;++side){
+            propHands[side]=studio->cameraHand==static_cast<int>(side)||studio->markerHand==static_cast<int>(side)
+                ||std::any_of(studio->papers.begin(),studio->papers.end(),[&](const auto& paper){return paper.hand==static_cast<int>(side);});
+            if(studio->cameraHand==static_cast<int>(side))propInputPalms[side]=studioCameraPalm(studio->camera,side);
+        }
+    }
     std::array<Pose,2> grips{};
     for(size_t i=0;i<2;++i)if(presentationGrips[i])
-        grips[i]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,*presentationGrips[i]));
+        grips[i]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,
+            propHands[i]?propInputPalms[i]:*presentationGrips[i]));
     if(frame.controllers.optic.held&&frame.controllers.optic.pose.tracked){
         // Acquire the housing's authored PALM contact. Reusing a gun-like raw
         // controller grip leaves the fingers pointing along the tube instead
@@ -532,16 +566,23 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         grips[1]=compose(inverse(*root),nativeTrackedPose(frame.nativePose,frame.headPose,safe));
     }
     const auto rootInverse=inverse(*root);
+    const auto eyeInModel=compose(rootInverse,Pose{{},frame.nativePose.position}).position;
     const float groundCeiling=frame.nativePose.position.y+.05f;
-    unsigned groundContacts{};
-    const auto modelSurface=[&](Vec3 point,float clearance)->std::optional<ArmSurface>{
+    unsigned groundContacts{},headContacts{};
+    const auto modelSurface=[&](Vec3 point,float clearance,bool footQuery=false)->std::optional<ArmSurface>{
         const auto world=compose(*root,Pose{{},point}).position;
-        const auto surface=groundSurface(world,groundCeiling,clearance);
+        // An authored prone ankle can be higher than the low viewer. Start
+        // its ray above the placed foot without relaxing hand/head queries.
+        const float ceiling=footQuery?std::max(groundCeiling,world.y+.05f):groundCeiling;
+        const auto surface=groundSurface(world,ceiling,clearance);
         if(!surface)return {};
         return ArmSurface{compose(rootInverse,Pose{{},surface->point}).position,
             rotate(rootInverse.orientation,surface->normal),clearance};
     };
     const auto clearWrist=[&](Pose target){
+        if(const auto surface=headClearanceSurface(target.position,eyeInModel,.14f)){
+            target.position=*outsideArmSurface(target.position,*surface);++headContacts;
+        }
         if(const auto surface=modelSurface(target.position,.055f))
             if(const auto point=outsideArmSurface(target.position,*surface)){
                 if(dot(*point-target.position,*point-target.position)>1e-8f)++groundContacts;
@@ -557,6 +598,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                     solution=contact;++groundContacts;
                 }
             }
+        }
+        if(solution)if(const auto surface=headClearanceSurface(solution->pose.elbow.position,eyeInModel,.12f)){
+            const auto contact=solveArm(animated,target,hint,&basis,&*surface);
+            if(!contact)return std::optional<ArmSolution>{};solution=contact;++headContacts;
         }
         return solution;
     };
@@ -624,19 +669,50 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // The arm meshes also carry spine and clavicle weights. Reposition
         // the whole upper body with one rigid transform: independent shoulder
         // offsets leave those shared sleeve vertices in different body frames.
-        // The shoulders must turn with the same physical head orientation as
-        // the tracked palms. Using the untouched FOX camera here leaves the
-        // sleeve roots behind when the user physically turns around.
+        // Neck look and a body turn are separate. The same camera transaction
+        // retains locomotion/snap heading before applying physical HMD look.
         auto forward=rotate(frame.nativePose.orientation,{0,0,1});
         if(forward.x*forward.x+forward.z*forward.z<.0001f)
             forward=rotate(nativeCamera.orientation,{0,0,1});
         const float yaw=std::atan2(forward.x,forward.z);
-        const Quat torso{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
+        Quat torso{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
+        const auto travelMode=nativeTravelMode();
+        const bool mountedBody=travelMode==TravelMode::horse;
+        if(frame.locomotionHeadingTracked&&!frame.controllers.frontEnd
+           &&!frame.controllers.authoredCamera&&!frame.controllers.cabinPlay
+           &&!frame.controllers.cabinTransit&&!frame.controllers.vehicleMounted
+           &&travelMode==TravelMode::onFoot){
+            const auto heading=anatomicalTorsoHeading(frame.locomotionHeading,frame.nativePose.orientation,
+                frame.controllers.playerPosture==PlayerPosture::prone);
+            if(heading)torso=*heading;
+        }
         const auto chest=bone(q,p,2);
+        if(mountedBody)if(const auto heading=nativeTorsoHeading(compose(*root,chest)))torso=*heading;
         const auto shoulderCenter=(bone(q,p,6).position+bone(q,p,10).position)*.5f;
         const auto uprightHead=compose(inverse(*root),Pose{torso,frame.nativePose.position});
-        auto torsoDelta=upperBodyPlacement(chest,shoulderCenter,uprightHead);
+        bool fullBody=frame.controllers.fullBody&&nativeHead.has_value()&&frame.anatomicalEyeModel==model
+            &&!frame.controllers.frontEnd&&!frame.controllers.authoredCamera
+            &&!frame.controllers.cabinPlay&&!frame.controllers.cabinTransit&&!frame.controllers.vehicleMounted
+            &&(travelMode==TravelMode::onFoot||mountedBody)&&parent[0]==-1&&parent[1]==0&&parent[2]==1&&parent[3]==2&&parent[4]==3
+            &&parent[13]==0&&parent[14]==13&&parent[15]==14&&parent[16]==15
+            &&parent[17]==0&&parent[18]==17&&parent[19]==18&&parent[20]==19;
+        if(frame.controllers.fullBody&&nativeHead&&frame.anatomicalEyeModel!=model)frame.body.rejection=1;
+        auto torsoDelta=fullBody?fullBodyPlacement(chest,bone(originalQ,originalP,4),uprightHead):upperBodyPlacement(chest,shoulderCenter,uprightHead);
         if(!torsoDelta)return false;
+        if(fullBody&&!mountedBody){
+            // A tracked turn belongs to the complete visible actor. Turning
+            // only the chest leaves the native legs facing the opposite way
+            // and twists shared garment weights around an unchanged waist.
+            // Place the complete render pose at the measured eye, including
+            // its pelvis. A pelvis-only pivot makes the eye orbit during a
+            // turn, then asks a nearly straight spine to recover that orbit.
+            // Native actor/collision and authored gait lengths stay untouched.
+            for(size_t i=0;i<count;++i)replace(q,p,i,compose(*torsoDelta,bone(originalQ,originalP,i)));
+            // Solve only contact residuals after the complete native posture
+            // has acquired the viewer heading and the exact anatomical eye.
+            torsoDelta=fullBodyPlacement(bone(q,p,2),bone(q,p,4),uprightHead);
+            if(!torsoDelta)return false;
+        }
         // Keep the shared sleeve roots together when the native prone head is
         // close to a slope. Moving an individual shoulder tears shared weights.
         float lift{};
@@ -645,12 +721,144 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             if(const auto surface=groundSurface(world,groundCeiling,.09f))
                 lift=std::max(lift,(surface->clearance-dot(world-surface->point,surface->normal))/surface->normal.y);
         }
-        if(lift>0){torsoDelta->position=torsoDelta->position+rotate(rootInverse.orientation,{0,lift,0});++groundContacts;}
-        for(const size_t i:{1,2,5,6,7,8,9,10,11,12})replace(q,p,i,compose(*torsoDelta,bone(q,p,i)));
+        std::optional<ArmSurface> chestFloor;
+        if(lift>0){
+            if(fullBody){
+                // Shoulder contact constrains the chest, not the eyes.
+                // Lifting the neck target displaced the head by 2--4 cm and
+                // rejected the entire body in a real prone head-turn run.
+                // Bend the measured spine while holding its neck endpoint.
+                const auto placedChest=bone(q,p,2).position;
+                chestFloor=ArmSurface{placedChest+rotate(rootInverse.orientation,{0,lift,0}),
+                    rotate(rootInverse.orientation,{0,1,0}),0};
+            }else torsoDelta->position=torsoDelta->position+rotate(rootInverse.orientation,{0,lift,0});
+            ++groundContacts;
+        }
+        const auto fitFullBody=[&](){
+            const auto neck=bone(q,p,3);
+            const ArmPose nativeSpine{bone(q,p,1),bone(q,p,2),neck};
+            const std::array<Pose,2> placedFeet{bone(q,p,15),bone(q,p,19)};
+            const auto neckTarget=compose(*torsoDelta,neck);
+            auto spine=solveSpine(nativeSpine,neckTarget,chestFloor?&*chestFloor:nullptr);
+            Vec3 pelvisShift{};
+            if(!spine&&chestFloor&&frame.controllers.playerPosture==PlayerPosture::prone){
+                // A nearly straight prone spine has no room to arch over a
+                // slope. Let the pelvis approach the fixed neck by at most
+                // 12 cm, preserving its tiny lumbar pivot and bone lengths.
+                // Feet retain their pre-contact footprint for the leg solve.
+                auto toward=rotate(root->orientation,neck.position-nativeSpine.shoulder.position);
+                const float distance=std::hypot(toward.x,toward.z);
+                if(distance>.1f){
+                    const auto direction=rotate(rootInverse.orientation,{toward.x/distance,0,toward.z/distance});
+                    const auto fit=[&](float amount){
+                        const Pose translation{{},direction*amount};
+                        return solveSpine({compose(translation,nativeSpine.shoulder),compose(translation,nativeSpine.elbow),
+                            compose(translation,nativeSpine.wrist)},neckTarget,&*chestFloor);
+                    };
+                    float low=0,high=.12f;
+                    spine=fit(high);
+                    if(spine){
+                        for(unsigned step=0;step<8;++step){
+                            const float middle=(low+high)*.5f;
+                            if(const auto candidate=fit(middle)){spine=candidate;high=middle;}else low=middle;
+                        }
+                        pelvisShift=direction*high;
+                        for(size_t i=0;i<count;++i){auto placed=bone(q,p,i);placed.position=placed.position+pelvisShift;replace(q,p,i,placed);}
+                    }
+                }
+            }
+            if(!spine){frame.body.rejection=2;return false;}
+            // Descendants still use the untouched native animation baseline.
+            // Include the complete eye-centered placement in joint deltas.
+            *torsoDelta=compose(spine->pose.elbow,inverse(chest));
+            const auto neckDelta=compose(spine->pose.wrist,inverse(bone(originalQ,originalP,3)));
+            replace(q,p,1,spine->pose.shoulder);replace(q,p,2,spine->pose.elbow);replace(q,p,3,spine->pose.wrist);
+            for(size_t i=3;i<count;++i){
+                if(i==3)continue;
+                bool upper=false,head=false;
+                for(int32_t ancestor=parent[i];ancestor>=0;ancestor=parent[ancestor]){
+                    if(ancestor==3)head=true;
+                    if(ancestor==2){upper=true;break;}
+                }
+                if(upper)replace(q,p,i,compose(head?neckDelta:*torsoDelta,bone(originalQ,originalP,i)));
+            }
+            const auto fittedEye=compose(*root,compose(bone(q,p,4),Pose{{},nativeEyeFromHead}));
+            const auto eyeError=fittedEye.position-frame.nativePose.position;
+            frame.body.eyeError=eyeError;
+            // Shoulder/floor correction must not admit an avatar whose head
+            // missed the stationary viewer. Reject before solving the arms,
+            // so the established complete hand/prop fallback remains intact.
+            if(!valid(fittedEye)||!(dot(eyeError,eyeError)<=fullBodyEyeErrorLimit*fullBodyEyeErrorLimit)){
+                frame.body.rejection=3;return false;
+            }
+            frame.body.valid=true;frame.body.spineClamped=spine->reachClamped;frame.body.mounted=mountedBody;
+            frame.body.pelvis=compose(*root,bone(q,p,0));frame.body.chest=compose(*root,bone(q,p,2));
+            for(size_t side=0;side<2;++side){
+                const size_t hip=side?17:13,knee=hip+1,ankle=hip+2;
+                if(mountedBody){
+                    // The saddle and stirrups own this lower-body animation.
+                    // Keep the native pelvis/legs; only the bounded spine and
+                    // tracked arms follow the viewer. Grounding these feet
+                    // or rotating the hips with head look detaches the rider.
+                    frame.body.feet[side]=compose(*root,bone(q,p,ankle));
+                    continue;
+                }
+                // Floor queries belong to the eye-placed native gait,
+                // not to feet at their obsolete animation-space location.
+                const ArmPose native{bone(q,p,hip),bone(q,p,knee),bone(q,p,ankle)};
+                auto contact=placedFeet[side];
+                std::optional<ArmSurface> floor;
+                if(const auto surface=modelSurface(contact.position,.09f,true)){
+                    floor=surface;++frame.body.floorQueries;
+                    // Retain native gait lift, including prone toe posture.
+                    // Eye/body yaw can move a foot to a different point on a
+                    // slope; preventing only penetration leaves that foot
+                    // floating over the new ground. Join both floor queries
+                    // to this original/retargeted skin pair instead.
+                    if(const auto originalFloor=modelSurface(bone(originalQ,originalP,ankle).position,.09f,true)){
+                        const float originalClearance=dot(bone(originalQ,originalP,ankle).position-originalFloor->point,originalFloor->normal);
+                        frame.body.nativeFloorClearance[side]=originalClearance;
+                        const float placedClearance=dot(contact.position-surface->point,surface->normal);
+                        const auto worldNormal=rotate(root->orientation,surface->normal);
+                        if(worldNormal.y>.35f){
+                            const float verticalCorrection=(std::max(.09f,originalClearance)-placedClearance)/worldNormal.y;
+                            contact.position=contact.position+rotate(rootInverse.orientation,{0,verticalCorrection,0});
+                        }
+                    }
+                    if(const auto point=outsideArmSurface(contact.position,*surface)){
+                        if(dot(*point-contact.position,*point-contact.position)>1e-8f)++frame.body.floorContacts;
+                        contact.position=*point;
+                    }
+                }
+                const auto leg=solveArm(native,contact,native.elbow.position-native.shoulder.position);
+                if(!leg){frame.body.rejection=4;return false;}
+                replace(q,p,hip,leg->pose.shoulder);replace(q,p,knee,leg->pose.elbow);replace(q,p,ankle,leg->pose.wrist);
+                const auto footDelta=compose(leg->pose.wrist,inverse(bone(originalQ,originalP,ankle)));
+                for(size_t i=ankle+1;i<count;++i){
+                    bool foot=false;for(int32_t ancestor=parent[i];ancestor>=0;ancestor=parent[ancestor])if(ancestor==static_cast<int32_t>(ankle)){foot=true;break;}
+                    if(foot)replace(q,p,i,compose(footDelta,bone(originalQ,originalP,i)));
+                }
+                frame.body.feet[side]=compose(*root,leg->pose.wrist);
+                if(floor)frame.body.floorClearance[side]=dot(leg->pose.wrist.position-floor->point,floor->normal);
+            }
+            return true;
+        };
+        if(fullBody&&!fitFullBody()){
+            // Optional body fitting cannot remove established hands/optics.
+            // Discard the partial body transaction and use the complete arm
+            // fit until this exact native skeleton has a valid body solution.
+            const auto rejection=frame.body.rejection;const auto eyeError=frame.body.eyeError;
+            q=originalQ;p=originalP;frame.body={};frame.body.rejection=rejection;frame.body.eyeError=eyeError;fullBody=false;
+            publishFullBodyVisibility(owner,model,false);
+            torsoDelta=upperBodyPlacement(chest,shoulderCenter,uprightHead);
+            if(!torsoDelta)return false;
+            if(lift>0)torsoDelta->position=torsoDelta->position+rotate(rootInverse.orientation,{0,lift,0});
+        }
+        if(!fullBody)for(const size_t i:{1,2,5,6,7,8,9,10,11,12})replace(q,p,i,compose(*torsoDelta,bone(q,p,i)));
         // Coco's stationary pelvis counter-pivot is a render-pose correction.
         // Never move the native actor/root, change collision, or apply it to
         // a horse, vehicle, menu, authored movie or prone player.
-        const bool canAlign=count>20&&parent[1]==0&&parent[13]==0&&parent[14]==13
+        const bool canAlign=!fullBody&&count>20&&parent[1]==0&&parent[13]==0&&parent[14]==13
             &&parent[17]==0&&parent[18]==17&&!frame.menuOpen&&!frame.controllers.cabinPlay
             &&!frame.controllers.scriptedDemo&&!frame.controllers.authoredCamera
             &&nativeTravelMode()==TravelMode::onFoot&&bone(originalQ,originalP,4).position.y>.6f;
@@ -735,6 +943,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             throwableActive=(get<uint32_t>(state+0x27c)&0x1c0)==0x80;
             const auto flags=get<uint32_t>(state+0x27c),mode=get<uint32_t>(state+0x3c0);
             weaponDiagnostics.flags=flags;weaponDiagnostics.mode=mode;
+            std::array<float,4> nativeTarget{};
+            if(firearmActive&&read(state+0x140,nativeTarget)
+               &&std::isfinite(nativeTarget[0])&&std::isfinite(nativeTarget[1])&&std::isfinite(nativeTarget[2])){
+                weaponDiagnostics.nativeAimTarget={nativeTarget[0],nativeTarget[1],nativeTarget[2]};
+                weaponDiagnostics.nativeAimTargetRead=true;
+            }
             if(!binocularHeld&&frame.controllers.weaponReady&&firearmActive&&!nativeManipulation&&!(flags&0x400000)&&!(mode&0x2000)){
                 weaponDiagnostics.muzzleAttempted=true;
                 // Use the same authored barrel frame as the native shot path.
@@ -823,7 +1037,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // changing only the weapon would detach its grip, sights and shot path.
     const auto calibratedWeaponAim=frame.controllers.hands[1].aimTracked
         ?weaponAimWithPitch(frame.controllers.hands[1].aim,frame.controllers.weaponAimPitch):std::nullopt;
-    if(barrelInGrip&&calibratedWeaponAim){
+    if(!propHands[1]&&barrelInGrip&&calibratedWeaponAim){
         const auto aim=compose(rootInverse,nativeTrackedPose(frame.nativePose,frame.headPose,*calibratedWeaponAim));
         if(const auto aimed=aimedWeaponGrip(grips[1],aim,*barrelInGrip)){
             grips[1]=*aimed;
@@ -973,6 +1187,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     constexpr std::array<size_t,10> changed{1,2,5,6,7,8,9,10,11,12};
     std::array<Pose,512> delta{};std::array<bool,512> controlled{};
     for(const auto i:changed){controlled[i]=true;delta[i]=compose(bone(q,p,i),inverse(bone(originalQ,originalP,i)));}
+    if(frame.body.valid)for(const size_t i:{0,3,13,14,15,17,18,19}){
+        controlled[i]=true;delta[i]=compose(bone(q,p,i),inverse(bone(originalQ,originalP,i)));
+    }
     for(size_t i=0;i<count;++i)if(!controlled[i]){
         auto ancestor=parent[i];
         while(ancestor>=0&&!controlled[static_cast<size_t>(ancestor)])ancestor=parent[static_cast<size_t>(ancestor)];
@@ -1044,7 +1261,16 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // socket, and close the optional support hand only after its grip is
         // actually held. This keeps both hands on the device rather than
         // leaving an open/free hand beside a floating model.
-        const float contact=side
+        const auto& studio=frame.controllers.studio;
+        const bool cameraContact=studio&&studio->available&&studio->cameraHand==static_cast<int>(side);
+        const bool markerContact=studio&&studio->available&&studio->markerHand==static_cast<int>(side);
+        const bool paperContact=studio&&studio->available&&std::any_of(studio->papers.begin(),studio->papers.end(),
+            [&](const auto& paper){return paper.hand==static_cast<int>(side);});
+        const bool tapeContact=frame.controllers.openingPropsActive&&std::any_of(
+            frame.controllers.openingBench.tapes.begin(),frame.controllers.openingBench.tapes.end(),
+            [&](const auto& tape){return tape.hand==static_cast<int>(side);});
+        const bool propContact=cameraContact||markerContact||paperContact||tapeContact;
+        const float contact=propContact?0.f:side
             ?((binocularHeld||((frame.controllers.weaponReady)&&(firearmActive||throwableActive)))?1.f:0.f)
             :(binocularSupport?1.f:supportBlend);
         // Native firearm contact owns the authored hand during reloads. The
@@ -1064,7 +1290,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const bool opticContact=binocularHeld&&(side!=0||binocularSupport);
             // Cup the top instead of leaving the fingers hovering open above
             // it. The thumb has its own opposing hinge and needs less curl.
-            const float curl=opticContact?std::clamp(controllerCurl,finger==0?.55f:.72f,finger==0?.65f:.82f)
+            const float propCurl=cameraContact?(finger==0?.50f:finger==1?.42f:.60f)
+                :markerContact?(finger==0?.50f:.62f):(finger==0?.35f:finger==1?.42f:.25f);
+            const float curl=propContact?propCurl:opticContact?std::clamp(controllerCurl,finger==0?.55f:.72f,finger==0?.65f:.82f)
                 :std::max(controllerCurl,frame.controllers.strikeCurl[side]);
             const auto rotation=fingerJointRotation(side!=0,static_cast<unsigned>(finger),static_cast<unsigned>(joint),curl);
             if(!rotation)return false;
@@ -1081,6 +1309,18 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // Animals never displace the controller-owned hands. Detect a stroke from
     // the rendered contact points below; an oversized collision proxy must
     // not hold the wrist away from the fur or redirect the player's fingers.
+    frame.body.headContacts=headContacts;
+    if(frame.body.valid){
+        // Reconstruct from the final skin before body-owned prop joins and
+        // visibility admission. A valid spine solve alone does not establish
+        // anatomical eye alignment after all descendant publication.
+        frame.body.head=compose(*root,bone(q,p,4));
+        frame.body.eye=compose(frame.body.head,Pose{{},nativeEyeFromHead});
+        frame.body.eyeError=frame.body.eye.position-frame.nativePose.position;
+        frame.body.valid=valid(frame.body.eye)
+            &&dot(frame.body.eyeError,frame.body.eyeError)<=fullBodyEyeErrorLimit*fullBodyEyeErrorLimit;
+        if(!frame.body.valid)frame.body.rejection=5;
+    }
     // Full render pose, before native matrix and attachment publication.
     // Native position.w metadata is retained. Publish the final anatomical
     // palm frames with this same skin transaction so handheld displays can
@@ -1092,6 +1332,31 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         renderedPalmTracked[side]=presentationHands[side].has_value()&&valid(renderedPalms[side]);
     }
     frame.renderedPalms=renderedPalms;frame.renderedPalmTracked=renderedPalmTracked;
+    // The native skin owns each held prop just as it owns the binocular.
+    // Raw tracking may request a palm beyond the arm or through a surface.
+    const auto trackingFromNative=compose(frame.headPose,compose(Pose{{0,1,0,0},{}},inverse(frame.nativePose)));
+    std::array<Pose,2> localPalms{},inputGrips{};
+    for(size_t side=0;side<2;++side){
+        localPalms[side]=compose(trackingFromNative,renderedPalms[side]);
+        inputGrips[side]=propInputPalms[side];
+    }
+    if(frame.controllers.studio&&frame.controllers.studio->available){
+        auto joined=std::make_shared<CabinStudioFrame>(*frame.controllers.studio);
+        joinStudioHands(*joined,inputGrips,localPalms,renderedPalmTracked);
+        if(frame.body.valid)joinStudioBody(*joined,
+            compose(trackingFromNative,frame.body.pelvis),
+            compose(trackingFromNative,compose(*root,bone(q,p,17))));
+        frame.controllers.studio=std::move(joined);
+    }
+    if(frame.controllers.openingPropsActive&&frame.controllers.openingWorldAnchored){
+        const auto cabinFromNative=inverse(frame.controllers.openingWorldOrigin);
+        for(auto& tape:frame.controllers.openingBench.tapes){
+            if(tape.hand<0||tape.hand>1||!renderedPalmTracked[tape.hand])continue;
+            const auto input=nativeTrackedPose(frame.nativePose,frame.headPose,inputGrips[tape.hand]);
+            const auto correction=compose(renderedPalms[tape.hand],inverse(input));
+            tape.pose=compose(cabinFromNative,compose(correction,compose(frame.controllers.openingWorldOrigin,tape.pose)));
+        }
+    }
     if(idroidMount){
         const size_t side=idroidHeld?0:1;
         frame.idroidDevice=compose(*root,compose(bone(q,p,wrists[side]),
@@ -1119,7 +1384,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // cannot continue independently at the unconstrained input position.
         if(!attachBinocular())return false;
     }
-    frame.nativeFirearmActive=firearmActive&&!binocularHeld;
+    frame.nativeFirearmActive=firearmActive&&!binocularHeld&&!propHands[1];
     frame.weaponSupportGripTracked=frame.nativeFirearmActive&&frame.controllers.weaponReady;
     frame.weaponSupportAttached=frame.weaponSupportGripTracked&&nearSupport;
     if(frame.weaponSupportGripTracked){
@@ -1196,6 +1461,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     else scopeAim.reset();
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
+    publishFullBodyVisibility(owner,model,frame.body.valid);
     if(idroidAttachmentDiagnosticsActive()){
         // Capture this solve's assigned rig sequence before native skin work.
         // A later render/rig query cannot stand in for this transaction.
@@ -1792,6 +2058,7 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
     }
     frame.controllers.openingWorldOrigin=worldOrigin;
     frame.controllers.openingWorldAnchored=worldAnchored;
+    if(worldAnchored)frame.controllers.openingLayout=nativeCabinLayout(worldOrigin,frame.activation);
     const auto applyRoomMovement=[&](){
         const auto before=frame.nativePose.position;
         const auto previousOffset=walk.offset;
@@ -1873,5 +2140,24 @@ TravelMode nativeTravelMode() noexcept{
         }
     }
     return now>=sampledAt&&now-sampledAt<=150?cached:TravelMode::unknown;
+}
+PlayerPosture nativePlayerPosture() noexcept{
+    // Live Lua registration was read from the owned game: STAND=4,
+    // SQUAT=5, CRAWL=6. Join the same double-buffered local-player table
+    // used by AndCheckStatus; animation height never decides the stance.
+    if(!enabled.load())return PlayerPosture::unknown;
+    const auto owner=playerOwner.load();const auto index=get<uint32_t>(base+0x2bd3fd4);
+    if(get<uintptr_t>(owner)!=base+0x23b8218||index>=16||get<uint32_t>(owner+0x3a0)!=index)return PlayerPosture::unknown;
+    for(int attempt=0;attempt<2;++attempt){
+        const auto phase=get<uint32_t>(base+0x2bd3fd0);if(phase>1)break;
+        const auto state=base+0x2bd3ff0+(phase*16ull+index)*0xe0;
+        std::array<uint32_t,5> flags{};Vec3 stateRoot{},ownerRoot{};
+        if(get<uintptr_t>(state)!=base+0x2190b28||!read(state+0xc0,flags)||!read(state+0x40,stateRoot)||!read(owner+0x60,ownerRoot))break;
+        if(phase!=get<uint32_t>(base+0x2bd3fd0))continue;
+        const auto delta=stateRoot-ownerRoot;
+        if(!valid(Pose{{},delta})||dot(delta,delta)>4||owner!=playerOwner.load()||index!=get<uint32_t>(base+0x2bd3fd4))break;
+        switch(flags[0]&0x70u){case 0x10:return PlayerPosture::standing;case 0x20:return PlayerPosture::crouched;case 0x40:return PlayerPosture::prone;default:break;}
+    }
+    return PlayerPosture::unknown;
 }
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "controls.hpp"
 #include "input_bridge.hpp"
+#include "core.hpp"
 
 namespace mgs5vr {
 struct NativeTermsMenu {
@@ -72,6 +73,18 @@ private:
     bool focused_{},carried_{};
 };
 void constrainCinematicInput(GamepadSample& sample,NativeMenuInput mode) noexcept;
+// Convert physical look motion only for a freshly witnessed hospital lesson.
+// The native script retains its own input history, outcome and progression.
+class HospitalHeadLook {
+public:
+    std::array<float,2> update(Quat head,bool available,uint64_t now,uint64_t referenceEpoch,uint64_t lessonKey) noexcept;
+    void reset() noexcept {*this={};}
+private:
+    Quat head_{};
+    std::array<float,2> gesture_{};
+    uint64_t last_{},until_{},epoch_{},key_{};
+    bool armed_{true};
+};
 // A spatial rack owns title selection. Sticks, grips and face buttons must not
 // also navigate its hidden native menu; only a selected tape confirms it.
 GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept;

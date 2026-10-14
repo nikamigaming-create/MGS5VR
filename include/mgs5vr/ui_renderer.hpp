@@ -33,10 +33,15 @@ bool releaseNativeIdroidTutorialPause(bool requestedStow=false) noexcept;
 uintptr_t captureNativeIdroidStowHelpOwner() noexcept;
 bool closeNativeIdroidStowHelp(uintptr_t owner) noexcept;
 bool nativeTitleMenuOpen() noexcept;
+void publishNativeHospitalTitleMenu(bool active) noexcept;
+struct OpeningNativeFocus;
+OpeningNativeFocus nativeTitleFocus() noexcept;
 void publishNativeAvatarEdit(bool active) noexcept;
 bool nativeAvatarEditActive() noexcept;
+void publishNativeSceneClear(bool visible) noexcept;
+bool nativeSceneClear() noexcept;
 // NativeDemoMode is defined with the dependency-free shared snapshot.
-void publishNativeDemoMode(NativeDemoMode mode,uint64_t candidateKey=0) noexcept;
+void publishNativeDemoMode(NativeDemoMode mode,uint64_t candidateKey=0,uint64_t lookLessonKey=0) noexcept;
 NativeDemoMode nativeDemoMode() noexcept;
 uint64_t nativeDemoCandidateKey() noexcept;
 uint64_t nativeDemoCandidateGeneration() noexcept;
@@ -45,6 +50,9 @@ bool nativeScriptedDemoActive() noexcept;
 // must not resurrect cassette geometry after ClearTitleMode has run.
 void publishNativeTitleMode(bool active) noexcept;
 bool nativeTitleModeActive() noexcept;
+// First-launch hospital scenes retain retail TitleMode without being startup UI.
+void publishNativeOpeningCinematic(bool active) noexcept;
+bool nativeOpeningCinematic() noexcept;
 // The physical cassette selector is valid only for the native helicopter
 // title cabin. Fresh-start title flows can keep TitleMode while showing the
 // hospital intro and must retain their native menu and input.
@@ -58,6 +66,8 @@ void publishNativeCabinTransit(bool active) noexcept;
 bool nativeCabinTransit() noexcept;
 // Retail sortie/customization and game-over screens have no iDroid open bit.
 void publishNativeSceneMenu(bool active) noexcept;
+void publishNativeSceneCanvas(bool active) noexcept;
+bool nativeSceneCanvasActive() noexcept;
 bool nativeLoadingTipsOpen() noexcept;
 // Source time of the latest expanded native equipment-description draw.
 uint64_t nativeEquipmentPickerDrawTime() noexcept;

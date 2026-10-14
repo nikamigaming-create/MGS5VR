@@ -33,7 +33,7 @@ inline bool mayRefreshPausedRig(const PausedRigOwner& owner,uintptr_t camera,
         &&frame.controllers.handheldMenus&&now>=owner.nativeUpdateTime
         &&now-owner.nativeUpdateTime<=freshnessMilliseconds;
     return owner.camera&&owner.player&&camera==owner.camera
-        &&frame.applied&&frame.stereoTracked&&(frame.menuOpen||boundary)
+        &&frame.applied&&frame.stereoTracked&&(frame.menuOpen||boundary||frame.controllers.cameraWorldFrozen)
         &&frame.playerOwner==owner.player&&frame.activation==owner.activation
         &&frame.controllers.referenceEpoch==owner.referenceEpoch
         &&frame.controllers.predictedXrTime>0&&frame.controllers.presentationFocused

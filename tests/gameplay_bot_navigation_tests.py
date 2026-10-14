@@ -17,6 +17,7 @@ from gameplay_bot.core import BattleResponseNeeded, BotFault
 from gameplay_bot.navigation import NativeMap, NavigationAtlas, NoConnectedNativeRoute, ObstacleMemory, RouteProgress, _ThreatCosts, arrived, movement_mode, read_nav2
 from gameplay_bot.route import finish_navigation, navigate, set_posture
 from gameplay_bot.perception import read_enemy_snapshot
+from gameplay_bot.hospital_navigation import HospitalEventRoute
 
 
 def tile(name, points, edges, *, boundaries=(), cross=(), group=4):
@@ -26,6 +27,57 @@ def tile(name, points, edges, *, boundaries=(), cross=(), group=4):
 
 
 class NavigationTests(unittest.TestCase):
+    def hospital_manifest(self, directory, center):
+        directory=pathlib.Path(directory)
+        source=directory/'owned-source';source.write_bytes(b'owned-fixture')
+        row={'file':str(source),'sha256':hashlib.sha256(source.read_bytes()).hexdigest()}
+        manifest=directory/'events.json'
+        manifest.write_text(json.dumps({'mission':10010,'location':30,'story':0,
+            'scene':row,'tiles':[row],'events':{'trap':{'sequence':'Seq_Game_Test',
+            'center':center,'size':[1.,3.,2.],'support_y':0.}}}))
+        native={'mission':10010,'location':30,'story':0,'sequence':'Seq_Game_Test',
+                'player_x':0.,'player_y':.9,'player_z':0.,'status_SQUAT':True,
+                'status_CRAWL':False,'status_STAND':False}
+        return manifest,native
+
+    def test_hospital_sparse_event_uses_floor_topology_instead_of_raised_body_node(self):
+        nav=NativeMap([tile('a',[(0,0,0),(3,0,0),(6,0,0),(0,.9,0)],[(0,1),(1,2)])])
+        with tempfile.TemporaryDirectory() as directory:
+            manifest,native=self.hospital_manifest(directory,[4.75,1.,0.])
+            self.assertEqual(nav.nearest([0,.9,0]),3)
+            with patch.object(NativeMap,'from_files',return_value=nav):
+                route=HospitalEventRoute(str(manifest),'trap','Seq_Game_Test',native)
+            self.assertEqual(route.route,[0,1,2])
+            self.assertEqual(route.target([0,.9,0]),(3,0,0))
+            self.assertTrue(route.inside([4.5,.9,0]))
+
+    def test_hospital_obstruction_is_remembered_and_changes_next_route(self):
+        nav=NativeMap([tile('a',[(0,0,0),(3,0,0),(0,0,2),(6,0,0)],
+                           [(0,1),(1,3),(0,2),(2,3)])])
+        with tempfile.TemporaryDirectory() as directory:
+            manifest,native=self.hospital_manifest(directory,[4.75,1.,0.])
+            with patch.object(NativeMap,'from_files',return_value=nav):
+                route=HospitalEventRoute(str(manifest),'trap','Seq_Game_Test',native)
+                self.assertEqual(route.route,[0,1,3])
+                route.index=1
+                self.assertEqual(route.obstructed([0,.9,0]),(0,1))
+                self.assertEqual(route.route,[0,2,3])
+                resumed=HospitalEventRoute(str(manifest),'trap','Seq_Game_Test',native)
+                self.assertEqual(resumed.route,[0,2,3])
+
+    def test_hospital_waypoint_uses_current_posture_floor_offset(self):
+        nav=NativeMap([tile('a',[(0,0,0),(3,0,0),(6,0,0)],[(0,1),(1,2)])])
+        with tempfile.TemporaryDirectory() as directory:
+            manifest,native=self.hospital_manifest(directory,[4.75,1.,0.])
+            data=json.loads(manifest.read_text())
+            data['events']['trap']['root_to_floor_offsets']={'SQUAT':.9,'CRAWL':.425}
+            manifest.write_text(json.dumps(data))
+            with patch.object(NativeMap,'from_files',return_value=nav):
+                route=HospitalEventRoute(str(manifest),'trap','Seq_Game_Test',native)
+            route.target([0,.9,0])
+            route.observe_posture({'status_CRAWL':True,'status_SQUAT':False,'status_STAND':False})
+            self.assertEqual(route.target([3,.425,0]),(6,0,0))
+
     def test_disconnected_directed_topology_refused_before_weighted_search(self):
         nav=NativeMap([tile('a',[(0,0,0),(1,0,0),(2,0,0)],[(0,1)])])
         with patch('gameplay_bot.navigation._ThreatCosts.penalty',side_effect=AssertionError('weighted search ran')):
@@ -335,6 +387,20 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(nav.path(0,3),[0,1,3])
         self.assertEqual(nav.path(0,3,blocked=[(1,3)]),[0,2,3])
         with self.assertRaises(BotFault): nav.path(0,3,blocked=[(1,3),(2,3)])
+
+    def test_hospital_event_uses_reachable_goal_instead_of_closest_island(self):
+        from gameplay_bot.hospital_navigation import HospitalEventRoute
+        route=HospitalEventRoute.__new__(HospitalEventRoute)
+        route.nav=NativeMap([tile('ward',[(0,0,0),(4,0,0),(3.5,0,1)],[(0,2)])])
+        route.root_offset=.425
+        route.goal_candidates=[(0.,1),(1.12,2)]
+        route.memory=Mock()
+        route.memory.active.return_value=set()
+        route.plan([0,.425,0])
+        self.assertEqual(route.goal_node,2)
+        self.assertEqual(route.route,[0,2])
+        route.memory.active.return_value={(0,2)}
+        with self.assertRaises(NoConnectedNativeRoute):route.plan([0,.425,0])
 
     def test_missing_split_group_is_retained_but_never_walked(self):
         nav=NativeMap([tile('a',[(0,0,0),(1,0,0)],[],cross=[{'from':0,'group':5,'to':1}])])

@@ -419,7 +419,9 @@ int WINAPI wWinMain(HINSTANCE current,HINSTANCE,PWSTR,int show){
         if(!preview){
             package=exePath().parent_path();if(!file(package/L"tools/install.ps1")){const auto dev=package.parent_path().parent_path();if(file(dev/L"tools/install.ps1"))package=dev;}
             if(!smoke)loadGames();WNDCLASSEXW cls{sizeof(cls)};cls.hInstance=instance;cls.lpfnWndProc=procedure;cls.lpszClassName=L"MGS5VRFieldTerminal";
-            cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.hIcon=LoadIconW(nullptr,IDI_APPLICATION);RegisterClassExW(&cls);
+            cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(102));
+            cls.hIconSm=static_cast<HICON>(LoadImageW(instance,MAKEINTRESOURCEW(102),IMAGE_ICON,
+                GetSystemMetrics(SM_CXSMICON),GetSystemMetrics(SM_CYSMICON),LR_DEFAULTCOLOR));RegisterClassExW(&cls);
             RECT work{};SystemParametersInfoW(SPI_GETWORKAREA,0,&work,0);const auto dpi=GetDpiForSystem();
             const float fit=std::min({float(dpi)/96.f,float(work.right-work.left-40)/designW,float(work.bottom-work.top-65)/designH});
             RECT bounds{0,0,int(designW*fit),int(designH*fit)};AdjustWindowRectEx(&bounds,WS_OVERLAPPEDWINDOW,FALSE,0);

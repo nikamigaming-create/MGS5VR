@@ -22,6 +22,8 @@ DEV = ROOT / "build/dev"
 SCRATCH = ROOT / "artifacts/bot"
 SUPPORTED_EXE = "085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45"
 BINARIES = ("dinput8.dll", "mgs5vr_controls.exe")
+CONTROLLER_ASSETS = tuple('assets/controls/' + name for name in
+    ('left.mesh', 'right.mesh', 'left.png', 'right.png', 'LICENSE.txt', 'provenance.json'))
 RETAINED_CONTROL = '; MGS5VR newer-build preference '
 
 
@@ -325,21 +327,37 @@ def deploy(value, known_old=None, build=None):
         if digest(game / name).lower() not in {h.lower() for h in allowed if h}:
             raise ValueError(f"Installed {name} has unknown provenance; preserved")
     controls = compatible_controls(build, game / "mgs5vr-controls.ini")
+    asset_files = tuple(name for name in CONTROLLER_ASSETS
+                        if name in manifest['files'] or name in record['files'] or name.replace('/', '\\') in record['files'])
+    for name in asset_files:
+        safe_tree(game / name, game)
+        if (game / name).exists():
+            allowed = {record['files'].get(name), record['files'].get(name.replace('/', '\\'))}
+            allowed.update(digest(base / name) for base in (PLAY, DEV) if (base / name).is_file())
+            if digest(game / name) not in {h.lower() for h in allowed if h}:
+                raise ValueError(f'Installed controller asset has unknown provenance; preserved: {name}')
+    assets_changed = any((not (game / name).is_file() or digest(game / name) != manifest['files'][name])
+                         if name in manifest['files'] else (game / name).exists() for name in asset_files)
+    if running and assets_changed:
+        raise ValueError('Close MGSV before changing the controller models')
     controls_changed = controls != (game / "mgs5vr-controls.ini").read_bytes()
     if running and controls_changed:
         raise ValueError("Close MGSV before changing the build's control-settings compatibility")
     personal = {name: digest(game / name) for name in ("mgs5vr.ini", "mgs5vr-controls.ini")}
     slot = "play" if build == PLAY else "dev"
     if (all(digest(game / name) == digest(build / name) for name in BINARIES)
-            and record.get("development_build") == manifest["source"] and record.get("build_slot") == slot and not controls_changed):
+            and record.get("development_build") == manifest["source"] and record.get("build_slot") == slot and not controls_changed and not assets_changed):
         print(f"Installed game already matches {slot}.")
         return
     rollback = ROOT / "build/install-rollback"
     if rollback.exists():
         raise ValueError(f"Unfinished install transaction preserved: {rollback}")
     rollback.mkdir(parents=True)
-    for name in (*BINARIES, "mgs5vr-install.json", "mgs5vr-controls.ini"):
-        shutil.copy2(game / name, rollback / name)
+    transaction_files = (*BINARIES, "mgs5vr-install.json", "mgs5vr-controls.ini", *asset_files)
+    for name in transaction_files:
+        if (game / name).is_file():
+            (rollback / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(game / name, rollback / name)
     recovered = False
     try:
         for name in BINARIES:
@@ -356,6 +374,20 @@ def deploy(value, known_old=None, build=None):
             if digest(game / name) != expected:
                 raise ValueError(f"Personal settings changed during sync: {name}")
             record["files"][name] = expected
+        for name in asset_files:
+            if name in manifest['files']:
+                (game / name).parent.mkdir(parents=True, exist_ok=True)
+                temporary = game / (name + '.mgs5vr-tmp')
+                safe_tree(temporary, game)
+                shutil.copy2(build / name, temporary)
+                os.replace(temporary, game / name)
+                record['files'].pop(name, None)
+                record['files'][name.replace('/', '\\')] = digest(game / name)
+            else:
+                if (game / name).exists():
+                    (game / name).unlink()
+                record['files'].pop(name, None)
+                record['files'].pop(name.replace('/', '\\'), None)
         if controls_changed:
             temporary = game / 'mgs5vr-controls.ini.mgs5vr-tmp'
             safe_tree(temporary, game)
@@ -368,13 +400,15 @@ def deploy(value, known_old=None, build=None):
         write_json(record_path, record)
         recovered = True
     except BaseException:
-        for name in (*BINARIES, "mgs5vr-install.json", "mgs5vr-controls.ini"):
-            if not (game / name).is_file() or digest(rollback / name) != digest(game / name):
+        for name in transaction_files:
+            if (rollback / name).is_file() and (not (game / name).is_file() or digest(rollback / name) != digest(game / name)):
                 shutil.copy2(rollback / name, game / name)
+            elif not (rollback / name).exists() and (game / name).exists():
+                (game / name).unlink()
         recovered = True
         raise
     finally:
-        for name in (*BINARIES, 'mgs5vr-controls.ini'):
+        for name in (*BINARIES, 'mgs5vr-controls.ini', *asset_files):
             temporary = game / (name + ".mgs5vr-tmp")
             if temporary.exists():
                 temporary.unlink()
@@ -704,6 +738,25 @@ def game_model(args):
     print(f"Game model: {ROOT / 'artifacts/dev/coverage/game-model.html'}")
 
 
+def items(args):
+    if args.action == 'refresh':
+        run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+             '-File', ROOT / 'tools/catalog-owned-assets.ps1', '-Game', settings()['game_dir']])
+        run([sys.executable, ROOT / 'tools/item-catalog.py', 'build'])
+        run([sys.executable, ROOT / 'tools/item-catalog.py', 'view'])
+    else:
+        command = [sys.executable, ROOT / 'tools/item-catalog.py', args.action]
+        if args.action == 'search':
+            if not args.query:
+                raise ValueError('items search requires a query')
+            command += [args.query, '--category', args.category, '--limit', str(args.limit)]
+        elif args.action == 'show':
+            if not args.query:
+                raise ValueError('items show requires an exact equipment ID or asset path')
+            command.append(args.query)
+        run(command)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="operation", required=True)
@@ -729,7 +782,7 @@ def main():
         clean(sys.modules[__name__], args)
     cleanup.set_defaults(handler=clean_builds)
     observe = commands.add_parser("bot")
-    observe.add_argument("--command", choices=("observe", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state", "mortar"), default="observe")
+    observe.add_argument("--command", choices=("observe", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state", "mortar"), default="observe")
     observe.add_argument('--policy', type=Path, help='mortar: reviewed authored fixture and operator position')
     observe.add_argument("--suite", type=Path)
     observe.add_argument("--seconds", type=float, default=15)
@@ -810,6 +863,12 @@ def main():
     model = commands.add_parser('model', help='Refresh the fixed map/state graph without game control')
     model.add_argument('--run', action='append', type=Path, default=[], help='Reviewed, pinned bot observations')
     model.set_defaults(handler=game_model)
+    item_index = commands.add_parser('items', help='Read-only owned equipment, prop and animation catalog')
+    item_index.add_argument('action', choices=('summary', 'search', 'show', 'view', 'refresh'))
+    item_index.add_argument('query', nargs='?')
+    item_index.add_argument('--category', choices=('all', 'equipment', 'models', 'animations'), default='all')
+    item_index.add_argument('--limit', type=int, default=30)
+    item_index.set_defaults(handler=items)
     commands.add_parser("prune").set_defaults(handler=lambda _: prune_runs(settings()))
     args = parser.parse_args()
     try:

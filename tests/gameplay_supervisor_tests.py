@@ -305,6 +305,7 @@ class StartupTransitionTests(unittest.TestCase):
 
     def test_retained_startup_blank_retries_only_released_capture_not_input(self):
         live=mock.Mock(held={}); clock=Clock(); state=self.state()
+        state['native']['mission']=10010
         live.capture.side_effect=[BlankCompositorFrame("retained blank",state), ["left","right"]]
         self.assertEqual(capture_released_startup_transition(live,"transition",clock=clock,sleep=clock.sleep),
                          ["left","right"])
