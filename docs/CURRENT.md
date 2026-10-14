@@ -39,6 +39,16 @@ portals remain non-traversable. All 39 navigation checks pass, including
 directed topology, malformed records and empty-tile refusal to create routes.
 The actual field approach repeat is pending.
 
+The first parsed route then aborted on its starting node because the path
+search's elapsed time had consumed the movement-stall deadline before its
+first pulse could be renewed. The executor now refreshes the live owner/pose
+after planning. Multi-page enemy observations run with input released and
+exclude only that neutral interval from the stall clock; actual lack of
+directed progress still expires. All 41 navigation checks pass, including
+world changes during slow planning and refusal to treat neutral time or
+lateral jitter as progress. Actual repeat `20261014T211108904110Z` is running
+with native waypoint progress; its final outcome and visual review are pending.
+
 The 1.0 source work survives the interrupted `Find mod download count` task.
 The published October 11 source is commit `87e51f2`, still present on
 `origin/main` after a fresh fetch. Later implementation, tests, licensed

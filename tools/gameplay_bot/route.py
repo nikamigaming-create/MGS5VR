@@ -213,6 +213,11 @@ def navigate(live, nav, goal, *, output, enemy_reader, mode='auto', max_seconds=
                 if carry_reader() is not True:raise BotFault('Exact body carry ended during the walking route')
                 _validate_field_state(state,witnessed_carry=True)
             if now >= next_enemies:
+                # Multi-page Lua perception can exceed an input lease. Observe
+                # with movement released, and do not call that neutral time a
+                # failed traversal. The next loop rechecks the live owner/pose.
+                live.release()
+                paused_at = clock()
                 snapshot = enemy_reader()
                 if (snapshot['mission'], snapshot['location']) != mission:
                     raise BotFault('Enemy telemetry belongs to another mission')
@@ -221,7 +226,10 @@ def navigate(live, nav, goal, *, output, enemy_reader, mode='auto', max_seconds=
                 result['enemy_snapshots'].append(snapshot)
                 enemies = [e['position'] for e in snapshot['soldiers']
                            if avoid_threats and e.get('position') and e.get('life') == snapshot['normal_life']]
-                next_enemies = now + 2.
+                progress.neutral_pause(clock() - paused_at)
+                next_enemies = clock() + 2.
+                renew = 0.
+                continue
             selected = movement_mode(native,enemies,last_life,current_mode,stealth=mode=='stealth') if mode in ('auto','stealth') else mode
             if crawl_turn_since is not None and selected in ('crawl','crouch'):selected='crouch'
             last_life = native['player_life']
@@ -268,6 +276,9 @@ def navigate(live, nav, goal, *, output, enemy_reader, mode='auto', max_seconds=
                 live.events.emit('navigation_plan', nodes=len(route), blocked=len(blocked), start=point, goal=target_goal)
                 progress = RouteProgress()
                 renew = 0.
+                # Never send movement using the pre-search camera or timestamp.
+                # Large native graphs can take longer than the stall deadline.
+                continue
             while index < len(route) and arrived(point, nav.positions[route[index]],
                     radius=min(1.4,arrival_radius*.5) if index==len(route)-1 and not retreat_goal else 1.4):
                 history.append(route[index])

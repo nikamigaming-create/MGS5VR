@@ -261,7 +261,7 @@ class NavigationTests(unittest.TestCase):
                 nav=Mock(identity='owned-map')
                 reader=Mock(return_value={'mission':30010,'location':10,'truncated':False,
                     'unavailable_loaded':0,'normal_life':'0','soldiers':[]})
-                samples=[foot,vault,recovery,foot,foot]
+                samples=[foot,vault,recovery,foot,foot,foot]
                 with tempfile.TemporaryDirectory() as directory, \
                      patch('gameplay_bot.combat.fresh_rig',side_effect=[(s,(30010,10,1,2,3)) for s in samples]):
                     result=navigate(live,nav,[0,0,0],output=pathlib.Path(directory),enemy_reader=reader,
@@ -407,6 +407,50 @@ class NavigationTests(unittest.TestCase):
         self.assertTrue(progress.stalled(1,5.1,2.1))
         self.assertFalse(progress.stalled(1,4.5,2.2))
         self.assertFalse(progress.stalled(2,6.,5.))
+
+    def test_released_perception_time_is_not_motion_or_progress(self):
+        progress = RouteProgress()
+        self.assertFalse(progress.stalled(1,5.,0.))
+        progress.neutral_pause(10.)
+        self.assertFalse(progress.stalled(1,4.9,11.))
+        self.assertTrue(progress.stalled(1,5.1,12.1))
+        for duration in (-1., float('nan'), float('inf'), True):
+            with self.assertRaises(BotFault): progress.neutral_pause(duration)
+
+    def test_changed_world_after_slow_planning_cannot_receive_stale_movement(self):
+        state = {'scene':'gameplay','camera_active':True,'menu':False,'idroid':False,
+                 'now_ms':100,'controls':{'context':'gameplay','rig_input':True,
+                    'travel_mode':1,'age_ms':0,'sample_ms':100},
+                 'rendered':{'native_pose':{'position':[0,1,0],'orientation':[0,0,0,1]}},
+                 'native':{'mission':10100,'location':20,'player_x':0,'player_y':0,
+                    'player_z':0,'player_life':7801,'not_alert':True,'player_vehicle_id':65535,
+                    'popup':False,'saving':False,'demo':False,'status_STAND':True}}
+        live = Mock()
+        live.bindings = {'axes':[{'name':'axes.move','source':'left_stick'}],
+            'actions':[{'name':'gameplay.run','bindings':[{'inputs':['left_stick_click']}]}]}
+        live.text_result.return_value = {'pose':{'position':[0,0,0],'orientation':[0,0,0,1]}}
+        live.capture.return_value = []
+        live.observe.side_effect = lambda **_: copy.deepcopy(state)
+        now = [0.]
+        nav = Mock(identity='owned-map')
+        nav.positions = [(3.,0.,0.),(10.,0.,0.)]
+        nav.nearest.side_effect = [0,1]
+        def search(*_, **__):
+            now[0] += 3.
+            state['native']['location'] = 10
+            return [0,1]
+        nav.path.side_effect = search
+        reader = Mock(return_value={'mission':10100,'location':20,'truncated':False,
+            'unavailable_loaded':0,'normal_life':'0','soldiers':[]})
+        with tempfile.TemporaryDirectory() as directory, \
+             patch('gameplay_bot.combat.fresh_rig',side_effect=lambda *_: (copy.deepcopy(state),(10100,20,1,2,3))), \
+             patch('gameplay_bot.combat.looking_head',return_value=[0,0,0,1]):
+            result = navigate(live,nav,[10,0,0],output=pathlib.Path(directory),
+                enemy_reader=reader,recenter=False,max_seconds=10.,clock=lambda:now[0],sleep=lambda _:None)
+        self.assertEqual(result['status'],'failed')
+        self.assertIn('Mission/location changed',result['error'])
+        nav.path.assert_called_once()
+        live.input.assert_not_called()
 
     def test_transport_failure_keeps_result_and_native_observation(self):
         class Live:

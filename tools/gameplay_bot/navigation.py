@@ -334,6 +334,13 @@ class RouteProgress:
             self.target, self.best, self.last_progress = target, distance, now
         return now - self.last_progress > 2.
 
+    def neutral_pause(self, seconds):
+        """Exclude a verified released observation interval, not poor movement."""
+        if type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0:
+            raise BotFault('Invalid neutral route observation duration')
+        if self.target is not None:
+            self.last_progress += seconds
+
 
 def movement_mode(native, enemies, previous_life=None, previous_mode=None, *, stealth=False):
     """Choose a physical posture/speed from observed danger, never fire blind."""
