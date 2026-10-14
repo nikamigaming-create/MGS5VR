@@ -200,6 +200,12 @@ capsules and uses the existing signature-verified world visibility query from
 the solved weapon muzzle. Unknown/blocked terrain refuses firing. The bot turns
 its simulated headset, aims through separate VR grip/aim poses, closes the loop
 against the actual native muzzle, and uses effective ready/trigger bindings.
+For a particular mission actor, `--target sol_NAME` requires that exact living
+native soldier as well as the selected camp, range and geometry; a nearer guard
+cannot substitute for it. Rifle corrections move the firing hand and measured
+authored support contact together from one publication, preserving both
+controllers' separate grip/aim frames. The final clear-ray, solved barrel and
+attached-support checks still admit each trigger independently.
 Actor incapacitation and ammunition are observed separately; a buddy can affect
 attribution. Both final eyes still need visual review. This is not full combat,
 body handling, all optics, supply-drop visibility, or campaign acceptance.

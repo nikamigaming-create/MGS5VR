@@ -14,6 +14,7 @@ def main():
     for name in ('game-dir','proxy','output'):parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--seconds',type=float,default=30.)
     parser.add_argument('--camp')
+    parser.add_argument('--target', help='One exact native soldier name; visibility and range guards still apply')
     parser.add_argument('--max-rounds',type=int,default=24)
     parser.add_argument('--radius',type=float,default=80.)
     args=parser.parse_args()
@@ -26,7 +27,8 @@ def main():
         try:
             live.ready()
             result=engage(live,output=args.output,enemy_script=(Path(__file__).parent/'navigation-state.lua').read_text(),
-                          camp=args.camp,max_seconds=args.seconds,max_rounds=args.max_rounds,radius=args.radius)
+                          camp=args.camp,max_seconds=args.seconds,max_rounds=args.max_rounds,radius=args.radius,
+                          target_name=args.target)
             print(json.dumps({key:result.get(key) for key in ('status','rounds','outcomes','error')}))
         finally:live.close()
     return 1 if result['status']=='failed' else 0

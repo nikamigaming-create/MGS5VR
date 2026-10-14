@@ -5,7 +5,7 @@ import sys
 import unittest
 from unittest.mock import Mock, patch
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'tools'))
-from gameplay_bot.combat import AimProbeUnavailable, active_targets, admit, aim_error, aim_quaternion, arm, battle_checkpoint, controller_pair, corrected_aim, effective_pitch, facing_error, fire, fresh_rig, looking_head, mul, paired_aim_position, pointing, support_poses, sight, track_and_fire
+from gameplay_bot.combat import AimProbeUnavailable, active_targets, admit, aim_error, aim_quaternion, aimed_support_frame, arm, battle_checkpoint, controller_pair, corrected_aim, effective_pitch, facing_error, fire, fresh_rig, looking_head, mul, paired_aim_position, pointing, support_poses, sight, track_and_fire
 from gameplay_bot.core import BotFault
 from gameplay_bot.live import rotate
 from gameplay_bot.autonomy import choose_vantage
@@ -19,6 +19,22 @@ from gameplay_bot.cover import floor_candidates, select as select_cover, verifie
 
 
 class CombatTests(unittest.TestCase):
+    def test_exact_mission_target_cannot_substitute_another_actor_or_bypass_visibility(self):
+        enemies={'truncated':False,'unavailable_loaded':0,'normal_life':'0',
+            'soldiers':[{'id':1,'name':'sol_guard','life':'0','camp':'camp'},
+                        {'id':2,'name':'sol_target_0000','life':'0','camp':'camp'}]}
+        geometry={'targets':[{'id':1,'query_valid':True,'unoccluded':True,'distance':5},
+                             {'id':2,'query_valid':True,'unoccluded':False,'distance':20}]}
+        self.assertEqual(active_targets(enemies,geometry,camp='camp',target_name='sol_target_0000'),[])
+        targets=active_targets(enemies,geometry,camp='camp',target_name='sol_target_0000',require_clear=False)
+        self.assertEqual([x['id'] for x in targets],[2])
+        self.assertFalse(targets[0]['sight']['unoccluded'])
+        self.assertEqual(active_targets(enemies,geometry,camp='other',target_name='sol_target_0000',require_clear=False),[])
+        self.assertEqual(active_targets(enemies,geometry,target_name='sol_missing'),[])
+        self.assertEqual(active_targets(enemies,geometry,target_name='sol_target_0000',radius=10,require_clear=False),[])
+        for name in ('', 'hos_diamond_0000', 'sol_target\";return true'):
+            with self.assertRaises(BotFault): active_targets(enemies,geometry,target_name=name)
+
     def test_crawl_facing_distinguishes_view_forward_from_native_body_backwards(self):
         self.assertAlmostEqual(body_heading_error({'player_yaw':90},[0,0,0],[1,0,0]),0.)
         self.assertGreater(body_heading_error({'player_yaw':-12},[0,0,0],[.206,0,-.978]),179.)
@@ -375,6 +391,38 @@ class CombatTests(unittest.TestCase):
             for a,b in zip(joined[key],pair[key]):self.assertAlmostEqual(a,b,places=7)
         with self.assertRaisesRegex(BotFault,'tracked'):
             support_poses({'weapon_support_tracked':False,'weapon_support_grip':contact},pair)
+
+    def test_rifle_support_turns_with_primary_instead_of_holding_the_old_barrel(self):
+        head={'position':[.1,.2,.05],'orientation':pointing([.6,.1,-1.])}
+        old={'position':[.3,-.25,-.5],'orientation':pointing([-.3,.1,-1.])}
+        contact={'position':[.2,-.3,-.9],'orientation':pointing([-.2,-.1,-1.])}
+        frame={'head_pose':head,'right_grip':old,'weapon_support_tracked':True,
+               'weapon_support_grip':contact}
+        pair={'orientation':[.5,0,0,math.sqrt(.75)],'position':[.01,-.1,.03]}
+        attitude=pointing([1.,.2,-.6]);view_position=[.22,-.25,-.45]
+        moved=aimed_support_frame(frame,view_position,attitude,pair)['weapon_support_grip']
+        target_q=mul(head['orientation'],mul(attitude,pair['orientation']))
+        target_p=[h+d for h,d in zip(head['position'],rotate(head['orientation'],view_position))]
+        old_local=rotate([-v for v in old['orientation'][:3]]+[old['orientation'][3]],
+                         [s-p for s,p in zip(contact['position'],old['position'])])
+        expected=[p+d for p,d in zip(target_p,rotate(target_q,old_local))]
+        for a,b in zip(moved['position'],expected):self.assertAlmostEqual(a,b,places=7)
+        self.assertGreater(math.dist(moved['position'],contact['position']),.2)
+        self.assertAlmostEqual(math.dist(moved['position'],target_p),math.dist(contact['position'],old['position']))
+        self.assertEqual(frame['weapon_support_grip'],contact)
+        left_pair={'orientation':[0,0,.3,math.sqrt(.91)],'position':[.02,-.1,.04]}
+        grip,aim=support_poses({**frame,'weapon_support_grip':moved},left_pair)
+        for key in ('position','orientation'):
+            for a,b in zip(controller_pair(grip,aim)[key],left_pair[key]):self.assertAlmostEqual(a,b,places=7)
+
+    def test_paired_rifle_motion_refuses_missing_or_invalid_source_poses(self):
+        pair={'orientation':[0,0,0,1],'position':[0,0,0]}
+        valid={'position':[0,0,0],'orientation':[0,0,0,1]}
+        frame={'head_pose':valid,'right_grip':valid,'weapon_support_tracked':True,'weapon_support_grip':valid}
+        for broken in ({**frame,'head_pose':None},{**frame,'right_grip':None},
+                       {**frame,'weapon_support_tracked':False},
+                       {**frame,'right_grip':{'position':[float('nan'),0,0],'orientation':[0,0,0,1]}}):
+            with self.assertRaises(BotFault):aimed_support_frame(broken,[.2,-.25,-.45],[0,0,0,1],pair)
 
     def test_detached_support_hand_cannot_fire_even_with_clear_aligned_geometry(self):
         actor={'id':1214,'name':'sol_guard'}

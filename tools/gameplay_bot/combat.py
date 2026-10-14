@@ -14,6 +14,7 @@ from .locomotion import _position, _validate_field_state
 from .perception import read_enemy_snapshot
 from .session import preserved_tracking_poses
 from .health import HealthRecoveryNeeded, needs_recovery
+from .motion import _pose
 
 
 class AimProbeUnavailable(BotFault):
@@ -136,6 +137,29 @@ def place_support_hand(live, frame, pair):
     live.events.emit('combat_support_pose_set',base_space='local',grip=grip,aim=aim,
                      source_sample_ms=frame.get('sample_ms'),
                      presentation_epoch=frame.get('presentation_epoch'))
+
+
+def aimed_support_frame(frame, grip_position, aim_orientation, pair):
+    """Move the measured LOCAL contact with the same requested primary turn.
+
+    A rifle's attached support hand guides the barrel. Sampling its socket
+    after turning only the primary hand follows that still-constrained old
+    barrel, so the two simulated hands oppose each other. Prepare both poses
+    from one publication before dispatch, preserving the authored contact.
+    """
+    head=frame.get('head_pose') or {};current=frame.get('right_grip') or {}
+    head=_pose(head.get('position'),head.get('orientation'),local_head=True)
+    current=_pose(current.get('position'),current.get('orientation'))
+    contact,_=support_poses(frame,{'position':[0.,0.,0.],'orientation':[0.,0.,0.,1.]})
+    view=_pose(grip_position,normalized(mul(aim_orientation,pair['orientation'])))
+    target={'position':[h+d for h,d in zip(head['position'],rotate(head['orientation'],view['position']))],
+            'orientation':normalized(mul(head['orientation'],view['orientation']))}
+    target=_pose(**target)
+    turn=normalized(mul(target['orientation'],inverse(current['orientation'])))
+    offset=rotate(turn,[c-p for c,p in zip(contact['position'],current['position'])])
+    contact=_pose([p+d for p,d in zip(target['position'],offset)],
+                  normalized(mul(turn,contact['orientation'])))
+    return {**frame,'weapon_support_grip':contact}
 
 
 def comfortable_grip(native):
@@ -278,11 +302,15 @@ return '{{"id":'..tostring(id)..',"life":'..tostring(life)..'}}' '''
     return data,timing
 
 
-def active_targets(enemies, geometry, *, camp=None, radius=80, require_clear=True):
+def active_targets(enemies, geometry, *, camp=None, radius=80, require_clear=True, target_name=None):
+    if target_name is not None and (not isinstance(target_name, str)
+            or not re.fullmatch(r'sol_[A-Za-z0-9_]+', target_name)):
+        raise BotFault('Combat target must be one exact native soldier name')
     if enemies.get('truncated') is not False or enemies.get('unavailable_loaded')!=0:
         raise BotFault('Combat cannot plan from incomplete enemy state')
     actors={r['id']:r for r in enemies['soldiers'] if r['life']==enemies['normal_life']
-            and re.fullmatch(r'sol_[A-Za-z0-9_]+',r['name']) and (camp is None or r.get('camp')==camp)}
+            and re.fullmatch(r'sol_[A-Za-z0-9_]+',r['name']) and (camp is None or r.get('camp')==camp)
+            and (target_name is None or r['name']==target_name)}
     candidates=[]
     for target in geometry['targets']:
         if (target.get('query_valid') is True and (not require_clear or target.get('unoccluded') is True)
@@ -361,12 +389,13 @@ def face_and_aim(live, actor, anchor, pitch, *, pair, support_pair, ready_inputs
             attitude=None
         attitude=(aim_quaternion(state['rendered']['native_pose'],data['muzzle']['position'],target['aim'],pitch)
                   if attitude is None else corrected_aim(state['rendered']['native_pose'],data['muzzle'],target['aim'],attitude))
+        support_frame=aimed_support_frame(state['rendered'],grip_position,attitude,pair)
+        # Prepare both from the old publication, then move them together.
+        # Never resample a socket constrained by a left hand we have not moved.
         live.execute({'op':'pose','hand':'right','position':grip_position,
                       'orientation':normalized(mul(attitude,pair['orientation'])),
                       'aim_position':paired_aim_position(grip_position,attitude,pair),'aim_orientation':attitude})
-        time.sleep(.04)
-        raised,_=admit(live,anchor)
-        place_support_hand(live,raised['rendered'],support_pair)
+        place_support_hand(live,support_frame,support_pair)
         live.input([channel(t) for t in ready_inputs],.25,lease_seconds=3.)
         time.sleep(.04)
         checked,checked_state=sight(live,anchor)
@@ -484,10 +513,13 @@ def battle_checkpoint(live, label, state):
 
 
 def engage(live, *, output, enemy_script, camp=None, max_seconds=30., max_rounds=24, radius=80.,
-           healthy_life=None, expected_slot=None):
+           healthy_life=None, expected_slot=None, target_name=None):
     """A bounded autonomous combat slice; no blanket game/visual acceptance."""
     if not 1<=max_seconds<=120 or type(max_rounds) is not int or not 1<=max_rounds<=100 or not 1<=radius<=180:
         raise BotFault('Combat requires bounded time, rounds and range')
+    if target_name is not None and (not isinstance(target_name, str)
+            or not re.fullmatch(r'sol_[A-Za-z0-9_]+', target_name)):
+        raise BotFault('Combat target must be one exact native soldier name')
     pitch=effective_pitch(live.bindings)
     ready=next((a for a in live.bindings['actions'] if a['name']=='gameplay.ready_weapon'),None)
     support=next((a for a in live.bindings['actions'] if a['name']=='gameplay.support_grip'),None)
@@ -502,7 +534,7 @@ def engage(live, *, output, enemy_script, camp=None, max_seconds=30., max_rounds
         raise BotFault('Two-hand combat requires the effective ready and support grip bindings')
     ready_inputs=list(dict.fromkeys(ready['bindings'][0]['inputs']+support['bindings'][0]['inputs']))
     result={'status':'running','bursts':[],'outcomes':[],'captures':[],
-            'visual_acceptance':'pending_both_eye_review','max_rounds':max_rounds,'camp':camp}
+            'visual_acceptance':'pending_both_eye_review','max_rounds':max_rounds,'camp':camp,'target_name':target_name}
     started=time.monotonic();rounds=0;attempts={};last_target=None
     try:
         with preserved_tracking_poses(live):
@@ -528,7 +560,7 @@ def engage(live, *, output, enemy_script, camp=None, max_seconds=30., max_rounds
                 enemies=read_enemy_snapshot(live.native.read,enemy_script)
                 if (enemies['mission'],enemies['location'])!=anchor[:2]:raise BotFault('Enemy world changed')
                 data,state=sight(live,anchor)
-                candidates=active_targets(enemies,data,camp=camp,radius=radius,require_clear=False)
+                candidates=active_targets(enemies,data,camp=camp,radius=radius,require_clear=False,target_name=target_name)
                 if not candidates:
                     result['status']='no_visible_active_target';break
                 actor=None

@@ -556,6 +556,8 @@ def bot(args):
         command = [sys.executable, ROOT / "tools/gameplay-combat.py", "--max-rounds", args.max_rounds, "--radius", args.radius]
         if args.camp:
             command += ["--camp", args.camp]
+        if getattr(args, 'target', None):
+            command += ['--target', args.target]
     elif args.operation == "autonomy":
         command = [sys.executable, ROOT / "tools/gameplay-autonomy.py", "--manifest", value["navigation"], "--camp", args.camp,
                    "--stealth-loadout", args.stealth_loadout.resolve()]
@@ -803,6 +805,7 @@ def main():
     combat = commands.add_parser("combat", help="Bounded native-observed combat through physical VR hand inputs")
     combat.add_argument("--seconds", type=float, default=30.)
     combat.add_argument("--camp")
+    combat.add_argument('--target', help='Exact native soldier name for a mission objective; no visibility override')
     combat.add_argument("--max-rounds", type=int, default=24)
     combat.add_argument("--radius", type=float, default=80.)
     combat.set_defaults(handler=bot)

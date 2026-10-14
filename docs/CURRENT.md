@@ -35,9 +35,9 @@ bounded NavWorld layout. Development now admits those records; empty tiles
 preserve provenance and supply no nodes or edges. Unknown date codes and
 unverified nonempty `201403241` layouts still fail. All 725 Africa tiles now
 parse, with 1,371,861 nodes and 4,331,494 explicit edges; 2,049 unresolved
-portals remain non-traversable. All 39 navigation checks pass, including
+portals remain non-traversable. All 41 navigation checks pass, including
 directed topology, malformed records and empty-tile refusal to create routes.
-The actual field approach repeat is pending.
+The actual field approach repeats below use that exact map identity.
 
 The first parsed route then aborted on its starting node because the path
 search's elapsed time had consumed the movement-stall deadline before its
@@ -46,8 +46,34 @@ after planning. Multi-page enemy observations run with input released and
 exclude only that neutral interval from the stall clock; actual lack of
 directed progress still expires. All 41 navigation checks pass, including
 world changes during slow planning and refusal to treat neutral time or
-lateral jitter as progress. Actual repeat `20261014T211108904110Z` is running
-with native waypoint progress; its final outcome and visual review are pending.
+lateral jitter as progress. Retained `20261014T211108904110Z` and
+`20261014T211559960702Z` made real waypoint progress but stopped at their
+bounded deadlines; neither is a completed-route pass. The next retained leg,
+`20261014T214505813998Z`, reached Bampapeve and correctly refused a crawl turn
+whose native body did not align. Retained walking repeat
+`20261014T215041909121Z` completed the native route to within two metres of
+adult target `sol_target_0000` (1079); both final eyes show the camp, connected
+hands/sleeves, and the native Fulton/carry prompts.
+
+At that approach the target was asleep (native life 3). Before the selected
+Fulton case could dispatch, the native target became dead (life 1) and
+`mission18_adult_target_clear` became true. Retained `20261014T215257985790Z`
+therefore failed its entry predicate with **no action dispatched**. This is
+native adult-objective progress, not a successful VR extraction test, and its
+cause has not been attributed to a particular shot or ally. All five children
+remain unrescued.
+
+The ranged rifle bot probe `20261014T213148377165Z` correctly refused a trigger
+when its actual barrel oscillated away from the selected target. The bot now
+prepares the firing hand and measured authored support contact from the same
+publication and rotates both together, rather than copying a socket already
+constrained by the old left hand after moving only the right. Native VR rig,
+bindings, barrel/visibility gates and collision stay intact. Optional combat
+`--target` names one exact living native soldier and cannot substitute a nearer
+guard. All 47 combat checks pass. The closer repeats
+`20261014T214835818220Z` and `20261014T215523448502Z` found their selected
+actors already incapacitated and dispatched no trigger; live acceptance of
+the paired-motion correction remains pending.
 
 The 1.0 source work survives the interrupted `Find mod download count` task.
 The published October 11 source is commit `87e51f2`, still present on
@@ -64,9 +90,12 @@ installer checks. `play/` still matches the published `experimental-2026-10-11`
 pin, DLL `3e6e3d6e9818`; `Play.cmd` restores that release, and `Play-Dev.cmd`
 selects checked development. No publication or pin promotion occurred.
 
-**Resume point:** repeat the corrected Mission 18 sortie/loadout spatial canvas,
-then complete its actual field objectives and reported results-to-cutscene
-handoff. The last retained run, `20261014T192109259237Z`, opened the left-hand
+**Resume point:** continue actual mission `10100`, `Seq_Game_BeforeRescueBoy`,
+from the Bampapeve approach toward the authored child-rescue door. The adult
+objective is complete; the five rescues and reported results-to-cutscene
+handoff remain pending. Sortie canvas padding/motion and the paired-rifle bot
+correction still need their own repeats. The interrupted thread's retained
+run, `20261014T192109259237Z`, opened the left-hand
 iDroid in the Africa ACC (`40020`, story 33). Its action was observed, but
 visual review is pending and cleanup failed with `Observed action prerequisite
 changed`; the run remains failed and does not verify deployment. Recovery
