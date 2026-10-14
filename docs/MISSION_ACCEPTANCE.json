@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_utc": "2026-10-14T17:32:33.385748+00:00",
+  "updated_utc": "2026-10-14T20:46:00Z",
   "scope": "Every released TPP story mission and difficulty variant; separate contextual inventory covers free roam, side operations, ACC and other modes. Registry indices are not assumed to equal displayed episode numbers.",
   "source": {
     "native_query": "TppDefine.MISSION_LIST, MISSION_ENUM, HARD_MISSION_ENUM, MISSING_NUMBER_MISSION_ENUM",
@@ -1173,21 +1173,24 @@
           "status": "unproven",
           "evidence": []
         }
-      },
-      "priority": "reported_release_blocker",
-      "reported_episode": 18,
-      "reported_failure": "Results require desktop focus/click and alternate flat/VR Confirm before the next cutscene."
+      }
     },
     {
       "native_mission_code": 10100,
       "native_registry_index": 19,
       "difficulty_variant": false,
       "base_code": 10100,
-      "status": "unproven",
+      "status": "partial_debug_playthrough",
       "checks": {
         "launch_and_loading_confirm": {
-          "status": "unproven",
-          "evidence": []
+          "status": "partial",
+          "evidence": [
+            "artifacts/bot/runs/20261014T203801017996Z",
+            "artifacts/bot/runs/20261014T204314877782Z",
+            "artifacts/bot/runs/20261014T204434101140Z",
+            "artifacts/bot/runs/20261014T204606976112Z"
+          ],
+          "notes": "Complete native loadout and arrival-time controls visible over retained stereo cabin; vertical canvas padding remains open. VR Confirm genuinely started mission 10100. Immediate arrival pair caught the authored episode-title fade; field and insertion review pending."
         },
         "first_person_stand_crouch_prone_and_motion": {
           "status": "unproven",
@@ -1237,6 +1240,20 @@
           "status": "unproven",
           "evidence": []
         }
+      },
+      "priority": "reported_release_blocker",
+      "reported_episode": 18,
+      "reported_failure": "Results require desktop focus/click and alternate flat/VR Confirm before the next cutscene.",
+      "displayed_title": "Blood Runs Deep",
+      "identity_evidence": {
+        "native_selected_sortie_code": 10100,
+        "native_field_mission_code": 10100,
+        "reviewed_displayed_episode": 18,
+        "evidence": [
+          "artifacts/bot/runs/20261014T203247447666Z",
+          "artifacts/bot/runs/20261014T204606976112Z"
+        ],
+        "notes": "Observed native pending sortie and field code. Registry index 19 is not the displayed episode; the earlier code 10091 assignment was incorrect."
       }
     },
     {

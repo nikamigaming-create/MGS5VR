@@ -8,6 +8,26 @@ or Steam shutdown is needed by the local workflow.
 
 ## October 14 recovery checkpoint
 
+Mission 18 continuation on DLL `0daabcf78b03`: the actual mission list showed
+18: Blood Runs Deep, and both the native pending sortie and loaded field code
+are `10100`. The earlier `10091` assignment incorrectly treated a registry
+index as the displayed episode. Its regression obligation is now attached to
+`10100`, and the observer reads the native pending sortie code directly.
+
+Retained `20261014T203801017996Z` exposed the complete native loadout, characters
+and authored grey preview in all ten reviewed settled eye images. The prior
+stretched cabin preview is resolved in this static repeat; excess vertical
+canvas padding, head motion and complete transition review remain open.
+Retained `20261014T204314877782Z` and `20261014T204434101140Z` selected Commence
+Mission and ASAP through VR Confirm. Native loading confirmation in
+`20261014T204606976112Z` genuinely started mission `10100`; its immediate pair
+caught the authored episode-title fade and is not a field visual pass.
+Retained `20261014T205019447458Z` used effective VR Interact at the helicopter
+exit prompt and returned to real on-foot `Seq_Game_BeforeRescueBoy`, vehicle
+ID `65535`, normal action and a saved checkpoint. Both after eyes were reviewed
+with visible terrain and connected hands/sleeves. Objectives, moving-body and
+optics interactions, and the reported results handoff remain pending.
+
 The 1.0 source work survives the interrupted `Find mod download count` task.
 The published October 11 source is commit `87e51f2`, still present on
 `origin/main` after a fresh fetch. Later implementation, tests, licensed
@@ -44,7 +64,7 @@ remains pending. These are the continuing 1.0 obligations.
 
 October 14 mission coverage: `MISSION_ACCEPTANCE.json` records all 51 released
 TPP mission codes from the live native registry, excluding its 11 unavailable
-entries. Mission 18 (`10091`) has an explicit results/input/cutscene regression
+entries. Mission 18 (`10100`) has an explicit results/input/cutscene regression
 obligation. No entire mission or physical-headset pass is inferred from this
 inventory.
 
@@ -84,7 +104,7 @@ the earlier right-side camera fallback no longer floats there. Moving, larger
 leans, other outfits, vehicles and cabin bodies remain unaccepted.
 
 The existing `helicopter-rewards-user-20261011` profile has native story 33 and
-all 51 released missions open, including `10091`. It was loaded for direct
+all 51 released missions open, including `10100`. It was loaded for direct
 Mission 18 testing; the genuine fresh mission 1 profile remains preserved.
 Retained VR menu runs `20261014T182648000323Z`, `20261014T183415809591Z`,
 `20261014T183709804442Z` and `20261014T183922775024Z` closed the real Choose a

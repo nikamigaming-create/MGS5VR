@@ -22,7 +22,7 @@ The prologue genuinely reached results and mission 1 under requested damage
 protection; normal-difficulty completion remains open. The mission 1 checkpoint
 is preserved. Stationary mounted body views were reviewed, while riding motion,
 larger leans, outfits and vehicle/cabin bodies remain open. The current direct
-regression is Mission 18 (`10091`): its sortie/loadout spatial-canvas correction
+regression is Mission 18 (`10100`): its sortie/loadout spatial-canvas correction
 needs an actual repeat before field objectives and the reported results-to-scene
 handoff. The last Africa ACC iDroid-open run failed cleanup and has pending
 visual review. [MISSION_ACCEPTANCE.json](MISSION_ACCEPTANCE.json) inventories

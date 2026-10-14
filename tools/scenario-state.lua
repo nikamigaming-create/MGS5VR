@@ -38,6 +38,9 @@ field('video_stopped', function() return TppVideoPlayer.IsVideoStopped() end)
 -- default helicopter target. This read does not change native menu ownership.
 field('customization_target', function() return mvars.startCustomizeTarget end)
 field('helicopter_space', function() return TppMission.IsHelicopterSpace(vars.missionCode) end)
+-- The displayed episode is not the native registry index. Observe the actual
+-- pending sortie code selected by retail before assigning mission evidence.
+field('sortie_mission_code', function() return mvars.heliSequence_nextMissionCode end)
 field('customization_kind', function()
     if TppSequence.GetCurrentSequenceName() ~= 'Seq_Game_WeaponCustomize' then return nil end
     local target = mvars.startCustomizeTarget
@@ -81,6 +84,12 @@ field('hospital_volgin_fatal_attack', function()
     end
 end)
 field('mission6_event_sequence', function() if vars.missionCode == 10040 then return svars.eventSequenceNum end end)
+field('mission18_adult_target_clear', function()
+    if vars.missionCode == 10100 then return svars.isTargetClear end
+end)
+field('mission18_children_rescued', function()
+    if vars.missionCode == 10100 then return svars.isBoyHostagesCount_clear end
+end)
 field('mission6_bridge_demo', function()
     if vars.missionCode == 10040 then return DemoDaemon.IsPlayingDemoId('p31_020020_000') end
 end)
