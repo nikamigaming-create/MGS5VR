@@ -74,13 +74,44 @@ eyes were reviewed: the prone body/shoulder obstructs much of the left eye
 when firing back across the native body heading. Physical sights, body
 visibility and complete rifle acceptance remain open.
 
-**Continuing work:** resolve the native cave approach and alert conditions,
-then perform the five rescues and the genuine results-to-cutscene handoff.
-No child rescue, mission result page or whole-mission acceptance has occurred.
-The runtime used above is still DLL `0daabcf78b03`; a required development
-build/check of the new tooling is pending. Full-game and physical Quest
-acceptance remain open. The older recovery checkpoint below retains its
-original scope and is superseded by these exact reload and field observations.
+The native alert subsequently cleared. The short prone-to-crouch case
+`20261015T005145593191Z` returned actual crouched control. The earlier
+two-pulse rise `20261015T004803436468Z` reached crouch but failed its separate
+standing predicate and returned to prone; it is not a standing pass.
+The alert-gated repeats `20261015T004850148350Z` and
+`20261015T005235842010Z` rejected their entry conditions before dispatch.
+Retained `20261015T005506090105Z` finally admitted the crouched, clear-alert
+VR Interact repeat, but its bounded crossing still hit native collision and
+failed to reach the displacement target. The ordinary gate has not opened.
+Investigate its native eligibility and the intended entrance before changing
+the established VR interaction; no native door, collision, actor or mission
+progression state was written.
+
+The required `tools/build.ps1 -SkipBootstrap` development build at source
+`845ff9d` passed all 56 CTest groups (48.48 seconds) and installer checks.
+Runtime DLL remains `0daabcf78b03`. Both complete slot manifests verify;
+published `play/` remains DLL `3e6e3d6e9818` and unchanged manifest
+`bc47e1f68476`. The obsolete-build inventory is empty. The build log and slot
+receipt are `mission18-upgrade-continuation-build.log` and
+`mission18-upgrade-checked-slots.json` in `artifacts/dev/one-zero-current/`.
+
+Before owned-session cleanup, the exact native state was mission `10100`,
+`Seq_Game_BeforeRescueBoy`, crouched at `[1397.169,130.729,-1516.487]`,
+adult objective clear, zero children rescued, checkpoint `0` and native
+alert clear. The complete stopped state is `mission18-upgrade-final-native.json`.
+This last pose has not been verified as a reload checkpoint. All sampled
+buttons, axes and triggers were neutral, with no Pause/iDroid menu open.
+Cleanup closed only the owned MGSV/simulator session; Steam PID 21364 remained
+running, and the per-game and Windows' 64-bit runtime remain Meta Quest Link.
+The cleanup log is `mission18-upgrade-cleanup.log`.
+
+**Resume point:** reload the genuine saved mission entry, resolve the ordinary
+cave gate's native eligibility/intended approach, then perform the five rescues
+and the genuine results-to-cutscene handoff. The head/input probe's pass does
+not certify a door opening. No child rescue, mission result page or
+whole-mission acceptance has occurred. Full-game and physical Quest acceptance
+remain open. The older recovery checkpoint below retains its original scope
+and is superseded by these exact reload and field observations.
 
 ## October 14 recovery checkpoint
 

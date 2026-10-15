@@ -26,10 +26,16 @@ regression is Mission 18 (`10100`): its static sortie/loadout repeat exposed
 the complete authored preview, with canvas padding and motion still open.
 Actual VR deployment reached the field and the adult objective became clear.
 The retained mine approach has all five children alive; the rescue door,
-extractions and reported results-to-scene handoff remain pending. No reload at
-the last test position is verified. Source checkpoints are now on the remote
-development branch, and the owned simulator session has been closed with Meta
-Link restored. [MISSION_ACCEPTANCE.json](MISSION_ACCEPTANCE.json) inventories
+extractions and reported results-to-scene handoff remain pending. The simulator
+upgrade continuation genuinely reloaded a field entry with the adult objective
+preserved, then verified existing VR wall-cover recovery and paired rifle
+discharge. The ordinary cave gate still blocked a clear-alert interaction/
+crossing repeat. Back-facing prone rifle views also exposed body/shoulder
+intrusion in the left eye. Neither the last test pose nor complete rifle/body
+acceptance is verified. The new tooling passed all 56 groups and installer
+checks; source checkpoints are on the remote development branch. The owned
+simulator session is closed with Meta Link restored.
+[MISSION_ACCEPTANCE.json](MISSION_ACCEPTANCE.json) inventories
 all 51 required missions; none has full-mission acceptance. Physical Quest
 acceptance remains pending. The October 13 findings below retain their original
 scope and are superseded only by the exact later results in CURRENT.md.
