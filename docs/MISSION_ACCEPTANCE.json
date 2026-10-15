@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_utc": "2026-10-14T20:46:00Z",
+  "updated_utc": "2026-10-15T00:45:21.804930+00:00",
   "scope": "Every released TPP story mission and difficulty variant; separate contextual inventory covers free roam, side operations, ACC and other modes. Registry indices are not assumed to equal displayed episode numbers.",
   "source": {
     "native_query": "TppDefine.MISSION_LIST, MISSION_ENUM, HARD_MISSION_ENUM, MISSING_NUMBER_MISSION_ENUM",
@@ -1197,8 +1197,11 @@
           "evidence": []
         },
         "physical_weapons_fire_reload_and_optics": {
-          "status": "unproven",
-          "evidence": []
+          "status": "partial",
+          "evidence": [
+            "artifacts/bot/runs/20261015T004131426704Z"
+          ],
+          "notes": "Exact native guard 1043; attached paired rifle support and two-round discharge observed, followed by native incapacitation with buddy attribution not excluded. Both aim-probe eyes reviewed: back-facing prone body/shoulder intrusion blocks much of the left eye. Sights, complete body view, reload and optics acceptance remain open."
         },
         "physical_binocular_acquire_mark_zoom": {
           "status": "unproven",
@@ -1209,8 +1212,13 @@
           "evidence": []
         },
         "mission_specific_vr_interactions": {
-          "status": "unproven",
-          "evidence": []
+          "status": "partial",
+          "evidence": [
+            "artifacts/bot/runs/20261014T205019447458Z",
+            "artifacts/bot/runs/20261015T001517562219Z",
+            "artifacts/bot/runs/20261015T001619118256Z"
+          ],
+          "notes": "Reviewed native VR helicopter exit and existing VR stance/dive wall-cover recovery. No cave-door opening or child extraction is accepted."
         },
         "authored_cinematics_head_motion_actor_visibility_shadows": {
           "status": "unproven",
@@ -1233,8 +1241,11 @@
           "evidence": []
         },
         "death_retry_checkpoint_reload": {
-          "status": "unproven",
-          "evidence": []
+          "status": "partial",
+          "evidence": [
+            "artifacts/bot/runs/20261014T235242773390Z"
+          ],
+          "notes": "Genuine restart and Continue reloaded native mission 10100 in the field with adult objective clear and zero children rescued. Both arrival eyes reviewed. Death/retry and reload at the last test pose remain unproven."
         },
         "physical_quest_link_acceptance": {
           "status": "unproven",

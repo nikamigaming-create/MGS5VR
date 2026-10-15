@@ -6,6 +6,82 @@ left-arm HUD popups, and the left-hand iDroid requested on October 4. Pause uses
 panel. Floating firearm aiming overlays stay off. No desktop/input automation
 or Steam shutdown is needed by the local workflow.
 
+## October 14 simulator-upgrade continuation
+
+The user closed the first fresh MGSV session for an upgrade; its clean exit
+before bot input is not a game-crash reproduction. Meta XR Simulator `v207.0`
+was replaced by `v207.1`. The ignored local test configuration now names the
+installed `v207.1` manifest. Windows' 64-bit physical runtime remains Meta
+Quest Link. Source checkpoint `857a6d2` is pushed to the development branch;
+the published `play/` pin has not advanced.
+
+Retained `20261014T235242773390Z` genuinely reloaded mission `10100` at
+`[1102.845,147.337,-1452.049]`, in `Seq_Game_BeforeRescueBoy`, with the adult
+objective still clear and zero children rescued. Both arrival eyes show the
+field and connected hands/sleeves. This proves that objective and a field
+entry survived the restart; it does not verify reloading at the previous
+test's final `[1387.221,129.985,-1491.565]` pose.
+
+The navigation importer dropped explicit native boundary links when two
+coincident endpoints rounded to different millimetres. The owned rescue-area
+pair differs in Y by `0.000376142` metres. The importer now requires reciprocal
+native tile/group references, the observed external-record sentinel, unique
+endpoints in both directions and at most 2 mm of full 3D disagreement. It
+does not connect nearby unreferenced floors. All 44 navigation checks pass.
+The Africa audit resolves 27,068 of 27,452 external records; 384 external and
+2,049 split-group records remain non-traversable. Retained preflights
+`20261015T000344933438Z` and `20261015T000651416555Z` still refuse a route into
+the rescue rooms before dispatch. Their remaining disconnected topology is
+not proof that the native player's cave entrance is inaccessible.
+
+Retained route `20261015T000942570512Z` stopped in native wall cover at the
+outer fence. A read-only status inventory established `PlayerStatus.BEHIND`,
+rather than a completed fence vault. The observer now records that registered
+status. Retained `20261015T001517562219Z` used the existing VR stance control
+to crouch in cover; `20261015T001619118256Z` used the existing VR dive control
+to leave it, with real `BEHIND=false`, `NORMAL_ACTION=true` and native
+displacement. Both final eye pairs were reviewed. The subsequent 220-node
+route `20261015T001718034754Z` reached the mine approach, and the 51-node
+walking route `20261015T001946741109Z` reached
+`[1397.139,130.729,-1516.690]`; both latter final eyes were reviewed.
+
+Owned locator arrays and native `Fox.StrCode32` joins identify the actual
+door pivots: the ordinary cave gate `...vrtn002_gim_n0002` is at
+`[1398.026,129.933,-1513.923]`; the rescue demo gate
+`...vrtn001_gim_n0000` is at `[1428.311,126.500,-1519.492]`; the inner boy gate
+`...vrtn002_gim_n0001` is at `[1419.915,124.977,-1537.309]`.
+The native lock query reports the ordinary gate unlocked and both rescue
+gates locked. The owned arrays, path hashes and read-only receipts remain
+private. The earlier enemy-check centre and nav-volume centres are distinct
+from these locator pivots.
+
+Retained `20261015T002405232994Z` reviewed the ordinary gate in both eyes.
+Retained `20261015T002707870529Z` made the bounded VR approach;
+`20261015T002940905389Z` then stopped on native collision with no movement
+progress. Retained `20261015T003057771431Z` delivered VR Interact while facing
+it, but both final eyes still show a closed gate. Its passed head/input
+predicate is **not** a door-opening or rescue pass. Native alert remained
+active through the prone and released observation runs
+`20261015T003524422930Z` and `20261015T003651397104Z`; the latter timed out.
+
+Retained combat `20261015T004131426704Z` selected exact living native guard
+`sol_diamond_0005` (1043). The corrected paired rifle motion established
+attached support, 7.15 cm barrel lateral error and a 2.84-degree view angle
+before a real two-round discharge (`PRIMARY_HIP` 30 to 28). Native actor life
+then became 2; buddy contribution is not excluded. This proves the bounded
+paired-motion/discharge case, not exclusive hit attribution. Both aim-probe
+eyes were reviewed: the prone body/shoulder obstructs much of the left eye
+when firing back across the native body heading. Physical sights, body
+visibility and complete rifle acceptance remain open.
+
+**Continuing work:** resolve the native cave approach and alert conditions,
+then perform the five rescues and the genuine results-to-cutscene handoff.
+No child rescue, mission result page or whole-mission acceptance has occurred.
+The runtime used above is still DLL `0daabcf78b03`; a required development
+build/check of the new tooling is pending. Full-game and physical Quest
+acceptance remain open. The older recovery checkpoint below retains its
+original scope and is superseded by these exact reload and field observations.
+
 ## October 14 recovery checkpoint
 
 The recovered source and subsequent tooling checkpoints through `2dcc960` are

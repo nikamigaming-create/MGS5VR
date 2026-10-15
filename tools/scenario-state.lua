@@ -127,7 +127,7 @@ field('mission_prepared', function() return TppSequence.IsMissionPrepareFinished
 -- (80/81/83) in this supported executable; no guessed injury getter is used.
 -- CQC_HOLD/CONTINUOUS are registered native values 87/88. Neither alone
 -- identifies the held actor; actor identity needs a separate joined read.
-for _, name in ipairs({'CARRY', 'CRAWL', 'NORMAL_ACTION', 'PARTS_ACTIVE', 'SQUAT', 'STAND',
+for _, name in ipairs({'CARRY', 'CRAWL', 'NORMAL_ACTION', 'PARTS_ACTIVE', 'SQUAT', 'STAND', 'BEHIND',
                        'INJURY_LOWER', 'INJURY_UPPER', 'CURE', 'GUN_FIRE', 'GUN_FIRE_SUPPRESSOR',
                        'CQC_HOLD', 'CQC_CONTINUOUS', 'INTRUDE', 'SUBJECT', 'ON_VEHICLE', 'ON_HORSE'}) do
     field('status_' .. name, function()
