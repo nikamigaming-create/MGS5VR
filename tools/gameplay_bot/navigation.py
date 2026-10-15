@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import heapq
+import itertools
 import json
 import math
 import re
@@ -90,7 +91,9 @@ def read_nav2(path):
     if not all(math.isfinite(v) for v in origin):
         raise BotFault("Nonfinite NAV2 origin")
     identity = {'source': str(Path(path).resolve()), 'sha256': hashlib.sha256(data).hexdigest(),
-                'version': magic}
+                'version': magic, 'split_index': data[20],
+                # Packed native X/Z tile identity, independent of its filename.
+                'tile_id': int.from_bytes(data[21:24], 'little') >> 7}
     if not count:
         if length != 112 or entry != length:
             raise BotFault("Empty NAV2 tile has unexplained payload")
@@ -137,8 +140,9 @@ def read_nav2(path):
                 elif portals == 2:
                     cross_group.append({'from': i, 'group': links[0], 'to': links[1]})
                 elif portals == 4:
-                    # External tile encoding is retained. Only an exactly
-                    # matching boundary endpoint in another file may join it.
+                    # Retain the complete external record. Its first two words
+                    # identify the neighbouring tile/group; the last word is
+                    # not the destination node index in the owned corpus.
                     boundaries.append({'node': i, 'raw': links})
                 elif portals:
                     raise BotFault("Unsupported NAV2 portal encoding")
@@ -184,29 +188,30 @@ class NativeMap:
     def __init__(self, tiles):
         self.positions, self.adj, self.sources = [], defaultdict(dict), []
         self.unresolved_portals = []
-        portals = defaultdict(list)
+        portals, external = defaultdict(list), []
         for tile in tiles:
             self.sources.append({'source': tile['source'], 'sha256': tile['sha256']})
             bases = {}
             for group in tile['groups']:
                 base = len(self.positions)
                 bases[group['id']] = (base, len(group['nodes']))
-                boundary_ids = {b['node'] for b in group.get('boundaries', [])}
                 for point in group['nodes']:
                     if len(point) != 3 or not all(math.isfinite(v) for v in point):
                         raise BotFault("Invalid native map position")
                     node = len(self.positions)
                     self.positions.append(tuple(point))
-                    # Exact millimetre agreement, including height. Never join
-                    # nearest X/Z nodes across a cliff or a missing tile.
-                    key = tuple(round(v, 3) for v in point)
-                    if node - base in boundary_ids:
-                        for other, source in portals[key]:
-                            if source != tile['source']:
-                                distance = math.dist(point, self.positions[other])
-                                self.adj[node][other] = (distance, None)
-                                self.adj[other][node] = (distance, None)
-                        portals[key].append((node, tile['source']))
+                for boundary in group.get('boundaries', []):
+                    node = boundary['node']
+                    raw = boundary.get('raw', ())
+                    if not 0 <= node < len(group['nodes']) or len(raw) != 4:
+                        raise BotFault('Invalid native external portal')
+                    point = self.positions[base + node]
+                    record = (base + node, tile['source'], tile.get('tile_id'), group['id'], raw)
+                    # A bucket only finds candidates. The 3D distance and both
+                    # native tile/group references below authorize the link.
+                    cell = tuple(math.floor(v / .002) for v in point)
+                    portals[(tile.get('tile_id'), group['id'], cell)].append(record)
+                    external.append(record)
                 for edge in group['edges']:
                     a, b = base + edge['from'], base + edge['to']
                     if not base <= a < len(self.positions) or not base <= b < len(self.positions):
@@ -227,6 +232,28 @@ class NativeMap:
                     if distance > .002:
                         raise BotFault("NAV2 group portal heights/positions disagree")
                     self.adj[a][b] = (distance, None)
+        candidates = {}
+        for node, source, tile_id, group_id, raw in external:
+            matches = []
+            point = self.positions[node]
+            cell = tuple(math.floor(v / .002) for v in point)
+            if tile_id is not None and raw[2] == 65535:
+                for offset in itertools.product((-1, 0, 1), repeat=3):
+                    neighbour = tuple(cell[i] + offset[i] for i in range(3))
+                    for other, other_source, _, _, other_raw in portals.get((raw[0], raw[1], neighbour), ()):
+                        if (other_source != source and other_raw[2] == 65535
+                                and tuple(other_raw[:2]) == (tile_id, group_id)
+                                and math.dist(point, self.positions[other]) <= .002):
+                            matches.append(other)
+            candidates[node] = matches
+        for node, source, _, _, raw in external:
+            matches = candidates[node]
+            if len(matches) != 1 or candidates.get(matches[0]) != [node]:
+                self.unresolved_portals.append({'source': source, 'node': node, 'raw': raw,
+                                                'reason': 'ambiguous_external' if matches else 'missing_external'})
+                continue
+            other = matches[0]
+            self.adj[node][other] = (math.dist(self.positions[node], self.positions[other]), None)
         self.identity = hashlib.sha256('\n'.join(sorted(s['sha256'] for s in self.sources)).encode()).hexdigest()
         if not self.positions:
             raise BotFault("No owned navigation tiles")

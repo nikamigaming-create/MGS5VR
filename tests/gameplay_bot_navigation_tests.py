@@ -20,10 +20,11 @@ from gameplay_bot.perception import read_enemy_snapshot
 from gameplay_bot.hospital_navigation import HospitalEventRoute
 
 
-def tile(name, points, edges, *, boundaries=(), cross=(), group=4):
-    return {'source':name, 'sha256':name*64, 'groups':[{'id':group,'nodes':points,
+def tile(name, points, edges, *, boundaries=(), cross=(), group=4, tile_id=0):
+    return {'source':name, 'sha256':name*64, 'tile_id':tile_id, 'groups':[{'id':group,'nodes':points,
         'edges':[{'from':a,'to':b,'flags':1249} for a,b in edges],
-        'boundaries':[{'node':i} for i in boundaries], 'cross_group':list(cross)}]}
+        'boundaries':[{'node':i,'raw':(target,other_group,65535,i)} for i,target,other_group in boundaries],
+        'cross_group':list(cross)}]}
 
 
 class NavigationTests(unittest.TestCase):
@@ -475,10 +476,56 @@ class NavigationTests(unittest.TestCase):
         with self.assertRaises(BotFault): nav.path(0,1)
 
     def test_exact_external_portal_joins_directed_paths(self):
-        nav=NativeMap([tile('a',[(0,0,0),(1,0,0)],[(0,1)],boundaries=[1]),
-                       tile('b',[(1,0,0),(2,0,0)],[(0,1)],boundaries=[0])])
+        nav=NativeMap([tile('a',[(0,0,0),(1,0,0)],[(0,1)],tile_id=1,boundaries=[(1,2,4)]),
+                       tile('b',[(1,0,0),(2,0,0)],[(0,1)],tile_id=2,boundaries=[(0,1,4)])])
         self.assertEqual(nav.path(0,3),[0,1,2,3])
         with self.assertRaises(BotFault): nav.path(3,0)
+
+    def test_external_portal_keeps_submillimetre_height_across_rounding_boundary(self):
+        # The owned rescue-gate tiles use different Y origins/divisors. Their
+        # coincident boundary rounds to 125.050 in one and 125.049 in the other.
+        a=(1417.2485322896282,125.0498205670839,-1536.)
+        b=(1417.2485322896282,125.04944442538952,-1536.)
+        self.assertNotEqual(tuple(round(v,3) for v in a),tuple(round(v,3) for v in b))
+        nav=NativeMap([tile('a',[(1416,a[1],a[2]),a],[(0,1)],group=0,tile_id=1323,
+                           boundaries=[(1,1259,2)]),
+                       tile('b',[b,(1418,b[1],b[2])],[(0,1)],group=2,tile_id=1259,
+                           boundaries=[(0,1323,0)])])
+        self.assertEqual(nav.path(0,3),[0,1,2,3])
+        self.assertAlmostEqual(nav.adj[1][2][0],abs(a[1]-b[1]))
+        with self.assertRaises(NoConnectedNativeRoute):nav.path(3,0)
+
+    def test_external_portal_requires_reciprocal_tile_group_and_close_3d_endpoint(self):
+        a=tile('a',[(0,0,0),(1,0,0)],[(0,1)],tile_id=1,boundaries=[(1,2,4)])
+        b=tile('b',[(1,0,0),(2,0,0)],[(0,1)],tile_id=2,boundaries=[(0,1,4)])
+        for field,value in ((0,3),(1,3),(2,0)):
+            other=copy.deepcopy(b)
+            raw=list(other['groups'][0]['boundaries'][0]['raw']);raw[field]=value
+            other['groups'][0]['boundaries'][0]['raw']=tuple(raw)
+            nav=NativeMap([a,other])
+            with self.assertRaises(NoConnectedNativeRoute):nav.path(0,3)
+        for offset in (.0021,.1,20.):
+            other=copy.deepcopy(b)
+            other['groups'][0]['nodes']=[(x,y+offset,z) for x,y,z in other['groups'][0]['nodes']]
+            nav=NativeMap([a,other])
+            with self.assertRaises(NoConnectedNativeRoute):nav.path(0,3)
+        # Missing and repeated destination split records cannot pick one by
+        # iteration order, even when their endpoint positions are identical.
+        missing=NativeMap([a])
+        self.assertEqual(len(missing.unresolved_portals),1)
+        duplicate=copy.deepcopy(b);duplicate['source']='c'
+        nav=NativeMap([a,b,duplicate])
+        self.assertEqual(len(nav.unresolved_portals),3)
+        with self.assertRaises(NoConnectedNativeRoute):nav.path(0,3)
+
+    def test_native_external_tile_identity_is_read_from_header_not_filename(self):
+        data=self.nav2_bytes(201403242)
+        data[20]=7;data[21:24]=(1323<<7).to_bytes(3,'little')
+        with tempfile.TemporaryDirectory() as directory:
+            path=pathlib.Path(directory)/'unrelated-name';path.write_bytes(data)
+            graph=read_nav2(path)
+            self.assertEqual(graph['tile_id'],1323)
+            self.assertEqual(graph['split_index'],7)
 
     def test_nearby_unconnected_nodes_cannot_invent_a_portal(self):
         for offset in (0., .1, 5.):
