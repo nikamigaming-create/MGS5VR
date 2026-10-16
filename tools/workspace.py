@@ -784,7 +784,7 @@ def main():
         clean(sys.modules[__name__], args)
     cleanup.set_defaults(handler=clean_builds)
     observe = commands.add_parser("bot")
-    observe.add_argument("--command", choices=("observe", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state", "mortar"), default="observe")
+    observe.add_argument("--command", choices=("observe", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state", "mortar", "cqc"), default="observe")
     observe.add_argument('--policy', type=Path, help='mortar: reviewed authored fixture and operator position')
     observe.add_argument("--suite", type=Path)
     observe.add_argument("--seconds", type=float, default=15)

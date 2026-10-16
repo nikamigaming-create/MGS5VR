@@ -2681,6 +2681,48 @@ class BotTests(unittest.TestCase):
             live.capture("failed-release")
         live.call.assert_not_called()
 
+    def test_known_busy_release_retries_only_neutral_input(self):
+        live = Live.__new__(Live)
+        live.events = self.events
+        clock = Clock()
+        calls = []
+        def call(method, value):
+            calls.append((method, value))
+            if len(calls) < 3:
+                raise RuntimeError("Error: Another input gesture is already in progress for this session.")
+        live.call = call
+        with mock.patch("gameplay_bot.live.time.monotonic", clock), mock.patch("gameplay_bot.live.time.sleep", clock.sleep):
+            live._release_channel(channel("left_stick_left"))
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all(name == 'set_controller_input' and value['value'] == 0
+                            and value['auto_release'] is False for name, value in calls))
+        self.assertAlmostEqual(clock.now, .05)
+
+    def test_busy_release_is_bounded_and_keeps_failed_channel(self):
+        live = Live.__new__(Live)
+        live.events = self.events
+        live.held = {('left', 'Thumbstick', 'X'): channel('left_stick_left')}
+        clock = Clock()
+        def call(method, value):
+            if value.get('sub_component') == 'X':
+                raise RuntimeError("Error: Another input gesture is already in progress for this session.")
+        live.call = call
+        with mock.patch("gameplay_bot.live.time.monotonic", clock), mock.patch("gameplay_bot.live.time.sleep", clock.sleep):
+            with self.assertRaisesRegex(BotFault, 'Input release failed'):
+                live.release()
+        self.assertAlmostEqual(clock.now, 1.)  # Both stick-X channels are explicitly rejected.
+        self.assertTrue(live.held)
+        self.assertFalse(live._released_once)
+
+    def test_unknown_release_completion_or_other_rejection_is_never_replayed(self):
+        for error in (TimeoutError('completion unknown'), RuntimeError('different input error')):
+            live = Live.__new__(Live)
+            live.events = self.events
+            live.call = mock.Mock(side_effect=error)
+            with self.assertRaises(type(error)):
+                live._release_channel(channel('y'))
+            self.assertEqual(live.call.call_count, 1)
+
     def test_ambiguous_operator_timeout_does_not_queue_more_work(self):
         live = Live.__new__(Live)
         live.kernel = mock.Mock()

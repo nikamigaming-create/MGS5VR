@@ -29,6 +29,8 @@ HeadCameraSample latest;
 OpticWaypoints waypoints;
 CombatSightSnapshot combatSight;
 std::atomic_uint64_t combatSightExpiry{};
+// Keep a finite segment outside the muzzle, including genuine close encounters.
+constexpr float combatSightMinimumRange=.25f;
 CoverProbeRequest coverRequest;
 CoverProbeSnapshot coverResult;
 uint64_t consumed{},consumedClear{};
@@ -103,7 +105,7 @@ std::optional<Vector> combatSurface(Vec3 origin,CombatSightTarget& target){
     if(!read<uintptr_t>(base+0x2c79710))return {};
     target.queryReason=2;
     if(!valid(Pose{{},origin})||!valid(Pose{{},endpoint})
-       ||!std::isfinite(length)||length<1.f||length>300.f)return {};
+       ||!std::isfinite(length)||length<combatSightMinimumRange||length>300.f)return {};
     alignas(16) std::array<std::byte,0x250> query{};
     using Init=void*(*)(void*,uint32_t);
     using Ray=uint32_t(*)(void*,uint32_t,const Vector*,const Vector*,float);
@@ -168,7 +170,7 @@ void sampleCombatSight(uintptr_t markers,const HeadCameraSample& frame,uint64_t 
             target.aim=target.marker+Vec3{0,-.65f,0};
             const auto delta=target.aim-result.muzzle.position;
             target.distance=std::sqrt(dot(delta,delta));
-            if(target.distance>=1.f&&target.distance<=180.f)candidates.push_back(target);
+            if(target.distance>=combatSightMinimumRange&&target.distance<=180.f)candidates.push_back(target);
         }
         std::sort(candidates.begin(),candidates.end(),[](const auto& a,const auto& b){return a.distance<b.distance;});
         result.candidates=candidates.size();

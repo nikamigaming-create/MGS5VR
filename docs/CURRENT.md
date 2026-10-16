@@ -6,6 +6,114 @@ left-arm HUD popups, and the left-hand iDroid requested on October 4. Pause uses
 panel. Floating firearm aiming overlays stay off. No desktop/input automation
 or Steam shutdown is needed by the local workflow.
 
+## October 16 release work in progress
+
+The user explicitly requested sustained autonomous defect repair and gameplay
+testing through the day, rather than a status-only handoff or assigning routine
+regressions to tonight's headset session. Continue the release queue below.
+Consult `build/dev/BUILD.json` and the ignored live-work receipt
+`artifacts/dev/one-zero-current/oct16-active-work.json` for the latest checked
+candidate and exact session/reload state; the dated observations below keep
+their original acceptance scope.
+
+Fresh development at source `a96eda5`, DLL `aa5696e3b8d2`, passed all 56 CTest
+groups (32.49 seconds) and installer checks. The first bounded pass observed
+18 native case outcomes: field contexts/Pause, one-hand firearm readiness,
+the four-state posture roundtrip and ordinary left-hand iDroid fit/stow/reopen.
+Paired final-eye stills were reviewed for their stated scope. Active held
+equipment/Commands popup pixels, continuous motion, forced tutorial stow,
+full optics and physical Quest acceptance were not established by those
+outcomes. The receipt is
+`artifacts/dev/one-zero-current/oct16-release-status.json`. The published
+October 11 `play/` manifest remains unchanged.
+
+Mission 18 has now passed the former cave-entrance blocker with existing VR
+controls. The standing, closer centerline approach and VR Interact in retained
+`20261016T140552686145Z` visibly opened the ordinary cave gate in both eyes.
+Subsequent crossing attempts stopped at its jamb; those remain failed.
+Retained `20261016T141206211705Z` aligned the native capsule and genuinely
+crossed to `[1398.670,130.729,-1514.615]`. Both eyes show the open gate and
+cave interior. Retained `20261016T141410447567Z` then walked into the cave to
+`[1401.084,130.360,-1514.927]`. No door, collision, actor transform or mission
+progression was written. The later NAV2 route preflights still refuse the
+disconnected rescue-door endpoint; they do not establish a player obstruction
+inside the now-open cave. Continue through observed native movement and actual
+door eligibility, then the five rescues and results handoff.
+
+Native movement run `20261016T140755439196Z` reproduced Meta simulator v207.1
+rejecting a zero-input release while an expiring gesture was still finishing.
+The harness now retries only that exact known rejection for an idempotent zero,
+bounded to 0.5 seconds. Nonzero actions, ambiguous timeouts and other failures
+are never replayed. All 299 bot checks pass, including bounded refusal and
+unknown-completion negatives. Complete development checks and a live repeat
+of the exact release-race recovery remain pending after this tooling change.
+
+The route genuinely reached the rescue gate at
+`[1424.307,127.468,-1517.122]` in retained `20261016T142237219796Z`.
+Native eligibility still requires no alert and no active soldier within the
+authored 30-metre rescue area. Two active guards followed Snake inside.
+The explicit lowered-trigger case `20261016T143433514405Z` observed native
+CQC_HOLD during the hold, but neither guard was incapacitated; it is not a
+rescue or exact-target CQC outcome. Inputs were released afterward.
+
+The combat observer had an artificial one-metre muzzle minimum, dropping
+the visible guard as the physical rifle approached. Development DLL
+`74a4aa7806a3` now retains finite rays from 25 cm and preserves native terrain,
+fresh owner, barrel alignment and support-hand gates. Its October 16 build
+passed all 56 CTest groups (28.71 seconds), including 52 combat contracts,
+and installer checks. Failed-aim captures now release input first and retain
+the original reason. A new live close-combat outcome remains pending.
+`oct16-close-combat-build.log` records this checked candidate.
+
+The earlier Mission 1 actual-game failure `20261014T175039775796Z` records
+ON_HORSE true, NORMAL_ACTION/ON_VEHICLE false and tutorial mode zero. The
+unchanged owned opener rejected that state after the VR request consumed
+native Menu. Source now adds ON_HORSE to the admitted postures in the extracted
+`native_idroid_open.lua`; native availability and tutorial progression remain
+retail-owned. All 57 isolated policy checks pass in both Lua 5.1 fixtures and
+the actual game's Lua VM, including missing horse registration, popup/save/
+demo/title/hospital/preparation/sequence refusal. A checked build containing
+that source and actual mounted open, stow and immediate reopen are required
+before claiming its live fix or tutorial acceptance.
+
+The rebuilt native session reloaded mission 18 in retained
+`20261016T144621964517Z`; both arrival eyes were reviewed. The walking route
+entered actual wall cover at two fences. In retained
+`20261016T145312484525Z`, the existing VR dive genuinely released crouched
+BEHIND into normal prone controls; both eyes were reviewed. The next route
+uses crouched movement toward the cave. Failed route/case attempts retain
+their failed scope, including a cover predicate that expired before input.
+
+Retained `20261016T151154791527Z` waited for real native eligibility and used
+VR Interact to unlock the rescue event door, genuinely entering
+`Seq_Demo_MeetBoySoldier`. Retained `20261016T151255384352Z` exercised native
+cinematic head turns, 12-cm lean and viewer movement. All six sequential eye
+pairs were reviewed: actual children, Snake, cave and moving native shots;
+no stereo synchronization or physical comfort is inferred. The separate
+20.109-second composited-left-eye take in
+`artifacts/dev/one-zero-current/oct16-rescue-cinematic/` contains 90 real
+captured frames (4.476 measured captures/sec, not game FPS), no reported
+capture/encoder error, and 1,206,832 bytes. Six sampled video frames were
+reviewed and show real changing action, not blank/stale content.
+
+Retained `20261016T151447820448Z` genuinely returned to
+`Seq_Game_AfterRescueBoy`, normal controls and checkpoint `363053210`
+(`CHK_MeetBoyHostages`), with saving false. Both final eyes show the open
+inner gate, the actual injured child, connected hands and native checkpoint
+feedback. Adult objective remains clear; **zero children are extracted**.
+This is the first actual rescue-door/cinematic/checkpoint pass, not a finished
+Mission 18. Verify the checkpoint reload when deploying the next candidate,
+then continue the five rescues and real mission-results handoff.
+
+The current owned simulator session is active for continuing Mission 18.
+Restore Meta Link and close owned test sessions during eventual cleanup;
+leave Steam running. Do not publish or advance the play pin from these scoped
+passes, and do not label any simulator work as physical-headset acceptance.
+The same chat has an hourly continuation through 18:00 America/Los_Angeles
+today, automation `mgs5vr-release-work-through-today`. Continue concrete fixes
+and bounded gameplay, avoid overlapping input owners, leave user-owned
+physical sessions alone, and clean up owned simulator work by that deadline.
+
 ## October 14 simulator-upgrade continuation
 
 The user closed the first fresh MGSV session for an upgrade; its clean exit

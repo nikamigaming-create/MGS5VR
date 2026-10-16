@@ -136,7 +136,7 @@ def continue_game(live, behavior):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("observe", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "campaign", "idroid", "optics", "supervise", "state"),
+    parser.add_argument("command", choices=("observe", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "campaign", "idroid", "optics", "supervise", "state", "cqc"),
                         help="session advances Continue and runs the whole suite on one connection")
     parser.add_argument("--game-dir", required=True, type=pathlib.Path)
     parser.add_argument("--proxy", type=pathlib.Path)
@@ -169,7 +169,7 @@ def main():
     if (not math.isfinite(args.seconds) or args.seconds < 0
             or (not args.seconds and args.command != 'supervise')):
         parser.error('--seconds must be positive; supervise also accepts zero for no total timer')
-    if args.command in ("run", "session", "cold-start") and not args.suite:
+    if args.command in ("run", "session", "cold-start", "cqc") and not args.suite:
         parser.error(args.command + " requires --suite")
     if args.trace_menu_input and args.command not in ("run", "session"):
         parser.error('--trace-menu-input requires one explicit run/session suite')
@@ -312,6 +312,11 @@ def main():
             elif args.command == "idroid":
                 start_recording()
                 result = inspect_idroid(live, behavior)
+            elif args.command == "cqc":
+                from gameplay_bot.cqc import run_named_cqc
+                start_recording()
+                result = run_named_cqc(live, read_json(args.suite), output=args.output,
+                    enemy_script=(ROOT / 'tools/navigation-state.lua').read_text())
             elif args.command == "optics":
                 start_recording()
                 result = inspect_optic_exposure(live,args.seconds)

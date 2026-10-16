@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from .combat import fresh_rig, looking_head
-from .core import BotFault, atomic_json
+from .core import BotFault, atomic_json, matches
 from .health import HealthRecoveryNeeded, needs_recovery
 from .live import authoritative_controls, channel, held_input_evidence, rotate
 from .locomotion import _position, _validate_xr_field_state, _neutral_audit
@@ -28,6 +28,25 @@ SOURCE_CONTRACT = {
     'physical_hand_grab_implemented': False,
     'pulse_durations': 'bounded experimental simulator inputs; not a discovered native timing contract',
 }
+
+
+def run_named_cqc(live, policy, *, enemy_script, output):
+    """Expose the existing bounded executor for one current, exact guard."""
+    if (not isinstance(policy, dict) or set(policy)-{'native','target','pulses','pulse_seconds'}
+            or not isinstance(policy.get('target'), str)
+            or not re.fullmatch(r'sol_[A-Za-z0-9_]{1,120}', policy['target'])
+            or not isinstance(policy.get('native'), dict) or not policy['native']):
+        raise BotFault('Named CQC needs an exact soldier and current native entry guards')
+    state, anchor = fresh_rig(live)
+    if not matches(state['native'], policy['native']):
+        raise BotFault('Named CQC native entry changed; no attack dispatched')
+    snapshot = read_enemy_snapshot(live.native.read, enemy_script)
+    targets = [row for row in snapshot['soldiers'] if row['name'] == policy['target']]
+    if len(targets) != 1:
+        raise BotFault('Exact named CQC soldier is unavailable; no substitute selected')
+    return attempt_cqc(live, actor=targets[0], anchor=anchor, enemy_script=enemy_script,
+                       output=output, pulses=policy.get('pulses', 1),
+                       pulse_seconds=policy.get('pulse_seconds', .65))
 
 
 def actor_identity(actor):

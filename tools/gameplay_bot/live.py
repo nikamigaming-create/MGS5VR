@@ -984,7 +984,7 @@ class Live:
             if key in keep or (required is not None and key not in required):
                 continue
             try:
-                self.call("set_controller_input", {**value, "value": 0, "auto_release": False})
+                self._release_channel(value)
                 self.held.pop((value["hand"], value["component"], value.get("sub_component")), None)
                 released_count += 1
             except Exception as error:
@@ -1014,6 +1014,27 @@ class Live:
             self._released_once = False
             raise BotFault("Input release failed: " + errors[0])
         self._released_once = True
+
+    def _release_channel(self, value):
+        # v207.1 can explicitly reject a neutral write while the previous
+        # independently expiring gesture finishes. That is a known rejection,
+        # not an ambiguous completion. Retry only this idempotent zero; never
+        # replay a nonzero action or a timed-out/otherwise failed request.
+        arguments = {**value, "value": 0, "auto_release": False}
+        deadline = time.monotonic() + .5
+        attempts = 0
+        while True:
+            try:
+                self.call("set_controller_input", arguments)
+                return
+            except RuntimeError as error:
+                if (str(error) != "Error: Another input gesture is already in progress for this session."
+                        or time.monotonic() >= deadline):
+                    raise
+                attempts += 1
+                self.events.emit('release_gesture_busy', channel=arguments, attempt=attempts,
+                                 action_replayed=False)
+                time.sleep(min(.025, max(0., deadline-time.monotonic())))
 
     def equipment_select(self, step):
         """Use the real wrist picker, with one independently expiring modifier."""

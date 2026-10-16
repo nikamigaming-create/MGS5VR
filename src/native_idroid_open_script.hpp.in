@@ -1,0 +1,5 @@
+#pragma once
+#include <string_view>
+namespace mgs5vr {
+inline constexpr std::string_view nativeIdroidOpenScript=R"mgs5vr_lua(@MGS5VR_NATIVE_IDROID_OPEN_LUA@)mgs5vr_lua";
+}

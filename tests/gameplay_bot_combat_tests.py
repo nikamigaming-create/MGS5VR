@@ -5,7 +5,7 @@ import sys
 import unittest
 from unittest.mock import Mock, patch
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'tools'))
-from gameplay_bot.combat import AimProbeUnavailable, active_targets, admit, aim_error, aim_quaternion, aimed_support_frame, arm, battle_checkpoint, controller_pair, corrected_aim, effective_pitch, facing_error, fire, fresh_rig, looking_head, mul, paired_aim_position, pointing, support_poses, sight, track_and_fire
+from gameplay_bot.combat import AimProbeUnavailable, active_targets, admit, aim_error, aim_quaternion, aimed_support_frame, arm, battle_checkpoint, controller_pair, corrected_aim, effective_pitch, facing_error, fire, fresh_rig, looking_head, mul, paired_aim_position, pointing, support_poses, sight, track_and_fire, failed_aim_checkpoint
 from gameplay_bot.core import BotFault
 from gameplay_bot.live import rotate
 from gameplay_bot.autonomy import choose_vantage
@@ -19,6 +19,57 @@ from gameplay_bot.cover import floor_candidates, select as select_cover, verifie
 
 
 class CombatTests(unittest.TestCase):
+    def test_close_target_selection_keeps_visibility_and_muzzle_clearance(self):
+        enemies={'truncated':False,'unavailable_loaded':0,'normal_life':'0',
+                 'soldiers':[{'id':7,'name':'sol_close','life':'0'}]}
+        for distance,clear,expected in ((.6,True,[7]),(.25,True,[7]),(.249,True,[]),
+                                      (.6,False,[]),(float('nan'),True,[])):
+            geometry={'targets':[{'id':7,'distance':distance,'query_valid':True,'unoccluded':clear}]}
+            with self.subTest(distance=distance,clear=clear):
+                self.assertEqual([t['id'] for t in active_targets(enemies,geometry)],expected)
+
+    def test_close_trigger_still_refuses_behind_embedded_occluded_and_invalid_rays(self):
+        actor={'id':7,'name':'sol_close'}
+        state={'rendered':{'native_pose':{'position':[0,0,0],'orientation':[0,0,0,1]},
+                           'weapon_support_attached':True}}
+        for aim,clear in (([0,0,-.6],True),([0,0,.249],True),([0,0,.6],False),
+                          ([float('nan'),0,.6],True),([.3,0,.6],True)):
+            live=Mock()
+            geometry={'muzzle':{'position':[0,0,0],'orientation':[0,0,0,1]},
+                      'targets':[{'id':7,'query_valid':True,'unoccluded':clear,'aim':aim}]}
+            with self.subTest(aim=aim,clear=clear), \
+                 patch('gameplay_bot.combat.admit',return_value=(state,None)), \
+                 patch('gameplay_bot.combat.read_actor',return_value=({'life':0},{})), \
+                 patch('gameplay_bot.combat.sight',return_value=(geometry,state)):
+                with self.assertRaises(AimProbeUnavailable):fire(live,actor,None,['right_grip','left_grip'])
+            live.input.assert_not_called()
+
+    def test_failed_support_aim_retains_reason_and_releases_before_capture(self):
+        live=Mock();ordered=Mock()
+        ordered.attach_mock(live.release,'release');ordered.attach_mock(live.capture,'capture')
+        live.capture.return_value=['actual-left.png','actual-right.png']
+        result=failed_aim_checkpoint(live,{'id':7},AimProbeUnavailable('target geometry unavailable'))
+        self.assertEqual(result,['actual-left.png','actual-right.png'])
+        self.assertEqual([c[0] for c in ordered.mock_calls],['release','capture'])
+        live.capture.assert_called_once_with('combat-aim-failed-released-7')
+        self.assertEqual(live.events.emit.call_args.kwargs['error'],'target geometry unavailable')
+        self.assertTrue(live.events.emit.call_args.kwargs['before_trigger'])
+        live.input.assert_not_called()
+
+    def test_failed_aim_release_failure_cannot_authorize_capture(self):
+        live=Mock();live.release.side_effect=BotFault('release completion unknown')
+        with self.assertRaisesRegex(BotFault,'release completion unknown'):
+            failed_aim_checkpoint(live,{'id':7},AimProbeUnavailable('support missing'))
+        live.capture.assert_not_called();live.input.assert_not_called()
+        self.assertEqual(live.events.emit.call_args.kwargs['error'],'support missing')
+
+    def test_original_aim_failure_is_recorded_even_if_released_capture_fails(self):
+        live=Mock();live.capture.side_effect=BotFault('compositor unavailable')
+        with self.assertRaisesRegex(BotFault,'compositor unavailable'):
+            failed_aim_checkpoint(live,{'id':7},AimProbeUnavailable('occluded target'))
+        live.release.assert_called_once_with();live.input.assert_not_called()
+        self.assertEqual(live.events.emit.call_args.kwargs['error'],'occluded target')
+
     def test_exact_mission_target_cannot_substitute_another_actor_or_bypass_visibility(self):
         enemies={'truncated':False,'unavailable_loaded':0,'normal_life':'0',
             'soldiers':[{'id':1,'name':'sol_guard','life':'0','camp':'camp'},
@@ -463,14 +514,14 @@ class CombatTests(unittest.TestCase):
         sleep.assert_not_called();self.assertEqual(live.input.call_count,1)
         self.assertEqual(live.input.call_args.kwargs['lease_seconds'],3.)
 
-    def test_trigger_expiry_does_not_shorten_support_or_replay_fire_during_outcome_wait(self):
+    def test_close_trigger_expiry_does_not_shorten_support_or_replay_fire_during_outcome_wait(self):
         state={'now_ms':1000,'rendered':{'native_pose':{'position':[0,0,0],'orientation':[0,0,0,1]},
                                        'weapon_support_attached':True},
                'native':{'player_life':7801,'player_yaw':0,'ammo_in_weapon_PRIMARY_HIP':31,'ammo_in_weapon_PRIMARY_BACK':198,
                          'ammo_in_weapon_SECONDARY':9},'controls':{'native_triggers':[255,255]}}
         after={**state,'native':{**state['native'],'ammo_in_weapon_SECONDARY':8}}
         geometry={'muzzle':{'position':[0,0,0],'orientation':[0,0,0,1]},
-                  'targets':[{'id':1167,'query_valid':True,'unoccluded':True,'aim':[0,0,10]}]}
+                  'targets':[{'id':1167,'query_valid':True,'unoccluded':True,'aim':[0,0,.6]}]}
         live=Mock();actor={'id':1167,'name':'sol_guard'}
         with patch('gameplay_bot.combat.admit',side_effect=[(state,None),(after,None),(after,None)]), \
              patch('gameplay_bot.combat.read_actor',side_effect=[({'life':0},{}),({'life':3},{})]), \

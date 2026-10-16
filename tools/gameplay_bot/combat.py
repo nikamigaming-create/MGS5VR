@@ -16,6 +16,8 @@ from .session import preserved_tracking_poses
 from .health import HealthRecoveryNeeded, needs_recovery
 from .motion import _pose
 
+MINIMUM_MUZZLE_TARGET_RANGE = .25
+
 
 class AimProbeUnavailable(BotFault):
     """One target cannot currently be inspected; other targets remain eligible."""
@@ -314,7 +316,7 @@ def active_targets(enemies, geometry, *, camp=None, radius=80, require_clear=Tru
     candidates=[]
     for target in geometry['targets']:
         if (target.get('query_valid') is True and (not require_clear or target.get('unoccluded') is True)
-            and 1<=target.get('distance',math.inf)<=radius and target['id'] in actors):
+            and MINIMUM_MUZZLE_TARGET_RANGE<=target.get('distance',math.inf)<=radius and target['id'] in actors):
             candidates.append({**actors[target['id']], 'sight':target})
     # Native phase is retained for evidence, not guessed into an aggression enum.
     return sorted(candidates,key=lambda row:(row['sight']['distance'],row['id']))
@@ -409,7 +411,7 @@ def face_and_aim(live, actor, anchor, pitch, *, pair, support_pair, ready_inputs
                          native_body_yaw=checked_state['native']['player_yaw'],
                          support_attached=checked_state['rendered'].get('weapon_support_attached'),
                          support_grip=checked_state['rendered'].get('weapon_support_grip'))
-        stable=stable+1 if (along>1 and lateral<=.18 and facing<=15.
+        stable=stable+1 if (along>=MINIMUM_MUZZLE_TARGET_RANGE and lateral<=.18 and facing<=15.
                            and checked_state['rendered'].get('weapon_support_attached') is True) else 0
         if stable>=2:return checked,latest
     raise AimProbeUnavailable('The actual VR view and barrel did not converge on the native target capsule')
@@ -427,7 +429,8 @@ def fire(live, actor, anchor, ready_inputs, *, seconds=.20, healthy_life=None, e
     if target is None or not target['query_valid'] or not target['unoccluded']:
         raise AimProbeUnavailable('Target lost visibility at the final trigger admission')
     along,lateral=aim_error(geometry['muzzle'],target['aim'])
-    if along<=1 or lateral>.18:
+    if not (math.isfinite(along) and math.isfinite(lateral)
+            and along>=MINIMUM_MUZZLE_TARGET_RANGE and lateral<=.18):
         raise AimProbeUnavailable('Actual barrel/target alignment changed before trigger dispatch')
     facing=facing_error(state['rendered']['native_pose'],target['aim'])
     if facing>15.:
@@ -512,6 +515,18 @@ def battle_checkpoint(live, label, state):
     return live.capture(label)
 
 
+def failed_aim_checkpoint(live, actor, error):
+    # A failed aim can have no admitted support contact. Keeping both grips
+    # then violates the stationary-inspection owner and used to mask the
+    # original geometry failure with a capture error. Retain the reason first,
+    # release all input, and label these pixels as a released view, not a
+    # successful two-hand aim. Trigger admission remains in fire().
+    live.events.emit('combat_probe_unavailable', target_id=actor['id'], error=str(error),
+                     before_trigger=True, input_replayed=False)
+    live.release()
+    return live.capture('combat-aim-failed-released-'+str(actor['id']))
+
+
 def engage(live, *, output, enemy_script, camp=None, max_seconds=30., max_rounds=24, radius=80.,
            healthy_life=None, expected_slot=None, target_name=None):
     """A bounded autonomous combat slice; no blanket game/visual acceptance."""
@@ -575,9 +590,7 @@ def engage(live, *, output, enemy_script, camp=None, max_seconds=30., max_rounds
                     except AimProbeUnavailable as error:
                         # Retain the actual attempted view/gun pose before
                         # preserved_tracking_poses restores the caller's pose.
-                        arm(live,ready_inputs,anchor,healthy_life=healthy_life)
-                        result['captures']+=live.capture('combat-aim-failed-'+str(candidate['id']),static_grips=True)
-                        live.events.emit('combat_probe_unavailable',target_id=candidate['id'],error=str(error))
+                        result['captures']+=failed_aim_checkpoint(live,candidate,error)
                         continue
                     arm(live,ready_inputs,anchor,healthy_life=healthy_life)
                     result['captures']+=live.capture('combat-aim-probe-'+str(candidate['id']),static_grips=True)

@@ -26,6 +26,7 @@
 #include "native_presentation_script.hpp"
 #include "native_god_mode_script.hpp"
 #include "native_idroid_interruption_script.hpp"
+#include "native_idroid_open_script.hpp"
 #include <windows.h>
 #include <MinHook.h>
 #include <intrin.h>
@@ -1302,16 +1303,7 @@ void pump(void* state){
                 &&nativeIdroidTutorialMode()==std::optional<unsigned>{0}
                 &&(!borrow.player||(borrow.returnRequested&&borrow.player==currentRig->playerOwner
                     &&borrow.activation==cameraStatus.activation))){
-            constexpr std::string_view openScript=
-                "if type(TppUiCommand.StartMbDvcTerminal)=='function' and not TppUiCommand.IsMbDvcTerminalOpened() "
-                "and not TppUiCommand.IsShowPopup() and not TppSave.IsSaving() "
-                "and not gvars.ini_isTitleMode and not DemoDaemon.IsDemoPlaying() "
-                "and TppSequence.IsMissionPrepareFinished() and not TppMission.IsHelicopterSpace(vars.missionCode) "
-                "and vars.missionCode~=10010 and TppSequence.GetCurrentSequenceName():match('^Seq_Game_') "
-                "and (PlayerInfo.AndCheckStatus{PlayerStatus.NORMAL_ACTION} "
-                "or PlayerInfo.AndCheckStatus{PlayerStatus.ON_VEHICLE}) then "
-                "TppUiCommand.StartMbDvcTerminal(); return 'opened' end return 'owner changed'";
-            int status=load(state,openScript.data(),openScript.size(),"@mgs5vr-handheld-idroid-open");
+            int status=load(state,nativeIdroidOpenScript.data(),nativeIdroidOpenScript.size(),"@mgs5vr-handheld-idroid-open");
             if(!status)status=original(state,0,1,0);
             size_t length{};const auto* result=getString(state,-1,&length);
             if(!status&&result&&std::string_view(result,length)=="opened"){

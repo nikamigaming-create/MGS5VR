@@ -2509,7 +2509,9 @@
         "include/mgs5vr/idroid_ui.hpp",
         "include/mgs5vr/native_controls.hpp",
         "src/native_idroid_interruption.lua",
-        "src/native_idroid_interruption_script.hpp.in"
+        "src/native_idroid_interruption_script.hpp.in",
+        "src/native_idroid_open.lua",
+        "src/native_idroid_open_script.hpp.in"
       ],
       "automated_tests": [
         "contracts",
