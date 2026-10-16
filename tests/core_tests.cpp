@@ -1684,6 +1684,9 @@ int main(){
         loading.awaitScene(true);loading.track({},true,900);
         expect(!loading.resolve(8,{},900).applied&&loading.status().reason==HeadCameraStop::cameraChanged,
             "a loading gap does not authorize adopting an unrelated camera");
+        loading.awaitScene(true);
+        expect(loading.status().reason==HeadCameraStop::cameraChanged,
+            "a verified loading terminal cannot relabel a rejected camera as an accepted scene boundary");
         loading.toggle();loading.resolve(7,{},900);loading.awaitScene(true);loading.toggle();
         expect(!loading.resolve(7,{},900).applied&&!loading.status().awaitingPlayer,
             "manual VR exit remains effective while a loading screen is visible");
@@ -1698,9 +1701,18 @@ int main(){
         loading.trackStereo({},eyes,true,100,input);loading.toggle();
         const auto title=loading.resolve(7,{},100);
         input.loading=true;
-        loading.trackStereo({},eyes,true,110,input);loading.awaitScene(true);
+        loading.trackStereo({},eyes,true,110,input);
+        expect(!loading.resolve(7,{},110).applied
+            &&loading.status().reason==HeadCameraStop::playerHeadUnavailable,
+            "native camera retirement can precede the XR loading observation");
+        loading.awaitScene(false);
+        expect(loading.status().reason==HeadCameraStop::playerHeadUnavailable,
+            "missing player publication alone does not authorize a loading panel");
+        loading.awaitScene(true);
         expect(!loading.resolve(7,{},110).applied&&!loading.active()&&loading.status().awaitingPlayer,
             "a decorative loading camera cannot hide native Start Mission pixels");
+        expect(loading.status().reason==HeadCameraStop::sceneUnavailable,
+            "verified loading after player retirement must replace the old Pause view with its native panel");
         input.loading=false;input.authoredCamera=true;
         loading.trackStereo({},eyes,true,115,input);
         expect(loading.resolve(7,{},115).applied&&loading.active(),

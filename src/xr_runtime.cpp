@@ -991,6 +991,16 @@ struct Session {
             &&rigControls.equipmentPhase()==0&&!commandsControls.active()&&!nativeInput.exclusive
             &&!nativeGamepadActive()&&idroidPopup.active&&!*idroidPopup.active&&idroidTutorial&&*idroidTutorial==0;
         if(idroidTap&&!priorIdroidTap){
+            std::ostringstream diagnostic;
+            diagnostic<<"VR iDroid Menu tap activation="<<nativeStatus.activation
+                <<" field_open="<<fieldIdroidOpen<<" live="<<liveIdroid
+                <<" ui_only="<<uiOnlyIdroid<<" borrowed="<<borrowedIdroid
+                <<" gameplay="<<gameplayContext<<" native_menu="<<nativeStatus.nativeMenuOpen
+                <<" equipment="<<rigControls.equipmentPhase()<<" commands="<<commandsControls.active()
+                <<" exclusive="<<nativeInput.exclusive<<" gamepad="<<nativeGamepadActive()
+                <<" routing="<<handheldMenuRoutingAvailable()<<" tutorial=";
+            diagnostic<<(idroidTutorial?std::to_string(*idroidTutorial):"unknown");
+            log(diagnostic.str());
             if(borrowedIdroid){
                 cancelHandheldIdroidBorrow();borrowedReloadPending=false;borrowedReloadPulseUntil=0;
                 requestHandheldIdroidOpen(0);
@@ -1004,7 +1014,7 @@ struct Session {
         if(!liveIdroid||nativeInput.exclusive)requestNativeIdroidClose(false);
         const bool manualToggle=headCamera().available()&&activeControl("system.toggle_vr");
         if(manualToggle||nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)automaticEntryDone=true;
-        if(loading&&(nativeStatus.active||nativeStatus.pending)){
+        if(loading&&(nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)){
             // Native loading tips include the actionable Start Mission prompt.
             // Publish its live pixels while preserving the requested VR mode.
             headCamera().awaitScene(loading);

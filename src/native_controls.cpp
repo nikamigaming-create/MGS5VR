@@ -23,7 +23,7 @@ std::atomic_uint64_t handheldWeaponSample{};
 std::atomic_bool handheldWeaponRouting{};
 std::atomic_bool handheldMenus{},handheldRoutingAvailable{};
 std::mutex idroidOpenMutex;
-HandheldIdroidOpenRequest idroidOpenRequest{};
+HandheldIdroidOpenQueue idroidOpenRequests;
 std::mutex idroidBorrowMutex;
 HandheldIdroidBorrow idroidBorrow{};
 std::atomic_uintptr_t idroidUiPlayer{};
@@ -70,11 +70,15 @@ bool takeNativeIdroidClose() noexcept {
 }
 void requestHandheldIdroidOpen(uint64_t activation) noexcept {
     std::lock_guard lock(idroidOpenMutex);
-    idroidOpenRequest={activation,activation?steadyMilliseconds():0};
+    idroidOpenRequests.request(activation,steadyMilliseconds());
 }
-HandheldIdroidOpenRequest takeHandheldIdroidOpen() noexcept {
+HandheldIdroidOpenRequest pendingHandheldIdroidOpen() noexcept {
     std::lock_guard lock(idroidOpenMutex);
-    const auto request=idroidOpenRequest;idroidOpenRequest={};return request;
+    return idroidOpenRequests.pending();
+}
+bool consumeHandheldIdroidOpen(HandheldIdroidOpenRequest expected) noexcept {
+    std::lock_guard lock(idroidOpenMutex);
+    return idroidOpenRequests.consume(expected);
 }
 void publishHandheldIdroidOwner(uintptr_t player,uint64_t activation) noexcept {
     idroidUiPlayer.store(0);

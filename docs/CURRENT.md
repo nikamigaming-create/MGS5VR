@@ -16,7 +16,7 @@ Consult `build/dev/BUILD.json` and the ignored live-work receipt
 candidate and exact session/reload state; the dated observations below keep
 their original acceptance scope.
 
-The checked runtime is now DLL `665e05cdc29f` and includes the mounted-iDroid
+The initial October 16 checked runtime, DLL `665e05cdc29f`, includes the mounted-iDroid
 posture fix, close-range optic observer correction and bounded release-race
 repair, committed and pushed as `506d175`. Its build passed all 56 CTest groups
 and installer checks; the 57 native iDroid policy checks also passed in the
@@ -45,6 +45,43 @@ despite delivery of A to the game's XInput caller. A separate settled 300 ms
 confirmation in `20261016T194227984112Z` closed the reviewed notice, and the
 normal VR Continue path then reached mission 1 in `20261016T194452844251Z`.
 The original startup failure remains open; that recovery is not a startup fix.
+
+Later genuine mission 1 testing uses the real VR Pause -> Restart Mission
+decision and loading confirmation. Retained `20261016T205454056077Z` opened
+the left handset in `Seq_Game_IDroidTutorial` at checkpoint zero; both eyes
+were reviewed. Early short Back presses remained blocked by the lesson.
+Retained `20261016T205721669086Z` subsequently stowed it with ordinary Back,
+entered `Seq_Game_BinocularsTutorial`, and missed an immediate Menu reopening.
+Its video and both failure eyes were reviewed; the failed run stays negative.
+A settled tap reopened separately. Diagnostic `ac2f533fb4a8` then passed the
+genuine tutorial handoff in `20261016T211035455158Z` and eleven further native
+close/reopen cycles in `20261016T211235729051Z` and `20261016T211441034506Z`.
+Both final eyes and sampled compositor frames were reviewed. These lessons
+reported tutorial mode zero; nonzero native guide modes remain unaccepted.
+
+The native opening queue now retains an unexecuted Menu request across a brief
+missing-rig publication, within its original one-second deadline and activation.
+An exact revision claim prevents duplicate execution and respects cancellation
+or a newer tap. The portable queue checks cover these boundaries. The earlier
+recorded miss was not independently attributed to that gap; passing repeats
+alone do not establish its cause or close the intermittent regression.
+
+Retained `20261016T212329654353Z` exposed a separate real loading defect:
+native mission 1 waited at Start Mission while both final eyes retained the
+former Pause image. Independent `20261016T212447349963Z` shows the same stale
+pixels; its new observer baseline is not loading acceptance. A native camera
+retiring before XR observed loading left the transition classified as a
+missing player, suppressing the loading panel. The regression reproduced one
+failure among 8,040 core checks before the fix. Development now recognizes the
+verified loading boundary after that retirement. The exact checked candidate
+and actual-game repeat are recorded in the work receipt above. No mission,
+tutorial, native AI or save-state progression was written by either repair.
+
+The stopped `mission1-native-restarted-tutorial-oct16` snapshot's live metadata
+has checkpoint zero, but its actual reload returned to the saved Rescue Miller
+checkpoint `2448458239`. It is not a saved pre-tutorial fixture. Each genuine
+lesson repeat must use the real Restart Mission route. Six-file save restoration
+and its independent hashes belong in the receipt at every stopping point.
 
 On that runtime, retained `20261016T152938582537Z` genuinely picked up the exact
 injured child, `20261016T153141790803Z` opened the left-hand iDroid while carrying

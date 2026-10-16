@@ -523,6 +523,27 @@ int main(int argc,char** argv){
             &&!freshHandheldIdroidOpenRequest({4,100},4,99)
             &&!freshHandheldIdroidOpenRequest({},4,100),
             "queued handheld opening cannot cross camera ownership, expiry or clock reset");
+        HandheldIdroidOpenQueue openings;
+        openings.request(4,100);
+        const auto waiting=openings.pending();
+        expect(openings.pending().time==100&&openings.pending().revision==waiting.revision
+            &&freshHandheldIdroidOpenRequest(waiting,4,1099),
+            "a rig publication gap retains the original request and deadline without executing it");
+        expect(openings.consume(waiting)&&!openings.consume(waiting)&&!openings.pending().time,
+            "a ready native owner claims one opening exactly once");
+        openings.request(4,200);const auto cancelled=openings.pending();
+        openings.request(0,210);
+        expect(!openings.consume(cancelled)&&!openings.pending().time,
+            "cancellation during a rig gap cannot resurrect the old tap");
+        openings.request(4,220);const auto older=openings.pending();
+        openings.request(4,230);const auto newer=openings.pending();
+        expect(!openings.consume(older)&&openings.pending().revision==newer.revision
+            &&openings.consume(newer),
+            "a newer tap wins over an older native job even within the same activation");
+        openings.request(4,300);const auto expired=openings.pending();
+        expect(!freshHandheldIdroidOpenRequest(expired,4,1301)&&openings.consume(expired)
+            &&!openings.pending().time,
+            "expiry discards a waiting request without extending its deadline");
         publishHandheldIdroidOwner(1234,4);
         expect(handheldIdroidOwned(1234,4)&&!handheldIdroidOwned(1235,4)&&!handheldIdroidOwned(1234,5),
             "UI-only device lease belongs to its exact native player and VR activation");

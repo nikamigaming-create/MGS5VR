@@ -119,9 +119,26 @@ void requestNativeIdroidClose(bool requested) noexcept;
 bool takeNativeIdroidClose() noexcept;
 // A VR Menu tap opens the native UI independently of the player's stationary
 // phone action. The Lua owner must revalidate the field before consuming it.
-struct HandheldIdroidOpenRequest { uint64_t activation{},time{}; };
+struct HandheldIdroidOpenRequest { uint64_t activation{},time{},revision{}; };
+// A short publication gap may delay an unexecuted request. Claim the exact
+// revision only when its owner/rig is ready; cancellation or a newer tap wins.
+class HandheldIdroidOpenQueue {
+    HandheldIdroidOpenRequest pending_{};
+    uint64_t revision_{};
+public:
+    void request(uint64_t activation,uint64_t time) noexcept {
+        pending_={activation,activation?time:0,++revision_};
+    }
+    HandheldIdroidOpenRequest pending() const noexcept {return pending_;}
+    bool consume(HandheldIdroidOpenRequest expected) noexcept {
+        if(!expected.time||expected.revision!=pending_.revision
+           ||expected.activation!=pending_.activation||expected.time!=pending_.time)return false;
+        pending_={};return true;
+    }
+};
 void requestHandheldIdroidOpen(uint64_t activation) noexcept;
-HandheldIdroidOpenRequest takeHandheldIdroidOpen() noexcept;
+HandheldIdroidOpenRequest pendingHandheldIdroidOpen() noexcept;
+bool consumeHandheldIdroidOpen(HandheldIdroidOpenRequest expected) noexcept;
 void publishHandheldIdroidOwner(uintptr_t player,uint64_t activation) noexcept;
 bool handheldIdroidOwned(uintptr_t player=0,uint64_t activation=0) noexcept;
 // A reload borrows the hand through the retail terminal Stop/Start lifecycle.

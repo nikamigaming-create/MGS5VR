@@ -1295,14 +1295,15 @@ void pump(void* state){
             }else if(status||(value&&std::string_view(value,length)=="owner changed"))cancelHandheldIdroidBorrow();
             setTop(state,top);
         }
-        const auto openRequest=takeHandheldIdroidOpen();
-        if(freshHandheldIdroidOpenRequest(openRequest,cameraStatus.activation,steadyMilliseconds())
-                &&currentRig&&currentRig->playerOwner&&cameraStatus.active&&!cameraStatus.suspended
+        const auto openRequest=pendingHandheldIdroidOpen();
+        const bool openRequestAllowed=freshHandheldIdroidOpenRequest(openRequest,cameraStatus.activation,steadyMilliseconds())
+                &&cameraStatus.active&&!cameraStatus.suspended
                 &&!cameraStatus.nativeMenuOpen&&handheldMenusSelected()&&!nativeGamepadActive()
                 &&!nativeIdroidOpen()&&!nativePauseMenuOpen()&&!nativeCabinPlay()
                 &&nativeIdroidTutorialMode()==std::optional<unsigned>{0}
-                &&(!borrow.player||(borrow.returnRequested&&borrow.player==currentRig->playerOwner
-                    &&borrow.activation==cameraStatus.activation))){
+                &&(!borrow.player||(borrow.returnRequested&&currentRig&&borrow.player==currentRig->playerOwner
+                    &&borrow.activation==cameraStatus.activation));
+        if(openRequestAllowed&&currentRig&&currentRig->playerOwner&&consumeHandheldIdroidOpen(openRequest)){
             int status=load(state,nativeIdroidOpenScript.data(),nativeIdroidOpenScript.size(),"@mgs5vr-handheld-idroid-open");
             if(!status)status=original(state,0,1,0);
             size_t length{};const auto* result=getString(state,-1,&length);
@@ -1315,6 +1316,32 @@ void pump(void* state){
             }
             log("VR handheld iDroid open status="+std::to_string(status)+": "+(result?std::string(result,std::min(length,size_t{200})):"no result"));
             setTop(state,top);
+        }else if(openRequest.time){
+            // Keep the original one-second deadline and exact activation.
+            // Nothing has executed yet: a menu-generation/skin publication
+            // gap must not silently consume this freshly requested opening.
+            const bool waitForRig=openRequestAllowed&&!currentRig;
+            const bool consumed=!waitForRig&&consumeHandheldIdroidOpen(openRequest);
+            static uint64_t reportedDeferredRevision{};
+            if(!waitForRig||reportedDeferredRevision!=openRequest.revision){
+                if(waitForRig)reportedDeferredRevision=openRequest.revision;
+                const auto sampled=steadyMilliseconds();
+                std::ostringstream diagnostic;
+                diagnostic<<"VR handheld iDroid request "<<(waitForRig?"deferred":"rejected")
+                <<" activation="<<openRequest.activation<<" revision="<<openRequest.revision<<" consumed="<<consumed
+                <<" current_activation="<<cameraStatus.activation<<" request_time="<<openRequest.time
+                <<" sample_time="<<sampled<<" fresh="
+                <<freshHandheldIdroidOpenRequest(openRequest,cameraStatus.activation,sampled)
+                <<" rig="<<bool(currentRig)<<" player="<<(currentRig?currentRig->playerOwner:0)
+                <<" active="<<cameraStatus.active<<" suspended="<<cameraStatus.suspended
+                <<" native_menu="<<cameraStatus.nativeMenuOpen<<" selected="<<handheldMenusSelected()
+                <<" gamepad="<<nativeGamepadActive()<<" open="<<nativeIdroidOpen()
+                <<" pause="<<nativePauseMenuOpen()<<" cabin="<<nativeCabinPlay()<<" tutorial=";
+                writeNativeIdroidTutorialModeJson(diagnostic,nativeIdroidTutorialMode());
+                diagnostic<<" borrowed_player="<<borrow.player<<" borrowed_return="<<borrow.returnRequested
+                    <<" snapshot_atomic=0";
+                log(diagnostic.str());
+            }
         }
         if(cameraStatus.active&&!cameraStatus.suspended&&!cameraStatus.nativeMenuOpen){
             while(const auto event=takeOpticEvent(steadyMilliseconds(),cameraStatus.activation)){

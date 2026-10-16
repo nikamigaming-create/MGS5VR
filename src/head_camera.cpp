@@ -338,7 +338,11 @@ void HeadCamera::cancel(HeadCameraStop reason){std::lock_guard lock(mutex_);canc
 void HeadCamera::awaitScene(bool nativeLoading){
     if(!nativeLoading)return;
     std::lock_guard lock(mutex_);
-    if(active_&&!awaitingScene_){awaitingScene_=true;rig_={};sceneTransitionActivation_=0;staleDemoRecoveryDwell_.reset();resetStabilization(this);}
+    // The native camera can retire before XR observes the loading terminal.
+    // Preserve the planned scene boundary even after awaitPlayerLocked, so
+    // loading cannot remain behind a retained Pause image without its panel.
+    const bool retiredPlayer=awaitingPlayer_&&reason_==HeadCameraStop::playerHeadUnavailable;
+    if((active_||retiredPlayer)&&!awaitingScene_){awaitingScene_=true;rig_={};sceneTransitionActivation_=0;staleDemoRecoveryDwell_.reset();resetStabilization(this);}
 }
 bool HeadCamera::available() const {std::lock_guard lock(mutex_);return enabled_;}
 bool HeadCamera::active() const {std::lock_guard lock(mutex_);return active_&&!awaitingScene_;}
