@@ -19,6 +19,7 @@ from gameplay_bot.menus import navigate as navigate_menu, observe as observe_men
 from gameplay_bot.optic_exposure import require_independent_luminance
 from operator_recovery_tests import RecoveryTests, LiveRecoveryIntegrationTests
 from gameplay_motion_tests import MotionTests
+from gameplay_bot_commands_tests import CommandsSelectionTests
 
 
 class NativeRecordingLedgerTests(unittest.TestCase):

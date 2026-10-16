@@ -90,6 +90,37 @@ end)
 field('mission18_children_rescued', function()
     if vars.missionCode == 10100 then return svars.isBoyHostagesCount_clear end
 end)
+local function mission18Recovered(name)
+    if vars.missionCode ~= 10100 then return nil end
+    local recovered = svars[name]
+    assert(type(recovered) == 'boolean', 'Native child recovery flag unavailable')
+    return recovered
+end
+field('mission18_child_0_recovered', function() return mission18Recovered('isCollect_Injury') end)
+field('mission18_child_1_recovered', function() return mission18Recovered('isCollect_YellowHood') end)
+field('mission18_child_2_recovered', function() return mission18Recovered('isCollect_Aflo') end)
+field('mission18_child_3_recovered', function() return mission18Recovered('isCollect_ShortAflo') end)
+field('mission18_child_4_recovered', function() return mission18Recovered('isCollect_BlackCoat') end)
+local mission18InjuredChild
+field('mission18_injured_child_id', function()
+    if vars.missionCode ~= 10100 then return nil end
+    local id = GameObject.GetGameObjectId('TppHostageUnique', 'hos_diamond_0000')
+    assert(id ~= GameObject.NULL_ID
+        and GameObject.GetTypeIndex(id) == TppGameObject.GAME_OBJECT_TYPE_HOSTAGE_UNIQUE,
+        'Exact native injured child is unavailable')
+    mission18InjuredChild = id
+    return id
+end)
+field('mission18_injured_child_carried', function()
+    if vars.missionCode ~= 10100 then return nil end
+    assert(mission18InjuredChild and type(TppGameObject.NPC_STATE_CARRIED) == 'number',
+        'Native injured-child carry observation unavailable')
+    -- GetStatus is shared by the owned hostage carry caller and was observed
+    -- on this exact TppHostageUnique before the pickup experiment.
+    local status = GameObject.SendCommand(mission18InjuredChild, {id = 'GetStatus'})
+    assert(type(status) == 'number', 'Native injured-child status unavailable')
+    return status == TppGameObject.NPC_STATE_CARRIED
+end)
 field('mission6_bridge_demo', function()
     if vars.missionCode == 10040 then return DemoDaemon.IsPlayingDemoId('p31_020020_000') end
 end)

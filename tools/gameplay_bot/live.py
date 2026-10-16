@@ -1092,6 +1092,9 @@ class Live:
         return self.observe()
 
     def execute(self, step):
+        if step.get('op') == 'commands_select':
+            from .commands import select
+            return select(self, step)
         if step.get('op') == 'menu_focus_sequence':
             from .menus import focus_sequence
             return focus_sequence(self, step)

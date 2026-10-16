@@ -34,7 +34,10 @@ SOURCE_CONTRACT = {
     'packet_source': 'input_bridge.cpp:23-33; xr_runtime.cpp:985-994',
 }
 PICKUP_SECONDS = .85  # One bounded experiment; not a sourced native hold duration.
-DROP_SECONDS = .12
+# The exact injured hostage stayed carried after .12/.85-second native B
+# packets; retained 20261016T160701943862Z observed the real put-down with
+# this sustained hold. The caller still requires the actual actor outcome.
+DROP_SECONDS = 2.2  # Bounded experiment, not a recovered native threshold.
 MAX_ROSTER = 16
 
 

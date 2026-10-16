@@ -16,6 +16,51 @@ Consult `build/dev/BUILD.json` and the ignored live-work receipt
 candidate and exact session/reload state; the dated observations below keep
 their original acceptance scope.
 
+The checked runtime is now DLL `665e05cdc29f` and includes the mounted-iDroid
+posture fix, close-range optic observer correction and bounded release-race
+repair, committed and pushed as `506d175`. Its build passed all 56 CTest groups
+and installer checks; the 57 native iDroid policy checks also passed in the
+actual retail Lua VM. Live mounted and forced-tutorial acceptance remains open.
+
+On that runtime, retained `20261016T152938582537Z` genuinely picked up the exact
+injured child, `20261016T153141790803Z` opened the left-hand iDroid while carrying
+him, and `20261016T153532094973Z` walked with that carry intact. Short native B
+holds did not put him down. Retained `20261016T160701943862Z` observed the actual
+put-down with a sustained 2.2-second VR hold; the bounded body helper now uses
+that measured experiment and still requires the native actor outcome. Retained
+`20261016T161235204006Z` genuinely recovered him through VR Interact, advancing
+the native counter to one and entering `Seq_Game_Escape`. The read-only observer
+now distinguishes all five native recovery flags rather than relying on a count.
+
+The native checkpoint reloaded after the rescue cinematic in retained
+`20261016T152234072395Z`. Inside-gate crossing `20261016T164842731538Z` required
+approaching the actual door instead of its adjoining fence; both eyes show the
+open passage. The outer gate similarly opened through existing VR Interact in
+`20261016T171052867824Z`. That case failed its movement-envelope guard after
+crossing; both eyes and subsequent native child positions establish the gate
+opening, not a complete case pass. No door or actor transform was written.
+
+The four healthy children deliberately reject carrying in the owned mission
+script while conscious and outside its designated carry state. Their attempted
+Fulton and pickup cases remain failed. The existing Commands wheel rendered
+the rescue choice in the retained 18.672-second compositor-left take
+`oct16-command-choices-live/` (53 captures, 2.838 measured captures/sec). A new
+bounded `commands_select` bot operation uses the effective held opener,
+selection stick and confirmation, requires a fresh native scene and released
+input, verifies the mapped R3/direction packet, and releases partial/uncertain
+actions without replay. Its seven failure-oriented tests pass, as do all 306
+bot checks and 33 catalog checks. This is a test executor, not a replacement VR
+binding or a native mission command.
+
+Retained `20261016T171350374153Z` selected the native Go choice through that VR
+wheel. Actual escort progress advanced from 2 to 5 and all four actors moved
+along the next route. The coordinated compositor-left take is 14.5 seconds,
+45 real captures (3.103 measured captures/sec); it and paired stills were
+reviewed for their scope. Capture cadence is not game FPS or stereo acceptance.
+Four rescues, the real mission results/input/cutscene handoff, live short-range
+firing, mounted iDroid and physical Quest acceptance remain open. No entire
+mission pass, public release or play-pin promotion is claimed.
+
 Fresh development at source `a96eda5`, DLL `aa5696e3b8d2`, passed all 56 CTest
 groups (32.49 seconds) and installer checks. The first bounded pass observed
 18 native case outcomes: field contexts/Pause, one-hand firearm readiness,
