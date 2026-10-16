@@ -299,6 +299,31 @@ int main(){
             &&!nativeIdroidStowHelpCloseAllowed(0,false,32,false)
             &&!nativeIdroidStowHelpCloseAllowed(std::nullopt,false,32,true),
             "active lessons, open terminals, ordinary Pause and absent owners remain untouched");
+        NativeIdroidStowHelpLease helpLease;
+        expect(!helpLease.pending(100).owner,"ordinary UI queries have no stow acknowledgment lease");
+        helpLease.begin(0x1234,100);
+        const auto help=helpLease.pending(110);
+        expect(help.owner==0x1234&&!help.acknowledged&&!helpLease.finish(help),
+            "native Help must receive its own Confirm before cleanup can complete");
+        expect(helpLease.acknowledge(help,120)&&!helpLease.acknowledge(help,121)
+            &&helpLease.pending(121).acknowledged,
+            "an owned stow can acknowledge its informational Help only once");
+        helpLease.begin(0x1234,130);
+        expect(!helpLease.acknowledge(help,140)&&!helpLease.finish(help),
+            "a newer stow on the same native owner invalidates an old UI claim");
+        const auto newerHelp=helpLease.pending(140);
+        auto otherHelp=newerHelp;otherHelp.owner=0x4321;
+        expect(!helpLease.acknowledge(otherHelp,150)&&!helpLease.pending(129).owner,
+            "replacement and future native owners cannot acknowledge Help");
+        expect(!helpLease.pending(2131).owner&&!helpLease.acknowledge(newerHelp,2131),
+            "a stow request cannot inject Confirm beyond its original two-second deadline");
+        helpLease.begin(0,2200);
+        expect(!helpLease.acknowledge(newerHelp,2200)&&!helpLease.pending(2200).owner,
+            "cancellation prevents a late acknowledgment of the old card");
+        helpLease.begin(0x4321,2300);const auto finalHelp=helpLease.pending(2301);
+        expect(helpLease.acknowledge(finalHelp,2302)&&helpLease.finish(finalHelp)
+            &&!helpLease.pending(2303).owner&&!helpLease.finish(finalHelp),
+            "native close completion retires the exact acknowledged lease without replay");
         expect(nativeCabinIdroidStow(true,false,0,true,false,true,true,true)==NativeCabinIdroidStow::requestClose,
             "held Back in ordinary ACC requests native Close before terminal Stop");
         expect(nativeCabinIdroidStow(true,false,0,true,true,false,true,true)==NativeCabinIdroidStow::wait,

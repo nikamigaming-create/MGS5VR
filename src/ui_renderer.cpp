@@ -1629,7 +1629,7 @@ uintptr_t captureNativeIdroidStowHelpOwner() noexcept {
     const auto mode=nativeIdroidTutorialMode();
     // FOB, SECURITY and the Mother Base/FOB inventory lessons create a Help
     // owner after requested terminal stow. Capture only these reproduced
-    // lessons; closeNativeIdroidStowHelp still requires that same owner,
+    // lessons; nativeIdroidStowHelpState still requires that same owner,
     // a closed terminal, mode zero and its exact native Help pause handle.
     if(!pauseReaderVerified||!mode||(*mode!=10&&*mode!=11&&*mode!=14)||!nativeIdroidOpen()||nativePauseMenuOpen())return 0;
     uintptr_t manager{},pause{},type{};uint32_t kind{};
@@ -1639,31 +1639,25 @@ uintptr_t captureNativeIdroidStowHelpOwner() noexcept {
         &&read(pause,&type,sizeof(type))&&type==base+0x218f648
         &&read(pause+0x38,&kind,sizeof(kind))&&kind==0?pause:0;
 }
-bool closeNativeIdroidStowHelp(uintptr_t owner) noexcept {
-    if(!enabled.load()||!pauseReaderVerified||!owner)return false;
+NativeIdroidStowHelpState nativeIdroidStowHelpState(uintptr_t owner) noexcept {
+    constexpr auto unavailable=NativeIdroidStowHelpState::unavailable;
+    if(!enabled.load()||!pauseReaderVerified||!owner)return unavailable;
     const auto popup=nativePopupSnapshot();
-    if(!popup.active||*popup.active)return false;
+    if(!popup.active||*popup.active)return unavailable;
     uintptr_t manager{},pause{},type{},handle{};uint32_t kind{},level{};
     if(!read(base+0x2bd3b80,&manager,sizeof(manager))||!manager
        ||!read(manager,&type,sizeof(type))||type!=base+0x218fba0
        ||!read(manager+8,&pause,sizeof(pause))||pause!=owner
        ||!read(pause,&type,sizeof(type))||type!=base+0x218f648
        ||!read(pause+0x38,&kind,sizeof(kind))
-       ||!nativeIdroidStowHelpCloseAllowed(nativeIdroidTutorialMode(),nativeIdroidOpen(),kind,true)
+       ||nativeIdroidTutorialMode()!=std::optional<unsigned>{0}||nativeIdroidOpen()
        ||!read(pause+0x40,&handle,sizeof(handle))
        ||handle<base+0x2b65d58||handle>=base+0x2b65d98||(handle-(base+0x2b65d58))%4
        ||!read(base+0x2b65d40,&type,sizeof(type))||type!=base+0x20c56c0
-       ||!read(handle,&level,sizeof(level))||(level&0x7fffffff)!=0x7ffffffe)return false;
-    constexpr std::array<unsigned char,15> signature{
-        0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x33,0xd2,0x48,0x83,0xc1,0x30};
-    std::array<unsigned char,signature.size()> actual{};
-    if(!read(base+0x5391b0,actual.data(),actual.size())||actual!=signature)return false;
-    // This is the same native close handler used by Back. It closes its UI
-    // tasks, clears its menu kind and releases only its allocated pause slot.
-    using Close=void(*)(void*);
-    reinterpret_cast<Close>(base+0x5391b0)(reinterpret_cast<void*>(pause));
-    return read(pause+0x38,&kind,sizeof(kind))&&kind==0
-        &&read(handle,&level,sizeof(level))&&(level&0x80000000)==0;
+       ||!read(handle,&level,sizeof(level))||(level&0x7fffffff)!=0x7ffffffe)return unavailable;
+    if(nativeIdroidStowHelpCloseAllowed(0,false,kind,true)&&(level&0x80000000))
+        return NativeIdroidStowHelpState::ready;
+    return kind==0&&!(level&0x80000000)?NativeIdroidStowHelpState::closed:unavailable;
 }
 uint64_t nativeEquipmentPickerDrawTime() noexcept {return enabled.load()?pickerDrawTime.load():0;}
 void requestNativeEquipmentPreview(bool visible) noexcept {equipmentPreviewRequestedAt.store(visible?steadyMilliseconds():0);}

@@ -31,7 +31,9 @@ NativePopupSnapshot nativePopupSnapshot() noexcept;
 // Caller must establish the completed ACC guide in the native Lua transaction.
 bool releaseNativeIdroidTutorialPause(bool requestedStow=false) noexcept;
 uintptr_t captureNativeIdroidStowHelpOwner() noexcept;
-bool closeNativeIdroidStowHelp(uintptr_t owner) noexcept;
+enum class NativeIdroidStowHelpState { unavailable, ready, closed };
+// Read only: the actual Help UI must handle its Confirm and close its card.
+NativeIdroidStowHelpState nativeIdroidStowHelpState(uintptr_t owner) noexcept;
 bool nativeTitleMenuOpen() noexcept;
 void publishNativeHospitalTitleMenu(bool active) noexcept;
 struct OpeningNativeFocus;

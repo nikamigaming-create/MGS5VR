@@ -29,6 +29,34 @@ inline bool nativeIdroidStowHelpCloseAllowed(std::optional<unsigned> mode,bool i
     return ownedRequest&&mode&&*mode==0&&!idroidOpen&&pauseKind==32;
 }
 
+struct NativeIdroidStowHelpRequest {
+    uintptr_t owner{};
+    uint64_t time{},revision{};
+    bool acknowledged{};
+};
+// Only the informational Help created by an explicit owned stow may receive
+// one native Confirm. A new owner/request, timeout or cancellation wins.
+class NativeIdroidStowHelpLease {
+public:
+    void begin(uintptr_t owner,uint64_t time) noexcept {request_={owner,time,++revision_,false};}
+    NativeIdroidStowHelpRequest pending(uint64_t time) const noexcept {
+        return request_.owner&&request_.time&&time>=request_.time&&time-request_.time<=2000?request_:NativeIdroidStowHelpRequest{};
+    }
+    bool acknowledge(NativeIdroidStowHelpRequest expected,uint64_t time) noexcept {
+        const auto current=pending(time);
+        if(!current.owner||current.acknowledged||current.owner!=expected.owner
+           ||current.time!=expected.time||current.revision!=expected.revision)return false;
+        request_.acknowledged=true;return true;
+    }
+    bool finish(NativeIdroidStowHelpRequest expected) noexcept {
+        if(!request_.acknowledged||request_.owner!=expected.owner||request_.revision!=expected.revision)return false;
+        request_={};return true;
+    }
+private:
+    NativeIdroidStowHelpRequest request_{};
+    uint64_t revision_{};
+};
+
 enum class NativeCabinIdroidStow { unchanged, wait, requestClose, finishStop };
 // An ordinary ACC terminal is also owned by the native seated player's
 // subjective/device action. Stop alone hides the UI but leaves that action

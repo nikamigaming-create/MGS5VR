@@ -121,6 +121,39 @@ original native edge false. The previous D-pad-only failure stays retained.
 This accepts the scoped arrival cutscene flow, not every cinematic or a whole
 mission. A later neutral observation confirms the restored horseback owner.
 
+The preserved `nvg-safe-motherbase` fixture naturally opened the Inventory/FOB
+guide in mode 14 at Mother Base mission 30050. Retained
+`20261016T223856621160Z` dismissed its reviewed initial Help using VR Back.
+Retained `20261016T223937888320Z` then held VR Back for 1,211 sampled ms,
+observed the real field owner, requested Menu 47 ms later and reopened the
+terminal. Its state checks passed, but both eyes and the 18.093-second
+compositor take (64 captures, no reported error) show an Exit Tutorial card
+over the reopened map. This remains a failed visual acceptance, with no
+tutorial-completion claim. The old helper cleared the native pause manager
+without completing that card's UI acknowledgment. Development now lets the
+verified native UI read one Confirm only for the exact Help owner captured by
+the explicit stow, after mode zero and terminal closure, within its original
+two-second lease. Ordinary menus, startup confirmations and unknown popups
+have no such lease. Actual corrected stow/reopen acceptance is still pending.
+
+The first UI-acknowledgment candidate `05cc3bd0e946` failed retained
+`20261016T225714536605Z`: its active-camera guard prevented acknowledgment
+after the exact Help pause retired the player camera with reason 7. The final
+guard also admits that verified awaiting-player state; other camera failures
+remain excluded, and actual render/control return is still required.
+Checked DLL `bd590d0f0596` passed all 56 test groups and installer checks, then
+all three cases in retained `20261016T230348544118Z`: genuine mode-14 opening,
+ordinary initial Help Back, and held-Back suspension followed by reopening
+47 ms after native field ownership. The native UI received one owned Confirm
+and closed its card; both final eyes show a clean map with attached handset
+and screen through hand/head motion. All three final eye pairs and sampled
+frames of the 23.031-second compositor-left take were reviewed (80 captures,
+no reported error). Cleanup restored the live player owner and closed the
+terminal. This accepts mode-14 suspension/reopening, not tutorial completion,
+every guide, every menu or physical Quest fit. The original stale-card and
+retired-camera failures remain retained. Six original save files, both personal
+INIs, Meta runtime and the published pin were independently verified afterward.
+
 On that runtime, retained `20261016T152938582537Z` genuinely picked up the exact
 injured child, `20261016T153141790803Z` opened the left-hand iDroid while carrying
 him, and `20261016T153532094973Z` walked with that carry intact. Short native B

@@ -70,8 +70,8 @@ std::mutex requestMutex;
 std::filesystem::path requestPath,resultPath,tracePath;
 bool externalCommands{};
 uint64_t checkedAt{};
-uintptr_t stowHelpOwner{};
-uint64_t stowHelpRequestedAt{};
+std::mutex stowHelpMutex;
+NativeIdroidStowHelpLease stowHelpLease;
 thread_local unsigned depth{};
 // Bounded observations of the retail UI input and stow handshake, plus
 // focused-firearm ownership filtering at the native UI trigger consumers.
@@ -334,6 +334,32 @@ bool uiEdge(void* object,uint32_t index,uint32_t bit,bool bypass){
     if(focusedWeaponOwnsUiTrigger(object,index,bit))return false;
     const auto native=observeUiButton(object,index,bit,bypass,reinterpret_cast<uintptr_t>(_ReturnAddress()),originalUiEdge,true);
     if(eulaInputScope&&!index&&reinterpret_cast<uintptr_t>(object)==imageBase+0x2bff868)++eulaScopedQueries;
+    if(!index&&bit==1&&reinterpret_cast<uintptr_t>(object)==imageBase+0x2bff868
+       &&controllerRigEnabled()&&!nativeGamepadActive()){
+        NativeIdroidStowHelpRequest request;
+        {std::lock_guard stowGuard(stowHelpMutex);request=stowHelpLease.pending(steadyMilliseconds());}
+        if(request.owner&&!request.acknowledged
+           &&nativeIdroidStowHelpState(request.owner)==NativeIdroidStowHelpState::ready){
+            const auto mask=menuInputMask(reinterpret_cast<uintptr_t>(object));
+            const auto camera=headCamera().status();
+            const auto controls=controlInputSnapshot();
+            const auto now=steadyMilliseconds();
+            // The exact Help pause can retire the player camera before its
+            // UI reads Confirm. It still owns menu input; rendering acceptance
+            // waits for the real player/rig return after native acknowledgment.
+            const bool helpCamera=camera.active||(camera.awaitingPlayer
+                &&camera.reason==HeadCameraStop::playerHeadUnavailable);
+            if(mask.valid&&!mask.count&&helpCamera&&!camera.suspended&&camera.nativeMenuOpen
+               &&controls.context==ControlContext::menus&&!controls.rigInput&&freshControlInputAudit(controls,now)){
+                bool claimed{};
+                {std::lock_guard stowGuard(stowHelpMutex);claimed=stowHelpLease.acknowledge(request,now);}
+                if(claimed){
+                    log(std::string("Requested terminal stow: owned Help native Confirm; original=")+(native?"1":"0"));
+                    return true;
+                }
+            }
+        }
+    }
     if(!index&&(bit==14||bit==15)&&reinterpret_cast<uintptr_t>(object)==imageBase+0x2bff868
        &&controllerRigEnabled()&&nativePauseMenuOpen()&&nativeScriptedDemoActive()
        &&!nativeIdroidOpen()&&!nativeGamepadActive()){
@@ -1267,14 +1293,17 @@ void pump(void* state){
     pumpHandheldIdroidEquipment();
     // Help can pause the gameplay Lua owner. Its native UI cleanup must run
     // on the pump independently of gameplay globals or coroutine addresses.
-    if(controllerRigEnabled()&&stowHelpOwner){
-        if(now<stowHelpRequestedAt||now-stowHelpRequestedAt>2000)stowHelpOwner=0;
-        else if(closeNativeIdroidStowHelp(stowHelpOwner)){
-            stowHelpOwner=0;
+    NativeIdroidStowHelpRequest stowHelp;
+    {std::lock_guard stowGuard(stowHelpMutex);stowHelp=stowHelpLease.pending(now);}
+    if(controllerRigEnabled()&&stowHelp.owner&&stowHelp.acknowledged
+       &&nativeIdroidStowHelpState(stowHelp.owner)==NativeIdroidStowHelpState::closed){
+        bool completed{};
+        {std::lock_guard stowGuard(stowHelpMutex);completed=stowHelpLease.finish(stowHelp);}
+        if(completed){
             nativeMenuOpen();
             restoreCompletedGuideRestrictions();
             releaseNativeIdroidTutorialPause();
-            log("Requested terminal stow: owned native post-close Help released");
+            log("Requested terminal stow: native UI acknowledged and closed owned Help");
         }
     }
     if(controllerRigEnabled()&&luaReady(state)){
@@ -1600,7 +1629,7 @@ void pump(void* state){
                         +"; post-close Help owner captured="+(requestedHelpOwner?"1":"0"));
                 }
                 if(!closeStatus&&requestedHelpOwner){
-                    stowHelpOwner=requestedHelpOwner;stowHelpRequestedAt=now;
+                    std::lock_guard stowGuard(stowHelpMutex);stowHelpLease.begin(requestedHelpOwner,now);
                 }
                 if(!closeStatus&&heldBackClose&&nativeIdroidRecoveryForTutorialMode(nativeIdroidTutorialMode())==NativeIdroidRecovery::ordinary){
                     // Restore only entry disables captured before this lesson
