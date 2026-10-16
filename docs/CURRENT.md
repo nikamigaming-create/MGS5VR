@@ -20,7 +20,31 @@ The checked runtime is now DLL `665e05cdc29f` and includes the mounted-iDroid
 posture fix, close-range optic observer correction and bounded release-race
 repair, committed and pushed as `506d175`. Its build passed all 56 CTest groups
 and installer checks; the 57 native iDroid policy checks also passed in the
-actual retail Lua VM. Live mounted and forced-tutorial acceptance remains open.
+actual retail Lua VM. Mounted opening, ordinary stow and immediate reopening
+now have actual-game evidence; forced-tutorial and physical acceptance remain open.
+
+Retained `20261016T194920611307Z` opens the left-hand iDroid in genuine mission 1,
+story 1, `Seq_Game_RescueMiller`, ON_HORSE true and NORMAL_ACTION false, matching
+the previously rejected posture. Both final eyes were reviewed. Retained
+`20261016T195451979738Z` stows it, requests reopening 62 ms after the observed
+return to horse controls, and moves the handset followed by independent head
+motion. Both final eyes and the relevant frames of its 27.485-second compositor
+left take were reviewed (92 captures, no reported error). This establishes the
+scoped mounted flow, not forced tutorial stow, synchronized stereo or Quest fit.
+
+Deeper mounted inspection `20261016T200101221675Z` passed its six-pose native
+palm-motion gate but failed before stick input because the old test skipped
+the player's grip-focus binding. The inspector now acquires that effective
+binding, checks the native owner and physical focus, keeps it through axis
+release, and releases partial or expired focus without replay. All 16 iDroid
+harness tests pass, including owner changes and unknown completion. Its newest
+live result belongs in the work receipt; no player binding was changed.
+
+Startup run `20261016T193759062649Z` retained an ignored autosave confirmation
+despite delivery of A to the game's XInput caller. A separate settled 300 ms
+confirmation in `20261016T194227984112Z` closed the reviewed notice, and the
+normal VR Continue path then reached mission 1 in `20261016T194452844251Z`.
+The original startup failure remains open; that recovery is not a startup fix.
 
 On that runtime, retained `20261016T152938582537Z` genuinely picked up the exact
 injured child, `20261016T153141790803Z` opened the left-hand iDroid while carrying
