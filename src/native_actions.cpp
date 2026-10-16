@@ -334,6 +334,27 @@ bool uiEdge(void* object,uint32_t index,uint32_t bit,bool bypass){
     if(focusedWeaponOwnsUiTrigger(object,index,bit))return false;
     const auto native=observeUiButton(object,index,bit,bypass,reinterpret_cast<uintptr_t>(_ReturnAddress()),originalUiEdge,true);
     if(eulaInputScope&&!index&&reinterpret_cast<uintptr_t>(object)==imageBase+0x2bff868)++eulaScopedQueries;
+    if(!index&&(bit==14||bit==15)&&reinterpret_cast<uintptr_t>(object)==imageBase+0x2bff868
+       &&controllerRigEnabled()&&nativePauseMenuOpen()&&nativeScriptedDemoActive()
+       &&!nativeIdroidOpen()&&!nativeGamepadActive()){
+        const auto mask=menuInputMask(reinterpret_cast<uintptr_t>(object));
+        const auto popup=nativePopupSnapshot();
+        const auto camera=headCamera().status();
+        const auto controls=controlInputSnapshot();
+        const auto now=steadyMilliseconds();
+        if(mask.valid&&!mask.count&&popup.active&&!*popup.active
+           &&camera.active&&!camera.suspended&&camera.nativeMenuOpen
+           &&controls.context==ControlContext::menus&&!controls.rigInput&&freshControlInputAudit(controls,now)){
+            if(const auto direction=takeCinematicMenuDirection(camera.activation,index,bit,now)){
+                if(*direction){
+                    std::ostringstream message;
+                    message<<"VR cinematic menu direction bit="<<bit<<" activation="<<camera.activation<<" native_result="<<native;
+                    log(message.str());
+                }
+                return *direction;
+            }
+        }
+    }
     return native;
 }
 bool uiRelease(void* object,uint32_t index,uint32_t bit,bool bypass){

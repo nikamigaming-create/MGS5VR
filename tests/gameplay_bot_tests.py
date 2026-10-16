@@ -3340,6 +3340,64 @@ class SessionTests(unittest.TestCase):
 
 class MenuCleanupTests(unittest.TestCase):
     @staticmethod
+    def cinematic_state():
+        return {'scene':'cinematic','demo':True,'title':False,'loading':False,'menu':False,
+            'idroid':False,'pause':False,'gamepad':False,'camera_active':True,'camera_suspended':False,
+            'camera_awaiting_player':False,'camera_native_menu':False,'now_ms':1000,'activation':7,
+            'rendered':{'sample_ms':990,'activation':7,'presentation_focused':True},
+            'controls':{'context':'menus','rig_input':False,'sample_ms':990,'age_ms':10,
+                'native_packet_source':'xr_runtime_final_mapped_packet','native_buttons':0,
+                'physical':[0]*11,'sticks':[0]*4,'native_axes':[0]*4,'native_triggers':[0]*2},
+            'native':{'mission':10020,'sequence':'Seq_Demo_ArrivalInAfghanistan','demo':True,
+                'demo_nonplayable':True,'title':False,'popup':False,'tutorial_pause':False,
+                'saving':False,'game_over':0}}
+
+    def test_owned_pause_can_return_to_three_fresh_neutral_native_cinematic_samples(self):
+        live=self.fixture(0);live.opened_menu='pause'
+        state=self.cinematic_state();live.observe.side_effect=None;live.observe.return_value=state
+        clock=Clock()
+        with mock.patch('gameplay_bot.live.time.monotonic',clock), \
+                mock.patch('gameplay_bot.live.time.sleep',clock.sleep):
+            live._finish_menu_cleanup(state)
+        self.assertIsNone(live.opened_menu)
+        self.assertEqual(live.observe.call_count,2)
+        live.events.emit.assert_called_with('test_menu_cleanup',status='closed',camera_restored=True,
+                                           return_owner='cinematic')
+        live.execute.assert_not_called()
+
+    def test_cinematic_cleanup_refuses_stale_unknown_and_held_owners_without_input(self):
+        import copy
+        invalid=[('controls.age_ms',251),('controls.native_buttons',8),('controls.physical',[1]+[0]*10),
+            ('controls.sticks',[0,1,0,0]),('controls.native_axes',[0,0,1,0]),
+            ('controls.native_triggers',[0,255]),('controls.rig_input',True),
+            ('controls.context','gameplay'),('native.sequence','Seq_Game_RescueMiller'),
+            ('native.demo',False),('native.demo_nonplayable',False),('native.popup',True),
+            ('native.tutorial_pause',True),('native.game_over',4),('rendered.sample_ms',800),
+            ('rendered.activation',8),('rendered.presentation_focused',False),('loading',True),
+            ('pause',True),('menu',True),('idroid',True),('camera_awaiting_player',True),('gamepad',True)]
+        for path,value in invalid:
+            with self.subTest(path=path):
+                state=copy.deepcopy(self.cinematic_state());target=state;parts=path.split('.')
+                for key in parts[:-1]:target=target[key]
+                target[parts[-1]]=value
+                live=self.fixture(0);live.opened_menu='pause'
+                live.observe.side_effect=None;live.observe.return_value=state;clock=Clock()
+                with mock.patch('gameplay_bot.live.time.monotonic',clock), \
+                        mock.patch('gameplay_bot.live.time.sleep',clock.sleep), \
+                        self.assertRaisesRegex(BotFault,'without restoring the live VR camera'):
+                    live._finish_menu_cleanup(state)
+                self.assertEqual(live.opened_menu,'pause');live.execute.assert_not_called()
+
+    def test_cinematic_return_does_not_bypass_idroid_stow_ownership(self):
+        live=self.fixture(0);state=self.cinematic_state()
+        live.observe.side_effect=None;live.observe.return_value=state;clock=Clock()
+        with mock.patch('gameplay_bot.live.time.monotonic',clock), \
+                mock.patch('gameplay_bot.live.time.sleep',clock.sleep), \
+                self.assertRaisesRegex(BotFault,'without restoring the live VR camera'):
+            live._finish_menu_cleanup(state)
+        self.assertEqual(live.opened_menu,'idroid');live.execute.assert_not_called()
+
+    @staticmethod
     def fixture(depth, popup=False):
         live = Live.__new__(Live)
         live.opened_menu = "idroid"

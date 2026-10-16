@@ -83,6 +83,44 @@ checkpoint `2448458239`. It is not a saved pre-tutorial fixture. Each genuine
 lesson repeat must use the real Restart Mission route. Six-file save restoration
 and its independent hashes belong in the receipt at every stopping point.
 
+Committed `b8fd23e` / checked DLL `c49c599287d3` passed the complete bounded
+restart handoff in retained `20261016T214733996360Z`: native Restart decision,
+ready loading panel, VR Resume through the authored fade, and actual arrival
+back at the original iDroid lesson. All four cases passed; the loading,
+cinematic and returned-field eye pairs were reviewed. Retained
+`20261016T215159591936Z` then passed the genuine tutorial stow and reopening
+43 ms after observed horse ownership, plus handset/head motion. Both final
+eyes and the relevant frames of its 37.578-second compositor-left tail were
+reviewed (116 captures, no reported error). This is scoped opening/interaction
+acceptance, with the earlier intermittent miss and physical acceptance open.
+
+Cutscene Skip remains a separate reproduced input failure. The effective
+analog menu stick reached the game's XInput caller, but right and down did
+not select Skip in the reviewed Resume/Skip menu; personal D-pad actions are
+unbound. Retained `20261016T221223675350Z` also failed after adding a bounded
+native D-pad pulse: Right/Left reached retail XInput, but both reviewed menu
+selections stayed on Resume and Confirm resumed the movie. Native UI queries
+missed those pressed edges. Development now relays a fresh effective menu-axis
+gesture to the verified horizontal native UI edge query, only while that
+noninteractive cinematic Pause owns input. Neutral entry, hysteresis, exact
+activation, a 250 ms original deadline, explicit D-pad precedence and exactly
+one delivery protect the handoff. A/B/Start remain native. Actual-game Skip
+acceptance is recorded below; no personal binding was changed.
+The runner now recognizes a closed test-owned Pause returning to a fresh,
+neutral native cinematic. iDroid stow still requires its live player/rig owner;
+this cleanup distinction does not relax pixel or gameplay acceptance.
+
+Checked DLL `bafd39873d7e` passed all 56 test groups and installer checks.
+Retained `20261016T223143075571Z` then passed all four actual cutscene cases:
+Right selected Skip in both eyes, Left plus native Confirm resumed the movie,
+Right selected Skip again, and native Confirm reached the original
+`Seq_Game_IDroidTutorial`. All four eye pairs and sampled frames of the
+20.922-second compositor-left take were reviewed (93 captures, no reported
+error). The three native query claims were Right, Left, Right, each with the
+original native edge false. The previous D-pad-only failure stays retained.
+This accepts the scoped arrival cutscene flow, not every cinematic or a whole
+mission. A later neutral observation confirms the restored horseback owner.
+
 On that runtime, retained `20261016T152938582537Z` genuinely picked up the exact
 injured child, `20261016T153141790803Z` opened the left-hand iDroid while carrying
 him, and `20261016T153532094973Z` walked with that carry intact. Short native B

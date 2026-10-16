@@ -201,6 +201,7 @@ struct Session {
     NativeControls nativeControls;
     IdroidBackRecovery idroidBackRecovery;
     IdroidTabInput idroidTabInput;
+    CinematicMenuNavigation cinematicMenuNavigation;
     IdroidFocusWeapon idroidFocusWeapon;
     bool lastMappedWeaponReady{},idroidTriggerReleaseRequired{};
     IdroidHandUseController idroidHandUse;
@@ -533,6 +534,8 @@ struct Session {
         idroidBackRecovery.suspend();requestNativeIdroidClose(false);requestHandheldIdroidOpen(0);priorIdroidTap=false;nativeControls.suspend();
         snapControls.reset();smoothControls.reset();cabinTurn.reset();cinematicTurn.reset();rigControls.suspend();controls.suspend();
         idroidTabInput.update({},false,steadyMilliseconds());
+        cinematicMenuNavigation.update({},false,steadyMilliseconds());
+        publishCinematicMenuDirection(0,0,steadyMilliseconds());
         idroidFocusWeapon.reset();axisOwnership.reset();lastMappedWeaponReady=false;priorIdroidRouting=false;
         idroidTriggerReleaseRequired=true;publishHandheldFocusedWeapon(false,steadyMilliseconds());
         vehiclePedals.reset();publishVehicleWeaponInput(false,false,false,steadyMilliseconds(),0);
@@ -1137,6 +1140,13 @@ struct Session {
         const auto terms=nativeTermsMenu();
         const auto fallbackMode=nativeSceneInputMode(nativeStatus.nativeMenuOpen||terms.ready(now),scriptedDemo,interactiveLook,
             sceneFallback,liveIdroid&&controllerFrame.handheldMenus);
+        const bool cinematicPauseNavigation=!nativeInput.exclusive&&!rigInput
+            &&fallbackMode==NativeMenuInput::menu&&nativePauseMenuOpen()&&scriptedDemo&&!interactiveLook
+            &&controllerFrame.presentationFocused&&!editorInputOwned&&!nativeGamepadActive()
+            &&idroidPopup.active&&!*idroidPopup.active;
+        if(!cinematicPauseNavigation){
+            cinematicMenuNavigation.update({},false,now);publishCinematicMenuDirection(0,0,now);
+        }
         const auto bit=[&](bool enabled,WORD mask){if(enabled)pad.buttons|=mask;};
         const auto mappedButton=[&](std::string_view name,WORD mask){bit(activeControl(name),mask);};
         const auto triggerValue=[&](std::string_view name){return static_cast<uint8_t>(controls.value(name)*255);};
@@ -1149,6 +1159,8 @@ struct Session {
             pad=nativeInput.gamepad;move={};navigation={};
         }else if(!rigInput){
             pad=nativeMenuGamepad(controls,routedPhysical,fallbackMode);
+            if(cinematicPauseNavigation)publishCinematicMenuDirection(nativeStatus.activation,
+                cinematicMenuNavigation.update(pad,true,now),now);
             if(focusedWeapon)idroidTriggerReleaseRequired=true;
             else if(!controls.bindingChordHeld("menus.left_trigger",physical)
                 &&!controls.bindingChordHeld("menus.right_trigger",physical)

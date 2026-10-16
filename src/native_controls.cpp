@@ -260,6 +260,52 @@ GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalCo
     constrainCinematicInput(pad,mode);
     return pad;
 }
+uint16_t CinematicMenuNavigation::update(const GamepadSample& sample,bool enabled,uint64_t time) noexcept {
+    if(!enabled||time<last_){
+        last_=time;direction_=0;available_=false;releaseRequired_=true;
+        return 0;
+    }
+    last_=time;
+    if(!available_){available_=true;releaseRequired_=true;}
+    const int x=sample.leftX,y=sample.leftY;
+    const bool neutral=std::abs(x)<11469&&std::abs(y)<11469;
+    if(sample.buttons&0xf){
+        // A player's explicitly configured D-pad input owns this packet.
+        direction_=0;releaseRequired_=true;return 0xffff;
+    }
+    if(neutral){direction_=0;releaseRequired_=false;}
+    if(releaseRequired_)return 0;
+    if(!direction_&&std::max(std::abs(x),std::abs(y))>22937){
+        direction_=std::abs(y)>=std::abs(x)?(y>0?1:2):(x<0?4:8);
+        return direction_;
+    }
+    return 0;
+}
+void CinematicMenuDirectionQueue::publish(uint64_t activation,uint16_t direction,uint64_t time) noexcept {
+    if(!activation||activation!=activation_||time<sampleTime_)*this={};
+    activation_=activation;sampleTime_=time;
+    if(!activation)return;
+    if(direction){
+        direction_=direction==4||direction==8?direction:0;
+        requestTime_=direction_?time:0;delivered_=false;
+    }
+}
+std::optional<bool> CinematicMenuDirectionQueue::take(uint64_t activation,uint32_t index,uint32_t bit,uint64_t time) noexcept {
+    if(!activation||activation!=activation_||!sampleTime_||time<sampleTime_||time-sampleTime_>250
+       ||!requestTime_||time<requestTime_||time-requestTime_>250||index||(bit!=14&&bit!=15))return {};
+    if(!delivered_&&bit==(direction_==4?14u:15u)){delivered_=true;return true;}
+    return false;
+}
+namespace {
+std::mutex cinematicDirectionMutex;
+CinematicMenuDirectionQueue cinematicDirections;
+}
+void publishCinematicMenuDirection(uint64_t activation,uint16_t direction,uint64_t time) noexcept {
+    std::lock_guard lock(cinematicDirectionMutex);cinematicDirections.publish(activation,direction,time);
+}
+std::optional<bool> takeCinematicMenuDirection(uint64_t activation,uint32_t index,uint32_t bit,uint64_t time) noexcept {
+    std::lock_guard lock(cinematicDirectionMutex);return cinematicDirections.take(activation,index,bit,time);
+}
 uint32_t vehicleWeaponConsumedInputs(const ControlBindings& bindings,const PhysicalControls& physical){
     uint32_t result{};
     for(const auto name:{"vehicle.ready_weapon","vehicle.fire","vehicle.reload"})

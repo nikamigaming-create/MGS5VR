@@ -21,6 +21,29 @@ enum class NativeMenuInput { menu, liveIdroid, scriptedScene, cinematic, cinemat
 NativeMenuInput nativeSceneInputMode(bool menuOpen,bool scriptedDemo,bool interactiveLook,
     bool sceneFallback,bool handheldIdroid) noexcept;
 GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalControls& physical,NativeMenuInput mode);
+// Detect one fresh direction on the effective menu axis. Keep the native
+// packet unchanged: its pressed bits may expire before the cinematic UI polls.
+class CinematicMenuNavigation {
+public:
+    uint16_t update(const GamepadSample& sample,bool enabled,uint64_t time) noexcept;
+private:
+    uint64_t last_{};
+    uint16_t direction_{};
+    bool available_{},releaseRequired_{true};
+};
+// A short, activation-scoped handoff to the verified native UI edge query.
+// Only horizontal Resume/Skip queries can consume it; A/B/Start stay native.
+class CinematicMenuDirectionQueue {
+public:
+    void publish(uint64_t activation,uint16_t direction,uint64_t time) noexcept;
+    std::optional<bool> take(uint64_t activation,uint32_t index,uint32_t bit,uint64_t time) noexcept;
+private:
+    uint64_t activation_{},sampleTime_{},requestTime_{};
+    uint16_t direction_{};
+    bool delivered_{};
+};
+void publishCinematicMenuDirection(uint64_t activation,uint16_t direction,uint64_t time) noexcept;
+std::optional<bool> takeCinematicMenuDirection(uint64_t activation,uint32_t index,uint32_t bit,uint64_t time) noexcept;
 // The personal gun consumes its effective physical inputs before native
 // driving actions. In particular, a remapped reload must not also exit.
 uint32_t vehicleWeaponConsumedInputs(const ControlBindings& bindings,const PhysicalControls& physical);

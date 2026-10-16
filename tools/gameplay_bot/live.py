@@ -368,6 +368,45 @@ def reviewed_action_packet(state, action, held_token=None):
     return True
 
 
+def released_cinematic_pause_return(state, opened_menu):
+    """Recognize a closed test Pause returning to a fresh, neutral native movie.
+
+    This is menu cleanup ownership, never pixel or gameplay acceptance.
+    iDroid stow still requires its ordinary live player/rig owner.
+    """
+    if (opened_menu != 'pause' or state.get('scene') != 'cinematic'
+            or state.get('demo') is not True
+            or any(state.get(k) is not False for k in ('title', 'loading', 'menu', 'idroid', 'pause',
+                'gamepad', 'camera_suspended', 'camera_awaiting_player', 'camera_native_menu'))
+            or state.get('camera_active') is not True):
+        return False
+    native, frame = state.get('native') or {}, state.get('rendered') or {}
+    now, sampled, activation = state.get('now_ms'), frame.get('sample_ms'), state.get('activation')
+    if (type(native.get('mission')) is not int or native['mission'] <= 0
+            or not isinstance(native.get('sequence'), str) or not native['sequence'].startswith('Seq_Demo_')
+            or native.get('demo') is not True or native.get('demo_nonplayable') is not True
+            or any(native.get(k) is not False for k in ('title', 'popup', 'tutorial_pause', 'saving'))
+            or type(native.get('game_over')) is not int or native['game_over'] != 0
+            or frame.get('presentation_focused') is not True
+            or type(now) is not int or type(sampled) is not int or not 0 <= now-sampled <= 150
+            or type(activation) is not int or activation <= 0 or frame.get('activation') != activation):
+        return False
+    try:
+        controls = authoritative_controls(state)
+    except BotFault:
+        return False
+    if (controls.get('context') != 'menus' or controls.get('rig_input') is not False
+            or controls.get('native_packet_source') != 'xr_runtime_final_mapped_packet'
+            or type(controls.get('native_buttons')) is not int or controls['native_buttons'] != 0):
+        return False
+    for key, count in (('physical', 11), ('sticks', 4), ('native_axes', 4), ('native_triggers', 2)):
+        values = controls.get(key)
+        if (not isinstance(values, list) or len(values) != count
+                or any(not finite_number(v) or abs(v) > .001 for v in values)):
+            return False
+    return True
+
+
 def released_startup_observation(state, held):
     """Admit a longer observation at the reproduced, released title splash."""
     if (held or state.get("scene") != "title" or state.get("title") is not True
@@ -1612,10 +1651,12 @@ class Live:
                         and state.get("camera_awaiting_player") is False
                         and isinstance(controls, dict) and controls.get("rig_input") is True
                         and isinstance(native, dict) and native.get("popup") is False)
-            stable = stable + 1 if playable else 0
+            cinematic = released_cinematic_pause_return(state, self.opened_menu)
+            stable = stable + 1 if playable or cinematic else 0
             if stable >= 3:
                 self.opened_menu = None
-                self.events.emit("test_menu_cleanup", status="closed", camera_restored=True)
+                self.events.emit("test_menu_cleanup", status="closed", camera_restored=True,
+                                 return_owner="cinematic" if cinematic else "player")
                 return
             if time.monotonic() >= deadline:
                 raise BotFault("Test menu closed without restoring the live VR camera; session cleanup required")
