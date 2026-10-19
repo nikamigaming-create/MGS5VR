@@ -562,6 +562,10 @@ int main(int argc,char** argv){
             "selecting Continue publishes only its native confirm while both sticks are held");
         expect(cabinTitleGamepad(menuInput,false,false)==menuInput,
             "ordinary menus and scripted gameplay keep their existing input outside the spatial rack");
+        expect(cabinTitleGamepad(menuInput,true,false,true)==menuInput,
+            "visible cabin title menu accepts the existing VR menu bindings without a cassette");
+        expect(cabinTitleGamepad(menuInput,true,true,true)==menuInput,
+            "a cassette pulse cannot replace input while the visible native menu owns controls");
     }
     {
         ControlBindings bindings;PhysicalControls input;

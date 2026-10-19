@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <vector>
+#include <intrin.h>
 
 namespace {
 using namespace mgs5vr;
@@ -29,6 +30,7 @@ HeadCameraSample latest;
 OpticWaypoints waypoints;
 CombatSightSnapshot combatSight;
 std::atomic_uint64_t combatSightExpiry{};
+std::atomic_uint16_t combatMarker{0xffff};
 // Keep a finite segment outside the muzzle, including genuine close encounters.
 constexpr float combatSightMinimumRange=.25f;
 CoverProbeRequest coverRequest;
@@ -47,6 +49,10 @@ void publishEvent(OpticEvent event){
     opticEvents.push(event);
 }
 struct alignas(16) Vector {float x{},y{},z{},w{};};
+using NativeRay=uint32_t(*)(void*,uint32_t,const Vector*,const Vector*,float,uint32_t);
+NativeRay originalNativeRay{};
+std::atomic_uint64_t rayTraceWindow{};
+std::atomic_uint32_t rayTraceCount{};
 
 template<class T> T read(uintptr_t address){
     T value{};SIZE_T size{};
@@ -55,6 +61,36 @@ template<class T> T read(uintptr_t address){
 }
 template<size_t N> bool matches(uintptr_t address,const std::array<unsigned char,N>& expected){
     return read<std::array<unsigned char,N>>(address)==expected;
+}
+
+uint32_t observeNativeRay(void* query,uint32_t flags,const Vector* from,const Vector* to,float radius,uint32_t tag){
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
+    const auto expiry=combatSightExpiry.load(std::memory_order_relaxed);
+    const auto now=expiry?steadyMilliseconds():0;
+    bool trace=false;
+    if(expiry>now&&combatMarker.load(std::memory_order_relaxed)!=0xffff){
+        auto window=rayTraceWindow.load(std::memory_order_relaxed);
+        if(now>=window+1000&&rayTraceWindow.compare_exchange_strong(window,now))rayTraceCount.store(0);
+        trace=rayTraceCount.fetch_add(1,std::memory_order_relaxed)<128;
+    }
+    const auto address=reinterpret_cast<uintptr_t>(query);
+    const auto start=trace?read<Vector>(reinterpret_cast<uintptr_t>(from)):Vector{};
+    const auto end=trace?read<Vector>(reinterpret_cast<uintptr_t>(to)):Vector{};
+    const auto layers=trace?read<uint64_t>(address):0;
+    const auto filter=trace?read<uint64_t>(address+0x18):0;
+    // Preserve every native argument, result and query write. The observation
+    // runs only after the synchronous query has released its native scene lock.
+    const auto result=originalNativeRay(query,flags,from,to,radius,tag);
+    if(trace){
+        std::ostringstream out;out<<"NativeRayProbe ms="<<now<<" caller="
+            <<(caller>=base&&caller<base+0x208d000?caller-base:0)
+            <<" thread="<<GetCurrentThreadId()<<" flags="<<flags<<" layers="<<layers<<" filter="<<filter
+            <<" radius="<<radius<<" tag="<<tag<<" from="<<start.x<<','<<start.y<<','<<start.z
+            <<" to="<<end.x<<','<<end.y<<','<<end.z<<" result="<<result
+            <<" count="<<read<uint32_t>(address+0x60)<<" index="<<read<int32_t>(address+0x64);
+        log(out.str());
+    }
+    return result;
 }
 
 std::optional<Vector> surface(const HeadCameraSample& frame,bool* queryValid=nullptr){
@@ -98,7 +134,7 @@ std::optional<Vector> surface(const HeadCameraSample& frame,bool* queryValid=nul
 
 // Reuse the signature-verified native world query and its visibility filter.
 // This must stay on the marker-update job, rather than the pipe/XR thread.
-std::optional<Vector> combatSurface(Vec3 origin,CombatSightTarget& target){
+std::optional<Vector> combatSurface(Vec3 origin,CombatSightTarget& target,bool projectileComparison=false){
     const auto endpoint=target.aim;
     auto& queryValid=target.queryValid;queryValid=false;target.queryReason=1;
     const auto delta=endpoint-origin;const float length=std::sqrt(dot(delta,delta));
@@ -111,11 +147,14 @@ std::optional<Vector> combatSurface(Vec3 origin,CombatSightTarget& target){
     using Ray=uint32_t(*)(void*,uint32_t,const Vector*,const Vector*,float);
     using Position=void*(*)(const void*,Vector*);
     reinterpret_cast<Init>(base+0xa0fb50)(query.data(),0);
-    const uint64_t layers=~uint64_t{},filter=0x80000004;
+    // The optional comparison reproduces the actual accepted ALM48 sky-shot
+    // query (retained 20261018T110942700836Z). It never supplies admission.
+    const uint64_t layers=projectileComparison?0x40:~uint64_t{};
+    const uint64_t filter=projectileComparison?0x2:0x80000004;
     std::memcpy(query.data(),&layers,sizeof(layers));
     std::memcpy(query.data()+0x18,&filter,sizeof(filter));
     const Vector start{origin.x,origin.y,origin.z,0},end{endpoint.x,endpoint.y,endpoint.z,0};
-    target.rayResult=reinterpret_cast<Ray>(base+0x1b9b130)(query.data(),0x04000700,&start,&end,0.f);
+    target.rayResult=reinterpret_cast<Ray>(base+0x1b9b130)(query.data(),projectileComparison?0x700:0x04000700,&start,&end,0.f);
     if(!target.rayResult){
         target.queryReason=3;queryValid=true;return {};
     }
@@ -124,7 +163,20 @@ std::optional<Vector> combatSurface(Vec3 origin,CombatSightTarget& target){
     target.hitCount=count;target.hitIndex=index;target.queryReason=4;
     if(!count||count>5||index<0||static_cast<uint32_t>(index)>=count)return {};
     Vector hit;
-    reinterpret_cast<Position>(base+0x1b9a5d0)(query.data()+0x70+index*0x60,&hit);
+    const auto* record=query.data()+0x70+index*0x60;
+    reinterpret_cast<Position>(base+0x1b9a5d0)(record,&hit);
+    if(target.aimKind==2){
+        std::memcpy(target.hitRecordWords.data(),record,0x60);
+        // The verified native position getter uses record+0x58 as the
+        // shape-to-world matrix and adds its translation at matrix+0x30.
+        // Read the diagnostic matrix without executing an unknown owner API.
+        const auto transform=target.hitRecordWords[11];SIZE_T bytes{};
+        if(transform)ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<const void*>(transform),
+            target.hitTransform.data(),sizeof(target.hitTransform),&bytes);
+        target.hitTransformRead=bytes==sizeof(target.hitTransform)
+            &&std::all_of(target.hitTransform.begin(),target.hitTransform.end(),[](float v){return std::isfinite(v);});
+        if(!target.hitTransformRead)target.hitTransform={};
+    }
     const auto direction=delta*(1.f/length),offset=Vec3{hit.x,hit.y,hit.z}-origin;
     const float along=dot(offset,direction);const auto residual=offset-direction*along;
     target.queryReason=5;
@@ -146,6 +198,8 @@ void sampleCombatSight(uintptr_t markers,const HeadCameraSample& frame,uint64_t 
     result.sampleTime=now;result.activation=frame.activation;
     result.presentationEpoch=frame.controllers.presentationEpoch;
     result.playerOwner=frame.playerOwner;result.trackingSequence=frame.trackingSequence;
+    const auto requested=combatMarker.load();
+    result.requestedMarker.id=requested;
     const auto& weapon=frame.weaponRig;
     if(frame.controllers.presentationFocused&&!frame.controllers.vehicleControls
        &&frame.controllers.weaponReady&&frame.nativeFirearmActive
@@ -160,14 +214,21 @@ void sampleCombatSight(uintptr_t markers,const HeadCameraSample& frame,uint64_t 
         for(size_t i=0;i<0x3b7;++i){
             const auto* record=actors.data()+i*0x30;
             const auto flags=std::to_integer<uint8_t>(record[0x1f]);
-            if(std::to_integer<uint8_t>(record[0x1e])!=1||(flags&5)!=1)continue;
+            const auto kind=std::to_integer<uint8_t>(record[0x1e]);
             CombatSightTarget target;
             std::memcpy(&target.id,record+0x1c,sizeof(target.id));
             std::memcpy(&target.marker,record+0x10,sizeof(target.marker));
             if(!target.id||target.id==0xffff||!valid(Pose{{},target.marker})||dot(target.marker,target.marker)<1)continue;
+            if(target.id==requested)result.requestedMarker={target.id,target.marker,kind,flags,true};
+            // Ordinary soldier observation is unchanged. An explicitly leased
+            // non-person record uses its exact native marker point; no torso
+            // offset or invented anatomical point is applied to a vehicle.
+            const bool explicitMarker=target.id==requested&&requested!=0xffff;
+            if((kind!=1&&!explicitMarker)||(flags&5)!=1)continue;
             // Aim inside the same native person-marker capsule used by recon;
             // this is a torso aim policy, not a recovered anatomical bone.
-            target.aim=target.marker+Vec3{0,-.65f,0};
+            target.aim=target.marker+(explicitMarker?Vec3{}:Vec3{0,-.65f,0});
+            if(explicitMarker)target.aimKind=2;
             const auto delta=target.aim-result.muzzle.position;
             target.distance=std::sqrt(dot(delta,delta));
             if(target.distance>=combatSightMinimumRange&&target.distance<=180.f)candidates.push_back(target);
@@ -186,7 +247,56 @@ void sampleCombatSight(uintptr_t markers,const HeadCameraSample& frame,uint64_t 
                 point.unoccluded=point.queryValid&&(!hit||point.surfaceDistance>=point.distance-.35f);
             };
             queryPoint(target);
-            if(!target.unoccluded){
+            if(target.aimKind==2){
+                // Read-only paired experiment on the same marker-update job,
+                // fresh muzzle and exact target. Existing visibility remains
+                // the sole admission result; never overwrite target with this.
+                auto projectile=target;
+                projectile.queryValid=false;projectile.rayResult=projectile.hitCount=0;
+                projectile.hitIndex=-1;projectile.rawSurface={};
+                projectile.rawAlong=projectile.rawLateralSquared=0;
+                const auto hit=combatSurface(result.muzzle.position,projectile,true);
+                std::ostringstream out;
+                out<<"CombatProjectileComparison ms="<<now<<" marker="<<target.id
+                    <<" muzzle="<<result.muzzle.position.x<<','<<result.muzzle.position.y<<','<<result.muzzle.position.z
+                    <<" aim="<<target.aim.x<<','<<target.aim.y<<','<<target.aim.z
+                    <<" distance="<<target.distance<<" visibility_valid="<<target.queryValid
+                    <<" visibility_result="<<target.rayResult<<" visibility_along="<<target.rawAlong
+                    <<" projectile_valid="<<projectile.queryValid<<" projectile_result="<<projectile.rayResult
+                    <<" projectile_reason="<<static_cast<unsigned>(projectile.queryReason)<<" projectile_count="<<projectile.hitCount
+                    <<" projectile_along="<<projectile.rawAlong
+                    <<" projectile_hit="<<projectile.rawSurface.x<<','<<projectile.rawSurface.y<<','<<projectile.rawSurface.z
+                    <<" projectile_clear="<<(projectile.queryValid&&(!hit||projectile.rawAlong>=target.distance-.35f));
+                if(hit){
+                    Vec3 normal{};
+                    std::memcpy(&normal,reinterpret_cast<const std::byte*>(projectile.hitRecordWords.data())+0x20,sizeof(normal));
+                    out<<" projectile_normal="<<normal.x<<','<<normal.y<<','<<normal.z
+                        <<" projectile_matrix_read="<<projectile.hitTransformRead<<" projectile_record=";
+                    for(size_t word=0;word<projectile.hitRecordWords.size();++word){
+                        if(word)out<<',';
+                        out<<projectile.hitRecordWords[word];
+                    }
+                    out<<" projectile_matrix=";
+                    for(size_t element=0;element<projectile.hitTransform.size();++element){
+                        if(element)out<<',';
+                        out<<projectile.hitTransform[element];
+                    }
+                }
+                log(out.str());
+                auto ground=projectile;
+                ground.aim=result.muzzle.position+Vec3{0,-3.f,0};
+                ground.queryValid=false;ground.rayResult=ground.hitCount=0;
+                ground.hitIndex=-1;ground.rawSurface={};
+                ground.rawAlong=ground.rawLateralSquared=0;
+                const auto groundHit=combatSurface(result.muzzle.position,ground,true);
+                std::ostringstream control;
+                control<<"CombatProjectileGroundControl ms="<<now
+                    <<" valid="<<ground.queryValid<<" result="<<ground.rayResult
+                    <<" reason="<<static_cast<unsigned>(ground.queryReason)<<" count="<<ground.hitCount
+                    <<" along="<<ground.rawAlong<<" hit="<<static_cast<bool>(groundHit);
+                log(control.str());
+            }
+            if(!target.unoccluded&&target.aimKind!=2){
                 // Low cover can conceal the torso while the native recon
                 // point is exposed. Query that actual point separately;
                 // neither a guessed bone nor the first blocked ray admits it.
@@ -567,12 +677,12 @@ void update(void* job,void* input,const void* output){
 }
 
 namespace mgs5vr {
-bool leaseCombatSight(uint64_t now,uint64_t milliseconds) noexcept {
-    if(!milliseconds){combatSightExpiry.store(0);std::lock_guard lock(mutex);combatSight={};return true;}
+bool leaseCombatSight(uint64_t now,uint64_t milliseconds,uint16_t marker) noexcept {
+    if(!milliseconds){combatSightExpiry.store(0);combatMarker.store(0xffff);std::lock_guard lock(mutex);combatSight={};return true;}
     if(!enabled.load()||milliseconds<100||milliseconds>5000)return false;
     const auto status=headCamera().status();
     if(!status.active||status.suspended)return false;
-    combatSightExpiry.store(now+milliseconds);return true;
+    combatMarker.store(marker);combatSightExpiry.store(now+milliseconds);return true;
 }
 CombatSightSnapshot combatSightSnapshot(){std::lock_guard lock(mutex);return combatSight;}
 uint64_t combatSightLeaseExpiry() noexcept {return combatSightExpiry.load();}
@@ -615,6 +725,7 @@ void installOpticMarkers(uintptr_t moduleBase){
     constexpr std::array<unsigned char,6> removeEntry{0x40,0x53,0x48,0x83,0xec,0x20};
     constexpr std::array<unsigned char,9> initEntry{0x48,0x89,0x4c,0x24,0x08,0x48,0x83,0xec,0x18};
     constexpr std::array<unsigned char,10> rayEntry{0x48,0x83,0xec,0x38,0xf3,0x0f,0x10,0x44,0x24,0x60};
+    constexpr std::array<unsigned char,12> nativeRayEntry{0x40,0x53,0x55,0x56,0x57,0x48,0x81,0xec,0x98,0,0,0};
     constexpr std::array<unsigned char,10> positionEntry{0x4c,0x8b,0xdc,0x48,0x81,0xec,0x98,0,0,0};
     constexpr std::array<unsigned char,14> radioCommitEntry{0x40,0x57,0x48,0x83,0xec,0x20,0x0f,0xb7,0x81,0xc0,0,0,0,0x48};
     constexpr std::array<unsigned char,8> radioSelectEntry{0x66,0x89,0x91,0x80,0,0,0,0xc3};
@@ -623,10 +734,15 @@ void installOpticMarkers(uintptr_t moduleBase){
        ||!matches(moduleBase+0x5c6250,removeEntry)
        ||!matches(moduleBase+0xa0fb50,initEntry)||!matches(moduleBase+0x1b9b130,rayEntry)
        ||!matches(moduleBase+0x1b9a5d0,positionEntry)
+       ||!matches(moduleBase+0x1b9b160,nativeRayEntry)
        ||read<uintptr_t>(moduleBase+0x21ade40)!=moduleBase+0x5c53a0
        ||read<uintptr_t>(moduleBase+0x21ade58)!=moduleBase+0x5c6250)
         throw std::runtime_error("Native optic marker signature mismatch");
     base=moduleBase;
+    const auto nativeRayAddress=reinterpret_cast<void*>(base+0x1b9b160);
+    const auto rayCreated=MH_CreateHook(nativeRayAddress,reinterpret_cast<void*>(&observeNativeRay),reinterpret_cast<void**>(&originalNativeRay));
+    if(rayCreated!=MH_OK)throw std::runtime_error(MH_StatusToString(rayCreated));
+    if(MH_EnableHook(nativeRayAddress)!=MH_OK)throw std::runtime_error("Cannot enable opt-in native ray observation");
     const auto address=reinterpret_cast<void*>(base+0x930710);
     const auto created=MH_CreateHook(address,reinterpret_cast<void*>(&update),reinterpret_cast<void**>(&original));
     if(created!=MH_OK)throw std::runtime_error(MH_StatusToString(created));

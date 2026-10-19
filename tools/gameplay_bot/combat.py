@@ -9,7 +9,7 @@ import re
 import time
 
 from .core import BotFault, atomic_json
-from .live import channel, fresh_control_observation, held_input_evidence, rotate
+from .live import channel, fresh_control_observation, held_input_evidence, rotate, sampled_release_keys
 from .locomotion import _position, _validate_field_state
 from .perception import read_enemy_snapshot
 from .session import preserved_tracking_poses
@@ -360,47 +360,61 @@ def arm(live, ready_inputs, anchor, *, healthy_life=None, witnessed_hospital_rid
     raise BotFault('Ready input did not establish the native firearm and authored muzzle')
 
 
-def face_and_aim(live, actor, anchor, pitch, *, pair, support_pair, ready_inputs, max_seconds=2.8):
+def one_hand_ready(state):
+    keys=sampled_release_keys(state)
+    frame=state.get('rendered') or {}
+    return (keys is not None and ('left','Grip',None) not in keys
+            and frame.get('native_firearm') is True
+            and frame.get('right_palm_tracked') is True
+            and frame.get('weapon_support_attached') is False)
+
+
+def face_and_aim(live, actor, anchor, pitch, *, pair, support_pair, ready_inputs, max_seconds=2.8, geometry_reader=None, grip_position=None, after_head_turn=None, support_required=True):
     """Look and raise the barrel before judging its current terrain visibility.
 
     A lowered muzzle can be inside terrain while the player can raise it.
     This read-only probe may aim at an obstructed capsule; fire() still requires
     a fresh clear ray and solved barrel alignment before any trigger input.
     """
+    if type(support_required) is not bool or (not support_required and ready_inputs!=['right_grip']):
+        raise BotFault('One-hand aiming requires only the effective firing grip')
     state,_=admit(live,anchor)
+    grip_position=_pose(grip_position if grip_position is not None else comfortable_grip(state['native']),[0.,0.,0.,1.])['position']
+    read_sight=geometry_reader or sight
     target=actor['sight']['aim']
     head=live.text_result(live.call('get_head_pose',{'base_space':'local'}))['pose']
     head['orientation']=looking_head(head['orientation'],state['rendered']['native_pose'],target)
     live.call('set_head_pose',{'base_space':'local',**head})
+    if after_head_turn is not None:after_head_turn()
     # The head RPC moves simulated controllers too. Re-establish the existing
     # separate grip/aim relationship at a comfortable VIEW-space palm position.
-    grip_position=comfortable_grip(state['native'])
     deadline=time.monotonic()+max_seconds;stable=0;attitude=None
     while time.monotonic()<deadline:
-        data,state=sight(live,anchor)
+        data,state=read_sight(live,anchor)
         target=next((t for t in data['targets'] if t['id']==actor['id']),None)
         if not target or not target['query_valid']:
             raise AimProbeUnavailable('Target lost its verified native geometry during the aim probe')
         if facing_error(state['rendered']['native_pose'],target['aim'])>5.:
             head['orientation']=looking_head(head['orientation'],state['rendered']['native_pose'],target['aim'])
             live.call('set_head_pose',{'base_space':'local',**head})
+            if after_head_turn is not None:after_head_turn()
             time.sleep(.04)
-            data,state=sight(live,anchor)
+            data,state=read_sight(live,anchor)
             target=next((t for t in data['targets'] if t['id']==actor['id']),None)
             if not target or not target['query_valid']:raise AimProbeUnavailable('Target lost geometry after looking')
             attitude=None
         attitude=(aim_quaternion(state['rendered']['native_pose'],data['muzzle']['position'],target['aim'],pitch)
                   if attitude is None else corrected_aim(state['rendered']['native_pose'],data['muzzle'],target['aim'],attitude))
-        support_frame=aimed_support_frame(state['rendered'],grip_position,attitude,pair)
+        support_frame=aimed_support_frame(state['rendered'],grip_position,attitude,pair) if support_required else None
         # Prepare both from the old publication, then move them together.
         # Never resample a socket constrained by a left hand we have not moved.
         live.execute({'op':'pose','hand':'right','position':grip_position,
                       'orientation':normalized(mul(attitude,pair['orientation'])),
                       'aim_position':paired_aim_position(grip_position,attitude,pair),'aim_orientation':attitude})
-        place_support_hand(live,support_frame,support_pair)
+        if support_required:place_support_hand(live,support_frame,support_pair)
         live.input([channel(t) for t in ready_inputs],.25,lease_seconds=3.)
         time.sleep(.04)
-        checked,checked_state=sight(live,anchor)
+        checked,checked_state=read_sight(live,anchor)
         latest=next((t for t in checked['targets'] if t['id']==actor['id']),None)
         if latest is None or not latest['query_valid']:raise AimProbeUnavailable('Target geometry became unavailable during aim')
         along,lateral=aim_error(checked['muzzle'],latest['aim'])
@@ -412,7 +426,8 @@ def face_and_aim(live, actor, anchor, pitch, *, pair, support_pair, ready_inputs
                          support_attached=checked_state['rendered'].get('weapon_support_attached'),
                          support_grip=checked_state['rendered'].get('weapon_support_grip'))
         stable=stable+1 if (along>=MINIMUM_MUZZLE_TARGET_RANGE and lateral<=.18 and facing<=15.
-                           and checked_state['rendered'].get('weapon_support_attached') is True) else 0
+                           and (checked_state['rendered'].get('weapon_support_attached') is True
+                                if support_required else one_hand_ready(checked_state))) else 0
         if stable>=2:return checked,latest
     raise AimProbeUnavailable('The actual VR view and barrel did not converge on the native target capsule')
 

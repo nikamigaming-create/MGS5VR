@@ -4,10 +4,29 @@ import time
 
 from .binocular_presentation import BinocularPresentation
 from .combat import fresh_rig
-from .core import BotFault, atomic_json
+from .core import BotFault, atomic_json, matches
+from .perception import read_enemy_snapshot
 from .health import HealthRecoveryNeeded, needs_recovery
 from .locomotion import _validate_xr_scene_state
 from .session import preserved_tracking_poses
+
+
+def run_named_recon(live, policy, *, enemy_script, output, max_seconds):
+    """Bound the existing recon executor to one guarded, currently loaded camp."""
+    if (not isinstance(policy, dict) or set(policy) != {'native', 'camp'}
+            or not isinstance(policy['native'], dict) or not policy['native']
+            or not isinstance(policy['camp'], str)
+            or not re.fullmatch(r'[A-Za-z0-9_]{1,100}', policy['camp'])
+            or type(max_seconds) not in (int, float) or not 5 <= max_seconds <= 60):
+        raise BotFault('Named recon requires a camp, native entry guards and 5..60 seconds')
+    state, anchor = fresh_rig(live)
+    if not matches(state['native'], policy['native']):
+        raise BotFault('Named recon native entry changed; no action dispatched')
+    enemies = read_enemy_snapshot(live.native.read, enemy_script)
+    if not any(row.get('camp') == policy['camp'] for row in enemies['soldiers']):
+        raise BotFault('Named recon camp is absent from the fresh native roster')
+    return inspect(live, enemies, output=output, anchor=anchor, camp=policy['camp'],
+                   healthy_life=state['native']['player_life'], max_seconds=max_seconds)
 
 
 class MarkerLog:

@@ -17,6 +17,7 @@
 #include "mgs5vr/animal_interaction.hpp"
 #include "mgs5vr/small_animal.hpp"
 #include "mgs5vr/player_visibility.hpp"
+#include "mgs5vr/optic_markers.hpp"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -34,6 +35,44 @@ using namespace mgs5vr;
 constexpr float fullBodyEyeErrorLimit=.02f;
 std::mutex obstructionWitnessMutex;
 WeaponObstructionWitness obstructionWitness;
+// Opt-in read-only lineage for a failed native skin solve. Shares the bounded
+// combat observation lease; never changes actor, camera, rig or input state.
+struct SkinSolveProbe {
+    uint64_t time{},activation{},tracking{},playerSequence{};
+    uintptr_t owner{},camera{},model{},frameOwner{};
+    Pose source{};unsigned stage{1},bodyRejection{};bool enabled{},applied{};
+    ArmPose arm{};Pose target{};Vec3 hint{},eye{};ArmBasis basis{};
+    ArmSurface headSurface{};unsigned armFailure{};
+    SkinSolveProbe(uint64_t now,uintptr_t o,uintptr_t c,uintptr_t m)
+        :time(now),owner(o),camera(c),model(m),enabled(combatSightLeaseExpiry()>now){}
+    ~SkinSolveProbe(){
+        if(!enabled)return;
+        static thread_local std::array<uint64_t,16> times{},counts{};
+        const auto i=std::min<size_t>(stage,15);++counts[i];
+        if(times[i]&&time>=times[i]&&time-times[i]<250)return;
+        times[i]=time;
+        std::ostringstream s;s<<"Combat skin solve stage="<<stage<<" count="<<counts[i]
+            <<" sample_ms="<<time<<" thread="<<GetCurrentThreadId()<<" owner="<<owner
+            <<" camera="<<camera<<" model="<<model<<" frame_owner="<<frameOwner
+            <<" applied="<<applied<<" activation="<<activation<<" tracking="<<tracking
+            <<" player_sequence="<<playerSequence<<" body_rejection="<<bodyRejection
+            <<" source_p="<<source.position.x<<','<<source.position.y<<','<<source.position.z
+            <<" source_q="<<source.orientation.x<<','<<source.orientation.y<<','<<source.orientation.z<<','<<source.orientation.w;
+        if(armFailure){
+            const auto pose=[&](const char* name,Pose p){s<<' '<<name<<"="<<p.position.x<<','<<p.position.y<<','<<p.position.z<<','
+                <<p.orientation.x<<','<<p.orientation.y<<','<<p.orientation.z<<','<<p.orientation.w;};
+            s.precision(9);s<<" arm_failure="<<armFailure;
+            pose("shoulder",arm.shoulder);pose("elbow",arm.elbow);pose("wrist",arm.wrist);pose("target",target);
+            s<<" hint="<<hint.x<<','<<hint.y<<','<<hint.z<<" eye="<<eye.x<<','<<eye.y<<','<<eye.z
+                <<" upper_axis="<<basis.upperAxis.x<<','<<basis.upperAxis.y<<','<<basis.upperAxis.z
+                <<" forearm_axis="<<basis.forearmAxis.x<<','<<basis.forearmAxis.y<<','<<basis.forearmAxis.z
+                <<" head_point="<<headSurface.point.x<<','<<headSurface.point.y<<','<<headSurface.point.z
+                <<" head_normal="<<headSurface.normal.x<<','<<headSurface.normal.y<<','<<headSurface.normal.z
+                <<" head_clearance="<<headSurface.clearance;
+        }
+        log(s.str());
+    }
+};
 using Update=void(*)(void*,void*);
 Update original{};
 struct Vector4{float x{},y{},z{},w{};};
@@ -115,6 +154,9 @@ bool heldCloseSupport{};
 uint64_t supportAt{};
 std::array<HandPresentationCache,2> handPresentation;
 StationaryBodyState stationaryBody;
+BodyHeadingState bodyHeading;
+uintptr_t legFitOwner{},legFitModel{};
+float standingLegScale=1.f;
 struct ShotRig {
     uintptr_t owner{},character{},camera{},model{};
     Pose sourceCamera{},wristWorld{};
@@ -434,6 +476,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(!character||get<uintptr_t>(character)!=base+0x2295210)return false;
     const auto component=get<uintptr_t>(character+0x10),holder=get<uintptr_t>(component+0x10),model=get<uintptr_t>(holder+0x68);
     if(!component||!holder||!model||get<uintptr_t>(model)!=base+0x20f4d90||reinterpret_cast<uintptr_t>(binding)!=model+0xa0)return false;
+    SkinSolveProbe probe(now,owner,camera,model);
     const auto driver=reinterpret_cast<uintptr_t>(context),skeleton=get<uintptr_t>(driver+0x10);
     if(get<uintptr_t>(holder+0x70)!=driver||get<uintptr_t>(driver)!=base+0x24c1988||!skeleton)return false;
     const auto count=get<uint16_t>(skeleton+0x48);
@@ -449,6 +492,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         if(!read(parents+i*0x20,parent[i])||parent[i]>=static_cast<int32_t>(i)||parent[i]<-1||!valid(bone(q,p,i)))return false;
     }
     if(parent[6]!=5||parent[7]!=6||parent[8]!=7||parent[10]!=9||parent[11]!=10||parent[12]!=11)return false;
+    probe.stage=2;
     if(parent[24]!=8||parent[30]!=8||parent[34]!=30||parent[40]!=12||parent[46]!=12||parent[50]!=46)return false;
     const auto bindOffset=[&](size_t i){return get<Vec3>(parents+i*0x20+0x10);};
     const std::array<ArmBasis,2> armBasis{{{bindOffset(7),bindOffset(8)},{bindOffset(11),bindOffset(12)}}};
@@ -462,6 +506,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const auto root=nativeAffinePose(matrix);if(!root)return false;
     const Pose nativeCamera{{cameraValues[0],cameraValues[1],cameraValues[2],cameraValues[3]},
                             {cameraValues[4],cameraValues[5],cameraValues[6]}};
+    probe.stage=3;probe.source=nativeCamera;
     std::optional<NativeBodyHead> nativeHead;
     const auto nativeHeadNames=get<uintptr_t>(model+0xe8);
     if(nativeHeadNames&&get<uint32_t>(nativeHeadNames+4*sizeof(uint32_t))==0xc3a88a1b
@@ -472,6 +517,16 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             compose(*root,bone(q,p,2)),true};
     }
     auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera,nativeHead);
+    probe.applied=frame.applied;probe.frameOwner=frame.playerOwner;probe.activation=frame.activation;
+    probe.tracking=frame.trackingSequence;probe.playerSequence=frame.playerSequence;
+    frame.nativeBodySourceTracked=false;
+    if(frame.applied&&frame.playerOwner==owner&&nativeHead&&frame.anatomicalEyeModel==model){
+        frame.nativeBodySourceTracked=true;
+        frame.nativeBodySourceRoot=nativeHead->worldFromRoot;
+        frame.nativeBodySourceChest=nativeHead->worldFromChest;
+        frame.nativeBodySourceHead=nativeHead->worldFromHead;
+        frame.nativeBodySourceEye=compose(nativeHead->worldFromHead,Pose{{},nativeEyeFromHead});
+    }
     if(frame.applied&&frame.controllers.scriptedDemo){
         // The camera is an observer during a movie, not Snake's body anchor.
         // Leave the entire authored actor skin in its native animation frame.
@@ -487,6 +542,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(!frame.applied||frame.playerOwner!=owner||frame.controllers.avatarEditor
        ||(frame.controllers.frontEnd&&!frame.controllers.openingSelector&&!frame.controllers.cabinPlay))return false;
     const bool vehicleWeaponReady=vehicleWeaponAcknowledged(frame,now);
+    probe.stage=4;
     if(vehicleWeaponScope(frame)&&!vehicleWeaponReady)
         frame.controllers.weaponReady=frame.controllers.supportGrip=false;
     frame.weaponRig={};
@@ -494,10 +550,11 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // right controller must not publish an unshifted camera for one frame and
     // snap back to the walking offset when its tracking returns.
     publishNativeCabinBounds(frame);
-    const auto idroidMount=frame.menuIdroid?nativeIdroidMount(driver):std::nullopt;
-    const bool idroidHeld=frame.menuOpen&&frame.menuIdroid&&frame.controllers.handheldMenus
+    const bool rocketIdroid=frame.rocketArmGuidance&&!frame.menuOpen;
+    const auto idroidMount=(frame.menuIdroid||rocketIdroid)?nativeIdroidMount(driver):std::nullopt;
+    const bool idroidHeld=((frame.menuOpen&&frame.menuIdroid)||rocketIdroid)&&frame.controllers.handheldMenus
         &&!frame.controllers.handheldIdroidStowed
-        &&!frame.menuWorldQuad&&idroidMount.has_value()&&!frame.controllers.nativeGamepad;
+        &&!frame.menuWorldQuad&&(idroidMount.has_value()||rocketIdroid)&&!frame.controllers.nativeGamepad;
     const auto names=get<uintptr_t>(model+0xe8);
     std::array<uint32_t,512> boneNames{};
     const bool namesRead=names&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(names),
@@ -506,6 +563,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::lock_guard lock(rigMutex);
     const RigContinuityKey continuity{owner,model,frame.activation,frame.controllers.referenceEpoch,
         frame.controllers.presentationEpoch};
+    if(legFitOwner!=owner||legFitModel!=model){legFitOwner=owner;legFitModel=model;standingLegScale=1.f;}
     std::array<std::optional<HandPresentationPose>,2> presentationHands;
     std::array<std::optional<Pose>,2> presentationGrips;
     if(frame.controllers.nativeGamepad){
@@ -544,6 +602,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         return headCamera().publishRigFrame(camera,owner,nativeCamera,frame);
     }
     const auto renderedHead=compose(*root,bone(q,p,4)).position;
+    probe.stage=5;
     const auto originalQ=q;const auto originalP=p;
     std::array<Pose,2> propInputPalms{frame.controllers.hands[0].grip,frame.controllers.hands[1].grip};
     std::array<bool,2> propHands{};
@@ -591,7 +650,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         return target;
     };
     const auto groundedArm=[&](const ArmPose& animated,Pose target,Vec3 hint,const ArmBasis& basis){
+        if(probe.enabled){probe.arm=animated;probe.target=target;probe.hint=hint;probe.basis=basis;probe.eye=eyeInModel;probe.armFailure=0;}
         auto solution=solveArm(animated,target,hint,&basis);
+        if(probe.enabled&&!solution)probe.armFailure=1;
         if(solution)if(const auto surface=modelSurface(solution->pose.elbow.position,.06f)){
             if(dot(solution->pose.elbow.position-surface->point,surface->normal)<surface->clearance){
                 if(const auto contact=solveArm(animated,target,hint,&basis,&*surface)){
@@ -601,7 +662,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
         if(solution)if(const auto surface=headClearanceSurface(solution->pose.elbow.position,eyeInModel,.12f)){
             const auto contact=solveArm(animated,target,hint,&basis,&*surface);
-            if(!contact)return std::optional<ArmSolution>{};solution=contact;++headContacts;
+            if(!contact){if(probe.enabled){probe.armFailure=2;probe.headSurface=*surface;}return std::optional<ArmSolution>{};}solution=contact;++headContacts;
         }
         return solution;
     };
@@ -634,6 +695,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
     const auto rightAnimated=bone(q,p,12),leftAnimated=bone(q,p,8);
+    probe.stage=6;
     WheelSample wheel{};wheel.time=frame.sampleTime;
     unsigned wheelHands{};
     for(size_t side=0;side<2;++side){
@@ -682,21 +744,41 @@ bool apply(void* context,void* binding,PoseRestore& restore){
            &&!frame.controllers.authoredCamera&&!frame.controllers.cabinPlay
            &&!frame.controllers.cabinTransit&&!frame.controllers.vehicleMounted
            &&travelMode==TravelMode::onFoot){
-            const auto heading=anatomicalTorsoHeading(frame.locomotionHeading,frame.nativePose.orientation,
-                frame.controllers.playerPosture==PlayerPosture::prone);
+            std::optional<Quat> handHeading;
+            if(presentationGrips[0]&&presentationGrips[1]&&!propHands[0]&&!propHands[1]){
+                const auto midpoint=(grips[0].position+grips[1].position)*.5f;
+                const auto aim=nativeTrackedPose(frame.nativePose,frame.headPose,presentationHands[1]->aim);
+                // Down-at-side, behind-back and crossed-body gestures cannot
+                // claim torso facing. A supported weapon can: both grips use
+                // the same frame as the viewer and native skin transaction.
+                // The hands' midpoint admits the gesture, but must not steer
+                // the torso: reaching onto a support socket changes that
+                // midpoint and otherwise moves the gun away from the hand.
+                // Use the primary tracked aim's heading in the same frame.
+                handHeading=trackedTorsoHeading(frame.nativePose,compose(*root,Pose{{},midpoint}).position,aim.orientation);
+            }
+            const auto heading=bodyHeading.update(frame.locomotionHeading,frame.nativePose.orientation,
+                frame.controllers.playerPosture==PlayerPosture::prone,frame.sampleTime,continuity,handHeading);
             if(heading)torso=*heading;
-        }
+        }else bodyHeading.reset();
         const auto chest=bone(q,p,2);
         if(mountedBody)if(const auto heading=nativeTorsoHeading(compose(*root,chest)))torso=*heading;
         const auto shoulderCenter=(bone(q,p,6).position+bone(q,p,10).position)*.5f;
-        const auto uprightHead=compose(inverse(*root),Pose{torso,frame.nativePose.position});
+        auto uprightHead=compose(inverse(*root),Pose{torso,frame.nativePose.position});
+        const auto fallbackUprightHead=uprightHead;
         bool fullBody=frame.controllers.fullBody&&nativeHead.has_value()&&frame.anatomicalEyeModel==model
             &&!frame.controllers.frontEnd&&!frame.controllers.authoredCamera
-            &&!frame.controllers.cabinPlay&&!frame.controllers.cabinTransit&&!frame.controllers.vehicleMounted
-            &&(travelMode==TravelMode::onFoot||mountedBody)&&parent[0]==-1&&parent[1]==0&&parent[2]==1&&parent[3]==2&&parent[4]==3
+            &&!frame.controllers.cabinTransit&&!frame.controllers.vehicleMounted
+            &&(frame.controllers.cabinPlay||travelMode==TravelMode::onFoot||mountedBody)&&parent[0]==-1&&parent[1]==0&&parent[2]==1&&parent[3]==2&&parent[4]==3
             &&parent[13]==0&&parent[14]==13&&parent[15]==14&&parent[16]==15
             &&parent[17]==0&&parent[18]==17&&parent[19]==18&&parent[20]==19;
         if(frame.controllers.fullBody&&nativeHead&&frame.anatomicalEyeModel!=model)frame.body.rejection=1;
+        // Prone uses BodyHeadingState's locomotion heading too: it includes
+        // native smooth turning and VR snap yaw, but excludes HMD neck look.
+        // Restoring the original skin heading here stranded the crawl body
+        // while the view/hands turned. Keep the anatomical camera anchor;
+        // fullBodyPlacement rotates the complete skin about that fixed eye,
+        // and the placed-foot queries resolve its new terrain contacts.
         auto torsoDelta=fullBody?fullBodyPlacement(chest,bone(originalQ,originalP,4),uprightHead):upperBodyPlacement(chest,shoulderCenter,uprightHead);
         if(!torsoDelta)return false;
         if(fullBody&&!mountedBody){
@@ -767,7 +849,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                     }
                 }
             }
-            if(!spine){frame.body.rejection=2;return false;}
+            if(!spine){frame.body.rejection=2;probe.bodyRejection=2;return false;}
             // Descendants still use the untouched native animation baseline.
             // Include the complete eye-centered placement in joint deltas.
             *torsoDelta=compose(spine->pose.elbow,inverse(chest));
@@ -789,7 +871,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             // missed the stationary viewer. Reject before solving the arms,
             // so the established complete hand/prop fallback remains intact.
             if(!valid(fittedEye)||!(dot(eyeError,eyeError)<=fullBodyEyeErrorLimit*fullBodyEyeErrorLimit)){
-                frame.body.rejection=3;return false;
+                frame.body.rejection=3;probe.bodyRejection=3;return false;
             }
             frame.body.valid=true;frame.body.spineClamped=spine->reachClamped;frame.body.mounted=mountedBody;
             frame.body.pelvis=compose(*root,bone(q,p,0));frame.body.chest=compose(*root,bone(q,p,2));
@@ -807,6 +889,17 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 // not to feet at their obsolete animation-space location.
                 const ArmPose native{bone(q,p,hip),bone(q,p,knee),bone(q,p,ankle)};
                 auto contact=placedFeet[side];
+                if(frame.controllers.cabinPlay){
+                    // The native seated animation projects its feet ahead of
+                    // the chair. A room-scale body must support the tracked
+                    // pelvis instead; retain a small authored fore/aft offset
+                    // and let the existing floor/reach solve bend the knees.
+                    auto footWorld=compose(*root,contact);
+                    const auto hipWorld=compose(*root,native.shoulder);
+                    footWorld.position.x=hipWorld.position.x+(footWorld.position.x-hipWorld.position.x)*.15f;
+                    footWorld.position.z=hipWorld.position.z+(footWorld.position.z-hipWorld.position.z)*.15f;
+                    contact=compose(rootInverse,footWorld);
+                }
                 std::optional<ArmSurface> floor;
                 if(const auto surface=modelSurface(contact.position,.09f,true)){
                     floor=surface;++frame.body.floorQueries;
@@ -830,8 +923,22 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                         contact.position=*point;
                     }
                 }
-                const auto leg=solveArm(native,contact,native.elbow.position-native.shoulder.position);
-                if(!leg){frame.body.rejection=4;return false;}
+                auto fittedLeg=native;
+                if(floor&&frame.controllers.physicalFloorTracked&&frame.controllers.playerPosture!=PlayerPosture::prone){
+                    // Fit leg reach to the real floor without moving the tracked
+                    // eye, hands or gun. Retain this actor's measured standing
+                    // length when sitting back down, so the knees bend rather
+                    // than shortening the avatar on every crouch. Runtime
+                    // recentering does not reset an anatomical fit.
+                    const auto magnitude=[](Vec3 v){return std::sqrt(dot(v,v));};
+                    const float reach=magnitude(native.elbow.position-native.shoulder.position)
+                        +magnitude(native.wrist.position-native.elbow.position);
+                    const float needed=magnitude(contact.position-native.shoulder.position);
+                    if(reach>.2f)standingLegScale=std::max(standingLegScale,std::clamp(needed/reach*1.005f,1.f,1.5f));
+                    if(const auto scaled=scaledLegPose(native,standingLegScale))fittedLeg=*scaled;
+                }
+                const auto leg=solveArm(fittedLeg,contact,native.elbow.position-native.shoulder.position);
+                if(!leg){frame.body.rejection=4;probe.bodyRejection=4;return false;}
                 replace(q,p,hip,leg->pose.shoulder);replace(q,p,knee,leg->pose.elbow);replace(q,p,ankle,leg->pose.wrist);
                 const auto footDelta=compose(leg->pose.wrist,inverse(bone(originalQ,originalP,ankle)));
                 for(size_t i=ankle+1;i<count;++i){
@@ -850,7 +957,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const auto rejection=frame.body.rejection;const auto eyeError=frame.body.eyeError;
             q=originalQ;p=originalP;frame.body={};frame.body.rejection=rejection;frame.body.eyeError=eyeError;fullBody=false;
             publishFullBodyVisibility(owner,model,false);
-            torsoDelta=upperBodyPlacement(chest,shoulderCenter,uprightHead);
+            torsoDelta=upperBodyPlacement(chest,shoulderCenter,fallbackUprightHead);
             if(!torsoDelta)return false;
             if(lift>0)torsoDelta->position=torsoDelta->position+rotate(rootInverse.orientation,{0,lift,0});
         }
@@ -886,6 +993,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     auto rightTarget=(wheel.hands&2)?rightAnimated:clearWrist(wristTarget);
     const ArmPose rightAnimatedArm{bone(q,p,10),bone(q,p,11),bone(q,p,12)};
     auto right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
+    probe.stage=7;
     if(!right)return false;
     replace(q,p,10,right->pose.shoulder);replace(q,p,11,right->pose.elbow);replace(q,p,12,right->pose.wrist);
     bendHistory[1]=right->pose.elbow.position-right->pose.shoulder.position;
@@ -912,6 +1020,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const bool binocularSupport=binocularHeld&&frame.controllers.optic.pose.supportHeld;
     if(binocularHeld){aimBlend=0;guidedOffset=identityQuaternion();}
     bool nativeManipulation=false,firearmActive=false,throwableActive=false;
+    probe.stage=8;
     std::optional<Vec3> barrelInGrip;
     std::optional<Pose> muzzleInGrip;
     std::optional<WeaponScopeGeometry> scopeInWrist;
@@ -1038,6 +1147,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const auto calibratedWeaponAim=frame.controllers.hands[1].aimTracked
         ?weaponAimWithPitch(frame.controllers.hands[1].aim,frame.controllers.weaponAimPitch):std::nullopt;
     if(!propHands[1]&&barrelInGrip&&calibratedWeaponAim){
+        probe.stage=9;
         const auto aim=compose(rootInverse,nativeTrackedPose(frame.nativePose,frame.headPose,*calibratedWeaponAim));
         if(const auto aimed=aimedWeaponGrip(grips[1],aim,*barrelInGrip)){
             grips[1]=*aimed;
@@ -1131,6 +1241,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // roll. Native reload contact remains authoritative during manipulation.
     aimBlend=std::clamp(aimBlend+(guiding?step:-step),0.f,1.f);
     if(aimBlend>0){
+        probe.stage=10;
         const auto guided=compose(grips[1],Pose{blendRotation({},guidedOffset,aimBlend),{}});
         rightTarget=clearWrist(compose(guided,gripFromWrist[1]));
         right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
@@ -1180,11 +1291,13 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         if(wheel.hands&1)target=leftAnimated;
         else if(supportBlend<1)target=clearWrist(target);
         const auto left=groundedArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],armBasis[0]);
+        probe.stage=11;
         if(!left)return false;
         replace(q,p,6,left->pose.shoulder);replace(q,p,7,left->pose.elbow);replace(q,p,8,left->pose.wrist);
         bendHistory[0]=left->pose.elbow.position-left->pose.shoulder.position;
     }
     constexpr std::array<size_t,10> changed{1,2,5,6,7,8,9,10,11,12};
+    probe.stage=12;
     std::array<Pose,512> delta{};std::array<bool,512> controlled{};
     for(const auto i:changed){controlled[i]=true;delta[i]=compose(bone(q,p,i),inverse(bone(originalQ,originalP,i)));}
     if(frame.body.valid)for(const size_t i:{0,3,13,14,15,17,18,19}){
@@ -1339,6 +1452,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     for(size_t side=0;side<2;++side){
         localPalms[side]=compose(trackingFromNative,renderedPalms[side]);
         inputGrips[side]=propInputPalms[side];
+        frame.controllers.hands[side].indexTip=compose(trackingFromNative,
+            compose(*root,bone(q,p,fingers[side][1]+2))).position;
+        frame.controllers.hands[side].indexTipTracked=renderedPalmTracked[side];
     }
     if(frame.controllers.studio&&frame.controllers.studio->available){
         auto joined=std::make_shared<CabinStudioFrame>(*frame.controllers.studio);
@@ -1357,7 +1473,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             tape.pose=compose(cabinFromNative,compose(correction,compose(frame.controllers.openingWorldOrigin,tape.pose)));
         }
     }
-    if(idroidMount){
+    if(idroidMount||(rocketIdroid&&idroidHeld)){
         const size_t side=idroidHeld?0:1;
         frame.idroidDevice=compose(*root,compose(bone(q,p,wrists[side]),
             idroidHeld?nativeIdroidLeftBodyInWrist:*idroidMount));
@@ -1411,7 +1527,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const uint64_t identity=static_cast<uint64_t>(scopeResource)<<32|scopeInWrist->sight;
         frame.weaponScope={compose(localFromWrist,scopeInWrist->ocular),compose(localFromWrist,scopeInWrist->objective),
             scopeInWrist->radius,frame.controllers.scopeEyeRelief,
-            scopeZoom.update(identity,frame.controllers.weaponZoomSequence,scopeInWrist->powers),identity,true,scopeInWrist->dotReticle};
+            scopeZoom.update(identity,frame.controllers.weaponZoomSequence,scopeInWrist->powers),identity,true,scopeInWrist->dotReticle,scopeInWrist->opaqueAtOnePower};
         const auto rawScope=frame.weaponScope;
         // At full two-hand contact, deliberate support-hand guidance is part
         // of the controller owner, not attachment noise. Follow that same
@@ -1460,7 +1576,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
     }
     else scopeAim.reset();
+    probe.stage=13;
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
+    probe.stage=14;
     publishFullBodyVisibility(owner,model,frame.body.valid);
     if(idroidAttachmentDiagnosticsActive()){
         // Capture this solve's assigned rig sequence before native skin work.
@@ -1491,10 +1609,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // animation cache and compound garment transforms on subsequent updates.
     restore.rotations=rotations;restore.positions=positions;restore.q=originalQ;restore.p=originalP;restore.count=count;
     restore.owner={camera,owner,frame.activation,frame.controllers.referenceEpoch,now,frame.menuGeneration};
-    // SKL_300_ASRROOT is the authored hip holster, independent of the held
-    // weapon's wrist socket. Suppress only its published render scale in VR.
-    // The native animation channels and held-weapon transform remain intact.
-    if(count>53&&parent[53]==0&&get<uint32_t>(names+53*4)==0xec70c442)
+    // SKL_300_ASRROOT follows the solved pelvis through the descendant pass.
+    // Keep the native loadout visible when that full body was admitted. The
+    // arms-only fallback still suppresses its unplaced hip stock near the eye.
+    if(!frame.body.valid&&count>53&&parent[53]==0&&get<uint32_t>(names+53*4)==0xec70c442)
         restore.stowedMount=get<uintptr_t>(reinterpret_cast<uintptr_t>(binding)+0x40)+53*64;
     std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
     std::memcpy(reinterpret_cast<void*>(positions),p.data(),count*16u);
@@ -1566,7 +1684,7 @@ void update(void* context,void* binding){
     original(context,binding);
     if(solved)noteCompletedAttachmentBody(context,binding,restore,false);
     const auto& attachmentFrame=restore.attachmentDiagnosticFrame;
-    const bool heldIdroid=solved&&attachmentFrame&&attachmentFrame->menuOpen&&attachmentFrame->menuIdroid
+    const bool heldIdroid=solved&&attachmentFrame&&((attachmentFrame->menuOpen&&attachmentFrame->menuIdroid)||attachmentFrame->rocketArmGuidance)
         &&attachmentFrame->controllers.handheldMenus&&!attachmentFrame->menuWorldQuad;
     if(menuBoundary||heldIdroid){
         // The native skin can already publish the new menu generation before
@@ -2025,7 +2143,7 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
         }
         frame.nativePose.position=advanceCabinWalk(transitWalk,frame.nativePose.position,
             frame.nativePose.orientation,c.cabinMove,steadyMilliseconds(),frame.activation,
-            moveNativeCabin,.85f,frame.menuOpen,true,frame.cabinBasePose);
+            moveNativeCabin,.85f,frame.menuOpen&&!c.handheldMenuFree,true,frame.cabinBasePose);
         return;
     }
     transitWalk={};
@@ -2063,10 +2181,10 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
         const auto before=frame.nativePose.position;
         const auto previousOffset=walk.offset;
         frame.nativePose.position=advanceCabinWalk(walk,before,frame.nativePose.orientation,
-            c.cabinMove,now,frame.activation,moveNativeCabin,.85f,frame.menuOpen);
+            c.cabinMove,now,frame.activation,moveNativeCabin,.85f,frame.menuOpen&&!c.handheldMenuFree);
         const auto moved=frame.nativePose.position-(before+previousOffset);
         const float stickMagnitude=std::hypot(c.cabinMove[0],c.cabinMove[1]);
-        if(!frame.menuOpen&&stickMagnitude>.2f&&dot(moved,moved)>.000001f&&now>=nextWalkReport){
+        if((!frame.menuOpen||c.handheldMenuFree)&&stickMagnitude>.2f&&dot(moved,moved)>.000001f&&now>=nextWalkReport){
             std::ostringstream s;s<<"Native title-cabin stick walk axis="<<c.cabinMove[0]<<','<<c.cabinMove[1]
                 <<" step="<<moved.x<<','<<moved.y<<','<<moved.z
                 <<" head="<<frame.nativePose.position.x<<','<<frame.nativePose.position.y<<','<<frame.nativePose.position.z;

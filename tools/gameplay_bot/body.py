@@ -64,6 +64,21 @@ def inspect_mounted_body(live, seconds, policy):
 
 
 def inspect_body(live,seconds=120.,policy=None):
+    if (policy or {}).get('camera_grab') is True:
+        from .body_gear import inspect_camera_grab
+        return inspect_camera_grab(live, seconds)
+    if (policy or {}).get('gear') is True:
+        from .body_gear import inspect
+        return inspect(live, seconds)
+    if (policy or {}).get('cabin') is True:
+        from .cabin_body import inspect
+        return inspect(live,seconds)
+    if (policy or {}).get('prone_turn') is True:
+        from .prone_turn import inspect
+        return inspect(live,seconds,policy)
+    if (policy or {}).get("roomscale") is True:
+        from .roomscale import inspect
+        return inspect(live,seconds,policy)
     if (policy or {}).get('mounted') is True:
         return inspect_mounted_body(live, seconds, policy)
     deadline=time.monotonic()+min(seconds,180.)

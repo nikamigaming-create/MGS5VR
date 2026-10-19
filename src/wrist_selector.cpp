@@ -82,8 +82,11 @@ WristSelectorImage makeAccWristHintImage(std::string_view idroidBinding){
     fill({0,0,width,height},RGB(12,22,27));
     fill({0,0,12,height},RGB(235,199,110));
     const std::string gesture(idroidBinding);
-    line(std::wstring(gesture.begin(),gesture.end())+L" : iDROID",{30,22,width-22,126},62,RGB(239,245,239));
-    line(L"MISSIONS TO DEPLOY",{30,130,width-22,236},52,RGB(235,199,110));
+    const auto split=gesture.find('\n');
+    const auto title=split==std::string::npos?gesture+" : iDROID":gesture.substr(0,split);
+    const auto detail=split==std::string::npos?std::string("MISSIONS TO DEPLOY"):gesture.substr(split+1);
+    line(std::wstring(title.begin(),title.end()),{30,22,width-22,126},62,RGB(239,245,239));
+    line(std::wstring(detail.begin(),detail.end()),{30,130,width-22,236},52,RGB(235,199,110));
     GdiFlush();std::memcpy(image.bgra.data(),pixels,image.bgra.size()*sizeof(uint32_t));
     for(auto& pixel:image.bgra)pixel|=0xff000000u;
     return image;

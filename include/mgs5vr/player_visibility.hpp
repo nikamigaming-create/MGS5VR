@@ -124,4 +124,15 @@ private:
     std::array<uint8_t,128> flags_{};
     uint16_t count_{};
 };
+// The launched projectile keeps native ownership. Only the source-matched
+// tracked hand's verified modular group is exposed during a headset replay.
+class RocketHandPresentation {
+public:
+    explicit RocketHandPresentation(const HeadCameraSample&,bool headPass) noexcept;
+    ~RocketHandPresentation();
+    RocketHandPresentation(const RocketHandPresentation&)=delete;
+    RocketHandPresentation& operator=(const RocketHandPresentation&)=delete;
+private:
+    uintptr_t owner_{},character_{},parts_{},record_{},renderer_{},model_{};
+};
 }

@@ -3,6 +3,14 @@
 #include <cmath>
 
 namespace mgs5vr {
+std::optional<ArmPose> scaledLegPose(const ArmPose& native,float scale){
+    if(!valid(native.shoulder)||!valid(native.elbow)||!valid(native.wrist)
+       ||!std::isfinite(scale)||scale<1.f||scale>1.5f)return {};
+    auto result=native;
+    result.elbow.position=native.shoulder.position+(native.elbow.position-native.shoulder.position)*scale;
+    result.wrist.position=native.shoulder.position+(native.wrist.position-native.shoulder.position)*scale;
+    return result;
+}
 std::optional<std::array<size_t,14>> armHelperIndices(std::span<const uint32_t> names,
     std::span<const int32_t> parents){
     if(names.empty()||names.size()!=parents.size())return {};
@@ -185,6 +193,44 @@ std::optional<Quat> anatomicalTorsoHeading(Quat locomotionHeading,Quat view,bool
         heading+=look-std::clamp(look,-neckYaw,neckYaw);
     }
     return Quat{0,std::sin(heading*.5f),0,std::cos(heading*.5f)};
+}
+std::optional<Quat> trackedTorsoHeading(Pose viewer,Vec3 handsMidpoint,Quat primaryAim){
+    if(!valid(viewer)||!valid(Pose{primaryAim,handsMidpoint}))return {};
+    const auto placement=handsMidpoint-viewer.position;
+    const auto look=rotate(viewer.orientation,{0,0,1});
+    const auto direction=rotate(primaryAim,{0,0,-1});
+    const float distance=std::hypot(placement.x,placement.z);
+    const float lookDistance=std::hypot(look.x,look.z),aimDistance=std::hypot(direction.x,direction.z);
+    if(distance<=.2f||lookDistance<=.1f||aimDistance<=.1f
+       ||placement.x*look.x+placement.z*look.z<=distance*lookDistance*.5f
+       ||direction.x*look.x+direction.z*look.z<=aimDistance*lookDistance*.5f)return {};
+    const float yaw=std::atan2(direction.x,direction.z);
+    return Quat{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
+}
+std::optional<Quat> BodyHeadingState::update(Quat locomotion,Quat view,bool prone,uint64_t time,RigContinuityKey key,
+                                          std::optional<Quat> handHeading){
+    if(!valid(Pose{locomotion,{}})||!valid(Pose{view,{}})||!time){reset();return {};}
+    const auto yaw=[](Quat q){const auto f=rotate(q,{0,0,1}),r=rotate(q,{1,0,0});
+        return std::hypot(f.x,f.z)>.001f?std::atan2(f.x,f.z):std::atan2(-r.z,r.x);};
+    const auto wrap=[](float a){return std::remainder(a,6.283185307f);};
+    const float base=yaw(locomotion),look=yaw(view);
+    if(!valid_||key!=key_||time<time_){heading_=base;locomotion_=base;valid_=true;key_=key;}
+    heading_=wrap(heading_+wrap(base-locomotion_));
+    if(prone)heading_=base;
+    else{
+        // Both hands moving around the viewer identify a body turn. Keep
+        // shoulder reach close to that direction while retaining independent
+        // neck look when hands stay in their existing world direction.
+        if(handHeading&&valid(Pose{*handHeading,{}})){
+            const float delta=wrap(yaw(*handHeading)-heading_);
+            heading_=wrap(heading_+delta);
+        }
+        constexpr float neckYaw=.872664626f;
+        const float delta=wrap(look-heading_);
+        heading_=wrap(heading_+delta-std::clamp(delta,-neckYaw,neckYaw));
+    }
+    locomotion_=base;time_=time;
+    return Quat{0,std::sin(heading_*.5f),0,std::cos(heading_*.5f)};
 }
 std::optional<Pose> fullBodyPlacement(Pose chest,Pose nativeHead,Pose uprightHead){
     if(!valid(chest)||!valid(uprightHead)||!valid(nativeHead))return {};

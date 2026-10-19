@@ -1,5 +1,6 @@
 #pragma once
 #include "cabin_props.hpp"
+#include "gear_contact.hpp"
 #include <memory>
 #include <optional>
 #include <string>
@@ -50,6 +51,7 @@ struct CabinStudioFrame {
     uint32_t confirmPaper{};
     Pose shutterPose{};
     uint8_t inputMask{},hapticMask{};
+    uint8_t cameraCandidateMask{};
     bool cabin{},available{},capacityReached{},keyboardOnly{};
     bool review{},freezeRequested{},freezeSupported{};
     StudioFreeze freezeState{StudioFreeze::live};
@@ -95,6 +97,7 @@ private:
     CabinStudioFrame frame_{};
     std::array<Pose,2> attachment_{};
     std::array<bool,2> squeezed_{},triggered_{};
+    std::array<GearContact,2> cameraContact_{};
     uint64_t last_{},lastShot_{},processedPhoto_{};
     uint32_t nextId_{1};
     bool initialized_{},cameraDropped_{},markerDropped_{},writing_{};

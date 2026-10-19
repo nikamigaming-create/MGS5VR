@@ -5,6 +5,13 @@
 int main(){
     using namespace mgs5vr;
     const auto require=[](bool value){if(!value)throw std::runtime_error("iDroid body publication ordering failed");};
+    const std::array<float,16> published{-0.492956012f,1.57928124e-8f,-0.870053828f,0,
+        -0.737847507f,-0.529918909f,0.418050557f,0,-0.461058319f,0.848047912f,0.26122725f,0,
+        804.654846f,338.720734f,1637.1106f,1};
+    auto rebuilt=published;rebuilt[0]=-0.492956042f;rebuilt[1]=0;rebuilt[6]=0.418050587f;
+    require(sameNativeIdroidMatrix(published,rebuilt));
+    rebuilt[12]+=.001f;require(!sameNativeIdroidMatrix(published,rebuilt));
+    rebuilt=published;rebuilt[0]+=.00001f;require(!sameNativeIdroidMatrix(published,rebuilt));
     require(idroidHandUseSourceFresh(1,2,3,100,2,3,250));
     require(!idroidHandUseSourceFresh(1,2,3,100,2,3,251));
     require(!idroidHandUseSourceFresh(1,2,3,100,4,3,110));

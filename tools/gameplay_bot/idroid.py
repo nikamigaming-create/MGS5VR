@@ -230,6 +230,9 @@ def _navigate_stationary(live, result, *, clock, sleep, focus_keep, focus_guard)
 
 def inspect_idroid(live, behavior, *, clock=time.monotonic, sleep=time.sleep):
     """Use normal menu controls; never acknowledge an unknown native popup."""
+    if live.observe().get('scene')=='cabin':
+        from .cabin_idroid import inspect
+        return inspect(live,behavior)
     case_id = "idroid-palm-motion-stationary-navigation"
     live.events.emit("case_started", case_id=case_id,
                      claim="Palm-relative hologram motion and stationary Snake during mapped menu-stick input")

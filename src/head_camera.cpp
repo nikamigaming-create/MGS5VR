@@ -8,6 +8,12 @@
 #include <mutex>
 
 namespace mgs5vr {
+std::optional<float> physicalFloorHeightOffset(float headY,float floorY,float units,float standingEyeHeight){
+    const float height=(headY-floorY)*units;
+    if(!std::isfinite(height)||!std::isfinite(standingEyeHeight)||!std::isfinite(units)||units<=0
+       ||height<=.35f||height>=2.4f||standingEyeHeight<=1.f||standingEyeHeight>=2.f)return {};
+    return height-standingEyeHeight;
+}
 namespace {
 float horizontalYaw(Quat orientation){
     const auto forward=rotate(orientation,{0,0,1});
@@ -35,6 +41,7 @@ struct PlayerRootSample {
 };
 struct CameraStabilizationState {
     Vec3 headLocalOffset{};
+    float standingEyeHeight{};
     bool valid{};
     uint64_t time{};
     bool followingPosture{};
@@ -154,7 +161,8 @@ Pose HeadCamera::followCinematicLocked(Pose nativePose,uint64_t time,bool advanc
     auto result=s.pose;result.position=result.position+s.freeOffset;return result;
 }
 bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
-                                  const std::array<float,16>& root,const std::array<float,16>& head,uint64_t time){
+                                  const std::array<float,16>& root,const std::array<float,16>& head,uint64_t time,
+                                  bool verifiedRocketArmGuidance){
     const auto reject=[&]{
         std::lock_guard lock(mutex_);
         if(camera==camera_&&(!playerOwner_||owner==playerOwner_))staleDemoRecoveryDwell_.reset();
@@ -175,7 +183,7 @@ bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceC
        ||rootForward.x*rootForward.x+rootForward.z*rootForward.z<.0001f)return reject();
     const auto rootYaw=yawRotation(std::atan2(rootForward.x,rootForward.z));
     const auto boom=sourceCamera.position-*position;
-    if(dot(boom,boom)>144)return reject();
+    if(dot(boom,boom)>144&&!verifiedRocketArmGuidance)return reject();
     std::lock_guard lock(mutex_);
     if(!enabled_||!requirePlayerHead_)return false;
     if(camera==camera_&&owner==playerOwner_&&time>=ownerHeadTime_)ownerHeadTime_=time;
@@ -187,7 +195,7 @@ bool HeadCamera::publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceC
         return false;
     }
     const auto sequence=++playerSequence_;
-    *found={camera,owner,sourceCamera,*position,time,sequence};
+    *found={camera,owner,sourceCamera,*position,time,sequence,verifiedRocketArmGuidance,rootYaw};
     {
         std::lock_guard rootLock(playerRootMutex);
         playerRoots[camera]={owner,rootPosition,rootYaw,time,sequence,*eyePosition};
@@ -230,7 +238,7 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
             // eye images even when FOX keeps the same camera object. Preserve
             // the last source view across AvatarEdit->demo so a new authored
             // shot camera can be adopted after its old source retires.
-            rig_={};if(authoredCameraChanged)lastView_={};++activation_;resetStabilization(this);
+            rig_={};if(authoredCameraChanged)lastView_={};++activation_;activationCause_=1;resetStabilization(this);
             if(authoredCameraChanged||scriptedDemoChanged){sceneTransitionActivation_=activation_;sceneTransitionAt_=time;}
         }
         if(trackingEpoch_&&controllers.referenceEpoch&&controllers.referenceEpoch!=trackingEpoch_&&(active_||pending_||awaitingPlayer_)){
@@ -242,7 +250,7 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
                 // the old origin through menu close would teleport the view.
                 origin_=uprightOrigin(compose(compose(head,inverse(head_)),origin_));
                 if(nativeMenuOpen_&&menuAnchored_){menuNative_=lastView_.nativePose;menuHead_=head;}
-                rig_={};++activation_;resetStabilization(this);
+                rig_={};++activation_;activationCause_=2;resetStabilization(this);
             }else{
                 if(!awaitingPlayer_){active_=false;pending_=true;}
                 camera_=playerOwner_=0;
@@ -320,11 +328,12 @@ void HeadCamera::cancelLocked(HeadCameraStop reason){
     resetStabilization(this);
     clearPlayerRootSample(oldCamera);
 }
-void HeadCamera::awaitPlayerLocked(){
+void HeadCamera::awaitPlayerLocked(uint8_t cause){
     // A native menu/cinematic has no matching player-head publication. Keep
     // native pixels and normal menu input available, but remember the user's
     // VR request. Resume only the exact camera/owner previously accepted.
     if(active_||pending_||awaitingPlayer_){
+        if(!awaitingPlayer_){awaitCause_=cause;awaitTime_=time_;}
         awaitingPlayer_=true;active_=pending_=suspended_=false;rig_={};
         staleDemoRecoveryDwell_.reset();
         resetStabilization(this);
@@ -346,7 +355,7 @@ void HeadCamera::awaitScene(bool nativeLoading){
 }
 bool HeadCamera::available() const {std::lock_guard lock(mutex_);return enabled_;}
 bool HeadCamera::active() const {std::lock_guard lock(mutex_);return active_&&!awaitingScene_;}
-HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_&&!awaitingScene_,pending_,awaitingScene_?HeadCameraStop::sceneUnavailable:reason_,cancellations_,activation_,suspended_,awaitingPlayer_||awaitingScene_,nativeMenuOpen_,nativeIdroidOpen_,rigRejectFlags_,rigAgeMs_,sceneTransitionActivation_};}
+HeadCameraStatus HeadCamera::status() const {std::lock_guard lock(mutex_);return {enabled_,active_&&!awaitingScene_,pending_,awaitingScene_?HeadCameraStop::sceneUnavailable:reason_,cancellations_,activation_,suspended_,awaitingPlayer_||awaitingScene_,nativeMenuOpen_,nativeIdroidOpen_,rigRejectFlags_,rigAgeMs_,sceneTransitionActivation_,activationCause_,camera_,playerOwner_,ownerHeadTime_,awaitCause_,awaitJoinFlags_,awaitTime_,awaitOwnerAge_};}
 bool HeadCamera::staleDemoRecoveryReady() const {
     const auto candidate=nativeDemoSnapshot();
     if(candidate.mode!=NativeDemoMode::staleCandidate||!candidate.candidateKey)return false;
@@ -495,24 +504,24 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(authoredScene&&camera_&&camera_!=camera){
         if(controllers_.avatarEditor&&avatarEditorBackdropValid_){
             if(!useRig)return result;
-            camera_=camera;playerOwner_=0;rig_={};lastView_={};++activation_;
+            camera_=camera;playerOwner_=0;rig_={};lastView_={};++activation_;activationCause_=3;
         }else{
             // Entering an authored scene invalidates lastView_'s gameplay
             // pixels. Its source retirement time must remain available or a
             // different movie camera is rejected for the entire cutscene.
             if(!useRig||!cameraRenderTime_||time<cameraRenderTime_||time-cameraRenderTime_<=500)return result;
-            camera_=camera;playerOwner_=0;rig_={};lastView_={};++activation_;
+            camera_=camera;playerOwner_=0;rig_={};lastView_={};++activation_;activationCause_=4;
             sceneTransitionActivation_=activation_;sceneTransitionAt_=time;
         }
     }
     // Loading can still publish its decorative character/camera. It must not
     // immediately reactivate stereo and cover the native confirmation screen.
-    if(controllers_.loading){awaitPlayerLocked();return result;}
+    if(controllers_.loading){awaitPlayerLocked(1);return result;}
     const bool spatialMenu=nativeMenuOpen_&&menuAnchored_&&active_;
     const bool frozenCamera=controllers_.cameraWorldFrozen&&cameraFreezeAnchored_&&active_&&!nativeMenuOpen_;
     const bool liveHandheldMenu=spatialMenu&&nativeIdroidOpen_&&!nativeIdroidPaused_&&controllers_.handheldMenus
         &&!controllers_.cabinPlay&&!controllers_.frontEnd&&!controllers_.avatarEditor;
-    if(nativeMenuOpen_&&!spatialMenu){awaitPlayerLocked();return result;}
+    if(nativeMenuOpen_&&!spatialMenu){awaitPlayerLocked(2);return result;}
     if(spatialMenu){
         if(camera!=camera_)return result;
         // Field handheld iDroid follows live locomotion. In the ACC, the
@@ -572,7 +581,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             camera_=camera;origin_=uprightOrigin(head_);frontEndOrigin_=uprightOrigin(sourceCamera);
             frontEndPanel_=compose(nativeTrackedPose(frontEndOrigin_,head_,head_),Pose{{},{0,-.05f,-1.3f}});
         }
-        playerOwner_=0;rig_={};awaitingPlayer_=pending_=false;active_=true;++activation_;
+        playerOwner_=0;rig_={};awaitingPlayer_=pending_=false;active_=true;++activation_;activationCause_=5;
         sceneTransitionActivation_=activation_;sceneTransitionAt_=time;
     }else if(requirePlayerHead_&&(!authoredScene||(!camera_&&!controllers_.scriptedDemo))
        &&(pending_||active_||awaitingPlayer_)){
@@ -591,20 +600,37 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             const bool interrupted=active_&&camera_==camera&&std::any_of(
                 playerHeads_.begin(),playerHeads_.end(),[&](const auto& p){
                     return p.camera==camera&&p.owner==playerOwner_&&p.sequence
-                        &&time>=p.time&&time-p.time<=1000&&same(p.sourceCamera,nativePose);
+                        &&time>=p.time&&((time-p.time<=150)
+                            ||(time-p.time<=1000&&same(p.sourceCamera,nativePose)));
                 });
             if(interrupted){
-                // Reject this stale skin without changing activation/input
+                // Reject this unmatched/stale skin without changing activation/input
                 // context. Only an already accepted stereo pair may cover
                 // the gap; the next fresh skin resumes this same session.
+                // During native camera motion the fresh player skin can
+                // precede this camera pose. That failed exact-pose join is
+                // not a menu/scene retirement. It has no new-pixel authority.
                 rig_={};suspendLocked(HeadCameraStop::playerHeadUnavailable);
-            }else awaitPlayerLocked();
+            }else{
+                if(!awaitingPlayer_){
+                    awaitJoinFlags_=active_?8:0;
+                    awaitOwnerAge_=~uint64_t{0};
+                    for(const auto& p:playerHeads_){
+                        if(p.camera!=camera||p.owner!=playerOwner_||!p.sequence||time<p.time)continue;
+                        const auto age=time-p.time;awaitOwnerAge_=std::min(awaitOwnerAge_,age);
+                        awaitJoinFlags_|=1;
+                        if(age<=150)awaitJoinFlags_|=2;
+                        if(age<=1000&&same(p.sourceCamera,nativePose))awaitJoinFlags_|=4;
+                    }
+                }
+                awaitPlayerLocked(3);
+            }
             return result;
         }
         if(camera_==camera&&!playerOwner_){
             // The scripted shot had no player owner. A fresh matching player
             // publication can take over immediately when control returns.
-            playerOwner_=found->owner;rig_={};lastView_={};++activation_;
+            playerOwner_=found->owner;rig_={};lastView_={};++activation_;activationCause_=6;
             sceneTransitionActivation_=activation_;sceneTransitionAt_=time;
             resetStabilization(this);
         }
@@ -637,7 +663,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             camera_=camera;playerOwner_=found->owner;awaitingPlayer_=false;active_=true;
             const bool returningFromShot=sceneTransitionActivation_==activation_
                 &&time>=sceneTransitionAt_&&time-sceneTransitionAt_<=250;
-            ++activation_; // No eye image from before the menu may be reused.
+            ++activation_;activationCause_=7; // No eye image from before the menu may be reused.
             if(returningFromShot)sceneTransitionActivation_=activation_;
         }
         // A scripted character can be scenery rather than the player's
@@ -646,12 +672,18 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         if(!controllers_.frontEnd&&!controllers_.avatarEditor&&!controllers_.cabinPlay)nativePose.position=found->position;
         ownerHeadTime_=found->time;
         result.playerSequence=found->sequence;result.playerOwner=found->owner;result.playerHead=found->position;
+        if(found->rocketArmGuidance){
+            result.rocketArmGuidance=true;result.rocketArmCamera=sourceCamera;
+            // Projectile steering has no authority to rotate Snake's tracking
+            // space. Both eyes and the skin retain the live player root yaw.
+            nativePose.orientation=found->rootHeading;
+        }
     }
     if(pending_){
         camera_=camera;playerOwner_=result.playerOwner;origin_=uprightOrigin(head_);
         frontEndOrigin_=uprightOrigin(nativePose);
         frontEndPanel_=compose(nativeTrackedPose(frontEndOrigin_,head_,head_),Pose{{},{0,-.05f,-1.3f}});
-        pending_=false;active_=true;++activation_;snapTranslation_={};snapYaw_=controllers_.snapYaw;
+        pending_=false;active_=true;++activation_;activationCause_=8;snapTranslation_={};snapYaw_=controllers_.snapYaw;
     }
     if(!active_)return result;
     if(camera_!=camera){cancelLocked(HeadCameraStop::cameraChanged);return result;}
@@ -678,7 +710,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             recoveryPlayerSequence_=found->sequence;
         }
     }else{staleDemoRecoveryDwell_.reset();recoveryPlayerSequence_=0;}
-    if(awaitingScene_){awaitingScene_=false;++activation_;}
+    if(awaitingScene_){awaitingScene_=false;++activation_;activationCause_=9;}
     if(controllers_.frontEnd)result.menuPanel=controllers_.authoredCamera
         ?compose(nativeTrackedPose(nativePose,head_,head_),Pose{{},{0,-.05f,-1.3f}}):frontEndPanel_;
     else if(controllers_.avatarEditor)
@@ -753,7 +785,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             const float baseYaw=horizontalYaw(nativePose.orientation)+controllers_.snapYaw;
             const float facing=lastView_.applied?horizontalYaw(lastView_.nativePose.orientation):baseYaw;
             origin_={yawRotation(horizontalYaw(head_.orientation)-facing+baseYaw),head_.position};
-            snapTranslation_={};snapYaw_=controllers_.snapYaw;recenterPending_=false;rig_={};++activation_;
+            snapTranslation_={};snapYaw_=controllers_.snapYaw;recenterPending_=false;rig_={};++activation_;activationCause_=10;
         }
     }
     if(useRig&&!authoredScene&&rig_.camera){
@@ -785,6 +817,14 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         rig_={};
     }
     suspended_=false;reason_=HeadCameraStop::none;
+    if(controllers_.cabinPlay&&!controllers_.frontEnd&&!controllers_.authoredCamera
+       &&nativeEyeJoined&&result.playerSequence){
+        // The cabin keeps its room anchor rather than field head stabilization,
+        // but body admission still needs this exact original-skin eye identity.
+        PlayerRootSample cabinRoot;
+        if(getPlayerRootSample(camera,result.playerOwner,result.playerSequence,time,cabinRoot))
+            result.anatomicalEyeModel=cabinRoot.eyeModel;
+    }
     if(!frozenCamera&&(!spatialMenu||liveHandheldMenu)&&!controllers_.frontEnd&&!controllers_.avatarEditor&&!controllers_.cabinPlay
        &&!controllers_.cabinTransit
        &&requirePlayerHead_&&result.playerSequence){
@@ -809,6 +849,9 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             const auto anatomicalHeading=rootSample.bodyFramesTracked?rootSample.anatomicalHeading:rootSample.orientation;
             const auto targetHeadLocalOffset=rotate(inverseQuat(anatomical?anatomicalHeading:rootSample.orientation),worldHeadOffset);
             const bool advanceOffset=!anatomical||!state.anatomicalModel||(nativeEyeJoined&&rootSample.eyeModel);
+            if(anatomical&&advanceOffset&&controllers_.playerPosture==PlayerPosture::standing
+               &&!state.standingEyeHeight&&targetHeadLocalOffset.y>1.f&&targetHeadLocalOffset.y<2.f)
+                state.standingEyeHeight=targetHeadLocalOffset.y;
             if(!state.valid){
                 state.headLocalOffset=targetHeadLocalOffset;
                 state.heading=rootSample.orientation;
@@ -873,14 +916,15 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             }else{
                 // Retain the eye's horizontal frame when Snake turns to run
                 // sideways/backwards. Native camera yaw still owns view turn.
-                // Anatomical body and viewer share a native chest heading.
-                // Holding the old character root yaw across a prone posture
-                // put the viewer nearly a metre away from that body's head.
-                // Retargeting around those displaced eyes then moved every
-                // foot to different terrain. Keep the posture offset in this
-                // same native camera heading, independent of HMD neck look.
+                // The anatomical offset was measured in the authored chest
+                // heading. A prone head extends well beyond the root; rotating
+                // that offset into an independent camera yaw moved the eyes
+                // 77 cm sideways into the slope in the retained M1 fixture.
+                // Preserve that native prone footprint. View yaw and HMD neck
+                // look still own orientation, not the anchored eye position.
                 const auto heading=anatomical&&rootSample.bodyFramesTracked
-                    ?yawRotation(horizontalYaw(nativePose.orientation)):state.heading;
+                    ?(controllers_.playerPosture==PlayerPosture::prone?anatomicalHeading
+                        :yawRotation(horizontalYaw(nativePose.orientation))):state.heading;
                 auto cameraAnchor=rootSample.position+rotate(heading,state.headLocalOffset);
                 if(!anatomical){
                     cameraAnchor=cameraAnchor+rotate(state.heading,{0,0,-cameraBackwardOffset});
@@ -914,6 +958,14 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     const bool anchoredMenu=spatialMenu&&!liveHandheldMenu;
     auto relative=compose(inverse(frozenCamera?cameraFreezeHead_:anchoredMenu?menuHead_:origin_),head_);
     relative.position=relative.position*units_;
+    if(!anchoredMenu&&!frozenCamera&&controllers_.physicalFloorTracked&&controllers_.fullBody
+       &&!controllers_.frontEnd&&!controllers_.authoredCamera&&!controllers_.scriptedDemo
+       &&!controllers_.cabinPlay&&!controllers_.cabinTransit&&!controllers_.vehicleMounted
+       &&controllers_.playerPosture!=PlayerPosture::prone){
+        const auto& body=stabilizationState(this);
+        if(body.valid)if(const auto offset=physicalFloorHeightOffset(head_.position.y,
+            controllers_.physicalFloorY,units_,body.standingEyeHeight))relative.position.y=*offset;
+    }
     const auto nativeDelta=compose(compose(basis,relative),inverse(basis));
     result.nativePose=compose(nativePose,nativeDelta);
     if(!anchoredMenu&&!frozenCamera){

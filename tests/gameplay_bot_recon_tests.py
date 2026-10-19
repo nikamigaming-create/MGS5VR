@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]/'tools'))
 from gameplay_bot.core import BotFault
-from gameplay_bot.recon import inspect, observed
+from gameplay_bot.recon import inspect, observed, run_named_recon
 
 
 class Clock:
@@ -61,6 +61,15 @@ class Presentation:
 
 
 class ReconTests(unittest.TestCase):
+    def test_named_recon_rejects_changed_world_before_roster_or_input(self):
+        with patch('gameplay_bot.recon.fresh_rig', return_value=({'native':{'mission':10100}}, ())), \
+             patch('gameplay_bot.recon.read_enemy_snapshot') as roster, \
+             patch('gameplay_bot.recon.inspect') as execute:
+            with self.assertRaisesRegex(BotFault, 'entry changed'):
+                run_named_recon(None, {'native':{'mission':10020},'camp':'afgh_slopedTown_cp'},
+                                enemy_script='', output=None, max_seconds=30)
+            roster.assert_not_called(); execute.assert_not_called()
+
     def run_recon(self, *, acquisition=True, explicit=True, capture_failure=False, zoom_changes=True):
         temporary=tempfile.TemporaryDirectory(); self.addCleanup(temporary.cleanup)
         root=pathlib.Path(temporary.name); live=Live(root); live.fail_capture=capture_failure; live.zoom_changes=zoom_changes

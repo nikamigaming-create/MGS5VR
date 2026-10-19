@@ -727,6 +727,9 @@ bool luaReady(void* state){
     setTop(state,top);nativeLuaReady.store(ready);return ready;
 }
 bool publishFastInput(const std::string& request,std::string& result){
+    if(request=="inspect-ui-draws"||request=="diagnostics:ui-draws:reset"){
+        result=inspectUiDrawInventory(request.ends_with(":reset"));return true;
+    }
     constexpr std::string_view coverPrefix="diagnostics:cover-probe:";
     constexpr std::string_view coverInspectPrefix="inspect-cover-probe:";
     if(request.starts_with(coverPrefix)||request.starts_with(coverInspectPrefix)){
@@ -805,8 +808,16 @@ bool publishFastInput(const std::string& request,std::string& result){
         const auto now=steadyMilliseconds();bool armed=false;
         if(request.starts_with(combatPrefix)){
             const auto argument=std::string_view(request).substr(combatPrefix.size());uint64_t duration{};
-            const auto parsed=std::from_chars(argument.data(),argument.data()+argument.size(),duration);
-            if(parsed.ec==std::errc{}&&parsed.ptr==argument.data()+argument.size())armed=leaseCombatSight(now,duration);
+            const auto separator=argument.find(':');const auto lease=argument.substr(0,separator);
+            const auto parsed=std::from_chars(lease.data(),lease.data()+lease.size(),duration);
+            uint16_t marker=0xffff;bool targetValid=true;
+            if(separator!=std::string_view::npos){
+                const auto target=argument.substr(separator+1);unsigned value{};
+                const auto identity=std::from_chars(target.data(),target.data()+target.size(),value);
+                targetValid=identity.ec==std::errc{}&&identity.ptr==target.data()+target.size()&&value>0&&value<0xffff;
+                if(targetValid)marker=static_cast<uint16_t>(value);
+            }
+            if(parsed.ec==std::errc{}&&parsed.ptr==lease.data()+lease.size()&&targetValid)armed=leaseCombatSight(now,duration,marker);
         }
         const auto sight=combatSightSnapshot();const auto expiry=combatSightLeaseExpiry();
         std::ostringstream out;out<<std::boolalpha<<"{\"schema\":1,\"source\":\"native_marker_job_world_visibility\",\"armed\":"<<armed
@@ -816,6 +827,9 @@ bool publishFastInput(const std::string& request,std::string& result){
             <<",\"tracking_sequence\":"<<sight.trackingSequence<<",\"muzzle_tracked\":"<<sight.muzzleTracked
             <<",\"muzzle\":{\"position\":["<<sight.muzzle.position.x<<','<<sight.muzzle.position.y<<','<<sight.muzzle.position.z
             <<"],\"orientation\":["<<sight.muzzle.orientation.x<<','<<sight.muzzle.orientation.y<<','<<sight.muzzle.orientation.z<<','<<sight.muzzle.orientation.w
+            <<"]},\"requested_marker\":{\"id\":"<<sight.requestedMarker.id<<",\"found\":"<<sight.requestedMarker.found
+            <<",\"kind\":"<<unsigned(sight.requestedMarker.kind)<<",\"flags\":"<<unsigned(sight.requestedMarker.flags)
+            <<",\"position\":["<<sight.requestedMarker.position.x<<','<<sight.requestedMarker.position.y<<','<<sight.requestedMarker.position.z
             <<"]},\"candidates\":"<<sight.candidates<<",\"targets\":[";
         for(size_t i=0;i<sight.count;++i){const auto& target=sight.targets[i];if(i)out<<',';
             out<<"{\"id\":"<<target.id<<",\"marker\":["<<target.marker.x<<','<<target.marker.y<<','<<target.marker.z
@@ -825,7 +839,12 @@ bool publishFastInput(const std::string& request,std::string& result){
                 <<",\"query_reason\":"<<static_cast<unsigned>(target.queryReason)
                 <<",\"ray_result\":"<<target.rayResult<<",\"hit_count\":"<<target.hitCount<<",\"hit_index\":"<<target.hitIndex
                 <<",\"raw_surface\":["<<target.rawSurface.x<<','<<target.rawSurface.y<<','<<target.rawSurface.z
-                <<"],\"raw_along\":"<<target.rawAlong<<",\"raw_lateral_squared\":"<<target.rawLateralSquared<<'}';}
+                <<"],\"raw_along\":"<<target.rawAlong<<",\"raw_lateral_squared\":"<<target.rawLateralSquared
+                <<",\"hit_transform_read\":"<<target.hitTransformRead<<",\"hit_transform\":[";
+            for(size_t j=0;j<target.hitTransform.size();++j){if(j)out<<',';out<<target.hitTransform[j];}
+            out<<"],\"hit_record_words\":[";
+            for(size_t j=0;j<target.hitRecordWords.size();++j){if(j)out<<',';out<<target.hitRecordWords[j];}
+            out<<"]}";}
         out<<"]}";result=out.str();return true;
     }
     constexpr std::string_view faultPrefix="diagnostics:controller-tracking-loss:";
@@ -983,6 +1002,11 @@ bool publishFastInput(const std::string& request,std::string& result){
            <<",\"camera_native_menu\":"<<camera.nativeMenuOpen
            <<",\"camera_native_idroid\":"<<camera.nativeIdroidOpen
            <<",\"camera_reason\":"<<static_cast<unsigned>(camera.reason)
+           <<",\"camera_activation_cause\":"<<unsigned(camera.activationCause)
+           <<",\"camera_source_owner\":"<<camera.sourceCamera<<",\"camera_player_owner\":"<<camera.sourcePlayerOwner
+           <<",\"camera_owner_head_ms\":"<<camera.ownerHeadTime
+           <<",\"camera_await_cause\":"<<unsigned(camera.awaitCause)<<",\"camera_await_join_flags\":"<<unsigned(camera.awaitJoinFlags)
+           <<",\"camera_await_ms\":"<<camera.awaitTime<<",\"camera_await_owner_age_ms\":"<<camera.awaitOwnerAge
            <<",\"activation\":"<<camera.activation<<",\"opening_assets\":"<<openingPropsAvailable();
         out<<",\"popup_observer\":";writeNativePopupSnapshotJson(out,popup,popupSampleMs);
         out<<",\"terms_menu\":{\"verified\":"<<terms.verified<<",\"active\":"<<terms.active
@@ -1029,6 +1053,7 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"menu_open\":"<<frame.menuOpen
                <<",\"camera_world_frozen\":"<<frame.controllers.cameraWorldFrozen
                <<",\"menu_idroid\":"<<frame.menuIdroid;
+            out<<",\"rocket_arm_guidance\":"<<frame.rocketArmGuidance;
             const auto pose=[&](const char* name,Pose value){
                 const auto p=value.position;const auto q=value.orientation;
                 out<<",\""<<name<<"\":{\"position\":["<<p.x<<','<<p.y<<','<<p.z
@@ -1040,6 +1065,11 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"concealed\":"<<authoredHead.concealed<<'}';
             pose("authored_head_pose",authoredHead.head);pose("authored_head_viewer",authoredHead.viewer);
             pose("native_pose",frame.nativePose);
+            out<<",\"native_body_source_tracked\":"<<frame.nativeBodySourceTracked;
+            pose("native_body_source_root",frame.nativeBodySourceRoot);
+            pose("native_body_source_chest",frame.nativeBodySourceChest);
+            pose("native_body_source_head",frame.nativeBodySourceHead);
+            pose("native_body_source_eye",frame.nativeBodySourceEye);
             out<<",\"player_posture\":"<<static_cast<unsigned>(frame.controllers.playerPosture)
                <<",\"full_body_requested\":"<<frame.controllers.fullBody
                <<",\"full_body\":{\"valid\":"<<frame.body.valid<<",\"spine_clamped\":"<<frame.body.spineClamped
@@ -1060,6 +1090,8 @@ bool publishFastInput(const std::string& request,std::string& result){
             pose("body_head",frame.body.head);pose("body_eye",frame.body.eye);
             pose("left_foot",frame.body.feet[0]);pose("right_foot",frame.body.feet[1]);
             pose("head_pose",frame.headPose);
+            out<<",\"physical_floor_tracked\":"<<frame.controllers.physicalFloorTracked
+               <<",\"physical_floor_y\":"<<frame.controllers.physicalFloorY;
             pose("locomotion_heading",Pose{frame.locomotionHeading,{}});
             out<<",\"locomotion_heading_tracked\":"<<frame.locomotionHeadingTracked;
             out<<",\"eyes\":[";
@@ -1070,6 +1102,7 @@ bool publishFastInput(const std::string& request,std::string& result){
             if(const auto studio=frame.controllers.studio){
                 out<<",\"studio\":{\"available\":"<<studio->available<<",\"cabin\":"<<studio->cabin
                    <<",\"camera_hand\":"<<studio->cameraHand<<",\"marker_hand\":"<<studio->markerHand
+                   <<",\"camera_candidate_mask\":"<<unsigned(studio->cameraCandidateMask)
                    <<",\"editor\":"<<studio->editor<<",\"shutter\":"<<studio->shutter<<",\"photo\":"<<studio->lastPhoto
                    <<",\"input_mask\":"<<unsigned(studio->inputMask)<<",\"keyboard_only\":"<<studio->keyboardOnly;
                 out<<",\"selected_photo\":"<<studio->selectedPhoto<<",\"review\":"<<studio->review
@@ -1092,8 +1125,13 @@ bool publishFastInput(const std::string& request,std::string& result){
             pose("left_palm",frame.renderedPalms[0]);
             pose("left_grip",frame.controllers.hands[0].grip);
             pose("right_palm",frame.renderedPalms[1]);
+            out<<",\"left_index_tip_tracked\":"<<frame.controllers.hands[0].indexTipTracked
+               <<",\"right_index_tip_tracked\":"<<frame.controllers.hands[1].indexTipTracked;
+            pose("left_index_tip_local",Pose{{},frame.controllers.hands[0].indexTip});
+            pose("right_index_tip_local",Pose{{},frame.controllers.hands[1].indexTip});
             pose("right_grip",frame.controllers.hands[1].grip);
             pose("idroid_device",frame.idroidDevice);
+            if(frame.rocketArmGuidance)pose("rocket_arm_camera",frame.rocketArmCamera);
             pose("scope_ocular",frame.weaponScope.ocular);
             pose("scope_objective",frame.weaponScope.objective);
             pose("weapon_support_grip",frame.weaponSupportGrip);
@@ -1115,6 +1153,8 @@ bool publishFastInput(const std::string& request,std::string& result){
                <<",\"equipped_slot\":"<<unsigned(vehicleGun.equippedSlot)<<",\"requested_slot\":"<<unsigned(vehicleGun.requestedSlot)<<'}';
             pose("binocular_ocular",frame.controllers.optic.pose.rightEyepiece);
             out<<",\"scope_tracked\":"<<frame.weaponScope.tracked
+               <<",\"scope_dot_reticle\":"<<frame.weaponScope.dotReticle
+               <<",\"scope_opaque_at_one_power\":"<<frame.weaponScope.opaqueAtOnePower
                <<",\"idroid_device_tracked\":"<<frame.idroidDeviceTracked
                <<",\"scope_magnification\":"<<frame.weaponScope.magnification
                <<",\"scope_radius\":"<<frame.weaponScope.radius
@@ -1164,6 +1204,7 @@ bool publishFastInput(const std::string& request,std::string& result){
             out<<",\"opening_position\":["<<p.x<<','<<p.y<<','<<p.z
                <<"],\"opening_orientation\":["<<q.x<<','<<q.y<<','<<q.z<<','<<q.w<<']';
             const auto focus=nativeTitleFocus();const auto bench=rendered?rendered->controllers.openingBench:CabinBenchFrame{};
+            out<<",\"opening_native_menu\":"<<(rendered&&rendered->controllers.openingNativeMenu);
             out<<",\"opening_focus\":{\"ready\":"<<focus.ready<<",\"row\":"<<unsigned(focus.row)<<",\"actions\":[";
             for(size_t i=0;i<focus.count;++i){if(i)out<<',';out<<unsigned(focus.actions[i]);}
             out<<"]},\"opening_bench\":{\"inserted\":"<<bench.inserted<<",\"lid\":"<<bench.lidOpen<<",\"tapes\":[";

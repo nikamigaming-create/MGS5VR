@@ -7,6 +7,7 @@
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
+#include "mgs5vr/rocket_arm.hpp"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -41,6 +42,7 @@ std::array<Observation,16> observations{};
 std::atomic_uint64_t totalCalls{},unrecordedCalls{};
 uintptr_t imageBase{};
 bool ownerContextVerified{};
+bool rocketModeReaderVerified{};
 bool groundZeroes{};
 using PoseGetter=const float*(*)(void*);
 PoseGetter originalPoseGetter{};
@@ -60,6 +62,26 @@ unsigned evidenceSamples{};
 template<size_t N> bool readMemory(uintptr_t address,std::array<unsigned char,N>& bytes){
     SIZE_T copied{};
     return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<const void*>(address),bytes.data(),N,&copied)&&copied==N;
+}
+template<class T> T readValue(uintptr_t address){
+    T value{};SIZE_T copied{};
+    if(!address||!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),
+        &value,sizeof(value),&copied)||copied!=sizeof(value))return {};
+    return value;
+}
+bool rocketCamera(uintptr_t owner,uintptr_t camera){
+    using namespace mgs5vr;
+    RocketArmCameraOwner sample;
+    sample.owner=owner;sample.camera=camera;sample.readerVerified=rocketModeReaderVerified;
+    sample.linkedCamera=readValue<uintptr_t>(owner+0x380);
+    sample.family=readValue<uint32_t>(owner+0x360);sample.mode=readValue<uint32_t>(owner+0x364);
+    sample.producer=readValue<uintptr_t>(owner+0xd50);
+    sample.selectedProducer=readValue<uintptr_t>(owner+0xbf0+2*8);
+    sample.producerOwner=readValue<uintptr_t>(sample.producer+8);
+    sample.overrideMode=readValue<int32_t>(sample.producer+0x10);
+    sample.typesVerified=readValue<uintptr_t>(owner)==imageBase+0x23b8218
+        &&readValue<uintptr_t>(sample.producer)==imageBase+0x23d4d20;
+    return rocketArmCameraOwned(sample);
 }
 template<size_t N> std::string hexBytes(const std::array<unsigned char,N>& bytes){
     std::ostringstream s;s<<std::hex<<std::setfill('0');
@@ -144,7 +166,8 @@ extern "C" void MgsCameraObserved(void* object,const float* source,uintptr_t cal
                     std::memcpy(root.data(),ownerBytes.data()+0x30,sizeof(root));
                     std::memcpy(head.data(),ownerBytes.data()+0x70,sizeof(head));
                     const mgs5vr::Pose sourceCamera{{v[0],v[1],v[2],v[3]},{v[4],v[5],v[6]}};
-                    mgs5vr::headCamera().publishPlayerHead(linked,context[0],sourceCamera,root,head,mgs5vr::steadyMilliseconds());
+                    mgs5vr::headCamera().publishPlayerHead(linked,context[0],sourceCamera,root,head,
+                        mgs5vr::steadyMilliseconds(),rocketCamera(context[0],linked));
                     const auto status=mgs5vr::headCamera().status();
                     mgs5vr::observeControllerRigOwner(context[0]);
                     // Scripted cutscenes use the authored camera and must show
@@ -185,6 +208,15 @@ void installCameraObserver(const std::filesystem::path& evidenceDirectory,Render
         0x48,0x8b,0x01,0xff,0x50,0x08};
     std::array<unsigned char,callsite.size()> liveCallsite{};
     ownerContextVerified=!groundZeroes&&readMemory(imageBase+0x1118b06,liveCallsite)&&liveCallsite==callsite;
+    // The selected producer returns mode 11 for native category 14. Verify
+    // this branch and its vtable before allowing a distant camera publication.
+    constexpr std::array<unsigned char,12> rocketBranch{
+        0x41,0x83,0xfa,0x0e,0x75,0x19,0x41,0xb9,0x0b,0,0,0};
+    std::array<unsigned char,rocketBranch.size()> liveRocketBranch{};
+    rocketModeReaderVerified=ownerContextVerified
+        &&readMemory(imageBase+0x12bc774,liveRocketBranch)&&liveRocketBranch==rocketBranch
+        &&readValue<uintptr_t>(imageBase+0x23d4d20+0x58)==imageBase+0x12bc630;
+    log("Native Rocket Arm camera reader verified="+std::to_string(rocketModeReaderVerified));
     if(!ownerContextVerified)log("Camera owner callsite differs; owner observations disabled");
     if(!evidenceDirectory.empty()){
         if(!evidenceDirectory.is_absolute())throw std::runtime_error("Camera evidence directory must be absolute");

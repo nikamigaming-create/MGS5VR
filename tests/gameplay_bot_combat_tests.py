@@ -1,13 +1,15 @@
 """Native/XR basis joins, occlusion rejection and actor eligibility contracts."""
 import math
+import copy
 import pathlib
 import sys
 import unittest
 from unittest.mock import Mock, patch
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'tools'))
-from gameplay_bot.combat import AimProbeUnavailable, active_targets, admit, aim_error, aim_quaternion, aimed_support_frame, arm, battle_checkpoint, controller_pair, corrected_aim, effective_pitch, facing_error, fire, fresh_rig, looking_head, mul, paired_aim_position, pointing, support_poses, sight, track_and_fire, failed_aim_checkpoint
+from gameplay_bot.combat import AimProbeUnavailable, active_targets, admit, aim_error, aim_quaternion, aimed_support_frame, arm, battle_checkpoint, controller_pair, corrected_aim, effective_pitch, facing_error, fire, fresh_rig, looking_head, mul, paired_aim_position, pointing, support_poses, sight, track_and_fire, failed_aim_checkpoint, face_and_aim
 from gameplay_bot.core import BotFault
 from gameplay_bot.live import rotate
+from gameplay_bot.combat import one_hand_ready
 from gameplay_bot.autonomy import choose_vantage
 from gameplay_bot.navigation import NativeMap
 from gameplay_bot.health import HealthRecoveryNeeded, critical_wound, needs_recovery, retreat_goal
@@ -16,9 +18,139 @@ from gameplay_bot.emplacement import check_guards, require_unburdened_field, ver
 from gameplay_bot.recon import marked_lines
 from gameplay_bot.route import body_heading_error, set_posture
 from gameplay_bot.cover import floor_candidates, select as select_cover, verified_candidates
+from gameplay_bot.helicopter_combat import joined_target, wait_hover, wait_support_publication, prepare_rifle_hold, support_contact_error
 
 
 class CombatTests(unittest.TestCase):
+    def test_one_hand_requires_observed_free_support_and_rendered_firing_palm(self):
+        state={'rendered':{'native_firearm':True,'right_palm_tracked':True,'weapon_support_attached':False}}
+        with patch('gameplay_bot.combat.sampled_release_keys',return_value={('right','Grip',None)}):
+            self.assertTrue(one_hand_ready(state))
+            for key,value in [('native_firearm',False),('right_palm_tracked',False),('weapon_support_attached',True)]:
+                altered=copy.deepcopy(state);altered['rendered'][key]=value
+                self.assertFalse(one_hand_ready(altered))
+        for keys in (None,{('left','Grip',None)}):
+            with patch('gameplay_bot.combat.sampled_release_keys',return_value=keys):
+                self.assertFalse(one_hand_ready(state))
+
+    def test_one_hand_aim_moves_no_support_and_keeps_barrel_and_view_checks(self):
+        live=Mock();live.text_result.return_value={'pose':{'position':[0,0,0],'orientation':[0,0,0,1]}}
+        frame={'native_pose':{'position':[0,0,0],'orientation':[0,0,0,1]},
+               'native_firearm':True,'right_palm_tracked':True,'weapon_support_attached':False}
+        state={'native':{'status_STAND':True,'player_yaw':0},'rendered':frame}
+        target={'id':7680,'aim':[0,0,10],'query_valid':True}
+        data={'targets':[target],'muzzle':{'position':[0,0,0],'orientation':[0,0,0,1]}}
+        with patch('gameplay_bot.combat.admit',return_value=(state,None)), \
+             patch('gameplay_bot.combat.sampled_release_keys',return_value={('right','Grip',None)}), \
+             patch('gameplay_bot.combat.aimed_support_frame') as socket, \
+             patch('gameplay_bot.combat.place_support_hand') as place, \
+             patch('gameplay_bot.combat.time.sleep'):
+            face_and_aim(live,{'id':7680,'sight':target},None,0,
+                         pair={'position':[0,0,0],'orientation':[0,0,0,1]},support_pair={},
+                         ready_inputs=['right_grip'],support_required=False,geometry_reader=lambda *_:(data,state))
+        self.assertEqual(live.execute.call_count,2)
+        self.assertTrue(all(c.args[0]['hand']=='right' for c in live.execute.call_args_list))
+        socket.assert_not_called();place.assert_not_called()
+        with self.assertRaises(BotFault):
+            face_and_aim(live,{},None,0,pair={},support_pair={},ready_inputs=['left_grip','right_grip'],support_required=False)
+
+    def test_optional_simulator_head_reposition_precedes_socket_observation(self):
+        live=Mock();order=[]
+        live.text_result.return_value={'pose':{'position':[0,0,0],'orientation':[0,0,0,1]}}
+        live.call.side_effect=lambda name,args: order.append('head') if name=='set_head_pose' else None
+        state={'native':{'status_STAND':True},'rendered':{'native_pose':{'position':[0,0,0],'orientation':[0,0,0,1]}}}
+        def reader(*_):order.append('sight');raise AimProbeUnavailable('End before aim input')
+        with patch('gameplay_bot.combat.admit',return_value=(state,None)),self.assertRaises(AimProbeUnavailable):
+            face_and_aim(live,{'sight':{'aim':[0,0,10]}},None,0,pair={},support_pair={},ready_inputs=[],
+                         geometry_reader=reader,after_head_turn=lambda:order.append('reposition'))
+        self.assertEqual(order,['head','reposition','sight']);live.input.assert_not_called()
+
+    def test_helicopter_rendered_palm_must_reach_authored_contact_not_just_flag(self):
+        frame={'head_pose':{'position':[0,0,0],'orientation':[0,0,0,1]},
+               'native_pose':{'position':[10,20,30],'orientation':[0,0,0,1]},
+               'weapon_support_grip':{'position':[.2,-.2,-.5]},
+               'left_palm':{'position':[9.8,19.8,30.5]},
+               'left_palm_tracked':True,'weapon_support_attached':True}
+        self.assertAlmostEqual(support_contact_error(frame),0.)
+        frame['left_palm']['position'][0]+=.1
+        self.assertGreater(support_contact_error(frame),.025)
+        frame['weapon_support_attached']=False
+        with self.assertRaises(AimProbeUnavailable):support_contact_error(frame)
+
+    def test_helicopter_rifle_hold_keeps_pair_and_prepares_before_gripping(self):
+        live=Mock();live.held={}
+        relationship={'position':[0,0,.1],'orientation':[0,0,0,1]}
+        grip=prepare_rifle_hold(live,relationship,relationship)
+        self.assertLess(math.dist(grip,[0,0,0]),.35)
+        self.assertEqual(live.execute.call_count,2)
+        for call in live.execute.call_args_list:
+            step=call.args[0];self.assertEqual(step['op'],'pose')
+            self.assertAlmostEqual(math.dist(step['position'],step['aim_position']),.1)
+        live.input.assert_not_called()
+        live.held={'right_trigger':1}
+        with self.assertRaises(BotFault):prepare_rifle_hold(live,relationship,relationship)
+        self.assertEqual(live.execute.call_count,2)
+
+    def test_helicopter_head_motion_waits_for_fresh_authored_socket_without_input(self):
+        live=Mock();clock=[0.]
+        missing={'rendered':{'rig_sequence':0,'native_firearm':False,'weapon_support_tracked':False}}
+        ready={'rendered':{'rig_sequence':23,'native_firearm':True,
+                          'weapon_support_tracked':True,'weapon_support_grip':{'position':[1,2,3]}}}
+        reader=Mock(side_effect=[({},missing),({'new_sample':True},ready)])
+        def sleep(s):clock[0]+=s
+        data,state=wait_support_publication(live,(1,2,3),{},missing,clock=lambda:clock[0],sleep=sleep,read_sight=reader)
+        self.assertIs(state,ready);self.assertTrue(data['new_sample'])
+        self.assertEqual(reader.call_count,2)
+        live.input.assert_not_called();live.execute.assert_not_called();live.call.assert_not_called()
+
+    def test_helicopter_missing_socket_times_out_without_pose_or_trigger_replay(self):
+        live=Mock();clock=[0.];missing={'rendered':{'rig_sequence':0,'weapon_support_tracked':True,'weapon_support_grip':{}}}
+        def sleep(s):clock[0]+=s
+        with self.assertRaises(AimProbeUnavailable):
+            wait_support_publication(live,None,{},missing,clock=lambda:clock[0],sleep=sleep,
+                                     read_sight=lambda *_:({},missing))
+        self.assertLessEqual(clock[0],.825)
+        live.input.assert_not_called();live.execute.assert_not_called();live.call.assert_not_called()
+
+    def test_helicopter_fast_flight_never_arms_or_fires(self):
+        live=Mock();clock=[0.]
+        def read(_):return {'id':7680,'position':[30.*clock[0],50.,0.],'cleared':False},{}
+        live.native.read.side_effect=read
+        def sleep(s):clock[0]+=s
+        with patch('gameplay_bot.helicopter_combat.admit'),self.assertRaises(AimProbeUnavailable):
+            wait_hover(live,None,max_seconds=1.,clock=lambda:clock[0],sleep=sleep)
+        live.input.assert_not_called();live.execute.assert_not_called()
+
+    def test_helicopter_slow_flight_requires_observed_stability(self):
+        live=Mock();clock=[0.]
+        live.native.read.return_value=({'id':7680,'position':[30.,50.,0.],'cleared':False},{})
+        def sleep(s):clock[0]+=s
+        with patch('gameplay_bot.helicopter_combat.admit'):
+            actor=wait_hover(live,None,max_seconds=1.,clock=lambda:clock[0],sleep=sleep)
+        self.assertFalse(actor['cleared']);self.assertGreaterEqual(clock[0],.35)
+        live.input.assert_not_called();live.execute.assert_not_called()
+
+    def test_helicopter_requires_typed_marker_join_and_fresh_exact_world_ray(self):
+        actor={'id':7680,'position':[10.,20.,30.],'cleared':False}
+        data={'requested_marker':{'id':7680,'found':True,'kind':13,'flags':3,'position':[10.,20.,30.]},
+              'targets':[{'id':7680,'aim_kind':2,'query_valid':True,'unoccluded':True,
+                          'distance':100.,'aim':[10.,20.,30.]}]}
+        self.assertEqual(joined_target(data,actor,require_clear=True)['id'],7680)
+        for field,value in [('id',7),('found',False),('kind',1),('flags',7),('position',[13.,20.,30.])]:
+            changed=copy.deepcopy(data);changed['requested_marker'][field]=value
+            with self.subTest(field=field),self.assertRaises(AimProbeUnavailable):
+                joined_target(changed,actor,require_clear=True)
+        for field,value in [('id',7),('aim_kind',0),('query_valid',False),('unoccluded',False),
+                            ('distance',181.),('distance',float('nan')),('aim',[10.,20.65,30.])]:
+            changed=copy.deepcopy(data);changed['targets'][0][field]=value
+            with self.subTest(field=field),self.assertRaises(AimProbeUnavailable):
+                joined_target(changed,actor,require_clear=True)
+        for changed in [{**actor,'cleared':True},{**actor,'id':7},
+                        {**actor,'position':[10.,float('nan'),30.]}]:
+            with self.assertRaises(AimProbeUnavailable):joined_target(data,changed)
+        blocked=copy.deepcopy(data);blocked['targets'][0]['unoccluded']=False
+        self.assertEqual(joined_target(blocked,actor)['id'],7680) # aim-only, never fire
+
     def test_close_target_selection_keeps_visibility_and_muzzle_clearance(self):
         enemies={'truncated':False,'unavailable_loaded':0,'normal_life':'0',
                  'soldiers':[{'id':7,'name':'sol_close','life':'0'}]}

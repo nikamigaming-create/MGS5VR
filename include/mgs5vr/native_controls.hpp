@@ -110,7 +110,7 @@ private:
 };
 // A spatial rack owns title selection. Sticks, grips and face buttons must not
 // also navigate its hidden native menu; only a selected tape confirms it.
-GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept;
+GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm,bool nativeMenu=false) noexcept;
 // Keep native Back taps intact. A deliberate held Back can dismiss an iDroid
 // terminal whose tutorial has disabled its ordinary cancel path.
 class IdroidBackRecovery {

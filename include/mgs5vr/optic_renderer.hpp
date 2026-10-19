@@ -42,7 +42,7 @@ void drawWorldWaypoints(ID3D11DeviceContext* context,
 bool drawPhysicalWeaponScope(ID3D11DeviceContext* context,
     const std::array<float,16>& ocularWorld,const std::array<float,16>& view,
     const std::array<float,16>& projection,float radius,float magnification,
-    ID3D11Texture2D* sceneSource,bool dotReticle=false) noexcept;
+    ID3D11Texture2D* sceneSource,bool dotReticle=false,bool opaqueAtOnePower=false) noexcept;
 
 // Draw the physical binocular housing into the current native eye scene.
 // `world` is the retail FOX world matrix for the tracked optic body, `view`
@@ -71,6 +71,11 @@ bool drawPhysicalIdroidCursor(ID3D11DeviceContext* context,
     const std::array<float,16>& world,
     const std::array<float,16>& view,
     const std::array<float,16>& projection) noexcept;
+
+// Current transaction's guidance image at the authored handset projector.
+bool drawIdroidGuidance(ID3D11DeviceContext*,const std::array<float,16>& world,
+    const std::array<float,16>& view,const std::array<float,16>& projection,
+    float width,float aspect,ID3D11Texture2D*,const EyeFrame&) noexcept;
 
 // Draw the owned title-opening props in the native cabin eye. The world array
 // is ordered radio/deck, then the six action tapes in openingTapeLabels order.

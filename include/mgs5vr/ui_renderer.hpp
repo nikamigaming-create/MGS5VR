@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <iosfwd>
+#include <string>
 
 namespace mgs5vr {
 void installUiRenderer(uintptr_t moduleBase);
@@ -31,6 +32,7 @@ NativePopupSnapshot nativePopupSnapshot() noexcept;
 // Caller must establish the completed ACC guide in the native Lua transaction.
 bool releaseNativeIdroidTutorialPause(bool requestedStow=false) noexcept;
 uintptr_t captureNativeIdroidStowHelpOwner() noexcept;
+uintptr_t nativeIdroidInformationalHelpOwner() noexcept;
 enum class NativeIdroidStowHelpState { unavailable, ready, closed };
 // Read only: the actual Help UI must handle its Confirm and close its card.
 NativeIdroidStowHelpState nativeIdroidStowHelpState(uintptr_t owner) noexcept;
@@ -99,5 +101,7 @@ private:
 // Called only at the verified native UI perspective-builder return address.
 bool applyUiEyeProjection(float* output) noexcept;
 void reportUiRenderer(std::ostream& output);
+// Reset/read only the bounded draw inventory; never changes native UI state.
+std::string inspectUiDrawInventory(bool reset);
 void stopUiRenderer() noexcept;
 }

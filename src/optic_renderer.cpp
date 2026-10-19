@@ -636,6 +636,7 @@ float4 main(PSIn input) : SV_TARGET {
     // pale untextured block under the simulator's near-field lighting.
     float diffuse = 0.22 + 0.78 * saturate(dot(normal, light));
     float3 albedo = retailDiffuse.Sample(retailSampler,input.uv).rgb;
+    if (baseColor.x < 0) return float4(albedo, 1);
     return float4(albedo * diffuse, baseColor.a);
 }
 )HLSL";
@@ -826,6 +827,8 @@ struct Resources {
     ComPtr<ID3D11DepthStencilView> housingDepthView;
     std::array<RetailGpuAsset,11> studioCamera;
     RetailGpuAsset studioMarker,studioMarkerTip,studioNotes,studioStickyBack,studioPhotoBack,studioViewfinder,studioFocus;
+    RetailGpuAsset idroidGuidance;
+    float idroidGuidanceWidth{},idroidGuidanceAspect{};
     std::array<RetailGpuAsset,44> studioKeys;
     std::array<RetailGpuAsset,6> studioButtons,studioButtonFaces;
     RetailGpuAsset studioButtonHover,studioResume,studioConfirmControl,studioCancelControl,studioCameraStatus,studioGallery,studioPaperConfirmation,
@@ -1663,13 +1666,14 @@ std::array<float,16> matrixProduct(const std::array<float,16>& a,const std::arra
 bool drawOpeningAsset(ID3D11DeviceContext* context,const RetailGpuAsset& asset,
     ID3D11RenderTargetView* target,ID3D11DepthStencilView* depth,
     const std::array<float,16>& world,const std::array<float,16>& view,
-    const std::array<float,16>& projection){
+    const std::array<float,16>& projection,bool emissive=false){
     if(!context||!asset.ready||!target||!depth)return false;
     const auto mvp=matrixProduct(matrixProduct(world,view),projection);
     for(const auto value:mvp)if(!std::isfinite(value))return false;
     Constants constants{};std::copy(mvp.begin(),mvp.end(),std::begin(constants.mvp));
     std::copy(world.begin(),world.end(),std::begin(constants.world));
     constants.baseColor[0]=constants.baseColor[1]=constants.baseColor[2]=constants.baseColor[3]=1.f;
+    if(emissive)constants.baseColor[0]=-1.f;
     context->UpdateSubresource(resources.constants.Get(),0,nullptr,&constants,0,0);
     ID3D11RenderTargetView* renderTarget=target;context->OMSetRenderTargets(1,&renderTarget,depth);
     const UINT stride=sizeof(Vertex),offset=0;ID3D11Buffer* vertexBuffer=asset.vertices.Get();
@@ -2091,8 +2095,8 @@ void drawWorldWaypoints(ID3D11DeviceContext* context,const std::array<float,16>&
 }
 bool drawPhysicalWeaponScope(ID3D11DeviceContext* context,const std::array<float,16>& ocularWorld,
     const std::array<float,16>& view,const std::array<float,16>& projection,float radius,float magnification,
-    ID3D11Texture2D* sceneSource,bool dotReticle) noexcept {
-    const bool collimator=dotReticle&&magnification==1.f;
+    ID3D11Texture2D* sceneSource,bool dotReticle,bool opaqueAtOnePower) noexcept {
+    const bool collimator=dotReticle&&magnification==1.f&&!opaqueAtOnePower;
     if(!context||(!sceneSource&&!collimator)||!std::isfinite(radius)||radius<.003f||radius>.06f
        ||!std::isfinite(magnification)||magnification<1.f||magnification>16.f)return false;
     try{
@@ -2353,7 +2357,7 @@ bool drawPhysicalIdroidCursor(ID3D11DeviceContext* context,const std::array<floa
 bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<float,16>,7>& worlds,
     const std::array<float,16>& view,const std::array<float,16>& projection,const std::array<float,16>& cabinWorld,
     const EyeFrame& eye,float lidOpen,int selection) noexcept{
-    (void)selection;(void)lidOpen;
+    (void)selection;(void)lidOpen;(void)cabinWorld;
     if(!context)return false;
     try{
         std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(device.GetAddressOf());
@@ -2365,9 +2369,8 @@ bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<f
         SavedState state;save(context,state);if(!state.renderTarget){restore(context,state);return false;}
         ComPtr<ID3D11DepthStencilView> depth;
         if(!bindHousingDepth(context,device.Get(),state,projection[14]>0,depth,&eye)){restore(context,state);return false;}
-        // The cabin already contains the player. Only its tactile button label
-        // and the movable tapes are ours; adding another body/lid duplicates it.
-        drawOpeningAsset(context,resources.openingEjectLabel,state.renderTarget.Get(),depth.Get(),cabinWorld,view,projection);
+        // Retain the player's authored controls without a billboard over them.
+        // The cassette geometry is independently movable.
         bool cassettes=true;
         for(size_t i=1;i<worlds.size();++i)
             cassettes=drawOpeningAsset(context,resources.openingCassette,state.renderTarget.Get(),depth.Get(),
@@ -2510,6 +2513,33 @@ bool drawCabinStudio(ID3D11DeviceContext* context,const CabinStudioFrame& frame,
                 }else for(size_t key=0;key<44;++key)draw(resources.studioKeys[key],worlds.keys[key]);
             }
         restore(context,saved);return true;
+    }catch(...){return false;}
+}
+bool drawIdroidGuidance(ID3D11DeviceContext* context,const std::array<float,16>& world,
+    const std::array<float,16>& view,const std::array<float,16>& projection,
+    float width,float aspect,ID3D11Texture2D* source,const EyeFrame& eye) noexcept {
+    if(!context||!source||!std::isfinite(width)||width<.2f||width>.6f
+       ||!std::isfinite(aspect)||aspect<.5f||aspect>3.f)return false;
+    try{
+        std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(&device);
+        if(!device)return false;
+        if(resources.device.Get()!=device.Get()){resources=Resources{};resources.device=device;}
+        if(!resources.attempted&&!createResources(device.Get()))return false;
+        if(!resources.ready)return false;
+        if(!resources.idroidGuidance.ready||resources.idroidGuidanceWidth!=width||resources.idroidGuidanceAspect!=aspect){
+            RetailGpuAsset surface;
+            if(!studioQuad(device.Get(),surface,{width*.5f,width/(2*aspect),0},{0xffffffffu},1,1,0))return false;
+            resources.idroidGuidance=std::move(surface);
+            resources.idroidGuidanceWidth=width;resources.idroidGuidanceAspect=aspect;
+        }
+        // Never keep a preceding flight/frame's SRV after a missing capture.
+        resources.idroidGuidance.diffuse.Reset();
+        if(FAILED(device->CreateShaderResourceView(source,nullptr,&resources.idroidGuidance.diffuse)))return false;
+        SavedState saved;save(context,saved);
+        ComPtr<ID3D11DepthStencilView> depth;
+        const bool ready=saved.renderTarget&&bindHousingDepth(context,device.Get(),saved,projection[14]>0,depth,&eye);
+        const bool drawn=ready&&drawOpeningAsset(context,resources.idroidGuidance,saved.renderTarget.Get(),depth.Get(),world,view,projection,true);
+        restore(context,saved);return drawn;
     }catch(...){return false;}
 }
 void stopPhysicalOpticRenderer() noexcept{setOpticNativeMaterialDrawCallback(nullptr);

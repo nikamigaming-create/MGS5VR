@@ -163,7 +163,7 @@ struct Instance {
 struct Session {
     Instance& instance;
     XrSession handle{XR_NULL_HANDLE};
-    XrSpace local{XR_NULL_HANDLE}, view{XR_NULL_HANDLE};
+    XrSpace local{XR_NULL_HANDLE}, view{XR_NULL_HANDLE}, floor{XR_NULL_HANDLE};
     XrActionSet actions{XR_NULL_HANDLE};
     XrAction grip{XR_NULL_HANDLE},aim{XR_NULL_HANDLE},recenter{XR_NULL_HANDLE};
     XrAction sticks{},triggers{},squeezes{},thumbClick{},triggerTouch{},thumbTouch{},thumbRestTouch{},stickTouch{},menu{};
@@ -207,6 +207,8 @@ struct Session {
     IdroidHandUseController idroidHandUse;
     IdroidHandUse priorIdroidHandUse{IdroidHandUse::device};
     bool priorIdroidTap{};
+    uint64_t cabinStowUntil{},cabinHelpConfirmUntil{};
+    uintptr_t cabinHelpOwner{};
     bool priorHandheldFree{},priorHandheldGrip{},priorIdroidRouting{};
     bool borrowedReloadPending{};
     bool borrowedReloadSent{};
@@ -240,6 +242,7 @@ struct Session {
     uint64_t presentationEpoch{nextRigPresentationEpoch()};
     ControllerFrame controllerFrame{};
     OpeningSelector openingSelector;
+    bool titleNativeMenu{true};
     CabinStudio cabinStudio;
     NativeTextKeyboard textKeyboard;
     OpeningSelectorFrame openingFrame{};
@@ -358,6 +361,9 @@ struct Session {
         xrCheck(xrCreateReferenceSpace(handle,&space,&local),"Create LOCAL space");
         space.referenceSpaceType=XR_REFERENCE_SPACE_TYPE_VIEW;
         xrCheck(xrCreateReferenceSpace(handle,&space,&view),"Create VIEW space");
+        space.referenceSpaceType=XR_REFERENCE_SPACE_TYPE_STAGE;
+        // Optional runtime floor: never invent one from the initial seated HMD.
+        if(XR_FAILED(xrCreateReferenceSpace(handle,&space,&floor)))floor=XR_NULL_HANDLE;
         hands={path("/user/hand/left"),path("/user/hand/right")};
         XrActionSetCreateInfo ai{XR_TYPE_ACTION_SET_CREATE_INFO};
         strcpy_s(ai.actionSetName,"theatre");strcpy_s(ai.localizedActionSetName,"MGS5VR theatre");
@@ -567,6 +573,7 @@ struct Session {
                 }
             }
         }
+        const auto previousStudio=controllerFrame.studio;
         controllerFrame={{trackedHand(0,time),trackedHand(1,time)},time,referenceEpoch};
         controllerFrame.presentationFocused=true;
         controllerFrame.presentationEpoch=presentationEpoch;
@@ -751,27 +758,62 @@ struct Session {
         controllerFrame.cabinPlay=cabinPlay;
         controllerFrame.cabinTransit=cabinTransit;
         controllerFrame.cabinDeployHint=cabinPlay&&!cabinTransit;
-        const bool titleCabin=spatialTitle&&openingCabinEnabled()&&nativeTitleMenuOpen()&&!manualScreenSelected&&!nativeGamepadActive();
+        // Physical props belong to the cabin scene, not the title menu's
+        // transient focus publication. Native actions still require ready focus.
+        const bool titleCabin=spatialTitle&&openingCabinEnabled()&&!manualScreenSelected&&!nativeGamepadActive();
         const auto openingFocus=nativeTitleFocus();
+        if(!title)titleNativeMenu=true;
         const auto cabinPublished=headCamera().publishedView();
         const auto openingLayout=cabinPublished?cabinPublished->controllers.openingLayout:CabinLayout{};
         auto propHands=controllerFrame.hands;
+        const auto contactFrame=headCamera().publishedRigFrame(now);
+        if(contactFrame&&contactFrame->activation==nativeStatus.activation
+            &&contactFrame->controllers.referenceEpoch==referenceEpoch
+            &&contactFrame->controllers.presentationEpoch==presentationEpoch
+            &&now>=contactFrame->sampleTime&&now-contactFrame->sampleTime<=100){
+            for(size_t side=0;side<2;++side){
+                propHands[side].indexTip=contactFrame->controllers.hands[side].indexTip;
+                propHands[side].indexTipTracked=propHands[side].gripTracked
+                    &&contactFrame->controllers.hands[side].indexTipTracked;
+            }
+        }
         if(editorInputOwned)for(auto& hand:propHands)hand.squeeze=hand.trigger=0;
+        if(titleCabin&&titleNativeMenu)for(auto& hand:propHands){
+            hand.gripTracked=hand.aimTracked=hand.indexTipTracked=false;
+            hand.squeeze=hand.trigger=0;
+        }
+        if(previousStudio&&previousStudio->available){
+            const auto& prior=*previousStudio;
+            for(size_t side=0;side<2;++side)
+                if(prior.cameraHand==static_cast<int>(side)||prior.markerHand==static_cast<int>(side)
+                    ||std::any_of(prior.papers.begin(),prior.papers.end(),[&](const auto& paper){return paper.hand==static_cast<int>(side);})){
+                    propHands[side].gripTracked=false;propHands[side].squeeze=propHands[side].trigger=0;
+                }
+        }
         if(titleCabin)openingFrame=openingSelector.update(true,openingAssetsReady,false,head,propHands,now,
             headCamera().openingTrackingOrigin(now),openingFocus,openingLayout);
         else if(cabinPlay)openingFrame=openingSelector.updateCabin(true,head,propHands,now,
             headCamera().openingTrackingOrigin(now),openingLayout);
-        else {openingSelector.reset();openingFrame={};}
+        else {
+            // Native title focus can disappear for one publication while the
+            // same cabin is still loaded. Suppress actions, but keep its props.
+            if(!title||loading)openingSelector.reset();
+            openingFrame={};
+        }
         controllerFrame.openingPropsActive=openingAssetsReady&&openingLayout.verified&&(openingFrame.active||openingFrame.cabinActive);
         controllerFrame.openingSelector=titleCabin&&openingFrame.active&&openingFocus.ready;
+        controllerFrame.openingNativeMenu=titleCabin&&titleNativeMenu;
         controllerFrame.openingSelection=controllerFrame.openingSelector?openingFrame.selection:-1;
         controllerFrame.openingBench=openingFrame.bench;
         controllerFrame.openingOrigin=(controllerFrame.openingSelector||cabinPlay)?openingFrame.origin:Pose{};
         std::array<StudioHand,2> studioHands{};
         for(size_t side=0;side<2;++side){const auto& hand=controllerFrame.hands[side];
-            studioHands[side]={hand.grip,hand.aim,hand.gripTracked,hand.aimTracked,hand.squeeze,hand.trigger};}
+            studioHands[side]={hand.grip,hand.aim,hand.gripTracked,hand.aimTracked,hand.squeeze,hand.trigger};
+            if(std::any_of(openingFrame.bench.tapes.begin(),openingFrame.bench.tapes.end(),[&](const auto& tape){return tape.hand==static_cast<int>(side);}))
+                studioHands[side].tracked=studioHands[side].aimTracked=false;
+        }
         const bool studioCabin=controllerFrame.openingPropsActive;
-        const bool studioAllowed=!editorInputOwned&&!loading&&!scriptedDemo&&!avatarEditor&&!nativeGamepadActive()&&!manualScreenSelected
+        const bool studioAllowed=!controllerFrame.openingNativeMenu&&!editorInputOwned&&!loading&&!scriptedDemo&&!avatarEditor&&!nativeGamepadActive()&&!manualScreenSelected
             &&!nativeStatus.nativeMenuOpen&&!binocularSelected
             &&(studioCabin||(nativeStatus.active&&!title&&!nativeStatus.nativeMenuOpen
                 &&!controllerFrame.vehicleMounted&&!controllerFrame.optic.held));
@@ -791,6 +833,14 @@ struct Session {
         }
         controllerFrame.studio=cabinStudio.update(studioAllowed,studioCabin,head,studioRoom,studioHands,now,completedStudioPhoto(),
             studioAllowed&&nativeStatus.active&&!title,cameraFreezeState(),studioHolster);
+        if(previousStudio&&previousStudio->cameraCandidateMask&&!controllerFrame.studio->cameraCandidateMask
+            &&controllerFrame.studio->cameraHand<0){
+            log("Gear camera candidate lost: allowed="+std::to_string(studioAllowed)
+                +" holster="+std::to_string(studioHolster.has_value())
+                +" tracked="+std::to_string(studioHands[1].tracked)
+                +" grip="+std::to_string(studioHands[1].squeeze)
+                +" time="+std::to_string(now));
+        }
         // Reuse the established mod-owned world-pause lease; tracking, skin,
         // the native eye renderer and the editor keep publishing while paused.
         requestCameraFreeze(controllerFrame.studio->freezeRequested||controlsEditor.visible(),nativeStatus.activation,referenceEpoch);
@@ -989,6 +1039,12 @@ struct Session {
             return controls.active(name);
         };
         const bool idroidTap=activeControl("system.idroid");
+        const bool titleMenuToggle=titleCabin&&openingFocus.ready&&!editorInputOwned&&!nativeInput.exclusive;
+        if(titleMenuToggle&&idroidTap&&!priorIdroidTap){
+            titleNativeMenu=!titleNativeMenu;
+            controllerFrame.openingNativeMenu=titleNativeMenu;
+        }
+        const bool cabinStowTap=cabinControlsReady&&nativeIdroidOpen()&&!nativeInput.exclusive;
         const bool fieldIdroidOpen=controllerFrame.handheldMenus&&handheldMenuRoutingAvailable()
             &&gameplayContext&&!cabinPlay&&!cabinTransit&&!nativeStatus.nativeMenuOpen
             &&rigControls.equipmentPhase()==0&&!commandsControls.active()&&!nativeInput.exclusive
@@ -1008,13 +1064,26 @@ struct Session {
                 cancelHandheldIdroidBorrow();borrowedReloadPending=false;borrowedReloadPulseUntil=0;
                 requestHandheldIdroidOpen(0);
                 if(liveIdroid)requestNativeIdroidClose(true);
-            }else if(uiOnlyIdroid&&liveIdroid)requestNativeIdroidClose(true);
+            }else if(cabinStowTap){
+                cabinHelpOwner=nativeIdroidInformationalHelpOwner();
+                cabinStowUntil=cabinHelpOwner?now+3000:0;
+                cabinHelpConfirmUntil=cabinHelpOwner?now+180:0;
+                // START below owns ordinary seated-player stow. Requesting
+                // terminal Close here first invalidates menu input readiness
+                // before that player can consume START, stranding SUBJECT.
+            }else if(liveIdroid&&uiOnlyIdroid)requestNativeIdroidClose(true);
             else if(fieldIdroidOpen)requestHandheldIdroidOpen(nativeStatus.activation);
         }
         priorIdroidTap=idroidTap;
         if(idroidBackRecovery.update(liveIdroid,activeControl("menus.back"),!nativeInput.exclusive,now))
             requestNativeIdroidClose(true);
-        if(!liveIdroid||nativeInput.exclusive)requestNativeIdroidClose(false);
+        if(!cabinControlsReady||nativeInput.exclusive||now>=cabinStowUntil||!nativeIdroidOpen()){
+            cabinStowUntil=cabinHelpConfirmUntil=0;cabinHelpOwner=0;
+        }
+        const bool cabinHelpConfirm=cabinStowUntil&&now<cabinHelpConfirmUntil&&cabinHelpOwner
+            &&nativeIdroidInformationalHelpOwner()==cabinHelpOwner;
+        if(cabinStowUntil&&liveIdroid&&!nativePauseMenuOpen())requestNativeIdroidClose(true);
+        else if(!liveIdroid||nativeInput.exclusive)requestNativeIdroidClose(false);
         const bool manualToggle=headCamera().available()&&activeControl("system.toggle_vr");
         if(manualToggle||nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)automaticEntryDone=true;
         if(loading&&(nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)){
@@ -1070,7 +1139,12 @@ struct Session {
             ||activeControl("gameplay.equip_binoculars")||activeControl("binoculars.stow");
         const bool centerChord=activeControl("system.recenter")&&!binocularInteraction;
         const bool headToggle=manualToggle;
-        const uint16_t menuBits=static_cast<uint16_t>((idroidTap&&!fieldIdroidOpen&&!uiOnlyIdroid?XINPUT_GAMEPAD_START:0)
+        // Ordinary ACC stow must reach the seated player's native Menu action
+        // as well as the terminal close lifecycle. Suppress it only while the
+        // verified Help overlay owns this tap; START there opens another menu.
+        const uint16_t menuBits=static_cast<uint16_t>((idroidTap&&!titleMenuToggle&&!fieldIdroidOpen&&!uiOnlyIdroid
+            &&!(cabinStowTap&&nativePauseMenuOpen())?XINPUT_GAMEPAD_START:0)
+            |(cabinHelpConfirm?XINPUT_GAMEPAD_A:0)
             |(activeControl("system.pause")?XINPUT_GAMEPAD_BACK:0));
         const bool utilityCenter=centerChord;
         const bool opticSupport=!liveIdroid&&activeControl("binoculars.support_grip");
@@ -1372,7 +1446,7 @@ struct Session {
         if(rigInput&&!nativeInput.exclusive&&!stickNavigation
            &&!mountedViewOwnsRightStick(mode,rigInput,nativeInput.exclusive,stickNavigation))
             {pad.rightX=0;pad.rightY=0;}
-        const bool cabinTurning=(controllerFrame.openingSelector||cabinPlay||cabinTransit)&&nativeStatus.active
+        const bool cabinTurning=!controllerFrame.openingNativeMenu&&(controllerFrame.openingSelector||cabinPlay||cabinTransit)&&nativeStatus.active
             &&!controllerFrame.cameraWorldFrozen&&!controllerFrame.studio->freezeRequested
             &&(!nativeStatus.nativeMenuOpen||idroidFree)&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;
         // Menu navigation owns its stick. Use the effective movement binding
@@ -1414,8 +1488,8 @@ struct Session {
         // Apply LAST: the generic menu mapping otherwise overwrites the zero
         // axes and moves native focus while the user walks around the cabin.
         pad=cabinTitleGamepad(pad,controllerFrame.openingSelector,
-            openingFrame.pulse==OpeningPulse::confirm&&!utilityCenter&&!headToggle);
-        if(controllerFrame.openingSelector&&!utilityCenter&&!headToggle){
+            openingFrame.pulse==OpeningPulse::confirm&&!utilityCenter&&!headToggle,controllerFrame.openingNativeMenu);
+        if(controllerFrame.openingSelector&&!controllerFrame.openingNativeMenu&&!utilityCenter&&!headToggle){
             if(openingFrame.pulse==OpeningPulse::up)pad.buttons=XINPUT_GAMEPAD_DPAD_UP;
             if(openingFrame.pulse==OpeningPulse::down)pad.buttons=XINPUT_GAMEPAD_DPAD_DOWN;
         }
@@ -1516,6 +1590,7 @@ struct Session {
         for(auto s:aimSpaces)if(s)xrDestroySpace(s);
         for(auto s:gripSpaces)if(s)xrDestroySpace(s);
         if(view)xrDestroySpace(view);
+        if(floor)xrDestroySpace(floor);
         if(local)xrDestroySpace(local);
         if(handle){
             log("OpenXR destroying session");
@@ -1756,6 +1831,16 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         for(size_t n=0;n<2;++n)trackedViews[n]={fromXr(views[n].pose),{views[n].fov.angleLeft,views[n].fov.angleRight,views[n].fov.angleUp,views[n].fov.angleDown}};
         auto trackedHead=fromXr(head.pose);
         session.syncInput(frame.predictedDisplayTime,trackedHead,trackedViews,tracking&&stereoTracked);
+        session.controllerFrame.physicalFloorTracked=false;
+        if(session.floor&&tracking&&nativeTravelMode()==TravelMode::onFoot){
+            XrSpaceLocation floor{XR_TYPE_SPACE_LOCATION};
+            if(XR_SUCCEEDED(xrLocateSpace(session.floor,session.local,frame.predictedDisplayTime,&floor))
+               &&(floor.locationFlags&validPoseBits)==validPoseBits&&valid(fromXr(floor.pose))
+               &&rotate(fromXr(floor.pose).orientation,{0,1,0}).y>.99f){
+                session.controllerFrame.physicalFloorY=floor.pose.position.y;
+                session.controllerFrame.physicalFloorTracked=true;
+            }
+        }
         if(!stats.haveViews&&tracking&&stereoTracked){
             stats.firstHead=trackedHead;stats.firstViews=trackedViews;stats.haveViews=true;
         }

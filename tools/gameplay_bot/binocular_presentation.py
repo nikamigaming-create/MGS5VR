@@ -96,6 +96,9 @@ def support_poses(frame, pair):
 
 
 def _angle(a, b):
+    # Operator readback rounds quaternion components. Compare rotations, not
+    # the slightly shortened quaternion lengths reported by that transport.
+    a, b = normalized(a), normalized(b)
     return math.degrees(2*math.acos(min(1., abs(sum(x*y for x, y in zip(a, b))))))
 
 
@@ -229,7 +232,7 @@ class BinocularPresentation:
                 raise BotFault('Binocular rig did not publish after the pose packet; no motion replay')
             self.sleep(.015)
 
-    def _motion(self, end_head, end_grips, *, follow_head, seconds=.4):
+    def _motion(self, end_head, end_grips, *, follow_head, seconds=.4, _path_deadline=None):
         if type(seconds) not in (int, float) or not .1 <= seconds <= 3:
             raise BotFault('Binocular motion needs a bounded 0.1..3 second duration')
         self.sample()
@@ -247,6 +250,27 @@ class BinocularPresentation:
         if follow_head:
             reach = max(math.sqrt(sum(v*v for v in starts[h]['position'])) for h in starts)
             packets = max(packets, math.ceil(math.radians(angle)*reach/.015))
+        # A long raise/turn can require dozens of serialized pose publications.
+        # Admit intermediate endpoints rather than exhausting one five-second
+        # segment. Preserve spatial step limits, stalled-packet rejection and a
+        # finite deadline for the entire path; an uncertain packet is not replayed.
+        path_deadline = self.clock()+30. if _path_deadline is None else _path_deadline
+        if packets > 12:
+            segments = math.ceil(packets/12)
+            if segments > 64:
+                raise BotFault('Binocular motion exceeds the bounded segmented path')
+            for index in range(1, segments+1):
+                if self.clock() >= path_deadline:
+                    self.live.release(); self.support_until = 0.
+                    raise BotFault('Binocular segmented path exceeded thirty seconds; no pose replay')
+                fraction = index/segments
+                waypoint_head = _blend(head, end_head, fraction)
+                waypoint_grips = {h: _blend(starts[h], ends[h], fraction) for h in starts}
+                if follow_head:
+                    waypoint_grips = {h: _compose(waypoint_head, p) for h, p in waypoint_grips.items()}
+                self._motion(waypoint_head, waypoint_grips, follow_head=follow_head,
+                             seconds=max(.1, seconds/segments), _path_deadline=path_deadline)
+            return self.state
         # Never skip intermediate poses after a slow RPC; large absolute turns
         # must not become a single late correction or lose the measured pairs.
         begun = self.clock(); largest_gap = 0.; last = begun
@@ -257,6 +281,8 @@ class BinocularPresentation:
                     self.hold_support()
                 if self.clock()-begun > 5.:
                     raise BotFault('Binocular motion exceeded five seconds; no pose replay')
+                if self.clock() >= path_deadline:
+                    raise BotFault('Binocular segmented path exceeded thirty seconds; no pose replay')
                 weight = index/packets
                 moved_head = _blend(head, end_head, weight)
                 poses = {}

@@ -120,6 +120,13 @@ class BinocularTests(unittest.TestCase):
         self.assertLess(math.dist(a['position'], b['position']), 1e-8)
         self.assertLess(_angle(a['orientation'], b['orientation']), 3e-6)
 
+    def test_quantized_operator_quaternion_and_its_double_cover_have_zero_angle(self):
+        rounded = [0., -.5153, 0., .857]
+        expected = normalized(rounded)
+        self.assertLess(_angle(rounded, expected), 3e-6)
+        self.assertLess(_angle([-v for v in rounded], expected), 3e-6)
+        self.assertGreater(_angle([0., -.52, 0., .85], expected), .1)
+
     def test_authored_sockets_still_match_the_production_housing_contract(self):
         source = (pathlib.Path(__file__).resolve().parents[1]/'include/mgs5vr/optic_rig.hpp').read_text()
         for name, expected in [('binocularOcularCenter', OCULAR), ('binocularPrimarySocket', PRIMARY),
@@ -188,6 +195,25 @@ class BinocularTests(unittest.TestCase):
             with self.assertRaises(BotFault): helper.raise_to_eye()
             self.assertEqual(live.held, {})
             self.assertLessEqual(len(live.mutations), 4)
+
+    def test_long_raise_segments_healthy_rpc_latency_without_skipping_poses(self):
+        live = Live(); helper = self.helper(live); live.packet_clock_cost = .04
+        helper.raise_to_eye()
+        completed = [c.kwargs for c in live.events.emit.call_args_list
+                     if c.args == ('binocular_motion_completed',)]
+        self.assertGreater(live.clock.now, 5.)
+        self.assertGreater(len(completed), 1)
+        self.assertTrue(all(c['packets'] <= 12 and c['seconds'] < 5. for c in completed))
+        self.assertTrue(all(c['largest_packet_gap_seconds'] < .5 for c in completed))
+
+    def test_segmented_motion_retains_one_total_deadline_and_releases_on_failure(self):
+        live = Live(); helper = self.helper(live); live.packet_clock_cost = .04
+        targets = inspection_poses(live.head, helper.pairs['right'], helper.pairs['left'], helper.fit)
+        with self.assertRaisesRegex(BotFault, 'thirty seconds'):
+            helper._motion(live.head, {h:p[0] for h,p in targets.items()}, follow_head=False,
+                           _path_deadline=live.clock.now+.2)
+        self.assertTrue(live.releases)
+        self.assertLessEqual(len(live.mutations), 8)
 
     def test_pose_endpoint_failure_is_not_reported_as_completed_motion(self):
         live = Live(); helper = self.helper(live); live.ignore_endpoint = True

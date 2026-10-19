@@ -3,6 +3,7 @@
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/idroid_ui.hpp"
+#include "mgs5vr/menu_surface.hpp"
 #include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/native_menu_restrictions.hpp"
 #include "mgs5vr/ui_clip.hpp"
@@ -144,6 +145,7 @@ struct Source {
     Pose idroidDisplay{};
     float idroidDisplayWidth{};
     bool idroidDisplayTracked{};
+    bool openingNativeMenu{};
 };
 thread_local Source producing,executing;
 std::mutex mutex;
@@ -153,10 +155,15 @@ struct NodeSample {
     uint64_t calls{},source{};
     uint32_t flags{},eye{},order{};
     std::string name;
+    uintptr_t cameraType{};
+    uint64_t resource{};
+    float layoutDepth{};
+    bool sceneCamera{};
 };
 std::vector<NodeSample> nodes;
 std::atomic_uint64_t queued{},executions{},joined{},patched{},cameraMismatch{},viewMismatch{},expired{},overflow{},nodeCalls{};
 std::atomic_uint64_t spatialDraws{};
+std::atomic_uint64_t menuFallbackSources{};
 std::atomic_uint64_t suppressedDraws{};
 std::array<std::atomic_uint64_t,2> spatialByEye{},hiddenPanelByEye{};
 std::filesystem::path settings;
@@ -981,7 +988,17 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
     // to a verified helicopter title cabin. A fresh-start hospital backdrop
     // can remain in TitleMode without that replacement surface; keep the
     // native Start Game menu and its input path in that state.
-    if(enabled.load()&&executing.eye.sourceSequence&&executing.frontEnd&&executing.openingSelector)return 0;
+    if(enabled.load()&&executing.eye.sourceSequence&&executing.frontEnd&&executing.openingSelector&&!executing.openingNativeMenu)return 0;
+    if(enabled.load()&&executing.eye.sourceSequence&&executing.frontEnd&&executing.openingNativeMenu){
+        // The witnessed title vignette/decoration uses the authored scene
+        // camera (order 166). Rendering it with the tracked eye view
+        // produces a giant circular mask. Keep the corresponding layout-camera
+        // rows, prompts and dialogs; only this title backdrop is redundant in
+        // the physical cabin.
+        const auto order=field<uint32_t>(item,0x28);
+        if(field<uintptr_t>(state,0x308)==executing.camera
+            &&order==166){++suppressedDraws;return 0;}
+    }
     if(enabled.load()&&executing.eye.sourceSequence&&!executing.menuOpen){
         const auto order=field<uint32_t>(item,0x28);
         const auto camera=field<uintptr_t>(state,0x308);
@@ -1013,6 +1030,19 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
         if(found==nodes.end()&&nodes.size()<96){
             nodes.push_back({address,camera,field<uintptr_t>(state,0x340),field<uintptr_t>(state,0x348),0,0,field<uint32_t>(item,0x50),0,order,nodeName(address)});
             found=nodes.end()-1;
+            read(camera,&found->cameraType,sizeof(found->cameraType));
+            found->sceneCamera=camera==executing.camera;
+            std::array<float,16> observedWorld{};
+            if(read(camera+0x30,observedWorld.data(),sizeof(observedWorld)))found->layoutDepth=observedWorld[14];
+            {
+                std::lock_guard ownerLock(idroidUiMutex);
+                const auto buffer=field<uintptr_t>(item,0x40);
+                unsigned matches{};
+                for(size_t i=0;i<idroidUiOwnerCount;++i){const auto& owner=idroidUiOwners[i].layout;
+                    if(owner.packet==address&&owner.buffer==buffer&&owner.camera==camera){++matches;found->resource=owner.resource;}
+                }
+                if(matches!=1)found->resource=0;
+            }
             uintptr_t traceType{};
             const bool traceLayoutCamera=!executing.frontEnd&&camera!=executing.camera
                 &&read(camera,&traceType,sizeof(traceType))&&traceType==base+0x20f08c8;
@@ -1551,8 +1581,11 @@ std::optional<bool> nativeMenuOpen() noexcept {
             }
         }
     }
-    const int next=(open?1:0)|(paused?2:0)|(sceneMenuMode.load()?4:0);
-    if(menuState.exchange(next)!=next)try{log("Native menu state="+std::to_string(next)+" (iDroid=1, pause=2, scene menu=4)");}catch(...){}
+    // A native confirmation can own input without the terminal or Pause bit.
+    // Only a currently verified active popup counts; last_result is historical.
+    const bool popup=nativePopupSnapshot().active.value_or(false);
+    const int next=(open?1:0)|(paused?2:0)|(sceneMenuMode.load()?4:0)|(popup?8:0);
+    if(menuState.exchange(next)!=next)try{log("Native menu state="+std::to_string(next)+" (iDroid=1, pause=2, scene menu=4, popup=8)");}catch(...){}
     return next!=0;
 }
 bool nativeIdroidOpen() noexcept {
@@ -1639,6 +1672,23 @@ uintptr_t captureNativeIdroidStowHelpOwner() noexcept {
         &&read(pause,&type,sizeof(type))&&type==base+0x218f648
         &&read(pause+0x38,&kind,sizeof(kind))&&kind==0?pause:0;
 }
+uintptr_t nativeIdroidInformationalHelpOwner() noexcept {
+    const auto mode=nativeIdroidTutorialMode();
+    const auto popup=nativePopupSnapshot();
+    if(!enabled.load()||!pauseReaderVerified||!mode||(*mode!=10&&*mode!=11&&*mode!=14)
+       ||!nativeIdroidOpen()||!nativePauseMenuOpen()||!popup.active||*popup.active)return 0;
+    uintptr_t manager{},pause{},type{},handle{};uint32_t kind{},level{};
+    if(!read(base+0x2bd3b80,&manager,sizeof(manager))||!manager
+       ||!read(manager,&type,sizeof(type))||type!=base+0x218fba0
+       ||!read(manager+8,&pause,sizeof(pause))||!pause
+       ||!read(pause,&type,sizeof(type))||type!=base+0x218f648
+       ||!read(pause+0x38,&kind,sizeof(kind))||kind!=32
+       ||!read(pause+0x40,&handle,sizeof(handle))
+       ||handle<base+0x2b65d58||handle>=base+0x2b65d98||(handle-(base+0x2b65d58))%4
+       ||!read(base+0x2b65d40,&type,sizeof(type))||type!=base+0x20c56c0
+       ||!read(handle,&level,sizeof(level))||level!=0xfffffffe)return 0;
+    return pause;
+}
 NativeIdroidStowHelpState nativeIdroidStowHelpState(uintptr_t owner) noexcept {
     constexpr auto unavailable=NativeIdroidStowHelpState::unavailable;
     if(!enabled.load()||!pauseReaderVerified||!owner)return unavailable;
@@ -1675,10 +1725,17 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     // same wrist origin. The iDroid gets its own tracked screen pose.
     const auto picker=wristPickerPose(rig);
     const auto idroid=trackedIdroidPose(rig);
-    const bool handMenu=rig.menuOpen&&rig.menuIdroid&&rig.controllers.handheldMenus&&idroid.has_value();
+    const bool handMenu=rig.menuOpen&&rig.menuIdroid&&rig.controllers.handheldMenus
+        &&rig.controllers.hands[0].gripTracked&&idroid.has_value();
     const bool quadMenu=rig.menuOpen&&rig.menuWorldQuad;
     const bool startup=rig.controllers.frontEnd||rig.controllers.avatarEditor;
-    const auto menuPanel=(startup||quadMenu)?rig.menuPanel:handMenu?idroid->screen:picker.value_or(Pose{});
+    const auto route=menuSurface(rig.menuOpen,startup||quadMenu,rig.menuIdroid?handMenu:picker.has_value());
+    const bool fallback=route==MenuSurface::fallback;
+    if(fallback)++menuFallbackSources;
+    // Use this exact source rig for BOTH eyes. A current menu with no handset
+    // display previously disappeared at the menuPanelTracked guard in node().
+    // Its already anchored menu plane survives device loss without moving HUD.
+    const auto menuPanel=(startup||quadMenu||fallback)?rig.menuPanel:handMenu?idroid->screen:picker.value_or(Pose{});
     producing={eye,camera,view,rig.wristPanel,picker.value_or(Pose{}),picker.has_value(),
                rig.wristPanelTracked&&panelFacesBothEyes(rig.wristPanel,eyes),
                rig.controllers.equipmentOpen&&!rig.controllers.equipmentCategory,
@@ -1686,9 +1743,10 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
                       rig.menuOpen,rig.menuIdroid,menuPanel,rig.controllers.frontEnd,rig.controllers.loading,
                       rig.controllers.openingSelector,rig.controllers.openingBackend,rig.controllers.avatarEditor,
                       authoredView,authoredProjection,
-                rig.controllers.wristPickerWidth,quadMenu?rig.controllers.menuQuadWidth:handMenu?rig.controllers.idroidScreenWidth:rig.controllers.wristPickerWidth};
+                rig.controllers.wristPickerWidth,(quadMenu||fallback)?rig.controllers.menuQuadWidth:handMenu?rig.controllers.idroidScreenWidth:rig.controllers.wristPickerWidth};
     producing.loading=rig.controllers.loading;
     producing.openingSelector=rig.controllers.openingSelector;
+    producing.openingNativeMenu=rig.controllers.openingNativeMenu;
     producing.hudMode=rig.controllers.hudMode;
     producing.hudView=hudView;
     producing.projection=projection;
@@ -1696,7 +1754,7 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     producing.weaponHudSetback=rig.controllers.weaponHudSetback;
     producing.wristTextScale=rig.controllers.wristTextScale;
     producing.firearmReticle=rig.nativeFirearmActive&&rig.controllers.weaponReady;
-    producing.menuPanelTracked=startup||quadMenu||(rig.menuIdroid?handMenu:picker.has_value());
+    producing.menuPanelTracked=startup||quadMenu||fallback||(rig.menuIdroid?handMenu:picker.has_value());
     producing.idroidSource={rig.playerOwner,rig.activation,rig.controllers.referenceEpoch,
         rig.controllers.presentationEpoch,rig.menuGeneration,eye.sourceSequence,
         rig.controllers.presentationFocused,rig.controllers.handheldMenus,rig.menuOpen,rig.menuIdroid};
@@ -1790,6 +1848,18 @@ bool applyUiEyeProjection(float* output) noexcept {
     }
     std::memcpy(output,executing.projection.data(),sizeof(executing.projection));++patched;return true;
 }
+std::string inspectUiDrawInventory(bool reset){
+    std::lock_guard lock(mutex);
+    if(reset)nodes.clear();
+    std::ostringstream out;out<<"{\"schema\":1,\"reset\":"<<(reset?"true":"false")<<",\"limit\":96,\"nodes\":[";
+    for(size_t i=0;i<nodes.size();++i){const auto& n=nodes[i];if(i)out<<',';
+        out<<"{\"node\":"<<n.node<<",\"camera\":"<<n.camera<<",\"camera_type\":"<<n.cameraType
+            <<",\"resource\":"<<n.resource<<",\"scene_camera\":"<<(n.sceneCamera?"true":"false")
+            <<",\"layout_depth\":"<<(std::isfinite(n.layoutDepth)?n.layoutDepth:0)
+            <<",\"order\":"<<n.order<<",\"calls\":"<<n.calls<<",\"source\":"<<n.source<<",\"eye\":"<<n.eye<<'}';
+    }
+    out<<"]}";return out.str();
+}
 void reportUiRenderer(std::ostream& out){
     const auto popupSampleMs=steadyMilliseconds();
     const auto popup=nativePopupSnapshot();
@@ -1871,6 +1941,7 @@ void reportUiRenderer(std::ostream& out){
        <<",\"joined\":"<<joined.load()<<",\"projection_patched\":"<<patched.load()<<",\"camera_mismatch\":"<<cameraMismatch.load()
        <<",\"view_restored\":"<<viewMismatch.load()<<",\"spatial_draws\":"<<spatialDraws.load()<<",\"suppressed_draws\":"<<suppressedDraws.load()
        <<",\"expired\":"<<expired.load()<<",\"overflow\":"<<overflow.load()
+       <<",\"menu_fallback_sources\":"<<menuFallbackSources.load()
        <<",\"marker_depth_preserved\":"<<markerDepthPreserved.load()
        <<",\"recon_model_groups_hidden\":"<<reconModelGroupsHidden.load()
        <<",\"idroid_ui_owner_hook\":"<<(uiBoundaryLayoutHookVerified?"true":"false")

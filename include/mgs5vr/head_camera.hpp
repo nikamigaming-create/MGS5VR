@@ -11,9 +11,17 @@
 #include <mutex>
 
 namespace mgs5vr {
+std::optional<float> physicalFloorHeightOffset(float headY,float floorY,float units,float standingEyeHeight);
 enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch, sceneUnavailable, staleRig };
 enum class PlayerPosture { unknown,standing,crouched,prone };
-struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{},nativeIdroidOpen{}; uint32_t rigRejectFlags{}; uint64_t rigAgeMs{}; uint64_t sceneTransitionActivation{}; };
+struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{},nativeIdroidOpen{}; uint32_t rigRejectFlags{}; uint64_t rigAgeMs{}; uint64_t sceneTransitionActivation{};
+    // Read-only provenance: 1 authored mode, 2 reference rebase, 3 avatar
+    // source, 4 authored source, 5 unowned shot, 6 player-owner join,
+    // 7 player resume, 8 pending camera, 9 scene resume, 10 explicit recenter.
+    uint8_t activationCause{};uintptr_t sourceCamera{},sourcePlayerOwner{};uint64_t ownerHeadTime{};
+    // Last retirement entry: 1 loading, 2 menu, 3 missing exact skin join.
+    uint8_t awaitCause{},awaitJoinFlags{};uint64_t awaitTime{},awaitOwnerAge{};
+};
 // New pixels require a currently accepted camera publication. Suspended
 // sources can retain only an image that was admitted before the suspension.
 constexpr bool mayAcceptNewStereoPair(HeadCameraStatus status) noexcept {
@@ -40,6 +48,8 @@ struct TrackedHand {
     bool gripTracked{},aimTracked{};
     float trigger{},squeeze{};
     bool triggerTouched{},thumbTouched{};
+    Vec3 indexTip{};
+    bool indexTipTracked{};
 };
 struct ControllerFrame {
     std::array<TrackedHand,2> hands{};
@@ -72,6 +82,8 @@ struct ControllerFrame {
     // stretches when the user chooses a more comfortable panel size.
     float idroidScreenWidth{.45f};
     float idroidScreenDepth{.09f},playerHeightOffset{};
+    float physicalFloorY{}; // Runtime STAGE floor expressed in this sample's LOCAL space.
+    bool physicalFloorTracked{};
     // Display fit relative to the native hologram socket, not the hand rig.
     Vec3 idroidScreenOffset{};
     Quat idroidScreenRotation{};
@@ -114,6 +126,7 @@ struct ControllerFrame {
     uint64_t headLookLessonKey{}; // Positive, fresh native hospital lesson routed through HMD motion.
     bool authoredCamera{}; // Follow the current native shot, including its position, pitch and roll.
     bool openingSelector{}; // Physical title tape rack owns a native pulse.
+    bool openingNativeMenu{}; // Explicit native menu access keeps props optional.
     bool openingBackend{}; // Actual title only; never suppress loading/prologue UI.
     bool cabinPlay{}; // Post-loading helicopter cabin sandbox owns tracked interaction.
     bool cabinDeployHint{}; // Actual ACC, not field transit; render only on the source LEFT forearm.
@@ -226,6 +239,15 @@ struct HeadCameraSample {
     bool cinematicFollowValid{};
     Quat locomotionHeading{}; // Accepted native heading plus snap, before physical HMD neck look.
     bool locomotionHeadingTracked{};
+    // Untouched owned skin from this rig transaction. Keep these distinct
+    // from the retargeted body/eye fit: a fitted eye can match a misplaced
+    // viewer perfectly while its original native head was elsewhere.
+    bool nativeBodySourceTracked{};
+    Pose nativeBodySourceRoot{},nativeBodySourceChest{},nativeBodySourceHead{},nativeBodySourceEye{};
+    // Exact native projectile view paired with this player publication. The
+    // world view remains anchored to Snake; this is never a retained image.
+    Pose rocketArmCamera{};
+    bool rocketArmGuidance{};
 };
 // Native listener adapters consume the center-head pose from the camera's
 // existing publication, never a newer tracking sample or an individual eye.
@@ -249,7 +271,8 @@ public:
     void configure(bool enabled,float nativeUnitsPerMeter=1,bool requirePlayerHead=false);
     bool publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
                            const std::array<float,16>& worldFromPlayer,
-                           const std::array<float,16>& playerFromHead,uint64_t milliseconds);
+                           const std::array<float,16>& playerFromHead,uint64_t milliseconds,
+                           bool verifiedRocketArmGuidance=false);
     void track(Pose head,bool validTracking,uint64_t milliseconds);
     void trackStereo(Pose head,const std::array<EyeView,2>& views,bool validTracking,uint64_t milliseconds,
                      ControllerFrame controllers={});
@@ -291,12 +314,14 @@ private:
     Pose followCinematicLocked(Pose nativePose,uint64_t milliseconds,bool advance);
     void cancelLocked(HeadCameraStop reason);
     void suspendLocked(HeadCameraStop reason);
-    void awaitPlayerLocked();
+    void awaitPlayerLocked(uint8_t cause);
     mutable std::mutex mutex_;
     Pose head_{}, origin_{},frontEndOrigin_{},frontEndPanel_{};
     Pose lastTitleSource_{},avatarEditorBackdrop_{};
     uintptr_t camera_{},playerOwner_{};
     uint64_t time_{},sequence_{},activation_{};
+    uint8_t activationCause_{};
+    uint8_t awaitCause_{},awaitJoinFlags_{};uint64_t awaitTime_{},awaitOwnerAge_{};
     uint64_t sceneTransitionActivation_{},sceneTransitionAt_{}; // Intentional native shot/control handoffs only.
     uint64_t trackingEpoch_{};
     float units_{1};
@@ -353,6 +378,8 @@ private:
         Pose sourceCamera{};
         Vec3 position{};
         uint64_t time{},sequence{};
+        bool rocketArmGuidance{};
+        Quat rootHeading{};
     };
     std::array<PlayerHead,8> playerHeads_{};
     uint64_t playerSequence_{},ownerHeadTime_{};

@@ -58,7 +58,7 @@ bool contact(const CabinTape& a,const CabinTape& b,Vec3& normal,float& penetrati
     }
     return true;
 }
-bool dynamic(const CabinTape& tape){return tape.hand<0&&tape.state!=CabinTapeState::seated&&tape.state!=CabinTapeState::ejecting;}
+bool dynamic(const CabinTape& tape){return tape.hand<0&&tape.state!=CabinTapeState::seated&&tape.state!=CabinTapeState::ejecting&&tape.state!=CabinTapeState::presented;}
 void playerContact(CabinTape& tape,const CabinLayout& layout){
     CabinTape player;player.pose=layout.player;Vec3 normal{};float penetration{};
     if(contact(tape,player,normal,penetration,{.0555f,.047f,.0162f})){
@@ -83,8 +83,9 @@ CabinLayout nativeCabinLayout(Pose origin,uint64_t generation) noexcept{
     // uth0_intr0 cushion triangles span X +/- .259, Z [-1.257,-.878].
     layout.seat=local(cabinNativeSeat.position);
     // Existing mesh 10/11 player on the case: no second player is rendered.
-    layout.player=local({.5755f,-2.198f,-1.111f},flat);
-    layout.slot=local({.5755f,-2.1765f,-1.111f},flat);
+    const auto playerRotation=compose(Pose{{0,-.608761429f,0,.793353340f},{}},Pose{flat,{}}).orientation;
+    layout.player=local({.57275230f,-2.19787509f,-1.11045077f},playerRotation);
+    layout.slot=cabinCarrierPose(layout.player,1);
     layout.eject=local({.619f,-2.178f,-1.087f}).position;
     layout.board=local(cabinNativeBoard.position,cabinNativeBoard.orientation);
     layout.floor=1197.30f-origin.position.y;
@@ -97,6 +98,15 @@ CabinLayout cabinDefaultLayout() noexcept{
 CabinBox cabinBench() noexcept{const auto l=cabinDefaultLayout();return {l.seat.position,l.seatHalf};}
 Pose cabinPlayerPose() noexcept{return cabinDefaultLayout().player;}
 Pose cabinSlotPose() noexcept{return cabinDefaultLayout().slot;}
+Pose cabinCarrierPose(Pose player,float lidOpen) noexcept{
+    // Same measured hinge and angle as the existing native cover. The cassette
+    // rests against its inside face and follows it into the compartment.
+    const float angle=-1.308996939f*std::clamp(lidOpen,0.f,1.f);
+    const Pose hinge{{},{0,.040f,.0161394f}};
+    const Pose turn{{std::sin(angle*.5f),0,0,std::cos(angle*.5f)},{}};
+    return compose(player,compose(hinge,compose(turn,
+        compose(inverse(hinge),Pose{{},{0,0,.004f}}))));
+}
 Vec3 cabinEjectButton() noexcept{return cabinDefaultLayout().eject;}
 std::array<Pose,6> tapeHomes(const CabinLayout& layout) noexcept{
     std::array<Pose,6> result{};
@@ -183,11 +193,20 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
     const float dt=lastTime_&&now>=lastTime_?std::min(.05f,static_cast<float>(now-lastTime_)*.001f):0;
     lastTime_=now;frame_.hovered=frame_.activated=-1;frame_.ejectPressed=false;frame_.blocked=false;
     frame_.hapticMask=0;
+    frame_.layout.slot=cabinCarrierPose(frame_.player,frame_.lidOpen);
     const auto slot=frame_.layout.slot;
     for(size_t side=0;side<2;++side){
         const auto& hand=hands[side];const bool tracked=hand.tracked&&valid(hand.pose);
         const bool gripping=tracked&&(hand.grip>(grabbed_[side]?.25f:.55f));
         const bool trigger=tracked&&hand.trigger>.68f;
+        const bool fingerTracked=tracked&&hand.indexTipTracked;
+        const auto fingerDelta=rotate(inverse(frame_.layout.room).orientation,hand.indexTip-frame_.layout.eject);
+        const bool fingerContact=fingerTracked&&std::abs(fingerDelta.x)<.009f
+            &&std::abs(fingerDelta.z)<.009f&&fingerDelta.y>-.004f&&fingerDelta.y<.012f;
+        const bool fingerPress=fingerContact&&!buttonContact_[side];
+        if(fingerContact)buttonContact_[side]=true;
+        else if(fingerTracked&&(std::abs(fingerDelta.x)>.015f||std::abs(fingerDelta.z)>.015f
+            ||fingerDelta.y<-.010f||fingerDelta.y>.020f))buttonContact_[side]=false;
         int held=-1;for(size_t i=0;i<6;++i)if(frame_.tapes[i].hand==static_cast<int>(side))held=static_cast<int>(i);
         if(held>=0){
             auto& tape=frame_.tapes[static_cast<size_t>(held)];
@@ -195,7 +214,10 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
                 if(dt>0){tape.velocity=limit((next.position-tape.pose.position)*(1/dt),3.f);
                     tape.angularVelocity=limit(angularVelocity(tape.pose.orientation,next.orientation,dt),12.f);}
                 tape.pose=next;
-                if(frame_.inserted<0){
+                const bool carrierOccupied=std::any_of(frame_.tapes.begin(),frame_.tapes.end(),[](const auto& other){
+                    return other.state==CabinTapeState::presented||other.state==CabinTapeState::ejecting;
+                });
+                if(frame_.inserted<0&&!carrierOccupied&&frame_.lidOpen>.8f){
                     const auto relative=compose(inverse(slot),tape.pose);
                     const auto normal=rotate(relative.orientation,{0,0,1});
                     const bool aligned=std::abs(relative.position.x)<.026f&&std::abs(relative.position.y)<.035f
@@ -205,7 +227,7 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
                         // Gentle slot guidance retains the player's insertion axis.
                         tape.pose=compose(slot,Pose{{},{relative.position.x*.25f,relative.position.y*.25f,std::max(0.f,relative.position.z)}});
                     }else tape.state=CabinTapeState::held;
-                }
+                }else tape.state=CabinTapeState::held;
                 if(tape.state!=CabinTapeState::guiding){
                     const auto e=extent(tape.pose);const auto p=compose(inverse(frame_.layout.seat),tape.pose).position;
                     if(std::abs(p.x)<frame_.layout.seatHalf.x&&std::abs(p.z)<frame_.layout.seatHalf.z
@@ -224,9 +246,9 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
                     frame_.hapticMask|=uint8_t(1u<<side);
                 }else {tape.state=CabinTapeState::falling;if(!tracked){tape.velocity={};tape.angularVelocity={};}}
             }
-        }else if(gripping&&!grabbed_[side]){
+        }else if(gripping){
             int nearest=-1;float distance=.04f*.04f;
-            for(size_t i=0;i<6;++i){const auto& tape=frame_.tapes[i];if(tape.hand>=0||tape.state==CabinTapeState::seated)continue;
+            for(size_t i=0;i<6;++i){const auto& tape=frame_.tapes[i];if(tape.hand>=0||tape.state==CabinTapeState::seated||tape.state==CabinTapeState::ejecting)continue;
                 const float d=distanceBox(hand.pose.position,tape);if(d<distance){distance=d;nearest=static_cast<int>(i);}}
             if(nearest>=0){auto& tape=frame_.tapes[static_cast<size_t>(nearest)];tape.hand=static_cast<int>(side);
                 tape.state=CabinTapeState::held;attachment_[side]=compose(inverse(hand.pose),tape.pose);frame_.hovered=nearest;
@@ -235,9 +257,10 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
         if(tracked&&held<0&&!gripping){
             for(size_t i=0;i<6;++i)if(distanceBox(hand.pose.position,frame_.tapes[i])<.04f*.04f)frame_.hovered=static_cast<int>(i);
             const auto delta=hand.pose.position-frame_.layout.eject;
-            if(trigger&&!triggered_[side]&&dot(delta,delta)<.05f*.05f&&frame_.inserted>=0){
+            const bool controllerPress=!hand.indexTipTracked&&trigger&&!triggered_[side]&&dot(delta,delta)<.05f*.05f;
+            if((fingerPress||controllerPress)&&frame_.inserted>=0){
                 auto& tape=frame_.tapes[static_cast<size_t>(frame_.inserted)];tape.state=CabinTapeState::ejecting;
-                frame_.inserted=-1;ejectionTime_=0;frame_.ejectPressed=true;frame_.lidOpen=1;
+                frame_.inserted=-1;ejectionTime_=0;frame_.ejectPressed=true;
                 frame_.hapticMask|=uint8_t(1u<<side);
             }
         }
@@ -245,13 +268,17 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
     }
     if(frame_.inserted>=0){
         insertionTime_+=dt;frame_.lidOpen=std::max(0.f,1-insertionTime_/.25f);
+        frame_.tapes[static_cast<size_t>(frame_.inserted)].pose=cabinCarrierPose(frame_.player,frame_.lidOpen);
         if(insertionTime_>=.28f&&!activationSent_){frame_.activated=frame_.inserted;activationSent_=true;}
     }
     for(auto& tape:frame_.tapes)if(tape.state==CabinTapeState::ejecting){
         ejectionTime_+=dt;const float t=std::min(1.f,ejectionTime_/.25f);
-        tape.pose=compose(slot,Pose{{},{0,0,.065f*t}});
-        if(t>=1){tape.state=CabinTapeState::falling;tape.velocity={-.35f,.20f,.15f};}
+        frame_.lidOpen=t;tape.pose=cabinCarrierPose(frame_.player,t);
+        // Eject presents the cassette in the carrier until it is taken by hand.
+        // It is not a spring-launched loose prop.
+        if(t>=1){tape.state=CabinTapeState::presented;tape.velocity={};tape.angularVelocity={};}
     }
+    frame_.layout.slot=cabinCarrierPose(frame_.player,frame_.lidOpen);
     // Fixed small steps keep release throws from tunnelling through the support.
     for(float remaining=dt;remaining>0;){const float h=std::min(remaining,1.f/120.f);step(h);remaining-=h;}
     return frame_;

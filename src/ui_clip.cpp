@@ -1,4 +1,5 @@
 #include "mgs5vr/ui_clip.hpp"
+#include "mgs5vr/cabin_cover.hpp"
 #include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/log.hpp"
 #include <d3d11.h>
@@ -13,6 +14,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <filesystem>
+#include <fstream>
+#include <mutex>
 
 namespace mgs5vr {
 std::optional<UiClipPlanes> uiClipPlanes(const std::array<float,16>& canvas) noexcept {
@@ -44,6 +48,46 @@ constexpr GUID shaderKey{0x4391f5a2,0x8d14,0x427b,{0xb3,0xda,0x4c,0x58,0x85,0xba
 constexpr GUID rasterKey{0x4391f5a3,0x8d14,0x427b,{0xb3,0xda,0x4c,0x58,0x85,0xba,0x02,0x11}};
 using CreateVs=HRESULT(STDMETHODCALLTYPE*)(ID3D11Device*,const void*,SIZE_T,ID3D11ClassLinkage*,ID3D11VertexShader**);
 CreateVs originalVs{};
+using CreateBuffer=HRESULT(STDMETHODCALLTYPE*)(ID3D11Device*,const D3D11_BUFFER_DESC*,const D3D11_SUBRESOURCE_DATA*,ID3D11Buffer**);
+CreateBuffer originalBuffer{};
+HRESULT STDMETHODCALLTYPE observeCabinBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,
+    const D3D11_SUBRESOURCE_DATA* data,ID3D11Buffer** output){
+    const auto result=originalBuffer(device,desc,data,output);
+    if(SUCCEEDED(result)&&output&&*output)observeCabinCoverBuffer(device,desc,data,*output);
+    // Explicit local investigation only. Never alter the native resource.
+    static const auto folder=[](){std::array<wchar_t,32768> path{};
+        GetModuleFileNameW(nullptr,path.data(),static_cast<DWORD>(path.size()));
+        return std::filesystem::path(path.data()).parent_path()/L"mgs5vr-cabin-probe";}();
+    static const auto signature=[](){std::ifstream in(folder/L"signature.bin",std::ios::binary);
+        return std::vector<char>(std::istreambuf_iterator<char>(in),{});}();
+    static std::atomic_uint dumps{};
+    if(SUCCEEDED(result)&&output&&*output&&desc&&data&&data->pSysMem&&signature.size()==48&&dumps.load()<4
+        &&(desc->BindFlags&D3D11_BIND_VERTEX_BUFFER)&&desc->ByteWidth>=48&&desc->ByteWidth<=8*1024*1024){
+        const auto begin=static_cast<const char*>(data->pSysMem),end=begin+desc->ByteWidth;
+        const auto found=std::search(begin,end,signature.begin(),signature.end());
+        if(found!=end){const auto index=dumps.fetch_add(1);
+            if(index<4)try{
+                std::ofstream file(folder/(std::to_string(index)+".bin"),std::ios::binary);
+                file.write(begin,desc->ByteWidth);
+                log("Cabin vertex probe match buffer="+std::to_string(reinterpret_cast<uintptr_t>(*output))
+                    +" bytes="+std::to_string(desc->ByteWidth)+" offset="+std::to_string(found-begin)
+                    +" usage="+std::to_string(desc->Usage)+" sample="+std::to_string(index));
+            }catch(...){}
+        }
+    }
+    return result;
+}
+using SetVertexBuffers=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT,ID3D11Buffer* const*,const UINT*,const UINT*);
+SetVertexBuffers originalVertexBuffers{},originalImmediateVertexBuffers{};
+void bindCoverBuffers(SetVertexBuffers original,ID3D11DeviceContext* context,UINT slot,UINT count,
+    ID3D11Buffer* const* buffers,const UINT* strides,const UINT* offsets){
+    if(!buffers||count>32){original(context,slot,count,buffers,strides,offsets);return;}
+    std::array<ID3D11Buffer*,32> selected{};
+    for(UINT i=0;i<count;++i)selected[i]=cabinCoverBuffer(buffers[i]);
+    original(context,slot,count,selected.data(),strides,offsets);
+}
+void STDMETHODCALLTYPE vertexBuffers(ID3D11DeviceContext* c,UINT slot,UINT count,ID3D11Buffer* const* b,const UINT* s,const UINT* o){bindCoverBuffers(originalVertexBuffers,c,slot,count,b,s,o);}
+void STDMETHODCALLTYPE immediateVertexBuffers(ID3D11DeviceContext* c,UINT slot,UINT count,ID3D11Buffer* const* b,const UINT* s,const UINT* o){bindCoverBuffers(originalImmediateVertexBuffers,c,slot,count,b,s,o);}
 using Draw=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT);
 using DrawIndexed=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT,INT);
 using DrawInstanced=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT,UINT,UINT);
@@ -197,12 +241,15 @@ void installUiClip(ID3D11Device* device){
     const auto hook=[](void* address,void* replacement,void** original){
         if(MH_CreateHook(address,replacement,original)!=MH_OK||MH_EnableHook(address)!=MH_OK)throw std::runtime_error("UI clipping hook failed");};
     hook(d[12],reinterpret_cast<void*>(&createVs),reinterpret_cast<void**>(&originalVs));
+    hook(d[3],reinterpret_cast<void*>(&observeCabinBuffer),reinterpret_cast<void**>(&originalBuffer));
+    hook(c[18],reinterpret_cast<void*>(&vertexBuffers),reinterpret_cast<void**>(&originalVertexBuffers));
     hook(c[12],reinterpret_cast<void*>(&indexed),reinterpret_cast<void**>(&originalIndexed));
     hook(c[13],reinterpret_cast<void*>(&draw),reinterpret_cast<void**>(&originalDraw));
     hook(c[20],reinterpret_cast<void*>(&indexedInstanced),reinterpret_cast<void**>(&originalIndexedInstanced));
     hook(c[21],reinterpret_cast<void*>(&instanced),reinterpret_cast<void**>(&originalInstanced));
     ComPtr<ID3D11DeviceContext> immediate;device->GetImmediateContext(&immediate);
     auto** i=*reinterpret_cast<void***>(immediate.Get());
+    if(i[18]!=c[18])hook(i[18],reinterpret_cast<void*>(&immediateVertexBuffers),reinterpret_cast<void**>(&originalImmediateVertexBuffers));
     // FOX draws cabin geometry on the immediate context and composites on a
     // deferred context. Their entry points can differ on the active driver.
     if(i[12]!=c[12])hook(i[12],reinterpret_cast<void*>(&immediateIndexed),reinterpret_cast<void**>(&originalImmediateIndexed));

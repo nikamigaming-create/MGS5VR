@@ -170,8 +170,8 @@ HandheldPlayerPadPolicy IdroidPadRelease::update(HandheldPlayerPadPolicy request
     }
     return policy_;
 }
-GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept {
-    if(!spatialTitle)return sample;
+GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm,bool nativeMenu) noexcept {
+    if(!spatialTitle||nativeMenu)return sample;
     GamepadSample result{};
     if(confirm)result.buttons=0x1000;
     return result;

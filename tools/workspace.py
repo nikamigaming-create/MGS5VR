@@ -558,6 +558,10 @@ def bot(args):
             command += ["--camp", args.camp]
         if getattr(args, 'target', None):
             command += ['--target', args.target]
+        if getattr(args, 'enemy_helicopter', False):
+            command += ['--enemy-helicopter']
+        if getattr(args, 'one_handed', False):
+            command += ['--one-handed']
     elif args.operation == "autonomy":
         command = [sys.executable, ROOT / "tools/gameplay-autonomy.py", "--manifest", value["navigation"], "--camp", args.camp,
                    "--stealth-loadout", args.stealth_loadout.resolve()]
@@ -784,7 +788,7 @@ def main():
         clean(sys.modules[__name__], args)
     cleanup.set_defaults(handler=clean_builds)
     observe = commands.add_parser("bot")
-    observe.add_argument("--command", choices=("observe", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state", "mortar", "cqc"), default="observe")
+    observe.add_argument("--command", choices=("observe", "showcase", "showcase-setup", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state", "mortar", "cqc", "recon"), default="observe")
     observe.add_argument('--policy', type=Path, help='mortar: reviewed authored fixture and operator position')
     observe.add_argument("--suite", type=Path)
     observe.add_argument("--seconds", type=float, default=15)
@@ -806,6 +810,8 @@ def main():
     combat.add_argument("--seconds", type=float, default=30.)
     combat.add_argument("--camp")
     combat.add_argument('--target', help='Exact native soldier name for a mission objective; no visibility override')
+    combat.add_argument('--enemy-helicopter',action='store_true',help='Explicit bounded Mission18 helicopter test')
+    combat.add_argument('--one-handed',action='store_true',help='Explicit helicopter one-hand firing case')
     combat.add_argument("--max-rounds", type=int, default=24)
     combat.add_argument("--radius", type=float, default=80.)
     combat.set_defaults(handler=bot)

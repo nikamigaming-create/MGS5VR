@@ -1,15 +1,18 @@
 #include "mgs5vr/core.hpp"
+#include "mgs5vr/mounted_grip.hpp"
 #include "mgs5vr/cabin_walk.hpp"
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/rocket_arm.hpp"
 #include "mgs5vr/paused_rig.hpp"
 #include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/idroid_rig.hpp"
 #include "mgs5vr/idroid_native_hold.hpp"
 #include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/idroid_ui.hpp"
+#include "mgs5vr/menu_surface.hpp"
 #include "mgs5vr/idroid_effect_probe.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/render_layout.hpp"
@@ -35,6 +38,11 @@ static void expect(bool ok,const char* name){++checks;if(!ok){++failures;std::ce
 static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
+    expect(menuSurface(true,false,false)==MenuSurface::fallback,"open menu with absent device gets spatial fallback");
+    expect(menuSurface(true,false,true)==MenuSurface::device,"ready device keeps native menu on device");
+    expect(menuSurface(true,true,true)==MenuSurface::spatial,"explicit spatial menu keeps one spatial owner");
+    expect(menuSurface(false,false,false)==MenuSurface::none,"lost wrist cannot promote ordinary HUD to face panel");
+    expect(menuSurface(false,true,false)==MenuSurface::none,"closed menu cannot resurrect stale panel");
     {
         constexpr uint64_t ours=0xc1dbf5bd3008ull;
         NativeGameStatusRecord record{};
@@ -684,6 +692,18 @@ int main(){
             expect(optic&&moved&&same(moved->ocular.position,compose(motion,optic->ocular).position),"launcher scope remains attached under rigid motion");
         }
         WeaponScopeZoom zoom;
+        const Pose stockRear{{},{0,.158995f,-.0380396f}},stockFront{{},{0,.158995f,.136873f}};
+        const auto stockDot=nativeWeaponScopeGeometry(stockRear,stockFront,{1,0,0,2});
+        expect(stockDot&&stockDot->dotReticle&&!stockDot->opaqueAtOnePower&&near(stockDot->radius,.0154731f),"baked stock reflex uses measured octagonal glass and transparent 1x dot");
+        expect(stockDot&&near(stockDot->ocular.position.z,-.0291299f),"stock reflex overlay lies on the viewing side of native glass");
+        const Pose fixedRear{{},{0,.155f,.0846941f}},fixedFront{{},{0,.155f,.259607f}};
+        const auto fixedStack=nativeWeaponScopeGeometry(fixedRear,fixedFront,{1,2,0,1});
+        expect(fixedStack&&fixedStack->opaqueAtOnePower&&fixedStack->dotReticle&&fixedStack->powers==std::array<uint8_t,3>{1,2,0},"fixed stock magnifier retains actual powers and scene pixels at 1x");
+        expect(fixedStack&&near(fixedStack->ocular.position.z,-.087569f)&&near(fixedStack->objective.position.z,.069988f),"fixed magnifier aperture comes from its glass, not the forward dot CNP");
+        const Pose stockMotion{{0,.38268343f,0,.92387953f},{3,-2,4}};
+        const auto movedStack=nativeWeaponScopeGeometry(compose(stockMotion,fixedRear),compose(stockMotion,fixedFront),{1,2,0,1});
+        expect(fixedStack&&movedStack&&same(movedStack->ocular.position,compose(stockMotion,fixedStack->ocular).position),"baked optic follows the native weapon rigidly");
+        expect(!nativeWeaponScopeGeometry(fixedRear,fixedFront,{1,4,0,1})&&!nativeWeaponScopeGeometry(fixedFront,fixedRear,{1,2,0,1}),"unmeasured stock power or reversed sockets cannot borrow fixed optic geometry");
         expect(near(zoom.update(21,0,{2,4,6}),2)&&near(zoom.update(21,1,{2,4,6}),4)
             &&near(zoom.update(21,2,{2,4,6}),6)&&near(zoom.update(21,3,{2,4,6}),2),"launcher zoom cycles only its native 2x/4x/6x powers");
     }
@@ -1718,6 +1738,45 @@ int main(){
     }
     const std::array<float,16> playerRoot{0,0,-1,0,0,1,0,0,1,0,0,0,500,300,1300,1};
     {
+        RocketArmCameraOwner owner{0x100,7,7,0x200,0x200,0x120,2,11,-1,true,true};
+        expect(rocketArmCameraOwned(owner),"typed native guided-flight producer is eligible");
+        const Pose distantFlight{{.616072953f,-.35409385f,.361318499f,.60375458f},{757.784241f,333.007141f,1663.47791f}};
+        const auto rigidFlight=rocketArmRenderPose(distantFlight);
+        expect(rigidFlight.has_value(),"observed native flight rotation is valid for rigid replay");
+        const auto roundTrip=compose(*rigidFlight,inverse(*rigidFlight)).position;
+        expect(dot(roundTrip,roundTrip)<.001f*.001f,"native flight replay remains rigid at kilometre-scale coordinates");
+        expect(!rocketArmRenderPose(Pose{{0,0,0,0},{}}),"invalid flight rotation is never repaired into an accepted camera");
+        auto other=owner;other.mode=10;
+        expect(!rocketArmCameraOwned(other),"Rocket Arm preparation is not a projectile feed");
+        other=owner;other.producerOwner++;
+        expect(!rocketArmCameraOwned(other),"another player's projectile producer cannot own this feed");
+        other=owner;other.selectedProducer++;
+        expect(!rocketArmCameraOwned(other),"retired camera producer cannot own this feed");
+        other=owner;other.overrideMode=11;
+        expect(!rocketArmCameraOwned(other),"forced camera modes do not certify native flight");
+        other=owner;other.readerVerified=false;
+        expect(!rocketArmCameraOwned(other),"unknown native reader cannot enable remote camera acceptance");
+        HeadCamera flight;flight.configure(true,1,true);flight.track({},true,100);flight.toggle();
+        auto head=identityMatrix;head[13]=1.6f;
+        expect(flight.publishPlayerHead(7,8,{},identityMatrix,head,100),"ordinary head publication admitted");
+        flight.resolve(7,{},100);
+        const Pose projectile{{0,std::sin(.5f),0,std::cos(.5f)},{40,3,20}};
+        expect(!flight.publishPlayerHead(7,8,projectile,identityMatrix,head,110),
+            "ordinary distant cameras retain the 12 metre rejection");
+        flight.track({},true,110);
+        expect(flight.publishPlayerHead(7,8,projectile,identityMatrix,head,110,true),
+            "verified native flight admits a fresh distant source camera");
+        const auto guided=flight.resolve(7,projectile,110);
+        expect(guided.applied&&guided.rocketArmGuidance&&guided.rocketArmCamera.position.x==40
+            &&std::abs(guided.nativePose.position.x)<1&&std::abs(guided.nativePose.orientation.y)<.001f,
+            "projectile view stays separate from the live Snake camera and heading");
+        flight.track({},true,300);
+        expect(!flight.resolve(7,projectile,300).applied,"remote flight never permits stale player publication");
+        flight.publishPlayerHead(7,8,{},identityMatrix,head,310);flight.track({},true,310);
+        const auto returned=flight.resolve(7,{},310);
+        expect(returned.applied&&!returned.rocketArmGuidance,"native return retires the projectile feed");
+    }
+    {
         HeadCamera loading;loading.configure(true,1,true);
         const std::array<EyeView,2> eyes{EyeView{Pose{{},{-.032f,0,0}},squareEye},EyeView{Pose{{},{.032f,0,0}},squareEye}};
         ControllerFrame input;input.frontEnd=true;
@@ -1867,13 +1926,28 @@ int main(){
         original.worldFromChest.orientation={0,.70710678f,0,.70710678f};
         nativeEyes.trackStereo({},eyes,true,2000,input);nativeEyes.publishPlayerHead(7,8,{},identityMatrix,cached,2000);
         const auto bodyAnchor=nativeEyes.resolve(7,{},2000,original);
-        const auto expectedAnchor=original.worldFromRoot.position+rotate(inverse(original.worldFromChest).orientation,
-            compose(original.worldFromHead,Pose{{},nativeEyeFromHead}).position-original.worldFromRoot.position);
+        const auto expectedAnchor=compose(original.worldFromHead,Pose{{},nativeEyeFromHead}).position;
         original.worldFromRoot.position.x=std::numeric_limits<float>::quiet_NaN();
         const auto invalidBody=nativeEyes.resolve(7,{},2000,original);
         expect(bodyAnchor.anatomicalEyeModel==12&&same(bodyAnchor.nativePose.position,expectedAnchor)
             &&!invalidBody.anatomicalEyeModel&&same(invalidBody.nativePose.position,bodyAnchor.nativePose.position),
-            "the original prone root and chest own placement together; an invalid body join cannot partly change the anchor");
+            "a prone camera/chest yaw disagreement cannot orbit the owned eyes; an invalid body join cannot partly change the anchor");
+        // Retained M1 native skin: the independent camera yaw previously put
+        // the prone viewer 77 cm from these original eyes, through the slope.
+        original.model=13;original.worldFromRoot.position={384.37f,321.062f,185.68f};
+        original.worldFromChest={{.031363f,.624354f,-.767401f,-.142456f},{384.359f,321.259f,185.532f}};
+        original.worldFromHead={{.0648627f,.884946f,-.456135f,-.0678508f},{384.292f,321.22f,185.163f}};
+        const Pose independentCamera{{0,-.766082f,0,.642742f},{384,323,186}};
+        auto capturedRoot=identityMatrix;
+        capturedRoot[12]=original.worldFromRoot.position.x;
+        capturedRoot[13]=original.worldFromRoot.position.y;
+        capturedRoot[14]=original.worldFromRoot.position.z;
+        nativeEyes.trackStereo({},eyes,true,2020,input);
+        nativeEyes.publishPlayerHead(7,8,independentCamera,capturedRoot,cached,2020);
+        const auto capturedProne=nativeEyes.resolve(7,independentCamera,2020,original);
+        expect(capturedProne.applied&&capturedProne.anatomicalEyeModel==13
+            &&same(capturedProne.nativePose.position,compose(original.worldFromHead,Pose{{},nativeEyeFromHead}).position),
+            "captured prone eyes stay at the untouched native skin when its camera looks across the body heading");
     }
     const auto headPoint=playerHeadPosition(playerRoot,headBone);
     expect(headPoint&&same(*headPoint,{500.1f,301.6f,1300}),"animated head position uses local-then-world transform order");
@@ -1900,9 +1974,15 @@ int main(){
     auto mismatchedCamera=lowered;mismatchedCamera.position.z+=1;
     expect(!firstPerson.resolve(11,mismatchedCamera,110).applied&&firstPerson.status().reason==HeadCameraStop::playerHeadUnavailable,
            "unmatched camera generation stops instead of attaching an unrelated player pose");
+    expect(firstPerson.status().suspended&&!firstPerson.status().awaitingPlayer,
+           "fresh mismatched player publication alone is not evidence of a native menu");
+    // Exercise a real native menu boundary separately from the brief skin gap.
+    firstPerson.setNativeMenuOpen(true);
+    firstPerson.resolve(11,mismatchedCamera,110);
+    firstPerson.setNativeMenuOpen(false);
     const auto menuActivation=firstPerson.status().activation;
     expect(!firstPerson.active()&&!firstPerson.status().pending&&firstPerson.status().awaitingPlayer,
-           "missing player publication exposes native menu pixels and controls while retaining VR intent");
+           "native menu without an accepted anchor exposes native pixels and controls while retaining VR intent");
     firstPerson.track(Pose{{},{0.3f,0.1f,-0.1f}},true,120);
     firstPerson.publishPlayerHead(12,23,lowered,playerRoot,headBone,120);
     expect(!firstPerson.resolve(12,lowered,120).applied&&firstPerson.status().awaitingPlayer,
@@ -1963,6 +2043,18 @@ int main(){
         const auto after=interrupted.resolve(11,thirdPerson,701);
         expect(after.applied&&!interrupted.status().suspended&&after.activation==before.activation,
             "fresh player skin resumes the existing stereo generation after a publication gap");
+        interrupted.track({},true,702);
+        expect(!interrupted.resolve(11,lowered,702).applied&&interrupted.active()
+            &&interrupted.status().suspended&&!interrupted.status().awaitingPlayer
+            &&interrupted.status().activation==before.activation
+            &&!mayAcceptNewStereoPair(interrupted.status())
+            &&mayReprojectAcceptedStereo(interrupted.status()),
+            "fresh same-owner skin with a different source pose rejects new pixels without retiring gameplay");
+        interrupted.publishPlayerHead(11,22,lowered,playerRoot,headBone,703);
+        interrupted.track({},true,703);
+        const auto moved=interrupted.resolve(11,lowered,703);
+        expect(moved.applied&&!interrupted.status().suspended&&moved.activation==before.activation,
+            "exact fresh source join after native camera motion resumes the same activation");
         interrupted.track({},true,1802);
         expect(!interrupted.resolve(11,thirdPerson,1802).applied&&interrupted.status().awaitingPlayer,
             "a retired primary still yields native scene control after the bounded recovery window");
@@ -2290,10 +2382,21 @@ int main(){
         for(uint64_t time=400;time<=950;time+=50){frame=tick(time);confirmed=confirmed||frame.pulse==OpeningPulse::confirm;}
         expect(confirmed&&frame.pulse==OpeningPulse::none,"Seated Continue generates one bounded native confirmation");
         hands[1].grip.position=cabinEjectButton();hands[1].trigger=0;tick(1000);
-        hands[1].trigger=1;frame=tick(1050);
-        expect(frame.bench.inserted==-1&&frame.bench.ejectPressed,"Physical eject releases the seated cassette");
+        hands[1].grip.position.x+=.10f;
+        hands[1].indexTip=cabinEjectButton();hands[1].indexTipTracked=true;
+        frame=tick(1050);
+        expect(frame.bench.inserted==-1&&frame.bench.ejectPressed,
+            "Rendered fingertip contact ejects without trigger or controller-grip proximity");
+        frame=tick(1070);
+        expect(!frame.bench.ejectPressed,"Resting a fingertip on eject cannot repeatedly press the button");
         for(uint64_t time=1100;time<=1450;time+=50)frame=tick(time);
-        hands[1].grip=frame.bench.tapes[0].pose;hands[1].squeeze=1;frame=tick(1500);
+        expect(frame.bench.tapes[0].state==CabinTapeState::presented,
+            "Eject retains the cassette in its carrier rather than throwing it onto the floor");
+        const auto presented=frame.bench.tapes[0].pose;
+        hands[1].grip.position={4,4,4};hands[1].squeeze=1;frame=tick(1470);
+        expect(same(frame.bench.tapes[0].pose.position,presented.position),
+            "An ejected cassette remains supported while the player reaches for it");
+        hands[1].grip=frame.bench.tapes[0].pose;frame=tick(1500);
         expect(frame.bench.tapes[0].hand==1,"An ejected cassette remains recoverable by hand");
         hands[1].grip.position={-.12f,-.35f,-.59f};frame=tick(1550);
         hands[1].squeeze=0;frame=tick(1600);
@@ -2335,6 +2438,28 @@ int main(){
             "The field camera stays on the native right hip through independent HMD motion and picks up at that same authored handle");
     }
     {
+        for(size_t side=0;side<2;++side){
+            CabinStudio bilateral;std::array<StudioHand,2> contact{};
+            contact[side].tracked=true;contact[side].squeeze=1;
+            contact[side].grip.position={0,2,0};
+            bilateral.update(true,true,Pose{},Pose{},contact,100);
+            contact[side].grip.position=studioCameraHome;
+            auto picked=bilateral.update(true,true,Pose{},Pose{},contact,150);
+            expect(picked->cameraHand==static_cast<int>(side),"Either hand acquires the cabin camera with grip held before contact");
+            contact[side].trigger=1;picked=bilateral.update(true,true,Pose{},Pose{},contact,1200);
+            expect(picked->shutter==1200,"Either camera hand operates its own shutter");
+            contact[side].squeeze=contact[side].trigger=0;
+            picked=bilateral.update(true,true,Pose{},Pose{},contact,1250);
+            expect(picked->cameraHand<0,"Either hand releases the camera");
+            contact[side].grip.position={0,2,0};contact[side].squeeze=1;
+            bilateral.update(true,true,Pose{},Pose{},contact,1300);
+            contact[side].grip.position=studioNotesHome;
+            picked=bilateral.update(true,true,Pose{},Pose{},contact,1350);
+            expect(picked->papers.size()==1&&picked->papers[0].hand==static_cast<int>(side),
+                "Either hand peels a note with grip held before contact");
+            contact[side].squeeze=0;picked=bilateral.update(true,true,Pose{},Pose{},contact,1400);
+            expect(picked->papers[0].hand<0,"Either hand releases its note");
+        }
         CabinStudio studio;std::array<StudioHand,2> hands{};
         for(auto& hand:hands)hand.tracked=true;
         hands[1].grip.position=studioCameraHome;
@@ -2356,6 +2481,7 @@ int main(){
         expect(frame->papers.back().pinned&&frame->papers.back().hand<0,"Releasing an aligned note on the native board attaches it");
         hands[0].squeeze=1;frame=studio.update(true,true,Pose{},Pose{},hands,1550);
         expect(!frame->papers.back().pinned&&frame->papers.back().hand==0,"A placed note can be pulled back off the board");
+        hands[0].squeeze=0;
         CabinStudio restored;restored.restore(frame->papers);frame=restored.update(true,true,Pose{},Pose{},hands,1600);
         expect(frame->papers.size()==2&&frame->papers.front().photo==1234&&frame->papers.back().hand<0,
             "Restored papers retain their photo identity without retaining a stale grip owner");
@@ -3231,6 +3357,73 @@ int main(){
             "a 60 degree neck look turns an upright torso only 10 degrees and retains the prone foot footprint");
         expect(!anatomicalTorsoHeading(Quat{0,0,0,0},{},false),
             "untracked locomotion heading cannot authorize a body turn");
+        {
+            BodyHeadingState follow;
+            const RigContinuityKey key{1,2,3,4,5};
+            const auto turn=[](float degrees){const float half=degrees*.00872664626f;
+                return Quat{0,std::sin(half),0,std::cos(half)};};
+            Vec3 previous{0,0,1};uint64_t tick=1;
+            for(int direction:{1,-1})for(int step=0;step<=360;++step){
+                const auto heading=follow.update({},turn(static_cast<float>(step*direction)),false,++tick,key);
+                expect(heading.has_value(),"room-scale body heading remains valid through a full physical turn");
+                const auto forward=rotate(*heading,{0,0,1});
+                if(step)expect(dot(previous,forward)>.999f,"body follow cannot jump at physical +/-180 degrees");
+                previous=forward;
+            }
+            const auto before=follow.update({},turn(20),false,++tick,key);
+            const auto after=follow.update(turn(45),turn(65),false,++tick,key);
+            expect(before&&after&&same(rotate(*after,{0,0,1}),rotate(turn(45),rotate(*before,{0,0,1}))),
+                "snap turn transports body and head together without spending neck yaw twice");
+            expect(!follow.update(Quat{0,0,0,0},{},false,++tick,key),"invalid tracking resets body heading history");
+            BodyHeadingState handsFollow;
+            BodyHeadingState proneFollow;
+            for(int degrees=-360;degrees<=360;degrees+=15){
+                const Pose proneChest{compose(Pose{turn(37),{}},Pose{{.70710678f,0,0,.70710678f},{}}).orientation,{}};
+                const auto turned=proneFollow.update(turn(static_cast<float>(degrees)),turn(static_cast<float>(degrees+70)),true,++tick,key,turn(-45));
+                expect(turned&&same(rotate(*turned,{0,0,1}),rotate(turn(static_cast<float>(degrees)),{0,0,1})),
+                    "prone native smooth or snap turning follows locomotion heading, independently of head and hand look");
+                if(turned){
+                    const auto placement=fullBodyPlacement(proneChest,proneHead,Pose{*turned,viewer.position});
+                    expect(placement&&same(compose(*placement,compose(proneHead,Pose{{},nativeEyeFromHead})).position,viewer.position),
+                        "prone stick turn pivots at the viewer without moving the anatomical eye");
+                }
+            }
+            for(int step=0;step<=360;++step){
+                const auto heading=handsFollow.update({},turn(static_cast<float>(step)),false,++tick,key,
+                    turn(static_cast<float>(step)));
+                expect(heading&&dot(rotate(*heading,{0,0,1}),rotate(turn(static_cast<float>(step)),{0,0,1}))>.99999f,
+                    "whole-body turn keeps shoulders aligned with tracked hands without directional hysteresis");
+            }
+            handsFollow.reset();
+            const auto independentLook=handsFollow.update({},turn(40),false,++tick,key,Quat{});
+            expect(independentLook&&same(rotate(*independentLook,{0,0,1}),{0,0,1}),
+                "head look does not drag shoulders away from stationary hands");
+            const auto freeHand=trackedTorsoHeading(Pose{},{0,-.25f,.45f},turn(180));
+            const auto supportHand=trackedTorsoHeading(Pose{},{.2f,-.25f,.45f},turn(180));
+            expect(freeHand&&supportHand&&same(rotate(*freeHand,{0,0,1}),{0,0,1})
+                &&same(rotate(*freeHand,{0,0,1}),rotate(*supportHand,{0,0,1})),
+                "reaching onto the support socket cannot steer the torso or move the primary gun away");
+            expect(!trackedTorsoHeading(Pose{},{0,-.25f,-.45f},turn(180))
+                &&!trackedTorsoHeading(Pose{},{0,-.25f,.45f},turn(90)),
+                "behind-back hands and sideways aim do not claim forward body facing");
+            const auto seated=physicalFloorHeightOffset(0,-1.1f,1,1.6f);
+            const auto standing=physicalFloorHeightOffset(.5f,-1.1f,1,1.6f);
+            const auto rebased=physicalFloorHeightOffset(0,-1.6f,1,1.6f);
+            expect(seated&&near(*seated,-.5f)&&standing&&near(*standing,0)&&rebased&&near(*rebased,0),
+                "runtime floor keeps seated-to-standing height independent of initial/recentered LOCAL origin");
+            expect(!physicalFloorHeightOffset(0,0,1,1.6f)&&!physicalFloorHeightOffset(1.6f,0,0,1.6f),
+                "unknown floor height or invalid scale cannot authorize height correction");
+            const ArmPose shortLeg{Pose{{},{0,1,0}},Pose{{},{0,.6f,.1f}},Pose{{},{0,.2f,0}}};
+            const auto fittedLeg=scaledLegPose(shortLeg,1.25f);
+            const auto magnitude=[](Vec3 v){return std::sqrt(dot(v,v));};
+            expect(fittedLeg&&same(fittedLeg->shoulder.position,shortLeg.shoulder.position)
+                &&same(fittedLeg->wrist.position,{0,0,0})
+                &&near(magnitude(fittedLeg->elbow.position-fittedLeg->shoulder.position),
+                    1.25f*magnitude(shortLeg.elbow.position-shortLeg.shoulder.position)),
+                "floor leg fit preserves hip and proportions while reaching the floor");
+            expect(!scaledLegPose(shortLeg,.9f)&&!scaledLegPose(shortLeg,1.6f),
+                "floor leg fit rejects shrinking and excessive extension");
+        }
         const auto chestBefore=nativeTorsoHeading(Pose{{.70090926f,0,0,.71325045f},{}});
         const auto chestAfter=nativeTorsoHeading(Pose{{.71325045f,0,0,.70090926f},{}});
         expect(chestBefore&&chestAfter&&same(rotate(*chestBefore,{0,0,1}),rotate(*chestAfter,{0,0,1})),
@@ -4424,6 +4617,32 @@ int main(){
     }
     expect(!solveWeapon({},sockets,false),"tracking loss prevents a fabricated weapon pose");
     sockets.calibrated=false;expect(!solveWeapon({},sockets,true),"uncalibrated weapon cannot silently use guessed sockets");
+    {
+        MountedGrip grip;
+        MountedGripOwner owner{1,2,3,4};
+        Pose hand{},contact{},aim{{0,.5f,0,.8660254f},{1,2,3}};
+        auto step=[&](bool squeeze,uint64_t time,bool available=true){
+            return grip.update(owner,hand,contact,aim,available,squeeze,time,.1f,.5f);
+        };
+        expect(!step(true,1).held,"entering a mount with held grip cannot acquire it");
+        step(false,2);
+        const auto acquired=step(true,3);
+        expect(acquired.held&&acquired.acquired&&same(acquired.requestedAim.position,aim.position)
+            &&near(acquired.requestedAim.orientation.y,aim.orientation.y),"fresh grip acquires without turning or moving the native pivot");
+        contact.position={.02f,0,0};
+        const auto moved=step(true,4);
+        expect(moved.held&&!moved.acquired&&same(moved.snappedHand.position,contact.position),"held hand follows the live authored handle");
+        hand.orientation={0,std::sin(.1f),0,std::cos(.1f)};
+        const auto turned=step(true,5);
+        expect(turned.held&&turned.requestedAim.orientation.y>acquired.requestedAim.orientation.y,"controller rotation requests native aim change");
+        expect(!step(true,6,false).held&&!step(true,7).held,"tracking loss drops grip and held recovery cannot reacquire");
+        step(false,8);expect(step(true,9).held,"fresh squeeze after recovery can acquire");
+        owner.mount=7;expect(!step(true,10).held&&!step(true,11).held,"changed native mount rejects old grip ownership");
+        step(false,12);expect(step(true,13).held,"new mount requires a released grip");
+        hand.position={.7f,0,0};expect(!step(true,14).held,"excess reach releases snapped hand");
+        hand.position={};expect(!step(true,15).held,"returning in reach while squeezed cannot regrab");
+        step(false,16);step(true,17);expect(!step(true,300).held,"stale publication releases mounted grip");
+    }
     std::cout<<checks<<" contract checks, "<<failures<<" failures. These tests do not prove in-game or headset behavior.\n";
     return failures?1:0;
 }

@@ -35,6 +35,7 @@ private:
 struct StationaryBodyPose {Vec3 pelvis,leftHip,rightHip,leftShoulder,rightShoulder;Pose chest;};
 std::optional<Pose> stationaryLowerBodyDelta(const StationaryBodyPose& body,Pose torsoDelta);
 struct ArmPose { Pose shoulder,elbow,wrist; };
+std::optional<ArmPose> scaledLegPose(const ArmPose& native,float scale);
 struct ArmSolution { ArmPose pose; bool reachClamped{}; };
 // A contact returned by native world collision, in the arm solve's space.
 struct ArmSurface { Vec3 point,normal; float clearance{}; };
@@ -51,6 +52,22 @@ std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprig
 // standing torso follows only beyond the neck's comfortable yaw; a prone
 // torso retains the native crawl heading and its floor footprint.
 std::optional<Quat> anatomicalTorsoHeading(Quat locomotionHeading,Quat view,bool prone);
+// World-space viewer uses +Z forward; the tracked OpenXR aim uses -Z.
+// Hand placement admits a body-turn gesture without steering its heading.
+std::optional<Quat> trackedTorsoHeading(Pose viewer,Vec3 handsMidpoint,Quat primaryAim);
+// Retain the body's turn across the +/-pi boundary. Native/snap yaw changes
+// transport that body heading; physical neck look only consumes its yaw slack.
+class BodyHeadingState {
+public:
+    std::optional<Quat> update(Quat locomotion,Quat view,bool prone,uint64_t time,RigContinuityKey key,
+                               std::optional<Quat> handHeading=std::nullopt);
+    void reset(){*this={};}
+private:
+    RigContinuityKey key_{};
+    float heading_{},locomotion_{};
+    uint64_t time_{};
+    bool valid_{};
+};
 // A chest can pitch through vertical while prone. Its lateral axis supplies
 // the same heading to camera placement and complete-body retargeting.
 std::optional<Quat> nativeTorsoHeading(Pose chest);

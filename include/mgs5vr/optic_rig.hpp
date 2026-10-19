@@ -17,6 +17,7 @@ struct WeaponScopeSample {
     uint64_t weaponIdentity{};
     bool tracked{};
     bool dotReticle{};
+    bool opaqueAtOnePower{}; // Fixed native magnifiers need scene pixels even at 1x.
 };
 std::optional<EyeView> weaponScopeSceneView(const WeaponScopeSample& scope);
 bool weaponScopeEyeVisible(const WeaponScopeSample& scope,Pose eye);
@@ -41,6 +42,7 @@ struct WeaponScopeGeometry {
     uint32_t sight{};
     std::array<uint8_t,3> powers{};
     bool dotReticle{};
+    bool opaqueAtOnePower{};
 };
 // Match the equipped CNP_REAR_SIGHT / CNP_FRONT_SIGHT pair and native optical
 // parameters to a measured round sight. Unknown/iron/holographic sights close.

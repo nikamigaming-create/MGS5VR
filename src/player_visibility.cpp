@@ -501,6 +501,39 @@ MenuCapturePlayerExclusion::~MenuCapturePlayerExclusion(){
            &&groupFlags(candidate,groups_[i])==static_cast<uint8_t>(flags_[i]&~4u))
             showVisibleGroup(reinterpret_cast<void*>(model_),groups_[i]);
 }
+RocketHandPresentation::RocketHandPresentation(const HeadCameraSample& frame,bool headPass) noexcept {
+    if(!headPass||!frame.rocketArmGuidance||!frame.body.valid||!frame.idroidDeviceTracked
+       ||!frame.applied||!frame.rigSequence||!showVisibleGroup||!hideVisibleGroup)return;
+    constexpr uint64_t blastHandModel=0x84a2a348c3d25162ull;
+    constexpr uint32_t handGroup=0xf948d635u;
+    const auto owner=frame.playerOwner,character=get<uintptr_t>(owner+0x370);
+    if(get<uintptr_t>(owner)!=base+0x23b8218||get<uintptr_t>(character)!=base+0x2295210)return;
+    const auto parts=get<uintptr_t>(character+0x610);
+    if(get<uintptr_t>(parts)!=base+0x22e56c0||get<uintptr_t>(parts+0x38)!=character)return;
+    const auto list=get<uintptr_t>(parts+0x48);
+    if(get<uintptr_t>(list)!=base+0x2215c78)return;
+    const auto count=get<uint32_t>(list+0x10);const auto records=get<uintptr_t>(list+8);
+    if(!records||!count||count>32)return;
+    Binding selected{};
+    for(uint32_t i=0;i<count;++i){
+        const auto record=get<uintptr_t>(records+i*8),renderer=get<uintptr_t>(record);
+        const auto model=get<uintptr_t>(renderer+0x40);
+        Binding candidate{owner,character,parts,record,renderer,model};
+        if(!owned(candidate)||get<uintptr_t>(model)!=base+0x20f4d90
+           ||get<uint64_t>(model+0x120)!=blastHandModel||groupIndex(candidate,handGroup)<0)continue;
+        if(selected.model)return; // Never choose between ambiguous parts.
+        selected=candidate;
+    }
+    if(!selected.model||(groupFlags(selected,handGroup)&4u))return;
+    showVisibleGroup(reinterpret_cast<void*>(selected.model),handGroup);
+    owner_=owner;character_=character;parts_=parts;record_=selected.record;
+    renderer_=selected.renderer;model_=selected.model;
+}
+RocketHandPresentation::~RocketHandPresentation(){
+    const Binding binding{owner_,character_,parts_,record_,renderer_,model_};
+    if(model_&&hideVisibleGroup&&owned(binding)&&get<uint64_t>(model_+0x120)==0x84a2a348c3d25162ull)
+        hideVisibleGroup(reinterpret_cast<void*>(model_),0xf948d635u);
+}
 void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
     base=moduleBase;hideVisibleGroup=showVisibleGroup=nullptr;
     wchar_t trace[2]{};

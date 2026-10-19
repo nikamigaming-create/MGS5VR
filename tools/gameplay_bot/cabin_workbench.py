@@ -1,7 +1,7 @@
 """One bounded actual-game cassette, camera, note and board interaction loop."""
 import math
 import time
-from .core import BotFault
+from .core import BotFault, atomic_json
 from .live import rotate
 from .combat import inverse, mul, pointing
 from .motion import _blend
@@ -28,11 +28,16 @@ def workbench(live, timeout=90., film=False):
     state=wait_for_continue_rack(live,advance_startup(live,timeout=timeout))
     ready_until=time.monotonic()+30.
     while not (state.get('opening_focus',{}).get('ready')
-            and state.get('opening_bench',{}).get('layout',{}).get('verified')
-            and state.get('rendered',{}).get('studio',{}).get('available')):
+            and state.get('opening_bench',{}).get('layout',{}).get('verified')):
         if time.monotonic()>ready_until or state.get('scene')!='title':
             raise BotFault('The physical native cabin did not finish becoming ready')
         time.sleep(.1);state=live.observe()
+    if state.get('opening_native_menu'):
+        live.execute({'op':'action','name':'system.idroid'})
+    until=time.monotonic()+5.
+    while state.get('opening_native_menu') or not state.get('rendered',{}).get('studio',{}).get('available'):
+        if time.monotonic()>until:raise BotFault('Optional prop mode did not open')
+        time.sleep(.05);state=live.observe()
     if state.get('scene')!='title' or 3 in state.get('opening_focus',{}).get('actions',[]):
         raise BotFault('Workbench uses an unavailable GZ import tape; this title does not admit that safe case')
     captures=[];outcomes=[];started=time.monotonic()
@@ -66,7 +71,10 @@ def workbench(live, timeout=90., film=False):
         end=time.monotonic()+seconds
         while time.monotonic()<end:
             s=observe()
-            if predicate(s):outcomes.append({'phase':label,'state':s});return s
+            if predicate(s):
+                outcomes.append({'phase':label,'state':s})
+                atomic_json(live.events.output/'workbench-progress.json',{'outcomes':outcomes,'captures':captures})
+                return s
             time.sleep(.04)
         raise BotFault('Workbench did not observe '+label)
     def move(hand, target, seconds=.40):
@@ -166,13 +174,37 @@ def workbench(live, timeout=90., film=False):
             for height in (.12,.05,0.):move('right',shifted(slot,[0.,0.,height]));hold(('right','Grip'))
             live.release();time.sleep(.45)
             wait(lambda s:s['opening_bench']['inserted']==1,'tape-seated-without-native-import')
+            rest('right')
             checkpoint('player-tape-seated')
             if movie:movie.mark('touch-eject')
-            move('right',compose(anchor,layout['eject']));hold(('right','Trigger'));live.release();time.sleep(.50)
+            live.release()
+            target=compose(anchor,layout['eject'])
+            move('right',shifted(target,[0.,.08,0.]))
+            for _ in range(8):
+                sample=observe().get('rendered') or {}
+                if not sample.get('right_index_tip_tracked'):
+                    raise BotFault('Rendered index fingertip is unavailable for physical eject')
+                tip=sample['right_index_tip_local']['position']
+                delta=[a-b for a,b in zip(target['position'],tip)]
+                if math.dist(tip,target['position'])<.006:break
+                grip=_controller_pose(live,'right','grip','local')
+                move('right',{**grip,'position':[a+b for a,b in zip(grip['position'],delta)]},seconds=.2)
+            else:raise BotFault('Index fingertip could not reach the physical eject button')
+            time.sleep(.50)
             ejected=wait(lambda s:s['opening_bench']['inserted']==-1,'tape-ejected')
+            presented=wait(lambda s:s['opening_bench']['tapes'][1]['state']==6,'ejected-tape-supported-in-carrier')
+            position=presented['opening_bench']['tapes'][1]['position']
+            time.sleep(.75)
+            retained=observe()['opening_bench']['tapes'][1]
+            if retained['state']!=6 or math.dist(position,retained['position'])>.002:
+                raise BotFault('Ejected cassette fell or drifted out of its carrier')
+            rest('right');checkpoint('player-lid-open-cassette-presented')
             if movie:movie.mark('tape-ejected');time.sleep(1.)
-            t=ejected['opening_bench']['tapes'][1]
-            move('right',compose(anchor,{'position':t['position'],'orientation':t['orientation']}));hold(('right','Grip'))
+            t=retained
+            pickup=compose(anchor,{'position':t['position'],'orientation':t['orientation']})
+            move('right',{**pickup,'position':[pickup['position'][0],pickup['position'][1]+.15,pickup['position'][2]]})
+            hold(('right','Grip'))
+            move('right',pickup)
             wait(lambda s:s['opening_bench']['tapes'][1]['hand']==1,'ejected-tape-recovered')
             move('right',{'position':[home['position'][0],home['position'][1]+.06,home['position'][2]],'orientation':home['orientation']})
             live.release();time.sleep(.40)
@@ -195,6 +227,31 @@ def workbench(live, timeout=90., film=False):
             move('right',grip);hold(('right','Grip'))
             room=studio()['room'];move('right',compose(room,studio()['camera_home']))
             live.release();time.sleep(.30)
+            rest('right')
+            camera=studio()['camera'];head=approach(camera)
+            hold(('left','Grip'))
+            move('left',studio()['camera'])
+            wait(lambda s:s['rendered']['studio']['camera_hand']==0,'left-camera-grip-before-contact')
+            previous_photo=studio()['photo']
+            move('left',shifted(head,[-.16,-.10,-.42]))
+            hold(('left','Grip'),('left','Trigger'))
+            wait(lambda s:s['rendered']['studio']['photo']>previous_photo,'left-camera-native-scene-printed',seconds=8.)
+            live.release(keep=(('left','Grip',None),))
+            checkpoint('left-camera-live-view-and-print')
+            room=studio()['room'];move('left',compose(room,studio()['camera_home']))
+            live.release();time.sleep(.30);rest('left')
+            note_home=compose(room,studio()['notes_home']);head=approach(note_home)
+            hold(('right','Grip'))
+            move('right',compose(studio()['room'],studio()['notes_home']))
+            right_note=wait(lambda s:any(p['hand']==1 and not p['photo'] for p in s['rendered']['studio']['papers']),
+                            'right-sticky-note-grip-before-contact')
+            right_note_id=next(p['id'] for p in right_note['rendered']['studio']['papers'] if p['hand']==1 and not p['photo'])
+            move('right',paper_grip('right',shifted(head,[.12,-.18,-.45])))
+            checkpoint('right-hand-sticky-note')
+            live.release()
+            wait(lambda s:any(p['id']==right_note_id and p['hand']<0 for p in s['rendered']['studio']['papers']),
+                 'right-sticky-note-released')
+            rest('right')
             if movie:movie.begin('sticky-note-caption-and-marker')
             note_home=compose(room,studio()['notes_home'])
             head=approach(note_home)

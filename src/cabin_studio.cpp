@@ -191,6 +191,7 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
     frame_.camera=rigid(frame_.camera);frame_.marker=rigid(frame_.marker);
     for(auto& paper:frame_.papers){paper.pose=rigid(paper.pose);paper.fieldPose=rigid(paper.fieldPose);}
     frame_.hapticMask=frame_.inputMask=0;frame_.hoverKey=frame_.hoverControl=-1;
+    frame_.cameraCandidateMask=0;
     frame_.capacityReached=frame_.papers.size()>=studioPaperLimit;
     frame_.freezeSupported=freezeSupported;frame_.freezeState=freeze;
     if(!freezeSupported||frame_.cameraHand<0||freeze==StudioFreeze::unavailable)frame_.freezeRequested=false;
@@ -198,6 +199,7 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
     if(!initialized_){initialized_=true;frame_.camera=compose(room,Pose{{},studioCameraHome});frame_.marker={{},studioMarkerHome};
         for(size_t i=0;i<2;++i){squeezed_[i]=hands[i].squeeze>.55f;triggered_[i]=hands[i].trigger>.65f;}}
     if(!allowed){frame_.editor=-1;frame_.cameraHand=frame_.markerHand=-1;
+        cameraContact_={};
         frame_.freezeRequested=false;frame_.confirmPhoto=0;frame_.confirmPaper=0;
         for(auto& paper:frame_.papers){paper.hand=-1;paper.field=false;}
         for(size_t i=0;i<2;++i){squeezed_[i]=hands[i].squeeze>.55f;triggered_[i]=hands[i].trigger>.65f;}
@@ -225,6 +227,16 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
         const auto local=compose(inverse(room),hand.grip);
         auto paperIt=std::find_if(frame_.papers.begin(),frame_.papers.end(),[&](const auto& p){return p.hand==static_cast<int>(side);});
         const bool hasPaper=paperIt!=frame_.papers.end();
+        const float mountedCameraDistance=surfaceDistance(frame_.camera,studioCameraHalf,hand.grip.position);
+        // The field camera already has a source-bound body mount. Contact
+        // cues precede pickup; a short hand drift retains one second to grab.
+        // Cabin table props retain their established handling policy.
+        const auto cameraContact=cameraContact_[side].update(1,
+            !cabin&&tracking&&frame_.fieldCameraHolster.has_value()&&frame_.cameraHand<0
+                &&!hasPaper&&frame_.markerHand!=static_cast<int>(side),
+            mountedCameraDistance<.035f*.035f,mountedCameraDistance<.15f*.15f,squeeze,now);
+        if(cameraContact.pulse)frame_.hapticMask|=uint8_t(1u<<side);
+        if(cameraContact.item)frame_.cameraCandidateMask|=uint8_t(1u<<side);
         if(frame_.cameraHand>=0&&frame_.cameraHand!=static_cast<int>(side)&&!hasPaper
                 &&frame_.markerHand!=static_cast<int>(side)&&hand.aimTracked&&valid(hand.aim)){
             for(size_t i=0;i<static_cast<size_t>(StudioControl::count);++i){
@@ -244,6 +256,7 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 lastShot_=now;frame_.shutter=now;frame_.shutterPose=compose(frame_.camera,studioCameraLens);
                 frame_.hapticMask|=uint8_t(1u<<side);}
             if(!squeeze){frame_.cameraHand=-1;cameraDropped_=cabin;frame_.freezeRequested=false;
+                if(!cabin&&frame_.fieldCameraHolster){frame_.camera=*frame_.fieldCameraHolster;cameraVelocity_={};}
                 frame_.confirmPhoto=0;cameraVelocity_=rotate(inverse(room).orientation,cameraVelocity_);
                 for(auto& p:frame_.papers)if(p.field&&p.hand<0)p.field=false;}
         }else if(frame_.markerHand==static_cast<int>(side)){
@@ -285,7 +298,7 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                     if(frame_.editor==static_cast<int>(paperIt->id)){frame_.editor=-1;frame_.confirmPaper=0;}}
                 ++frame_.revision;
             }
-        }else if(squeeze&&!squeezed_[side]){
+        }else if(squeeze&&(cabin||!squeezed_[side])){
             StudioPaper* selected{};float paperDistance=.035f*.035f;
             for(auto& paper:frame_.papers){if(paper.hand>=0||(!cabin&&!paper.field))continue;
                 const auto distance=surfaceDistance(paper.field?paper.fieldPose:paper.pose,studioPaperHalf(paper.photo!=0),
@@ -295,7 +308,10 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 ?surfaceDistance(frame_.camera,studioCameraHalf,hand.grip.position):100.f;
             const auto markerDistance=cabin&&frame_.markerHand<0
                 ?surfaceDistance(frame_.marker,{.008f,.008f,.08f},local.position):100.f;
-            if(cameraDistance<.035f*.035f&&cameraDistance<paperDistance&&cameraDistance<=markerDistance){
+            const bool cameraPickup=cabin||!frame_.fieldCameraHolster
+                ?cameraDistance<.035f*.035f&&cameraDistance<paperDistance&&cameraDistance<=markerDistance
+                :cameraContact.grab&&!selected;
+            if(cameraPickup){
                 frame_.cameraHand=static_cast<int>(side);cameraDropped_=false;
                 attachment_[side]=rigid(compose(inverse(hand.grip),frame_.camera));
                 // Retain the picked-up orientation and place the authored side

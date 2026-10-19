@@ -34,6 +34,9 @@ def continue_game(live, behavior):
             if time.monotonic()>ready_until or state.get('scene')!='title':
                 raise BotFault('The physical native title/player did not finish becoming ready')
             time.sleep(.1);state=live.observe(native=True)
+        if state.get('opening_native_menu'):
+            live.execute({'op':'action','name':'system.idroid'})
+            state=behavior.wait_for({'opening_native_menu':False},5,'optional-cassette-mode')
         origin, orientation = state["opening_position"], state["opening_orientation"]
         from gameplay_bot.combat import controller_pair, inverse, mul, paired_aim_position, pointing
         from gameplay_bot.session import _controller_pose
@@ -136,7 +139,7 @@ def continue_game(live, behavior):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("observe", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "campaign", "idroid", "optics", "supervise", "state", "cqc"),
+    parser.add_argument("command", choices=("observe", "showcase", "showcase-setup", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "campaign", "idroid", "optics", "supervise", "state", "cqc", "recon"),
                         help="session advances Continue and runs the whole suite on one connection")
     parser.add_argument("--game-dir", required=True, type=pathlib.Path)
     parser.add_argument("--proxy", type=pathlib.Path)
@@ -169,7 +172,7 @@ def main():
     if (not math.isfinite(args.seconds) or args.seconds < 0
             or (not args.seconds and args.command != 'supervise')):
         parser.error('--seconds must be positive; supervise also accepts zero for no total timer')
-    if args.command in ("run", "session", "cold-start", "cqc") and not args.suite:
+    if args.command in ("run", "session", "cold-start", "cqc", "recon") and not args.suite:
         parser.error(args.command + " requires --suite")
     if args.trace_menu_input and args.command not in ("run", "session"):
         parser.error('--trace-menu-input requires one explicit run/session suite')
@@ -269,6 +272,7 @@ def main():
                 from gameplay_bot.body import inspect_body
                 policy=read_json(args.suite) if args.suite else {}
                 arrival=continue_game(live,behavior) if policy.get('enter',True) else None
+                start_recording()
                 result=inspect_body(live,args.seconds,policy)
                 if arrival:result['arrival']=arrival
             elif args.command == "controls-editor":
@@ -279,6 +283,7 @@ def main():
                 else:
                     current=live.observe(native=True)
                     arrival=({'status':'current_scene','state':current} if current['scene']==policy['scene']
+                        or (policy.get('restore_vr_only') and policy['scene']=='cabin' and current.get('cabin'))
                         else advance_startup(live,timeout=args.seconds))
                 result=inspect_controls_editor(live,policy,args.seconds);result['arrival']=arrival
             elif args.command == "studio-manager":
@@ -317,6 +322,18 @@ def main():
                 start_recording()
                 result = run_named_cqc(live, read_json(args.suite), output=args.output,
                     enemy_script=(ROOT / 'tools/navigation-state.lua').read_text())
+            elif args.command == "recon":
+                from gameplay_bot.recon import run_named_recon
+                start_recording()
+                result = run_named_recon(live, read_json(args.suite), output=args.output,
+                    enemy_script=(ROOT / 'tools/navigation-state.lua').read_text(), max_seconds=args.seconds)
+            elif args.command == "showcase-setup":
+                from gameplay_bot.showcase import setup_weapon
+                result = setup_weapon(live, read_json(args.suite))
+            elif args.command == "showcase":
+                from gameplay_bot.showcase import run as run_showcase
+                start_recording()
+                result = run_showcase(live, behavior, read_json(args.suite), args.seconds)
             elif args.command == "optics":
                 start_recording()
                 result = inspect_optic_exposure(live,args.seconds)

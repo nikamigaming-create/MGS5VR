@@ -1,8 +1,17 @@
 #pragma once
 #include "core.hpp"
 #include <cstddef>
+#include <cmath>
 
 namespace mgs5vr {
+// Native palette rebuilding can round a rotation coefficient by a few ulps
+// without changing its source transaction. This is an absolute 1e-6 bound,
+// never a world-coordinate-relative tolerance or a replacement for stamps.
+inline bool sameNativeIdroidMatrix(const std::array<float,16>& a,const std::array<float,16>& b) noexcept {
+    for(size_t i=0;i<a.size();++i)
+        if(!std::isfinite(a[i])||!std::isfinite(b[i])||std::abs(a[i]-b[i])>1e-6f)return false;
+    return true;
+}
 struct HeadCameraSample;
 // This stamp describes a completed owned body publication, not a pose request.
 struct IdroidBodyStamp {

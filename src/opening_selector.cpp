@@ -93,7 +93,8 @@ OpeningSelectorFrame OpeningSelector::update(bool title,bool assetsAvailable,boo
 
     std::array<CabinHand,2> cabinHands{};
     for(size_t side=0;side<2;++side){const auto& hand=hands[side];
-        cabinHands[side]={compose(inverse(origin_),hand.grip),hand.gripTracked,hand.squeeze,hand.trigger};}
+        cabinHands[side]={compose(inverse(origin_),hand.grip),hand.gripTracked,hand.squeeze,hand.trigger,
+            compose(inverse(origin_),Pose{{},hand.indexTip}).position,hand.indexTipTracked};}
     frame.bench=props_.update(cabinHands,now,layout);
     const int hovered=frame.bench.hovered;
     if(phase_==Phase::idle&&frame.bench.activated>=0){
@@ -160,7 +161,8 @@ OpeningSelectorFrame OpeningSelector::updateCabin(bool active,Pose head,
     frame.origin=origin_;
     std::array<CabinHand,2> cabinHands{};
     for(size_t side=0;side<2;++side){const auto& hand=hands[side];
-        cabinHands[side]={compose(inverse(origin_),hand.grip),hand.gripTracked,hand.squeeze,hand.trigger};}
+        cabinHands[side]={compose(inverse(origin_),hand.grip),hand.gripTracked,hand.squeeze,hand.trigger,
+            compose(inverse(origin_),Pose{{},hand.indexTip}).position,hand.indexTipTracked};}
     frame.bench=props_.update(cabinHands,now,layout);
     frame.selection=frame.bench.hovered;
     return frame;

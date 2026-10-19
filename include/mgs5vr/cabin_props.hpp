@@ -5,14 +5,17 @@
 namespace mgs5vr {
 // Cabin-local, metre-sized rigid objects. Identity is the cassette index, never
 // a rack location. The immutable snapshot travels with the camera publication.
-enum class CabinTapeState : uint8_t { resting, falling, held, guiding, seated, ejecting };
+enum class CabinTapeState : uint8_t { resting, falling, held, guiding, seated, ejecting, presented };
 struct CabinTape {
     Pose pose{};
     Vec3 velocity{},angularVelocity{};
     CabinTapeState state{CabinTapeState::resting};
     int hand{-1};
 };
-struct CabinHand { Pose pose{}; bool tracked{}; float grip{},trigger{}; };
+struct CabinHand {
+    Pose pose{}; bool tracked{}; float grip{},trigger{};
+    Vec3 indexTip{}; bool indexTipTracked{};
+};
 struct CabinLayout {
     Pose room{},seat{},player{},slot{},board{};
     Vec3 seatHalf{.250f,.035f,.180f},eject{};
@@ -46,6 +49,7 @@ float cabinNativeSupportHeight(Vec3 roomPoint) noexcept;
 CabinBox cabinBench() noexcept;
 Pose cabinPlayerPose() noexcept;
 Pose cabinSlotPose() noexcept;
+Pose cabinCarrierPose(Pose player,float lidOpen) noexcept;
 Vec3 cabinEjectButton() noexcept;
 std::array<Pose,6> cabinTapeHomes() noexcept;
 
@@ -58,6 +62,7 @@ private:
     void step(float dt);
     CabinBenchFrame frame_{};
     std::array<bool,2> grabbed_{},triggered_{};
+    std::array<bool,2> buttonContact_{};
     std::array<Pose,2> attachment_{};
     uint64_t lastTime_{};
     float insertionTime_{},ejectionTime_{};

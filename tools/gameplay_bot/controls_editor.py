@@ -14,7 +14,9 @@ def inspect_controls_editor(live,policy,seconds=180.):
     def observe():
         if time.monotonic()>deadline:raise BotFault('Controls editor deadline')
         s=live.observe()
-        if s['scene']!=policy['scene'] or s.get('loading'):raise BotFault('Controls editor lost selected native scene')
+        cabin_screen=(policy['scene']=='cabin' and s.get('cabin') and not s.get('camera_active')
+                      and (s.get('controls_editor') or {}).get('visible'))
+        if (s['scene']!=policy['scene'] and not cabin_screen) or s.get('loading'):raise BotFault('Controls editor lost selected native scene')
         if s.get('controls_editor'):
             s['rendered']=s.get('rendered') or {};s['rendered']['controls_editor']=s['controls_editor']
         return s
@@ -69,6 +71,13 @@ def inspect_controls_editor(live,policy,seconds=180.):
         try:
             live.release();wait(lambda s:s['rendered'].get('controls_editor') is not None,'editor-runtime-ready',15.)
             initial=observe();result['initial_native']=initial.get('native')
+            if policy.get('restore_vr_only'):
+                if not editor().get('vr_enabled'):
+                    select('system.toggle_vr');click(120);click(113)
+                    wait(lambda s:s['rendered']['controls_editor'].get('vr_enabled') and s.get('camera_active'),
+                         'immersive-renderer-restored',8.)
+                click(100);wait(lambda s:not s['rendered']['controls_editor']['visible'],'editor-closed')
+                result['status']='restored_vr_and_closed_editor';return result
             if initial.get('rendered',{}).get('binocular_held'):
                 live.execute({'op':'action','name':'binoculars.stow','seconds':.25});live.release()
                 wait(lambda s:not s['rendered'].get('binocular_held'),'initial-binocular-stowed')
@@ -98,7 +107,8 @@ def inspect_controls_editor(live,policy,seconds=180.):
                 click(100);wait(lambda s:not s['rendered']['controls_editor']['visible'] and not s['rendered']['controls_editor']['owns_input'],'editor-close-neutral')
                 result['status']='observed_controls_panel';return result
             if policy.get('settings'):
-                click(117);wait(lambda s:s['rendered']['controls_editor'].get('settings'),'live-settings-tab')
+                if not editor().get('settings'):click(117)
+                wait(lambda s:s['rendered']['controls_editor'].get('settings'),'live-settings-tab')
                 configured=live.bindings.get('settings',[])
                 if len(editor()['rows'])!=len(configured)+1:raise BotFault('The headset omitted a supported gameplay setting')
                 for name,control in (('settings.binocular_auto_mark',120),('settings.player_height_offset_cm',119),('settings.turn_mode',118)):
@@ -150,6 +160,6 @@ def inspect_controls_editor(live,policy,seconds=180.):
             live.release()
             current=live.observe()
             if (current.get('rendered') or {}).get('controls_editor',{}).get('visible'):
-                if current.get('scene')==policy['scene']:click(100)
+                if current.get('scene')==policy['scene'] or (policy['scene']=='cabin' and current.get('cabin')):click(100)
                 else:result['cleanup']='Scene changed; runtime closes editor on scene loss.'
             live.release();atomic_json(live.events.output/'controls-editor-progress.json',result)
