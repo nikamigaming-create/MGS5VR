@@ -217,6 +217,7 @@ const settingCopy={
  binocular_actor_glow:['Binocular target glow','Highlight targets with a glow. Turning this off keeps their labels.'],
  binocular_mark_dwell_ms:['Time before automatic marking','How long to keep a person in your sights before marking them.'],
  player_height_offset_cm:['Eye height adjustment','Raise or lower your viewpoint without changing the size of the world.'],
+ seated_mode:['Seated mode','Play sitting down at the correct in-game height. Enable while seated; recenter to recalibrate without standing up.'],
  weapon_smoothing_ms:['Weapon and scope stabilization','0 is off; 100 strongly steadies small shakes. Gun, sight and hands move together; deliberate aim changes follow quickly.'],
  weapon_aim_pitch_degrees:['One-hand weapon tilt','Default −30°. Adjust firearm pointing up or down; the gun, hand, sight and muzzle move together. 0 removes this trim. Two-hand direction follows the support grip.'],
  support_grip_radius_cm:['Support grip distance','How close your free hand must be to take hold of the weapon.'],

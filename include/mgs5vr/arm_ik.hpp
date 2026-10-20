@@ -112,11 +112,13 @@ private:
 // presented offset so an unrelated stow animation cannot drag the free hand.
 class SupportPose {
 public:
-    std::optional<Pose> update(Pose nativeOffset,bool attached,bool manipulating);
-    void reset(){attached_=false;acquired_={};presented_.reset();}
+    std::optional<Pose> update(Pose nativeOffset,bool attached,bool manipulating,std::optional<Pose> weaponInWrist=Pose{});
+    void reset(){*this={};}
 private:
     bool attached_{};
     Pose acquired_{};
+    Pose weaponInWrist_{};
+    bool weaponAnchored_{};
     std::optional<Pose> presented_;
 };
 // OpenXR grip frame from the native wrist and the index/little metacarpal heads.

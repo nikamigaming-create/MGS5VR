@@ -143,7 +143,7 @@ struct ControllerFrame {
     Pose openingWorldOrigin{}; // Native anchor captured once, before collision correction.
     bool openingWorldAnchored{};
     PlayerPosture playerPosture{PlayerPosture::unknown};
-    bool fullBody{},cinematicFreeMove{true};
+    bool fullBody{},seatedMode{},cinematicFreeMove{true};
     std::array<float,2> cinematicMove{};
 };
 // A platform overlay takes input focus, not ownership of the game scene.
@@ -325,6 +325,8 @@ private:
     uint64_t sceneTransitionActivation_{},sceneTransitionAt_{}; // Intentional native shot/control handoffs only.
     uint64_t trackingEpoch_{};
     float units_{1};
+    float seatedHeadY_{};
+    bool seatedMode_{};
     float snapYaw_{};
     Vec3 snapTranslation_{}; // Native-yaw local, not a persistent world-space offset.
     bool enabled_{},tracking_{},pending_{},active_{};

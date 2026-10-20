@@ -54,9 +54,9 @@ try {
     Assert ($loaded.state.runtime.'ui.map_control_prompts' -eq '1') 'reviewed Map control labels default on in the launcher runtime snapshot'
     Assert ($loaded.state.runtime.'optics.binocular_native_material' -eq '0') 'unproven binocular scene lighting defaults off in the launcher runtime snapshot'
     $settingRows=@($loaded.state.settings)
-    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 61) 'serialized settings field is a flat array containing all 61 setting rows'
+    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 62) 'serialized settings field is a flat array containing all 62 setting rows'
     $rowsValid=$true
-    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 61) { $rowsValid=$false }
+    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 62) { $rowsValid=$false }
     else {
         foreach ($row in $settingRows) {
             $numbers=@($row.value,$row.min,$row.max)
@@ -66,6 +66,7 @@ try {
         }
     }
     Assert $rowsValid 'each setting row has a named setting and numeric value/min/max bounds'
+    Assert (@($settingRows | Where-Object { $_.name -eq 'settings.seated_mode' -and $_.value -eq 0 -and $_.min -eq 0 -and $_.max -eq 1 }).Count -eq 1) 'seated mode is an explicit toggle and preserves standing mode by default'
     Assert (@($settingRows | Where-Object { $_.name -eq 'settings.wrist_text_scale' -and $_.value -eq 1.5 }).Count -eq 1) 'arm text defaults to the requested larger size'
     Assert (@($settingRows | Where-Object { $_.name -eq 'settings.tracked_weapon_obstruction' -and $_.value -eq 1 -and $_.min -eq 0 -and $_.max -eq 1 }).Count -eq 1) 'tracked-gun cover clearance is present and defaults on'
     Assert (@($settingRows | Where-Object { $_.name -eq 'settings.block_firing_near_cover' -and $_.value -eq 0 -and $_.min -eq 0 -and $_.max -eq 1 }).Count -eq 1) 'the independent cover firing block is present and defaults off'

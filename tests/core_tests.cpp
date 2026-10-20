@@ -1948,6 +1948,19 @@ int main(){
         expect(capturedProne.applied&&capturedProne.anatomicalEyeModel==13
             &&same(capturedProne.nativePose.position,compose(original.worldFromHead,Pose{{},nativeEyeFromHead}).position),
             "captured prone eyes stay at the untouched native skin when its camera looks across the body heading");
+        original.worldFromChest.orientation={0,0,0,1};
+        original.worldFromHead.position.x+=.08f;
+        nativeEyes.trackStereo({},eyes,true,2040,input);
+        nativeEyes.publishPlayerHead(7,8,independentCamera,capturedRoot,cached,2040);
+        const auto crawlStride=nativeEyes.resolve(7,independentCamera,2040,original);
+        expect(same(crawlStride.nativePose.position,capturedProne.nativePose.position),
+            "crawling chest yaw and head sway do not move the root-anchored viewpoint");
+        nativeEyes.recenter();original.worldFromHead.position.y-=.4f;
+        nativeEyes.trackStereo({},eyes,true,2060,input);
+        nativeEyes.publishPlayerHead(7,8,independentCamera,capturedRoot,cached,2060);
+        const auto recenteredStride=nativeEyes.resolve(7,independentCamera,2060,original);
+        expect(same(recenteredStride.nativePose.position,crawlStride.nativePose.position),
+            "recenter cannot reseed anatomical height from a transient lowered animation frame");
     }
     const auto headPoint=playerHeadPosition(playerRoot,headBone);
     expect(headPoint&&same(*headPoint,{500.1f,301.6f,1300}),"animated head position uses local-then-world transform order");
@@ -3039,6 +3052,24 @@ int main(){
             &&same(rotate(centered.nativePose.orientation,{0,0,1}),rotate(turned.nativePose.orientation,{0,0,1})),
             "recenter clears a leaned snap/native-yaw offset without changing facing");
     }
+    {
+        HeadCamera seated;seated.configure(true);ControllerFrame input;input.referenceEpoch=1;
+        input.seatedMode=true;input.fullBody=true;input.physicalFloorTracked=true;input.physicalFloorY=0;
+        Pose head{{},{0,1.05f,0}},stock{{},{10,1.7f,20}};
+        seated.trackStereo(head,rigEyes,true,100,input);seated.toggle();
+        expect(near(seated.resolve(1,stock,100).nativePose.position.y,1.7f),"seated activation uses native eye height without standing calibration");
+        head.position.y+=.1f;seated.trackStereo(head,rigEyes,true,110,input);
+        expect(near(seated.resolve(1,stock,110).nativePose.position.y,1.8f),"seated mode retains physical vertical lean");
+        seated.recenter();
+        expect(near(seated.resolve(1,stock,111).nativePose.position.y,1.7f),"seated recenter calibrates from the current sitting position");
+        seated.trackStereo(head,rigEyes,false,120,input);
+        head.position.y+=.1f;seated.trackStereo(head,rigEyes,true,130,input);
+        expect(near(seated.resolve(1,stock,130).nativePose.position.y,1.8f),"tracking recovery does not silently recalibrate seated height");
+        input.referenceEpoch=2;head.position.y-=1.f;seated.trackStereo(head,rigEyes,true,140,input);
+        expect(near(seated.resolve(1,stock,140).nativePose.position.y,1.8f),"runtime reference change transports the seated baseline");
+        stock.position.y=.4f;
+        expect(near(seated.resolve(1,stock,141).nativePose.position.y,.5f),"seated native crouch and prone still lower the viewpoint");
+    }
     ControllerFrame hands;hands.referenceEpoch=1;hands.predictedXrTime=9000;
     {
         const auto yaw=[](float a){return Quat{0,std::sin(a*.5f),0,std::cos(a*.5f)};};
@@ -3568,6 +3599,13 @@ int main(){
     expect(presentedSupport&&same(presentedSupport->position,acquiredSupport.position),"new contact reacquires its own weapon pose");
     supportPose.reset();
     expect(!supportPose.update(stowingSupport,false,false),"menu or tracking reset clears support presentation");
+    const Pose weaponAtGrab{{},{0,0,.05f}},weaponMoved{{0,.258819f,0,.9659258f},{.02f,0,.1f}};
+    supportPose.update(acquiredSupport,true,false,weaponAtGrab);
+    const auto movedContact=supportPose.update(stowingSupport,true,false,weaponMoved);
+    const auto expectedContact=compose(weaponMoved,compose(inverse(weaponAtGrab),acquiredSupport));
+    expect(movedContact&&same(movedContact->position,expectedContact.position),"support stays on the acquired weapon point when its attachment moves relative to the wrist");
+    const auto missingAttachment=supportPose.update(stowingSupport,true,false,std::nullopt);
+    expect(missingAttachment&&same(missingAttachment->position,expectedContact.position),"missing weapon attachment cannot snap acquired support into the wrist frame");
     expect(!support.update(true,true,.25f,1000)&&!support.update(true,true,.25f,1200),"a free palm away from the weapon support grip stays one-handed");
     expect(!support.update(true,true,.09f,1300)&&!support.update(true,true,.09f,1400)
         &&support.update(true,true,.09f,1450),"support engages only after dwelling at the actual weapon grip");

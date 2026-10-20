@@ -123,6 +123,7 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=ownerHeadTime_=0;suspended_=false;
     controllers_={};rig_={};nativeMenuOpen_=false;nativeIdroidOpen_=false;nativeIdroidPaused_=false;awaitingScene_=false;lastView_={};cameraRenderTime_=0;menuAnchored_=false;trackingEpoch_=0;
     cameraFreezeAnchored_=false;
+    seatedHeadY_=0;seatedMode_=false;
     menuGeneration_=0;
     staleDemoRecoveryDwell_.reset();
     lastTitleSource_={};avatarEditorBackdrop_={};lastTitleSourceValid_=avatarEditorBackdropValid_=false;
@@ -218,6 +219,10 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
     tracking_=tracking_&&dot(separation,separation)>0.0001f&&dot(separation,separation)<0.04f;
     stereoTracking_=tracking_;
     if(tracking_){
+        if(controllers.seatedMode&&!seatedMode_)seatedHeadY_=head.position.y;
+        else if(controllers.seatedMode&&trackingEpoch_&&controllers.referenceEpoch!=trackingEpoch_)
+            seatedHeadY_+=head.position.y-head_.position.y;
+        seatedMode_=controllers.seatedMode;
         const bool enteringAvatarEditor=controllers.avatarEditor&&!controllers_.avatarEditor;
         const bool leavingAvatarEditor=!controllers.avatarEditor&&controllers_.avatarEditor;
         if(enteringAvatarEditor){
@@ -250,7 +255,9 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
                 // the old origin through menu close would teleport the view.
                 origin_=uprightOrigin(compose(compose(head,inverse(head_)),origin_));
                 if(nativeMenuOpen_&&menuAnchored_){menuNative_=lastView_.nativePose;menuHead_=head;}
-                rig_={};++activation_;activationCause_=2;resetStabilization(this);
+                // LOCAL rebasing changes tracking coordinates, not the native
+                // actor's posture or measured anatomical standing height.
+                rig_={};++activation_;activationCause_=2;
             }else{
                 if(!awaitingPlayer_){active_=false;pending_=true;}
                 camera_=playerOwner_=0;
@@ -283,7 +290,12 @@ void HeadCamera::toggle(){
 }
 void HeadCamera::recenter(){
     std::lock_guard lock(mutex_);
-    if(enabled_&&(active_||pending_||awaitingPlayer_)){recenterPending_=true;rig_={};resetStabilization(this);}
+    if(enabled_&&(active_||pending_||awaitingPlayer_)){
+        recenterPending_=true;rig_={};
+        if(controllers_.seatedMode)seatedHeadY_=head_.position.y;
+        // Do not reseed the native eye anchor from a transient crouch/gait
+        // frame merely because the player recentered their headset.
+    }
 }
 void HeadCamera::setNativeMenuOpen(bool open,bool idroid,bool pause,bool idroidPaused){
     std::lock_guard lock(mutex_);
@@ -846,7 +858,10 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 headPoint.y-rootSample.position.y,
                 headPoint.z-rootSample.position.z
             };
-            const auto anatomicalHeading=rootSample.bodyFramesTracked?rootSample.anatomicalHeading:rootSample.orientation;
+            // Crawling chest yaw oscillates on every stride. Measure and
+            // transport its eye offset in the actor root frame instead.
+            const auto anatomicalHeading=rootSample.bodyFramesTracked&&controllers_.playerPosture!=PlayerPosture::prone
+                ?rootSample.anatomicalHeading:rootSample.orientation;
             const auto targetHeadLocalOffset=rotate(inverseQuat(anatomical?anatomicalHeading:rootSample.orientation),worldHeadOffset);
             const bool advanceOffset=!anatomical||!state.anatomicalModel||(nativeEyeJoined&&rootSample.eyeModel);
             if(anatomical&&advanceOffset&&controllers_.playerPosture==PlayerPosture::standing
@@ -958,7 +973,9 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     const bool anchoredMenu=spatialMenu&&!liveHandheldMenu;
     auto relative=compose(inverse(frozenCamera?cameraFreezeHead_:anchoredMenu?menuHead_:origin_),head_);
     relative.position=relative.position*units_;
-    if(!anchoredMenu&&!frozenCamera&&controllers_.physicalFloorTracked&&controllers_.fullBody
+    if(!anchoredMenu&&!frozenCamera&&controllers_.seatedMode&&!controllers_.authoredCamera)
+        relative.position.y=(head_.position.y-seatedHeadY_)*units_;
+    if(!anchoredMenu&&!frozenCamera&&!controllers_.seatedMode&&controllers_.physicalFloorTracked&&controllers_.fullBody
        &&!controllers_.frontEnd&&!controllers_.authoredCamera&&!controllers_.scriptedDemo
        &&!controllers_.cabinPlay&&!controllers_.cabinTransit&&!controllers_.vehicleMounted
        &&controllers_.playerPosture!=PlayerPosture::prone){

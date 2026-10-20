@@ -386,11 +386,14 @@ bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time
     if(time-since_>=150){attached_=true;candidate_=false;}
     return attached_;
 }
-std::optional<Pose> SupportPose::update(Pose nativeOffset,bool attached,bool manipulating){
-    if(!valid(nativeOffset)){reset();return {};}
+std::optional<Pose> SupportPose::update(Pose nativeOffset,bool attached,bool manipulating,std::optional<Pose> weaponInWrist){
+    if(!valid(nativeOffset)||(weaponInWrist&&!valid(*weaponInWrist))){reset();return {};}
     if(attached){
-        if(!attached_)acquired_=nativeOffset;
-        presented_=manipulating?nativeOffset:acquired_;
+        if(!attached_){
+            weaponAnchored_=weaponInWrist.has_value();weaponInWrist_=weaponInWrist.value_or(Pose{});
+            acquired_=compose(inverse(weaponInWrist_),nativeOffset);
+        }else if(weaponAnchored_&&weaponInWrist)weaponInWrist_=*weaponInWrist;
+        presented_=manipulating?nativeOffset:compose(weaponInWrist_,acquired_);
     }
     attached_=attached;
     return presented_;

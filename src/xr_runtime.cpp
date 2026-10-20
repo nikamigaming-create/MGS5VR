@@ -513,8 +513,10 @@ struct Session {
             XrActionStatePose state{XR_TYPE_ACTION_STATE_POSE};xrCheck(xrGetActionStatePose(handle,&info,&state),"Read controller tracking state");
             if(!state.isActive)return false;
             XrSpaceLocation pose{XR_TYPE_SPACE_LOCATION};xrCheck(xrLocateSpace(space,local,time,&pose),"Locate controller pose");
-            constexpr auto trackedBits=validPoseBits|XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT|XR_SPACE_LOCATION_POSITION_TRACKED_BIT;
-            if((pose.locationFlags&trackedBits)!=trackedBits||!valid(fromXr(pose.pose)))return false;
+            // Runtime-valid inferred poses remain usable when an idle Touch
+            // controller temporarily loses optical tracking. Invalid poses
+            // still release input; never extend a stale sample ourselves.
+            if((pose.locationFlags&validPoseBits)!=validPoseBits||!valid(fromXr(pose.pose)))return false;
             output=fromXr(pose.pose);return true;
         };
         result.gripTracked=locate(grip,gripSpaces[n],result.grip);
@@ -884,6 +886,7 @@ struct Session {
         controllerFrame.playerHeightOffset=controls.setting("settings.player_height_offset_cm")*.01f;
         controllerFrame.playerPosture=nativePlayerPosture();
         controllerFrame.fullBody=controls.setting("settings.full_body")!=0;
+        controllerFrame.seatedMode=controls.setting("settings.seated_mode")!=0;
         controllerFrame.cinematicFreeMove=controls.setting("settings.cinematic_free_move")!=0;
         requestFullBodyVisibility(controllerFrame.fullBody);
         controllerFrame.supportGripRadius=controls.setting("settings.support_grip_radius_cm")*.01f;
@@ -1832,7 +1835,7 @@ RuntimeStats runTheatre(TextureMailbox& source,const TheatreConfig& config,const
         auto trackedHead=fromXr(head.pose);
         session.syncInput(frame.predictedDisplayTime,trackedHead,trackedViews,tracking&&stereoTracked);
         session.controllerFrame.physicalFloorTracked=false;
-        if(session.floor&&tracking&&nativeTravelMode()==TravelMode::onFoot){
+        if(session.floor&&tracking&&!session.controllerFrame.seatedMode&&nativeTravelMode()==TravelMode::onFoot){
             XrSpaceLocation floor{XR_TYPE_SPACE_LOCATION};
             if(XR_SUCCEEDED(xrLocateSpace(session.floor,session.local,frame.predictedDisplayTime,&floor))
                &&(floor.locationFlags&validPoseBits)==validPoseBits&&valid(fromXr(floor.pose))

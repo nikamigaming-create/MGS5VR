@@ -1023,6 +1023,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     probe.stage=8;
     std::optional<Vec3> barrelInGrip;
     std::optional<Pose> muzzleInGrip;
+    std::optional<Pose> supportWeaponInWrist;
     std::optional<WeaponScopeGeometry> scopeInWrist;
     uint32_t scopeResource{};
     uint64_t weaponSupportIdentity{};
@@ -1071,6 +1072,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                     const auto attachment=nativeAffinePose(attachmentMatrix),socket=nativeAffinePose(muzzleMatrix);
                     weaponDiagnostics.attachmentValid=attachment.has_value();weaponDiagnostics.muzzleSocketValid=socket.has_value();
                     if(attachment&&socket){
+                        supportWeaponInWrist=*attachment;
                         muzzleInGrip=compose(gripFromWrist[1],compose(*attachment,*socket));
                         weaponDiagnostics.muzzleInGrip=*muzzleInGrip;weaponDiagnostics.muzzleSolved=true;
                         barrelInGrip=rotate(muzzleInGrip->orientation,{0,0,1});
@@ -1224,7 +1226,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     const auto presentedSupport=binocularSupportWrist
         ?compose(inverse(right->pose.wrist),*binocularSupportWrist)
-        :supportPose.update(supportOffset,nearSupport,nativeManipulation).value_or(supportOffset);
+        :supportPose.update(supportOffset,nearSupport,nativeManipulation,supportWeaponInWrist).value_or(supportOffset);
+    if(!binocularHeld&&nearSupport)heldSupportOffset=presentedSupport;
     attached=compose(right->pose.wrist,presentedSupport);
     bool guiding=!binocularHeld&&!compactSupport&&nearSupport&&nativeManipulation&&aimBlend>0;
     if(!compactSupport&&barrelInGrip&&frame.controllers.hands[0].gripTracked&&nearSupport){

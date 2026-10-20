@@ -1,5 +1,32 @@
 # Current plan — ACC readiness
 
+## October 19 evening: comfort hotfix candidate
+
+User identified published `3cb686fd4f1c` as the report baseline and requested
+quick precision changes with automated checks, leaving physical testing to them.
+This supersedes extended live reproduction for this pass. The short baseline
+and Continue observation were stopped; the owned simulator/game are closed.
+
+- New `settings.seated_mode` is on the first live VR Settings page. Enable it
+  while sitting; Apply calibrates the current seated eye level to native stance
+  height. Recenter recalibrates while seated. Physical lean and native
+  crouch/prone remain relative to that baseline. Room-floor height and leg
+  stretching are disabled in seated mode; standing mode remains the default.
+- Recenter and a live LOCAL-space rebase preserve the native anatomical height
+  and posture stabilization rather than reseeding from transient animation.
+- Runtime-valid inferred controller poses remain usable when optical tracking
+  flags drop on idle controllers. Invalid poses still release controls. This
+  targets the reported idle fallback; the physical Quest trigger is unverified.
+- Prone camera offsets use actor-root heading instead of alternating chest yaw.
+- Support contact is retained in the weapon attachment frame, including changes
+  relative to the wrist. Native reload/bolt animation still owns manipulation.
+
+The user reports testing development `b627c7cacc9a` and explicitly authorizes
+publication as `experimental-2026-10-19.1`. All 58 automated groups and installer
+checks passed. This does not establish universal mission or headset coverage.
+Publish and verify the checked payload before advancing `play/` to that release.
+Both launch paths retain wired Meta Quest Link.
+
 October 19 release decision: the user reports having completed headset testing
 and explicitly authorized publication of the current experimental candidate.
 This supersedes the earlier publication hold, not the documented feature
