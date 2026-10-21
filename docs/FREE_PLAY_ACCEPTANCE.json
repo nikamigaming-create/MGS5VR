@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "bc7dd67830ce",
-  "candidate_status": "Sortie head preview repaired and observed in both eyes with clear first-person return. Remaining field fixes active.",
+  "candidate": "c2b3f553cbb8",
+  "candidate_status": "Sortie head repaired; bare-hand wrist-driven torso coupling removed in repeated gameplay. Remaining field defects active.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -682,7 +682,7 @@
     {
       "id": "FP17",
       "title": "Right wrist steers shoulders and opposite arm; apparent arm shortening in physical VR",
-      "status": "reproduced_fix_built_pending_gameplay",
+      "status": "wrist_coupling_corrected_simulator_reach_and_headset_open",
       "report": "Both hands vertical/parallel moderately extended; moving only right hand pulls left hand backward, rotating right wrist moves shoulders oppositely while view stays fixed. User distinguishes physical VR from Snakebot.",
       "acceptance": [
         "Hold HMD and left controller fixed; independently sweep right wrist yaw and right-hand forward translation with both hands vertical and parallel",
@@ -691,7 +691,7 @@
         "Physical Quest Link verification required; simulator evidence alone cannot close user report"
       ],
       "investigation": [
-        "src/controller_rig.cpp uses primary aim for trackedTorsoHeading when both presentation hands are forward; no explicit supported-weapon requirement at that call. Plausible coupling source, not yet reproduced in current field."
+        "Reproduced right-wrist-driven torso and opposite-hand displacement. Torso aim ownership now requires an acquired two-handed weapon support grip."
       ],
       "evidence": [
         {
@@ -717,6 +717,54 @@
           ],
           "head_and_left_controller_position_displacement_m": 0,
           "change": "Limit aim-driven torso heading to acquired two-handed weapon support; bare hands no longer authorize it. Gameplay repeat pending."
+        },
+        {
+          "run": "20261021T142402604044Z",
+          "candidate": "c2b3f553cbb8",
+          "result": "wrist_steering_removed_remaining_native_idle_motion",
+          "right_wrist_degrees": [
+            0,
+            30,
+            -30,
+            0
+          ],
+          "chest_yaw_degrees": [
+            42.787474066941826,
+            49.90083300106523,
+            45.90089485923972,
+            45.44713181925093
+          ],
+          "left_palm_displacement_m": [
+            0.0,
+            0.011240510486627157,
+            0.003840296342734065,
+            0.005569324555099392
+          ],
+          "scope": "Mother Base on foot, fixed HMD and left input; opposite palm movement at most 1.13cm, with native source chest animation varying independently. Physical reach and headset validation remain open."
+        },
+        {
+          "run": "20261021T142515699785Z",
+          "candidate": "c2b3f553cbb8",
+          "result": "wrist_steering_removed_remaining_native_idle_motion",
+          "right_wrist_degrees": [
+            0,
+            30,
+            -30,
+            0
+          ],
+          "chest_yaw_degrees": [
+            49.43726562296992,
+            43.56886157975366,
+            50.511609198328955,
+            42.95731227819367
+          ],
+          "left_palm_displacement_m": [
+            0.0,
+            0.007859598017714476,
+            0.0019860989401307015,
+            0.009943890787819184
+          ],
+          "scope": "Mother Base on foot, fixed HMD and left input; opposite palm movement at most 1.13cm, with native source chest animation varying independently. Physical reach and headset validation remain open."
         }
       ]
     }

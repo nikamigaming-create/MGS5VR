@@ -1,3 +1,15 @@
+# October 21 current gameplay checkpoint
+
+Main contains the consolidated work and two new production fixes.
+Current checked and installed development: c2b3f553cbb8. Published play unchanged.
+Actual wrist repeats 142402604044Z and 142515699785Z remove the prior wrist-driven
+30-degree torso turn and 8.5–12cm opposite-hand movement. Residual native idle
+animation moves the palm at most 1.13cm. Physical reach/headset remain open.
+FP14 sortie preview is fixed in development and checked in FIELD_FIXES.
+Current game389880/simulator62184: Mother Base30050, ordinary on-foot play.
+No supervisor is running. Continue standing/fit and remaining field fixes.
+Earlier checkpoints below are historical; their PIDs/builds are stale.
+
 # October 21 hand fixes on main
 
 Rifle support fingers now visibly curl in both eyes through three shots after

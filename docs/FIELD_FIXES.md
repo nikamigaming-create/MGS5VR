@@ -10,7 +10,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Mortar operator viewpoint — FP15.** Reported inside the emplacement; establish native operator position and usable view of aiming/firing in both eyes.
 - [ ] **Natural mounted-weapon controls — FP11/FP15.** Implement physical grip-and-aim and stick aiming for mortars and each turret type; verify native pivots/limits, contact, release, firing and exit. MountedGrip helper exists but has no production adapter.
 - [ ] **Small-rock slipping and stops — FP16.** Reported; locate/repeat affected rocks, distinguish native collision/fall state from camera/body presentation.
-- [ ] **Right-wrist shoulder/opposite-arm coupling — FP17.** Reported in physical VR. Reproduced: right wrist +/-30 degrees rotates chest and shifts fixed-input left palm8.5/12cm. Acquired-weapon-only torso correction built; gameplay repeat pending.
+- [ ] **Right-wrist shoulder/opposite-arm coupling — FP17.** Reported in physical VR. Reproduced: right wrist +/-30 degrees rotates chest and shifts fixed-input left palm8.5/12cm. Acquired-weapon-only torso correction removes wrist-driven heading in two Mother Base repeats. Remaining opposite-palm movement is at most 1.13cm and follows native idle animation. Physical headset and reach remain open.
 - [ ] **Shortened arm reach — FP17.** Reported; compare native bone lengths/calibration and physical reach across modes. Physical Quest validation required.
 - [ ] **Precision-weapon support loss — FP02.** Moving supported rifle and3 back-slot shots retain contact in082239, but open support fingers reproduced in both eyes. Read-only shared palettes match; candidate73fe7d0b521d cups acquired long-gun support outside native manipulation. Curled fingers now visible after moving aim and3 shots; native reload5->9 and reacquisition observed. Mid-reload pair capture failed on grip lease; broader verification remains open. Bolt-action and physical headset remain open.
 - [ ] **Tutorial camera handoff and retained iDroid — FP07/FP12.** Exact retained-terminal timeout, cinematic return and ordinary stow/reopen pass onff0dd2c746a6 after fixing reproduced ownership loss. Scoped simulator subcase complete; physical Quest, alignment and remaining tutorial lessons stay open.
@@ -25,7 +25,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Cabin gallery/workbench/cassettes — FP10.** Note editor, printing/stacking and cassette presentation remain open.
 - [ ] **ACC loadout holsters — FP11.** Native physical interaction and live acceptance incomplete.
 - [ ] **ACC free-roam destination entry — FP13.** Entry absence reproduced in ACC40050; native cause/routing unresolved.
-- [ ] **Headless sortie preview — FP14.** Visual failure reproduced; preserve ordinary first-person head exclusion while restoring preview.
+- [x] **Headless sortie preview — FP14.** Restored in development: complete head in both eyes on native sortie screens; clear first-person return after departure. Runs 134958388735Z and 135550994795Z.
 - [ ] **Remaining mission/menu/weapon/control regressions — FP12.** Reconcile existing catalogs by exact build; retain explicit untested combinations.
 
 ## Current execution checkpoint
