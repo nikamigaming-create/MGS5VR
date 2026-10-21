@@ -358,7 +358,7 @@
     {
       "id": "FP03",
       "title": "Contextual Y actions force camera yaw: Fulton, vehicle entry and climbing",
-      "status": "reproduce",
+      "status": "reproduced_unfixed",
       "acceptance": [
         "before/during/after extraction at multiple headings",
         "native actor/engine camera/HMD yaw telemetry",
@@ -373,6 +373,25 @@
           "result": "no_incapacitation_no_fulton",
           "limitation": "Actor life0; no native CQC_HOLD/CONTINUOUS; not extraction or yaw acceptance",
           "harness_fix": "Observe nativeAction transition without dispatching another trigger in that state"
+        },
+        {
+          "runs": [
+            "20261021T193830194950Z",
+            "20261021T193922082738Z",
+            "20261021T195034107680Z",
+            "20261021T200533374378Z"
+          ],
+          "candidate": "56d5a6b01274",
+          "scope": "Native deployed jeep in Afghanistan free play; legitimate VR approach, two entries and exits; fixed identity HMD pose.",
+          "result": "Forced yaw reproduced. Second entry starts at33.45 degrees, traverses12.54 and74.54, settles164.56:131-degree final rotation. First exit turns164.6 to130.2.",
+          "cause": "Driver view uses animated player-root yaw, including entry animation, and initializes look offset to zero. Exit restores native chase-camera yaw.",
+          "native_research": "Read-only owned-game vehicle registry and local ridden-ID accessor resolved. Jeep record position matches GetPosition; heading remains2.872148rad through exit while ridden ID changes25600->65535. Native rotation construction reads record angles+0x44,+0x48,+0x2c. Private current-vehicle-heading-contract.md.",
+          "limitation": "No production repair yet. Driving turns, four entry headings, Fulton and climbing remain unverified."
+        },
+        {
+          "run": "20261021T200417973648Z",
+          "result": "No exit dispatched: native network notice owned menu. Observed notice dismissed with existing menus.confirm in200457570168; subsequent native exit200533374378 succeeded.",
+          "acceptance": false
         }
       ],
       "reports": [

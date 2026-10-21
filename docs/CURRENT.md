@@ -56,3 +56,21 @@ Exact current reach/body/wrist/weapon runs are recorded in the acceptance ledger
 Continue the unresolved field list, including Y-action/vehicle view ownership,
 cover step-out, mounted weapons and native iDroid alignment. Do not interpret
 50cm reach or one landing zone as whole-game or physical-headset acceptance.
+
+## Vehicle rotation continuation
+
+FP03 is now reproduced in the native deployed jeep with a fixed HMD. Entry
+from33.45 degrees settles164.56 degrees after an additional intermediate swing;
+exit also rotates the view. Driver view currently follows Snake's animated
+root and starts with zero look offset; exit restores native chase-camera yaw.
+The actual vehicle heading and exact local ridden-ID lookup are resolved from
+owned native code and read-only live data. Private continuation:
+`private/current-vehicle-heading-contract.md`. No production repair was made
+in this investigation. Use the vehicle's heading changes while preserving the
+pre-action viewing direction; also handle exit and existing snap-turn state.
+Do not mask entry with a fixed timer or certify Fulton/climbing from jeep work.
+
+Runs193830194950,193922082738,195034107680 and200533374378 are retained.
+The native network notice interrupting200417973648 was dismissed with the
+existing VR Confirm binding in200457570168; no exit input was dispatched by
+the interrupted case. Owned game/simulator then closed; Steam retained.
