@@ -442,6 +442,16 @@ that grip does not also change tabs, and trigger zoom stays dormant. Release
 the gun grip before using a fresh squeeze to change pages. A fresh grip inside
 focus cannot draw another gun. Root tabs cycle from the last page to the first.
 
+**Free roam from the helicopter:** open iDroid, choose **Missions → Mission
+List**, then change the list's category once to **Free Roam (Move to area of
+operations/Mother Base)**. With default handheld controls, hold **left grip**
+and flick **right stick right** to change that category. Choose Afghanistan,
+Africa or Mother Base, confirm the destination and landing zone, then select
+**Commence Mission** and a drop time. Use your configured Interact action
+(default **Y**) to leave the helicopter after landing. Free Roam is a category
+inside Mission List; there is no separate area-selection row on this Missions
+page. Rebound controls use the `idroid.next_tab` and `menus.confirm` actions.
+
 Set **`settings.handheld_menus = 0`** to use a world panel slightly below eye
 level. Gameplay pauses while that mode is open. Closing it releases only the
 mod's own pause; other native pauses remain. An existing explicit preference

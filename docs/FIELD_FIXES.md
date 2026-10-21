@@ -11,7 +11,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Natural mounted-weapon controls — FP11/FP15.** Implement physical grip-and-aim and stick aiming for mortars and each turret type; verify native pivots/limits, contact, release, firing and exit. MountedGrip helper exists but has no production adapter.
 - [ ] **Small-rock slipping and stops — FP16.** Reported; locate/repeat affected rocks, distinguish native collision/fall state from camera/body presentation.
 - [ ] **Right-wrist shoulder/opposite-arm coupling — FP17.** Reported in physical VR. Reproduced: right wrist +/-30 degrees rotates chest and shifts fixed-input left palm8.5/12cm. Acquired-weapon-only torso correction removes wrist-driven heading in two Mother Base repeats. Remaining opposite-palm movement is at most 1.13cm and follows native idle animation. Physical headset and reach remain open.
-- [ ] **Shortened arm reach — FP17.** Reported; compare native bone lengths/calibration and physical reach across modes. Physical Quest validation required.
+- [ ] **Shortened arm reach — FP17.** Reproduced in game: at50cm tracked reach, full-body palm is20.5cm short crouched and11.3cm short standing; arms-only standing matches within0.04cm. Two shoulder-fit candidates rejected for worse crouched reach (23.7/24.2cm) and removed from source; defect remains open. Physical Quest validation remains required.
 - [ ] **Precision-weapon support loss — FP02.** Moving supported rifle and3 back-slot shots retain contact in082239, but open support fingers reproduced in both eyes. Read-only shared palettes match; candidate73fe7d0b521d cups acquired long-gun support outside native manipulation. Curled fingers now visible after moving aim and3 shots; native reload5->9 and reacquisition observed. Mid-reload pair capture failed on grip lease; broader verification remains open. Bolt-action and physical headset remain open.
 - [ ] **Tutorial camera handoff and retained iDroid — FP07/FP12.** Exact retained-terminal timeout, cinematic return and ordinary stow/reopen pass onff0dd2c746a6 after fixing reproduced ownership loss. Scoped simulator subcase complete; physical Quest, alignment and remaining tutorial lessons stay open.
 - [ ] **Idle/tracking-loss camera and weapon continuity — FP01/FP02.** Camera fallback not reproduced in simulator. Rifle disappearance reproduced in both eyes during tracking loss. Combined candidate 148d5ca51161 built/installed; 58 test groups and installer checks passed; scoped field loss/recovery and safe held-trigger checks passed on both primary slots (runs023544/023824/024003/024113 below). Other transitions and physical Quest remain open.
@@ -24,31 +24,17 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Cabin paper/pen — FP09.** Grip/contact, writing/pinning and prompt clipping remain open.
 - [ ] **Cabin gallery/workbench/cassettes — FP10.** Note editor, printing/stacking and cassette presentation remain open.
 - [ ] **ACC loadout holsters — FP11.** Native physical interaction and live acceptance incomplete.
-- [ ] **ACC free-roam destination entry — FP13.** Entry absence reproduced in ACC40050; native cause/routing unresolved.
+- [x] **ACC free-roam destination entry — FP13.** Resolved route: Missions -> Mission List -> Free Roam. Existing VR bindings reach all three destination entries; Afghanistan selection, landing zone, sortie, flight and on-foot exit verified on c2b3. No unlock/save edits or forced visibility. Controls guide corrected; handset alignment remains FP07.
 - [x] **Headless sortie preview — FP14.** Restored in development: complete head in both eyes on native sortie screens; clear first-person return after departure. Runs 134958388735Z and 135550994795Z.
 - [ ] **Remaining mission/menu/weapon/control regressions — FP12.** Reconcile existing catalogs by exact build; retain explicit untested combinations.
 
 ## Current execution checkpoint
 
-Checked development `ff0dd2c746a6`: exact retained-terminal native tutorial timeout,
-cinematic and same-player return passed, including ordinary Back, immediate reopen
-and final stow (`20261021T034930898656Z`). Same-open-terminal provenance fixes the
-post-scene ownership loss reproduced on148d. All58 automated groups and installer
-checks pass. Broad FP07/FP12 stay open for alignment, other lessons and headset.
-
-Both primary-slot rifle tracking-loss, held-trigger suppression/release and positive
-firing rearm passed on this binary (`20261021T040358781890Z`,
-`20261021T040558709267Z`). Both loss/recovery eyes reviewed. Open support fingers
-remain visible; other owners, movement, bolt-action/recoil and physical Quest are
-unproven. Earlier evidence and failed harness assertions remain retained in JSON.
-
-Session closed with neutral controls, faults0 and no menus; Steam retained.
-Published pin unchanged. Per-game and both Play commands select Meta; global
-Windows runtime is Virtual Desktop and registry restoration was denied. See
-CURRENT.md for exact evidence and the launch check.
-
-Next: FP02 moving support/contact and precision-weapon checks; FP07 native handset
-alignment; FP03 Y-action rotation reproduction. Broader checklist stays active.
+Development `c2b3f553cbb8` includes the sortie-head, support-finger and bare-hand
+wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
+was verified through on-foot arrival on 21 October; the earlier missing root-row
+investigation did not identify the Mission List category. Guidance now describes
+that route. The complete field list above remains the work queue.
 
 ## Closure requirements
 
@@ -59,5 +45,5 @@ alignment; FP03 Y-action rotation reproduction. Broader checklist stays active.
 - [ ] Release test inputs, restore test poses and close test-opened menus.
 - [ ] Preserve published play build, personal bindings/settings, saves and established VR interactions.
 
-FP14 is fixed in development; all unchecked defects remain open. Keep this checklist and the JSON ledger in
+FP14 is fixed in development and FP13 routing is resolved; all unchecked defects remain open. Keep this checklist and the JSON ledger in
 sync as evidence changes; retain the full scope across continuation turns.

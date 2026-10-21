@@ -614,7 +614,7 @@
     {
       "id": "FP13",
       "title": "ACC free-roam area-selection entry is absent",
-      "status": "reproduced_entry_absence_cause_unresolved",
+      "status": "native_free_roam_route_verified_in_simulator",
       "evidence": [
         {
           "run": "20261020T221309748784Z",
@@ -625,6 +625,19 @@
           "run": "20261020T222055724136Z",
           "scope": "source-derived native ReleaseFreePlay diagnostic",
           "result": "MSN_LOCATION visibility false before and after; story33 and availableGMP4663940 unchanged"
+        },
+        {
+          "candidate": "c2b3f553cbb8",
+          "run": "20261021T170452371353Z",
+          "scope": "Missions -> Mission List -> Free Roam category, using existing VR tab and Confirm bindings. Afghanistan, Africa and Mother Base entries visible in both eyes. Northern Kabul destination and low-danger landing zone selected; native sortie preview reached.",
+          "arrival_runs": [
+            "20261021T171037607691Z",
+            "20261021T171138168205Z",
+            "20261021T171416965878Z"
+          ],
+          "result": "Native mission30010 Seq_Game_FreePlay, normal helicopter flight and Y exit to status_NORMAL_ACTION=true; final on-foot images reviewed in both eyes.",
+          "correction": "MSN_LOCATION root visibility was the wrong criterion for accessing Free Roam. Native Mission List category supplies this route without forcing menu visibility, changing unlocks or editing saves.",
+          "limitations": "Afghanistan route verified in simulator; Africa and Mother Base category entries observed, their departures not exercised in this run. Handset alignment and physical-headset acceptance remain separate open defects. Intermediate expected-state assertions failed while menus advanced normally; those failures remain recorded."
         }
       ],
       "acceptance": [
@@ -765,6 +778,39 @@
             0.009943890787819184
           ],
           "scope": "Mother Base on foot, fixed HMD and left input; opposite palm movement at most 1.13cm, with native source chest animation varying independently. Physical reach and headset validation remain open."
+        },
+        {
+          "candidate": "c2b3f553cbb8",
+          "runs": [
+            "20261021T171741149076Z",
+            "20261021T171949017204Z",
+            "20261021T172159557973Z"
+          ],
+          "scope": "Empty left hand reach in Afghanistan mission30010. Fixed HMD, forward controller positions50/65/80cm at x=-30cm,y=-20cm; compare native crouch, standing and temporary full_body=0.",
+          "result": "Full body crouched palm errors20.5/35.1/49.8cm; standing11.3/26.2/41.0cm. Arms-only standing50cm reach error0.04cm; farther65/80cm still limited by native arm lengths. Full-body fitting adds about14cm of lost forward reach in standing.",
+          "settings": "Original personal controls restored byte-for-byte after full_body comparison.",
+          "next": "Two pelvis/shoulder-fit experiments rejected and removed; production source restored. Arm reach remains open. Next investigation must resolve chest/neck placement rather than repeat this fit."
+        },
+        {
+          "candidate": "4fb68902bdb2",
+          "runs": [
+            "20261021T174212443950Z",
+            "20261021T174307891746Z"
+          ],
+          "scope": "First shoulder-fit candidate, same50/65/80cm left controller poses in native crouch and standing after normal Afghanistan free-roam deployment.",
+          "result": "Rejected: crouched50cm palm error23.7cm versus20.5cm baseline. Standing50cm error9.1cm versus11.3cm baseline is insufficient. Eye alignment and floor contacts held, but horizontal-only shoulder-center fitting traded reach for shoulder height.",
+          "next": "Two pelvis/shoulder-fit experiments rejected and removed; production source restored. Arm reach remains open. Next investigation must resolve chest/neck placement rather than repeat this fit."
+        },
+        {
+          "candidate": "bb31c44d80b8",
+          "runs": [
+            "20261021T175207310751Z",
+            "20261021T175641867665Z",
+            "20261021T175708591693Z"
+          ],
+          "scope": "Revised three-dimensional shoulder objective, same native Afghanistan free-roam arrival and crouched 50/65/80cm controller poses.",
+          "result": "Rejected: palm errors 24.2/39.1/53.9cm, worse than baseline. Full body remained valid and eye error below 0.004cm, so this was not a fallback result. Both experimental production edits removed.",
+          "limitations": "Suite observed_pass only confirmed requested poses were dispatched; it does not indicate correct reach. No headset acceptance, publication or pinning."
         }
       ]
     }

@@ -13,10 +13,19 @@ source work has been consolidated and pushed.
 - Bare-hand right-wrist rotation no longer steers torso heading. The previous
   8.5–12cm opposite-palm displacement fell to at most 1.13cm in two repeats;
   residual movement follows native idle animation. Arm reach/headset stay open.
+- Free Roam is reachable through Missions -> Mission List -> Free Roam. Existing
+  VR bindings completed Afghanistan destination/LZ selection, sortie, flight and
+  on-foot helicopter exit. The controls guide now describes the native route.
+- Short reach is now reproduced: at 50cm forward controller reach, the full-body
+  palm is 20.5cm short crouched and 11.3cm short standing. Two pelvis/shoulder-fit
+  experiments made crouching worse and were removed; the defect remains open.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Production candidate checked in game: `c2b3f553cbb8`. Recorded runs and precise
+Production source checked in game: `c2b3f553cbb8`; restored development rebuild
+`436f50fc8654` uses that unchanged production source after removing both failed
+reach experiments. It built, passed required checks and is installed, but this
+rebuild has not had a new gameplay run. Recorded runs and precise
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).
 

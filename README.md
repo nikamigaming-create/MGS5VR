@@ -8,7 +8,7 @@ binoculars and scopes, and equipment on your left wrist.
 **Current development status:** Coco's adaptations, physical binocular lesson
 integration and native A* navigation are retained. Full-game, weapon coverage,
 iDroid tutorial recovery and physical-headset acceptance remain open. Native
-handheld iDroid alignment passes scoped simulator checks. Local work keeps two
+handheld iDroid contact and projection alignment remain under repair. Local work keeps two
 builds: pinned `play/` matching the last published release and `build/dev/`
 holding the checked candidate for testing. `tools/build.ps1` refreshes
 development; `Play.cmd` restores the published pin and `Play-Dev.cmd` selects
@@ -33,6 +33,10 @@ other headsets are unverified. This is not a standalone Quest app.
    and choose **Launch**. Steam must be running and signed in. Use the game's
    **Action Type** controls. `Launch-Headset.cmd` also launches the saved selection.
 4. Load **Continue → Resume Game**. Tracked VR enters automatically.
+
+For free roam from the helicopter, open **iDroid → Missions → Mission List**
+and change its category to **Free Roam** (default: hold left grip and flick
+right stick right). Choose a destination, landing zone and drop time.
 
 The field terminal has interactive 3D training cassettes, clean gameplay beside
 rotating controllers, a guide to all eight control modes, and a binding editor.
