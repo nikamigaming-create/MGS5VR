@@ -831,9 +831,37 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const auto neck=bone(q,p,3);
             const ArmPose nativeSpine{bone(q,p,1),bone(q,p,2),neck};
             const std::array<Pose,2> placedFeet{bone(q,p,15),bone(q,p,19)};
-            const auto neckTarget=compose(*torsoDelta,neck);
+            auto neckTarget=compose(*torsoDelta,neck);
             auto spine=solveSpine(nativeSpine,neckTarget,chestFloor?&*chestFloor:nullptr);
             Vec3 pelvisShift{};
+            if(!mountedBody&&!frame.controllers.cabinPlay
+               &&(frame.controllers.playerPosture==PlayerPosture::standing
+                  ||frame.controllers.playerPosture==PlayerPosture::crouched)){
+                // Native aiming animation pitches the head ahead of the neck.
+                // Retarget its neutral basis to the torso, keeping the measured
+                // eyes fixed. Physical look must not steer this torso fit.
+                const Pose headTarget{uprightHead.orientation,
+                    uprightHead.position-rotate(uprightHead.orientation,nativeEyeFromHead)};
+                const auto neutralNeck=compose(compose(headTarget,inverse(bone(q,p,4))),neck);
+                const auto ray=neutralNeck.position-nativeSpine.shoulder.position;
+                const float distance=std::sqrt(dot(ray,ray));
+                const auto upper=nativeSpine.elbow.position-nativeSpine.shoulder.position;
+                const auto lower=nativeSpine.wrist.position-nativeSpine.elbow.position;
+                const float reach=std::sqrt(dot(upper,upper))+std::sqrt(dot(lower,lower))-.005f;
+                const float advance=std::max(0.f,distance-reach);
+                // The pelvis follows only the spine's measured reach deficit;
+                // its feet remain at placedFeet for the existing leg solve.
+                if(distance>.001f&&advance<=.12f){
+                    const Pose shift{{},ray*(advance/distance)};
+                    const auto fitted=solveSpine({compose(shift,nativeSpine.shoulder),
+                        compose(shift,nativeSpine.elbow),compose(shift,nativeSpine.wrist)},
+                        neutralNeck,chestFloor?&*chestFloor:nullptr);
+                    if(fitted&&!fitted->reachClamped){
+                        spine=fitted;neckTarget=neutralNeck;pelvisShift=shift.position;
+                        for(size_t i=0;i<count;++i){auto placed=bone(q,p,i);placed.position=placed.position+pelvisShift;replace(q,p,i,placed);}
+                    }
+                }
+            }
             if(!spine&&chestFloor&&frame.controllers.playerPosture==PlayerPosture::prone){
                 // A nearly straight prone spine has no room to arch over a
                 // slope. Let the pelvis approach the fixed neck by at most

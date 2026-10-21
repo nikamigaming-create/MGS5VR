@@ -1,4 +1,4 @@
-# Field fixes — active checklist
+- [ ] **Floating in seated and standing modes — FP05.** Reproduced helicopter-exit latch fixed: initial crouched camera formerly1.18/1.369m above root versus native eye~0.76m; two fresh corrected exits0.775/0.788m. Standing/crouch/prone/walk retain native leg scale. Physical seated/standing report remains open.
 
 Updated 21 October 2026. All community-reported defects are top priority.
 An unchecked box means unresolved. Only check a box after its acceptance
@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Development `ca16f0e84503` includes the clavicle reach correction plus the sortie-head, support-finger and bare-hand
+Development `56d5a6b01274` includes helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
 investigation did not identify the Mission List category. Guidance now describes

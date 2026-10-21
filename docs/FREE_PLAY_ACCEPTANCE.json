@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "ca16f0e84503",
-  "candidate_status": "Authored clavicle now contributes to full-body reach. Reproduced standing50cm reach error reduced11.3cm to1.1mm; crouched20.5cm to5.4cm. Remaining crouched reach and physical acceptance open.",
+  "candidate": "56d5a6b01274",
+  "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -342,6 +342,16 @@
           "scope": "Adjacent regression check after clavicle change: selected back-slot rifle, moving acquired support, three native discharges, reload and reacquisition.",
           "result": "Three one-round discharges confirmed, both-eye post-shot view retains gun/contact/curled support fingers. Reload capture timed out after left eye, so no paired mid-reload claim. Follow-up selected state reports9 rounds and moving support reacquires in all three poses; both eyes reviewed.",
           "limits": "Not all weapons, bolt actions, damage or physical headset. Failed capture remains recorded."
+        },
+        {
+          "candidate": "56d5a6b01274",
+          "runs": [
+            "20261021T191805969410Z",
+            "20261021T191851394905Z"
+          ],
+          "result": "Moving supported back-slot rifle retained contact through3 verified one-round discharges. Native reload replenished magazine to9; later acquire0/1/2 retained support and both-eye final grip reviewed.",
+          "failure": "Mid-reload right-eye capture failed: Static grip expired or gameplay input changed during optic capture. Entire reload capture case remains failed.",
+          "limits": "No global weapon identity, hit/damage, every weapon or physical-headset claim."
         }
       ]
     },
@@ -481,10 +491,41 @@
     {
       "id": "FP05",
       "title": "Floating and transient size accumulation",
-      "status": "simulator_pass_headset_unproven",
+      "status": "helicopter_exit_fixed_in_simulator_physical_modes_open",
       "acceptance": [
         "42 native-game simulator height/posture phases passed on c6f6bebd10bd",
         "physical Quest confirmation required"
+      ],
+      "evidence": [
+        {
+          "candidate": "8483ea95dba9 / 56d5a6b01274",
+          "commit": "1217caf",
+          "reproduction_runs": [
+            "20261021T181416249027Z",
+            "20261021T183639029991Z"
+          ],
+          "verification_runs": [
+            "20261021T190428000034Z",
+            "20261021T190506451763Z",
+            "20261021T191338716576Z",
+            "20261021T191432581578Z"
+          ],
+          "defect": "Helicopter exit retains crouched posture; first animated eye sample was latched indefinitely. Explicit stand/crouch restored normal height.",
+          "fix": "Open existing 900ms posture-settling window only at verified cabin-transit exit, including when posture stays crouched. Ordinary gait/prone anchoring retained.",
+          "camera_height_above_root_m": {
+            "before": [
+              1.18,
+              1.369
+            ],
+            "after": [
+              0.775,
+              0.788
+            ],
+            "native_eye_approx": 0.76
+          },
+          "result": "Fresh exits no longer remain elevated; full body valid and leg scales1.0 in exit, standing/crouch/prone/walk. Both-eye reach/body images reviewed.",
+          "limits": "Physical Quest seated/standing behavior still unverified; not universal FP05 closure."
+        }
       ]
     },
     {
@@ -700,6 +741,17 @@
         "Record exact native location and repeat same rock both directions walking/running, seated/standing and full-body on/off",
         "Correlate native floor, actor position/velocity, posture/travel state and VR eye height through interruption",
         "Preserve native collision and valid fall behavior; distinguish real actor stumble from VR presentation jump"
+      ],
+      "evidence": [
+        {
+          "candidate": "1f05c434f039 (earlier investigation only)",
+          "runs": [
+            "20261021T184403296435Z",
+            "20261021T184637310496Z"
+          ],
+          "result": "LZ low-terrain walk traversed~5.7m with0.56m elevation rise; reported slip/stop not reproduced. Return route moved~10m across area but endpoint was3.6m outside requested goal; navigation failure, not a collision diagnosis.",
+          "limits": "Exact reported rock location remains unknown; optional user question pending. No FP16 fix claimed."
+        }
       ]
     },
     {
@@ -845,6 +897,30 @@
           "result": "Standing50cm gap corrected to1.1mm; crouched50cm improved from20.5cm to5.4cm. Body remained admitted with near-zero eye error and unchanged native foot clearance. Both eyes reviewed for reach, standing downward body view and crouched body view; continuous arms retained. Native stand/crouch/prone/stand and short walk completed.",
           "limits": "Crouched gap is not fixed;65/80cm exceed current rig reach. No physical-headset acceptance. Generic suite pass indicates pose dispatch only; geometric reach measured separately.",
           "next": "Investigate native head/neck rest pose using private/reach-next-investigation.json. Offline calculation is not a live fix."
+        },
+        {
+          "candidate": "56d5a6b01274",
+          "scope": "Neutral authored head/neck fit in standing/crouch, measured spine reach and bounded pelvis follow; existing feet solve retained. HMD look excluded from torso heading. Prone, cabin and mounted paths retained.",
+          "runs": [
+            "20261021T191338716576Z",
+            "20261021T191412670615Z",
+            "20261021T191432581578Z",
+            "20261021T191718053726Z"
+          ],
+          "palm_error_m": {
+            "crouched_50_65_80cm": [
+              0.0015852262,
+              0.1332258763,
+              0.2779420469
+            ],
+            "standing_50_65_80cm": [
+              0.00099,
+              0.06105,
+              0.20412
+            ]
+          },
+          "result": "50cm gap corrected in crouch and standing. Body valid in all posture/walk phases, legs1.0, camera retains corrected exit height. Both final eyes reviewed. Fixed opposite palm moves at most0.1mm through right-wrist0/+30/-30/0 degrees.",
+          "limits": "65/80cm still reach-limited; no arbitrary arm elongation. Broad interactions and physical Quest remain unaccepted. Earlier1f05 experiment exposed camera floating and was removed until camera fix; it is not the final accepted candidate."
         }
       ]
     }
@@ -912,17 +988,16 @@
     },
     "cleanup_receipt": "artifacts/dev/field-report-review/scene-owner-final-cleanup-before-stop.json",
     "last_native_checkpoint": {
-      "mission": 10020,
-      "sequence": "Seq_Game_RescueMiller",
-      "on_horse": false,
+      "mission": 30010,
+      "sequence": "Seq_Game_FreePlay",
       "menu": false,
       "pause": false,
       "idroid": false,
-      "saving": false
+      "session": "closed after neutral cleanup"
     },
     "build_slots": {
       "published_pin": "b627c7cacc9a",
-      "development": "ff0dd2c746a6",
+      "development": "56d5a6b01274",
       "installed": "development",
       "pin_matches_play": true,
       "physical_runtime": "Explicit Meta Quest Link in both local Play commands"
@@ -936,6 +1011,7 @@
     },
     "research_dossier": "D:/Dev/Tools/Ghidrust/workspace/evidence/mgs5vr/idroid-post-tutorial-close",
     "runtime_note": "Per-game Meta preference and -MetaLink launch checks pass. Windows global runtime was observed as Virtual Desktop at final cleanup; direct restoration to mandated Meta default was denied by Windows registry permissions. Global value remains Virtual Desktop. No SteamVR switch occurred.",
-    "overall_goal_status": "active_all_unresolved_field_fixes"
+    "overall_goal_status": "active_all_unresolved_field_fixes",
+    "current_checkpoint": "Helicopter-exit height and 50cm crouched reach repaired; all remaining FIELD_FIXES stay active. No harness source changes in these fixes."
   }
 }
