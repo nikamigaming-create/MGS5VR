@@ -1,3 +1,16 @@
+# October 21 hand fixes on main
+
+Rifle support fingers now visibly curl in both eyes through three shots after
+moving aim. Native reload replenishes5->9; reacquisition returns to the curled
+grip in both eyes. Retained140842395426Z/141139376668Z. Mid-reload paired capture
+expired its input lease; do not relabel that runner failure as a pass. Broad FP02
+remains open for bolt-action and physical checks.
+Right-wrist coupling reproduced in140937499000Z: fixed HMD/left controller,
+right yaw+/-30 turns chest~30 degrees and moves left palm8.5/12cm. Correction
+limits hand-driven torso heading to an acquired two-handed weapon hold. Build
+completed; actual-game repeat next. Current live game is the preceding build,
+mission10020 RescueMiller on foot, neutral; do not deploy over the live process.
+
 # October 21 gameplay result: sortie preview head restored
 
 Development bc7dd67830ce restores only mod-owned hiding during the exact native

@@ -751,9 +751,14 @@ bool apply(void* context,void* binding,PoseRestore& restore){
            &&!frame.controllers.cabinTransit&&!frame.controllers.vehicleMounted
            &&travelMode==TravelMode::onFoot){
             std::optional<Quat> handHeading;
-            if(presentationGrips[0]&&presentationGrips[1]&&!propHands[0]&&!propHands[1]){
+            if(frame.controllers.weaponReady&&frame.controllers.supportGrip
+               &&supportContact.attached()&&!frame.controllers.optic.held
+               &&presentationGrips[0]&&presentationGrips[1]&&!propHands[0]&&!propHands[1]){
                 const auto midpoint=(grips[0].position+grips[1].position)*.5f;
                 const auto aim=nativeTrackedPose(frame.nativePose,frame.headPose,presentationHands[1]->aim);
+                // Only an acquired two-handed weapon hold owns aim-driven
+                // torso facing. Bare-hand wrist rotation must not move the
+                // shoulders and pull the stationary opposite hand out of reach.
                 // Down-at-side, behind-back and crossed-body gestures cannot
                 // claim torso facing. A supported weapon can: both grips use
                 // the same frame as the viewer and native skin transaction.

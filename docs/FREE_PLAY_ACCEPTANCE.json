@@ -324,6 +324,14 @@
           "scope": "3 right-hand yaw sweeps and3 PRIMARY_BACK trigger edges,1 native round each, sampled support retained. Paired final eyes show open bionic support fingers.8 read-only comparisons match18 shared modular/body joints within1.73e-6 max element difference; gross stale modular palette hypothesis contradicted in this run.",
           "dossier": "D:/Dev/Tools/Ghidrust/workspace/evidence/mgs5vr/rifle-support-fingers/",
           "limitation": "Does not establish bolt-action or physical-headset acceptance."
+        },
+        {
+          "run": "20261021T140842395426Z",
+          "result": "curled_support_fingers_visible_with_moving_rifle_and_three_shots",
+          "candidate": "bc7dd67830ce",
+          "followup_run": "20261021T141139376668Z",
+          "reload": "Native manipulation seen; magazine replenished from5 to9 and subsequent reacquisition shows curled grip in both eyes. Mid-reload pair capture failed when grip lease expired; retained failure.",
+          "limitations": "Does not close all precision weapons, bolt-action or physical headset coverage."
         }
       ]
     },
@@ -674,7 +682,7 @@
     {
       "id": "FP17",
       "title": "Right wrist steers shoulders and opposite arm; apparent arm shortening in physical VR",
-      "status": "reproduce",
+      "status": "reproduced_fix_built_pending_gameplay",
       "report": "Both hands vertical/parallel moderately extended; moving only right hand pulls left hand backward, rotating right wrist moves shoulders oppositely while view stays fixed. User distinguishes physical VR from Snakebot.",
       "acceptance": [
         "Hold HMD and left controller fixed; independently sweep right wrist yaw and right-hand forward translation with both hands vertical and parallel",
@@ -684,6 +692,32 @@
       ],
       "investigation": [
         "src/controller_rig.cpp uses primary aim for trackedTorsoHeading when both presentation hands are forward; no explicit supported-weapon requirement at that call. Plausible coupling source, not yet reproduced in current field."
+      ],
+      "evidence": [
+        {
+          "run": "20261021T140937499000Z",
+          "result": "right_wrist_drives_chest_and_opposite_hand",
+          "right_wrist_degrees": [
+            0,
+            30,
+            -30,
+            0
+          ],
+          "chest_yaw_degrees": [
+            -98.159,
+            -68.486,
+            -128.248,
+            -98.419
+          ],
+          "left_palm_displacement_m": [
+            0,
+            0.08549,
+            0.12045,
+            0.001
+          ],
+          "head_and_left_controller_position_displacement_m": 0,
+          "change": "Limit aim-driven torso heading to acquired two-handed weapon support; bare hands no longer authorize it. Gameplay repeat pending."
+        }
       ]
     }
   ],
