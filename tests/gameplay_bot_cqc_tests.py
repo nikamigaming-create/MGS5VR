@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]/'tools'))
 from gameplay_bot.cqc import (
     attempt_cqc, classify, cqc_binding, cqc_packet, exact_close_target,
-    native_cqc_script, validate_native, wait_released, _checkpoint, _close_position, _facing,
+    native_cqc_script, validate_native, wait_released, _checkpoint, _close_position, _facing, run_named_cqc, cqc_state,
 )
 from gameplay_bot.core import BotFault
 
@@ -19,6 +19,37 @@ ANCHOR = (30010, 10, 2, 99, 4)
 ACTOR = {'name': 'sol_fixture_0000', 'id': 1166}
 BINDINGS = {'actions': [{'name': 'gameplay.fire_or_cqc', 'contexts': ['gameplay', 'commands'],
     'bindings': [{'gesture': 'level', 'inputs': ['right_trigger'], 'milliseconds': 0}]}]}
+
+
+class NamedCqcTests(unittest.TestCase):
+    def test_explicit_target_keeps_existing_executor_and_bounds(self):
+        live=Mock();policy={'target':ACTOR['name'],'native':{'mission':30010},'pulses':5,'pulse_seconds':.18}
+        with patch('gameplay_bot.cqc.fresh_rig',return_value=({'native':{'mission':30010}},ANCHOR)), \
+             patch('gameplay_bot.cqc.read_enemy_snapshot',return_value={'soldiers':[ACTOR]}), \
+             patch('gameplay_bot.cqc.attempt_cqc',return_value={'status':'observed'}) as execute:
+            self.assertEqual(run_named_cqc(live,policy,enemy_script='roster',output='out'),{'status':'observed'})
+        execute.assert_called_once_with(live,actor=ACTOR,anchor=ANCHOR,enemy_script='roster',
+                                        output='out',pulses=5,pulse_seconds=.18,contextual=False)
+
+    def test_changed_world_or_missing_exact_target_never_dispatches(self):
+        for native,roster in (({'mission':10020},[ACTOR]),({'mission':30010},[]),
+                              ({'mission':30010},[{'name':'sol_other','id':2}]),
+                              ({'mission':30010},[ACTOR,ACTOR])):
+            with self.subTest(native=native,roster=roster):
+                with patch('gameplay_bot.cqc.fresh_rig',return_value=({'native':native},ANCHOR)), \
+                     patch('gameplay_bot.cqc.read_enemy_snapshot',return_value={'soldiers':roster}), \
+                     patch('gameplay_bot.cqc.attempt_cqc') as execute:
+                    with self.assertRaises(BotFault):
+                        run_named_cqc(Mock(),{'target':ACTOR['name'],'native':{'mission':30010}},
+                                      enemy_script='roster',output='out')
+                    execute.assert_not_called()
+
+    def test_unreviewed_or_incomplete_policy_is_rejected_before_live_reads(self):
+        for policy in ({},{'target':ACTOR['name']},{'target':'hos_child','native':{'mission':30010}},
+                       {'target':ACTOR['name'],'native':{'mission':30010},'warp':True}):
+            with patch('gameplay_bot.cqc.fresh_rig') as read:
+                with self.assertRaises(BotFault):run_named_cqc(Mock(),policy,enemy_script='roster',output='out')
+                read.assert_not_called()
 
 
 def native(life=0, hold=False, *, action='Idle', status='Normal'):
@@ -32,6 +63,7 @@ def state(held=False, stamp=1000):
     return {'now_ms': stamp, 'scene': 'gameplay', 'camera_active': True,
             'camera_available': True, 'menu': False, 'idroid': False, 'gamepad': False,
             'activation': 2, 'rendered': {'player_owner': 99, 'presentation_epoch': 4,
+                'head_pose': {'position': [0, 0, 0], 'orientation': [0, 0, 0, 1]},
                 'sample_ms': stamp, 'raw_right_grip_tracked': True, 'raw_right_aim_tracked': True,
                 'native_pose': {'position': [0, 1.5, 0], 'orientation': [0, 0, 0, 1]}},
             'native': {'player_x': 0, 'player_y': 0, 'player_z': 0,
@@ -49,6 +81,23 @@ def enemies():
 
 
 class CqcTests(unittest.TestCase):
+    def test_native_action_is_observable_but_never_admits_trigger_packet(self):
+        fixture = state()
+        fixture['native'].update(player_vehicle_id=65535, popup=False, saving=False,
+            demo=False, demo_nonplayable=False, game_over=0, title=False,
+            status_CARRY=False, status_CURE=False, status_NORMAL_ACTION=False)
+        fixture['rendered']['binocular_held'] = False
+        fixture['controls']['travel_mode'] = 4
+        with patch('gameplay_bot.cqc.fresh_rig', return_value=(fixture, ANCHOR)):
+            self.assertEqual(cqc_state(Mock(), ANCHOR, transition=True)[0], fixture)
+            with self.assertRaises(BotFault): cqc_state(Mock(), ANCHOR)
+            for mode in (0, 2, 3):
+                fixture['controls']['travel_mode'] = mode
+                with self.assertRaises(BotFault): cqc_state(Mock(), ANCHOR, transition=True)
+        held = state(True, 1001)
+        held['controls']['travel_mode'] = 4
+        with self.assertRaises(BotFault): cqc_packet(held, after_sample_ms=1000)
+
     def test_effective_binding_rejects_ready_or_command_chords(self):
         self.assertEqual(cqc_binding(BINDINGS), ['right_trigger'])
         for change in ({'inputs': ['right_grip', 'right_trigger']}, {'gesture': 'hold'}, {'inputs': ['x']}):
@@ -163,7 +212,7 @@ class CqcTests(unittest.TestCase):
             live.observe.side_effect = BotFault('operator completion unknown') if unknown else None
             live.observe.return_value = state(not miss_packet, 1001)
             before_dispatch = native(); before_dispatch['position'] = [0, 0, 1.8] if actor_moved else [0, 0, 1]
-            live.native.read.side_effect = [(native(), {}), (before_dispatch, {}),
+            live.native.read.side_effect = [(native(), {}), (before_dispatch, {}), (before_dispatch, {}),
                 (native(hold=True, action='CqcRaw'), {}), (native(life=4), {})]
             now = [0.]
             with patch('gameplay_bot.cqc.cqc_state', return_value=(state(), ANCHOR)), \

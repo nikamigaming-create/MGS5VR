@@ -41,6 +41,13 @@ PhysicalControls synthesizeDirections(PhysicalControls input,std::array<int,2>& 
 }
 }
 void publishControlInputAudit(ControlInputAudit sample){std::lock_guard lock(auditMutex);audit=sample;}
+const std::array<std::string_view,29>& controlInputNames(){return names;}
+uint32_t physicalControlMask(const PhysicalControls& input,bool touches) noexcept{
+    std::array<int,2> directions{};const auto physical=synthesizeDirections(input,directions);
+    uint32_t result{};for(unsigned n=0;n<(touches?29u:19u);++n)
+        if(physical.buttons[n]>.5f)result|=1u<<n;
+    return result;
+}
 PhysicalControls ControlAxisOwnership::update(PhysicalControls input,uint32_t owner) noexcept {
     std::array<std::array<float,2>*,2> sticks{&input.leftStick,&input.rightStick};
     const bool changed=!initialized_||owner!=owner_;
@@ -97,6 +104,7 @@ const std::vector<ControlDefinition>& controlDefinitions(){
     static const std::vector<ControlDefinition> definitions=[] {
         std::vector<ControlDefinition> result{
         {"system.idroid","tap(menu,550)",normal},{"system.pause","hold(menu,550)",normal},
+        {"system.controls","hold(menu + left_stick_click,650)",all},
         {"system.idroid_focus","left_grip",normal,true},
         {"system.recenter","press(left_grip + menu)",normal},{"system.toggle_vr","hold(menu + b,550)",all},
         {"system.native_buttons","hold(menu + a,550)",all},
@@ -229,7 +237,7 @@ const std::vector<SettingDefinition>& settingDefinitions(){
         {"settings.binocular_roll_degrees",0,-180,180},{"settings.binocular_auto_mark",1,0,1},
         {"settings.binocular_max_eye_distance_cm",30,15,50},
         {"settings.binocular_actor_glow",1,0,1},{"settings.binocular_mark_dwell_ms",650,100,3000},
-        {"settings.player_height_offset_cm",0,-50,50},
+        {"settings.player_height_offset_cm",0,-50,50},{"settings.full_body",1,0,1},{"settings.seated_mode",0,0,1},{"settings.cinematic_free_move",1,0,1},
         {"settings.left_hand_x_cm",0,-15,15},{"settings.left_hand_y_cm",0,-15,15},{"settings.left_hand_z_cm",0,-15,15},
         {"settings.left_hand_pitch_degrees",0,-90,90},{"settings.left_hand_yaw_degrees",0,-90,90},{"settings.left_hand_roll_degrees",0,-90,90},
         {"settings.right_hand_x_cm",0,-15,15},{"settings.right_hand_y_cm",0,-15,15},{"settings.right_hand_z_cm",0,-15,15},
@@ -495,6 +503,12 @@ float ControlBindings::setting(std::string_view name) const{
     const auto it=std::find_if(settings_.begin(),settings_.end(),[&](const auto& e){return e.name==name;});
     return it==settings_.end()?0:it->value;
 }
+std::string ControlBindings::settingText(std::string_view name) const{
+    const float value=setting(name);
+    if(name=="settings.turn_mode")return value==0?"snap":value==1?"native_smooth":"off";
+    if(name=="settings.hud_mode")return value==0?"full":value==1?"binoculars_only":"off";
+    std::ostringstream out;out<<value;return out.str();
+}
 std::string ControlBindings::label(std::string_view action) const{
     if(const auto axis=std::find_if(axes_.begin(),axes_.end(),[&](const auto& a){return a.name==action;});axis!=axes_.end())
         return axis->source==0?"L STICK":axis->source==1?"R STICK":"UNBOUND";
@@ -516,6 +530,23 @@ std::string ControlBindings::label(std::string_view action) const{
         }
     }
     return text;
+}
+std::string ControlBindings::bindingText(std::string_view action) const{
+    if(const auto axis=std::find_if(axes_.begin(),axes_.end(),[&](const auto& a){return a.name==action;});axis!=axes_.end())
+        return axis->source==0?"left_stick":axis->source==1?"right_stick":"disabled";
+    const auto entry=std::find_if(entries_.begin(),entries_.end(),[&](const auto& e){return e.name==action;});
+    if(entry==entries_.end()||entry->bindings.empty())return "disabled";
+    constexpr std::array<std::string_view,5> gestures{"level","press","release","tap","hold"};
+    std::string result;
+    for(const auto& binding:entry->bindings){
+        if(!result.empty())result+=" | ";
+        if(binding.gesture!=Gesture::level){result+=gestures[static_cast<size_t>(binding.gesture)];result+='(';}
+        bool first=true;for(unsigned bit=0;bit<names.size();++bit)if(binding.mask&(1u<<bit)){
+            if(!first)result+=" + ";result+=names[bit];first=false;}
+        if(binding.gesture==Gesture::tap||binding.gesture==Gesture::hold)result+=','+std::to_string(binding.milliseconds);
+        if(binding.gesture!=Gesture::level)result+=')';
+    }
+    return result;
 }
 std::string ControlBindings::bindingsJson() const{
     constexpr std::array<std::string_view,8> contexts{"gameplay","equipment","commands","binoculars","menus","horse","vehicle","nativeButtons"};

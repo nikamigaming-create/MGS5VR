@@ -9,15 +9,22 @@ import re
 import time
 
 from .core import BotFault, atomic_json
-from .live import channel, fresh_control_observation, held_input_evidence, rotate
+from .live import channel, fresh_control_observation, held_input_evidence, rotate, sampled_release_keys
 from .locomotion import _position, _validate_field_state
 from .perception import read_enemy_snapshot
 from .session import preserved_tracking_poses
 from .health import HealthRecoveryNeeded, needs_recovery
+from .motion import _pose
+
+MINIMUM_MUZZLE_TARGET_RANGE = .25
 
 
 class AimProbeUnavailable(BotFault):
     """One target cannot currently be inspected; other targets remain eligible."""
+
+
+class RigPublicationDelay(BotFault):
+    """The same live owner has not produced a fresh rig within the deadline."""
 
 
 def mul(a, b):
@@ -134,6 +141,29 @@ def place_support_hand(live, frame, pair):
                      presentation_epoch=frame.get('presentation_epoch'))
 
 
+def aimed_support_frame(frame, grip_position, aim_orientation, pair):
+    """Move the measured LOCAL contact with the same requested primary turn.
+
+    A rifle's attached support hand guides the barrel. Sampling its socket
+    after turning only the primary hand follows that still-constrained old
+    barrel, so the two simulated hands oppose each other. Prepare both poses
+    from one publication before dispatch, preserving the authored contact.
+    """
+    head=frame.get('head_pose') or {};current=frame.get('right_grip') or {}
+    head=_pose(head.get('position'),head.get('orientation'),local_head=True)
+    current=_pose(current.get('position'),current.get('orientation'))
+    contact,_=support_poses(frame,{'position':[0.,0.,0.],'orientation':[0.,0.,0.,1.]})
+    view=_pose(grip_position,normalized(mul(aim_orientation,pair['orientation'])))
+    target={'position':[h+d for h,d in zip(head['position'],rotate(head['orientation'],view['position']))],
+            'orientation':normalized(mul(head['orientation'],view['orientation']))}
+    target=_pose(**target)
+    turn=normalized(mul(target['orientation'],inverse(current['orientation'])))
+    offset=rotate(turn,[c-p for c,p in zip(contact['position'],current['position'])])
+    contact=_pose([p+d for p,d in zip(target['position'],offset)],
+                  normalized(mul(turn,contact['orientation'])))
+    return {**frame,'weapon_support_grip':contact}
+
+
 def comfortable_grip(native):
     # A standing chest pose puts the pistol into the ground from the actual
     # prone eye. These are bot hand poses; player rig/calibration stay intact.
@@ -168,18 +198,25 @@ def fresh_rig(live, anchor=None, *, clock=time.monotonic, sleep=time.sleep):
         stamp=frame.get('sample_ms')
         if type(stamp) is int and 0<=state['now_ms']-stamp<=150:return state,identity
         live.events.emit('field_publication_wait',state=state,anchor=identity,input_replayed=False)
-        if clock()>=until:raise BotFault('The same-owner VR rig did not publish a fresh pose before the bounded deadline')
+        if clock()>=until:raise RigPublicationDelay('The same-owner VR rig did not publish a fresh pose before the bounded deadline')
         sleep(.025)
 
 
-def admit(live, anchor=None, *, clock=time.monotonic, sleep=time.sleep):
+def admit(live, anchor=None, *, witnessed_hospital_ride=False, clock=time.monotonic, sleep=time.sleep):
     # A released sprint/hit animation can briefly clear NORMAL_ACTION. Wait
     # with observation only; no gameplay action may use that transition state.
     until=clock()+1.5;expected=anchor
     while True:
         state,identity=fresh_rig(live,expected,clock=clock,sleep=sleep)
         expected=identity
-        try:_validate_field_state(state)
+        ride = (witnessed_hospital_ride is True
+            and tuple(state['native'].get(k) for k in ('mission','location','story','sequence'))
+                == (10010,30,0,'Seq_Game_VolginRide')
+            and state['native'].get('hospital_volgin_ride') is True
+            and state['native'].get('weapon_PRIMARY_HIP') == 70)
+        if witnessed_hospital_ride and not ride:
+            raise BotFault('Scripted horse combat lost its native ride and shotgun owner')
+        try:_validate_field_state(state,witnessed_hospital_route=ride)
         except BotFault:
             native=state['native']
             waiting=(native.get('status_NORMAL_ACTION') is False and native.get('status_CARRY') is False
@@ -207,7 +244,7 @@ def admit(live, anchor=None, *, clock=time.monotonic, sleep=time.sleep):
     return state,identity
 
 
-def sight(live, anchor, *, clock=time.monotonic):
+def sight(live, anchor, *, witnessed_hospital_ride=False, clock=time.monotonic):
     # Actual 20261005-truck-active-driver-69cf fired the WU correctly, then
     # its native bolt animation withdrew the muzzle after arm() had sampled
     # readiness. The same-owner publication remained fresh throughout. Allow
@@ -217,7 +254,7 @@ def sight(live, anchor, *, clock=time.monotonic):
     while True:
         started=clock()
         data,timing=live.native.read('inspect-combat-sight')
-        state,_=admit(live,anchor)
+        state,_=admit(live,anchor,**({'witnessed_hospital_ride':True} if witnessed_hospital_ride else {}))
         frame=state['rendered']
         owner_valid=(data.get('activation')==anchor[2] and data.get('player_owner')==anchor[3]
                      and data.get('presentation_epoch')==anchor[4])
@@ -267,22 +304,26 @@ return '{{"id":'..tostring(id)..',"life":'..tostring(life)..'}}' '''
     return data,timing
 
 
-def active_targets(enemies, geometry, *, camp=None, radius=80, require_clear=True):
+def active_targets(enemies, geometry, *, camp=None, radius=80, require_clear=True, target_name=None):
+    if target_name is not None and (not isinstance(target_name, str)
+            or not re.fullmatch(r'sol_[A-Za-z0-9_]+', target_name)):
+        raise BotFault('Combat target must be one exact native soldier name')
     if enemies.get('truncated') is not False or enemies.get('unavailable_loaded')!=0:
         raise BotFault('Combat cannot plan from incomplete enemy state')
     actors={r['id']:r for r in enemies['soldiers'] if r['life']==enemies['normal_life']
-            and re.fullmatch(r'sol_[A-Za-z0-9_]+',r['name']) and (camp is None or r.get('camp')==camp)}
+            and re.fullmatch(r'sol_[A-Za-z0-9_]+',r['name']) and (camp is None or r.get('camp')==camp)
+            and (target_name is None or r['name']==target_name)}
     candidates=[]
     for target in geometry['targets']:
         if (target.get('query_valid') is True and (not require_clear or target.get('unoccluded') is True)
-            and 1<=target.get('distance',math.inf)<=radius and target['id'] in actors):
+            and MINIMUM_MUZZLE_TARGET_RANGE<=target.get('distance',math.inf)<=radius and target['id'] in actors):
             candidates.append({**actors[target['id']], 'sight':target})
     # Native phase is retained for evidence, not guessed into an aggression enum.
     return sorted(candidates,key=lambda row:(row['sight']['distance'],row['id']))
 
 
-def arm(live, ready_inputs, anchor, *, healthy_life=None, clock=time.monotonic, sleep=time.sleep):
-    state,_=admit(live,anchor)
+def arm(live, ready_inputs, anchor, *, healthy_life=None, witnessed_hospital_ride=False, clock=time.monotonic, sleep=time.sleep):
+    state,_=admit(live,anchor,**({'witnessed_hospital_ride':True} if witnessed_hospital_ride else {}))
     if healthy_life is not None and needs_recovery(state['native'],healthy_life):
         raise HealthRecoveryNeeded('Damage takes priority before weapon readiness')
     already=held_input_evidence(state,ready_inputs)
@@ -300,7 +341,7 @@ def arm(live, ready_inputs, anchor, *, healthy_life=None, clock=time.monotonic, 
     # wait within the existing independent 3 s grip lease instead of aborting.
     deadline=clock()+2.8;since=None
     while clock()<deadline:
-        raised,_=admit(live,anchor)
+        raised,_=admit(live,anchor,**({'witnessed_hospital_ride':True} if witnessed_hospital_ride else {}))
         if healthy_life is not None and needs_recovery(raised['native'],healthy_life):
             raise HealthRecoveryNeeded('Damage takes priority while waiting for the native weapon cycle')
         audit=held_input_evidence(raised,ready_inputs,after_sample_ms=state['now_ms'])
@@ -319,46 +360,61 @@ def arm(live, ready_inputs, anchor, *, healthy_life=None, clock=time.monotonic, 
     raise BotFault('Ready input did not establish the native firearm and authored muzzle')
 
 
-def face_and_aim(live, actor, anchor, pitch, *, pair, support_pair, ready_inputs, max_seconds=2.8):
+def one_hand_ready(state):
+    keys=sampled_release_keys(state)
+    frame=state.get('rendered') or {}
+    return (keys is not None and ('left','Grip',None) not in keys
+            and frame.get('native_firearm') is True
+            and frame.get('right_palm_tracked') is True
+            and frame.get('weapon_support_attached') is False)
+
+
+def face_and_aim(live, actor, anchor, pitch, *, pair, support_pair, ready_inputs, max_seconds=2.8, geometry_reader=None, grip_position=None, after_head_turn=None, support_required=True):
     """Look and raise the barrel before judging its current terrain visibility.
 
     A lowered muzzle can be inside terrain while the player can raise it.
     This read-only probe may aim at an obstructed capsule; fire() still requires
     a fresh clear ray and solved barrel alignment before any trigger input.
     """
+    if type(support_required) is not bool or (not support_required and ready_inputs!=['right_grip']):
+        raise BotFault('One-hand aiming requires only the effective firing grip')
     state,_=admit(live,anchor)
+    grip_position=_pose(grip_position if grip_position is not None else comfortable_grip(state['native']),[0.,0.,0.,1.])['position']
+    read_sight=geometry_reader or sight
     target=actor['sight']['aim']
     head=live.text_result(live.call('get_head_pose',{'base_space':'local'}))['pose']
     head['orientation']=looking_head(head['orientation'],state['rendered']['native_pose'],target)
     live.call('set_head_pose',{'base_space':'local',**head})
+    if after_head_turn is not None:after_head_turn()
     # The head RPC moves simulated controllers too. Re-establish the existing
     # separate grip/aim relationship at a comfortable VIEW-space palm position.
-    grip_position=comfortable_grip(state['native'])
     deadline=time.monotonic()+max_seconds;stable=0;attitude=None
     while time.monotonic()<deadline:
-        data,state=sight(live,anchor)
+        data,state=read_sight(live,anchor)
         target=next((t for t in data['targets'] if t['id']==actor['id']),None)
         if not target or not target['query_valid']:
             raise AimProbeUnavailable('Target lost its verified native geometry during the aim probe')
         if facing_error(state['rendered']['native_pose'],target['aim'])>5.:
             head['orientation']=looking_head(head['orientation'],state['rendered']['native_pose'],target['aim'])
             live.call('set_head_pose',{'base_space':'local',**head})
+            if after_head_turn is not None:after_head_turn()
             time.sleep(.04)
-            data,state=sight(live,anchor)
+            data,state=read_sight(live,anchor)
             target=next((t for t in data['targets'] if t['id']==actor['id']),None)
             if not target or not target['query_valid']:raise AimProbeUnavailable('Target lost geometry after looking')
             attitude=None
         attitude=(aim_quaternion(state['rendered']['native_pose'],data['muzzle']['position'],target['aim'],pitch)
                   if attitude is None else corrected_aim(state['rendered']['native_pose'],data['muzzle'],target['aim'],attitude))
+        support_frame=aimed_support_frame(state['rendered'],grip_position,attitude,pair) if support_required else None
+        # Prepare both from the old publication, then move them together.
+        # Never resample a socket constrained by a left hand we have not moved.
         live.execute({'op':'pose','hand':'right','position':grip_position,
                       'orientation':normalized(mul(attitude,pair['orientation'])),
                       'aim_position':paired_aim_position(grip_position,attitude,pair),'aim_orientation':attitude})
-        time.sleep(.04)
-        raised,_=admit(live,anchor)
-        place_support_hand(live,raised['rendered'],support_pair)
+        if support_required:place_support_hand(live,support_frame,support_pair)
         live.input([channel(t) for t in ready_inputs],.25,lease_seconds=3.)
         time.sleep(.04)
-        checked,checked_state=sight(live,anchor)
+        checked,checked_state=read_sight(live,anchor)
         latest=next((t for t in checked['targets'] if t['id']==actor['id']),None)
         if latest is None or not latest['query_valid']:raise AimProbeUnavailable('Target geometry became unavailable during aim')
         along,lateral=aim_error(checked['muzzle'],latest['aim'])
@@ -369,8 +425,9 @@ def face_and_aim(live, actor, anchor, pitch, *, pair, support_pair, ready_inputs
                          native_body_yaw=checked_state['native']['player_yaw'],
                          support_attached=checked_state['rendered'].get('weapon_support_attached'),
                          support_grip=checked_state['rendered'].get('weapon_support_grip'))
-        stable=stable+1 if (along>1 and lateral<=.18 and facing<=15.
-                           and checked_state['rendered'].get('weapon_support_attached') is True) else 0
+        stable=stable+1 if (along>=MINIMUM_MUZZLE_TARGET_RANGE and lateral<=.18 and facing<=15.
+                           and (checked_state['rendered'].get('weapon_support_attached') is True
+                                if support_required else one_hand_ready(checked_state))) else 0
         if stable>=2:return checked,latest
     raise AimProbeUnavailable('The actual VR view and barrel did not converge on the native target capsule')
 
@@ -387,7 +444,8 @@ def fire(live, actor, anchor, ready_inputs, *, seconds=.20, healthy_life=None, e
     if target is None or not target['query_valid'] or not target['unoccluded']:
         raise AimProbeUnavailable('Target lost visibility at the final trigger admission')
     along,lateral=aim_error(geometry['muzzle'],target['aim'])
-    if along<=1 or lateral>.18:
+    if not (math.isfinite(along) and math.isfinite(lateral)
+            and along>=MINIMUM_MUZZLE_TARGET_RANGE and lateral<=.18):
         raise AimProbeUnavailable('Actual barrel/target alignment changed before trigger dispatch')
     facing=facing_error(state['rendered']['native_pose'],target['aim'])
     if facing>15.:
@@ -472,11 +530,26 @@ def battle_checkpoint(live, label, state):
     return live.capture(label)
 
 
+def failed_aim_checkpoint(live, actor, error):
+    # A failed aim can have no admitted support contact. Keeping both grips
+    # then violates the stationary-inspection owner and used to mask the
+    # original geometry failure with a capture error. Retain the reason first,
+    # release all input, and label these pixels as a released view, not a
+    # successful two-hand aim. Trigger admission remains in fire().
+    live.events.emit('combat_probe_unavailable', target_id=actor['id'], error=str(error),
+                     before_trigger=True, input_replayed=False)
+    live.release()
+    return live.capture('combat-aim-failed-released-'+str(actor['id']))
+
+
 def engage(live, *, output, enemy_script, camp=None, max_seconds=30., max_rounds=24, radius=80.,
-           healthy_life=None, expected_slot=None):
+           healthy_life=None, expected_slot=None, target_name=None):
     """A bounded autonomous combat slice; no blanket game/visual acceptance."""
     if not 1<=max_seconds<=120 or type(max_rounds) is not int or not 1<=max_rounds<=100 or not 1<=radius<=180:
         raise BotFault('Combat requires bounded time, rounds and range')
+    if target_name is not None and (not isinstance(target_name, str)
+            or not re.fullmatch(r'sol_[A-Za-z0-9_]+', target_name)):
+        raise BotFault('Combat target must be one exact native soldier name')
     pitch=effective_pitch(live.bindings)
     ready=next((a for a in live.bindings['actions'] if a['name']=='gameplay.ready_weapon'),None)
     support=next((a for a in live.bindings['actions'] if a['name']=='gameplay.support_grip'),None)
@@ -491,7 +564,7 @@ def engage(live, *, output, enemy_script, camp=None, max_seconds=30., max_rounds
         raise BotFault('Two-hand combat requires the effective ready and support grip bindings')
     ready_inputs=list(dict.fromkeys(ready['bindings'][0]['inputs']+support['bindings'][0]['inputs']))
     result={'status':'running','bursts':[],'outcomes':[],'captures':[],
-            'visual_acceptance':'pending_both_eye_review','max_rounds':max_rounds,'camp':camp}
+            'visual_acceptance':'pending_both_eye_review','max_rounds':max_rounds,'camp':camp,'target_name':target_name}
     started=time.monotonic();rounds=0;attempts={};last_target=None
     try:
         with preserved_tracking_poses(live):
@@ -517,7 +590,7 @@ def engage(live, *, output, enemy_script, camp=None, max_seconds=30., max_rounds
                 enemies=read_enemy_snapshot(live.native.read,enemy_script)
                 if (enemies['mission'],enemies['location'])!=anchor[:2]:raise BotFault('Enemy world changed')
                 data,state=sight(live,anchor)
-                candidates=active_targets(enemies,data,camp=camp,radius=radius,require_clear=False)
+                candidates=active_targets(enemies,data,camp=camp,radius=radius,require_clear=False,target_name=target_name)
                 if not candidates:
                     result['status']='no_visible_active_target';break
                 actor=None
@@ -532,9 +605,7 @@ def engage(live, *, output, enemy_script, camp=None, max_seconds=30., max_rounds
                     except AimProbeUnavailable as error:
                         # Retain the actual attempted view/gun pose before
                         # preserved_tracking_poses restores the caller's pose.
-                        arm(live,ready_inputs,anchor,healthy_life=healthy_life)
-                        result['captures']+=live.capture('combat-aim-failed-'+str(candidate['id']),static_grips=True)
-                        live.events.emit('combat_probe_unavailable',target_id=candidate['id'],error=str(error))
+                        result['captures']+=failed_aim_checkpoint(live,candidate,error)
                         continue
                     arm(live,ready_inputs,anchor,healthy_life=healthy_life)
                     result['captures']+=live.capture('combat-aim-probe-'+str(candidate['id']),static_grips=True)

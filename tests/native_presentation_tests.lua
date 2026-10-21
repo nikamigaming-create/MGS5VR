@@ -24,10 +24,14 @@ return function(source)
     check(code==(options.mission or 10010),'helicopter query uses the current native mission')
     if options.helicopterError then error('helicopter query failed') end
     return options.helicopter
-   end},
+   end,GetMissionClearState=function() return options.missionClearState end,
+    IsDefiniteMissionClear=function() return options.definiteClear==true end},
+   TppDefine={MISSION_CLEAR_STATE={MISSION_GAME_END=3,SHOW_CREDIT_END=4,BLACK_TELEPHOHE_END=5,REWARD_END=6}},
    DemoDaemon=daemon,
    TppDemo=tppDemo,
    TppUiCommand=options.ui or false,
+   TppVideoPlayer=options.videoStopped==nil and false or {
+    IsVideoStopped=function() return options.videoStopped end},
    s10010_sequence=options.missionSequence or false,
    gvars={ini_isTitleMode=options.title or false},
    vars={missionCode=options.mission or 10010,playerVehicleGameObjectId=options.vehicle},
@@ -61,10 +65,10 @@ return function(source)
   'native demo query catches the helicopter handoff')
  for _,sequence in ipairs({'Seq_Game_FewDaysLater0','Seq_Game_FewDaysLater1'}) do
   check(evaluate({sequence=sequence,mission=10010,
-   daemon={IsDemoPlaying=function() return true end}})=='scripted-look',
+   daemon={IsDemoPlaying=function() return true end}})=='scripted-look-'..sequence:sub(-1),
    'hospital look lessons remain interactive while an authored demo plays')
-  check(evaluate({sequence=sequence,mission=10010,title=true})=='scripted-look-title',
-   'hospital look lessons retain title presentation when its native flag is set')
+  check(evaluate({sequence=sequence,mission=10010,title=true})=='scripted-opening-look-'..sequence:sub(-1),
+   'first-launch hospital lessons keep their native title and tracked 3D presentation')
   check(evaluate({sequence=sequence,mission=10020,
    daemon={IsDemoPlaying=function() return true end}})=='scripted-demo',
    'a sequence name from another mission cannot enable look-lesson input')
@@ -72,11 +76,35 @@ return function(source)
  check(evaluate({sequence='Seq_Demo_FewDaysLater1_NG1',mission=10010,
   daemon={IsDemoPlaying=function() return true end}})=='scripted-demo',
   'the adjacent noninteractive hospital shot still suppresses gameplay input')
+ check(evaluate({sequence='Seq_Game_FewDaysLater2',mission=10010})=='profile-menu',
+  'the native hospital name/birthday form retains menu and authored-body ownership without a popup flag')
+ check(evaluate({sequence='Seq_Game_FewDaysLater2',mission=10020})=='closed',
+  'the hospital profile form cannot claim another mission')
+ local finished={sequence='Seq_Demo_Bridge',mission=10010,missionClearState=3,
+  definiteClear=true,videoStopped=true,normalAction=true,partsActive=true,missionPrepared=true,
+  ui={IsResultBlockLoaded=function() return true end}}
+ check(evaluate(finished)=='native-popup:mission-end','native mission-end UI owns the ended bridge scene and Confirm')
+ finished.activeDemo=true
+ check(evaluate(finished)=='scripted-demo','loaded result resources never replace an active native 3D scene')
+ finished.activeDemo=false;finished.videoStopped=false
+ check(evaluate(finished)~='native-popup:mission-end','a playing recorded movie keeps its cinematic owner')
+ check(evaluate({sequence='Seq_Game_MissionPreparation_SelectItem',mission=40020,
+  helicopter=true})=='native-popup:sortie','native sortie preview owns its complete spatial canvas')
+ check(evaluate({sequence='Seq_Game_MissionPreparation_SelectItem',mission=40020,
+  helicopter=true,activeDemo=true})=='scripted-demo','a real authored shot keeps ownership during sortie preparation')
  check(evaluate({sequence='Seq_Game_Idle',mission=10020,
   missionSequence={IsDemoPlaying=function() error('requires an explicit demo-name list') end}})=='closed',
   'the prologue list-query is not called as a global no-argument demo flag')
  check(evaluate({sequence='Seq_Demo_StartHasTitleMission',title=1})=='scripted-demo-title',
   'named title demo remains a native title presentation')
+ check(evaluate({sequence='Seq_Game_TitleMenu',title=true,mission=10010})=='title-hospital-menu',
+  'the witnessed first-launch hospital title menu owns its spatial VR panel')
+ check(evaluate({sequence='Seq_Demo_StartHasTitleMission',title=true,mission=10010,
+  activeDemo=true,videoStopped=true})=='scripted-opening-demo',
+  'a witnessed native hospital opening is 3D despite retail TitleMode')
+ check(evaluate({sequence='Seq_Demo_StartHasTitleMission',title=true,mission=10010,
+  activeDemo=true,videoStopped=false})=='scripted-demo-title',
+  'a recorded movie cannot claim the native 3D opening owner')
  check(evaluate({sequence='Seq_Game_AvatarEdit',title=true,
   daemon={IsDemoPlaying=function() return true end}})=='avatar-edit',
   'avatar editor state takes precedence over a demo flag')
@@ -114,8 +142,11 @@ return function(source)
   activeDemo=false,notPlayable=false,missionPrepared=true,normalAction=true,partsActive=true})=='scripted-demo-title',
   'title scenes cannot enter stale-demo recovery')
  check(evaluate({sequence='Seq_Demo_Fallback',mission=10020,
-  activeDemo=true,notPlayable=false,missionPrepared=true,normalAction=true,partsActive=true})=='closed',
-  'an active demo explicitly marked playable admits gameplay only with affirmative control state')
+  activeDemo=true,notPlayable=false,missionPrepared=true,normalAction=true,partsActive=true})=='scripted-demo',
+  'an active named authored sequence retains cinematic ownership despite ordinary player-status flags')
+ check(evaluate({sequence='Seq_Demo_QuietAppear',mission=10010,
+  activeDemo=true,notPlayable=false,normalAction=true,partsActive=true,videoStopped=true})=='scripted-demo',
+  'the witnessed post-avatar hospital scene remains immersive despite its native isInGame classification')
  check(evaluate({sequence='Seq_Game_BackgroundNpcDemo',mission=10040,
   activeDemo=true,notPlayable=false,missionPrepared=true,normalAction=true,partsActive=true})=='closed',
   'an explicitly playable background demo retains gameplay when native player control is active')

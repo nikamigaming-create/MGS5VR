@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools"))
 from gameplay_bot.core import BotFault
-from gameplay_bot.idroid import inspect_idroid, navigate_stationary
+from gameplay_bot.idroid import inspect_idroid, navigate_stationary, navigation_focus
 
 
 class Clock:
@@ -83,6 +83,106 @@ class Behavior:
         if any(state.get(key) != value for key, value in expected.items()):
             raise BotFault("Observed state did not reach " + label)
         return state
+
+
+class FocusLive(Live):
+    """Separate grip/axis channels; unfocused phone retains horse controls."""
+    def __init__(self, clock, *, focus_hand='left', source='left_stick', fault=None):
+        super().__init__(clock, source=source)
+        self.focus_hand, self.focus_fault, self.focus = focus_hand, fault, False
+        self.bindings['actions']=[{'name':'system.idroid_focus','modifier':True,
+            'bindings':[{'gesture':'level','inputs':[focus_hand+'_grip']}]}]
+
+    def observe(self, native=False):
+        state=super().observe(native=native)
+        state.update(idroid_handheld=True,idroid_menu_control=2 if self.focus else 1,
+            idroid_menu_routing_available=True,idroid_closing=False,idroid_tutorial_mode=0,
+            pause=False,title=False,loading=False,demo=False,gamepad=False,transport={'seconds':0.},
+            camera_active=True,camera_suspended=False)
+        state['rendered'].update(player_owner=99,presentation_epoch=2)
+        state['native'].update(mission=10020,sequence='Seq_Game_RescueMiller',popup=False,
+            saving=False,game_over=0,tutorial_pause=False,status_ON_HORSE=True,status_NORMAL_ACTION=False)
+        physical=[0]*11
+        if self.focus:physical[7 if self.focus_hand=='left' else 8]=1.
+        state['controls'].update(context='menus' if self.focus else 'horse',physical=physical,
+            native_packet_source='xr_runtime_final_mapped_packet',native_buttons=0,
+            native_axes=[0]*4,native_triggers=[0,0],rig_input=True,
+            touches={k:0 for k in ('left_thumbrest','right_thumbrest','a_touch','b_touch','x_touch','y_touch',
+                                  'left_stick_touch','right_stick_touch','left_trigger_touch','right_trigger_touch')})
+        if self.focus and self.focus_fault=='ack':
+            state['idroid_menu_control']=1;state['controls']['context']='horse'
+        if self.focus and self.focus_fault=='owner':state['rendered']['player_owner']=100
+        if self.focus and self.focus_fault=='popup':state['native']['popup']=True
+        if self.held and self.focus_fault=='axis_owner':state['rendered']['presentation_epoch']=3
+        return state
+
+    def input(self, values, duration, *, lease_seconds):
+        if values[0]['component']=='Grip':
+            self.focus=True;self.inputs.append(values[0])
+            if self.focus_fault=='timeout':raise TimeoutError('focus completion unknown')
+        else:
+            if not self.focus:raise AssertionError('Axis dispatched without physical grip focus')
+            super().input(values,duration,lease_seconds=lease_seconds)
+
+    def release(self, *, keep=()):
+        super().release()
+        if not keep:self.focus=False
+
+
+class IdroidFocusTests(unittest.TestCase):
+    def test_both_sticks_wait_for_effective_focus_and_release_it(self):
+        for focus_hand in ('left','right'):
+            for source in ('left_stick','right_stick'):
+                clock=Clock();live=FocusLive(clock,focus_hand=focus_hand,source=source);result={}
+                navigate_stationary(live,result,clock=clock,sleep=clock.sleep)
+                self.assertEqual(live.inputs[0]['component'],'Grip')
+                self.assertEqual(live.inputs[0]['hand'],focus_hand)
+                self.assertEqual(live.inputs[1]['hand'],source.split('_')[0])
+                self.assertEqual(len(live.inputs),3)
+                self.assertEqual(result['max_displacement'],0.)
+                self.assertFalse(live.focus);self.assertFalse(live.held)
+
+    def test_unavailable_or_wrong_focus_binding_dispatches_nothing(self):
+        for bindings in ([],[{'name':'system.idroid_focus','modifier':False,'bindings':[]}],
+                         [{'name':'system.idroid_focus','modifier':True,
+                           'bindings':[{'gesture':'level','inputs':['a']}]}]):
+            clock=Clock();live=FocusLive(clock);live.bindings['actions']=bindings
+            with self.assertRaises(BotFault):navigate_stationary(live,{},clock=clock,sleep=clock.sleep)
+            self.assertFalse(live.inputs)
+
+    def test_missing_ack_changed_owner_or_popup_never_sends_an_axis(self):
+        for fault in ('ack','owner','popup','timeout'):
+            clock=Clock();live=FocusLive(clock,fault=fault)
+            with self.assertRaises((BotFault,TimeoutError)):
+                navigate_stationary(live,{},clock=clock,sleep=clock.sleep)
+            self.assertEqual(len(live.inputs),1)
+            self.assertEqual(live.inputs[0]['component'],'Grip')
+            self.assertFalse(live.focus);self.assertFalse(live.held)
+            self.assertLess(clock.now,1.)
+
+    def test_owner_change_during_axis_stops_before_the_other_stick(self):
+        clock=Clock();live=FocusLive(clock,fault='axis_owner')
+        with self.assertRaisesRegex(BotFault,'owner'):
+            navigate_stationary(live,{},clock=clock,sleep=clock.sleep)
+        self.assertEqual(len(live.inputs),2)
+        self.assertFalse(live.focus);self.assertFalse(live.held)
+
+    def test_expired_focus_never_dispatches_another_axis(self):
+        clock=Clock();live=FocusLive(clock);initial=live.observe(native=True)
+        with self.assertRaisesRegex(BotFault,'expired'):
+            with navigation_focus(live,initial,clock=clock,sleep=clock.sleep) as (_,guard):
+                clock.sleep(4.6);guard(live.observe(native=True))
+        self.assertEqual(len(live.inputs),1);self.assertFalse(live.focus)
+
+    def test_tutorial_loading_or_unidentified_owner_refuses_before_focus(self):
+        for key,value in (('pause',True),('loading',True),('idroid_closing',True),
+                          ('camera_active',False),('camera_suspended',True),('activation',2),
+                          ('idroid_tutorial_mode',11),('rendered',{})):
+            clock=Clock();live=FocusLive(clock);initial=live.observe(native=True);initial[key]=value
+            with self.assertRaises(BotFault):
+                with navigation_focus(live,initial,clock=clock,sleep=clock.sleep):
+                    self.fail('Unknown owner admitted')
+            self.assertFalse(live.inputs)
 
 
 class IdroidAcceptanceTests(unittest.TestCase):

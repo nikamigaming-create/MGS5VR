@@ -12,6 +12,7 @@ struct NativeDemoSnapshot {
     uint64_t candidateKey{};
     uint64_t generation{};
     uint64_t publishedAtMs{};
+    uint64_t lookLessonKey{};
 };
 
 // Header-only state is shared by core and runtime without introducing a
@@ -29,14 +30,16 @@ inline NativeDemoSnapshot nativeDemoSnapshot() noexcept {
     return nativeDemoStateStorage();
 }
 inline void publishNativeDemoSnapshot(NativeDemoMode mode,uint64_t key,
-                                      uint64_t publishedAtMs) noexcept {
+                                      uint64_t publishedAtMs,uint64_t lookLessonKey=0) noexcept {
     std::lock_guard lock(nativeDemoStateMutex());
     auto& state=nativeDemoStateStorage();
     if(mode!=NativeDemoMode::staleCandidate)key=0;
-    if(state.mode!=mode||state.candidateKey!=key)++state.generation;
+    if(mode!=NativeDemoMode::interactiveLook)lookLessonKey=0;
+    if(state.mode!=mode||state.candidateKey!=key||state.lookLessonKey!=lookLessonKey)++state.generation;
     state.mode=mode;
     state.candidateKey=key;
-    state.publishedAtMs=mode==NativeDemoMode::staleCandidate?publishedAtMs:0;
+    state.lookLessonKey=lookLessonKey;
+    state.publishedAtMs=(mode==NativeDemoMode::staleCandidate||mode==NativeDemoMode::interactiveLook)?publishedAtMs:0;
 }
 
 } // namespace mgs5vr

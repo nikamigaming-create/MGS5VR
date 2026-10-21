@@ -1,6 +1,7 @@
 #include "mgs5vr/native_controls.hpp"
 #include "mgs5vr/native_input_delivery.hpp"
 #include <cmath>
+#include <algorithm>
 #include <atomic>
 #include <mutex>
 
@@ -22,7 +23,7 @@ std::atomic_uint64_t handheldWeaponSample{};
 std::atomic_bool handheldWeaponRouting{};
 std::atomic_bool handheldMenus{},handheldRoutingAvailable{};
 std::mutex idroidOpenMutex;
-HandheldIdroidOpenRequest idroidOpenRequest{};
+HandheldIdroidOpenQueue idroidOpenRequests;
 std::mutex idroidBorrowMutex;
 HandheldIdroidBorrow idroidBorrow{};
 std::atomic_uintptr_t idroidUiPlayer{};
@@ -69,11 +70,15 @@ bool takeNativeIdroidClose() noexcept {
 }
 void requestHandheldIdroidOpen(uint64_t activation) noexcept {
     std::lock_guard lock(idroidOpenMutex);
-    idroidOpenRequest={activation,activation?steadyMilliseconds():0};
+    idroidOpenRequests.request(activation,steadyMilliseconds());
 }
-HandheldIdroidOpenRequest takeHandheldIdroidOpen() noexcept {
+HandheldIdroidOpenRequest pendingHandheldIdroidOpen() noexcept {
     std::lock_guard lock(idroidOpenMutex);
-    const auto request=idroidOpenRequest;idroidOpenRequest={};return request;
+    return idroidOpenRequests.pending();
+}
+bool consumeHandheldIdroidOpen(HandheldIdroidOpenRequest expected) noexcept {
+    std::lock_guard lock(idroidOpenMutex);
+    return idroidOpenRequests.consume(expected);
 }
 void publishHandheldIdroidOwner(uintptr_t player,uint64_t activation) noexcept {
     idroidUiPlayer.store(0);
@@ -165,8 +170,8 @@ HandheldPlayerPadPolicy IdroidPadRelease::update(HandheldPlayerPadPolicy request
     }
     return policy_;
 }
-GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept {
-    if(!spatialTitle)return sample;
+GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm,bool nativeMenu) noexcept {
+    if(!spatialTitle||nativeMenu)return sample;
     GamepadSample result{};
     if(confirm)result.buttons=0x1000;
     return result;
@@ -195,6 +200,29 @@ void constrainCinematicInput(GamepadSample& sample,NativeMenuInput mode) noexcep
     if(mode!=NativeMenuInput::cinematic&&mode!=NativeMenuInput::cinematicLook)return;
     sample.leftX=sample.leftY=0;sample.leftTrigger=sample.rightTrigger=0;
     if(mode==NativeMenuInput::cinematic)sample.rightX=sample.rightY=0;
+}
+std::array<float,2> HospitalHeadLook::update(Quat head,bool available,uint64_t now,uint64_t epoch,uint64_t key) noexcept {
+    if(!available||!now||!epoch||(key!=1&&key!=2)||!valid(Pose{head,{}})){reset();return {};}
+    if(!last_||epoch_!=epoch||key_!=key||now<last_||now-last_>250){
+        head_=head;last_=now;epoch_=epoch;key_=key;gesture_={};until_=0;armed_=true;return {};
+    }
+    // Retail averages a window of stick history. A brief angular velocity
+    // sample is diluted by neutral frames, even after a deliberate head turn.
+    // Use a held physical look gesture for at most two seconds. The authored
+    // eye anchor stays fixed while retail consumes it, so this cannot double
+    // the player's head motion. Returning to neutral releases and rearms it.
+    const auto delta=compose(inverse(Pose{head_,{}}),Pose{head,{}}).orientation;
+    const auto forward=rotate(delta,Vec3{0,0,-1});
+    const float yaw=std::atan2(forward.x,-forward.z);
+    const float pitch=std::asin(std::clamp(forward.y,-1.f,1.f));
+    const float angle=std::max(std::abs(yaw),std::abs(pitch));
+    if(angle<.08f){armed_=true;gesture_={};until_=0;}
+    else if(armed_&&angle>=.18f){
+        gesture_=std::abs(pitch)>=std::abs(yaw)?std::array<float,2>{0,std::copysign(1.f,pitch)}:
+            std::array<float,2>{std::copysign(1.f,yaw),0};
+        until_=now+2000;armed_=false;
+    }
+    last_=now;return now<until_?gesture_:std::array<float,2>{};
 }
 GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalControls& physical,NativeMenuInput mode){
     GamepadSample pad;
@@ -231,6 +259,52 @@ GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalCo
     pad.rightX=static_cast<int16_t>(look[0]*32767);pad.rightY=static_cast<int16_t>(look[1]*32767);
     constrainCinematicInput(pad,mode);
     return pad;
+}
+uint16_t CinematicMenuNavigation::update(const GamepadSample& sample,bool enabled,uint64_t time) noexcept {
+    if(!enabled||time<last_){
+        last_=time;direction_=0;available_=false;releaseRequired_=true;
+        return 0;
+    }
+    last_=time;
+    if(!available_){available_=true;releaseRequired_=true;}
+    const int x=sample.leftX,y=sample.leftY;
+    const bool neutral=std::abs(x)<11469&&std::abs(y)<11469;
+    if(sample.buttons&0xf){
+        // A player's explicitly configured D-pad input owns this packet.
+        direction_=0;releaseRequired_=true;return 0xffff;
+    }
+    if(neutral){direction_=0;releaseRequired_=false;}
+    if(releaseRequired_)return 0;
+    if(!direction_&&std::max(std::abs(x),std::abs(y))>22937){
+        direction_=std::abs(y)>=std::abs(x)?(y>0?1:2):(x<0?4:8);
+        return direction_;
+    }
+    return 0;
+}
+void CinematicMenuDirectionQueue::publish(uint64_t activation,uint16_t direction,uint64_t time) noexcept {
+    if(!activation||activation!=activation_||time<sampleTime_)*this={};
+    activation_=activation;sampleTime_=time;
+    if(!activation)return;
+    if(direction){
+        direction_=direction==4||direction==8?direction:0;
+        requestTime_=direction_?time:0;delivered_=false;
+    }
+}
+std::optional<bool> CinematicMenuDirectionQueue::take(uint64_t activation,uint32_t index,uint32_t bit,uint64_t time) noexcept {
+    if(!activation||activation!=activation_||!sampleTime_||time<sampleTime_||time-sampleTime_>250
+       ||!requestTime_||time<requestTime_||time-requestTime_>250||index||(bit!=14&&bit!=15))return {};
+    if(!delivered_&&bit==(direction_==4?14u:15u)){delivered_=true;return true;}
+    return false;
+}
+namespace {
+std::mutex cinematicDirectionMutex;
+CinematicMenuDirectionQueue cinematicDirections;
+}
+void publishCinematicMenuDirection(uint64_t activation,uint16_t direction,uint64_t time) noexcept {
+    std::lock_guard lock(cinematicDirectionMutex);cinematicDirections.publish(activation,direction,time);
+}
+std::optional<bool> takeCinematicMenuDirection(uint64_t activation,uint32_t index,uint32_t bit,uint64_t time) noexcept {
+    std::lock_guard lock(cinematicDirectionMutex);return cinematicDirections.take(activation,index,bit,time);
 }
 uint32_t vehicleWeaponConsumedInputs(const ControlBindings& bindings,const PhysicalControls& physical){
     uint32_t result{};

@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from .combat import fresh_rig, looking_head
-from .core import BotFault, atomic_json
+from .core import BotFault, atomic_json, matches
 from .health import HealthRecoveryNeeded, needs_recovery
 from .live import authoritative_controls, channel, held_input_evidence, rotate
 from .locomotion import _position, _validate_xr_field_state, _neutral_audit
@@ -28,6 +28,25 @@ SOURCE_CONTRACT = {
     'physical_hand_grab_implemented': False,
     'pulse_durations': 'bounded experimental simulator inputs; not a discovered native timing contract',
 }
+
+
+def run_named_cqc(live, policy, *, enemy_script, output):
+    """Expose the existing bounded executor for one current, exact guard."""
+    if (not isinstance(policy, dict) or set(policy)-{'native','target','pulses','pulse_seconds','contextual'}
+            or not isinstance(policy.get('target'), str)
+            or not re.fullmatch(r'sol_[A-Za-z0-9_]{1,120}', policy['target'])
+            or not isinstance(policy.get('native'), dict) or not policy['native']):
+        raise BotFault('Named CQC needs an exact soldier and current native entry guards')
+    state, anchor = fresh_rig(live)
+    if not matches(state['native'], policy['native']):
+        raise BotFault('Named CQC native entry changed; no attack dispatched')
+    snapshot = read_enemy_snapshot(live.native.read, enemy_script)
+    targets = [row for row in snapshot['soldiers'] if row['name'] == policy['target']]
+    if len(targets) != 1:
+        raise BotFault('Exact named CQC soldier is unavailable; no substitute selected')
+    return attempt_cqc(live, actor=targets[0], anchor=anchor, enemy_script=enemy_script,
+                       output=output, pulses=policy.get('pulses', 1),
+                       pulse_seconds=policy.get('pulse_seconds', .65), contextual=policy.get('contextual',False))
 
 
 def actor_identity(actor):
@@ -109,7 +128,10 @@ def validate_native(data, actor, anchor, *, player_index=None):
 
 def cqc_state(live, anchor, healthy_life=None, *, transition=False):
     state, identity = fresh_rig(live, anchor)
-    controls, _ = _validate_xr_field_state(state)
+    # An already dispatched punch can temporarily clear NORMAL_ACTION and
+    # publish nativeAction (4). Observe its completion with the same scene,
+    # tracking and owner guards; this does not admit another trigger press.
+    controls, _ = _validate_xr_field_state(state, observing_native_action=transition)
     native, frame = state['native'], state['rendered']
     if (native.get('player_vehicle_id') != 65535 or native.get('popup') is not False or
             native.get('saving') is not False or native.get('demo') is not False or
@@ -140,7 +162,7 @@ def cqc_packet(state, *, after_sample_ms):
     return audit
 
 
-def exact_close_target(snapshot, actor, anchor, player, *, max_range=1.75):
+def exact_close_target(snapshot, actor, anchor, player, *, max_range=1.75, contextual=False):
     """A proximity admission bound is an experiment, not native CQC eligibility."""
     name, object_id = actor_identity(actor)
     if ((snapshot.get('mission'), snapshot.get('location')) != tuple(anchor[:2]) or
@@ -174,7 +196,7 @@ def exact_close_target(snapshot, actor, anchor, player, *, max_range=1.75):
         if (not isinstance(point, list) or len(point) != 3 or
                 any(type(v) not in (int, float) or not math.isfinite(v) for v in point)):
             raise BotFault('Another native guard has an unavailable point')
-        if math.hypot(point[0]-player[0], point[2]-player[2]) <= 2.5 and abs(point[1]-player[1]) <= 1.5:
+        if not contextual and math.hypot(point[0]-player[0], point[2]-player[2]) <= 2.5 and abs(point[1]-player[1]) <= 1.5:
             raise BotFault('Another active close guard makes the CQC target ambiguous')
     return chosen
 
@@ -268,7 +290,7 @@ def classify(before, during, after, *, ammo_unchanged):
 
 
 def attempt_cqc(live, *, actor, anchor, enemy_script, output, healthy_life=None,
-                pulses=1, pulse_seconds=.65, gap_seconds=.08, clock=time.monotonic, sleep=time.sleep):
+                pulses=1, pulse_seconds=.65, gap_seconds=.08, contextual=False, clock=time.monotonic, sleep=time.sleep):
     """One single hold, or an explicitly selected chain of at most five presses.
 
     Caller first approaches within 1.75m using native NAV and crouches/stands.
@@ -283,6 +305,7 @@ def attempt_cqc(live, *, actor, anchor, enemy_script, output, healthy_life=None,
         raise BotFault('CQC needs one bounded hold or 2..5 short sampled presses')
     output = Path(output); output.mkdir(parents=True, exist_ok=True)
     result = {'status': 'running', 'source_contract': SOURCE_CONTRACT, 'target': actor,
+              'contextual_target_selection':contextual,
               'pulses': [], 'captures': [], 'visual_acceptance': 'pending_both_eye_review',
               'native_player_to_actor_link_verified': False, 'physical_hand_grab_implemented': False}
     try:
@@ -293,7 +316,8 @@ def attempt_cqc(live, *, actor, anchor, enemy_script, output, healthy_life=None,
                 raise BotFault('CQC approach must be crouched or standing, not crawling')
             snapshot = read_enemy_snapshot(live.native.read, enemy_script)
             state, _ = cqc_state(live, anchor, healthy_life)
-            exact_close_target(snapshot, actor, anchor, _position(state))
+            exact_close_target(snapshot, actor, anchor, _position(state),contextual=contextual)
+            result['nearby_roster_before']=snapshot
             script = native_cqc_script(actor, anchor)
             before, timing = live.native.read(script)
             validate_native(before, actor, anchor)
@@ -316,6 +340,9 @@ def attempt_cqc(live, *, actor, anchor, enemy_script, output, healthy_life=None,
                 if (output/'STOP').exists(): raise BotFault('CQC stopped before the next pulse')
                 state, _ = cqc_state(live, anchor, healthy_life, transition=index > 0)
                 _neutral_audit(state['controls'])
+                if state['controls']['travel_mode'] != 1:
+                    result['chain_stopped_for_native_action'] = True
+                    break
                 if (state['controls'].get('native_triggers') != [0, 0] or
                         state['controls'].get('native_buttons') != 0 or
                         state['controls'].get('native_axes') != [0, 0, 0, 0]):
@@ -327,7 +354,28 @@ def attempt_cqc(live, *, actor, anchor, enemy_script, output, healthy_life=None,
                     break
                 state, _ = cqc_state(live, anchor, healthy_life, transition=index > 0)
                 _close_position(current_actor['position'], _position(state))
+                # The pre-action compositor capture can outlast a nearby
+                # patrol's turn. Face its freshly read position again before
+                # admitting the trigger; never aim at the cached capture pose.
+                head = live.text_result(live.call('get_head_pose', {'base_space':'local'}))['pose']
+                camera = state['rendered']['native_pose']
+                goal = [current_actor['position'][0],camera['position'][1],current_actor['position'][2]]
+                head['orientation'] = looking_head(head['orientation'],camera,goal)
+                live.call('set_head_pose', {'base_space':'local',**head})
+                until = clock()+1.
+                while True:
+                    state, _ = cqc_state(live,anchor,healthy_life,transition=index > 0)
+                    published=state['rendered']['head_pose']['orientation']
+                    if abs(sum(a*b for a,b in zip(published,head['orientation'])))>.99999:break
+                    if clock()>=until:raise BotFault('CQC facing pose did not publish')
+                    sleep(.015)
+                current_actor,_=live.native.read(script)
+                validate_native(current_actor,actor,anchor,player_index=before['player_index'])
+                _close_position(current_actor['position'],_position(state))
                 result['view_target_angle_degrees'] = _facing(state['rendered']['native_pose'], current_actor['position'])
+                if state['controls']['travel_mode'] != 1:
+                    result['chain_stopped_for_native_action'] = True
+                    break
                 floor = state['controls']['sample_ms']; sampled = []
                 started = clock()
                 try:

@@ -8,6 +8,8 @@
 #include "mgs5vr/scene_capture.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/wrist_selector.hpp"
+#include "mgs5vr/cabin_studio_store.hpp"
+#include "mgs5vr/native_text_input.hpp"
 #include <windows.h>
 #include <bcrypt.h>
 #include <d3d11_1.h>
@@ -24,6 +26,7 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <sstream>
@@ -119,6 +122,11 @@ struct RetailGpuAsset {
     std::filesystem::path diffusePath;
     UINT indexCount{};
     bool ready{};
+    std::vector<Vertex> bindVertices;
+    ComPtr<ID3D11Buffer> doorVertices,doorIndices;
+    UINT doorIndexCount{};
+    mgs5vr::Vec3 hinge{};
+    float lid{-1};
 };
 
 template<class T>
@@ -551,15 +559,41 @@ bool createRetailGpuAsset(ID3D11Device* device,RetailGpuAsset& asset,
        ||model->vertices.size()>std::numeric_limits<UINT>::max()/sizeof(Vertex)
        ||model->indices.size()>std::numeric_limits<UINT>::max()/sizeof(uint16_t))return false;
     D3D11_BUFFER_DESC vertexDescription{};vertexDescription.ByteWidth=static_cast<UINT>(model->vertices.size()*sizeof(Vertex));
-    vertexDescription.Usage=D3D11_USAGE_IMMUTABLE;vertexDescription.BindFlags=D3D11_BIND_VERTEX_BUFFER;
+    vertexDescription.Usage=D3D11_USAGE_IMMUTABLE;
+    vertexDescription.BindFlags=D3D11_BIND_VERTEX_BUFFER;
     D3D11_SUBRESOURCE_DATA vertexData{};vertexData.pSysMem=model->vertices.data();
     if(FAILED(device->CreateBuffer(&vertexDescription,&vertexData,asset.vertices.ReleaseAndGetAddressOf())))return false;
-    D3D11_BUFFER_DESC indexDescription{};indexDescription.ByteWidth=static_cast<UINT>(model->indices.size()*sizeof(uint16_t));
+    auto bodyIndices=model->indices;std::vector<uint16_t> doorIndices;
+    if(model->sha256=="26fa26a4814aa3271e06392a1bdf96bd2120b597bd89de79b7ff588b8d8dbea7"){
+        bodyIndices.clear();
+        // The owned player has a static front cover. Its control bone is a
+        // small lever, not a door. Separate complete cover triangles and add
+        // a VR hinge at the authored upper cover edge; retain its native UVs.
+        for(size_t face=0;face<model->indices.size();face+=3){
+            bool front=true;float normal{};
+            for(size_t i=0;i<3;++i){const auto& vertex=model->vertices[model->indices[face+i]];
+                front=front&&vertex.position[2]>=.010f;normal+=vertex.normal[2];}
+            auto& target=front&&normal>1.8f?doorIndices:bodyIndices;
+            target.insert(target.end(),model->indices.begin()+face,model->indices.begin()+face+3);
+        }
+        if(!doorIndices.empty()){
+            asset.bindVertices=model->vertices;asset.hinge={0,.040f,model->max[2]};
+            auto doorDescription=vertexDescription;doorDescription.Usage=D3D11_USAGE_DYNAMIC;
+            doorDescription.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
+            if(FAILED(device->CreateBuffer(&doorDescription,&vertexData,&asset.doorVertices)))return false;
+            D3D11_BUFFER_DESC indices{};indices.ByteWidth=static_cast<UINT>(doorIndices.size()*sizeof(uint16_t));
+            indices.Usage=D3D11_USAGE_IMMUTABLE;indices.BindFlags=D3D11_BIND_INDEX_BUFFER;
+            D3D11_SUBRESOURCE_DATA data{};data.pSysMem=doorIndices.data();
+            if(FAILED(device->CreateBuffer(&indices,&data,&asset.doorIndices)))return false;
+            asset.doorIndexCount=static_cast<UINT>(doorIndices.size());
+        }
+    }
+    D3D11_BUFFER_DESC indexDescription{};indexDescription.ByteWidth=static_cast<UINT>(bodyIndices.size()*sizeof(uint16_t));
     indexDescription.Usage=D3D11_USAGE_IMMUTABLE;indexDescription.BindFlags=D3D11_BIND_INDEX_BUFFER;
-    D3D11_SUBRESOURCE_DATA indexData{};indexData.pSysMem=model->indices.data();
+    D3D11_SUBRESOURCE_DATA indexData{};indexData.pSysMem=bodyIndices.data();
     if(FAILED(device->CreateBuffer(&indexDescription,&indexData,asset.indices.ReleaseAndGetAddressOf()))
        ||!createRetailDiffuseView(device,*diffuse,asset.diffuse))return false;
-    asset.modelPath=modelPath;asset.diffusePath=diffusePath;asset.indexCount=static_cast<UINT>(model->indices.size());asset.ready=true;
+    asset.modelPath=modelPath;asset.diffusePath=diffusePath;asset.indexCount=static_cast<UINT>(bodyIndices.size());asset.ready=true;
     std::ostringstream message;message<<"Opening "<<label<<" FMDL loaded path="<<modelPath.string()
         <<" bytes="<<std::filesystem::file_size(modelPath)<<" vertices="<<model->vertices.size()
         <<" triangles="<<model->indices.size()/3<<" bounds="<<model->min[0]<<","<<model->min[1]<<","<<model->min[2]<<".."
@@ -602,6 +636,7 @@ float4 main(PSIn input) : SV_TARGET {
     // pale untextured block under the simulator's near-field lighting.
     float diffuse = 0.22 + 0.78 * saturate(dot(normal, light));
     float3 albedo = retailDiffuse.Sample(retailSampler,input.uv).rgb;
+    if (baseColor.x < 0) return float4(albedo, 1);
     return float4(albedo * diffuse, baseColor.a);
 }
 )HLSL";
@@ -760,6 +795,9 @@ struct Resources {
     ComPtr<ID3D11InputLayout> markerInputLayout;
     ComPtr<ID3D11RasterizerState> markerRasterizer;
     ComPtr<ID3D11DepthStencilState> markerDepth;
+    ComPtr<ID3D11DepthStencilState> markerMaskWrite,markerMaskRead;
+    ComPtr<ID3D11Texture2D> markerMaskTexture;
+    ComPtr<ID3D11DepthStencilView> markerMask;
     ComPtr<ID3D11SamplerState> sampler;
     ComPtr<ID3D11SamplerState> lensSampler;
     ComPtr<ID3D11InputLayout> inputLayout;
@@ -787,8 +825,22 @@ struct Resources {
     ComPtr<ID3D11BlendState> idroidBlend;
     ComPtr<ID3D11Texture2D> housingDepth;
     ComPtr<ID3D11DepthStencilView> housingDepthView;
-    RetailGpuAsset openingRadio;
+    std::array<RetailGpuAsset,11> studioCamera;
+    RetailGpuAsset studioMarker,studioMarkerTip,studioNotes,studioStickyBack,studioPhotoBack,studioViewfinder,studioFocus;
+    RetailGpuAsset idroidGuidance;
+    float idroidGuidanceWidth{},idroidGuidanceAspect{};
+    std::array<RetailGpuAsset,44> studioKeys;
+    std::array<RetailGpuAsset,6> studioButtons,studioButtonFaces;
+    RetailGpuAsset studioButtonHover,studioResume,studioConfirmControl,studioCancelControl,studioCameraStatus,studioGallery,studioPaperConfirmation,
+        studioCancel,studioDelete;
+    uint64_t studioGalleryPhoto{};
+    std::string studioStatusText;
+    struct PaperGpu {RetailGpuAsset face;uint64_t revision{};};
+    std::map<uint32_t,PaperGpu> studioPapers;
+    bool studioReady{};
     RetailGpuAsset openingCassette;
+    std::array<RetailGpuAsset,6> openingLabels;
+    RetailGpuAsset openingEjectLabel;
     ComPtr<ID3D11Buffer> wristHintVertices;
     ComPtr<ID3D11PixelShader> wristHintPixelShader;
     ComPtr<ID3D11ShaderResourceView> wristHintTexture;
@@ -914,7 +966,7 @@ void appendIdroidFace(std::vector<IdroidVertex>& vertices,mgs5vr::Vec3 a,mgs5vr:
     const auto make=[&](mgs5vr::Vec3 p){return IdroidVertex{{p.x,p.y,p.z},{normal.x,normal.y,normal.z},
         {color[0],color[1],color[2],color[3]}};};
     const auto v0=make(a),v1=make(b),v2=make(c),v3=make(d);
-    for(const auto& v:{v0,v1,v2,v0,v2,v3})vertices.push_back(v);
+    for(const auto& v:{v0,v1,v2,v2,v1,v3})vertices.push_back(v);
 }
 
 void appendIdroidBox(std::vector<IdroidVertex>& vertices,mgs5vr::Vec3 minimum,mgs5vr::Vec3 maximum,
@@ -1057,6 +1109,343 @@ bool createResources(ID3D11Device* device){
     return true;
 }
 
+bool createCabinSurface(ID3D11Device* device,RetailGpuAsset& asset,
+    const std::vector<Vertex>& vertices,const std::vector<uint16_t>& indices,
+    const std::vector<uint32_t>& pixels,UINT width,UINT height){
+    if(vertices.empty()||indices.empty()||pixels.size()!=size_t(width)*height)return false;
+    D3D11_BUFFER_DESC vb{};vb.ByteWidth=static_cast<UINT>(vertices.size()*sizeof(Vertex));
+    vb.Usage=D3D11_USAGE_IMMUTABLE;vb.BindFlags=D3D11_BIND_VERTEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA data{};data.pSysMem=vertices.data();
+    if(FAILED(device->CreateBuffer(&vb,&data,&asset.vertices)))return false;
+    vb.ByteWidth=static_cast<UINT>(indices.size()*sizeof(uint16_t));vb.BindFlags=D3D11_BIND_INDEX_BUFFER;data.pSysMem=indices.data();
+    if(FAILED(device->CreateBuffer(&vb,&data,&asset.indices)))return false;
+    // Full mip chain keeps the printed label sharp at hand distance without
+    // turning small text into shimmer when it rests farther away on the bench.
+    std::vector<std::vector<uint32_t>> levels{pixels};UINT w=width,h=height;
+    while(w>1||h>1){const UINT nw=std::max(1u,w/2),nh=std::max(1u,h/2);std::vector<uint32_t> next(size_t(nw)*nh);
+        for(UINT y=0;y<nh;++y)for(UINT x=0;x<nw;++x){uint32_t value=0xff000000;
+            for(unsigned c=0;c<3;++c){unsigned sum{};for(UINT dy=0;dy<2;++dy)for(UINT dx=0;dx<2;++dx)
+                sum+=(levels.back()[size_t(std::min(y*2+dy,h-1))*w+std::min(x*2+dx,w-1)]>>(c*8))&255;
+                value|=(sum/4)<<(c*8);}next[size_t(y)*nw+x]=value;}
+        levels.push_back(std::move(next));w=nw;h=nh;
+    }
+    std::vector<D3D11_SUBRESOURCE_DATA> mips;w=width;
+    for(const auto& level:levels){D3D11_SUBRESOURCE_DATA mip{};mip.pSysMem=level.data();mip.SysMemPitch=w*4;
+        mips.push_back(mip);w=std::max(1u,w/2);}
+    D3D11_TEXTURE2D_DESC desc{};desc.Width=width;desc.Height=height;desc.MipLevels=static_cast<UINT>(levels.size());
+    desc.ArraySize=desc.SampleDesc.Count=1;desc.Format=DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+    desc.Usage=D3D11_USAGE_IMMUTABLE;desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+    ComPtr<ID3D11Texture2D> texture;
+    if(FAILED(device->CreateTexture2D(&desc,mips.data(),&texture))
+       ||FAILED(device->CreateShaderResourceView(texture.Get(),nullptr,&asset.diffuse)))return false;
+    asset.indexCount=static_cast<UINT>(indices.size());asset.ready=true;return true;
+}
+bool studioBox(ID3D11Device* device,RetailGpuAsset& asset,mgs5vr::Vec3 half,uint32_t color,
+    mgs5vr::Vec3 center={}){
+    std::vector<IdroidVertex> geometry;appendIdroidBox(geometry,center-half,center+half,{1,1,1,1});
+    std::vector<Vertex> vertices;std::vector<uint16_t> indices;
+    for(const auto& source:geometry){Vertex vertex{};std::copy(std::begin(source.position),std::end(source.position),vertex.position);
+        std::copy(std::begin(source.normal),std::end(source.normal),vertex.normal);
+        indices.push_back(static_cast<uint16_t>(vertices.size()));vertices.push_back(vertex);}
+    return createCabinSurface(device,asset,vertices,indices,{color},1,1);
+}
+bool studioBevel(ID3D11Device* device,RetailGpuAsset& asset,mgs5vr::Vec3 half,float radius,
+    uint32_t color,mgs5vr::Vec3 center={}){
+    radius=std::min({radius,half.x*.4f,half.y*.4f,half.z*.4f});
+    std::vector<Vertex> vertices;std::vector<uint16_t> indices;
+    const auto face=[&](mgs5vr::Vec3 a,mgs5vr::Vec3 b,mgs5vr::Vec3 c){
+        const auto u=b-a,edgeV=c-a;
+        const mgs5vr::Vec3 cross{u.y*edgeV.z-u.z*edgeV.y,u.z*edgeV.x-u.x*edgeV.z,u.x*edgeV.y-u.y*edgeV.x};
+        const auto n=cross*(1.f/std::max(.000001f,std::sqrt(mgs5vr::dot(cross,cross))));
+        for(auto p:{a,b,c}){p=p+center;Vertex v{};v.position[0]=p.x;v.position[1]=p.y;v.position[2]=p.z;
+            v.normal[0]=n.x;v.normal[1]=n.y;v.normal[2]=n.z;
+            indices.push_back(static_cast<uint16_t>(vertices.size()));vertices.push_back(v);}
+    };
+    std::array<std::array<mgs5vr::Vec3,8>,4> rings{};
+    for(size_t ring=0;ring<4;++ring){
+        const bool cap=ring==0||ring==3;const float h=cap?radius*.35f:0;
+        const float x=half.x-h,y=half.y-h,r=radius-h,z=ring==0?-half.z:ring==1?-half.z+radius:ring==2?half.z-radius:half.z;
+        rings[ring]={mgs5vr::Vec3{-x+r,-y,z},{x-r,-y,z},{x,-y+r,z},{x,y-r,z},
+            {x-r,y,z},{-x+r,y,z},{-x,y-r,z},{-x,-y+r,z}};
+    }
+    for(size_t ring=0;ring<3;++ring)for(size_t i=0;i<8;++i){const size_t j=(i+1)%8;
+        face(rings[ring][i],rings[ring][j],rings[ring+1][i]);
+        face(rings[ring+1][i],rings[ring][j],rings[ring+1][j]);}
+    for(size_t i=0;i<8;++i){const size_t j=(i+1)%8;
+        face({0,0,-half.z},rings[0][j],rings[0][i]);face({0,0,half.z},rings[3][i],rings[3][j]);}
+    return createCabinSurface(device,asset,vertices,indices,{color},1,1);
+}
+bool studioQuad(ID3D11Device* device,RetailGpuAsset& asset,mgs5vr::Vec3 half,
+    const std::vector<uint32_t>& pixels,UINT width,UINT height,float z=.001f){
+    std::vector<Vertex> vertices;const std::vector<uint16_t> indices{0,1,2,2,1,3};
+    for(const auto p:std::array<std::array<float,4>,4>{{{-half.x,-half.y,0,1},{half.x,-half.y,1,1},
+        {-half.x,half.y,0,0},{half.x,half.y,1,0}}}){
+        Vertex v{};v.position[0]=p[0];v.position[1]=p[1];v.position[2]=z;v.normal[2]=1;
+        v.uv[0]=p[2];v.uv[1]=p[3];vertices.push_back(v);}
+    return createCabinSurface(device,asset,vertices,indices,pixels,width,height);
+}
+bool studioCylinder(ID3D11Device* device,RetailGpuAsset& asset,float radius,float from,float to,
+    uint32_t color,mgs5vr::Vec3 center={}){
+    std::vector<Vertex> vertices;std::vector<uint16_t> indices;
+    const auto vertex=[&](float x,float y,float z,float nx,float ny,float nz){Vertex v{};
+        v.position[0]=x+center.x;v.position[1]=y+center.y;v.position[2]=z+center.z;
+        v.normal[0]=nx;v.normal[1]=ny;v.normal[2]=nz;indices.push_back(static_cast<uint16_t>(vertices.size()));vertices.push_back(v);};
+    for(int segment=0;segment<32;++segment){
+        const float a=segment*6.2831853f/32,b=(segment+1)*6.2831853f/32;
+        const float x=std::cos(a),y=std::sin(a),xx=std::cos(b),yy=std::sin(b);
+        vertex(x*radius,y*radius,from,x,y,0);vertex(xx*radius,yy*radius,from,xx,yy,0);vertex(x*radius,y*radius,to,x,y,0);
+        vertex(x*radius,y*radius,to,x,y,0);vertex(xx*radius,yy*radius,from,xx,yy,0);vertex(xx*radius,yy*radius,to,xx,yy,0);
+        vertex(0,0,from,0,0,-1);vertex(xx*radius,yy*radius,from,0,0,-1);vertex(x*radius,y*radius,from,0,0,-1);
+        vertex(0,0,to,0,0,1);vertex(x*radius,y*radius,to,0,0,1);vertex(xx*radius,yy*radius,to,0,0,1);
+    }
+    return createCabinSurface(device,asset,vertices,indices,{color},1,1);
+}
+std::vector<uint32_t> studioPaperPixels(const mgs5vr::StudioPaper& paper,UINT size=1024){
+    static const bool fontLoaded=[](){const auto path=openingAssetPath(L"studio_font",
+        L"assets\\fonts\\permanent-marker\\PermanentMarker-Regular.ttf");return AddFontResourceExW(path.c_str(),FR_PRIVATE,nullptr)>0;}();
+    BITMAPINFO bitmap{};bitmap.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bitmap.bmiHeader.biWidth=size;
+    bitmap.bmiHeader.biHeight=-static_cast<LONG>(size);bitmap.bmiHeader.biPlanes=1;bitmap.bmiHeader.biBitCount=32;
+    HDC dc=CreateCompatibleDC(nullptr);void* raw{};HBITMAP surface=CreateDIBSection(dc,&bitmap,DIB_RGB_COLORS,&raw,nullptr,0);
+    if(!dc||!surface||!raw){if(surface)DeleteObject(surface);if(dc)DeleteDC(dc);return {};}
+    const auto old=SelectObject(dc,surface);auto* bits=static_cast<uint32_t*>(raw);
+    const bool photo=paper.photo!=0;std::fill(bits,bits+size_t(size)*size,photo?0xfff4f0e7:0xfff8e885);
+    if(photo)if(const auto image=mgs5vr::studioPhotoPixels(paper.photo)){
+        const UINT inset=size/17,photoSize=size-2*inset;
+        for(UINT y=0;y<photoSize;++y)for(UINT x=0;x<photoSize;++x)
+            bits[size_t(y+inset)*size+x+inset]=image->bgra[size_t(y)*image->height/photoSize*image->width+size_t(x)*image->width/photoSize];
+        // A real Polaroid border remains available for the caption.
+        for(UINT y=size*81/100;y<size;++y)std::fill(bits+size_t(y)*size,bits+size_t(y+1)*size,0xfff4f0e7);
+    }
+    const auto& ink=*paper.ink;
+    const auto letters=ink.text.size();
+    const float lettering=photo?(letters<=16?.09f:.047f)
+        :letters<=8?.25f:letters<=24?.18f:letters<=48?.135f:.10f;
+    HFONT font=CreateFontW(-static_cast<int>(size*lettering),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,
+        DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,
+        fontLoaded?L"Permanent Marker":L"Segoe Print");
+    const auto oldFont=SelectObject(dc,font);SetTextColor(dc,RGB(22,23,24));SetBkMode(dc,TRANSPARENT);
+    RECT rect{static_cast<LONG>(size/18),static_cast<LONG>(photo?size*83/100:size/15),
+        static_cast<LONG>(size-size/18),static_cast<LONG>(size-size/24)};
+    const std::wstring caption(ink.text.begin(),ink.text.end());
+    DrawTextW(dc,caption.c_str(),static_cast<int>(caption.size()),&rect,DT_WORDBREAK|DT_NOPREFIX);
+    HPEN pen=CreatePen(PS_SOLID,std::max(2,static_cast<int>(size/130)),RGB(18,18,20));const auto oldPen=SelectObject(dc,pen);
+    for(const auto& stroke:ink.strokes)if(!stroke.points.empty()){
+        MoveToEx(dc,static_cast<int>(stroke.points.front().u*size),static_cast<int>(stroke.points.front().v*size),nullptr);
+        for(const auto point:stroke.points)LineTo(dc,static_cast<int>(point.u*size),static_cast<int>(point.v*size));}
+    SelectObject(dc,oldPen);DeleteObject(pen);SelectObject(dc,oldFont);DeleteObject(font);
+    std::vector<uint32_t> pixels(bits,bits+size_t(size)*size);for(auto& p:pixels)p|=0xff000000;
+    SelectObject(dc,old);DeleteObject(surface);DeleteDC(dc);return pixels;
+}
+std::vector<uint32_t> studioTextPixels(std::string_view text,UINT width=512,UINT height=160,
+    uint32_t background=0xff182023,COLORREF color=RGB(240,240,230)){
+    BITMAPINFO bitmap{};bitmap.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bitmap.bmiHeader.biWidth=width;
+    bitmap.bmiHeader.biHeight=-static_cast<LONG>(height);bitmap.bmiHeader.biPlanes=1;bitmap.bmiHeader.biBitCount=32;
+    HDC dc=CreateCompatibleDC(nullptr);void* raw{};HBITMAP surface=CreateDIBSection(dc,&bitmap,DIB_RGB_COLORS,&raw,nullptr,0);
+    if(!dc||!surface||!raw){if(surface)DeleteObject(surface);if(dc)DeleteDC(dc);return {};}
+    const auto old=SelectObject(dc,surface);auto* bits=static_cast<uint32_t*>(raw);
+    std::fill(bits,bits+size_t(width)*height,background);
+    const bool multiline=text.find('\n')!=std::string_view::npos;
+    const auto makeFont=[](int pixels){return CreateFontW(-pixels,0,0,0,FW_BOLD,FALSE,FALSE,FALSE,
+        DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,L"Bahnschrift");};
+    const int fontHeight=static_cast<int>(height*(multiline?.35f:.65f));
+    HFONT font=makeFont(fontHeight);const auto oldFont=SelectObject(dc,font);
+    const std::wstring label(text.begin(),text.end());LONG widest{};size_t start{};
+    while(start<label.size()){
+        const auto end=label.find(L'\n',start);const auto length=(end==std::wstring::npos?label.size():end)-start;
+        SIZE size{};GetTextExtentPoint32W(dc,label.data()+start,static_cast<int>(length),&size);widest=std::max(widest,size.cx);
+        if(end==std::wstring::npos)break;start=end+1;
+    }
+    if(widest>static_cast<LONG>(width)-12){
+        SelectObject(dc,oldFont);DeleteObject(font);
+        font=makeFont(std::max(8,static_cast<int>(fontHeight*static_cast<float>(width-12)/widest*.96f)));
+        SelectObject(dc,font);
+    }
+    SetTextColor(dc,color);SetBkMode(dc,TRANSPARENT);
+    RECT rect{4,multiline?static_cast<LONG>(height/8):0,static_cast<LONG>(width)-4,static_cast<LONG>(height)};
+    DrawTextW(dc,label.c_str(),static_cast<int>(label.size()),&rect,DT_CENTER|DT_NOPREFIX|(multiline?0:DT_VCENTER|DT_SINGLELINE));
+    std::vector<uint32_t> pixels(bits,bits+size_t(width)*height);for(auto& p:pixels)p|=0xff000000;
+    SelectObject(dc,oldFont);DeleteObject(font);SelectObject(dc,old);DeleteObject(surface);DeleteDC(dc);return pixels;
+}
+enum class StudioIcon { back,next,print,erase,live,freeze,resume,confirm,cancel,space,backspace };
+std::vector<uint32_t> studioIconPixels(StudioIcon icon,UINT width=512,UINT height=160,
+    uint32_t background=0xff182023){
+    // Small, font-independent symbols. Supersampling keeps their strokes clean
+    // before the existing texture mip chain handles distance in the headset.
+    constexpr UINT samples=4;
+    const UINT rasterWidth=width*samples,rasterHeight=height*samples;
+    BITMAPINFO bitmap{};bitmap.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bitmap.bmiHeader.biWidth=rasterWidth;
+    bitmap.bmiHeader.biHeight=-static_cast<LONG>(rasterHeight);bitmap.bmiHeader.biPlanes=1;bitmap.bmiHeader.biBitCount=32;
+    HDC dc=CreateCompatibleDC(nullptr);void* raw{};HBITMAP surface=CreateDIBSection(dc,&bitmap,DIB_RGB_COLORS,&raw,nullptr,0);
+    if(!dc||!surface||!raw){if(surface)DeleteObject(surface);if(dc)DeleteDC(dc);return {};}
+    const auto old=SelectObject(dc,surface);auto* bits=static_cast<uint32_t*>(raw);
+    std::fill(bits,bits+size_t(rasterWidth)*rasterHeight,background);
+    const float unit=static_cast<float>(rasterHeight)*.68f/100.f;
+    const auto point=[&](float x,float y){return POINT{static_cast<LONG>(std::lround(rasterWidth*.5f+x*unit)),
+        static_cast<LONG>(std::lround(rasterHeight*.5f+y*unit))};};
+    LOGBRUSH ink{BS_SOLID,RGB(240,240,230),0};
+    HPEN pen=ExtCreatePen(PS_GEOMETRIC|PS_SOLID|PS_ENDCAP_ROUND|PS_JOIN_ROUND,
+        std::max(1L,std::lround(7.f*unit)),&ink,0,nullptr);
+    HBRUSH fill=CreateSolidBrush(ink.lbColor);
+    const auto oldPen=SelectObject(dc,pen),oldBrush=SelectObject(dc,GetStockObject(NULL_BRUSH));
+    const auto line=[&](float x,float y,float xx,float yy){
+        const auto a=point(x,y),b=point(xx,yy);MoveToEx(dc,a.x,a.y,nullptr);LineTo(dc,b.x,b.y);};
+    const auto box=[&](float x,float y,float xx,float yy){
+        const auto a=point(x,y),b=point(xx,yy);Rectangle(dc,a.x,a.y,b.x,b.y);};
+    switch(icon){
+    case StudioIcon::back:case StudioIcon::next:{
+        const float direction=icon==StudioIcon::back?1.f:-1.f;
+        const POINT points[]{point(16.f*direction,-34),point(-16.f*direction,0),point(16.f*direction,34)};
+        Polyline(dc,points,3);break;}
+    case StudioIcon::print:
+        box(-25,-43,25,-17);box(-40,-17,40,24);
+        SelectObject(dc,fill);box(-25,10,25,43);SelectObject(dc,GetStockObject(NULL_BRUSH));
+        line(-15,24,15,24);line(25,-3,25,-3);break;
+    case StudioIcon::erase:
+        line(-32,-25,32,-25);box(-12,-40,12,-25);
+        line(-26,-16,-22,41);line(-22,41,22,41);line(22,41,26,-16);
+        line(-8,-9,-8,27);line(8,-9,8,27);break;
+    case StudioIcon::live:{
+        const auto a=point(-42,-23),b=point(42,36);
+        RoundRect(dc,a.x,a.y,b.x,b.y,static_cast<int>(14*unit),static_cast<int>(14*unit));
+        line(-22,-23,-16,-40);line(-16,-40,13,-40);line(13,-40,20,-23);
+        const auto lensA=point(-17,-10),lensB=point(17,24);
+        Ellipse(dc,lensA.x,lensA.y,lensB.x,lensB.y);break;}
+    case StudioIcon::freeze:
+        SelectObject(dc,fill);box(-25,-35,-11,35);box(11,-35,25,35);break;
+    case StudioIcon::resume:{
+        SelectObject(dc,fill);const POINT points[]{point(-23,-37),point(35,0),point(-23,37)};
+        Polygon(dc,points,3);break;}
+    case StudioIcon::confirm:{
+        const POINT points[]{point(-35,1),point(-11,27),point(36,-29)};Polyline(dc,points,3);break;}
+    case StudioIcon::cancel:
+        line(-28,-28,28,28);line(-28,28,28,-28);break;
+    case StudioIcon::space:
+        line(-35,-12,-35,16);line(-35,16,35,16);line(35,16,35,-12);break;
+    case StudioIcon::backspace:{
+        const POINT points[]{point(-42,0),point(-18,-29),point(40,-29),point(40,29),point(-18,29),point(-42,0)};
+        Polyline(dc,points,6);line(-2,-12,22,12);line(-2,12,22,-12);break;}
+    }
+    GdiFlush();
+    std::vector<uint32_t> pixels(size_t(width)*height);
+    for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x){
+        UINT blue{},green{},red{};
+        for(UINT yy=0;yy<samples;++yy)for(UINT xx=0;xx<samples;++xx){
+            const auto p=bits[size_t(y*samples+yy)*rasterWidth+x*samples+xx];
+            blue+=p&255;green+=(p>>8)&255;red+=(p>>16)&255;}
+        pixels[size_t(y)*width+x]=0xff000000|(red/(samples*samples)<<16)
+            |(green/(samples*samples)<<8)|blue/(samples*samples);
+    }
+    SelectObject(dc,oldBrush);DeleteObject(fill);SelectObject(dc,oldPen);DeleteObject(pen);
+    SelectObject(dc,old);DeleteObject(surface);DeleteDC(dc);return pixels;
+}
+bool createStudioResources(ID3D11Device* device){
+    if(resources.studioReady)return true;
+    // A recognizable instant camera: rounded ivory housing, separate film base,
+    // side handle, lens rings, recessed glass, flash and red shutter button.
+    // All parts share the same tracked world transform and native scene depth.
+    auto& camera=resources.studioCamera;
+    if(!studioBevel(device,camera[0],{.066f,.042f,.033f},.008f,0xffe9e5d9,{0,.006f,0})
+        ||!studioBevel(device,camera[1],{.067f,.018f,.049f},.006f,0xff222529,{0,-.053f,-.012f})
+        ||!studioBevel(device,camera[2],{.018f,.041f,.033f},.007f,0xff33373a,{.075f,-.003f,.006f})
+        ||!studioBevel(device,camera[3],{.054f,.031f,.003f},.003f,0xff24292c,{0,.006f,-.035f})
+        ||!studioCylinder(device,camera[4],.025f,-.065f,-.038f,0xffa8afb0,{-.019f,.003f,0})
+        ||!studioCylinder(device,camera[5],.022f,-.070f,-.061f,0xff141a1d,{-.019f,.003f,0})
+        ||!studioCylinder(device,camera[6],.0175f,-.071f,-.070f,0xff142d40,{-.019f,.003f,0})
+        ||!studioBevel(device,camera[7],{.014f,.009f,.002f},.002f,0xfff1e8c5,{.032f,.027f,-.040f})
+        ||!studioCylinder(device,camera[8],.007f,-.043f,-.039f,0xffb53528,{.073f,.028f,0})
+        ||!studioBox(device,camera[9],{.043f,.003f,.001f},0xff06090b,{0,-.050f,-.062f})
+        ||!studioBevel(device,camera[10],{.031f,.027f,.002f},.002f,0xff252c30,{-.012f,.007f,.034f})
+        ||!studioCylinder(device,resources.studioMarker,.006f,-.070f,.040f,0xff202327)
+        ||!studioCylinder(device,resources.studioMarkerTip,.002f,-.080f,-.070f,0xff101214)
+        ||!studioBox(device,resources.studioNotes,{.038f,.003f,.038f},0xfff8e885)
+        ||!studioBox(device,resources.studioStickyBack,mgs5vr::studioPaperHalf(false),0xfff8e885)
+        ||!studioBox(device,resources.studioPhotoBack,mgs5vr::studioPaperHalf(true),0xfff4f0e7)
+        ||!studioBox(device,resources.studioFocus,{.023f,.023f,.0004f},0xffecc03d))return false;
+    // The finder is inset toward the left, away from the gripping hand.
+    // Translate its own vertices once; its live texture keeps the shared pose.
+    {
+        RetailGpuAsset finder;
+        std::vector<Vertex> vertices;const std::vector<uint16_t> indices{0,1,2,2,1,3};
+        for(const auto p:std::array<std::array<float,4>,4>{{{-.027f,-.023f,0,1},{.027f,-.023f,1,1},
+            {-.027f,.023f,0,0},{.027f,.023f,1,0}}}){
+            Vertex v{};v.position[0]=p[0]-.012f;v.position[1]=p[1]+.007f;v.position[2]=.0365f;
+            v.normal[2]=1;v.uv[0]=p[2];v.uv[1]=p[3];vertices.push_back(v);}
+        if(!createCabinSurface(device,finder,vertices,indices,{0xff182023},1,1))return false;
+        resources.studioViewfinder=std::move(finder);
+        resources.studioGallery=resources.studioViewfinder;
+    }
+    for(size_t i=0;i<44;++i){
+        mgs5vr::StudioPaper paper{};auto ink=std::make_shared<mgs5vr::StudioInk>();ink->text=mgs5vr::studioKey(i);paper.ink=ink;
+        const auto pixels=i==33?studioIconPixels(StudioIcon::space,256,256):
+            i==34?studioIconPixels(StudioIcon::backspace,256,256):
+            (i==35||i==43)?studioIconPixels(StudioIcon::erase,256,256):
+            i==36?studioIconPixels(StudioIcon::confirm,256,256):studioPaperPixels(paper,256);
+        if(!studioQuad(device,resources.studioKeys[i],{.0215f,.0215f,0},pixels,256,256))return false;
+    }
+    constexpr std::array<StudioIcon,6> buttonIcons{StudioIcon::back,StudioIcon::next,StudioIcon::print,
+        StudioIcon::erase,StudioIcon::live,StudioIcon::freeze};
+    for(size_t i=0;i<6;++i){
+        const auto control=static_cast<mgs5vr::StudioControl>(i);
+        const auto position=mgs5vr::studioControlPose({},control).position;
+        if(!studioBevel(device,resources.studioButtons[i],mgs5vr::studioControlHalf,.0015f,0xff303b43,
+            position+mgs5vr::Vec3{0,0,-.003f})
+            ||!studioQuad(device,resources.studioButtonFaces[i],mgs5vr::studioControlHalf,
+                studioIconPixels(buttonIcons[i]),512,160))return false;
+    }
+    if(!studioQuad(device,resources.studioResume,mgs5vr::studioControlHalf,studioIconPixels(StudioIcon::resume),512,160)
+        ||!studioQuad(device,resources.studioConfirmControl,mgs5vr::studioControlHalf,studioIconPixels(StudioIcon::confirm,512,160,0xff7c3028),512,160)
+        ||!studioQuad(device,resources.studioCancelControl,mgs5vr::studioControlHalf,studioIconPixels(StudioIcon::cancel),512,160)
+        ||!studioBox(device,resources.studioButtonHover,{.027f,.010f,.0004f},0xffe4c253,{0,0,-.0005f})
+        ||!studioQuad(device,resources.studioCancel,{.0215f,.0215f,0},studioIconPixels(StudioIcon::cancel,256,256),256,256)
+        ||!studioQuad(device,resources.studioDelete,{.0215f,.0215f,0},studioIconPixels(StudioIcon::confirm,256,256,0xff7c3028),256,256)
+        ||!studioQuad(device,resources.studioPaperConfirmation,{.245f,.047f,0},
+            studioTextPixels("DELETE THIS PAPER?\nTHIS CANNOT BE UNDONE",1024,240,0xff602922),1024,240))return false;
+    resources.studioReady=true;return true;
+}
+bool createCabinLabels(ID3D11Device* device){
+    constexpr UINT width=512,height=160;
+    constexpr std::array<uint32_t,6> stripes{0xff9c3929,0xff9b8141,0xff3d596c,0xff496350,0xff923e39,0xff55524b};
+    for(size_t tape=0;tape<7;++tape){
+        BITMAPINFO bitmap{};bitmap.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bitmap.bmiHeader.biWidth=width;
+        bitmap.bmiHeader.biHeight=-static_cast<LONG>(height);bitmap.bmiHeader.biPlanes=1;bitmap.bmiHeader.biBitCount=32;
+        void* bits{};HDC dc=CreateCompatibleDC(nullptr);HBITMAP surface=CreateDIBSection(dc,&bitmap,DIB_RGB_COLORS,&bits,nullptr,0);
+        if(!dc||!surface||!bits){if(surface)DeleteObject(surface);if(dc)DeleteDC(dc);return false;}
+        const auto old=SelectObject(dc,surface);auto* ink=static_cast<uint32_t*>(bits);
+        std::fill(ink,ink+width*height,0xffede5cd);
+        for(UINT y=0;y<12;++y)for(UINT x=0;x<width;++x)ink[size_t(y)*width+x]=stripes[tape%6];
+        std::wstring caption=tape==6?L"EJECT":std::wstring(mgs5vr::openingTapeLabels[tape].begin(),mgs5vr::openingTapeLabels[tape].end());
+        if(tape==1)caption=L"DOWNLOAD MGSV: GZ\nSAVE DATA";
+        if(tape==2)caption=L"METAL GEAR\nONLINE";
+        if(tape==4)caption=L"DELETE SAVE DATA";
+        const int fontHeight=tape==1?40:tape==4?43:54;
+        HFONT font=CreateFontW(-fontHeight,0,0,0,FW_BOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,L"Bahnschrift");
+        const auto oldFont=SelectObject(dc,font);SetTextColor(dc,RGB(30,29,24));SetBkMode(dc,TRANSPARENT);
+        RECT text{10,caption.find(L'\n')==std::wstring::npos?48:27,502,150};
+        DrawTextW(dc,caption.c_str(),static_cast<int>(caption.size()),&text,DT_CENTER|DT_NOPREFIX);
+        std::vector<uint32_t> pixels(ink,ink+width*height);for(auto& p:pixels)p|=0xff000000;
+        SelectObject(dc,oldFont);DeleteObject(font);SelectObject(dc,old);DeleteObject(surface);DeleteDC(dc);
+        std::vector<Vertex> vertices;std::vector<uint16_t> indices;
+        // Labels are actual triangles on both broad faces of the casing. The
+        // rear UV winding is reversed so turning a tape never mirrors its text.
+        for(int side:{1,-1}){
+            const float z=side*.00565f;const uint16_t first=static_cast<uint16_t>(vertices.size());
+            for(const auto& p:std::array<std::array<float,4>,4>{{{-.046f,.010f,0,1},{.046f,.010f,1,1},{-.046f,.029f,0,0},{.046f,.029f,1,0}}}){
+                Vertex v{};v.position[0]=p[0];v.position[1]=p[1];v.position[2]=z;v.normal[2]=static_cast<float>(side);
+                v.uv[0]=side>0?p[2]:1-p[2];v.uv[1]=p[3];vertices.push_back(v);}
+            for(const auto i:{0,1,2,2,1,3})indices.push_back(first+static_cast<uint16_t>(i));
+        }
+        if(tape==6){
+            const mgs5vr::Vec3 p{};vertices.clear();indices={0,1,2,2,1,3};
+            for(const auto& corner:std::array<std::array<float,4>,4>{{{-.029f,.011f,0,1},{.029f,.011f,1,1},{-.029f,-.011f,0,0},{.029f,-.011f,1,0}}}){
+                Vertex vertex{};vertex.position[0]=p.x+corner[0];vertex.position[1]=p.y+.0062f;
+                vertex.position[2]=p.z+corner[1];vertex.normal[1]=1;vertex.uv[0]=corner[2];vertex.uv[1]=corner[3];vertices.push_back(vertex);}
+        }
+        auto& label=tape==6?resources.openingEjectLabel:resources.openingLabels[tape];
+        if(!createCabinSurface(device,label,vertices,indices,pixels,width,height))return false;
+    }
+    return true;
+}
 bool createOpeningResources(ID3D11Device* device){
     if(resources.openingReady)return true;
     if(!device||resources.openingAttempted||!resources.ready)return false;
@@ -1065,13 +1454,8 @@ bool createOpeningResources(ID3D11Device* device){
         L"retail-assets\\Assets\\tpp\\item\\cct\\Scenes\\cct0_main1_def.fmdl");
     const auto cassetteDiffuse=openingAssetPath(L"cassette_diffuse_dds",
         L"retail-assets\\Assets\\tpp\\item\\cct\\Pictures\\cct0_main1_def_c00_bsm.dds");
-    const auto radioModel=openingAssetPath(L"radio_fmdl",
-        L"retail-assets\\Assets\\tpp\\item\\rdi\\Scenes\\rdi0_main0_def.fmdl");
-    const auto radioDiffuse=openingAssetPath(L"radio_diffuse_dds",
-        L"retail-assets\\Assets\\tpp\\item\\rdi\\Pictures\\rdi0_main0_def_c00_bsm.dds");
-    const bool radio=createRetailGpuAsset(device,resources.openingRadio,radioModel,radioDiffuse,"radio");
     const bool cassette=createRetailGpuAsset(device,resources.openingCassette,cassetteModel,cassetteDiffuse,"cassette");
-    resources.openingReady=radio&&cassette;
+    resources.openingReady=cassette&&createCabinLabels(device);
     if(!resources.openingReady)
         mgs5vr::log("Opening title props unavailable; native title panel remains the fallback");
     return resources.openingReady;
@@ -1282,13 +1666,14 @@ std::array<float,16> matrixProduct(const std::array<float,16>& a,const std::arra
 bool drawOpeningAsset(ID3D11DeviceContext* context,const RetailGpuAsset& asset,
     ID3D11RenderTargetView* target,ID3D11DepthStencilView* depth,
     const std::array<float,16>& world,const std::array<float,16>& view,
-    const std::array<float,16>& projection){
+    const std::array<float,16>& projection,bool emissive=false){
     if(!context||!asset.ready||!target||!depth)return false;
     const auto mvp=matrixProduct(matrixProduct(world,view),projection);
     for(const auto value:mvp)if(!std::isfinite(value))return false;
     Constants constants{};std::copy(mvp.begin(),mvp.end(),std::begin(constants.mvp));
     std::copy(world.begin(),world.end(),std::begin(constants.world));
     constants.baseColor[0]=constants.baseColor[1]=constants.baseColor[2]=constants.baseColor[3]=1.f;
+    if(emissive)constants.baseColor[0]=-1.f;
     context->UpdateSubresource(resources.constants.Get(),0,nullptr,&constants,0,0);
     ID3D11RenderTargetView* renderTarget=target;context->OMSetRenderTargets(1,&renderTarget,depth);
     const UINT stride=sizeof(Vertex),offset=0;ID3D11Buffer* vertexBuffer=asset.vertices.Get();
@@ -1307,9 +1692,18 @@ bool drawOpeningAsset(ID3D11DeviceContext* context,const RetailGpuAsset& asset,
 }
 
 bool bindHousingDepth(ID3D11DeviceContext* context,ID3D11Device* device,
-    const SavedState& state,bool reversed,ComPtr<ID3D11DepthStencilView>& target){
+    const SavedState& state,bool reversed,ComPtr<ID3D11DepthStencilView>& target,
+    const mgs5vr::EyeFrame* eye=nullptr){
     const char* source="native writable depth";
-    if(state.depthTarget){
+    if(eye&&mgs5vr::nativeEyeDepthView(*eye,device,target.GetAddressOf())){
+        ComPtr<ID3D11Resource> depthResource,colorResource;target->GetResource(&depthResource);
+        state.renderTarget->GetResource(&colorResource);
+        ComPtr<ID3D11Texture2D> depthTexture,colorTexture;
+        if(FAILED(depthResource.As(&depthTexture))||FAILED(colorResource.As(&colorTexture)))return false;
+        D3D11_TEXTURE2D_DESC a{},b{};depthTexture->GetDesc(&a);colorTexture->GetDesc(&b);
+        if(a.Width!=b.Width||a.Height!=b.Height||a.SampleDesc.Count!=b.SampleDesc.Count)return false;
+        source="matched native eye depth";
+    }else if(state.depthTarget){
         D3D11_DEPTH_STENCIL_VIEW_DESC view{};state.depthTarget->GetDesc(&view);
         if(view.Flags&D3D11_DSV_READ_ONLY_DEPTH){
             ComPtr<ID3D11Resource> texture;state.depthTarget->GetResource(texture.GetAddressOf());
@@ -1440,6 +1834,13 @@ float4 main(float4 position:SV_POSITION,float4 color:COLOR):SV_TARGET{return col
     D3D11_DEPTH_STENCIL_DESC depth{};
     if(FAILED(device->CreateRasterizerState(&raster,&resources.markerRasterizer))
         ||FAILED(device->CreateDepthStencilState(&depth,&resources.markerDepth)))return false;
+    depth.StencilEnable=TRUE;depth.StencilReadMask=depth.StencilWriteMask=255;
+    depth.FrontFace={D3D11_STENCIL_OP_KEEP,D3D11_STENCIL_OP_KEEP,D3D11_STENCIL_OP_REPLACE,D3D11_COMPARISON_ALWAYS};
+    depth.BackFace=depth.FrontFace;
+    if(FAILED(device->CreateDepthStencilState(&depth,&resources.markerMaskWrite)))return false;
+    depth.StencilWriteMask=0;depth.FrontFace.StencilPassOp=D3D11_STENCIL_OP_KEEP;
+    depth.FrontFace.StencilFunc=D3D11_COMPARISON_EQUAL;depth.BackFace=depth.FrontFace;
+    if(FAILED(device->CreateDepthStencilState(&depth,&resources.markerMaskRead)))return false;
     D3D11_BUFFER_DESC buffer{};buffer.ByteWidth=16384*sizeof(MarkerVertex);buffer.Usage=D3D11_USAGE_DYNAMIC;
     buffer.BindFlags=D3D11_BIND_VERTEX_BUFFER;buffer.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
     return SUCCEEDED(device->CreateBuffer(&buffer,nullptr,&resources.markerVertices));
@@ -1471,7 +1872,8 @@ std::array<uint8_t,7> markerGlyph(char c){
 
 void drawWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
     const std::array<float,16>& view,const std::array<float,16>& projection,mgs5vr::Vec3 camera,
-    const mgs5vr::OpticWaypoints& points,ID3D11RenderTargetView* target,const D3D11_VIEWPORT& viewport,bool lens){
+    const mgs5vr::OpticWaypoints& points,ID3D11RenderTargetView* target,const D3D11_VIEWPORT& viewport,bool lens,
+    ID3D11DepthStencilView* housingMask=nullptr){
     const auto status=mgs5vr::headCamera().status();
     const auto now=mgs5vr::steadyMilliseconds();
     if(!target||!status.active||points.activation!=status.activation
@@ -1532,9 +1934,10 @@ void drawWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
     }
     if(vertices.empty())return;
     ID3D11ShaderResourceView* none=nullptr;context->PSSetShaderResources(0,1,&none);
-    context->OMSetRenderTargets(1,&target,nullptr);
+    context->OMSetRenderTargets(1,&target,housingMask);
     context->RSSetViewports(1,&viewport);context->RSSetState(resources.markerRasterizer.Get());
-    context->OMSetDepthStencilState(resources.markerDepth.Get(),0);context->OMSetBlendState(nullptr,nullptr,0xffffffffu);
+    context->OMSetDepthStencilState(housingMask?resources.markerMaskRead.Get():resources.markerDepth.Get(),0);
+    context->OMSetBlendState(nullptr,nullptr,0xffffffffu);
     ID3D11Buffer* buffer=resources.markerVertices.Get();const UINT stride=sizeof(MarkerVertex),offset=0;
     context->IASetVertexBuffers(0,1,&buffer,&stride,&offset);context->IASetInputLayout(resources.markerInputLayout.Get());
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1551,91 +1954,46 @@ void drawWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
     if(visible&&!resources.markerReported){resources.markerReported=true;mgs5vr::log("Native acquired markers reprojected from world positions");}
 }
 
-void drawOpeningLabels(ID3D11DeviceContext* context,ID3D11RenderTargetView* target,
-    const D3D11_VIEWPORT& viewport,const std::array<std::array<float,16>,7>& worlds,
-    const std::array<float,16>& view,const std::array<float,16>& projection,int selection){
-    if(!context||!target||!viewport.Width||!viewport.Height||!createMarkerResources(resources.device.Get()))return;
-    std::vector<MarkerVertex> vertices;vertices.reserve(4096);
-    using Color=std::array<float,3>;
-    constexpr Color white{.72f,.92f,1.f},amber{1.f,.70f,.16f};
-    const auto quad=[&](float x0,float y0,float x1,float y1,Color color){
-        const auto v=[&](float x,float y){return MarkerVertex{x,y,color[0],color[1],color[2],1};};
-        for(const auto vertex:{v(x0,y0),v(x1,y0),v(x0,y1),v(x0,y1),v(x1,y0),v(x1,y1)})vertices.push_back(vertex);
-    };
-    const auto vp=matrixProduct(view,projection);unsigned visible{};
-    for(size_t i=1;i<worlds.size();++i){
-        // Place the caption just below its own cassette. The earlier positive
-        // anchor lifted both rows into the gap; the labels then looked like a
-        // missing top row instead of names attached to the physical tapes.
-        // Keep this in the cassette's local space so the shared prop layout
-        // drives geometry, hover, and text from the same authored position.
-        const auto clip=transformPoint(matrixProduct(worlds[i],vp),{0,-.040f,0});
-        if(!std::isfinite(clip.w)||clip.w<=.01f)continue;
-        const float x=clip.x/clip.w,y=clip.y/clip.w;
-        if(!std::isfinite(x)||!std::isfinite(y)||std::abs(x)>.98f||std::abs(y)>.94f)continue;
-        ++visible;
-        const auto label=mgs5vr::openingTapeLabels[i-1];
-        // Keep the exact native action names attached to each cassette, but
-        // wrap the three long names so the 5x7 glyphs remain readable at the
-        // eye-capture resolution. This is text on the physical prop, not a
-        // replacement instruction card or a black backdrop.
-        std::array<std::string_view,3> lines{{label,{},{}}};
-        if(label=="DOWNLOAD MGSV: GZ SAVE DATA")lines={{"DOWNLOAD","MGSV: GZ","SAVE DATA"}};
-        else if(label=="METAL GEAR ONLINE")lines={{"METAL GEAR","ONLINE",{}}};
-        else if(label=="DELETE SAVE DATA")lines={{"DELETE","SAVE DATA",{}}};
-        size_t columns{};
-        for(const auto line:lines)columns=std::max(columns,line.size());
-        // Bound the glyphs by this cassette's physical column. A fixed NDC
-        // font made long captions collide when the rack was farther away.
-        const auto edge0=transformPoint(matrixProduct(worlds[i],vp),{-.055f,-.040f,0});
-        const auto edge1=transformPoint(matrixProduct(worlds[i],vp),{ .055f,-.040f,0});
-        if(edge0.w<=.01f||edge1.w<=.01f||!columns)continue;
-        const float columnWidth=std::abs(edge1.x/edge1.w-edge0.x/edge0.w);
-        const float pixel=std::min(.0023f,columnWidth/static_cast<float>(columns*6-1));
-        if(!std::isfinite(pixel)||pixel<=0)continue;
-        const auto lineWidth=[&](std::string_view line){
-            return line.empty()?0.f:static_cast<float>(line.size()*6-1)*pixel;
-        };
-        const float width=static_cast<float>(columns*6-1)*pixel;
-        const float left=x-width*.5f,top=y+8*pixel;
-        const auto color=selection==static_cast<int>(i-1)?amber:white;
-        for(size_t lineIndex=0;lineIndex<lines.size();++lineIndex){
-            const auto current=lines[lineIndex];
-            if(current.empty())continue;
-            const float lineLeft=x-lineWidth(current)*.5f;
-            const float lineTop=top-static_cast<float>(lineIndex)*8*pixel;
-            for(size_t n=0;n<current.size();++n){
-                const auto glyph=markerGlyph(current[n]);
-                for(size_t row=0;row<7;++row)for(size_t col=0;col<5;++col)
-                    if(glyph[row]&(1u<<(4-col))){
-                        const float gx=lineLeft+static_cast<float>(n*6+col)*pixel;
-                        const float gy=lineTop-static_cast<float>(row)*pixel;
-                        quad(gx,gy,gx+pixel,gy-pixel,color);
-                    }
-            }
-        }
-        if(selection==static_cast<int>(i-1)){
-            const float rows=lines[1].empty()?8.f:lines[2].empty()?16.f:24.f;
-            quad(left,top-rows*pixel,left+width,top-(rows+2)*pixel,amber);
-        }
+ID3D11DepthStencilView* binocularMarkerMask(ID3D11DeviceContext* context,ID3D11Device* device,
+    const SavedState& state,const std::array<float,16>& world,
+    const std::array<float,16>& view,const std::array<float,16>& projection){
+    if(!resources.ready&&!createResources(device))return nullptr;
+    if(!createMarkerResources(device)||!state.renderTarget)return nullptr;
+    ComPtr<ID3D11Resource> resource;state.renderTarget->GetResource(&resource);
+    ComPtr<ID3D11Texture2D> color;if(FAILED(resource.As(&color)))return nullptr;
+    D3D11_TEXTURE2D_DESC desc{},old{};color->GetDesc(&desc);
+    if(resources.markerMaskTexture)resources.markerMaskTexture->GetDesc(&old);
+    if(!resources.markerMask||desc.Width!=old.Width||desc.Height!=old.Height
+       ||desc.SampleDesc.Count!=old.SampleDesc.Count||desc.SampleDesc.Quality!=old.SampleDesc.Quality){
+        resources.markerMask.Reset();resources.markerMaskTexture.Reset();
+        desc.Format=DXGI_FORMAT_D24_UNORM_S8_UINT;desc.MipLevels=desc.ArraySize=1;
+        desc.Usage=D3D11_USAGE_DEFAULT;desc.BindFlags=D3D11_BIND_DEPTH_STENCIL;
+        desc.CPUAccessFlags=desc.MiscFlags=0;
+        if(FAILED(device->CreateTexture2D(&desc,nullptr,&resources.markerMaskTexture))
+           ||FAILED(device->CreateDepthStencilView(resources.markerMaskTexture.Get(),nullptr,&resources.markerMask)))return nullptr;
     }
-    if(vertices.empty())return;
-    ID3D11ShaderResourceView* none=nullptr;context->PSSetShaderResources(0,1,&none);
-    context->OMSetRenderTargets(1,&target,nullptr);context->RSSetViewports(1,&viewport);
-    context->RSSetState(resources.markerRasterizer.Get());context->OMSetDepthStencilState(resources.markerDepth.Get(),0);
-    context->OMSetBlendState(nullptr,nullptr,0xffffffffu);
-    ID3D11Buffer* buffer=resources.markerVertices.Get();const UINT stride=sizeof(MarkerVertex),offset=0;
-    context->IASetVertexBuffers(0,1,&buffer,&stride,&offset);context->IASetInputLayout(resources.markerInputLayout.Get());
+    context->ClearDepthStencilView(resources.markerMask.Get(),D3D11_CLEAR_STENCIL,1,0);
+    context->OMSetRenderTargets(0,nullptr,resources.markerMask.Get());
+    context->OMSetDepthStencilState(resources.markerMaskWrite.Get(),1);
+    const auto mvp=matrixProduct(matrixProduct(world,view),projection);Constants constants{};
+    std::copy(mvp.begin(),mvp.end(),constants.mvp);std::copy(world.begin(),world.end(),constants.world);
+    context->UpdateSubresource(resources.constants.Get(),0,nullptr,&constants,0,0);
+    const UINT stride=sizeof(Vertex),offset=0;ID3D11Buffer* vertices=resources.vertices.Get();
+    context->IASetInputLayout(resources.inputLayout.Get());context->IASetVertexBuffers(0,1,&vertices,&stride,&offset);
+    context->IASetIndexBuffer(resources.indices.Get(),DXGI_FORMAT_R16_UINT,0);
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    context->VSSetShader(resources.markerVertexShader.Get(),nullptr,0);context->PSSetShader(resources.markerPixelShader.Get(),nullptr,0);
-    for(size_t first=0;first<vertices.size();first+=16383){
-        const auto count=std::min(size_t{16383},vertices.size()-first);D3D11_MAPPED_SUBRESOURCE mapped{};
-        if(FAILED(context->Map(resources.markerVertices.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&mapped)))return;
-        std::memcpy(mapped.pData,vertices.data()+first,count*sizeof(MarkerVertex));context->Unmap(resources.markerVertices.Get(),0);
-        context->Draw(static_cast<UINT>(count),0);
-    }
-    static bool reported{};
-    if(visible&&!reported){reported=true;mgs5vr::log("Native title tape action labels attached to owned cassette props");}
+    context->VSSetShader(resources.vertexShader.Get(),nullptr,0);context->PSSetShader(nullptr,nullptr,0);
+    ID3D11Buffer* buffer=resources.constants.Get();context->VSSetConstantBuffers(0,1,&buffer);
+    context->RSSetState(resources.rasterizer.Get());if(state.viewportCount)context->RSSetViewports(1,&state.viewport);
+    context->DrawIndexed(resources.indexCount,0,0);
+    return resources.markerMask.Get();
+}
+
+void drawOpeningLabels(ID3D11DeviceContext* context,ID3D11RenderTargetView* target,
+    ID3D11DepthStencilView* depth,const std::array<std::array<float,16>,7>& worlds,
+    const std::array<float,16>& view,const std::array<float,16>& projection){
+    for(size_t i=1;i<worlds.size();++i)
+        drawOpeningAsset(context,resources.openingLabels[i-1],target,depth,worlds[i],view,projection);
 }
 
 bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& world,
@@ -1717,7 +2075,7 @@ bool capturePhysicalOpticScene(ID3D11DeviceContext* context,const std::array<flo
 }
 void drawWorldWaypoints(ID3D11DeviceContext* context,const std::array<float,16>& view,
     const std::array<float,16>& projection,Vec3 cameraPosition,const OpticWaypoints& markers,
-    HudMode mode,bool enemyMarkers) noexcept{
+    HudMode mode,bool enemyMarkers,const std::array<float,16>* binocularWorld) noexcept{
     if(!context||!markers.count)return;
     try{
         std::lock_guard lock(rendererMutex);
@@ -1728,15 +2086,17 @@ void drawWorldWaypoints(ID3D11DeviceContext* context,const std::array<float,16>&
         for(size_t i=0;i<std::min(markers.count,markers.points.size());++i)
             if(worldMarkerVisible(mode,enemyMarkers,markers.points[i].letter))
                 visible.points[visible.count++]=markers.points[i];
-        if(state.renderTarget&&state.viewportCount)
-            drawWaypoints(context,device.Get(),view,projection,cameraPosition,visible,state.renderTarget.Get(),state.viewport,false);
+        if(state.renderTarget&&state.viewportCount){
+            auto* mask=binocularWorld?binocularMarkerMask(context,device.Get(),state,*binocularWorld,view,projection):nullptr;
+            drawWaypoints(context,device.Get(),view,projection,cameraPosition,visible,state.renderTarget.Get(),state.viewport,false,mask);
+        }
         restore(context,state);
     }catch(...){}
 }
 bool drawPhysicalWeaponScope(ID3D11DeviceContext* context,const std::array<float,16>& ocularWorld,
     const std::array<float,16>& view,const std::array<float,16>& projection,float radius,float magnification,
-    ID3D11Texture2D* sceneSource,bool dotReticle) noexcept {
-    const bool collimator=dotReticle&&magnification==1.f;
+    ID3D11Texture2D* sceneSource,bool dotReticle,bool opaqueAtOnePower) noexcept {
+    const bool collimator=dotReticle&&magnification==1.f&&!opaqueAtOnePower;
     if(!context||(!sceneSource&&!collimator)||!std::isfinite(radius)||radius<.003f||radius>.06f
        ||!std::isfinite(magnification)||magnification<1.f||magnification>16.f)return false;
     try{
@@ -1914,7 +2274,7 @@ bool drawPhysicalBinoculars(ID3D11DeviceContext* context,const std::array<float,
         }
         Constants constants{};std::copy(mvp.begin(),mvp.end(),std::begin(constants.mvp));std::copy(world.begin(),world.end(),std::begin(constants.world));
         ComPtr<ID3D11DepthStencilView> housingDepth;
-        if(!bindHousingDepth(context,device.Get(),state,projection[14]>0,housingDepth)){restore(context,state);return false;}
+        if(!bindHousingDepth(context,device.Get(),state,projection[14]>0,housingDepth,sourceEye)){restore(context,state);return false;}
         constants.baseColor[0]=1.f;constants.baseColor[1]=1.f;constants.baseColor[2]=1.f;constants.baseColor[3]=1.f;
         context->UpdateSubresource(resources.constants.Get(),0,nullptr,&constants,0,0);const UINT stride=sizeof(Vertex),offset=0;ID3D11Buffer* vertexBuffer=resources.vertices.Get();
         context->IASetInputLayout(resources.inputLayout.Get());context->IASetVertexBuffers(0,1,&vertexBuffer,&stride,&offset);context->IASetIndexBuffer(resources.indices.Get(),DXGI_FORMAT_R16_UINT,0);
@@ -1995,7 +2355,9 @@ bool drawPhysicalIdroidCursor(ID3D11DeviceContext* context,const std::array<floa
     }catch(...){return false;}
 }
 bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<float,16>,7>& worlds,
-    const std::array<float,16>& view,const std::array<float,16>& projection,int selection) noexcept{
+    const std::array<float,16>& view,const std::array<float,16>& projection,const std::array<float,16>& cabinWorld,
+    const EyeFrame& eye,float lidOpen,int selection) noexcept{
+    (void)selection;(void)lidOpen;(void)cabinWorld;
     if(!context)return false;
     try{
         std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(device.GetAddressOf());
@@ -2006,20 +2368,20 @@ bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<f
         for(const auto& world:worlds)for(const auto value:world)if(!std::isfinite(value))return false;
         SavedState state;save(context,state);if(!state.renderTarget){restore(context,state);return false;}
         ComPtr<ID3D11DepthStencilView> depth;
-        if(!bindHousingDepth(context,device.Get(),state,projection[14]>0,depth)){restore(context,state);return false;}
-        const bool radio=drawOpeningAsset(context,resources.openingRadio,state.renderTarget.Get(),depth.Get(),
-            worlds[0],view,projection);
+        if(!bindHousingDepth(context,device.Get(),state,projection[14]>0,depth,&eye)){restore(context,state);return false;}
+        // Retain the player's authored controls without a billboard over them.
+        // The cassette geometry is independently movable.
         bool cassettes=true;
         for(size_t i=1;i<worlds.size();++i)
             cassettes=drawOpeningAsset(context,resources.openingCassette,state.renderTarget.Get(),depth.Get(),
                 worlds[i],view,projection)&&cassettes;
-        if(radio&&cassettes)
-            drawOpeningLabels(context,state.renderTarget.Get(),state.viewport,worlds,view,projection,selection);
+        if(cassettes)
+            drawOpeningLabels(context,state.renderTarget.Get(),depth.Get(),worlds,view,projection);
         restore(context,state);
-        if(radio&&cassettes&&!resources.openingReported){
-            resources.openingReported=true;mgs5vr::log("Owned cassette and radio props rendered in the native title cabin");
+        if(cassettes&&!resources.openingReported){
+            resources.openingReported=true;mgs5vr::log("Physical labelled cassettes use the existing native cabin player; native depth join reported separately");
         }
-        return radio&&cassettes;
+        return cassettes;
     }catch(...){return false;}
 }
 
@@ -2056,6 +2418,130 @@ bool drawAccWristHint(ID3D11DeviceContext* context,const std::array<float,16>& w
     }catch(...){return false;}
 }
 
+bool drawCabinStudio(ID3D11DeviceContext* context,const CabinStudioFrame& frame,const CabinStudioMatrices& worlds,
+    const std::array<float,16>& view,const std::array<float,16>& projection,const EyeFrame& eye,
+    ID3D11Texture2D* cameraScene) noexcept{
+    if(!context||!frame.available)return false;
+    try{
+        std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(&device);if(!device)return false;
+        if(resources.device.Get()!=device.Get()){resources=Resources{};resources.device=device;}
+        if(!resources.attempted&&!createResources(device.Get()))return false;
+        if(!resources.ready||!createStudioResources(device.Get()))return false;
+        SavedState saved;save(context,saved);if(!saved.renderTarget){restore(context,saved);return false;}
+        ComPtr<ID3D11DepthStencilView> depth;
+        if(!bindHousingDepth(context,device.Get(),saved,projection[14]>0,depth,&eye)){restore(context,saved);return false;}
+        const auto draw=[&](RetailGpuAsset& asset,const std::array<float,16>& world){
+            return drawOpeningAsset(context,asset,saved.renderTarget.Get(),depth.Get(),world,view,projection);};
+        if(frame.keyboardOnly){
+            if(frame.hoverKey>=0&&nativeTextKeyEnabled(static_cast<size_t>(frame.hoverKey)))
+                draw(resources.studioFocus,worlds.keys[static_cast<size_t>(frame.hoverKey)]);
+            for(size_t key=0;key<44;++key)if(nativeTextKeyEnabled(key))draw(resources.studioKeys[key],worlds.keys[key]);
+            restore(context,saved);return true;
+        }
+        for(auto& part:resources.studioCamera)draw(part,worlds.camera);
+        if(cameraScene&&!frame.review){
+            resources.studioViewfinder.diffuse.Reset();device->CreateShaderResourceView(cameraScene,nullptr,&resources.studioViewfinder.diffuse);
+        }
+        if(frame.review){
+            if(resources.studioGalleryPhoto!=frame.selectedPhoto){
+                resources.studioGallery.diffuse.Reset();resources.studioGalleryPhoto=frame.selectedPhoto;
+                if(const auto pixels=studioPhotoPixels(frame.selectedPhoto)){
+                    D3D11_TEXTURE2D_DESC desc{};desc.Width=pixels->width;desc.Height=pixels->height;
+                    desc.MipLevels=desc.ArraySize=1;desc.SampleDesc.Count=1;desc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
+                    desc.Usage=D3D11_USAGE_IMMUTABLE;desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+                    const D3D11_SUBRESOURCE_DATA initial{pixels->bgra.data(),pixels->width*4,0};
+                    ComPtr<ID3D11Texture2D> texture;
+                    if(SUCCEEDED(device->CreateTexture2D(&desc,&initial,&texture)))
+                        device->CreateShaderResourceView(texture.Get(),nullptr,&resources.studioGallery.diffuse);
+                }
+            }
+            if(resources.studioGallery.diffuse)draw(resources.studioGallery,worlds.camera);
+        }else if(resources.studioViewfinder.diffuse)draw(resources.studioViewfinder,worlds.camera);
+        for(size_t i=0;i<6;++i){
+            draw(resources.studioButtons[i],worlds.camera);
+            if(frame.hoverControl==static_cast<int>(i))draw(resources.studioButtonHover,worlds.controls[i]);
+            auto& face=frame.confirmPhoto&&i==3?resources.studioConfirmControl
+                :frame.confirmPhoto&&i==4?resources.studioCancelControl
+                :i==5&&frame.freezeRequested?resources.studioResume:resources.studioButtonFaces[i];
+            draw(face,worlds.controls[i]);
+        }
+        std::string status;
+        if(frame.confirmPhoto)status="DELETE PHOTO?";
+        else{
+            if(frame.review){
+                const auto selected=std::find(frame.photos.begin(),frame.photos.end(),frame.selectedPhoto);
+                status=selected==frame.photos.end()?"NO SAVED PHOTOS":"PHOTO "+std::to_string(selected-frame.photos.begin()+1)
+                    +" / "+std::to_string(frame.photos.size());
+            }else status="LIVE";
+            if(frame.freezeState==StudioFreeze::frozen)status+=" / FROZEN";
+            else if(frame.freezeState==StudioFreeze::pending)status+=" / WAIT";
+            else if(frame.freezeState==StudioFreeze::unavailable)status+=" / FREEZE FAILED";
+            else if(!frame.freezeSupported)status+=" / NO FREEZE";
+            if(frame.capacityReached)status+="\nPAPER STORAGE FULL";
+        }
+        if(status!=resources.studioStatusText||!resources.studioCameraStatus.ready){
+            RetailGpuAsset label;if(studioQuad(device.Get(),label,{.032f,.009f,0},studioTextPixels(status),512,160)){
+                resources.studioCameraStatus=std::move(label);resources.studioStatusText=status;
+            }
+        }
+        if(resources.studioCameraStatus.ready)draw(resources.studioCameraStatus,worlds.cameraStatus);
+        if(frame.cabin){
+            draw(resources.studioNotes,worlds.notes);
+            draw(resources.studioMarker,worlds.marker);
+            draw(resources.studioMarkerTip,worlds.marker);
+        }
+            for(auto it=resources.studioPapers.begin();it!=resources.studioPapers.end();){
+                if(std::none_of(frame.papers.begin(),frame.papers.end(),[&](const auto& p){return p.id==it->first;}))
+                    it=resources.studioPapers.erase(it);else ++it;
+            }
+            for(size_t index=0;index<frame.papers.size()&&index<worlds.papers.size();++index){
+                const auto& paper=frame.papers[index];const auto& world=worlds.papers[index];
+                if(!frame.cabin&&!paper.field)continue;
+                draw(paper.photo?resources.studioPhotoBack:resources.studioStickyBack,world);
+                auto& gpu=resources.studioPapers[paper.id];
+                if(!gpu.face.ready||gpu.revision!=paper.ink->revision){
+                    RetailGpuAsset face;const auto pixels=studioPaperPixels(paper);
+                    if(studioQuad(device.Get(),face,studioPaperHalf(paper.photo!=0),pixels,1024,1024,.001f)){
+                        gpu.face=std::move(face);gpu.revision=paper.ink->revision;}}
+                if(gpu.face.ready)draw(gpu.face,world);
+            }
+            if(frame.editor>=0){
+                if(frame.hoverKey>=0)draw(resources.studioFocus,worlds.keys[static_cast<size_t>(frame.hoverKey)]);
+                if(frame.confirmPaper){
+                    draw(resources.studioPaperConfirmation,worlds.paperConfirmation);
+                    draw(resources.studioCancel,worlds.keys[33]);draw(resources.studioDelete,worlds.keys[43]);
+                }else for(size_t key=0;key<44;++key)draw(resources.studioKeys[key],worlds.keys[key]);
+            }
+        restore(context,saved);return true;
+    }catch(...){return false;}
+}
+bool drawIdroidGuidance(ID3D11DeviceContext* context,const std::array<float,16>& world,
+    const std::array<float,16>& view,const std::array<float,16>& projection,
+    float width,float aspect,ID3D11Texture2D* source,const EyeFrame& eye) noexcept {
+    if(!context||!source||!std::isfinite(width)||width<.2f||width>.6f
+       ||!std::isfinite(aspect)||aspect<.5f||aspect>3.f)return false;
+    try{
+        std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(&device);
+        if(!device)return false;
+        if(resources.device.Get()!=device.Get()){resources=Resources{};resources.device=device;}
+        if(!resources.attempted&&!createResources(device.Get()))return false;
+        if(!resources.ready)return false;
+        if(!resources.idroidGuidance.ready||resources.idroidGuidanceWidth!=width||resources.idroidGuidanceAspect!=aspect){
+            RetailGpuAsset surface;
+            if(!studioQuad(device.Get(),surface,{width*.5f,width/(2*aspect),0},{0xffffffffu},1,1,0))return false;
+            resources.idroidGuidance=std::move(surface);
+            resources.idroidGuidanceWidth=width;resources.idroidGuidanceAspect=aspect;
+        }
+        // Never keep a preceding flight/frame's SRV after a missing capture.
+        resources.idroidGuidance.diffuse.Reset();
+        if(FAILED(device->CreateShaderResourceView(source,nullptr,&resources.idroidGuidance.diffuse)))return false;
+        SavedState saved;save(context,saved);
+        ComPtr<ID3D11DepthStencilView> depth;
+        const bool ready=saved.renderTarget&&bindHousingDepth(context,device.Get(),saved,projection[14]>0,depth,&eye);
+        const bool drawn=ready&&drawOpeningAsset(context,resources.idroidGuidance,saved.renderTarget.Get(),depth.Get(),world,view,projection,true);
+        restore(context,saved);return drawn;
+    }catch(...){return false;}
+}
 void stopPhysicalOpticRenderer() noexcept{setOpticNativeMaterialDrawCallback(nullptr);
     std::lock_guard lock(rendererMutex);resources=Resources{};}
 }

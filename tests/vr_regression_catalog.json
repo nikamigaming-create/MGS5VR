@@ -117,7 +117,8 @@
     "tools/gameplay_bot/suites/standing-prone.json",
     "tools/gameplay_bot/suites/tutorial-exit-ack.json",
     "tools/gameplay_bot/suites/weapon-grip-inspection.json",
-    "tools/gameplay_bot/suites/wrist-display.json"
+    "tools/gameplay_bot/suites/wrist-display.json",
+    "tools/gameplay_bot/suites/body-gear-observe.json"
   ],
   "excluded_unimplemented_claims": [
     "Physical stand/crouch/prone inference.",
@@ -135,8 +136,8 @@
     "runtime": 6,
     "tooling": 5,
     "baseline_ctest_groups": 41,
-    "current_ctest_groups": 55,
-    "public_native_fixture_files": 19,
+    "current_ctest_groups": 58,
+    "public_native_fixture_files": 20,
     "features_with_registered_automated_tests": 45,
     "features_with_auxiliary_tests_only": 1,
     "features_without_automated_tests": 2,
@@ -196,6 +197,7 @@
         "include/mgs5vr/capture_hook.hpp",
         "include/mgs5vr/core.hpp",
         "include/mgs5vr/head_camera.hpp",
+        "include/mgs5vr/rocket_arm.hpp",
         "include/mgs5vr/mailbox.hpp",
         "include/mgs5vr/render_camera.hpp",
         "include/mgs5vr/render_layout.hpp",
@@ -656,7 +658,10 @@
         "include/mgs5vr/native_actions.hpp",
         "include/mgs5vr/native_demo_state.hpp",
         "include/mgs5vr/player_visibility.hpp",
-        "include/mgs5vr/stale_demo_recovery.hpp"
+        "include/mgs5vr/stale_demo_recovery.hpp",
+        "include/mgs5vr/native_text_input.hpp",
+        "src/native_text_input.cpp",
+        "src/native_text_keyboard.cpp"
       ],
       "automated_tests": [
         "contracts",
@@ -758,7 +763,15 @@
         "src/native_cabin_script.hpp.in",
         "include/mgs5vr/head_camera.hpp",
         "include/mgs5vr/native_actions.hpp",
-        "include/mgs5vr/opening_selector.hpp"
+        "include/mgs5vr/opening_selector.hpp",
+        "src/cabin_props.cpp",
+        "src/cabin_cover.cpp",
+        "include/mgs5vr/cabin_cover.hpp",
+        "include/mgs5vr/cabin_props.hpp",
+        "src/cabin_studio.cpp",
+        "include/mgs5vr/cabin_studio.hpp",
+        "src/cabin_studio_store.cpp",
+        "include/mgs5vr/cabin_studio_store.hpp"
       ],
       "automated_tests": [
         "contracts",
@@ -806,7 +819,8 @@
       },
       "missing_checks": [
         "Public physical-cassette native fixture and continuous title-to-field cleanup.",
-        "All title submenus and alternate saves; headset reach/readability."
+        "All title submenus and alternate saves; headset reach/readability.",
+        "Native seat contact; full pickup/drop/insert/eject loop; camera-posed photos, Sharpie text/freehand, board placement and persistence in both eyes."
       ],
       "sustained_regression": {
         "status": "missing",
@@ -1405,19 +1419,24 @@
         "src/head_camera.cpp",
         "include/mgs5vr/arm_ik.hpp",
         "include/mgs5vr/controller_rig.hpp",
-        "include/mgs5vr/head_camera.hpp"
+        "include/mgs5vr/head_camera.hpp",
+        "include/mgs5vr/gear_contact.hpp",
+        "tools/gameplay_bot/body_gear.py"
       ],
       "automated_tests": [
         "contracts",
-        "community_regressions"
+        "community_regressions",
+        "body_gear_contact"
       ],
       "test_sources": [
         "tests/core_tests.cpp",
-        "tests/community_tests.cpp"
+        "tests/community_tests.cpp",
+        "tests/gear_contact_tests.cpp"
       ],
       "auxiliary_tests": [],
       "native_fixtures": [
-        "tools/gameplay_bot/suites/weapon-grip-inspection.json"
+        "tools/gameplay_bot/suites/weapon-grip-inspection.json",
+        "tools/gameplay_bot/suites/body-gear-observe.json"
       ],
       "evidence_sources": [
         "docs/CURRENT.md",
@@ -1434,7 +1453,7 @@
       "coverage": {
         "automated": {
           "status": "partial",
-          "scope": "Acquisition dwell, contact radius, detachment, rigid transforms and smoothing resets are checked."
+          "scope": "Acquisition dwell, contact radius, detachment, rigid transforms and smoothing resets are checked. Isolated body-gear candidate timing checks cover one-second expiry, held-grip rejection, stale sources, item changes and reach loss; field-camera grace pickup and same-update return are also checked. Native loadout acquisition is not connected or accepted."
         },
         "native": {
           "status": "retained_scoped",
@@ -2499,7 +2518,9 @@
         "include/mgs5vr/idroid_ui.hpp",
         "include/mgs5vr/native_controls.hpp",
         "src/native_idroid_interruption.lua",
-        "src/native_idroid_interruption_script.hpp.in"
+        "src/native_idroid_interruption_script.hpp.in",
+        "src/native_idroid_open.lua",
+        "src/native_idroid_open_script.hpp.in"
       ],
       "automated_tests": [
         "contracts",
@@ -3483,6 +3504,7 @@
       "source_paths": [
         "src/vehicle_weapon.cpp",
         "include/mgs5vr/vehicle_weapon.hpp",
+        "include/mgs5vr/mounted_grip.hpp",
         "include/mgs5vr/vehicle_pedals.hpp",
         "src/input_bridge.cpp",
         "src/head_camera.cpp",
@@ -3830,19 +3852,25 @@
         "include/mgs5vr/controls.hpp",
         "include/mgs5vr/input_bridge.hpp",
         "include/mgs5vr/native_controls.hpp",
-        "include/mgs5vr/xr_runtime.hpp"
+        "include/mgs5vr/xr_runtime.hpp",
+        "src/controls_editor.cpp",
+        "src/controls_panel_renderer.cpp",
+        "include/mgs5vr/controls_editor.hpp",
+        "include/mgs5vr/controls_panel_renderer.hpp"
       ],
       "automated_tests": [
         "controls_config",
         "configurable_controls",
         "community_regressions",
-        "effective_bindings_export"
+        "effective_bindings_export",
+        "headset_controls_editor"
       ],
       "test_sources": [
         "tools/controls-check.cpp",
         "tests/controls_tests.cpp",
         "tests/community_tests.cpp",
-        "tests/bindings_export_tests.py"
+        "tests/bindings_export_tests.py",
+        "tests/controls_editor_tests.cpp"
       ],
       "auxiliary_tests": [],
       "native_fixtures": [],
@@ -3850,7 +3878,8 @@
         "docs/CONTROLS.md",
         "docs/CURRENT.md",
         "docs/QUEST3_TESTER_FEEDBACK.md",
-        "docs/REGRESSION_COVERAGE.md"
+        "docs/REGRESSION_COVERAGE.md",
+        "docs/HEADSET_CONTROLS_EDITOR.md"
       ],
       "community_reports": [
         "R20",
@@ -3862,7 +3891,7 @@
       "coverage": {
         "automated": {
           "status": "partial",
-          "scope": "Parser/defaults, chord priority, native mode, export and Xbox/VR owner changes; separate touch tokens are covered in configuration."
+          "scope": "Parser/defaults, chord priority, native mode, export and Xbox/VR owner changes; separate touch tokens are covered in configuration. Headset editor covers release-before-capture, two-hand chords, context filtering, confirmation, stale-file protection and closing input handoff; native visuals remain separate."
         },
         "native": {
           "status": "retained_scoped",
@@ -4335,6 +4364,7 @@
         "tools/gameplay_bot/cover.py",
         "tools/gameplay_bot/bodies.py",
         "tools/gameplay_bot/commander.py",
+        "tools/gameplay_bot/commands.py",
         "tools/gameplay_bot/autonomy.py",
         "tools/gameplay_bot/tactics.py",
         "tools/gameplay_bot/cqc.py",
@@ -4346,7 +4376,10 @@
         "tools/gameplay-mortar.py",
         "tools/gameplay_bot/menu_coverage.py",
         "tools/gameplay_bot/state_graph.py",
-        "tools/gameplay-coverage.py"
+        "tools/gameplay-coverage.py",
+        "tools/showcase.py",
+        "tools/gameplay_bot/showcase.py",
+        "tools/gameplay_bot/arsenal.py"
       ],
       "automated_tests": [
         "simulator_session_ownership",
@@ -4371,7 +4404,8 @@
         "native_input_delivery_contracts",
         "gameplay_bot_recon_contracts",
         "gameplay_bot_mortar_contracts",
-        "gameplay_menu_variant_contracts"
+        "gameplay_menu_variant_contracts",
+        "gameplay_bot_showcase_contracts"
       ],
       "test_sources": [
         "tests/simulator_session_ownership_tests.ps1",
@@ -4394,12 +4428,14 @@
         "tests/gameplay_bot_combat_tests.py",
         "tests/gameplay_bot_tactics_tests.py",
         "tests/gameplay_bot_cqc_tests.py",
+        "tests/gameplay_bot_commands_tests.py",
         "tests/gameplay_bot_idroid_film_tests.py",
         "tests/gameplay_bot_binocular_presentation_tests.py",
         "tests/native_input_delivery_tests.cpp",
         "tests/gameplay_bot_recon_tests.py",
         "tests/gameplay_bot_mortar_tests.py",
-        "tests/menu_coverage_variants_tests.py"
+        "tests/menu_coverage_variants_tests.py",
+        "tests/gameplay_bot_showcase_tests.py"
       ],
       "auxiliary_tests": [
         "tests/record_simulator_tests.py",
@@ -4692,7 +4728,10 @@
     "native_input_delivery_contracts",
     "gameplay_bot_recon_contracts",
     "gameplay_bot_mortar_contracts",
-    "gameplay_menu_variant_contracts"
+    "gameplay_menu_variant_contracts",
+    "headset_controls_editor",
+    "gameplay_bot_showcase_contracts",
+    "body_gear_contact"
   ],
   "source_inventory_rule": "Every current file under src/ and include/ must have at least one feature source_paths reference. Public source additions/deletions require explicit catalog review.",
   "current_user_reports": [

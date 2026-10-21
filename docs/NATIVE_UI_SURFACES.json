@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "purpose": "Track native UI destinations and evidence while preserving existing VR interactions.",
+  "inventory_complete": false,
+  "headset_accepted": false,
+  "current_priority": "rocket_arm_idroid",
+  "identification_contract": {
+    "required": [
+      "current typed owner",
+      "resource identity or verified native producer",
+      "lifecycle",
+      "source frame",
+      "pixel source and aspect"
+    ],
+    "insufficient_alone": [
+      "draw order",
+      "camera depth",
+      "texture pointer",
+      "menu flag",
+      "successful input call"
+    ],
+    "unknown": "Record and classify. A verified open menu with no device surface uses the spatial fallback; do not promote arbitrary world or optical draws into a panel."
+  },
+  "surfaces": [
+    {
+      "id": "personal_status",
+      "destination": "left_bionic_forearm",
+      "implementation": "existing",
+      "acceptance": "scoped_evidence_only",
+      "preserve": "Weapon/status and ordinary notifications stay on the left forearm."
+    },
+    {
+      "id": "native_idroid",
+      "destination": "left_hand_idroid_projector",
+      "implementation": "existing",
+      "acceptance": "scoped_evidence_only",
+      "preserve": "Native maps, missions, management, ordinary/forced stow and immediate reopening."
+    },
+    {
+      "id": "rocket_arm_idroid",
+      "destination": "left_hand_idroid_projector",
+      "implementation": "implemented_scoped_simulator_pass",
+      "acceptance": "headset_and_interruption_coverage_pending",
+      "observed": "Candidate 5f73f4917b24 shows guidance at the native left-hand iDroid emitter with holding hand and live full body in separate left/right launch, ground impact and return recordings. Four post-flight open/stow/reopen cases pass. Target destruction, pre-stowed state, tracking loss, interruptions and other arm variants remain unproven. The latest checked build adds remote-lens failure isolation without a fresh live run. Release is held for the user's headset test.",
+      "requirements": [
+        "Identify exact flight producer and start/end state",
+        "Maintain fresh Snake world, body and hand rendering across native projectile-camera ownership changes; retained stereo is not live-body proof",
+        "Render live feed at the authored iDroid projector with correct aspect",
+        "Keep headset/world/body view independent",
+        "Preserve steering, acceleration and cancellation",
+        "Restore prior device state after return, interruption, death and loading"
+      ],
+      "evidence": [
+        "artifacts/rocket-arm/idroid-feed-visible-left/capture.json",
+        "artifacts/rocket-arm/idroid-feed-visible-right/capture.json",
+        "artifacts/bot/runs/20261019T042907036259Z",
+        "artifacts/rocket-arm/feed-diagnostics/samples.jsonl",
+        "artifacts/rocket-arm/idroid-source-left/capture.json",
+        "artifacts/rocket-arm/idroid-parts-trace/samples.jsonl"
+      ]
+    },
+    {
+      "id": "pause_settings_dialogs",
+      "destination": "spatial_stereo_panel",
+      "implementation": "partial",
+      "acceptance": "coverage_open",
+      "preserve": "Known active popup detection and missing-device fallback; no stranded flat-only dialog."
+    },
+    {
+      "id": "physical_optics",
+      "destination": "native_physical_optic",
+      "implementation": "existing",
+      "acceptance": "scoped_evidence_only",
+      "preserve": "Handheld binocular aiming, zoom, acquisition, explicit marking and real firearm sights; no detached zoom window."
+    },
+    {
+      "id": "title_loading_profile_sortie",
+      "destination": "context_specific_spatial_panel",
+      "implementation": "existing",
+      "acceptance": "coverage_open",
+      "requirements": [
+        "Inventory each native owner separately",
+        "Check transition and return",
+        "Preserve ordinary title menu access without cassette handling"
+      ]
+    },
+    {
+      "id": "other_remote_camera_feeds",
+      "destination": "classify_before_routing",
+      "implementation": "unknown",
+      "acceptance": "untested",
+      "requirements": [
+        "Inventory loaded native camera producers",
+        "Exercise developed equipment and mission-specific flows",
+        "Do not assume every feed shares the Rocket Arm owner"
+      ]
+    },
+    {
+      "id": "youtube_idroid_tab",
+      "destination": "left_hand_idroid_projector",
+      "implementation": "future_scope",
+      "acceptance": "not_implemented",
+      "requirements": [
+        "Explicit app focus and media controls",
+        "Keep playback input separate from native gameplay",
+        "Preserve native iDroid functions",
+        "Validate media content, audio, performance and headset readability"
+      ]
+    }
+  ],
+  "audit_sequence": [
+    "Catalogue owned UI assets and native producer identities, including mission-loaded resources.",
+    "Catalogue camera ownership transitions and every XR fallback trigger as well as UI draws: projectile flight, cinematics, vehicles, death, loading and deployment.",
+    "Collect bounded live draw inventories before, during and after each action; retain unknown owners and truncation limits.",
+    "Join each draw to its intended device, content producer and lifecycle; replace blanket routing only with evidence-backed classification.",
+    "Capture both eyes through open, interact, head/hand movement, close, reopen and interruption cases.",
+    "Check for duplicated content, missing desktop-only dialogs, wrong aspect, unreadable pixels and unexpected input capture.",
+    "Keep unvisited scenes and undeveloped equipment explicitly untested; simulator checks do not imply physical-headset acceptance."
+  ],
+  "coverage_contract": {
+    "per_case": [
+      "native producer/resource identity",
+      "trigger and exit state",
+      "intended VR destination",
+      "input owner",
+      "live world/body requirement",
+      "left/right evidence",
+      "head and hand motion",
+      "close/reopen/interruption",
+      "tested build",
+      "observed result and remaining gaps"
+    ],
+    "scenario_groups": [
+      "ACC arrival, departure and return",
+      "loadout and every available equipment family",
+      "ordinary and forced tutorial iDroid",
+      "Pause, settings and remapping",
+      "confirmation, error, save and connection dialogs",
+      "mission objectives, results and checkpoints",
+      "damage, death, rescue and restart",
+      "binoculars and weapon optics",
+      "Rocket/Blast Arm and other remote cameras",
+      "cinematic entry/exit and vehicle changes",
+      "controller tracking loss and recovery"
+    ],
+    "discovery_limit": "Current draw inventory is capped at 96 nodes and groups by camera/order/join state; it is a discovery aid, not an exhaustive resource inventory.",
+    "completion_rule": "No all-UI acceptance until enumerated producers and transitions have matched live cases; retain unknown and unvisited entries explicitly."
+  }
+}

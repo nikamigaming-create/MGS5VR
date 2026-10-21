@@ -29,6 +29,12 @@ inline constexpr std::array<std::string_view,6> openingTapeLabels{{
 }};
 
 enum class OpeningPulse : uint8_t { none, up, down, confirm };
+// Read-only native row/action table, sampled by the title's own update.
+struct OpeningNativeFocus {
+    std::array<uint8_t,7> actions{};
+    uint8_t count{},row{};
+    bool ready{};
+};
 
 struct OpeningSelectorFrame {
     bool active{};
@@ -40,35 +46,38 @@ struct OpeningSelectorFrame {
     bool dogPetted{};
     bool continueReady{};
     Pose origin{};
+    CabinBenchFrame bench{};
 };
 
 // One shared layout is used by rendering and input.  Entry zero is the real
-// radio/deck; entries one through six are the six action tapes in label order.
+// cassette player; entries one through six are tapes in label order.
 std::array<Vec3,7> openingPropOffsets() noexcept;
 std::array<float,7> openingPropScales() noexcept;
 bool openingPropsAvailable() noexcept;
 bool openingCabinEnabled() noexcept;
 
-// The title rack is deliberately fail-closed.  Continue is accepted only
-// from the native title's known initial focus; every other tape remains
-// visible but cannot leak a guessed D-pad sequence into the game.  No actor,
-// menu, save-data, or Lua state is fabricated by this class.
+// Insertion navigates the observed native rows and confirms only the matching
+// action. No menu, save-data or Lua state is fabricated by this class.
 class OpeningSelector {
 public:
     OpeningSelectorFrame update(bool title,bool assetsAvailable,bool dogAvailable,Pose head,
-        const std::array<TrackedHand,2>& hands,uint64_t now,std::optional<Pose> anchoredOrigin={});
+        const std::array<TrackedHand,2>& hands,uint64_t now,std::optional<Pose> anchoredOrigin={},
+        OpeningNativeFocus focus={},CabinLayout layout=cabinDefaultLayout());
     OpeningSelectorFrame updateCabin(bool active,Pose head,
-        const std::array<TrackedHand,2>& hands,uint64_t now);
+        const std::array<TrackedHand,2>& hands,uint64_t now,std::optional<Pose> anchoredOrigin={},
+        CabinLayout layout=cabinDefaultLayout());
     void reset() noexcept;
 
 private:
-    enum class Phase : uint8_t { idle, confirm };
+    enum class Phase : uint8_t { idle, navigate, release, confirm };
     Phase phase_{Phase::idle};
     int target_{-1};
-    uint64_t confirmUntil_{};
-    bool previousTrigger_{};
+    uint64_t confirmUntil_{},routeUntil_{},pulseUntil_{};
+    uint8_t priorRow_{};
+    OpeningPulse direction_{OpeningPulse::none};
     bool initialized_{};
     Pose origin_{};
+    CabinProps props_{};
 };
 
 }

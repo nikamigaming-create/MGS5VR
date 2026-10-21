@@ -523,6 +523,27 @@ int main(int argc,char** argv){
             &&!freshHandheldIdroidOpenRequest({4,100},4,99)
             &&!freshHandheldIdroidOpenRequest({},4,100),
             "queued handheld opening cannot cross camera ownership, expiry or clock reset");
+        HandheldIdroidOpenQueue openings;
+        openings.request(4,100);
+        const auto waiting=openings.pending();
+        expect(openings.pending().time==100&&openings.pending().revision==waiting.revision
+            &&freshHandheldIdroidOpenRequest(waiting,4,1099),
+            "a rig publication gap retains the original request and deadline without executing it");
+        expect(openings.consume(waiting)&&!openings.consume(waiting)&&!openings.pending().time,
+            "a ready native owner claims one opening exactly once");
+        openings.request(4,200);const auto cancelled=openings.pending();
+        openings.request(0,210);
+        expect(!openings.consume(cancelled)&&!openings.pending().time,
+            "cancellation during a rig gap cannot resurrect the old tap");
+        openings.request(4,220);const auto older=openings.pending();
+        openings.request(4,230);const auto newer=openings.pending();
+        expect(!openings.consume(older)&&openings.pending().revision==newer.revision
+            &&openings.consume(newer),
+            "a newer tap wins over an older native job even within the same activation");
+        openings.request(4,300);const auto expired=openings.pending();
+        expect(!freshHandheldIdroidOpenRequest(expired,4,1301)&&openings.consume(expired)
+            &&!openings.pending().time,
+            "expiry discards a waiting request without extending its deadline");
         publishHandheldIdroidOwner(1234,4);
         expect(handheldIdroidOwned(1234,4)&&!handheldIdroidOwned(1235,4)&&!handheldIdroidOwned(1234,5),
             "UI-only device lease belongs to its exact native player and VR activation");
@@ -541,6 +562,10 @@ int main(int argc,char** argv){
             "selecting Continue publishes only its native confirm while both sticks are held");
         expect(cabinTitleGamepad(menuInput,false,false)==menuInput,
             "ordinary menus and scripted gameplay keep their existing input outside the spatial rack");
+        expect(cabinTitleGamepad(menuInput,true,false,true)==menuInput,
+            "visible cabin title menu accepts the existing VR menu bindings without a cassette");
+        expect(cabinTitleGamepad(menuInput,true,true,true)==menuInput,
+            "a cassette pulse cannot replace input while the visible native menu owns controls");
     }
     {
         ControlBindings bindings;PhysicalControls input;
@@ -566,6 +591,81 @@ int main(int argc,char** argv){
         expect(pauseMode==NativeMenuInput::menu&&paused.leftY>20000&&paused.rightX<0
             &&paused.leftTrigger==255&&paused.rightTrigger==255,
             "Pause during a cutscene retains the visible menu's navigation and triggers");
+        CinematicMenuNavigation menuDirection;
+        GamepadSample rightMenu{};rightMenu.leftX=32767;rightMenu.buttons=0x1000;
+        rightMenu.leftTrigger=71;rightMenu.rightTrigger=93;
+        expect(!menuDirection.update(rightMenu,false,100),
+            "ordinary menus and native gameplay cannot generate cinematic navigation");
+        expect(!menuDirection.update(rightMenu,true,110),
+            "entering cutscene Pause with a held stick cannot select Skip");
+        menuDirection.update({},true,120);
+        const auto rightChoice=menuDirection.update(rightMenu,true,130);
+        expect(rightChoice==8&&rightMenu.buttons==0x1000&&rightMenu.leftX==32767
+            &&rightMenu.leftTrigger==71&&rightMenu.rightTrigger==93,
+            "a fresh direction leaves the native Confirm, axes and triggers unchanged");
+        expect(!menuDirection.update(rightMenu,true,140)&&!menuDirection.update({},true,150)
+            &&!menuDirection.update({},true,230),
+            "held and released axes cannot duplicate a direction event");
+        GamepadSample upMenu{};upMenu.leftY=32767;
+        expect(menuDirection.update(upMenu,true,240)==1,
+            "the vertical VR menu axis supplies native Up");
+        upMenu.leftX=16000;upMenu.leftY=15000;
+        expect(!menuDirection.update(upMenu,true,500),
+            "menu-axis hysteresis requires centering before a new direction");
+        menuDirection.update({},true,510);
+        GamepadSample explicitDirection=rightMenu;explicitDirection.buttons|=4;
+        expect(menuDirection.update(explicitDirection,true,520)==0xffff
+            &&!menuDirection.update(rightMenu,true,530),
+            "explicit personal D-pad bindings win and do not leave an inherited axis press");
+        menuDirection.update({},true,540);
+        menuDirection.update(rightMenu,true,550);
+        expect(!menuDirection.update({},false,560)
+            &&!menuDirection.update(rightMenu,true,570),
+            "leaving the cutscene menu cancels navigation and requires neutral on the next owner");
+        menuDirection.update({},true,580);menuDirection.update(rightMenu,true,590);
+        expect(!menuDirection.update(rightMenu,true,10)
+            &&!menuDirection.update(rightMenu,true,20),
+            "clock reset cannot replay a held cutscene direction");
+        ControlBindings remappedMenu;
+        std::istringstream rightMenuAxis("[axes]\nmenu=right_stick\n");
+        expect(remappedMenu.load(rightMenuAxis).empty(),"remapped cutscene menu fixture is valid");
+        PhysicalControls remappedInput;
+        remappedMenu.update(remappedInput,ControlContext::menus,100);
+        remappedMenu.update(remappedInput,ControlContext::menus,120);
+        CinematicMenuNavigation remappedDirection;remappedDirection.update({},true,120);
+        remappedInput.rightStick={-1,0};remappedMenu.update(remappedInput,ControlContext::menus,140);
+        const auto remappedPacket=nativeMenuGamepad(remappedMenu,remappedInput,NativeMenuInput::menu);
+        expect(remappedDirection.update(remappedPacket,true,140)==4
+            &&!remappedMenu.active("menus.dpad_left"),
+            "cutscene compatibility follows the effective menu axis without changing an unbound D-pad action");
+        CinematicMenuDirectionQueue directions;
+        directions.publish(12,8,100);
+        expect(!directions.take(12,0,1,110)&&!directions.take(12,0,2,110)
+            &&!directions.take(12,0,9,110)&&!directions.take(12,1,15,110),
+            "a cinematic direction never changes Confirm, Back, Start or another player's UI");
+        expect(directions.take(12,0,14,110)==false&&directions.take(12,0,15,110)==true
+            &&directions.take(12,0,15,111)==false,
+            "only the matching native UI edge consumes a fresh direction exactly once");
+        directions.publish(12,0,200);
+        expect(directions.take(12,0,15,350)==false&&!directions.take(12,0,15,351),
+            "neutral producer heartbeats do not extend the original 250 ms gesture deadline");
+        directions.publish(12,4,400);directions.publish(12,8,410);
+        expect(directions.take(12,0,14,420)==false&&directions.take(12,0,15,420)==true,
+            "the newest fresh gesture replaces an unconsumed opposite direction");
+        directions.publish(12,4,500);directions.publish(13,0,510);
+        expect(!directions.take(12,0,14,520)&&!directions.take(13,0,14,520),
+            "activation changes cancel pending cinematic directions");
+        directions.publish(13,4,600);directions.publish(0,0,610);
+        expect(!directions.take(13,0,14,620),"losing Pause ownership cancels its pending gesture");
+        directions.publish(13,4,700);directions.publish(13,0xffff,710);
+        expect(!directions.take(13,0,14,720),"an explicit personal D-pad action cancels the axis relay");
+        directions.publish(13,4,800);directions.publish(13,1,810);
+        expect(!directions.take(13,0,14,820),"a newer vertical gesture cancels an old horizontal choice");
+        directions.publish(13,8,900);
+        expect(!directions.take(13,0,15,899)&&!directions.take(13,0,15,1151),
+            "future and stale producer samples cannot drive a native UI edge");
+        directions.publish(13,4,1000);directions.publish(13,0,10);
+        expect(!directions.take(13,0,14,20),"clock rewind cancels a pending UI gesture");
         ControlBindings handheldBindings;
         std::istringstream distinctMenuAxes("[axes]\nmove=right_stick\nmenu=left_stick\n");
         expect(handheldBindings.load(distinctMenuAxes).empty(),"handheld menu axis fixture is valid");
@@ -694,6 +794,16 @@ int main(int argc,char** argv){
         expect(nativeSceneInputMode(false,true,false,false,false)==NativeMenuInput::cinematic
             &&nativeSceneInputMode(false,false,false,true,false)==NativeMenuInput::scriptedScene,
             "movies and ordinary scripted gameplay retain distinct input policies");
+        HospitalHeadLook headLesson;
+        expect(headLesson.update({},true,1000,1,2)==std::array<float,2>{},"head look seeds a fresh native lesson without input");
+        const Quat lookingUp{std::sin(.1f),0,0,std::cos(.1f)};
+        const auto headLook=headLesson.update(lookingUp,true,1100,1,2);
+        expect(headLook[1]>.5f&&std::abs(headLook[0])<.01f,"physical upward head motion reaches the native hospital input-history threshold");
+        expect(headLesson.update(lookingUp,true,1230,1,2)[1]>.5f,"a held head gesture survives the native input averaging window");
+        for(uint64_t time=1430;time<3300;time+=200)headLesson.update(lookingUp,true,time,1,2);
+        expect(headLesson.update(lookingUp,true,3300,1,2)==std::array<float,2>{},"a held head gesture ends after its bounded native pulse");
+        expect(headLesson.update({},false,3340,1,2)==std::array<float,2>{},"menu or tracking loss releases tutorial look");
+        expect(headLesson.update(lookingUp,true,3400,2,2)==std::array<float,2>{},"a new tracking space never reuses old head motion");
         input={};bindings.update(input,ControlContext::menus,160);
         input.buttons[4]=1;bindings.update(input,ControlContext::menus,180);
         bindings.update(input,ControlContext::menus,740);

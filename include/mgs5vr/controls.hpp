@@ -57,6 +57,8 @@ std::optional<ControlInputAudit> controlInputAudit(uint64_t now);
 std::string_view controlContextName(ControlContext context);
 struct ControlDefinition {std::string_view name,binding;uint32_t contexts{};bool modifier{};};
 const std::vector<ControlDefinition>& controlDefinitions();
+const std::array<std::string_view,29>& controlInputNames();
+uint32_t physicalControlMask(const PhysicalControls& input,bool touches=true) noexcept;
 struct SettingDefinition {std::string_view name;float value{},minimum{},maximum{};};
 const std::vector<SettingDefinition>& settingDefinitions();
 struct NativeButtonDefinition {std::string_view name,binding;uint16_t mask{};};
@@ -97,7 +99,10 @@ public:
     bool hasPhysicalIntent(const PhysicalControls& input) const;
     std::array<float,2> axis(std::string_view name,const PhysicalControls& input) const;
     float setting(std::string_view name) const;
+    std::string settingText(std::string_view name) const;
     std::string label(std::string_view action) const;
+    // Canonical parser syntax, retaining alternatives and gesture timing.
+    std::string bindingText(std::string_view action) const;
     // Effective parsed bindings, including overrides and timing. Used by the
     // test bot and generated instructions; never reconstruct this from labels.
     std::string bindingsJson() const;

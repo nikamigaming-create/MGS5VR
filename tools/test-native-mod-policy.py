@@ -6,5 +6,6 @@ import sys
 root = pathlib.Path(__file__).resolve().parents[1]
 quote = lambda path: '[====[' + (root / path).read_text(encoding='utf-8') + ']====]'
 script = ('return assert(loadstring(' + quote('tests/native_mod_policy_tests.lua') + '))()('
-          + quote('src/native_god_mode.lua') + ',' + quote('src/native_idroid_interruption.lua') + ')')
+          + quote('src/native_god_mode.lua') + ',' + quote('src/native_idroid_interruption.lua')
+          + ',' + quote('src/native_idroid_open.lua') + ')')
 raise SystemExit(subprocess.call([sys.executable, str(root / 'tools/native-actions.py'), '--script', script]))

@@ -38,7 +38,7 @@ constexpr bool matchesNativeIdroidLeftHand(std::span<const uint32_t> names,
 // Convert the tracked anatomical palm to the wrist of this authored hold.
 // These knuckle positions come from the same native contact sample.
 std::optional<Pose> nativeIdroidLeftWristFromGrip() noexcept;
-// Place that same native cup at the tracked palm, with the device facing along
-// the controller's pointing basis. Runtime grip cant is not a handset axis.
-std::optional<Pose> nativeIdroidLeftHandheldWrist(Pose grip,Pose aim,Pose fit={}) noexcept;
+// Place that native cup at the tracked palm. The fixed device-in-wrist mount
+// follows this hand; controller aim never rotates the wrist to face a screen.
+std::optional<Pose> nativeIdroidLeftHandheldWrist(Pose grip,Pose fit={}) noexcept;
 }

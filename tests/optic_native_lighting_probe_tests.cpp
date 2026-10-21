@@ -222,6 +222,18 @@ int main(){
     cpuTranspose=upload;
     for(size_t i=0;i<16;++i)cpuTranspose.projection[i]=sceneSource.projection[(i%4)*4+i/4];
     check(!matches(cpuTranspose,sceneSource),"direct view with transposed projection rejected");
+    auto lightingSource=sceneSource;
+    lightingSource.view={0,0,-1,0,0,1,0,0,1,0,0,0,.1f,-1198.17f,.2f,1};
+    const OpticLightingMatrix world{0,0,1,0,0,1,0,0,-1,0,0,0,.2f,1198.17f,-.1f,1};
+    auto lightingUpload=upload;lightingUpload.source=lightingSource;lightingUpload.viewIsWorld=true;
+    for(size_t i=0;i<16;++i)lightingUpload.view[i]=world[(i%4)*4+i/4];
+    check(matches(lightingUpload,lightingSource),"PS world reconstruction upload joins translated native eye");
+    lightingUpload.view[3]+=.06f;
+    check(!matches(lightingUpload,lightingSource),"opposite eye world reconstruction rejected");
+    lightingUpload.view[3]-=.06f;lightingUpload.view[7]=0;
+    check(!matches(lightingUpload,lightingSource),"different world origin reconstruction rejected");
+    lightingUpload.view[7]=1198.17f;lightingUpload.source.eye.eye=1;
+    check(!matches(lightingUpload,lightingSource),"inverse camera encoding retains exact eye provenance");
     auto bodyUpload=upload;auto carriedSource=sceneSource;
     carriedSource.binocularWorldValid=true;carriedSource.binocularWorld={1,0,0,0,0,1,0,0,0,0,1,0,1,2,3,1};
     bodyUpload.source=carriedSource;

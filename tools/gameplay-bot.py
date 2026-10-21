@@ -28,36 +28,82 @@ def continue_game(live, behavior):
     state = advance_startup(live)
     if state["scene"] == "title":
         state = wait_for_continue_rack(live, state)
+        ready_until=time.monotonic()+30.
+        while not (state.get('opening_focus',{}).get('ready')
+                and state.get('opening_bench',{}).get('layout',{}).get('verified')):
+            if time.monotonic()>ready_until or state.get('scene')!='title':
+                raise BotFault('The physical native title/player did not finish becoming ready')
+            time.sleep(.1);state=live.observe(native=True)
+        if state.get('opening_native_menu'):
+            live.execute({'op':'action','name':'system.idroid'})
+            state=behavior.wait_for({'opening_native_menu':False},5,'optional-cassette-mode')
         origin, orientation = state["opening_position"], state["opening_orientation"]
-        target = [a+b for a, b in zip(origin, rotate(orientation, [-.12, -.58, -1.35]))]
-        # The cassette reach is temporary: retain the caller's valid local
-        # grip pose and restore it on every exit path before continuing/loading.
-        with preserved_controller_pose(live, "right", "grip", "local") as saved_pose:
+        from gameplay_bot.combat import controller_pair, inverse, mul, paired_aim_position, pointing
+        from gameplay_bot.session import _controller_pose
+        from gameplay_bot.cabin_workbench import compose
+        flat = [-.7071067812, 0., 0., .7071067812]
+        with preserved_tracking_poses(live):
+            saved_pose = _controller_pose(live,'right','grip','local')
+            pair = controller_pair(saved_pose, _controller_pose(live, 'right', 'aim', 'local'))
+            def move_to(local, seconds=.55, rotation=None):
+                start_pose = _controller_pose(live, 'right', 'grip', 'local')
+                target = {'position': [a+b for a,b in zip(origin,rotate(orientation,local))],
+                          'orientation': mul(orientation,rotation or flat)}
+                began = time.monotonic()
+                for packet in range(1, 11):
+                    pose = _blend(start_pose,target,packet/10)
+                    aim_q = mul(pose['orientation'],inverse(pair['orientation']))
+                    live.call('set_controller_pose',{'hand':'right','pose_type':'grip','base_space':'local',**pose})
+                    live.call('set_controller_pose',{'hand':'right','pose_type':'aim','base_space':'local',
+                        'position':paired_aim_position(pose['position'],aim_q,pair),'orientation':aim_q})
+                    time.sleep(max(0.,began+seconds*packet/10-time.monotonic()))
             live.release()
-            reach_started = time.monotonic()
-            for frame in range(1, 11):
-                current = live.observe()
-                if current["scene"] != "title" or not current.get("title_menu"):
-                    raise BotFault("Title ownership changed during Continue reach")
-                fraction = frame / 10
-                eased = fraction * fraction * (3 - 2 * fraction)
-                pose = _blend(saved_pose, {"position": target,
-                                          "orientation": [0., 0., 0., 1.]}, eased)
-                live.call("set_controller_pose", {"hand": "right", "pose_type": "grip",
-                                                   "base_space": "local", **pose})
-                time.sleep(max(0., reach_started + .75 * fraction - time.monotonic()))
-            live.events.emit("human_paced_continue_reach", duration_seconds=time.monotonic()-reach_started,
-                             packets=10, instant_pose_change=False, target=target)
+            bench = state.get('opening_bench') or {}
+            tapes = bench.get('tapes') or []
+            if len(tapes)!=6 or not state.get('opening_focus',{}).get('ready'):
+                raise BotFault('Physical cassette state or native title focus unavailable')
+            layout=bench.get('layout') or {}
+            if not layout.get('verified') or not isinstance(layout.get('slot'),dict):
+                raise BotFault('The cassette player lacks its witnessed native seat layout')
+            # Both tape and player must be within the anatomical arm's reach.
+            # Approach the witnessed furniture before sending grip movement.
+            center=[(a+b)/2 for a,b in zip(layout['seat']['position'],layout['slot']['position'])]
+            room={'position':origin,'orientation':orientation}
+            contact=compose(room,{'position':center,'orientation':[0.,0.,0.,1.]})['position']
+            position=compose(room,{'position':[center[0],center[1]+.55,center[2]+.40],
+                'orientation':[0.,0.,0.,1.]})['position']
+            head=live.text_result(live.call('get_head_pose',{'base_space':'local'}))['pose']
+            target={'position':position,'orientation':pointing([a-b for a,b in zip(contact,position)])}
+            grips={hand:_controller_pose(live,hand,'grip','local') for hand in ('left','right')}
+            aims={hand:_controller_pose(live,hand,'aim','local') for hand in ('left','right')}
+            for n in range(1,9):
+                moved=_blend(head,target,n/8)
+                live.call('set_head_pose',{'base_space':'local',**moved})
+                delta=[a-b for a,b in zip(moved['position'],head['position'])]
+                for hand in ('left','right'):
+                    for kind,pose in (('grip',grips[hand]),('aim',aims[hand])):
+                        live.call('set_controller_pose',{'hand':hand,'pose_type':kind,'base_space':'local',
+                            'position':[a+b for a,b in zip(pose['position'],delta)],'orientation':pose['orientation']})
+                time.sleep(.03)
+            time.sleep(.25)
+            state=live.observe()
+            origin,orientation=state['opening_position'],state['opening_orientation']
+            tapes=state['opening_bench']['tapes'];layout=state['opening_bench']['layout']
+            slot=layout['slot'];slot_position=slot['position'];slot_rotation=slot['orientation']
+            move_to(tapes[0]['position'],rotation=tapes[0]['orientation'])
             capture_continue_rack(live)
-            # Re-check current title ownership after capture, before the sole edge.
-            state = live.observe()
-            if state["scene"] != "title" or not state.get("title_menu"):
-                raise BotFault("Title ownership changed before Continue")
-            live.events.emit("semantic_action", action="opening.continue", label="REACH CONTINUE / RIGHT TRIGGER", target=target)
-            live.input([{"hand": "right", "component": "Trigger", "value": 1.}], .18)
-            time.sleep(.18)
+            live.input([{'hand':'right','component':'Grip','value':1.}],.1,lease_seconds=5.)
+            time.sleep(.12)
+            if live.observe().get('opening_bench',{}).get('tapes',[{}])[0].get('hand')!=1:
+                raise BotFault('Continue cassette did not attach to the physical grip')
+            move_to([tapes[0]['position'][0],tapes[0]['position'][1]+.18,tapes[0]['position'][2]],rotation=tapes[0]['orientation'])
+            for distance in (.10,.05,0.):
+                lift=rotate(slot_rotation,[0.,0.,distance])
+                move_to([a+b for a,b in zip(slot_position,lift)],rotation=slot_rotation)
             live.release()
-            behavior.wait_for({"title": False}, 60, "leave-title")
+            live.events.emit('semantic_action',action='opening.continue',
+                             label='GRAB CONTINUE / INSERT INTO PLAYER / RELEASE')
+            behavior.wait_for({'title':False},60,'leave-title')
             controller_pose_restore = saved_pose
         continued_from_title = True
     state = live.observe()
@@ -93,7 +139,7 @@ def continue_game(live, behavior):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("observe", "continue", "run", "session", "move", "campaign", "idroid", "optics", "supervise", "state"),
+    parser.add_argument("command", choices=("observe", "showcase", "showcase-setup", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "campaign", "idroid", "optics", "supervise", "state", "cqc", "recon"),
                         help="session advances Continue and runs the whole suite on one connection")
     parser.add_argument("--game-dir", required=True, type=pathlib.Path)
     parser.add_argument("--proxy", type=pathlib.Path)
@@ -126,7 +172,7 @@ def main():
     if (not math.isfinite(args.seconds) or args.seconds < 0
             or (not args.seconds and args.command != 'supervise')):
         parser.error('--seconds must be positive; supervise also accepts zero for no total timer')
-    if args.command in ("run", "session") and not args.suite:
+    if args.command in ("run", "session", "cold-start", "cqc", "recon") and not args.suite:
         parser.error(args.command + " requires --suite")
     if args.trace_menu_input and args.command not in ("run", "session"):
         parser.error('--trace-menu-input requires one explicit run/session suite')
@@ -199,20 +245,98 @@ def main():
                         next_capture = time.monotonic() + 1.
                     time.sleep(.25)
                 result = {"status": "observed", "state": state, "baseline": baseline}
+            elif args.command == "cold-start":
+                from gameplay_bot.cold_start import advance_cold_start
+                result = advance_cold_start(live, read_json(args.suite), args.seconds)
+            elif args.command == "cinematic":
+                from gameplay_bot.cinematic import inspect_cinematic
+                start_recording()
+                result = inspect_cinematic(live, args.seconds, read_json(args.suite) if args.suite else None)
+            elif args.command == "profile":
+                from gameplay_bot.profile import inspect_profile
+                result = inspect_profile(live, args.seconds, read_json(args.suite))
+            elif args.command == "title":
+                state = advance_startup(live, timeout=args.seconds)
+                if state["scene"] != "title" or not state.get("title_menu"):
+                    raise BotFault("Title inspection requires the witnessed native title menu")
+                state = wait_for_continue_rack(live, state)
+                result = {"status": "observed_title", "state": state,
+                          "captures": capture_continue_rack(live), "visual_acceptance": "pending"}
+            elif args.command in ("bench","bench-film"):
+                from gameplay_bot.cabin_workbench import workbench
+                result=workbench(live,timeout=args.seconds,film=args.command=='bench-film')
+            elif args.command == "studio-board":
+                from gameplay_bot.cabin_workbench import inspect_persisted_board
+                result=inspect_persisted_board(live,timeout=args.seconds)
+            elif args.command == "body":
+                from gameplay_bot.body import inspect_body
+                policy=read_json(args.suite) if args.suite else {}
+                arrival=continue_game(live,behavior) if policy.get('enter',True) else None
+                start_recording()
+                result=inspect_body(live,args.seconds,policy)
+                if arrival:result['arrival']=arrival
+            elif args.command == "controls-editor":
+                from gameplay_bot.controls_editor import inspect_controls_editor
+                policy=read_json(args.suite) if args.suite else {'scene':'cabin','enter':True}
+                if policy.get('enter'):
+                    arrival=continue_game(live,behavior)
+                else:
+                    current=live.observe(native=True)
+                    arrival=({'status':'current_scene','state':current} if current['scene']==policy['scene']
+                        or (policy.get('restore_vr_only') and policy['scene']=='cabin' and current.get('cabin'))
+                        else advance_startup(live,timeout=args.seconds))
+                result=inspect_controls_editor(live,policy,args.seconds);result['arrival']=arrival
+            elif args.command == "studio-manager":
+                from gameplay_bot.studio_manager import inspect_camera_manager
+                policy=read_json(args.suite) if args.suite else {'scene':'title','mode':'gallery'}
+                if policy.get('enter'):
+                    arrival=continue_game(live,behavior)
+                else:
+                    advance_startup(live,timeout=args.seconds)
+                    arrival=None
+                result=inspect_camera_manager(live,policy,args.seconds)
+                if arrival:result['arrival']=arrival
+            elif args.command == "studio-field":
+                from gameplay_bot.cabin_field import inspect_field_studio
+                arrival=continue_game(live,behavior)
+                result=inspect_field_studio(live,args.seconds)
+                result['arrival']=arrival
+            elif args.command == "studio-hands":
+                from gameplay_bot.cabin_field import inspect_studio_hands
+                arrival=continue_game(live,behavior)
+                result=inspect_studio_hands(live,args.seconds)
+                result['arrival']=arrival
             elif args.command == "continue":
                 result = continue_game(live, behavior)
                 if result.get("status") == "observed_arrival":
                     start_recording()
             elif args.command == "move":
                 start_recording()
-                result = move_local(live, target_distance=args.distance)
+                # Match walk_local's live-calibrated short pulses. The old
+                # 0.15 brake value stalls inside the native walking deadzone.
+                result = move_local(live, target_distance=args.distance,
+                                    brake_magnitude=.35, pulse_seconds=.1)
                 result["captures"] = live.capture("movement-after-release")
             elif args.command == "idroid":
                 start_recording()
-                with preserved_controller_pose(live, "right", "grip", "view") as saved_pose:
-                    result = inspect_idroid(live, behavior)
-                result["controller_pose_restored"] = True
-                result["controller_pose_restore"] = saved_pose
+                result = inspect_idroid(live, behavior)
+            elif args.command == "cqc":
+                from gameplay_bot.cqc import run_named_cqc
+                start_recording()
+                result = run_named_cqc(live, read_json(args.suite), output=args.output,
+                    enemy_script=(ROOT / 'tools/navigation-state.lua').read_text())
+            elif args.command == "recon":
+                from gameplay_bot.recon import run_named_recon
+                start_recording()
+                result = run_named_recon(live, read_json(args.suite), output=args.output,
+                    enemy_script=(ROOT / 'tools/navigation-state.lua').read_text(), max_seconds=args.seconds)
+            elif args.command == "showcase-setup":
+                from gameplay_bot.showcase import setup_weapon
+                result = setup_weapon(live, read_json(args.suite))
+            elif args.command == "showcase":
+                from gameplay_bot.showcase import run as run_showcase
+                start_recording()
+                result = run_showcase(live, behavior, read_json(args.suite), args.seconds)
             elif args.command == "optics":
                 start_recording()
                 result = inspect_optic_exposure(live,args.seconds)

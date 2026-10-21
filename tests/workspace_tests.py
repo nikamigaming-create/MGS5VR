@@ -17,6 +17,33 @@ spec.loader.exec_module(workspace)
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_body_policy_cannot_be_silently_ignored(self):
+        args=argparse.Namespace(operation='bot',command='body',policy=Path('standing.json'))
+        with patch.object(workspace,'settings') as settings:
+            with self.assertRaisesRegex(ValueError,'use --suite'):
+                workspace.bot(args)
+            settings.assert_not_called()
+
+    def test_simulator_launch_selects_only_requested_retained_slot(self):
+        value={'game_dir':str(self.game),'runtime':'runtime.json','operator_proxy':'operator/proxy.exe'}
+        for slot,expected in (('dev',self.dev),('play',self.play)):
+            args=argparse.Namespace(slot=slot,tracking_fault_test=False)
+            with patch.object(workspace,'settings',return_value=value), patch.object(workspace,'deploy') as deploy:
+                workspace.launch_sim(args)
+                deploy.assert_called_once_with(value,build=expected)
+
+    def test_bot_rejects_other_slot_before_pruning_or_input(self):
+        args=argparse.Namespace(operation='bot',command='observe',slot='play')
+        value={'game_dir':str(self.game),'operator_proxy':'operator/proxy.exe'}
+        manifest={'files':{'dinput8.dll':'different-build'}}
+        with patch.object(workspace,'settings',return_value=value), \
+             patch.object(workspace,'checked_build',return_value=manifest) as checked, \
+             patch.object(workspace,'prune_runs') as prune:
+            with self.assertRaisesRegex(ValueError,'Installed game differs'):
+                workspace.bot(args)
+            checked.assert_called_once_with(self.play)
+            prune.assert_not_called()
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

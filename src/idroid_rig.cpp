@@ -10,14 +10,14 @@ std::optional<Pose> nativeIdroidLeftWristFromGrip() noexcept {
     const auto palm=anatomicalGrip(Pose{},Vec3{.087f,.018f,.029f},Vec3{.078f,.012f,-.037f});
     return palm?std::optional<Pose>{inverse(*palm)}:std::nullopt;
 }
-std::optional<Pose> nativeIdroidLeftHandheldWrist(Pose grip,Pose aim,Pose fit) noexcept {
-    if(!valid(grip)||!valid(aim)||!valid(fit))return {};
+std::optional<Pose> nativeIdroidLeftHandheldWrist(Pose grip,Pose fit) noexcept {
+    if(!valid(grip)||!valid(fit))return {};
     const auto wristFromGrip=nativeIdroidLeftWristFromGrip();
     if(!wristFromGrip)return {};
-    const auto palmInBody=compose(inverse(nativeIdroidLeftBodyInWrist),inverse(*wristFromGrip));
-    const auto orientation=compose(Pose{aim.orientation,{}},Pose{fit.orientation,{}}).orientation;
-    const Pose body{orientation,compose(grip,fit).position-rotate(orientation,palmInBody.position)};
-    const auto wrist=compose(body,inverse(nativeIdroidLeftBodyInWrist));
+    // The tracked palm owns orientation as well as position. Orienting the
+    // handset from aim and solving backwards into the wrist twists the hand
+    // whenever grip and aim differ. Retain the authored device-in-wrist mount.
+    const auto wrist=compose(compose(grip,fit),*wristFromGrip);
     return valid(wrist)?std::optional<Pose>{wrist}:std::nullopt;
 }
 std::optional<std::array<float,16>> nativeIdroidAttachmentDelta(const std::array<float,16>& rootBone,

@@ -3,8 +3,11 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include "core.hpp"
 
 namespace mgs5vr {
+void requestFullBodyVisibility(bool enabled) noexcept;
+void publishFullBodyVisibility(uintptr_t owner,uintptr_t model,bool ready) noexcept;
 // Keep the native body visible for scripted scenes, even while immersive
 // presentation is active; ordinary first-person gameplay still hides it.
 constexpr bool hidePlayerInFirstPerson(bool immersiveActive,bool scriptedDemo) noexcept {
@@ -94,7 +97,16 @@ void observePlayerVisibilityForSource(const HeadCameraSample&,uint64_t sourceSeq
 void initializePlayerVisibility(uintptr_t moduleBase) noexcept;
 // Called on the native player camera publication thread, after the player has
 // updated its appearance. Only verified models owned by this player are changed.
-void updatePlayerVisibility(uintptr_t cameraOwner,bool firstPerson,bool hideArms=false) noexcept;
+void updatePlayerVisibility(uintptr_t cameraOwner,bool firstPerson,bool hideArms=false,bool authoredBody=false) noexcept;
+struct AuthoredHeadVisibility {
+    uintptr_t owner{},model{};
+    Pose head{},viewer{};
+    uint64_t time{},activation{};
+    bool concealed{};
+};
+void publishAuthoredPlayerHead(uintptr_t owner,uintptr_t model,Pose worldHead,uint64_t activation) noexcept;
+void updateAuthoredPlayerVisibility() noexcept;
+AuthoredHeadVisibility authoredHeadVisibility() noexcept;
 // Exclude the owned player only from the native-camera image copied onto the
 // Title panel. The opening selector may preserve the verified arm subtree so
 // the tracked hands remain connected to the visible forearms.
@@ -111,5 +123,16 @@ private:
     std::array<uint32_t,128> groups_{};
     std::array<uint8_t,128> flags_{};
     uint16_t count_{};
+};
+// The launched projectile keeps native ownership. Only the source-matched
+// tracked hand's verified modular group is exposed during a headset replay.
+class RocketHandPresentation {
+public:
+    explicit RocketHandPresentation(const HeadCameraSample&,bool headPass) noexcept;
+    ~RocketHandPresentation();
+    RocketHandPresentation(const RocketHandPresentation&)=delete;
+    RocketHandPresentation& operator=(const RocketHandPresentation&)=delete;
+private:
+    uintptr_t owner_{},character_{},parts_{},record_{},renderer_{},model_{};
 };
 }

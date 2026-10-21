@@ -1,6 +1,7 @@
 #pragma once
 #include "controls.hpp"
 #include "input_bridge.hpp"
+#include "core.hpp"
 
 namespace mgs5vr {
 struct NativeTermsMenu {
@@ -20,6 +21,29 @@ enum class NativeMenuInput { menu, liveIdroid, scriptedScene, cinematic, cinemat
 NativeMenuInput nativeSceneInputMode(bool menuOpen,bool scriptedDemo,bool interactiveLook,
     bool sceneFallback,bool handheldIdroid) noexcept;
 GamepadSample nativeMenuGamepad(const ControlBindings& bindings,const PhysicalControls& physical,NativeMenuInput mode);
+// Detect one fresh direction on the effective menu axis. Keep the native
+// packet unchanged: its pressed bits may expire before the cinematic UI polls.
+class CinematicMenuNavigation {
+public:
+    uint16_t update(const GamepadSample& sample,bool enabled,uint64_t time) noexcept;
+private:
+    uint64_t last_{};
+    uint16_t direction_{};
+    bool available_{},releaseRequired_{true};
+};
+// A short, activation-scoped handoff to the verified native UI edge query.
+// Only horizontal Resume/Skip queries can consume it; A/B/Start stay native.
+class CinematicMenuDirectionQueue {
+public:
+    void publish(uint64_t activation,uint16_t direction,uint64_t time) noexcept;
+    std::optional<bool> take(uint64_t activation,uint32_t index,uint32_t bit,uint64_t time) noexcept;
+private:
+    uint64_t activation_{},sampleTime_{},requestTime_{};
+    uint16_t direction_{};
+    bool delivered_{};
+};
+void publishCinematicMenuDirection(uint64_t activation,uint16_t direction,uint64_t time) noexcept;
+std::optional<bool> takeCinematicMenuDirection(uint64_t activation,uint32_t index,uint32_t bit,uint64_t time) noexcept;
 // The personal gun consumes its effective physical inputs before native
 // driving actions. In particular, a remapped reload must not also exit.
 uint32_t vehicleWeaponConsumedInputs(const ControlBindings& bindings,const PhysicalControls& physical);
@@ -72,9 +96,21 @@ private:
     bool focused_{},carried_{};
 };
 void constrainCinematicInput(GamepadSample& sample,NativeMenuInput mode) noexcept;
+// Convert physical look motion only for a freshly witnessed hospital lesson.
+// The native script retains its own input history, outcome and progression.
+class HospitalHeadLook {
+public:
+    std::array<float,2> update(Quat head,bool available,uint64_t now,uint64_t referenceEpoch,uint64_t lessonKey) noexcept;
+    void reset() noexcept {*this={};}
+private:
+    Quat head_{};
+    std::array<float,2> gesture_{};
+    uint64_t last_{},until_{},epoch_{},key_{};
+    bool armed_{true};
+};
 // A spatial rack owns title selection. Sticks, grips and face buttons must not
 // also navigate its hidden native menu; only a selected tape confirms it.
-GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm) noexcept;
+GamepadSample cabinTitleGamepad(GamepadSample sample,bool spatialTitle,bool confirm,bool nativeMenu=false) noexcept;
 // Keep native Back taps intact. A deliberate held Back can dismiss an iDroid
 // terminal whose tutorial has disabled its ordinary cancel path.
 class IdroidBackRecovery {
@@ -106,9 +142,26 @@ void requestNativeIdroidClose(bool requested) noexcept;
 bool takeNativeIdroidClose() noexcept;
 // A VR Menu tap opens the native UI independently of the player's stationary
 // phone action. The Lua owner must revalidate the field before consuming it.
-struct HandheldIdroidOpenRequest { uint64_t activation{},time{}; };
+struct HandheldIdroidOpenRequest { uint64_t activation{},time{},revision{}; };
+// A short publication gap may delay an unexecuted request. Claim the exact
+// revision only when its owner/rig is ready; cancellation or a newer tap wins.
+class HandheldIdroidOpenQueue {
+    HandheldIdroidOpenRequest pending_{};
+    uint64_t revision_{};
+public:
+    void request(uint64_t activation,uint64_t time) noexcept {
+        pending_={activation,activation?time:0,++revision_};
+    }
+    HandheldIdroidOpenRequest pending() const noexcept {return pending_;}
+    bool consume(HandheldIdroidOpenRequest expected) noexcept {
+        if(!expected.time||expected.revision!=pending_.revision
+           ||expected.activation!=pending_.activation||expected.time!=pending_.time)return false;
+        pending_={};return true;
+    }
+};
 void requestHandheldIdroidOpen(uint64_t activation) noexcept;
-HandheldIdroidOpenRequest takeHandheldIdroidOpen() noexcept;
+HandheldIdroidOpenRequest pendingHandheldIdroidOpen() noexcept;
+bool consumeHandheldIdroidOpen(HandheldIdroidOpenRequest expected) noexcept;
 void publishHandheldIdroidOwner(uintptr_t player,uint64_t activation) noexcept;
 bool handheldIdroidOwned(uintptr_t player=0,uint64_t activation=0) noexcept;
 // A reload borrows the hand through the retail terminal Stop/Start lifecycle.

@@ -129,6 +129,16 @@ int visibilityChecks(){
     update(true);update(false);
     if(flags!=std::array<uint8_t,3>{11,11,3}||replacementFlags!=nativeFlags||mask(model)!=2)++failures;
     put(renderer,0x40,address(model));flags=nativeFlags;
+    // The observed hospital cover has independently visible children but no
+    // head group. Only this exact resource in the owned modular list qualifies.
+    groups={0xf948d635,0x897667a7,0xa7d6b488};
+    put(model,0x120,uint64_t{0x84a06ebcd692bb87ull});
+    update(true);if(flags!=std::array<uint8_t,3>{11,11,3})++failures;
+    update(false);if(flags!=nativeFlags)++failures;
+    put(model,0x120,uint64_t{0x84a06ebcd692bb88ull});
+    update(true);if(flags!=nativeFlags)++failures;
+    update(false);groups={0xf948d635,0xa9e88501,0xdc3a5d6d};
+    put(model,0x120,uint64_t{});
     if(VirtualProtect(region,0x1d0000,PAGE_READWRITE,&prior)){
         region[0x1ccc30]=0x90;FlushInstructionCache(GetCurrentProcess(),region,0x1d0000);
         mgs5vr::initializePlayerVisibility(base);update(true);

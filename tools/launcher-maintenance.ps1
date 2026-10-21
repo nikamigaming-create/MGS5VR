@@ -24,9 +24,11 @@ if ($mgsRecord.schema -ne 1 -or $mgsRecord.product -ne 'MGS5VR theatre preview' 
     throw 'The installation record does not belong to this folder. No files changed.'
 }
 $mgsNames=@('dinput8.dll','mgs5vr.ini','mgs5vr-controls.ini','mgs5vr_controls.exe','mgs5vr-install.json')
+$mgsNames+=@('assets\controls\left.mesh','assets\controls\right.mesh','assets\controls\left.png','assets\controls\right.png',
+    'assets\controls\LICENSE.txt','assets\controls\provenance.json') | Where-Object { $mgsRecord.files.PSObject.Properties.Name -contains $_ }
 foreach ($mgsName in $mgsNames) {
     $mgsPath=Join-Path $mgsTarget $mgsName
-    if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($mgsPath)) -ine $mgsTarget) { throw 'Unsafe mod file path.' }
+    if (-not [IO.Path]::GetFullPath($mgsPath).StartsWith($mgsTarget+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe mod file path.' }
     for ($mgsAncestor=$mgsPath; $mgsAncestor; $mgsAncestor=Split-Path -Parent $mgsAncestor) {
         # Resolve once, with the race between Test-Path and Get-Item treated as
         # a missing ancestor. This also works under CTest's mocked PowerShell
@@ -40,7 +42,7 @@ foreach ($mgsName in $mgsNames) {
     if ($mgsName -ne 'mgs5vr-install.json' -and $mgsRecord.files.PSObject.Properties.Name -notcontains $mgsName) {
         throw "Unrecorded $mgsName was preserved. No files changed."
     }
-    if ($mgsName -in @('dinput8.dll','mgs5vr_controls.exe') -and
+    if (($mgsName -in @('dinput8.dll','mgs5vr_controls.exe') -or $mgsName.StartsWith('assets\controls\')) -and
         (Get-FileHash -LiteralPath $mgsPath -Algorithm SHA256).Hash -ine $mgsRecord.files.$mgsName) {
         throw "Modified $mgsName was preserved. No files changed."
     }
@@ -61,8 +63,10 @@ $mgsBackup=Join-Path $mgsBackupRoot ((Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[g
 New-Item -ItemType Directory -Path $mgsBackup | Out-Null
 $mgsMoved=@()
 $mgsFreshHashes=@{}
+$mgsAdded=@()
 try {
     foreach ($mgsName in $mgsNames) {
+        [IO.Directory]::CreateDirectory((Split-Path -Parent (Join-Path $mgsBackup $mgsName))) | Out-Null
         Move-Item -LiteralPath (Join-Path $mgsTarget $mgsName) -Destination (Join-Path $mgsBackup $mgsName)
         $mgsMoved+=$mgsName
     }
@@ -72,6 +76,10 @@ try {
             $mgsFreshHashes[$mgsName]=(Get-FileHash -LiteralPath (Join-Path $mgsTarget $mgsName) -Algorithm SHA256).Hash
         }
         $mgsNewRecord=Get-Content -Raw -LiteralPath $mgsRecordPath | ConvertFrom-Json
+        $mgsAdded=@('assets\controls\left.mesh','assets\controls\right.mesh','assets\controls\left.png','assets\controls\right.png',
+            'assets\controls\LICENSE.txt','assets\controls\provenance.json') | Where-Object {
+                $mgsNames -notcontains $_ -and $mgsNewRecord.files.PSObject.Properties.Name -contains $_ }
+        foreach ($mgsName in $mgsAdded) { $mgsFreshHashes[$mgsName]=(Get-FileHash -LiteralPath (Join-Path $mgsTarget $mgsName) -Algorithm SHA256).Hash }
         foreach ($mgsName in @('mgs5vr.ini','mgs5vr-controls.ini')) {
             Copy-Item -LiteralPath (Join-Path $mgsBackup $mgsName) -Destination (Join-Path $mgsTarget $mgsName)
             $mgsFreshHashes[$mgsName]=(Get-FileHash -LiteralPath (Join-Path $mgsTarget $mgsName) -Algorithm SHA256).Hash
@@ -86,6 +94,13 @@ try {
     Write-Output "Previous mod files and settings are recoverable in: $mgsBackup"
 } catch {
     $mgsFailure=$_
+    foreach ($mgsName in $mgsAdded) {
+        $mgsPath=Join-Path $mgsTarget $mgsName
+        if (Test-Path -LiteralPath $mgsPath) {
+            if ((Get-FileHash -LiteralPath $mgsPath -Algorithm SHA256).Hash -ine $mgsFreshHashes[$mgsName]) { throw "A new controller asset changed during recovery; preserved: $mgsPath. Original error: $mgsFailure" }
+            Remove-Item -LiteralPath $mgsPath
+        }
+    }
     foreach ($mgsName in $mgsMoved) {
         $mgsPath=Join-Path $mgsTarget $mgsName
         if (Test-Path -LiteralPath $mgsPath) {

@@ -8,6 +8,33 @@ bounded retention. The default command
 only observes. Use `workspace.py pin` before citing a run as acceptance evidence,
 and `workspace.py stop-sim` for exact-owned test-session cleanup.
 
+To compare the published baseline, stop the owned simulator session, use
+`workspace.py launch-sim --slot play`, then pass `--slot play` to each
+`workspace.py bot` command. Both commands default to development. This selects
+and verifies an existing retained slot; it never changes the published pin.
+Body inspection policies are supplied with `bot --command body --suite <file>`;
+`--policy` belongs to the mortar command. Size probes can separately exercise
+standing/seated height, `transitions` or `rotations`. Traversal probes support
+`seated`, `full_body` and bounded `head_offset` comparisons, and restore those
+preferences and tracking poses afterward. A stopped movement probe is an
+investigation result, not a route pass.
+
+Hospital event movement uses `hospital_navigate_event` with an exact native
+sequence, event name, and private manifest containing hashes of the owned scene
+and NAV2 tiles. The manifest supplies the authored trigger bounds, destination
+floor and witnessed root-to-floor calibration. The executor follows the full
+directed A* path, including intermediate doorway and stair nodes, through the
+effective VR stick bindings. Native movement locks release input; observed
+obstructions expire and cause bounded replanning. NPC topology is a planning
+prior, and predicted player clearance remains unknown until actual traversal.
+God-mode debug traversal does not certify ordinary-difficulty playability.
+
+The NAV2 reader retains hash-checked empty split tiles as provenance without
+inventing nodes. The owned Africa corpus validates `201403240` and `201403242`
+NavWorld records under the same bounds, index, flag and portal checks;
+`201403241` is admitted only for exact 112-byte empty tiles. Unknown versions,
+unexplained empty payloads and unsupported nonempty layouts stop planning.
+
 For the reviewed mortar field fixture, use
 `python tools/workspace.py bot --command mortar --policy private/mortar-fire-policy.json --record --seconds 60`.
 Run Continue first when starting a new simulator session. The policy identifies
@@ -101,8 +128,10 @@ unrecognized popup. Prefer a suite of observed field actions for teaching takes.
   stick, reduces the value before the target, releases and checks settling.
   The five-second/one-unit bounds reject stuck movement and scene changes. This
   is a movement primitive, not a demonstrated route or collision planner.
-  Braking is currently verified in simulated dynamics only: the old live probes
-  overshot, and the new .30/.15 values still need native deadzone calibration.
+  The standalone move command uses the same .35 braking value and .1-second
+  pulses as `walk_local`. On October 20 the former .15 brake stalled at
+  0.292 native units; the .35 probe reached 0.533 for a 0.35 target and settled.
+  This remains bounded coarse movement, not precision arrival or corridor proof.
 - `--record` captures rotating native source-eye video and process audio. This
   is **not** the final composited headset image. `tools/record-simulator.py`
   supplies separate final-eye takes; its measured cadence is retained.
@@ -184,6 +213,12 @@ capsules and uses the existing signature-verified world visibility query from
 the solved weapon muzzle. Unknown/blocked terrain refuses firing. The bot turns
 its simulated headset, aims through separate VR grip/aim poses, closes the loop
 against the actual native muzzle, and uses effective ready/trigger bindings.
+For a particular mission actor, `--target sol_NAME` requires that exact living
+native soldier as well as the selected camp, range and geometry; a nearer guard
+cannot substitute for it. Rifle corrections move the firing hand and measured
+authored support contact together from one publication, preserving both
+controllers' separate grip/aim frames. The final clear-ray, solved barrel and
+attached-support checks still admit each trigger independently.
 Actor incapacitation and ammunition are observed separately; a buddy can affect
 attribution. Both final eyes still need visual review. This is not full combat,
 body handling, all optics, supply-drop visibility, or campaign acceptance.

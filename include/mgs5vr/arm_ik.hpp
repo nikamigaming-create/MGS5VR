@@ -35,15 +35,52 @@ private:
 struct StationaryBodyPose {Vec3 pelvis,leftHip,rightHip,leftShoulder,rightShoulder;Pose chest;};
 std::optional<Pose> stationaryLowerBodyDelta(const StationaryBodyPose& body,Pose torsoDelta);
 struct ArmPose { Pose shoulder,elbow,wrist; };
+std::optional<ArmPose> scaledLegPose(const ArmPose& native,float scale);
 struct ArmSolution { ArmPose pose; bool reachClamped{}; };
+struct GroundedLegSolution { ArmSolution leg; float scale{1}; };
+// Fit only this frame's leg reach. Calibration is a lower bound, never a
+// high-water mark from earlier head motion. Arms retain their own size limits.
+std::optional<GroundedLegSolution> solveGroundedLeg(const ArmPose& native,Pose contact,float calibration=1.f);
 // A contact returned by native world collision, in the arm solve's space.
 struct ArmSurface { Vec3 point,normal; float clearance{}; };
 std::optional<Vec3> outsideArmSurface(Vec3 point,const ArmSurface& surface);
 // Axes in the authored joint frames, independent of the current weapon animation.
 struct ArmBasis { Vec3 upperAxis,forearmAxis; Vec3 elbowBend{0,0,1},wristUp{0,1,0}; };
+// Owned Snake face0/3/4: SKL_004_HEAD to SKL_430_EYEL/431_EYER midpoint.
+// Authored FOX head basis is +Y up, +Z forward (not OpenXR's -Z forward).
+inline constexpr Vec3 nativeEyeFromHead{0,.08700009f,.106f};
 // A shared model-space transform for the spine, clavicles and arm roots.
 // uprightHead carries the camera's yaw, without tracked look pitch or roll.
 std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprightHead);
+// Native locomotion/snap heading is independent of physical neck look. A
+// standing torso follows only beyond the neck's comfortable yaw; a prone
+// torso retains the native crawl heading and its floor footprint.
+std::optional<Quat> anatomicalTorsoHeading(Quat locomotionHeading,Quat view,bool prone);
+// World-space viewer uses +Z forward; the tracked OpenXR aim uses -Z.
+// Hand placement admits a body-turn gesture without steering its heading.
+std::optional<Quat> trackedTorsoHeading(Pose viewer,Vec3 handsMidpoint,Quat primaryAim);
+// Retain the body's turn across the +/-pi boundary. Native/snap yaw changes
+// transport that body heading; physical neck look only consumes its yaw slack.
+class BodyHeadingState {
+public:
+    std::optional<Quat> update(Quat locomotion,Quat view,bool prone,uint64_t time,RigContinuityKey key,
+                               std::optional<Quat> handHeading=std::nullopt);
+    void reset(){*this={};}
+private:
+    RigContinuityKey key_{};
+    float heading_{},locomotion_{};
+    uint64_t time_{};
+    bool valid_{};
+};
+// A chest can pitch through vertical while prone. Its lateral axis supplies
+// the same heading to camera placement and complete-body retargeting.
+std::optional<Quat> nativeTorsoHeading(Pose chest);
+// Preserve native posture pitch/roll. Only viewer yaw and translation retarget
+// the native upper body; the spine solve then limits it to anatomical reach.
+std::optional<Pose> fullBodyPlacement(Pose chest,Pose nativeHead,Pose uprightHead);
+std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 eye,float radius);
+// Native lumbar, chest, neck channels; the separate waist pivot stays native.
+std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface=nullptr);
 std::optional<ArmSolution> solveArm(const ArmPose& animated,Pose wristTarget,Vec3 bendHint,
                                   const ArmBasis* basis=nullptr,const ArmSurface* elbowSurface=nullptr);
 // Local corrective rotations observed on this profile's seven arm helpers.
@@ -79,11 +116,13 @@ private:
 // presented offset so an unrelated stow animation cannot drag the free hand.
 class SupportPose {
 public:
-    std::optional<Pose> update(Pose nativeOffset,bool attached,bool manipulating);
-    void reset(){attached_=false;acquired_={};presented_.reset();}
+    std::optional<Pose> update(Pose nativeOffset,bool attached,bool manipulating,std::optional<Pose> weaponInWrist=Pose{});
+    void reset(){*this={};}
 private:
     bool attached_{};
     Pose acquired_{};
+    Pose weaponInWrist_{};
+    bool weaponAnchored_{};
     std::optional<Pose> presented_;
 };
 // OpenXR grip frame from the native wrist and the index/little metacarpal heads.

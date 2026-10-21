@@ -60,7 +60,7 @@ VisibilityLease visibilityLease{};
 bool visibilityWriterVerified{};
 std::optional<DisplayPublication> display;
 bool transformWriterVerified{};
-struct EquipmentLease {uintptr_t player{},character{},service{};uint64_t activation{},generation{};uint32_t handle{};};
+struct EquipmentLease {uintptr_t player{},character{},service{};uint64_t activation{},generation{};uint32_t handle{};bool rocket{};};
 std::mutex equipmentMutex;
 EquipmentLease equipmentLease{};
 uint64_t equipmentGeneration{};
@@ -99,7 +99,7 @@ bool inspect(uintptr_t owner,Owned& value) noexcept {
         std::lock_guard lock(equipmentMutex);
         if(equipmentLease.player!=owner||equipmentLease.character!=value.character
                 ||equipmentLease.service!=value.service||!equipmentLease.generation
-                ||!handheldIdroidOwned(owner,equipmentLease.activation))return false;
+                ||(!equipmentLease.rocket&&!handheldIdroidOwned(owner,equipmentLease.activation)))return false;
         value.handle=equipmentLease.handle;value.equipmentLease=equipmentLease.generation;
     }
     const auto slot=value.handle>>16;
@@ -185,8 +185,8 @@ IdroidBodyStamp stamp(const HeadCameraSample& frame,const Owned& owned) noexcept
 void updateHandheldVisibility(const HeadCameraSample& frame,const Owned& owned) noexcept {
     if(!visibilityWriterVerified)return;
     std::lock_guard lock(visibilityMutex);
-    const bool wanted=handheldIdroidOwned(frame.playerOwner,frame.activation)
-        &&frame.menuOpen&&frame.menuIdroid&&frame.controllers.handheldMenus
+    const bool wanted=((handheldIdroidOwned(frame.playerOwner,frame.activation)
+        &&frame.menuOpen&&frame.menuIdroid)||(frame.rocketArmGuidance&&!frame.menuOpen))&&frame.controllers.handheldMenus
         &&!frame.controllers.handheldIdroidStowed&&!frame.menuWorldQuad&&!nativeIdroidClosing();
     const auto current=binding(owned);
     // Native dc4430 owns category-17 visibility: record+5 bit2 is inverted
@@ -224,10 +224,10 @@ void printMatrix(std::ostringstream& stream,const char* label,const Matrix& matr
 }
 bool publishHandheldBody(const HeadCameraSample& frame,const Owned& owned,
                          const Completion& completion) noexcept {
-    if(!transformWriterVerified||!frame.menuOpen||!frame.menuIdroid
+    if(!transformWriterVerified||(!(frame.menuOpen&&frame.menuIdroid)&&!frame.rocketArmGuidance)
         ||!frame.controllers.handheldMenus||frame.controllers.handheldIdroidStowed||frame.menuWorldQuad
         ||!frame.idroidDeviceTracked||nativeIdroidClosing()
-        ||(!handheldIdroidOwned(frame.playerOwner,frame.activation)&&(owned.state==3||!(owned.flags&0x20)))
+        ||(!frame.rocketArmGuidance&&!handheldIdroidOwned(frame.playerOwner,frame.activation)&&(owned.state==3||!(owned.flags&0x20)))
         ||!sameIdroidBodyPublication(completion.stamp,stamp(frame,owned)))return false;
     // UI-only ID499 has no player equipment task to move its scene root.
     // A reused native slot otherwise keeps its old world bounds, culling the
@@ -335,9 +335,17 @@ bool idroidAttachmentDiagnosticsActive() noexcept {return enabled.load();}
 std::optional<NativeIdroidDisplay> resolveNativeIdroidDisplay(const HeadCameraSample& frame) noexcept {
     if(!enabled.load()||!frame.applied||!frame.stereoTracked)return {};
     try{
+        const auto rejected=[&](const char* reason,uint64_t rig=0){
+            static std::atomic_uint64_t last{};
+            const auto now=GetTickCount64();auto previous=last.load();
+            if(frame.rocketArmGuidance&&now-previous>=1000&&last.compare_exchange_strong(previous,now))
+                log("Rocket handset rejected reason="+std::string(reason)+" requested_rig="+std::to_string(frame.rigSequence)
+                    +" published_rig="+std::to_string(rig));
+            return std::optional<NativeIdroidDisplay>{};
+        };
         std::optional<DisplayPublication> snapshot;
         {std::lock_guard lock(completionMutex);snapshot=display;}
-        if(!snapshot)return {};
+        if(!snapshot)return rejected("no_publication");
         // Reject unmatched generations before doing native reads. This also
         // keeps ordinary non-iDroid rendering off the expensive owner walk.
         auto requested=snapshot->value.stamp;
@@ -349,15 +357,30 @@ std::optional<NativeIdroidDisplay> resolveNativeIdroidDisplay(const HeadCameraSa
         requested.predictedXrTime=frame.controllers.predictedXrTime;
         requested.focused=frame.controllers.presentationFocused;
         if(!idroidBodyCompletedBefore(snapshot->value.stamp,snapshot->value.bodyCompleteQpc,
-            requested,snapshot->value.publishedQpc))return {};
+            requested,snapshot->value.publishedQpc))return rejected("stamp",snapshot->value.stamp.rig);
         Owned owned;
-        if(!inspect(frame.playerOwner,owned)||!sameIdroidBodyPublication(snapshot->value.stamp,stamp(frame,owned))
-            ||!sameNativeIdroidBinding(snapshot->value.binding,binding(owned))
-            ||snapshot->bindingFlags!=owned.handsetBindingFlags||snapshot->rootBone!=owned.handsetRootBone
-            ||snapshot->bindingRoot!=owned.handsetBindingRoot)return {};
+        if(!inspect(frame.playerOwner,owned))return rejected("owner",snapshot->value.stamp.rig);
+        if(!sameIdroidBodyPublication(snapshot->value.stamp,stamp(frame,owned)))return rejected("body_stamp",snapshot->value.stamp.rig);
+        if(!sameNativeIdroidBinding(snapshot->value.binding,binding(owned)))return rejected("binding",snapshot->value.stamp.rig);
+        const bool sameBone=snapshot->rootBone==owned.handsetRootBone
+            ||(frame.rocketArmGuidance&&sameNativeIdroidMatrix(snapshot->rootBone,owned.handsetRootBone));
+        if(snapshot->bindingFlags!=owned.handsetBindingFlags||!sameBone
+            ||snapshot->bindingRoot!=owned.handsetBindingRoot){
+            static std::atomic_uint64_t lastMatrix{};const auto now=GetTickCount64();auto previous=lastMatrix.load();
+            if(frame.rocketArmGuidance&&now-previous>=1000&&lastMatrix.compare_exchange_strong(previous,now)){
+                std::ostringstream trace;trace.precision(9);
+                trace<<"Rocket handset matrix flags="<<unsigned(snapshot->bindingFlags)<<'/'<<unsigned(owned.handsetBindingFlags)
+                    <<" bone_equal="<<(snapshot->rootBone==owned.handsetRootBone)
+                    <<" binding_equal="<<(snapshot->bindingRoot==owned.handsetBindingRoot);
+                printMatrix(trace,"published_world",nativeIdroidWorldMatrix(snapshot->rootBone,snapshot->bindingRoot,snapshot->bindingFlags));
+                printMatrix(trace,"current_world",nativeIdroidWorldMatrix(owned.handsetRootBone,owned.handsetBindingRoot,owned.handsetBindingFlags));
+                log(trace.str());
+            }
+            return rejected("matrix",snapshot->value.stamp.rig);
+        }
         std::lock_guard lock(completionMutex);
         if(!display||display->value.publishedQpc!=snapshot->value.publishedQpc
-            ||!sameIdroidBodyPublication(completed.stamp,requested))return {};
+            ||!sameIdroidBodyPublication(completed.stamp,requested))return rejected("superseded",snapshot->value.stamp.rig);
         return snapshot->value;
     }catch(...){return {};}
 }
@@ -410,7 +433,8 @@ void pumpHandheldIdroidEquipment() noexcept {
     try{
         const auto frame=headCamera().publishedRigFrame(steadyMilliseconds());
         const auto borrow=handheldIdroidBorrow();
-        const bool wanted=handheldIdroidOwned()&&((nativeIdroidOpen()&&!nativeIdroidClosing())||borrow.player)
+        const bool rocket=frame&&frame->rocketArmGuidance&&!frame->menuOpen;
+        const bool wanted=(rocket||(handheldIdroidOwned()&&((nativeIdroidOpen()&&!nativeIdroidClosing())||borrow.player)))
             &&handheldMenusSelected()&&!nativeGamepadActive()
             &&!nativeLoadingTipsOpen()&&!nativeTitleModeActive()&&!nativeScriptedDemoActive();
         uintptr_t character{},service{};
@@ -428,7 +452,7 @@ void pumpHandheldIdroidEquipment() noexcept {
         const bool ownerKnown=frame&&character&&service;
         const bool same=ownerKnown&&equipmentLease.player==frame->playerOwner
             &&equipmentLease.character==character&&equipmentLease.service==service;
-        if(equipmentLease.generation&&same&&borrow.player&&!nativeIdroidOpen()){
+        if(equipmentLease.generation&&same&&borrow.player&&!nativeIdroidOpen()&&!rocket){
             const auto slot=equipmentLease.handle>>16;
             const auto records=get<uintptr_t>(service+0x140);
             if(records&&slot<=255&&get<uint16_t>(records+slot*6)==499
@@ -463,8 +487,9 @@ void pumpHandheldIdroidEquipment() noexcept {
             }
             equipmentLease={};
         }
-        if(equipmentLease.generation&&same&&handheldIdroidOwned(frame->playerOwner,frame->activation))
-            equipmentLease.activation=frame->activation;
+        if(equipmentLease.generation&&same&&(rocket||handheldIdroidOwned(frame->playerOwner,frame->activation))){
+            equipmentLease.activation=frame->activation;equipmentLease.rocket=rocket;
+        }
         if(!wanted||!frame||!service||equipmentLease.generation)return;
         // The real player-held path retains its existing resource owner.
         std::array<uintptr_t,4> callbacks{},contexts{};
@@ -478,7 +503,7 @@ void pumpHandheldIdroidEquipment() noexcept {
         if((handle&31u)!=17u||((handle>>5)&0x7ffu)!=499u||(handle>>16)>255u){
             log("VR handheld native ID499 allocation unavailable");return;
         }
-        equipmentLease={frame->playerOwner,character,service,frame->activation,++equipmentGeneration,handle};
+        equipmentLease={frame->playerOwner,character,service,frame->activation,++equipmentGeneration,handle,rocket};
         // dc0920 requests this exact native equipment slot's asset load. It
         // queues an unloaded alternate slot, which retail's service completes.
         using Load=void(*)(void*,uint32_t);
@@ -497,7 +522,7 @@ void noteIdroidBodyComplete(uintptr_t driver,uintptr_t bodyBinding,const HeadCam
         const bool inspected=inspect(frame.playerOwner,owned);
         static std::atomic_uint64_t lastDiagnostic{};
         const auto now=GetTickCount64();
-        if(handheldIdroidOwned(frame.playerOwner)&&now-lastDiagnostic.load()>1000){
+        if((handheldIdroidOwned(frame.playerOwner)||frame.rocketArmGuidance)&&now-lastDiagnostic.load()>1000){
             lastDiagnostic.store(now);
             log("VR handheld handset publication inspect="+std::to_string(inspected)
                 +" stage="+std::to_string(owned.inspectionStage)+" lease="+std::to_string(owned.equipmentLease)
@@ -513,7 +538,7 @@ void noteIdroidBodyComplete(uintptr_t driver,uintptr_t bodyBinding,const HeadCam
             completed={current,eventQpc,event,GetCurrentThreadId(),pausedRefresh};display.reset();}
         const Completion transaction{current,eventQpc,event,GetCurrentThreadId(),pausedRefresh};
         const bool published=publishHandheldBody(frame,owned,transaction);
-        if(handheldIdroidOwned(frame.playerOwner)&&now==lastDiagnostic.load())
+        if((handheldIdroidOwned(frame.playerOwner)||frame.rocketArmGuidance)&&now==lastDiagnostic.load())
             log("VR handheld handset transform published="+std::to_string(published)
                 +" tracked="+std::to_string(frame.idroidDeviceTracked)+" flags="+std::to_string(owned.handsetBindingFlags));
         if(published){

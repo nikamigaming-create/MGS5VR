@@ -48,6 +48,21 @@ if (-not (Test-Path -LiteralPath $mgsControls -PathType Leaf)) { $mgsControls = 
 foreach ($mgsRequired in @($mgsChecker,$mgsControls)) {
     if (-not (Test-Path -LiteralPath $mgsRequired -PathType Leaf)) { throw "Missing controls package file: $mgsRequired" }
 }
+$mgsControllerNames=@('left.mesh','right.mesh','left.png','right.png','LICENSE.txt','provenance.json')
+$mgsControllerRoot=Join-Path $mgsRoot 'assets\controls'
+foreach ($mgsName in $mgsControllerNames) {
+    $mgsSource=Join-Path $mgsControllerRoot $mgsName
+    if (-not (Test-Path -LiteralPath $mgsSource -PathType Leaf)) { throw "Missing controller model package file: $mgsName" }
+    $mgsDestination=Join-Path $mgsTarget "assets\controls\$mgsName"
+    for ($mgsAncestor=$mgsDestination; $mgsAncestor; $mgsAncestor=Split-Path -Parent $mgsAncestor) {
+        if ((Test-Path -LiteralPath $mgsAncestor) -and ((Get-Item -LiteralPath $mgsAncestor).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Controller assets must not use linked paths.' }
+        if ($mgsAncestor -eq $mgsTarget) { break }
+    }
+    if ((Test-Path -LiteralPath $mgsDestination) -and
+        (Get-FileHash -LiteralPath $mgsDestination -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $mgsSource -Algorithm SHA256).Hash) {
+        throw "Existing modified controller model was preserved: $mgsName"
+    }
+}
 $mgsNames = @('dinput8.dll','mgs5vr.ini','mgs5vr-controls.ini','mgs5vr_controls.exe','mgs5vr-install.json')
 foreach ($mgsName in $mgsNames) {
     if (Test-Path -LiteralPath (Join-Path $mgsTarget $mgsName)) {
@@ -106,6 +121,14 @@ if ($mgsNativeAdapter -and $EnableControllerRigExperiment) {
     }
 }
 try {
+    [IO.Directory]::CreateDirectory((Join-Path $mgsTarget 'assets\controls')) | Out-Null
+    foreach ($mgsName in $mgsControllerNames) {
+        $mgsRelative="assets\controls\$mgsName"
+        if (-not (Test-Path -LiteralPath (Join-Path $mgsTarget $mgsRelative))) {
+            Copy-Item -LiteralPath (Join-Path $mgsControllerRoot $mgsName) -Destination (Join-Path $mgsTarget $mgsRelative)
+            $mgsCreated += $mgsRelative
+        }
+    }
     $mgsMissingAssets = @($mgsAssetHashes.Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $mgsTarget $_) -PathType Leaf) })
     if ($mgsMissingAssets.Count) {
         $mgsImporter = Join-Path $mgsRoot 'build\Release\mgs5vr_import.exe'

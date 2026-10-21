@@ -1,10 +1,12 @@
 #include "mgs5vr/render_camera.hpp"
+#include "mgs5vr/cabin_studio_store.hpp"
 #include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/optic_renderer.hpp"
+#include "mgs5vr/cabin_cover.hpp"
 #include "mgs5vr/optic_markers.hpp"
 #include "mgs5vr/small_animal.hpp"
 #include "mgs5vr/player_visibility.hpp"
@@ -12,6 +14,9 @@
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/menu_surface.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/idroid_rig.hpp"
+#include "mgs5vr/idroid_attachment.hpp"
+#include "mgs5vr/rocket_arm.hpp"
 #include "mgs5vr/control_prompts.hpp"
 #include <windows.h>
 #include <intrin.h>
@@ -100,6 +105,7 @@ thread_local uintptr_t stereoTarget{};
 thread_local uint32_t sceneRenderPass{};
 thread_local mgs5vr::EyeFrame drawingEye{};
 thread_local bool clipProjection{},gpuProjection{},insideStereo{};
+thread_local mgs5vr::OpticNativeLightingScope* viewportLighting{};
 std::atomic_uint64_t sceneCalls{},scenePairs{},sceneRejected{},sceneCopies{};
 std::atomic_uint64_t duplicatePresentsSkipped{};
 std::atomic_uint32_t sceneContextType{99};
@@ -219,6 +225,7 @@ __declspec(noinline) uintptr_t projection(float* output,float a,float b,float c,
     std::array<float,16> matrix{};std::memcpy(matrix.data(),output,sizeof(matrix));
     if(!mgs5vr::setEyeProjection(matrix,drawingEye.view.fov))return result;
     std::memcpy(output,matrix.data(),sizeof(matrix));if(clip)clipProjection=true;if(gpu)gpuProjection=true;
+    if(gpu&&viewportLighting)viewportLighting->refreshProjection(matrix);
     return result;
 }
 __declspec(noinline) uintptr_t viewport(void* input,uint8_t history){
@@ -580,7 +587,8 @@ __declspec(noinline) uintptr_t registerTarget(void* graphics,void* target){
 __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint32_t worker){
     const auto id=++sceneCalls;sceneThread.store(GetCurrentThreadId());
     const auto status=mgs5vr::headCamera().status();
-    if(!enabled.load()||!status.active||insideStereo||!mgs5vr::sceneCaptureAvailable())return originalScene(render,graphics,task,worker);
+    if(!enabled.load()||!status.active||mgs5vr::nativeAvatarEditActive()||mgs5vr::nativeSceneCanvasActive()||insideStereo||!mgs5vr::sceneCaptureAvailable())
+        return originalScene(render,graphics,task,worker);
     SceneSource source;{std::lock_guard lock(sceneMutex);source=sceneSource;}
     bool contains=false;auto candidate=field<uintptr_t>(render,layout.renderViewports);
     for(unsigned n=0;candidate&&n<16;++n){if(candidate==source.viewport){contains=true;break;}candidate=field<uintptr_t>(reinterpret_cast<void*>(candidate),layout.viewportNext);}
@@ -641,8 +649,21 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const bool binocularLensVisible=optic.held&&optic.pose.tracked&&std::any_of(
         source.pair.sample.views.begin(),source.pair.sample.views.end(),
         [&](const auto& eye){return mgs5vr::binocularEyeVisible(optic.pose,eye.pose,optic.maxEyeDistance);});
-    const bool collimator=scope.dotReticle&&scope.magnification==1.f;
-    const auto opticView=!diagnosticLensRendering.load()?std::nullopt:binocularLensVisible?mgs5vr::binocularSceneView(optic.pose,
+    const bool collimator=scope.dotReticle&&scope.magnification==1.f&&!scope.opaqueAtOnePower;
+    const auto& studio=source.pair.sample.controllers.studio;
+    const bool studioCamera=studio&&studio->available&&studio->cameraHand>=0&&!studio->review&&!optic.held&&!source.pair.sample.menuOpen;
+    const std::optional<mgs5vr::EyeView> studioView=studioCamera
+        ?std::optional<mgs5vr::EyeView>{mgs5vr::EyeView{studio->shutter&&studio->shutter>mgs5vr::acceptedStudioShutter()
+            ?studio->shutterPose:mgs5vr::compose(studio->camera,mgs5vr::studioCameraLens),{-.50f,.50f,.50f,-.50f}}}:std::nullopt;
+    const bool rocketGuidance=source.pair.sample.rocketArmGuidance&&!source.pair.sample.menuOpen;
+    const float rocketAspect=std::abs(authoredProjection[5]/authoredProjection[0]);
+    const float rocketX=std::atan(1.f/std::abs(authoredProjection[0]));
+    const float rocketY=std::atan(1.f/std::abs(authoredProjection[5]));
+    const std::optional<mgs5vr::EyeView> rocketView=rocketGuidance&&std::isfinite(rocketAspect)
+        &&rocketAspect>.5f&&rocketAspect<3.f
+        ?std::optional<mgs5vr::EyeView>{{source.pair.sample.headPose,{-rocketX,rocketX,rocketY,-rocketY}}}:std::nullopt;
+    const auto rocketHandset=rocketView?mgs5vr::resolveNativeIdroidDisplay(source.pair.sample):std::nullopt;
+    const auto opticView=rocketView?rocketView:studioView?studioView:!diagnosticLensRendering.load()?std::nullopt:binocularLensVisible?mgs5vr::binocularSceneView(optic.pose,
         source.pair.sample.controllers.magnification):collimator?std::nullopt:scopeView;
     mgs5vr::ComPtr<ID3D11Texture2D> opticScene;
     // Snapshot text and both-eye facing once for this stereo transaction.
@@ -653,14 +674,21 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         &&!hintSource.menuOpen&&!hintSource.menuIdroid&&hintSource.wristPanelTracked
         &&!hintControls.equipmentOpen&&!hintControls.commandControls&&!hintControls.nativeGamepad
         &&!hintControls.frontEnd&&!hintControls.loading&&!hintControls.scriptedDemo&&!hintControls.optic.held;
+    const auto studioHint=studio?mgs5vr::studioWristHint(*studio):std::string{};
+    const bool heldObjectHint=!studioHint.empty()
+        &&hintSource.wristPanelTracked&&!hintSource.menuOpen&&!hintControls.loading;
     const auto hintBindings=accHint?mgs5vr::controlPromptBindings():nullptr;
-    const std::string hintBinding=hintBindings?hintBindings->label("system.idroid"):std::string{};
+    const std::string hintBinding=heldObjectHint
+        ?studioHint
+        :hintBindings?hintBindings->label("system.idroid"):std::string{};
     const std::array<mgs5vr::Pose,2> hintEyes{
         mgs5vr::nativeEyePose(hintSource.nativePose,hintSource.headPose,hintSource.views[0].pose),
         mgs5vr::nativeEyePose(hintSource.nativePose,hintSource.headPose,hintSource.views[1].pose)};
-    const bool drawAccHint=accHint&&!hintBinding.empty()&&hintBinding!="UNBOUND"
+    const bool drawAccHint=(accHint||heldObjectHint)&&!hintBinding.empty()&&hintBinding!="UNBOUND"
         &&mgs5vr::panelFacesBothEyes(hintSource.wristPanel,hintEyes);
     const uint32_t extraPass=opticView?1u:0u;
+    mgs5vr::setCabinCoverOpening(source.pair.sample.controllers.openingPropsActive
+        ?source.pair.sample.controllers.openingBench.lidOpen:0.f);
     for(uint32_t pass=0;pass<(extraPass?5u:2u);++pass){
         sceneRenderPass=pass;
         const bool headPreparation=extraPass&&pass<2;
@@ -673,6 +701,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         const auto hudView=mgs5vr::hudViewForPass(eye,optic.held&&optic.active
             &&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular);
         saved.restore();eyeViewport=source.viewport;clipProjection=gpuProjection=false;
+        mgs5vr::RocketHandPresentation rocketHand(source.pair.sample,!lensPass&&!restoreHead);
         drawingEye={lensPass?*opticView:source.pair.sample.views[eye],id,source.pair.sample.trackingSequence,status.activation,source.pair.sample.sampleTime,eye,false,false};
         // FOX sky/lighting expects a centered render projection. Keep the
         // runtime's asymmetric optics separately and crop the enclosing image
@@ -682,13 +711,26 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         const auto renderFov=mgs5vr::enclosingEyeFov(drawingEye.displayFov);
         if(!renderFov){complete=false;sceneFailure=4;break;}
         drawingEye.view.fov=*renderFov;
-        const auto native=mgs5vr::nativeEyePose(source.pair.sample.nativePose,source.pair.sample.headPose,drawingEye.view.pose);
+        const auto native=lensPass&&rocketView?mgs5vr::rocketArmRenderPose(source.pair.sample.rocketArmCamera).value_or(source.pair.sample.rocketArmCamera)
+            :mgs5vr::nativeEyePose(source.pair.sample.nativePose,source.pair.sample.headPose,drawingEye.view.pose);
         alignas(16) auto nativeValues=values(native);
         alignas(16) std::array<float,16> eyeWorld{},eyeView{};
         alignas(16) std::array<unsigned char,0x140> inverseInput{};
         std::memcpy(inverseInput.data()+layout.inversePose,nativeValues.data(),sizeof(nativeValues));
         originalWorld(nativeValues.data(),eyeWorld.data());originalView(inverseInput.data(),eyeView.data());
-        if(std::max(inverseError(eyeWorld,eyeView),inverseError(eyeView,eyeWorld))>=0.003f){complete=false;sceneFailure=3;break;}
+        const auto eyeInverseError=std::max(inverseError(eyeWorld,eyeView),inverseError(eyeView,eyeWorld));
+        if(eyeInverseError>=0.003f){
+            std::ostringstream failure;failure.precision(9);
+            failure<<"Native eye inverse rejected source="<<id<<" lens="<<lensPass
+                <<" rocket="<<rocketGuidance<<" error="<<eyeInverseError<<" pose=";
+            for(const auto value:nativeValues)failure<<value<<',';
+            mgs5vr::log(failure.str());
+            // A rejected remote-camera transform has no authority over the
+            // already captured, valid Snake eyes. Restore those head passes
+            // without this frame's feed; never trigger the theatre fallback.
+            if(lensPass&&rocketGuidance){opticScene.Reset();continue;}
+            complete=false;sceneFailure=3;break;
+        }
         std::memcpy(reinterpret_cast<void*>(source.grCamera+0x30),eyeWorld.data(),sizeof(eyeWorld));
         std::memcpy(reinterpret_cast<void*>(source.grCamera+0x70),eyeView.data(),sizeof(eyeView));
         // Until per-eye temporal resources are isolated, publish a zero-motion
@@ -700,7 +742,25 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         std::optional<LensExposureGuard> exposure;
         if(!restoreHead)exposure.emplace(lensPass,source.viewport,
             optic.held?1:scope.weaponIdentity,id,mgs5vr::steadyMilliseconds());
-        originalViewport(reinterpret_cast<void*>(source.viewport),0);
+        {
+            // FOX records its opaque/depth passes while building the viewport,
+            // before originalScene composites it. Keep the same eye publication
+            // around that work, and refresh its projection at the native upload.
+            std::optional<mgs5vr::OpticNativeLightingScope> lighting;
+            std::optional<mgs5vr::OpticLightingMatrix> binocularWorld;
+            if(!restoreHead&&!lensPass){
+                if(optic.held&&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular){
+                    const auto body=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,source.pair.sample.headPose,optic.pose.renderBody);
+                    alignas(16) auto bodyValues=values(body);binocularWorld.emplace();originalWorld(bodyValues.data(),binocularWorld->data());
+                }
+                auto pendingEye=drawingEye;pendingEye.projected=true;
+                const auto pendingProjection=field<std::array<float,16>>(reinterpret_cast<void*>(source.viewport),layout.gpuProjection);
+                lighting.emplace(pendingEye,source.grCamera,eyeView,pendingProjection,true,binocularWorld?&*binocularWorld:nullptr);
+                viewportLighting=&*lighting;
+            }
+            originalViewport(reinterpret_cast<void*>(source.viewport),0);
+            viewportLighting=nullptr;
+        }
         if(!clipProjection||!gpuProjection){complete=false;sceneFailure=4;break;}
         if(lensPass)saved.preserveOpticVisibility();
         // Keep native visibility preparation independent of the telescope's
@@ -732,7 +792,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 originalWorld(bodyValues.data(),binocularWorld->data());
             }
             mgs5vr::OpticNativeLightingScope lightingSource(drawingEye,source.grCamera,
-                eyeView,eyeProjection,!lensPass&&optic.held,
+                eyeView,eyeProjection,!lensPass,
                 binocularWorld?&*binocularWorld:nullptr);
             result=originalScene(render,graphics,task,worker);
         }
@@ -741,6 +801,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         // Native passes may finish and replace the current deferred context.
         const auto afterOwner=field<uintptr_t>(graphics,layout.graphicsContext);
         auto* afterContext=afterOwner?field<ID3D11DeviceContext*>(reinterpret_cast<void*>(afterOwner),8):nullptr;
+        if(!lensPass&&!restoreHead)mgs5vr::snapshotNativeEyeDepth(afterContext,drawingEye);
         if(headPreparation||restoreHead){
             if(!opticHeadScenes[eye].transfer(afterContext,id,restoreHead)){complete=false;sceneFailure=8;break;}
             if(headPreparation)continue;
@@ -752,11 +813,13 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             std::array<float,16> opticProjection{};
             std::memcpy(opticProjection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(opticProjection));
             if(!mgs5vr::capturePhysicalOpticScene(afterContext,eyeView,opticProjection,native.position,opticScene.GetAddressOf(),
-                mgs5vr::worldHudVisible(source.pair.sample.controllers.hudMode,hudView),&markerSnapshot))
+                !rocketGuidance&&!studioCamera&&mgs5vr::worldHudVisible(source.pair.sample.controllers.hudMode,hudView),&markerSnapshot))
                 mgs5vr::log("Physical optic scene copy unavailable; retaining normal head views");
+            if(studioCamera&&opticScene&&studio->shutter>mgs5vr::acceptedStudioShutter())
+                mgs5vr::captureStudioPhoto(afterContext,opticScene.Get(),studio->shutter);
             continue;
         }
-        if(afterContext&&titleSurface&&source.pair.sample.controllers.openingSelector){
+        if(afterContext&&source.pair.sample.controllers.openingPropsActive){
             // The title camera is the only authenticated native cabin anchor
             // currently available. Keep the props in that same FOX frame so
             // they move with the authored helicopter shot instead of becoming
@@ -768,8 +831,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             const auto& cabin=source.pair.sample.controllers;
             const auto titleOrigin=cabin.openingWorldAnchored?cabin.openingWorldOrigin:
                 mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,source.pair.sample.headPose,cabin.openingOrigin);
-            const auto offsets=mgs5vr::openingPropOffsets();
-            const auto scales=mgs5vr::openingPropScales();
+            const auto& bench=cabin.openingBench;
             const auto propWorld=[&](mgs5vr::Vec3 offset,float scale,mgs5vr::Quat orientation=mgs5vr::Quat{}){
                 const auto prop=mgs5vr::compose(titleOrigin,mgs5vr::Pose{orientation,offset});
                 alignas(16) auto propValues=values(prop);std::array<float,16> world{};
@@ -780,13 +842,39 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 return world;
             };
             std::array<std::array<float,16>,7> openingWorlds{};
-            for(size_t i=0;i<openingWorlds.size();++i)
-                openingWorlds[i]=propWorld(offsets[i],scales[i]);
+            openingWorlds[0]=propWorld(bench.player.position,1,bench.player.orientation);
+            for(size_t i=0;i<bench.tapes.size();++i)
+                openingWorlds[i+1]=propWorld(bench.tapes[i].pose.position,1,bench.tapes[i].pose.orientation);
              // The rack is an owned visual aid.  Animals are never drawn from
              // poses supplied by the VR layer: TppBuddyDog2/TppRat must own
              // their meshes, bones, animation, and world position.
             mgs5vr::drawOpeningProps(afterContext,openingWorlds,eyeView,eyeProjection,
+                 propWorld(bench.layout.eject,1,bench.layout.player.orientation),drawingEye,bench.lidOpen,
                  source.pair.sample.controllers.openingSelection);
+        }
+        if(afterContext&&studio&&studio->available&&!studio->keyboardOnly){
+            const auto matrix=[&](mgs5vr::Pose pose){alignas(16) auto v=values(pose);std::array<float,16> world{};
+                originalWorld(v.data(),world.data());return world;};
+            const auto& sample=source.pair.sample;
+            const auto room=mgs5vr::nativeTrackedPose(sample.nativePose,sample.headPose,studio->roomTracking);
+            mgs5vr::CabinStudioMatrices matrices{};
+            matrices.camera=matrix(mgs5vr::nativeTrackedPose(sample.nativePose,sample.headPose,studio->camera));
+            for(size_t i=0;i<6;++i)matrices.controls[i]=matrix(mgs5vr::nativeTrackedPose(sample.nativePose,sample.headPose,
+                mgs5vr::studioControlPose(studio->camera,static_cast<mgs5vr::StudioControl>(i))));
+            matrices.cameraStatus=matrix(mgs5vr::nativeTrackedPose(sample.nativePose,sample.headPose,
+                mgs5vr::compose(studio->camera,mgs5vr::Pose{{},{-.012f,.038f,.039f}})));
+            for(const auto& paper:studio->papers)matrices.papers.push_back(matrix(paper.field
+                ?mgs5vr::nativeTrackedPose(sample.nativePose,sample.headPose,paper.fieldPose)
+                :mgs5vr::compose(room,paper.pose)));
+            if(studio->cabin){
+                matrices.marker=matrix(mgs5vr::compose(room,studio->marker));
+                matrices.notes=matrix(mgs5vr::compose(room,mgs5vr::Pose{{},mgs5vr::studioNotesHome}));
+            }
+            if(studio->editor>=0){
+                for(size_t key=0;key<44;++key)matrices.keys[key]=matrix(mgs5vr::compose(room,mgs5vr::studioKeyPose(studio->keyboard,key)));
+                matrices.paperConfirmation=matrix(mgs5vr::compose(room,mgs5vr::compose(studio->keyboard,mgs5vr::Pose{{},{0,.13f,0}})));
+            }
+            mgs5vr::drawCabinStudio(afterContext,*studio,matrices,eyeView,eyeProjection,drawingEye,studioCamera?opticScene.Get():nullptr);
         }
         if(afterContext&&optic.held&&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular){
             const auto body=mgs5vr::nativeTrackedPose(source.pair.sample.nativePose,
@@ -809,13 +897,47 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             alignas(16) std::array<float,16> ocularWorld{},projection{};
             originalWorld(ocularValues.data(),ocularWorld.data());
             std::memcpy(projection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(projection));
-            mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get(),scope.dotReticle);
+            mgs5vr::drawPhysicalWeaponScope(afterContext,ocularWorld,eyeView,projection,scope.radius,scope.magnification,opticScene.Get(),scope.dotReticle,scope.opaqueAtOnePower);
         }
         const auto& wrist=source.pair.sample;
+        if(afterContext&&rocketView&&opticScene){
+            // The handset must have completed the same skin transaction as
+            // these eyes. A tracked pose alone is not a visible device.
+            if(const auto& handset=rocketHandset){
+                auto deviceFrame=wrist;deviceFrame.idroidDevice=handset->body;
+                if(const auto device=mgs5vr::trackedIdroidPose(deviceFrame)){
+                    auto screen=device->screen;
+                    // Keep the authored lower emitter edge fixed when the
+                    // native camera's aspect differs from the map's 16:9.
+                    screen=mgs5vr::compose(screen,mgs5vr::Pose{{},{0,wrist.controllers.idroidScreenWidth*(.5f/rocketAspect-9.f/32.f),0}});
+                    alignas(16) auto screenValues=values(screen);
+                    alignas(16) std::array<float,16> screenWorld{};
+                    originalWorld(screenValues.data(),screenWorld.data());
+                    mgs5vr::drawIdroidGuidance(afterContext,screenWorld,eyeView,eyeProjection,
+                        wrist.controllers.idroidScreenWidth,rocketAspect,opticScene.Get(),drawingEye);
+                }
+            }
+        }
+        if(rocketGuidance&&eye==0){
+            static uint64_t lastRocketReport{};
+            if(now-lastRocketReport>=1000){
+                lastRocketReport=now;
+                mgs5vr::log("Rocket guidance source="+std::to_string(id)+" rig="+std::to_string(wrist.rigSequence)
+                    +" aspect="+std::to_string(rocketAspect)+" view="+std::to_string(rocketView.has_value())
+                    +" pixels="+std::to_string(bool(opticScene))+" handset="+std::to_string(rocketHandset.has_value()));
+            }
+        }
         if(!titleSurface&&!wrist.menuOpen&&hudView==mgs5vr::HudView::world
-                &&wrist.controllers.hudMode!=mgs5vr::HudMode::off)
+                &&wrist.controllers.hudMode!=mgs5vr::HudMode::off){
+            std::optional<std::array<float,16>> markerHousing;
+            if(optic.held&&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular){
+                const auto body=mgs5vr::nativeTrackedPose(wrist.nativePose,wrist.headPose,optic.pose.renderBody);
+                alignas(16) auto bodyValues=values(body);markerHousing.emplace();
+                originalWorld(bodyValues.data(),markerHousing->data());
+            }
             mgs5vr::drawWorldWaypoints(afterContext,eyeView,eyeProjection,native.position,markerSnapshot,
-                wrist.controllers.hudMode,wrist.controllers.enemyWorldMarkers);
+                wrist.controllers.hudMode,wrist.controllers.enemyWorldMarkers,markerHousing?&*markerHousing:nullptr);
+        }
         if(afterContext&&drawAccHint){
             alignas(16) auto hintPose=values(wrist.wristPanel);
             alignas(16) std::array<float,16> hintWorld{};

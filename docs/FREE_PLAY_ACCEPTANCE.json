@@ -1,0 +1,771 @@
+{
+  "schema": 1,
+  "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
+  "candidate": "73fe7d0b521d",
+  "candidate_status": "Checked support-finger candidate built;58 groups and installer checks passed. Actual-game moving contact/recoil/reload/free-hand verification pending. Published play unchanged; full field bug list active.",
+  "checklist": "docs/FIELD_FIXES.md",
+  "scope_limits": [
+    "Simulator passes do not establish physical-headset acceptance",
+    "Unknown combinations remain unproven; no universal pass inferred"
+  ],
+  "issues": [
+    {
+      "id": "FP01",
+      "title": "Right-controller inactivity or invalid tracking enters third person",
+      "status": "reproduce",
+      "acceptance": [
+        "valid right hand stationary >6 seconds with left/head motion",
+        "right grip invalid 7 seconds",
+        "right aim invalid 7 seconds",
+        "right grip+aim invalid 7 seconds",
+        "automatic recovery without recenter",
+        "repeat seated/standing, field/ACC, weapon/iDroid owners"
+      ],
+      "evidence": [
+        {
+          "run": "20261020T214002922383Z",
+          "scope": "ACC seated stationary-valid and right grip/aim/both validity loss; 20 sampled frames active and unsuspended; combined-loss both eyes inspected",
+          "limitation": "harness omitted return value, runner result null; corrected and repeat pending; physical Quest still unproven"
+        },
+        {
+          "run": "20261020T214111077797Z",
+          "scope": "20 ACC seated checkpoints repeated with corrected harness; stationary valid right hand >6 seconds, grip/aim/both loss and automatic recovery",
+          "result": "observed_camera_continuity",
+          "limitations": [
+            "field/standing/held-weapon/iDroid cases pending",
+            "physical Quest inactivity unproven"
+          ]
+        },
+        {
+          "run": "20261020T214655180013Z",
+          "scope": "Mother Base seated; 20 checkpoints, stationary valid hand and right grip/aim/both invalidity with late sample beyond seven seconds; automatic recovery",
+          "result": "observed_camera_continuity",
+          "visual_review": "combined-loss late checkpoint both eyes show first person and retained right hand"
+        },
+        {
+          "run": "20261020T214814573009Z",
+          "scope": "Mother Base standing with runtime floor; 20 checkpoints, stationary hand and grip/aim/both loss; recovery without recenter",
+          "result": "observed_camera_continuity",
+          "visual_review": "late combined-loss both eyes show first person and retained right hand"
+        },
+        {
+          "run": "20261021T021917348749Z",
+          "result": "regression_setup_only",
+          "scope": "Fresh native departure and horseback arrival in both eyes on candidate148d5ca51161; active unsuspended camera.",
+          "limitation": "Tutorial handoff and rifle-loss regressions not yet exercised in this resumed session."
+        },
+        {
+          "run": "20261021T023544588585Z",
+          "result": "observed_scoped_rifle_tracking_continuity",
+          "scope": "29 sampled states, 25 with right grip+aim fault12; support attached and camera active/unsuspended in every sample. Loss and recovered paired eyes show the selected back-slot rifle retained.",
+          "limitation": "Static grip fault, no continuous stereo take, other owners/reference spaces and physical Quest unproven; open support fingers still visible."
+        },
+        {
+          "run": "20261021T023824584002Z",
+          "result": "observed_no_discharge_with_held_trigger_through_recovery",
+          "scope": "Trigger pressed only after confirmed fault12; mapped RT0 and unchanged native ammunition through fault and >1s recovered tracking. 39 records including neutral release.",
+          "limitation": "Positive firing rearm covered in a separate following run."
+        },
+        {
+          "run": "20261021T024003656861Z",
+          "result": "observed_back_slot_recovery_and_firing_rearm",
+          "scope": "Repeated held-trigger suppression/release, then three fresh trigger edges each discharged one round from PRIMARY_BACK with sampled trigger and retained support.",
+          "limitation": "One selected native slot/loadout, not every weapon. Earlier run20261021T023915446376Z failed support-acquisition precondition before fault/trigger dispatch; retained."
+        },
+        {
+          "run": "20261021T024113307573Z",
+          "result": "observed_hip_slot_tracking_and_recovery_with_checker_mismatch",
+          "scope": "28 fault/recovery samples retain support and active unsuspended camera; both loss/recovery eyes reviewed. Held-trigger no-discharge check passed; subsequent fresh trigger sampled and PRIMARY_HIP ammunition decreased by3 with support retained.",
+          "limitation": "Old firing checker expected PRIMARY_BACK and reported different_slot_discharged. Preserve that failed assertion; do not relabel it a checker pass. Expected-slot selection corrected for future runs. Weapon model identity beyond selected slot is not asserted."
+        },
+        {
+          "candidate": "ff0dd2c746a6",
+          "run": "20261021T040358781890Z",
+          "slot": "PRIMARY_HIP",
+          "result": "observed_scoped_tracking_continuity_safe_trigger_recovery_and_rearm",
+          "tracking_samples": 28,
+          "fault12_samples": 24,
+          "all_tracking_camera_active_unsuspended": true,
+          "all_tracking_support_attached": true,
+          "trigger_recovery": {
+            "status": "observed_no_discharge_through_recovery",
+            "samples": 38,
+            "positive_trigger_rearm": "observed_native_discharge"
+          },
+          "shots": [
+            {
+              "actual_slot": "PRIMARY_HIP",
+              "rounds": 2,
+              "status": "pass",
+              "trigger_sampled": true
+            },
+            {
+              "actual_slot": "PRIMARY_HIP",
+              "rounds": 2,
+              "status": "pass",
+              "trigger_sampled": true
+            },
+            {
+              "actual_slot": "PRIMARY_HIP",
+              "rounds": 2,
+              "status": "pass",
+              "trigger_sampled": true
+            }
+          ],
+          "visual_review": "Both eyes at late loss and recovery retain selected rifle; open support fingers remain visible.",
+          "limitation": "Scoped simulator static-grip fault; physical Quest, all weapon types, moving contact and other owners remain unproven."
+        },
+        {
+          "candidate": "ff0dd2c746a6",
+          "run": "20261021T040558709267Z",
+          "slot": "PRIMARY_BACK",
+          "result": "observed_scoped_tracking_continuity_safe_trigger_recovery_and_rearm",
+          "tracking_samples": 28,
+          "fault12_samples": 24,
+          "all_tracking_camera_active_unsuspended": true,
+          "all_tracking_support_attached": true,
+          "trigger_recovery": {
+            "status": "observed_no_discharge_through_recovery",
+            "samples": 37,
+            "positive_trigger_rearm": "observed_native_discharge"
+          },
+          "shots": [
+            {
+              "actual_slot": "PRIMARY_BACK",
+              "rounds": 1,
+              "status": "pass",
+              "trigger_sampled": true
+            },
+            {
+              "actual_slot": "PRIMARY_BACK",
+              "rounds": 1,
+              "status": "pass",
+              "trigger_sampled": true
+            },
+            {
+              "actual_slot": "PRIMARY_BACK",
+              "rounds": 1,
+              "status": "pass",
+              "trigger_sampled": true
+            }
+          ],
+          "visual_review": "Both eyes at late loss and recovery retain selected rifle; open support fingers remain visible.",
+          "limitation": "Scoped simulator static-grip fault; physical Quest, all weapon types, moving contact and other owners remain unproven."
+        }
+      ]
+    },
+    {
+      "id": "FP02",
+      "title": "Precision weapon support grip detaches after firing",
+      "status": "reproduce",
+      "acceptance": [
+        "native sniper selected",
+        "support acquire, aim, fire, bolt cycle, follow-up shots",
+        "release/reacquire, two-handed motion, repeated grip cycles"
+      ],
+      "evidence": [
+        {
+          "run": "20261021T001242421704Z",
+          "scope": "AM MRS-71, both grips continuously held, eight-second right grip and aim tracking loss; both final eyes inspected during loss and recovery",
+          "result": "visible_rifle_disappears_during_tracking_loss",
+          "finding": "Support drops by 0.08s, returns at 8.48s without grip repress; all 30 camera samples remain first person. Native firearm true does not establish visible rifle.",
+          "limitations": [
+            "Not firing-induced loss",
+            "Physical Quest untested",
+            "Support fingers remain visually open"
+          ],
+          "next": "Preserve acquired weapon ownership across tracking loss without enabling attack from invalid tracking or firing a held trigger on recovery"
+        },
+        {
+          "run": "20261020T214917646823Z",
+          "scope": "requested primary-right selection with loaded customized sniper base799; one-hand and three support acquisition telemetry checkpoints",
+          "result": "visual_failure_no_visible_rifle",
+          "finding": "support_attached true and native_firearm true are insufficient: final-eye images show bare hands; no firing pass, actual selected weapon unproven",
+          "next": "inspect native disable-action flags and actual weapon selection before changing grip behavior"
+        },
+        {
+          "run": "20261020T215634653721Z",
+          "scope": "recorded native source-eye wrist picker on Mother Base",
+          "finding": "red prohibition mark on GEIST P3 status; requested primary-right browse sampled physically but native navigation axes stayed zero; no selected sniper or visible firearm established",
+          "video_source": "native_source_eye_before_runtime_crop_and_composition",
+          "video_frames": 421,
+          "dropped_samples": 8,
+          "next": "reach unrestricted native field context using normal menus, then repeat sniper firing test"
+        },
+        {
+          "run": "20261020T225459731487Z",
+          "scope": "Afghanistan mission10020 on foot, visible AM MRS-71, three native PRIMARY_BACK shots with both grips continuously held",
+          "result": "three_discharges_support_retained",
+          "visual_review": "Both final-eye captures after third shot show rifle and support hand; no upward snap in sampled state",
+          "limitations": [
+            "Only loaded semiautomatic rifle; bolt-action rifles untested",
+            "Stationary controller poses; dynamic aiming and physical Quest not established",
+            "Support fingers appear open in final-eye images; contact appearance still needs investigation"
+          ]
+        },
+        {
+          "run": "20261020T225816870564Z",
+          "scope": "Same AM MRS-71; paired controllers yaw +12/-12/0 degrees, three native follow-up shots",
+          "result": "support_retained_all_18_motion_samples_and_three_shots",
+          "limitations": [
+            "Simulator pose RPCs serialized, not physical Quest",
+            "No bolt-action weapon tested",
+            "Both-eye motion video not reviewed"
+          ]
+        },
+        {
+          "run": "20261021T021917348749Z",
+          "result": "regression_setup_only",
+          "scope": "Fresh native departure and horseback arrival in both eyes on candidate148d5ca51161; active unsuspended camera.",
+          "limitation": "Tutorial handoff and rifle-loss regressions not yet exercised in this resumed session."
+        },
+        {
+          "run": "20261021T023544588585Z",
+          "result": "observed_scoped_rifle_tracking_continuity",
+          "scope": "29 sampled states, 25 with right grip+aim fault12; support attached and camera active/unsuspended in every sample. Loss and recovered paired eyes show the selected back-slot rifle retained.",
+          "limitation": "Static grip fault, no continuous stereo take, other owners/reference spaces and physical Quest unproven; open support fingers still visible."
+        },
+        {
+          "run": "20261021T023824584002Z",
+          "result": "observed_no_discharge_with_held_trigger_through_recovery",
+          "scope": "Trigger pressed only after confirmed fault12; mapped RT0 and unchanged native ammunition through fault and >1s recovered tracking. 39 records including neutral release.",
+          "limitation": "Positive firing rearm covered in a separate following run."
+        },
+        {
+          "run": "20261021T024003656861Z",
+          "result": "observed_back_slot_recovery_and_firing_rearm",
+          "scope": "Repeated held-trigger suppression/release, then three fresh trigger edges each discharged one round from PRIMARY_BACK with sampled trigger and retained support.",
+          "limitation": "One selected native slot/loadout, not every weapon. Earlier run20261021T023915446376Z failed support-acquisition precondition before fault/trigger dispatch; retained."
+        },
+        {
+          "run": "20261021T024113307573Z",
+          "result": "observed_hip_slot_tracking_and_recovery_with_checker_mismatch",
+          "scope": "28 fault/recovery samples retain support and active unsuspended camera; both loss/recovery eyes reviewed. Held-trigger no-discharge check passed; subsequent fresh trigger sampled and PRIMARY_HIP ammunition decreased by3 with support retained.",
+          "limitation": "Old firing checker expected PRIMARY_BACK and reported different_slot_discharged. Preserve that failed assertion; do not relabel it a checker pass. Expected-slot selection corrected for future runs. Weapon model identity beyond selected slot is not asserted."
+        },
+        {
+          "candidate": "ff0dd2c746a6",
+          "run": "20261021T040358781890Z",
+          "slot": "PRIMARY_HIP",
+          "result": "observed_scoped_tracking_continuity_safe_trigger_recovery_and_rearm",
+          "tracking_samples": 28,
+          "fault12_samples": 24,
+          "all_tracking_camera_active_unsuspended": true,
+          "all_tracking_support_attached": true,
+          "trigger_recovery": {
+            "status": "observed_no_discharge_through_recovery",
+            "samples": 38,
+            "positive_trigger_rearm": "observed_native_discharge"
+          },
+          "shots": [
+            {
+              "actual_slot": "PRIMARY_HIP",
+              "rounds": 2,
+              "status": "pass",
+              "trigger_sampled": true
+            },
+            {
+              "actual_slot": "PRIMARY_HIP",
+              "rounds": 2,
+              "status": "pass",
+              "trigger_sampled": true
+            },
+            {
+              "actual_slot": "PRIMARY_HIP",
+              "rounds": 2,
+              "status": "pass",
+              "trigger_sampled": true
+            }
+          ],
+          "visual_review": "Both eyes at late loss and recovery retain selected rifle; open support fingers remain visible.",
+          "limitation": "Scoped simulator static-grip fault; physical Quest, all weapon types, moving contact and other owners remain unproven."
+        },
+        {
+          "candidate": "ff0dd2c746a6",
+          "run": "20261021T040558709267Z",
+          "slot": "PRIMARY_BACK",
+          "result": "observed_scoped_tracking_continuity_safe_trigger_recovery_and_rearm",
+          "tracking_samples": 28,
+          "fault12_samples": 24,
+          "all_tracking_camera_active_unsuspended": true,
+          "all_tracking_support_attached": true,
+          "trigger_recovery": {
+            "status": "observed_no_discharge_through_recovery",
+            "samples": 37,
+            "positive_trigger_rearm": "observed_native_discharge"
+          },
+          "shots": [
+            {
+              "actual_slot": "PRIMARY_BACK",
+              "rounds": 1,
+              "status": "pass",
+              "trigger_sampled": true
+            },
+            {
+              "actual_slot": "PRIMARY_BACK",
+              "rounds": 1,
+              "status": "pass",
+              "trigger_sampled": true
+            },
+            {
+              "actual_slot": "PRIMARY_BACK",
+              "rounds": 1,
+              "status": "pass",
+              "trigger_sampled": true
+            }
+          ],
+          "visual_review": "Both eyes at late loss and recovery retain selected rifle; open support fingers remain visible.",
+          "limitation": "Scoped simulator static-grip fault; physical Quest, all weapon types, moving contact and other owners remain unproven."
+        },
+        {
+          "candidate": "ff0dd2c746a6",
+          "run": "20261021T082239334618Z",
+          "result": "support_retained_moving_recoil_but_open_finger_visual_failure",
+          "scope": "3 right-hand yaw sweeps and3 PRIMARY_BACK trigger edges,1 native round each, sampled support retained. Paired final eyes show open bionic support fingers.8 read-only comparisons match18 shared modular/body joints within1.73e-6 max element difference; gross stale modular palette hypothesis contradicted in this run.",
+          "dossier": "D:/Dev/Tools/Ghidrust/workspace/evidence/mgs5vr/rifle-support-fingers/",
+          "limitation": "Does not establish bolt-action or physical-headset acceptance."
+        }
+      ]
+    },
+    {
+      "id": "FP03",
+      "title": "Contextual Y actions force camera yaw: Fulton, vehicle entry and climbing",
+      "status": "reproduce",
+      "acceptance": [
+        "before/during/after extraction at multiple headings",
+        "native actor/engine camera/HMD yaw telemetry",
+        "seated/standing, movement and immediate recovery",
+        "Repeat Fulton, vehicle entry, table climb and sandbag climb from at least four starting headings; record native actor yaw, native camera yaw, VR view basis and physical HMD yaw before/during/after",
+        "Preserve authored actor alignment where required without rotating the physical VR viewing direction; test exit/cancel and seated/standing"
+      ],
+      "evidence": [
+        {
+          "run": "20261020T235935512463Z",
+          "scope": "CQC prerequisite attempt through native movement and one sampled VR trigger; normal field returned after1.343s",
+          "result": "no_incapacitation_no_fulton",
+          "limitation": "Actor life0; no native CQC_HOLD/CONTINUOUS; not extraction or yaw acceptance",
+          "harness_fix": "Observe nativeAction transition without dispatching another trigger in that state"
+        }
+      ],
+      "reports": [
+        "October 20: user reports several Y-bound actions turn the player toward the same direction; not limited to Fulton."
+      ]
+    },
+    {
+      "id": "FP04",
+      "title": "Tight corridor sticking and body size",
+      "status": "reproduce",
+      "acceptance": [
+        "same passage full body on/off",
+        "lean/recenter and native capsule position",
+        "stairs, rails, doorways, obstruction recovery",
+        "Native cover entry, along-wall movement, physical lean/peek and aim without unwanted viewpoint displacement; clean exit in seated and standing modes",
+        "Cover toggle off or immersive: no automatic aim-out translation in either setting; safe changes around entry/aim/exit",
+        "Inventory native cover eligibility and benefits across wall/corner, low cover, crouch/prone and occlusion; verify each applicable effect using physical VR position rather than a blanket BEHIND flag",
+        "Preserve ordinary native geometry/posture protection with assistance off; immersive recognition must not grant concealment or protection when physically exposed; any native stability modifier requires separate evidence"
+      ],
+      "evidence": [
+        {
+          "run": "20261020T233250494696Z",
+          "before_head": {
+            "position": [
+              0,
+              0.25,
+              0
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "aim_head": {
+            "position": [
+              0,
+              0.25,
+              0
+            ],
+            "orientation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "before_view": {
+            "position": [
+              1633.53,
+              324.314,
+              1029.45
+            ],
+            "orientation": [
+              0,
+              -0.765975,
+              0,
+              0.64287
+            ]
+          },
+          "aim_view": {
+            "position": [
+              1633.81,
+              324.321,
+              1028.57
+            ],
+            "orientation": [
+              0,
+              -0.766032,
+              0,
+              0.642802
+            ]
+          },
+          "view_shift_m": 0.9234982403882407,
+          "before_root": {
+            "position": [
+              1634.13,
+              323.274,
+              1029.35
+            ],
+            "orientation": [
+              0,
+              -0.807831,
+              0,
+              0.589414
+            ]
+          },
+          "aim_root": {
+            "position": [
+              1634.41,
+              323.281,
+              1028.47
+            ],
+            "orientation": [
+              0,
+              -0.15416,
+              0,
+              0.988046
+            ]
+          },
+          "finding": "Grip-ready initiates native cover aim-out: actual player/root translation drives the VR view, despite stationary HMD. Native BEHIND clears during aim and returns on release.",
+          "physical_headset_acceptance": false
+        },
+        {
+          "run": "20261020T234904979967Z",
+          "scope": "Seated native wall cover, raising rifle with centred stationary HMD; subsequent lean/up/return; both aim eyes inspected",
+          "result": "unwanted_native_aim_out_displacement",
+          "view_displacement_m": 0.9234982403882407,
+          "head_pose_unchanged": true,
+          "finding": "Same displacement as raised-head test: raising weapon alone produces approximately 0.924 m native-root/view movement; physical upward peek is not required",
+          "physical_headset_acceptance": false
+        }
+      ]
+    },
+    {
+      "id": "FP05",
+      "title": "Floating and transient size accumulation",
+      "status": "simulator_pass_headset_unproven",
+      "acceptance": [
+        "42 native-game simulator height/posture phases passed on c6f6bebd10bd",
+        "physical Quest confirmation required"
+      ]
+    },
+    {
+      "id": "FP06",
+      "title": "Transit helicopter body exclusion",
+      "status": "reproduce",
+      "acceptance": [
+        "native seated body, transit, boarding/disembarking"
+      ]
+    },
+    {
+      "id": "FP07",
+      "title": "Handheld iDroid natural palm-up usability",
+      "status": "verify",
+      "acceptance": [
+        "both-eye screen readability and native emitter alignment",
+        "forced stow, immediate reopen, driving and walking"
+      ],
+      "evidence": [
+        {
+          "run": "20261021T013713159974Z",
+          "scope": "Native Mission1 terminal retained across authored explanation; later Seq_Game_RescueMiller, menu true, camera suspended reason7, no rendered rig; user screenshot matches retained stale horseback map.",
+          "result": "reproduced half-state",
+          "candidate": "148d5ca51161",
+          "change": "Permit verified authored-camera/player handoff through retained unpaused field terminal; rebuild anchor only after fresh exact player join.",
+          "validation": "58 test groups and installer checks passed; live repeat pending"
+        },
+        {
+          "run": "20261021T021917348749Z",
+          "result": "regression_setup_only",
+          "scope": "Fresh native departure and horseback arrival in both eyes on candidate148d5ca51161; active unsuspended camera.",
+          "limitation": "Tutorial handoff and rifle-loss regressions not yet exercised in this resumed session."
+        },
+        {
+          "run": "20261021T021943336936Z",
+          "result": "observed_ordinary_tutorial_stow_reopen_only",
+          "scope": "Native iDroid lesson open, Back to binocular lesson, reopen after visible native allowance and second stow. Explanation later returned to active player camera; fresh paired return in20261021T023437357914Z.",
+          "limitation": "Original unclosed-terminal-across-timeout failure path not repeated. Intel action unproven; later progression cannot certify it."
+        },
+        {
+          "candidate": "ff0dd2c746a6",
+          "run": "20261021T034930898656Z",
+          "result": "observed_exact_retained_terminal_handoff_stow_reopen_pass",
+          "scope": "Native Phantom Limbs departure, lesson opened once and retained through authored timeout, explanation cinematic and same-player return. All1009 read-only camera samples active/unsuspended over539.6s. Ordinary Back, immediate Menu reopen and final Back all observed_pass. Same terminal ownership suspended/restored in native log.",
+          "witness": "artifacts/bot/runs/20261021T034930898656Z/exact-camera-watch.jsonl",
+          "videos": [
+            "artifacts/dev/field-report-review/scene-owner-fixed-timeout-left",
+            "artifacts/dev/field-report-review/scene-owner-fixed-return-left"
+          ],
+          "visual_review": "Both eyes reviewed during cinematic, retained-terminal return, reopened and stowed states. Chronological1fps analytical contact sheets of original continuous45s takes show native motion and both transitions; original videos retained.",
+          "limitations": [
+            "Scoped simulator evidence; physical Quest unproven.",
+            "Native lesson timeout is not completion of binocular/intel/marking tutorial actions.",
+            "Existing edge-on handset presentation and support-finger contact remain open.",
+            "Capture cadence~3fps does not establish headset performance or temporal stereo acceptance."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FP08",
+      "title": "Rocket-arm live view and left-arm steering",
+      "status": "reproduce",
+      "acceptance": [
+        "native flight, view continuity, steering and recovery"
+      ]
+    },
+    {
+      "id": "FP09",
+      "title": "Cabin paper/pen grip and prompt clipping",
+      "status": "reproduce",
+      "acceptance": [
+        "pinch/contact animation",
+        "writing plus pinning",
+        "readability throughout held poses"
+      ]
+    },
+    {
+      "id": "FP10",
+      "title": "Cabin gallery/workbench and cassette presentation",
+      "status": "reproduce",
+      "acceptance": [
+        "note editor open",
+        "front-slot printing and visible stacking",
+        "cassette geometry"
+      ]
+    },
+    {
+      "id": "FP11",
+      "title": "Mounted turret hand controls and ACC loadout holsters",
+      "status": "incomplete",
+      "acceptance": [
+        "native physical interaction implementation and live acceptance"
+      ]
+    },
+    {
+      "id": "FP12",
+      "title": "Remaining mission, menu, weapon and historical acceptance gaps",
+      "status": "inventory",
+      "acceptance": [
+        "reconcile community-issues.json, vr_regression_catalog.json and current evidence by exact build",
+        "systematic cross-mode coverage with explicit untested combinations"
+      ],
+      "evidence": [
+        {
+          "run": "20261021T021917348749Z",
+          "result": "regression_setup_only",
+          "scope": "Fresh native departure and horseback arrival in both eyes on candidate148d5ca51161; active unsuspended camera.",
+          "limitation": "Tutorial handoff and rifle-loss regressions not yet exercised in this resumed session."
+        },
+        {
+          "run": "20261021T021943336936Z",
+          "result": "native_intel_request_unproven",
+          "scope": "Physical binocular raise advanced to IntelRadioTutorial; candidate36864 appeared briefly, then65535 at the bounded X intel request. Authored explanation eventually began without a successful request proof.",
+          "limitation": "No production optics changes; investigate target lifetime/freshness before claiming a cause or a lesson pass."
+        },
+        {
+          "candidate": "ff0dd2c746a6",
+          "run": "20261021T034930898656Z",
+          "result": "observed_exact_retained_terminal_handoff_stow_reopen_pass",
+          "scope": "Native Phantom Limbs departure, lesson opened once and retained through authored timeout, explanation cinematic and same-player return. All1009 read-only camera samples active/unsuspended over539.6s. Ordinary Back, immediate Menu reopen and final Back all observed_pass. Same terminal ownership suspended/restored in native log.",
+          "witness": "artifacts/bot/runs/20261021T034930898656Z/exact-camera-watch.jsonl",
+          "videos": [
+            "artifacts/dev/field-report-review/scene-owner-fixed-timeout-left",
+            "artifacts/dev/field-report-review/scene-owner-fixed-return-left"
+          ],
+          "visual_review": "Both eyes reviewed during cinematic, retained-terminal return, reopened and stowed states. Chronological1fps analytical contact sheets of original continuous45s takes show native motion and both transitions; original videos retained.",
+          "limitations": [
+            "Scoped simulator evidence; physical Quest unproven.",
+            "Native lesson timeout is not completion of binocular/intel/marking tutorial actions.",
+            "Existing edge-on handset presentation and support-finger contact remain open.",
+            "Capture cadence~3fps does not establish headset performance or temporal stereo acceptance."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FP13",
+      "title": "ACC free-roam area-selection entry is absent",
+      "status": "reproduced_entry_absence_cause_unresolved",
+      "evidence": [
+        {
+          "run": "20261020T221309748784Z",
+          "scope": "ACC40050 Missions page: mission list and Return to Mother Base visible, area-selection entry absent",
+          "prior_investigation": "docs/HELICOPTER_IDLE_REPORT.md"
+        },
+        {
+          "run": "20261020T222055724136Z",
+          "scope": "source-derived native ReleaseFreePlay diagnostic",
+          "result": "MSN_LOCATION visibility false before and after; story33 and availableGMP4663940 unchanged"
+        }
+      ],
+      "acceptance": [
+        "native area-selection entry and destination choice visibly usable through VR",
+        "normal departure and arrival in unrestricted free roam",
+        "preserve mission list and Mother Base routing"
+      ]
+    },
+    {
+      "id": "FP14",
+      "title": "Sortie character preview has no visible head",
+      "status": "reproduced_visual_failure_cause_unresolved",
+      "evidence": [
+        {
+          "run": "20261020T223141980039Z",
+          "scope": "native sortie preparation and drop-time preview show headless character"
+        }
+      ],
+      "acceptance": [
+        "native character preview has complete head and body",
+        "ordinary first-person head exclusion remains correct",
+        "both-eye preview and return-to-game inspection"
+      ]
+    },
+    {
+      "id": "FP15",
+      "title": "Mortar viewpoint is inside emplacement instead of behind it",
+      "status": "reproduce",
+      "report": "User can fire but cannot see aiming or impacts; viewpoint appears inside mortar.",
+      "acceptance": [
+        "Native mortar entry from multiple headings; verify eye position relative to authored operator seat and barrel in both eyes",
+        "Physical aim, visible trajectory/target feedback, firing and exit remain usable",
+        "Seated/standing and return to ordinary on-foot view; no arbitrary camera offset accepted without native operator-frame evidence"
+      ]
+    },
+    {
+      "id": "FP16",
+      "title": "Small low rocks cause slipping, falling and brief locomotion stops",
+      "status": "reproduce",
+      "report": "User reports running over certain relatively flat rocks causes slips/falls and brief stops. Exact sites not yet identified.",
+      "acceptance": [
+        "Record exact native location and repeat same rock both directions walking/running, seated/standing and full-body on/off",
+        "Correlate native floor, actor position/velocity, posture/travel state and VR eye height through interruption",
+        "Preserve native collision and valid fall behavior; distinguish real actor stumble from VR presentation jump"
+      ]
+    },
+    {
+      "id": "FP17",
+      "title": "Right wrist steers shoulders and opposite arm; apparent arm shortening in physical VR",
+      "status": "reproduce",
+      "report": "Both hands vertical/parallel moderately extended; moving only right hand pulls left hand backward, rotating right wrist moves shoulders oppositely while view stays fixed. User distinguishes physical VR from Snakebot.",
+      "acceptance": [
+        "Hold HMD and left controller fixed; independently sweep right wrist yaw and right-hand forward translation with both hands vertical and parallel",
+        "Record tracked grips, anatomical wrists, shoulders, torso heading and camera pose together; inspect both eyes during motion",
+        "Repeat bare hands, one-handed and supported weapon, full-body on/off, seated/standing; compare arm reach against measured native chain and calibration",
+        "Physical Quest Link verification required; simulator evidence alone cannot close user report"
+      ],
+      "investigation": [
+        "src/controller_rig.cpp uses primary aim for trackedTorsoHeading when both presentation hands are forward; no explicit supported-weapon requirement at that call. Plausible coupling source, not yet reproduced in current field."
+      ]
+    }
+  ],
+  "active_work": {
+    "candidate": "73fe7d0b521d",
+    "targets": [
+      "tutorial camera handoff freeze",
+      "held-rifle right tracking loss"
+    ],
+    "retained_runs": [
+      "20261021T020956565498Z",
+      "20261021T021029190440Z",
+      "20261021T021349078893Z",
+      "20261021T021533458086Z",
+      "20261021T021917348749Z",
+      "20261021T021943336936Z",
+      "20261021T023437357914Z",
+      "20261021T023517962986Z",
+      "20261021T023544588585Z",
+      "20261021T023824584002Z",
+      "20261021T023915446376Z",
+      "20261021T024003656861Z",
+      "20261021T024113307573Z",
+      "20261021T024550736759Z",
+      "20261021T024657159924Z",
+      "20261021T025633799429Z",
+      "20261021T025751994289Z",
+      "20261021T030853626912Z",
+      "20261021T032054920826Z",
+      "20261021T034658797156Z",
+      "20261021T034930898656Z",
+      "20261021T040358781890Z",
+      "20261021T040558709267Z"
+    ],
+    "continuation_run": "20261021T131651898999Z",
+    "checkpoint": "Candidate73fe7d0b521d actual-game verification ongoing. Native terminal open passed, generic cleanup refused unknown menu before closing input. Retained terminal timeout entered explanation with active unsuspended camera. Await native RescueMiller return, ordinary stow, dismount, moving/reload visual check and right-wrist isolation. Full bug-list goal active.",
+    "acceptance": "Scoped simulator passes; no physical Quest, full tutorial, whole mission or universal weapon acceptance.",
+    "harness_failures": [
+      "Absent controls.menu_y predicate",
+      "Unsupported array-element dotted predicate",
+      "Commence incorrectly expected SelectDetail before ASAP; actual native sequence remained SelectItem"
+    ],
+    "preserved": "Published play unchanged; no save/progression edits, Pause, Steam restart or desktop automation.",
+    "tutorial_reopen_video": {
+      "path": "artifacts/dev/field-report-review/tutorial-reopen-resumed-left/capture.json",
+      "duration_seconds": 30.187,
+      "frames": 75,
+      "measured_capture_fps": 2.4845,
+      "error": null,
+      "review": "Start/middle/end show live map/world; sparse left-eye observation only, not continuous stereo acceptance."
+    },
+    "tutorial_exact_reproduction_pending": false,
+    "session": "Owned game72840 live, no active input runner; bounded read-only witness82127. Native authored explanation. Steam retained; Meta lease restoration due on cleanup.",
+    "next_actions": [
+      "Resume unresolved FP02 moving support/contact and precision-weapon recoil/bolt-action checks; open fingers remain a visual failure.",
+      "Continue FP07 native left-hand handset/contact/projector alignment; exact timeout lifecycle subcase now passes.",
+      "Audit effective bindings and reproduce FP03 forced Y-action rotation at bounded native actions.",
+      "Physical wired Quest Link validation still required; retain exact candidate and headset results separately."
+    ],
+    "harness_changes": {
+      "file": "tools/gameplay_bot/weapon_probe.py",
+      "purpose": "Confirm loss before trigger dispatch, sample mapped attack and native ammunition through recovery, release, and optionally check native firing rearm. Wait boundedly for acquired support; derive expected slot from selected card.",
+      "tests": "310 existing gameplay-bot tests and 4 recovery-evidence tests pass; Python compilation passes. No production binary rebuilt or changed."
+    },
+    "cleanup_receipt": "artifacts/dev/field-report-review/scene-owner-final-cleanup-before-stop.json",
+    "last_native_checkpoint": {
+      "mission": 10020,
+      "sequence": "Seq_Game_RescueMiller",
+      "on_horse": false,
+      "menu": false,
+      "pause": false,
+      "idroid": false,
+      "saving": false
+    },
+    "build_slots": {
+      "published_pin": "b627c7cacc9a",
+      "development": "ff0dd2c746a6",
+      "installed": "development",
+      "pin_matches_play": true,
+      "physical_runtime": "Explicit Meta Quest Link in both local Play commands"
+    },
+    "exact_attempt_failure": {
+      "run": "20261021T024657159924Z",
+      "result": "game_exited_before_dispatch",
+      "original_defect_repeated": false,
+      "log": "game-before-clean-exit.log",
+      "note": "Do not infer crash cause or camera freeze from native ExitProcess code0."
+    },
+    "research_dossier": "D:/Dev/Tools/Ghidrust/workspace/evidence/mgs5vr/idroid-post-tutorial-close",
+    "runtime_note": "Per-game Meta preference and -MetaLink launch checks pass. Windows global runtime was observed as Virtual Desktop at final cleanup; direct restoration to mandated Meta default was denied by Windows registry permissions. Global value remains Virtual Desktop. No SteamVR switch occurred.",
+    "overall_goal_status": "active_all_unresolved_field_fixes"
+  }
+}

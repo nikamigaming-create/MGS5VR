@@ -197,6 +197,24 @@ struct RigInputSample {
     GamepadSample gamepad;bool weaponReady{};
     bool rightWheelGrip{},vehicleWeaponIntent{};
 };
+struct WeaponTrackingDecision { bool retainReady{},allowAttack{}; };
+// Retain only an already published held weapon in the same owner/reference
+// space. Tracking recovery never turns an uninterrupted trigger hold into fire.
+class WeaponTrackingContinuity {
+public:
+    WeaponTrackingDecision update(bool eligible,bool held,bool tracked,bool publishedReady,
+                                  bool triggerHeld,uint64_t owner,uint64_t reference){
+        const bool same=eligible&&eligible_&&owner&&owner==owner_&&reference==reference_;
+        const bool retain=same&&held&&!tracked&&publishedReady;
+        if(!eligible||!same||!tracked)attackRelease_=true;
+        if(eligible&&tracked&&!triggerHeld)attackRelease_=false;
+        eligible_=eligible;owner_=owner;reference_=reference;
+        return {retain,!eligible||(tracked&&!attackRelease_)};
+    }
+private:
+    uint64_t owner_{},reference_{};
+    bool eligible_{},attackRelease_{true};
+};
 // Mounted vehicle triggers retain the game's accelerator/brake meanings.
 // A travel-mode transition consumes held controls until they are released.
 class RigInput {

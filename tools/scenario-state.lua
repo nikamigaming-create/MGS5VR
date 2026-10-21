@@ -13,12 +13,34 @@ local function field(name, fn)
 end
 field('mission', function() return vars.missionCode end)
 field('location', function() return vars.locationCode end)
+field('hospital_volgin_ride', function()
+    if vars.missionCode ~= 10010 or vars.locationCode ~= 30 then return nil end
+    return mvars.doesPlayerVolginRide == true
+end)
 field('sequence', function() return TppSequence.GetCurrentSequenceName() end)
+field('title_shown', function() return mvars.titleShown end)
+field('title_started', function() return mvars.titleStarted end)
+field('look_lesson_succeeded', function() return mvars.stickCheckSucceeded end)
+field('look_lesson_right_x', function() return PlayerVars.rightStickX end)
+field('look_lesson_right_y', function() return PlayerVars.rightStickY end)
+field('player_pad_direct', function() return PlayerVars.scannedButtonsDirect end)
+field('player_pad_fire', function() return bit.band(PlayerVars.scannedButtonsDirect, PlayerPad.FIRE) ~= 0 end)
+field('player_pad_hold', function() return bit.band(PlayerVars.scannedButtonsDirect, PlayerPad.HOLD) ~= 0 end)
+field('player_pad_action', function() return bit.band(PlayerVars.scannedButtonsDirect, PlayerPad.ACTION) ~= 0 end)
+field('player_pad_reload', function() return bit.band(PlayerVars.scannedButtonsDirect, PlayerPad.RELOAD) ~= 0 end)
+field('mission_clear_state', function() return TppMission.GetMissionClearState() end)
+field('mission_clear_type', function() return TppMission.GetMissionClearType() end)
+field('next_mission_on_clear', function() return TppMission.GetNextMissionCodeForMissionClear() end)
+field('result_block_loaded', function() return TppUiCommand.IsResultBlockLoaded() end)
+field('video_stopped', function() return TppVideoPlayer.IsVideoStopped() end)
 -- ACC weapon, helicopter and vehicle selectors share WeaponCustomize sequence
 -- names. Preserve the authored target separately; nil is unknown, never a
 -- default helicopter target. This read does not change native menu ownership.
 field('customization_target', function() return mvars.startCustomizeTarget end)
 field('helicopter_space', function() return TppMission.IsHelicopterSpace(vars.missionCode) end)
+-- The displayed episode is not the native registry index. Observe the actual
+-- pending sortie code selected by retail before assigning mission evidence.
+field('sortie_mission_code', function() return mvars.heliSequence_nextMissionCode end)
 field('customization_kind', function()
     if TppSequence.GetCurrentSequenceName() ~= 'Seq_Game_WeaponCustomize' then return nil end
     local target = mvars.startCustomizeTarget
@@ -51,7 +73,54 @@ field('player_camera_pitch', function() return vars.playerCameraRotation[0] end)
 field('demo', function() return DemoDaemon.IsDemoPlaying() end)
 field('demo_nonplayable', function() return TppDemo.IsNotPlayable() end)
 field('checkpoint', function() return gvars.mis_checkPoint end)
+field('hospital_gun_route_unlocked', function()
+    if vars.missionCode == 10010 and vars.locationCode == 30 then
+        return mvars.extinguisherFinished == true
+    end
+end)
+field('hospital_volgin_fatal_attack', function()
+    if vars.missionCode == 10010 and vars.locationCode == 30 then
+        return mvars.killedByVolgin == true
+    end
+end)
 field('mission6_event_sequence', function() if vars.missionCode == 10040 then return svars.eventSequenceNum end end)
+field('mission18_adult_target_clear', function()
+    if vars.missionCode == 10100 then return svars.isTargetClear end
+end)
+field('mission18_children_rescued', function()
+    if vars.missionCode == 10100 then return svars.isBoyHostagesCount_clear end
+end)
+local function mission18Recovered(name)
+    if vars.missionCode ~= 10100 then return nil end
+    local recovered = svars[name]
+    assert(type(recovered) == 'boolean', 'Native child recovery flag unavailable')
+    return recovered
+end
+field('mission18_child_0_recovered', function() return mission18Recovered('isCollect_Injury') end)
+field('mission18_child_1_recovered', function() return mission18Recovered('isCollect_YellowHood') end)
+field('mission18_child_2_recovered', function() return mission18Recovered('isCollect_Aflo') end)
+field('mission18_child_3_recovered', function() return mission18Recovered('isCollect_ShortAflo') end)
+field('mission18_child_4_recovered', function() return mission18Recovered('isCollect_BlackCoat') end)
+local mission18InjuredChild
+field('mission18_injured_child_id', function()
+    if vars.missionCode ~= 10100 then return nil end
+    local id = GameObject.GetGameObjectId('TppHostageUnique', 'hos_diamond_0000')
+    assert(id ~= GameObject.NULL_ID
+        and GameObject.GetTypeIndex(id) == TppGameObject.GAME_OBJECT_TYPE_HOSTAGE_UNIQUE,
+        'Exact native injured child is unavailable')
+    mission18InjuredChild = id
+    return id
+end)
+field('mission18_injured_child_carried', function()
+    if vars.missionCode ~= 10100 then return nil end
+    assert(mission18InjuredChild and type(TppGameObject.NPC_STATE_CARRIED) == 'number',
+        'Native injured-child carry observation unavailable')
+    -- GetStatus is shared by the owned hostage carry caller and was observed
+    -- on this exact TppHostageUnique before the pickup experiment.
+    local status = GameObject.SendCommand(mission18InjuredChild, {id = 'GetStatus'})
+    assert(type(status) == 'number', 'Native injured-child status unavailable')
+    return status == TppGameObject.NPC_STATE_CARRIED
+end)
 field('mission6_bridge_demo', function()
     if vars.missionCode == 10040 then return DemoDaemon.IsPlayingDemoId('p31_020020_000') end
 end)
@@ -89,7 +158,7 @@ field('mission_prepared', function() return TppSequence.IsMissionPrepareFinished
 -- (80/81/83) in this supported executable; no guessed injury getter is used.
 -- CQC_HOLD/CONTINUOUS are registered native values 87/88. Neither alone
 -- identifies the held actor; actor identity needs a separate joined read.
-for _, name in ipairs({'CARRY', 'CRAWL', 'NORMAL_ACTION', 'PARTS_ACTIVE', 'SQUAT', 'STAND',
+for _, name in ipairs({'CARRY', 'CRAWL', 'NORMAL_ACTION', 'PARTS_ACTIVE', 'SQUAT', 'STAND', 'BEHIND',
                        'INJURY_LOWER', 'INJURY_UPPER', 'CURE', 'GUN_FIRE', 'GUN_FIRE_SUPPRESSOR',
                        'CQC_HOLD', 'CQC_CONTINUOUS', 'INTRUDE', 'SUBJECT', 'ON_VEHICLE', 'ON_HORSE'}) do
     field('status_' .. name, function()

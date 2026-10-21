@@ -107,3 +107,13 @@ a Play-Dev launch selected SteamVR. Windows' 64-bit OpenXR ActiveRuntime is
 now Meta Quest Link, and both local Play commands explicitly pass `-MetaLink`
 to the shared headset launcher. Preserve this choice through development and
 simulator cleanup. Do not switch the physical session back to SteamVR.
+
+User direction, 21 October 2026:
+
+Use this checkout on main as the only local development branch. Consolidate
+outstanding work onto main; do not create feature branches or worktrees.
+Progress means reported gameplay defects fixed, not harness changes, test counts,
+or evidence collection. Supporting checks remain necessary but are not delivery.
+Work through docs/FIELD_FIXES.md without stopping after a narrow subcase. Keep
+known failures explicit; do not claim 100 percent working from incomplete coverage.
+Close leftover test sessions and do not leave background harnesses running.

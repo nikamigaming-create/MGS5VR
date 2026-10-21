@@ -9,6 +9,7 @@
 #include "mgs5vr/ui_clip.hpp"
 #include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/render_size.hpp"
+#include "mgs5vr/cabin_studio_store.hpp"
 #include <MinHook.h>
 #include <atomic>
 #include <stdexcept>
@@ -63,11 +64,12 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
                 // no new complete pair. Poll only this owner context.
                 destination->poll(context.Get());
                 pumpOpticNativeLightingProbe(context.Get());
+                pollStudioPhoto(context.Get());
                 const auto eye=observeRenderPresent(swap);
                  // Keep the complete stereo family in the mailbox between native
                 // scene completions. A mono fallback would replace its array and
                 // force the XR consumer to rebuild both eye swapchains.
-                const bool published=headCamera().active()
+                const bool published=headCamera().active()&&!nativeAvatarEditActive()
                     ? publishSceneEyes(swap,context.Get(),*destination)
                     : destination->publish(source.Get(),context.Get(),eye);
                 if(published)++copied;

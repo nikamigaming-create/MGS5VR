@@ -19,6 +19,7 @@ from gameplay_bot.menus import navigate as navigate_menu, observe as observe_men
 from gameplay_bot.optic_exposure import require_independent_luminance
 from operator_recovery_tests import RecoveryTests, LiveRecoveryIntegrationTests
 from gameplay_motion_tests import MotionTests
+from gameplay_bot_commands_tests import CommandsSelectionTests
 
 
 class NativeRecordingLedgerTests(unittest.TestCase):
@@ -710,6 +711,21 @@ class TrackingLossFixtureTests(unittest.TestCase):
         live.input = mock.Mock()
         return live
 
+    def test_held_controller_loss_requires_static_grip_validator(self):
+        for allowed in (False, True):
+            live = self.make_live()
+            live.held = {('right', 'Grip', None): 1}
+            live.bindings = {}
+            with mock.patch('gameplay_bot.live.static_grip_capture_allowed', return_value=allowed) as check:
+                step = {'op':'tracking_loss', 'mask':4, 'milliseconds':500, 'static_grips':True}
+                if allowed:
+                    live.execute(step)
+                    live.native.read.assert_called_once()
+                else:
+                    with self.assertRaises(BotFault): live.execute(step)
+                    live.native.read.assert_not_called()
+                check.assert_called_once_with(live.held, live.observe.return_value, live.bindings)
+
     def test_valid_bounds_arm_only_the_explicit_native_fixture(self):
         for mask, milliseconds in ((0, 100), (1, 8000), (4, 500), (15, 100)):
             for state in ({"scene": "gameplay"}, {"scene": "cabin"},
@@ -840,6 +856,27 @@ class MenuNavigationTests(unittest.TestCase):
                                 'native_before':{**guard,'sequence':'Seq_Game_MainGame'}},
                           clock=clock,sleep=clock.sleep)
         live.input.assert_not_called()
+
+    def test_hospital_profile_navigation_retains_native_owner_and_rejects_other_scenes(self):
+        live, clock, active = self.fixture()
+        original = live.observe.side_effect
+        guard = {'mission':10010, 'sequence':'Seq_Game_FewDaysLater2',
+                 'story':0, 'popup':False, 'saving':False}
+        def state(native=False):
+            value = original(native)
+            value.update(scene='menu',menu=True,idroid=False,pause=False,title=False,
+                         loading=False,demo=True,gamepad=False,native=dict(guard))
+            return value
+        live.observe.side_effect = state
+        navigate_menu(live, {'owner':'hospital_profile','direction':'down','native_before':guard},
+                      clock=clock,sleep=clock.sleep)
+        self.assertEqual(active, [])
+        live.input.reset_mock()
+        for changed in ({'mission':10020}, {'sequence':'Seq_Game_FewDaysLater1'}, {'popup':True}):
+            with self.subTest(changed=changed), self.assertRaisesRegex(BotFault, 'exact native hospital'):
+                navigate_menu(live, {'owner':'hospital_profile','direction':'down',
+                                    'native_before':{**guard,**changed}},clock=clock,sleep=clock.sleep)
+            live.input.assert_not_called()
 
     def test_idroid_cursor_edge_releases_before_native_list_repeat(self):
         live, clock, active = self.fixture()
@@ -1520,6 +1557,29 @@ class BotTests(unittest.TestCase):
     def behavior(self, adapter):
         return Behaviors(adapter, self.events, self.clock, self.clock.sleep)
 
+    def test_authored_loading_fade_keeps_original_deadline_without_replaying_input(self):
+        pending = {"demo": True, "camera_active": False, "menu": False, "pause": False,
+                   "idroid": False, "loading": False, "gamepad": False,
+                   "native": {"demo": True, "demo_nonplayable": True, "game_over": 0, "popup": False},
+                   "controls": {"native_buttons": 0, "age_ms": 5, "physical": [0]*11,
+                                "sticks": [0]*4, "native_axes": [0]*4, "native_triggers": [0]*2}}
+        predicate = {"demo": True, "native.demo": True, "camera_active": True}
+        ready = copy.deepcopy(pending); ready["camera_active"] = True
+        adapter = Adapter([pending]*24 + [ready]*2)
+        adapter.capture = mock.Mock(side_effect=BlankCompositorFrame("retained authored fade", pending))
+        result = self.behavior(adapter).wait_for(predicate, 4., "arrival")
+        self.assertTrue(result["camera_active"])
+        self.assertEqual(adapter.actions, 0)
+        self.assertEqual(adapter.capture.call_count, 1)
+        from gameplay_bot.core import neutral_authored_scene_transition
+        for path, value in (("menu", True), ("native.demo_nonplayable", False), ("controls.native_buttons", 4096)):
+            broken = copy.deepcopy(pending)
+            target = broken
+            parts = path.split('.')
+            for key in parts[:-1]: target = target[key]
+            target[parts[-1]] = value
+            self.assertFalse(neutral_authored_scene_transition(predicate, broken))
+
     def test_acc_helicopter_back_cannot_dispatch_on_field_idroid_weapon_or_unknown_target(self):
         path=pathlib.Path(__file__).resolve().parents[1]/'tools/gameplay_bot/suites/acc-helicopter-customization-back.json'
         case=json.loads(path.read_text())['cases'][0]
@@ -1882,6 +1942,17 @@ class BotTests(unittest.TestCase):
         self.assertTrue(static_grip_capture_allowed(held,state,bindings))
         changed=copy.deepcopy(state);changed['rendered']['weapon_support_attached']=False
         self.assertFalse(static_grip_capture_allowed(held,changed,bindings))
+        changed.update(tracking_fault_mask=12,head_tracking_fault_mask=0,loading=False,gamepad=False)
+        changed['rendered']['native_firearm']=True
+        changed['controls'].update(travel_mode=1,native_axes=[0,0,0,0],native_triggers=[0,0])
+        self.assertTrue(static_grip_capture_allowed(held,changed,bindings))
+        for key,value in [('tracking_fault_mask',0),('head_tracking_fault_mask',1),
+                          ('idroid',True),('loading',True),('gamepad',True)]:
+            invalid=copy.deepcopy(changed);invalid[key]=value
+            self.assertFalse(static_grip_capture_allowed(held,invalid,bindings))
+        for key,value in [('native_triggers',[0,255]),('native_axes',[1,0,0,0]),('travel_mode',4)]:
+            invalid=copy.deepcopy(changed);invalid['controls'][key]=value
+            self.assertFalse(static_grip_capture_allowed(held,invalid,bindings))
         changed=copy.deepcopy(state);changed['idroid']=True
         self.assertFalse(static_grip_capture_allowed(held,changed,bindings))
         changed=copy.deepcopy(state);changed['controls']['native_buttons']=0x1000
@@ -2637,6 +2708,48 @@ class BotTests(unittest.TestCase):
             live.capture("failed-release")
         live.call.assert_not_called()
 
+    def test_known_busy_release_retries_only_neutral_input(self):
+        live = Live.__new__(Live)
+        live.events = self.events
+        clock = Clock()
+        calls = []
+        def call(method, value):
+            calls.append((method, value))
+            if len(calls) < 3:
+                raise RuntimeError("Error: Another input gesture is already in progress for this session.")
+        live.call = call
+        with mock.patch("gameplay_bot.live.time.monotonic", clock), mock.patch("gameplay_bot.live.time.sleep", clock.sleep):
+            live._release_channel(channel("left_stick_left"))
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all(name == 'set_controller_input' and value['value'] == 0
+                            and value['auto_release'] is False for name, value in calls))
+        self.assertAlmostEqual(clock.now, .05)
+
+    def test_busy_release_is_bounded_and_keeps_failed_channel(self):
+        live = Live.__new__(Live)
+        live.events = self.events
+        live.held = {('left', 'Thumbstick', 'X'): channel('left_stick_left')}
+        clock = Clock()
+        def call(method, value):
+            if value.get('sub_component') == 'X':
+                raise RuntimeError("Error: Another input gesture is already in progress for this session.")
+        live.call = call
+        with mock.patch("gameplay_bot.live.time.monotonic", clock), mock.patch("gameplay_bot.live.time.sleep", clock.sleep):
+            with self.assertRaisesRegex(BotFault, 'Input release failed'):
+                live.release()
+        self.assertAlmostEqual(clock.now, 1.)  # Both stick-X channels are explicitly rejected.
+        self.assertTrue(live.held)
+        self.assertFalse(live._released_once)
+
+    def test_unknown_release_completion_or_other_rejection_is_never_replayed(self):
+        for error in (TimeoutError('completion unknown'), RuntimeError('different input error')):
+            live = Live.__new__(Live)
+            live.events = self.events
+            live.call = mock.Mock(side_effect=error)
+            with self.assertRaises(type(error)):
+                live._release_channel(channel('y'))
+            self.assertEqual(live.call.call_count, 1)
+
     def test_ambiguous_operator_timeout_does_not_queue_more_work(self):
         live = Live.__new__(Live)
         live.kernel = mock.Mock()
@@ -3253,6 +3366,64 @@ class SessionTests(unittest.TestCase):
 
 class MenuCleanupTests(unittest.TestCase):
     @staticmethod
+    def cinematic_state():
+        return {'scene':'cinematic','demo':True,'title':False,'loading':False,'menu':False,
+            'idroid':False,'pause':False,'gamepad':False,'camera_active':True,'camera_suspended':False,
+            'camera_awaiting_player':False,'camera_native_menu':False,'now_ms':1000,'activation':7,
+            'rendered':{'sample_ms':990,'activation':7,'presentation_focused':True},
+            'controls':{'context':'menus','rig_input':False,'sample_ms':990,'age_ms':10,
+                'native_packet_source':'xr_runtime_final_mapped_packet','native_buttons':0,
+                'physical':[0]*11,'sticks':[0]*4,'native_axes':[0]*4,'native_triggers':[0]*2},
+            'native':{'mission':10020,'sequence':'Seq_Demo_ArrivalInAfghanistan','demo':True,
+                'demo_nonplayable':True,'title':False,'popup':False,'tutorial_pause':False,
+                'saving':False,'game_over':0}}
+
+    def test_owned_pause_can_return_to_three_fresh_neutral_native_cinematic_samples(self):
+        live=self.fixture(0);live.opened_menu='pause'
+        state=self.cinematic_state();live.observe.side_effect=None;live.observe.return_value=state
+        clock=Clock()
+        with mock.patch('gameplay_bot.live.time.monotonic',clock), \
+                mock.patch('gameplay_bot.live.time.sleep',clock.sleep):
+            live._finish_menu_cleanup(state)
+        self.assertIsNone(live.opened_menu)
+        self.assertEqual(live.observe.call_count,2)
+        live.events.emit.assert_called_with('test_menu_cleanup',status='closed',camera_restored=True,
+                                           return_owner='cinematic')
+        live.execute.assert_not_called()
+
+    def test_cinematic_cleanup_refuses_stale_unknown_and_held_owners_without_input(self):
+        import copy
+        invalid=[('controls.age_ms',251),('controls.native_buttons',8),('controls.physical',[1]+[0]*10),
+            ('controls.sticks',[0,1,0,0]),('controls.native_axes',[0,0,1,0]),
+            ('controls.native_triggers',[0,255]),('controls.rig_input',True),
+            ('controls.context','gameplay'),('native.sequence','Seq_Game_RescueMiller'),
+            ('native.demo',False),('native.demo_nonplayable',False),('native.popup',True),
+            ('native.tutorial_pause',True),('native.game_over',4),('rendered.sample_ms',800),
+            ('rendered.activation',8),('rendered.presentation_focused',False),('loading',True),
+            ('pause',True),('menu',True),('idroid',True),('camera_awaiting_player',True),('gamepad',True)]
+        for path,value in invalid:
+            with self.subTest(path=path):
+                state=copy.deepcopy(self.cinematic_state());target=state;parts=path.split('.')
+                for key in parts[:-1]:target=target[key]
+                target[parts[-1]]=value
+                live=self.fixture(0);live.opened_menu='pause'
+                live.observe.side_effect=None;live.observe.return_value=state;clock=Clock()
+                with mock.patch('gameplay_bot.live.time.monotonic',clock), \
+                        mock.patch('gameplay_bot.live.time.sleep',clock.sleep), \
+                        self.assertRaisesRegex(BotFault,'without restoring the live VR camera'):
+                    live._finish_menu_cleanup(state)
+                self.assertEqual(live.opened_menu,'pause');live.execute.assert_not_called()
+
+    def test_cinematic_return_does_not_bypass_idroid_stow_ownership(self):
+        live=self.fixture(0);state=self.cinematic_state()
+        live.observe.side_effect=None;live.observe.return_value=state;clock=Clock()
+        with mock.patch('gameplay_bot.live.time.monotonic',clock), \
+                mock.patch('gameplay_bot.live.time.sleep',clock.sleep), \
+                self.assertRaisesRegex(BotFault,'without restoring the live VR camera'):
+            live._finish_menu_cleanup(state)
+        self.assertEqual(live.opened_menu,'idroid');live.execute.assert_not_called()
+
+    @staticmethod
     def fixture(depth, popup=False):
         live = Live.__new__(Live)
         live.opened_menu = "idroid"
@@ -3394,6 +3565,7 @@ class StartupTests(unittest.TestCase):
 
     def test_information_next_pages_finish_before_title_without_idle_timeout(self):
         information=self.information_close()
+        information['native']['mission']=10010
         menu=self.stage('Seq_Demo_StartHasTitleMission',menu=True)
         live=mock.Mock();clock=Clock();pages=[]
         live.observe.side_effect=lambda **_: information if len(pages)<3 else menu
@@ -3401,6 +3573,7 @@ class StartupTests(unittest.TestCase):
         self.assertIs(advance_startup(live,clock=clock,sleep=clock.sleep),menu)
         self.assertEqual(len(pages),3)
         self.assertTrue(all(p['state_before']['terms_menu.mode']==2 for p in pages))
+        self.assertTrue(all(p['native_before']['mission']==10010 for p in pages))
         self.assertGreaterEqual(clock.now,2.)
 
     def test_information_confirmation_stops_after_eight_pages_on_stuck_screen(self):
@@ -3450,6 +3623,20 @@ class StartupTests(unittest.TestCase):
         self.assertEqual(live.execute.call_args_list[-1].args[0]["state_before"],
                          {"title_menu": False, "press_start_ready": True})
         self.assertLess(clock.now, 1.)
+
+    def test_hospital_show_title_uses_start_without_cabin_start_hook(self):
+        title = {**self.stage('Seq_Demo_StartHasTitleMission'),
+            'title':True, 'press_start_ready':False, 'opening_cinematic':False,
+            'gamepad':False, 'controls':{'context':'menus'}}
+        title['native'].update(mission=10010,location=30,story=0,
+            title_shown=True,title_started=True,demo=False,saving=False)
+        menu = {**title,'title_menu':True}
+        live = Adapter([title,title,menu]);live.events=mock.Mock();live.execute=mock.Mock()
+        clock = Clock()
+        self.assertIs(advance_startup(live,clock=clock,sleep=clock.sleep),menu)
+        live.execute.assert_called_once()
+        self.assertEqual(live.execute.call_args.args[0]['name'],'system.idroid')
+        self.assertEqual(live.execute.call_args.args[0]['native_before']['title_shown'],True)
 
     def test_login_progress_and_results_complete_without_bot_confirmation(self):
         login = {"scene": "cinematic", "title_menu": False,

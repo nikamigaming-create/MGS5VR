@@ -29,6 +29,7 @@ sealed class FieldTerminal : Form {
         string requestedPage=Option(args,"--page");
         startPage=new[]{"home","tapes","modes","controls","settings","notes","tour"}.Contains(requestedPage)?requestedPage:"home";
         Text="MGS5VR / Field Terminal"; ClientSize=new Size(1440,940); MinimumSize=new Size(1000,700);
+        Icon=System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         StartPosition=FormStartPosition.CenterScreen; BackColor=Color.FromArgb(239,235,224);
         if(smoke!=null){Opacity=0;ShowInTaskbar=false;}
         web.Dock=DockStyle.Fill; Controls.Add(web); Shown+=async(s,e)=>await Initialize();

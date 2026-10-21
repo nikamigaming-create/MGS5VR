@@ -47,12 +47,14 @@ def _validate_xr_scene_state(state, *, activation=None):
         raise BotFault("Camera generation changed during locomotion")
 
 
-def _validate_xr_field_state(state, *, activation=None):
+def _validate_xr_field_state(state, *, activation=None, witnessed_hospital_stand=False,
+                             observing_native_action=False):
     _validate_xr_scene_state(state, activation=activation)
     controls = authoritative_controls(state)
     if controls.get("context") != "gameplay" or controls.get("rig_input") is not True:
         raise BotFault("Native XR controls are not in the live gameplay rig")
-    if type(controls.get("travel_mode")) is not int or controls["travel_mode"] != 1:
+    if (type(controls.get("travel_mode")) is not int
+            or controls['travel_mode'] not in ((1,4) if witnessed_hospital_stand or observing_native_action else (1,))):
         raise BotFault("The observed native travel mode is not on foot")
 
     now_ms = state.get("now_ms")
@@ -68,17 +70,42 @@ def _validate_xr_field_state(state, *, activation=None):
     return controls, now_ms
 
 
-def _validate_field_state(state, anchor=None, *, witnessed_carry=False):
-    controls, now_ms = _validate_xr_field_state(state)
-
+def _validate_field_state(state, anchor=None, *, witnessed_carry=False, witnessed_hospital_rail=False,
+                          witnessed_smoke_corridor=False, witnessed_hospital_route=False):
     native = state.get("native")
     if not isinstance(native, dict):
         raise BotFault("Native mission identity is unavailable")
     mission, location, sequence = native.get("mission"), native.get("location"), native.get("sequence")
+    if (mission==10010 and location==30 and sequence=='Seq_Game_VolginInEntrance'
+            and native.get('hospital_volgin_fatal_attack') is True):
+        raise BotFault('Native Volgin fatal attack completed; checkpoint recovery is required')
+    hospital_stand = (witnessed_hospital_route is True and mission==10010 and location==30
+                      and native.get('story')==0 and sequence in (
+                          'Seq_Game_Stairway','Seq_Game_AfterCorridor')
+                      and native.get('status_STAND') is True and native.get('status_PARTS_ACTIVE') is True
+                      and native.get('status_NORMAL_ACTION') is False
+                      and native.get('status_CARRY') is False
+                      and native.get('status_INTRUDE') is False and native.get('status_SUBJECT') is False
+                      and native.get('player_vehicle_id')==65535)
+    controls, now_ms = _validate_xr_field_state(state,witnessed_hospital_stand=hospital_stand)
+    # The Move tutorial permits crawl input while NORMAL_ACTION stays false.
+    # A separately witnessed active retail rail also moves Snake from crawling
+    # to crouching/standing. Keep both exceptions bound to the campaign owner.
+    hospital_crawl = (mission == 10010 and location == 30 and native.get('story') == 0
+                      and isinstance(sequence,str) and sequence.startswith('Seq_Game_')
+                      and (sequence in ('Seq_Game_EscapeFromAwakeRoom', 'Seq_Game_AfterHeliDemo')
+                           or witnessed_hospital_rail is True or witnessed_hospital_route is True
+                           or (witnessed_smoke_corridor is True and sequence in (
+                               'Seq_Game_EnterSmokeRoom','Seq_Game_EscapeFromSmokeRoom')))
+                      and (native.get('status_CRAWL') is True or
+                           ((witnessed_hospital_rail is True or witnessed_hospital_route is True) and any(
+                               native.get('status_'+posture) is True for posture in ('SQUAT','STAND'))))
+                      and native.get('status_PARTS_ACTIVE') is True)
     if (type(mission) is not int or mission <= 0 or type(location) is not int
             or not isinstance(sequence, str) or not sequence.startswith("Seq_Game_")
             or native.get("title") is not False
             or not (native.get("status_NORMAL_ACTION") is True
+                    or hospital_crawl
                     or (witnessed_carry is True and native.get("status_CARRY") is True))
             or native.get("saving") is not False or native.get("popup") is not False
             or type(native.get("game_over")) is not int or native["game_over"] != 0
@@ -93,6 +120,61 @@ def _validate_field_state(state, anchor=None, *, witnessed_carry=False):
         if current != before:
             raise BotFault("Mission, location, sequence, or camera generation changed during locomotion")
     return controls, now_ms
+
+
+def crawl_hospital(live, seconds=2., direction='forward', *, witnessed_smoke_corridor=False,
+                   witnessed_under_bed=False,
+                   clock=time.monotonic, sleep=time.sleep):
+    """Play one witnessed hospital crawl hold through the effective XR axis."""
+    if not finite_number(seconds) or not .25 <= seconds <= 3.:
+        raise BotFault('Hospital crawl hold requires 0.25..3 seconds')
+    if direction not in ('forward', 'forward_left', 'forward_right'):
+        raise BotFault('Hospital crawl requires a forward direction')
+    live.release()
+    before=live.observe(native=True)
+    controls,_=_validate_field_state(before,witnessed_smoke_corridor=witnessed_smoke_corridor)
+    native=before['native']
+    escape=(native['sequence'] in ('Seq_Game_EscapeFromAwakeRoom','Seq_Game_AfterHeliDemo')
+            and native.get('status_CRAWL') is True)
+    smoke=(witnessed_smoke_corridor is True and native['sequence'] in (
+               'Seq_Game_EnterSmokeRoom','Seq_Game_EscapeFromSmokeRoom')
+           and native.get('status_CRAWL') is True)
+    under_bed=(witnessed_under_bed is True and native['sequence']=='Seq_Game_UnderBed'
+               and native.get('status_CRAWL') is True)
+    if (native['mission']!=10010 or native['location']!=30 or native.get('story')!=0
+            or not (escape or smoke or under_bed) or native.get('status_PARTS_ACTIVE') is not True):
+        raise BotFault('Hospital crawl requires the witnessed room escape owner')
+    _neutral_audit(controls)
+    source=_axis_source(live.bindings,'axes.move')
+    hand='left' if source=='left_stick' else 'right'
+    channels=[{'hand':hand,'component':'Thumbstick','sub_component':'Y',
+               'value':.8 if direction=='forward' else .6}]
+    if direction!='forward':
+        channels.append({'hand':hand,'component':'Thumbstick',
+                         'sub_component':'X','value':-.6 if direction=='forward_left' else .6})
+    held_started=clock()
+    try:
+        live.input(channels,seconds,lease_seconds=seconds+.5)
+        held_started=clock()
+        deadline=held_started+seconds
+        while clock()<deadline:
+            current=live.observe(native=True)
+            owner=current.get('native',{})
+            if (any(current.get(k) for k in ('demo','loading','menu','pause','title'))
+                    or current.get('camera_suspended') is True
+                    or any(owner.get(k)!=native.get(k) for k in ('mission','location','sequence','story'))):
+                break
+            _validate_field_state(current,witnessed_smoke_corridor=witnessed_smoke_corridor)
+            sleep(min(.05,max(0.,deadline-clock())))
+    finally:
+        held_seconds=clock()-held_started
+        live.release()
+    after=live.observe(native=True)
+    result={'before':before,'after':after,'input':channels,'seconds':seconds,'held_seconds':held_seconds,
+            'native_displacement':_distance(_position(before),_position(after)),
+            'input_scope':'effective_physical_xr_move_axis','prologue_complete':False}
+    live.events.emit('hospital_crawl_hold',**result)
+    return result
 
 
 def _neutral_audit(controls):
@@ -209,6 +291,12 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
     phase_floor_ms = controls["sample_ms"]
     identity = (native["mission"], native["location"], native["sequence"], admission.get("activation"))
     anchor = {"identity": identity}
+    # The hospital's forced crawl animation can finish its lurch after neutral
+    # input. It exceeded the field probe's 900 ms settling window in the real
+    # game; retain the same absolute segment deadline and displacement bound.
+    settle_window = (3.0 if identity[:3] == (10010,30,'Seq_Game_EscapeFromAwakeRoom')
+                     and native.get('status_NORMAL_ACTION') is False
+                     else min(.9, max_seconds * .25))
     live.events.emit("locomotion_started", input={"axis": "axes.move", "source": source,
                       "hand": hand, "direction": "stick_" + direction, "cruise_value": cruise_magnitude,
                       "brake_value": brake_magnitude},
@@ -378,7 +466,7 @@ def move_local(live, *, target_distance=.25, max_displacement=.75, max_seconds=5
 
             # Inertia is measured with neutral controls. No new input is allowed
             # while position reads are delayed or the previous pulse is moving.
-            settle_deadline = min(deadline, clock() + min(.9, max_seconds * .25))
+            settle_deadline = min(deadline, clock() + settle_window)
             stable_samples = 0
             previous = position
             settle_stable = False

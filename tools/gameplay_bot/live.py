@@ -154,6 +154,20 @@ def rotate(q, v):
     return [a+w*t[0]+y*t[2]-z*t[1], b+w*t[1]+z*t[0]-x*t[2], c+w*t[2]+x*t[1]-y*t[0]]
 
 
+def scripted_horse_fire_owner(state, native_before):
+    """Own a longer diagnostic grip/trigger hold only in the retail chase."""
+    required = {'mission':10010, 'location':30, 'story':0,
+                'sequence':'Seq_Game_VolginRide', 'game_over':0, 'popup':False,
+                'hospital_volgin_ride':True, 'weapon_PRIMARY_HIP':70}
+    if not isinstance(native_before, dict) or not matches(native_before, required):
+        return False
+    return (matches(state.get('native', {}), required)
+            and state.get('scene') == 'gameplay' and state.get('camera_active') is True
+            and all(state.get(k) is False for k in ('menu','pause','idroid','gamepad'))
+            and state.get('controls', {}).get('context') == 'gameplay'
+            and state.get('controls', {}).get('rig_input') is True)
+
+
 def channel(token):
     if token.endswith("_touch") or token in ("left_thumbrest", "right_thumbrest"):
         raise BotFault("The installed simulator operator cannot synthesize capacitive touch inputs: " + token)
@@ -354,6 +368,45 @@ def reviewed_action_packet(state, action, held_token=None):
     return True
 
 
+def released_cinematic_pause_return(state, opened_menu):
+    """Recognize a closed test Pause returning to a fresh, neutral native movie.
+
+    This is menu cleanup ownership, never pixel or gameplay acceptance.
+    iDroid stow still requires its ordinary live player/rig owner.
+    """
+    if (opened_menu != 'pause' or state.get('scene') != 'cinematic'
+            or state.get('demo') is not True
+            or any(state.get(k) is not False for k in ('title', 'loading', 'menu', 'idroid', 'pause',
+                'gamepad', 'camera_suspended', 'camera_awaiting_player', 'camera_native_menu'))
+            or state.get('camera_active') is not True):
+        return False
+    native, frame = state.get('native') or {}, state.get('rendered') or {}
+    now, sampled, activation = state.get('now_ms'), frame.get('sample_ms'), state.get('activation')
+    if (type(native.get('mission')) is not int or native['mission'] <= 0
+            or not isinstance(native.get('sequence'), str) or not native['sequence'].startswith('Seq_Demo_')
+            or native.get('demo') is not True or native.get('demo_nonplayable') is not True
+            or any(native.get(k) is not False for k in ('title', 'popup', 'tutorial_pause', 'saving'))
+            or type(native.get('game_over')) is not int or native['game_over'] != 0
+            or frame.get('presentation_focused') is not True
+            or type(now) is not int or type(sampled) is not int or not 0 <= now-sampled <= 150
+            or type(activation) is not int or activation <= 0 or frame.get('activation') != activation):
+        return False
+    try:
+        controls = authoritative_controls(state)
+    except BotFault:
+        return False
+    if (controls.get('context') != 'menus' or controls.get('rig_input') is not False
+            or controls.get('native_packet_source') != 'xr_runtime_final_mapped_packet'
+            or type(controls.get('native_buttons')) is not int or controls['native_buttons'] != 0):
+        return False
+    for key, count in (('physical', 11), ('sticks', 4), ('native_axes', 4), ('native_triggers', 2)):
+        values = controls.get(key)
+        if (not isinstance(values, list) or len(values) != count
+                or any(not finite_number(v) or abs(v) > .001 for v in values)):
+            return False
+    return True
+
+
 def released_startup_observation(state, held):
     """Admit a longer observation at the reproduced, released title splash."""
     if (held or state.get("scene") != "title" or state.get("title") is not True
@@ -381,12 +434,41 @@ def released_startup_observation(state, held):
 
 
 def static_grip_capture_allowed(held, state, bindings):
-    """Permit a sampled stationary weapon or binocular support inspection.
+    """Permit sampled input consumed by an inspection or mapping owner.
 
     Grips must resolve only to the established weapon-ready/support modifiers
     in the effective layout. The actual XR sample must contain no face button,
-    trigger or stick input. Input still expires independently of capture RPCs.
+    trigger or stick input. The mapping editor instead owns all controls and
+    must deliver a neutral native packet. Input expires independently of RPCs.
     """
+    editor=state.get('rendered',{}).get('controls_editor') or {}
+    if held and editor.get('visible') is True and editor.get('owns_input') is True:
+        try:controls=authoritative_controls(state)
+        except BotFault:return False
+        # The mapping panel consumes every sampled input. Held inspection is
+        # allowed only while no native button, stick or trigger is delivered;
+        # capture rechecks this owner separately before each compositor eye.
+        if (state.get('camera_active') is True and state.get('loading') is False
+                and state.get('gamepad') is False and controls.get('native_buttons')==0
+                and controls.get('native_axes')==[0,0,0,0] and controls.get('native_triggers')==[0,0]
+                and editor.get('live_inputs',0) and controls.get('age_ms',1000)<150):
+            return True
+    studio=state.get('rendered',{}).get('studio') or {}
+    if held and studio.get('available') and state.get('camera_active') is True and state.get('menu') is False \
+            and state.get('loading') is False and state.get('gamepad') is False:
+        try:controls=authoritative_controls(state)
+        except BotFault:return False
+        mask=studio.get('input_mask',0);owned=set()
+        for side,hand in enumerate(('left','right')):
+            if mask&(1<<side):owned.add(hand)
+        if owned and all(v.get('hand') in owned and v.get('component')=='Grip' and not v.get('sub_component')
+                and finite_number(v.get('value')) and 0<v['value']<=1 for v in held.values()):
+            physical=controls['physical'];sticks=controls['sticks']
+            if (all(abs(v)<=.01 for i,v in enumerate(physical[:11]) if i not in (7,8))
+                    and all(abs(v)<=.01 for v in sticks) and controls.get('native_buttons')==0
+                    and controls.get('native_triggers')==[0,0]
+                    and held_input_evidence(state,[v['hand']+'_grip' for v in held.values()])):
+                return True
     if state.get('controls',{}).get('context')=='binoculars':
         from .binocular_presentation import static_support_capture_allowed
         return static_support_capture_allowed(held,state,bindings)
@@ -419,6 +501,18 @@ def static_grip_capture_allowed(held, state, bindings):
     support_without_terminal=(state.get('menu') is False and state.get('idroid') is False
             and tokens=={'left_grip','right_grip'}
             and state.get('rendered',{}).get('weapon_support_attached') is True)
+    # A bounded controller-loss fixture must be able to show detached support.
+    # Require a neutral native packet and no terminal instead of requiring the
+    # attachment whose disappearance is being investigated.
+    faulted_support=(state.get('menu') is False and state.get('idroid') is False
+            and state.get('loading') is False and state.get('gamepad') is False
+            and tokens=={'left_grip','right_grip'}
+            and state.get('tracking_fault_mask') in (4,8,12)
+            and state.get('head_tracking_fault_mask') == 0
+            and state.get('rendered',{}).get('native_firearm') is True
+            and controls.get('travel_mode') == 1
+            and controls.get('native_axes') == [0,0,0,0]
+            and controls.get('native_triggers') == [0,0])
     if handheld_free:
         if (tokens!={'right_grip'} and not support_borrowed) or controls.get('native_triggers')!=[255,0]:
             return False
@@ -446,7 +540,7 @@ def static_grip_capture_allowed(held, state, bindings):
                 # from a gun. The sampled native support owner explicitly
                 # stows that terminal, so this one inactive focus mapping
                 # does not make a stationary support capture a menu action.
-                if ((support_borrowed or support_without_terminal)
+                if ((support_borrowed or support_without_terminal or faulted_support)
                         and action.get('name') == 'system.idroid_focus'
                         and action.get('modifier') is True and binding.get('gesture') == 'level'):
                     continue
@@ -742,7 +836,8 @@ class Live:
         if state.get("title") is True or state.get("title_cabin") is True:
             state.update(self.startup_evidence.read())
         controls = state.get("controls") or {}
-        native_presentation = state.get("camera_active") is False and controls.get("context") == "nativeButtons"
+        native_presentation = state.get("camera_active") is False and all(
+            state.get(key) is False for key in ("loading", "title", "menu", "demo"))
         if (native or native_presentation) and not fast_only:
             if released_startup_observation(state, getattr(self, "held", {})):
                 state["native"], state["lua_transport"] = self.native.read_startup_observation(self.lua_script)
@@ -752,6 +847,13 @@ class Live:
             else:
                 state["native"], state["lua_transport"] = self.native.read(self.lua_script)
             state["scene"] = scene(state)
+        editor=state.get("controls_editor")
+        if isinstance(editor,dict) and editor.get("visible"):
+            # VR off has no native first-person publication. The editor still
+            # has its own current spatial surface; expose that diagnostic to
+            # UI inspections without inventing a skin, head or hand sample.
+            state["rendered"]=state.get("rendered") or {}
+            state["rendered"]["controls_editor"]=editor
         self.events.emit("observation", state=state)
         self.latest_state = state
         observer = getattr(self, 'state_observer', None)
@@ -933,7 +1035,7 @@ class Live:
             if key in keep or (required is not None and key not in required):
                 continue
             try:
-                self.call("set_controller_input", {**value, "value": 0, "auto_release": False})
+                self._release_channel(value)
                 self.held.pop((value["hand"], value["component"], value.get("sub_component")), None)
                 released_count += 1
             except Exception as error:
@@ -963,6 +1065,27 @@ class Live:
             self._released_once = False
             raise BotFault("Input release failed: " + errors[0])
         self._released_once = True
+
+    def _release_channel(self, value):
+        # v207.1 can explicitly reject a neutral write while the previous
+        # independently expiring gesture finishes. That is a known rejection,
+        # not an ambiguous completion. Retry only this idempotent zero; never
+        # replay a nonzero action or a timed-out/otherwise failed request.
+        arguments = {**value, "value": 0, "auto_release": False}
+        deadline = time.monotonic() + .5
+        attempts = 0
+        while True:
+            try:
+                self.call("set_controller_input", arguments)
+                return
+            except RuntimeError as error:
+                if (str(error) != "Error: Another input gesture is already in progress for this session."
+                        or time.monotonic() >= deadline):
+                    raise
+                attempts += 1
+                self.events.emit('release_gesture_busy', channel=arguments, attempt=attempts,
+                                 action_replayed=False)
+                time.sleep(min(.025, max(0., deadline-time.monotonic())))
 
     def equipment_select(self, step):
         """Use the real wrist picker, with one independently expiring modifier."""
@@ -999,6 +1122,8 @@ class Live:
                 if sample and sample["sampled_context"] == context:
                     first = sample["sample_ms"] if first is None else first
                     if sample["sample_ms"] - first >= math.ceil(seconds * 1000):
+                        self.events.emit('equipment_input_checkpoint',tokens=tokens,state=current,
+                                         first_sample_ms=first,last_sample_ms=sample['sample_ms'])
                         return current
                 else:
                     first = None
@@ -1020,6 +1145,9 @@ class Live:
         return self.observe()
 
     def execute(self, step):
+        if step.get('op') == 'commands_select':
+            from .commands import select
+            return select(self, step)
         if step.get('op') == 'menu_focus_sequence':
             from .menus import focus_sequence
             return focus_sequence(self, step)
@@ -1079,6 +1207,51 @@ class Live:
             self.release()
 
     def _execute(self, step):
+        if step.get('op') == 'await_state':
+            from .core import Behaviors
+            seconds,predicate=step.get('seconds',8.),step.get('state')
+            if (self.held or type(seconds) not in (int,float) or not math.isfinite(seconds)
+                    or not 0<seconds<=60 or not isinstance(predicate,dict) or not predicate):
+                raise BotFault('Phase wait requires released input, explicit state and a bounded deadline')
+            return Behaviors(self,self.events).wait_for(predicate,seconds,'explicit-phase-wait',stable=2)
+        if step.get('op') == 'advance_startup':
+            from .startup import advance_startup
+            seconds=step.get('seconds',60.)
+            if type(seconds) not in (int,float) or not math.isfinite(seconds) or not 0<seconds<=90:
+                raise BotFault('Startup observation requires a bounded 0..90 second window')
+            return advance_startup(self,timeout=seconds)
+        if step.get('op') == 'observe_interval':
+            from .interval import observe_interval
+            return observe_interval(self, step)
+        if step.get('op') == 'hospital_follow':
+            from .hospital import follow_rail
+            return follow_rail(self,step.get('seconds',30.))
+        if step.get('op') == 'hospital_follow_ishmael':
+            from .hospital import follow_rail
+            return follow_rail(self,step.get('seconds',30.),ishmael=True,waypoints=step.get('waypoints'),
+                               sequence=step.get('sequence','Seq_Game_EnterSmokeRoom'),
+                               stop_at_last_waypoint=step.get('stop_at_last_waypoint',False))
+        if step.get('op') == 'hospital_navigate_event':
+            from .hospital import follow_rail
+            return follow_rail(self,step.get('seconds',45.),ishmael=True,
+                               sequence=step['sequence'],event_manifest=step['manifest'],event=step['event'])
+        if step.get('op') == 'hospital_stick_probe':
+            from .hospital import probe_stick
+            return probe_stick(self,step['axis'],step['value'],step.get('seconds',.6))
+        if step.get('op') == 'hospital_shoot_extinguisher':
+            from .hospital import shoot_extinguisher
+            return shoot_extinguisher(self)
+        if step.get('op') == 'hospital_horse_chase':
+            from .hospital import horse_chase
+            return horse_chase(self,step.get('seconds',90.))
+        if step.get('op') == 'hospital_corridor_cue':
+            from .hospital import corridor_cue
+            return corridor_cue(self,step['sequence'],step.get('seconds',.6))
+        if step.get('op') == 'hospital_crawl':
+            from .locomotion import crawl_hospital
+            return crawl_hospital(self,step.get('seconds',2.),step.get('direction','forward'),
+                                  witnessed_smoke_corridor=step.get('witnessed_smoke_corridor',False),
+                                  witnessed_under_bed=step.get('witnessed_under_bed',False))
         if step.get('op') == 'action' and 'wheel_sweep_degrees' in step:
             from .vehicle_wheel import sweep
             return sweep(self, step)
@@ -1095,9 +1268,13 @@ class Live:
             head_loss = step["op"] == "head_tracking_loss"
             mask, milliseconds = step.get("mask"), step.get("milliseconds")
             if (type(mask) is not int or not 0 <= mask <= (3 if head_loss else 15)
-                    or type(milliseconds) is not int or not 100 <= milliseconds <= 8000 or self.held):
-                raise BotFault("Tracking-loss fixture requires released input and a bounded valid mask")
+                    or type(milliseconds) is not int or not 100 <= milliseconds <= 8000
+                    or (self.held and (head_loss or step.get('static_grips') is not True))):
+                raise BotFault("Tracking-loss fixture requires released input or verified static grips and a bounded valid mask")
             state = self.observe()
+            if self.held and (head_loss or step.get('static_grips') is not True
+                              or not static_grip_capture_allowed(self.held,state,self.bindings)):
+                raise BotFault("Tracking-loss fixture requires released input or explicitly verified static grips")
             playable = state.get("scene") in ("gameplay", "cabin") or (
                 state.get("idroid") and not any(state.get(k) for k in ("pause", "title", "loading", "demo")))
             if (not playable or not state.get("camera_active")
@@ -1175,6 +1352,10 @@ class Live:
         binding = action["bindings"][0]
         ready_binding = None
         vehicle_fire = name == 'vehicle.fire'
+        horse_fire = step.get('scripted_horse_burst') is True
+        if horse_fire and (name != 'gameplay.fire_or_cqc' or step.get('include_ready') is not True
+                           or not scripted_horse_fire_owner(state, step.get('native_before'))):
+            raise BotFault('Long scripted fire requires the exact native horse chase and physical ready binding')
         vehicle_owner = None
         wheel_pair = step.get('include_left_wheel') is True
         wheel_owner = wheel_root = None
@@ -1242,7 +1423,9 @@ class Live:
             # the effective personal hold threshold; never retry implicitly.
             default_duration = min(.30, threshold * .6)
         duration = float(step.get("seconds", default_duration))
-        if ready_binding and not .03 <= duration <= .35:
+        if horse_fire and not .03 <= duration <= 2.:
+            raise BotFault('Scripted horse ready/fire requires a bounded 0.03..2 second hold')
+        if ready_binding and not horse_fire and not .03 <= duration <= .35:
             raise BotFault("Ready/fire inspection requires a bounded 0.03..0.35 second burst")
         if wheel_pair and not .03 <= duration <= 2.5:
             raise BotFault('Two-hand wheel inspection requires a bounded 0.03..2.5 second hold')
@@ -1333,13 +1516,14 @@ class Live:
                     if time.monotonic() >= ready_deadline:
                         raise BotFault("Native weapon readiness was not sampled before trigger dispatch")
                     time.sleep(.025)
-            if name in ("system.pause", "system.idroid") and state.get("menu") is False:
+            if (name in ("system.pause", "system.idroid") and state.get("menu") is False
+                    and state.get("scene") != "title"):
                 # Record ownership before dispatch so an interrupted opening
                 # still has cleanup. Never close a user's pre-existing menu.
                 self.opened_menu = "idroid" if name == "system.idroid" else "pause"
             lease_seconds = min(5., duration + 2.) if sampled_hold or during else duration
             if ready_binding:
-                lease_seconds = min(.6, duration + .2)
+                lease_seconds = min(2.85, duration + .8) if horse_fire else min(.6, duration + .2)
             if wheel_pair:
                 # input() adds a 150 ms modifier tail; actual backend timers
                 # therefore remain <= 3 s even if this runner stops responding.
@@ -1355,7 +1539,9 @@ class Live:
             if ready_binding or wheel_pair:
                 deadline = dispatched + lease_seconds
             while True:
-                held_state = self.observe(native=native_during or vehicle_fire or wheel_pair)
+                held_state = self.observe(native=native_during or vehicle_fire or wheel_pair or horse_fire)
+                if horse_fire and not scripted_horse_fire_owner(held_state, step['native_before']):
+                    raise BotFault('Scripted chase owner changed during the bounded trigger hold')
                 if wheel_pair and vehicle_wheel_test_owner(held_state, step['native_before'],
                         root=wheel_root, grips=True) != wheel_owner:
                     raise BotFault('Two-hand wheel owner, stationary root, or neutral pedals changed during grip lease')
@@ -1483,10 +1669,12 @@ class Live:
                         and state.get("camera_awaiting_player") is False
                         and isinstance(controls, dict) and controls.get("rig_input") is True
                         and isinstance(native, dict) and native.get("popup") is False)
-            stable = stable + 1 if playable else 0
+            cinematic = released_cinematic_pause_return(state, self.opened_menu)
+            stable = stable + 1 if playable or cinematic else 0
             if stable >= 3:
                 self.opened_menu = None
-                self.events.emit("test_menu_cleanup", status="closed", camera_restored=True)
+                self.events.emit("test_menu_cleanup", status="closed", camera_restored=True,
+                                 return_owner="cinematic" if cinematic else "player")
                 return
             if time.monotonic() >= deadline:
                 raise BotFault("Test menu closed without restoring the live VR camera; session cleanup required")

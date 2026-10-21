@@ -10,7 +10,7 @@ def neutral_startup_transition(state):
     native, controls = state.get("native", {}), state.get("controls", {})
     if not isinstance(native, dict) or not isinstance(controls, dict):
         return False
-    boot_notice = (type(native.get('mission')) is int and native['mission'] == 1
+    boot_notice = (type(native.get('mission')) is int and native['mission'] in (1, 10010)
                    and native.get('sequence') in ('Seq_Demo_ConfirmAutoSave',
                        'Seq_Demo_CreateOrLoadSaveData', 'Seq_Demo_LogInKonamiServer')
                    and native.get('title') is False and state.get('title') is False
@@ -89,6 +89,7 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
     information_steps = 0
     information_next_at = 0.
     previous = None
+    phase_started = clock()
     while True:
         state = live.observe(native=True)
         native = state.get("native", {})
@@ -96,6 +97,7 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
         if phase != previous:
             live.events.emit("startup_stage", state=state)
             previous = phase
+            phase_started = clock()
         if state["scene"] in ("loading", "gameplay", "cabin"):
             return state
         if state["scene"] == "title" and state.get("title_menu") is True:
@@ -116,9 +118,38 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
             action = ("logged-in-notice", {"mission": 1, "sequence": "Seq_Demo_LogInKonamiServer",
                                           "title": False, "popup": True})
         elif online_information_close(state):
-            action = ("online-information-close", {"mission": 1,
+            action = ("online-information-close", {"mission": native["mission"],
                 "sequence": "Seq_Demo_LogInKonamiServer", "title": False,
                 "popup": False, "saving": False})
+        elif (native.get('mission') == 10010 and native.get('location') == 30
+              and native.get('story') == 0
+              and native.get('sequence') == 'Seq_Demo_StartHasTitleMission'
+              and native.get('title') is True and native.get('title_shown') is True
+              and native.get('title_started') is True and native.get('demo') is False
+              and native.get('popup') is False and native.get('saving') is False
+              and state.get('title') is True and state.get('title_menu') is False
+              and state.get('opening_cinematic') is False and state.get('gamepad') is False
+              and state.get('controls', {}).get('context') == 'menus'):
+            # Retained 120928: this native ShowTitle owner consumes START,
+            # although the ordinary cabin's press_start_ready hook is false.
+            action = ('hospital-press-start', {'mission':10010,'location':30,
+                'story':0,'sequence':'Seq_Demo_StartHasTitleMission','title':True,
+                'title_shown':True,'title_started':True,'demo':False,
+                'popup':False,'saving':False})
+        elif (native.get('mission') == 10010 and native.get('location') == 30
+              and native.get('story') == 0
+              and native.get('sequence') == 'Seq_Demo_StartHasTitleMission'
+              and native.get('title') is True and native.get('popup') is False
+              and native.get('saving') is False and state.get('title') is True
+              and state.get('title_menu') is False and state.get('press_start_ready') is not True
+              and state.get('gamepad') is False
+              and clock()-phase_started >= 2.
+              and state.get('controls', {}).get('context') == 'menus'):
+            # The saved hospital title has an A disclosure before its native
+            # Continue menu; it never publishes the ordinary cabin START gate.
+            action = ('hospital-title-disclosure', {'mission':10010,'location':30,
+                'story':0,'sequence':'Seq_Demo_StartHasTitleMission',
+                'title':True,'popup':False,'saving':False})
         elif (state["scene"] == "title" and not state.get("title_menu")
               and state.get("press_start_ready") is True
               and native.get("sequence") == "Seq_Demo_StartHasTitleMission"
@@ -140,10 +171,14 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
             # notice consumes A. In normal VR controls the configured iDroid
             # tap supplies START on release; A can be consumed without opening
             # the title menu, leaving the cockpit idle until the deadline.
-            step = {"op": "action", "name": "system.idroid" if label == "press-start" else "menus.confirm",
+            step = {"op": "action", "name": "system.idroid" if label in ("press-start", "hospital-press-start") else "menus.confirm",
                     "native_before": guard}
             if label == "press-start":
                 step["state_before"] = {"title_menu": False, "press_start_ready": True}
+            elif label == "hospital-press-start":
+                step["seconds"] = .15
+                step["state_before"] = {"title":True,"title_menu":False,
+                    "opening_cinematic":False,"gamepad":False,"controls.context":"menus"}
             else:
                 # The retained cold-start run sampled controls 156 ms apart;
                 # a 120 ms A pulse expired unseen. These recognized notices
@@ -213,7 +248,8 @@ def online_information_close(state):
     terms = state.get('terms_menu') or {}
     now, sample, owner = state.get('now_ms'), terms.get('sample_ms'), terms.get('owner')
     return (matches(state, ONLINE_INFORMATION_CLOSE)
-            and matches(native, {'mission': 1, 'sequence': 'Seq_Demo_LogInKonamiServer',
+            and type(native.get('mission')) is int and native['mission'] in (1, 10010)
+            and matches(native, {'sequence': 'Seq_Demo_LogInKonamiServer',
                                  'title': False, 'popup': False, 'saving': False})
             and type(owner) is int and owner > 0
             and type(now) is int and type(sample) is int and 0 <= now-sample <= 250)

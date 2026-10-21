@@ -1,4 +1,4 @@
-return function(godSource, interruptionSource)
+return function(godSource, interruptionSource, openSource)
     local checks = 0
     local function check(value, reason) assert(value, reason); checks = checks + 1 end
     local function run(source, env)
@@ -22,6 +22,12 @@ return function(godSource, interruptionSource)
     check(run(godSource, env) == 'disabled', 'Title cannot acquire protection')
     env.gvars.ini_isTitleMode = false; env.vars.missionCode = 10010
     check(run(godSource, env) == 'disabled', 'Hospital authored damage remains retail')
+    env.vars.locationCode = 30; env.mvars = {doesPlayerVolginRide = true}
+    local sequence = 'Seq_Game_VolginRide'
+    env.TppSequence = {GetCurrentSequenceName = function() return sequence end}
+    check(run(godSource, env) == 'enabled' and owners.MGS5VR_GodMode, 'Requested God mode protects the native horse escape')
+    sequence = 'Seq_Game_GunTutorial'
+    check(run(godSource, env) == 'disabled' and not owners.MGS5VR_GodMode, 'Returning to a hospital lesson releases only the mod owner')
     local open, stops, failure = true, 0, false
     local interruption = {type = type,
         TppMission = {IsGameOver = function() return failure end},
@@ -33,5 +39,44 @@ return function(godSource, interruptionSource)
     check(run(interruptionSource, interruption) == 'closed' and stops == 1, 'Repeated failure pump does not reopen or repeat Stop')
     interruption.TppMission.IsGameOver = nil
     check(run(interruptionSource, interruption) == 'unchanged' and stops == 1, 'Missing state cannot invent a mission failure')
+    local function opening(changes)
+        local state = {posture = 'horse', sequence = 'Seq_Game_IDroidTutorial', mission = 10020,
+            open = false, popup = false, saving = false, title = false, demo = false,
+            prepared = true, helicopter = false, starts = 0}
+        for key, value in pairs(changes or {}) do state[key] = value end
+        local openingEnv = {type = type, vars = {missionCode = state.mission},
+            gvars = {ini_isTitleMode = state.title},
+            PlayerStatus = {NORMAL_ACTION = 'normal', ON_VEHICLE = 'vehicle', ON_HORSE = 'horse'},
+            PlayerInfo = {AndCheckStatus = function(status) return status[1] == state.posture end},
+            TppSave = {IsSaving = function() return state.saving end},
+            DemoDaemon = {IsDemoPlaying = function() return state.demo end},
+            TppMission = {IsHelicopterSpace = function(code)
+                check(code == state.mission, 'Availability uses the actual mission'); return state.helicopter end},
+            TppSequence = {IsMissionPrepareFinished = function() return state.prepared end,
+                GetCurrentSequenceName = function() return state.sequence end},
+            TppUiCommand = {IsMbDvcTerminalOpened = function() return state.open end,
+                IsShowPopup = function() return state.popup end,
+                StartMbDvcTerminal = function() state.starts = state.starts + 1; state.open = true end}}
+        if state.unregisteredHorse then openingEnv.PlayerStatus.ON_HORSE = nil end
+        if state.missingStart then openingEnv.TppUiCommand.StartMbDvcTerminal = nil end
+        local expectedSequence = state.sequence
+        local result = run(openSource, openingEnv)
+        check(openingEnv.vars.missionCode == state.mission and state.sequence == expectedSequence,
+            'Opening cannot advance mission or tutorial state')
+        return result, state
+    end
+    for _, posture in ipairs{'normal', 'vehicle', 'horse'} do
+        local result, state = opening{posture = posture}
+        check(result == 'opened' and state.open and state.starts == 1,
+            'Normal, vehicle and native horse states admit the owned handset request')
+    end
+    for _, changes in ipairs{{posture = 'other'}, {popup = true}, {saving = true}, {title = true},
+            {demo = true}, {prepared = false}, {helicopter = true}, {mission = 10010},
+            {sequence = 'Seq_Demo_ArrivalInAfghanistan'}, {unregisteredHorse = true},
+            {missingStart = true}, {open = true}} do
+        local result, state = opening(changes)
+        check(result == 'owner changed' and state.starts == 0,
+            'Unavailable or changed native owner never starts the handset')
+    end
     return 'Native mod policy contracts passed: ' .. checks
 end

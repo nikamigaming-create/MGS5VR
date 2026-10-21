@@ -1,0 +1,3162 @@
+{
+  "schema": 1,
+  "updated_utc": "2026-10-15T00:45:21.804930+00:00",
+  "scope": "Every released TPP story mission and difficulty variant; separate contextual inventory covers free roam, side operations, ACC and other modes. Registry indices are not assumed to equal displayed episode numbers.",
+  "source": {
+    "native_query": "TppDefine.MISSION_LIST, MISSION_ENUM, HARD_MISSION_ENUM, MISSING_NUMBER_MISSION_ENUM",
+    "native_inventory": "artifacts/dev/one-zero-current/native-mission-inventory.json",
+    "owned_define_sha256": "55459399f355a38c74a699fae8f84892a66da49a10d255f789915b154447d38f"
+  },
+  "required_mission_count": 51,
+  "full_mission_pass_count": 0,
+  "acceptance_rule": "A pass requires native objective completion, reviewed final output through scene/menu transitions, reliable VR input and clean next-scene control. Unit checks, input delivery, shared input modes, debug jumps and another mission never certify this mission. Simulator and physical headset results remain separate.",
+  "missions": [
+    {
+      "native_mission_code": 10010,
+      "native_registry_index": 0,
+      "difficulty_variant": false,
+      "base_code": 10010,
+      "status": "partial_debug_playthrough",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "partial",
+          "evidence": [
+            "artifacts/bot/runs/20261014T172413728112Z",
+            "artifacts/bot/runs/20261014T172531428385Z"
+          ],
+          "notes": "Score to Heroism visible in both eyes; Exit reached native clear phase 4/Bridge2. Immediate post-exit capture hit authored black fade; temporal transition review pending."
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      },
+      "notes": "Genuine cleared profile through hospital and native horse escape; requested damage protection. Native score/Heroism VR paging and Bridge2 observed; next mission and normal difficulty remain unproven."
+    },
+    {
+      "native_mission_code": 10020,
+      "native_registry_index": 1,
+      "difficulty_variant": false,
+      "base_code": 10020,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10030,
+      "native_registry_index": 2,
+      "difficulty_variant": false,
+      "base_code": 10030,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10036,
+      "native_registry_index": 3,
+      "difficulty_variant": false,
+      "base_code": 10036,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10043,
+      "native_registry_index": 4,
+      "difficulty_variant": false,
+      "base_code": 10043,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10033,
+      "native_registry_index": 5,
+      "difficulty_variant": false,
+      "base_code": 10033,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10040,
+      "native_registry_index": 6,
+      "difficulty_variant": false,
+      "base_code": 10040,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10041,
+      "native_registry_index": 7,
+      "difficulty_variant": false,
+      "base_code": 10041,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10044,
+      "native_registry_index": 8,
+      "difficulty_variant": false,
+      "base_code": 10044,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10052,
+      "native_registry_index": 9,
+      "difficulty_variant": false,
+      "base_code": 10052,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10054,
+      "native_registry_index": 10,
+      "difficulty_variant": false,
+      "base_code": 10054,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10050,
+      "native_registry_index": 11,
+      "difficulty_variant": false,
+      "base_code": 10050,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10070,
+      "native_registry_index": 12,
+      "difficulty_variant": false,
+      "base_code": 10070,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10080,
+      "native_registry_index": 13,
+      "difficulty_variant": false,
+      "base_code": 10080,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10086,
+      "native_registry_index": 14,
+      "difficulty_variant": false,
+      "base_code": 10086,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10082,
+      "native_registry_index": 15,
+      "difficulty_variant": false,
+      "base_code": 10082,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10090,
+      "native_registry_index": 16,
+      "difficulty_variant": false,
+      "base_code": 10090,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10195,
+      "native_registry_index": 17,
+      "difficulty_variant": false,
+      "base_code": 10195,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10091,
+      "native_registry_index": 18,
+      "difficulty_variant": false,
+      "base_code": 10091,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10100,
+      "native_registry_index": 19,
+      "difficulty_variant": false,
+      "base_code": 10100,
+      "status": "partial_debug_playthrough",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "partial",
+          "evidence": [
+            "artifacts/bot/runs/20261014T203801017996Z",
+            "artifacts/bot/runs/20261014T204314877782Z",
+            "artifacts/bot/runs/20261014T204434101140Z",
+            "artifacts/bot/runs/20261014T204606976112Z"
+          ],
+          "notes": "Complete native loadout and arrival-time controls visible over retained stereo cabin; vertical canvas padding remains open. VR Confirm genuinely started mission 10100. Immediate arrival pair caught the authored episode-title fade; field and insertion review pending."
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "partial",
+          "evidence": [
+            "artifacts/bot/runs/20261015T004131426704Z"
+          ],
+          "notes": "Exact native guard 1043; attached paired rifle support and two-round discharge observed, followed by native incapacitation with buddy attribution not excluded. Both aim-probe eyes reviewed: back-facing prone body/shoulder intrusion blocks much of the left eye. Sights, complete body view, reload and optics acceptance remain open."
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "partial",
+          "evidence": [
+            "artifacts/bot/runs/20261014T205019447458Z",
+            "artifacts/bot/runs/20261015T001517562219Z",
+            "artifacts/bot/runs/20261015T001619118256Z"
+          ],
+          "notes": "Reviewed native VR helicopter exit and existing VR stance/dive wall-cover recovery. No cave-door opening or child extraction is accepted."
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "partial",
+          "evidence": [
+            "artifacts/bot/runs/20261014T235242773390Z"
+          ],
+          "notes": "Genuine restart and Continue reloaded native mission 10100 in the field with adult objective clear and zero children rescued. Both arrival eyes reviewed. Death/retry and reload at the last test pose remain unproven."
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      },
+      "priority": "reported_release_blocker",
+      "reported_episode": 18,
+      "reported_failure": "Results require desktop focus/click and alternate flat/VR Confirm before the next cutscene.",
+      "displayed_title": "Blood Runs Deep",
+      "identity_evidence": {
+        "native_selected_sortie_code": 10100,
+        "native_field_mission_code": 10100,
+        "reviewed_displayed_episode": 18,
+        "evidence": [
+          "artifacts/bot/runs/20261014T203247447666Z",
+          "artifacts/bot/runs/20261014T204606976112Z"
+        ],
+        "notes": "Observed native pending sortie and field code. Registry index 19 is not the displayed episode; the earlier code 10091 assignment was incorrect."
+      }
+    },
+    {
+      "native_mission_code": 10110,
+      "native_registry_index": 20,
+      "difficulty_variant": false,
+      "base_code": 10110,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10121,
+      "native_registry_index": 21,
+      "difficulty_variant": false,
+      "base_code": 10121,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10115,
+      "native_registry_index": 22,
+      "difficulty_variant": false,
+      "base_code": 10115,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10120,
+      "native_registry_index": 23,
+      "difficulty_variant": false,
+      "base_code": 10120,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10085,
+      "native_registry_index": 24,
+      "difficulty_variant": false,
+      "base_code": 10085,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10200,
+      "native_registry_index": 25,
+      "difficulty_variant": false,
+      "base_code": 10200,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10211,
+      "native_registry_index": 26,
+      "difficulty_variant": false,
+      "base_code": 10211,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10081,
+      "native_registry_index": 27,
+      "difficulty_variant": false,
+      "base_code": 10081,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10130,
+      "native_registry_index": 28,
+      "difficulty_variant": false,
+      "base_code": 10130,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10140,
+      "native_registry_index": 29,
+      "difficulty_variant": false,
+      "base_code": 10140,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10150,
+      "native_registry_index": 30,
+      "difficulty_variant": false,
+      "base_code": 10150,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10151,
+      "native_registry_index": 31,
+      "difficulty_variant": false,
+      "base_code": 10151,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10045,
+      "native_registry_index": 32,
+      "difficulty_variant": false,
+      "base_code": 10045,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10156,
+      "native_registry_index": 33,
+      "difficulty_variant": false,
+      "base_code": 10156,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10093,
+      "native_registry_index": 34,
+      "difficulty_variant": false,
+      "base_code": 10093,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10171,
+      "native_registry_index": 35,
+      "difficulty_variant": false,
+      "base_code": 10171,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10240,
+      "native_registry_index": 36,
+      "difficulty_variant": false,
+      "base_code": 10240,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10260,
+      "native_registry_index": 37,
+      "difficulty_variant": false,
+      "base_code": 10260,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 10280,
+      "native_registry_index": 38,
+      "difficulty_variant": false,
+      "base_code": 10280,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11043,
+      "native_registry_index": 40,
+      "difficulty_variant": true,
+      "base_code": 10043,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11054,
+      "native_registry_index": 42,
+      "difficulty_variant": true,
+      "base_code": 10054,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11082,
+      "native_registry_index": 44,
+      "difficulty_variant": true,
+      "base_code": 10082,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11090,
+      "native_registry_index": 45,
+      "difficulty_variant": true,
+      "base_code": 10090,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11033,
+      "native_registry_index": 47,
+      "difficulty_variant": true,
+      "base_code": 10033,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11050,
+      "native_registry_index": 48,
+      "difficulty_variant": true,
+      "base_code": 10050,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11140,
+      "native_registry_index": 52,
+      "difficulty_variant": true,
+      "base_code": 10140,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11080,
+      "native_registry_index": 54,
+      "difficulty_variant": true,
+      "base_code": 10080,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11121,
+      "native_registry_index": 56,
+      "difficulty_variant": true,
+      "base_code": 10121,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11130,
+      "native_registry_index": 58,
+      "difficulty_variant": true,
+      "base_code": 10130,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11044,
+      "native_registry_index": 59,
+      "difficulty_variant": true,
+      "base_code": 10044,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "native_mission_code": 11151,
+      "native_registry_index": 61,
+      "difficulty_variant": true,
+      "base_code": 10151,
+      "status": "unproven",
+      "checks": {
+        "launch_and_loading_confirm": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "first_person_stand_crouch_prone_and_motion": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_weapons_fire_reload_and_optics": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_binocular_acquire_mark_zoom": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "left_hand_idroid_and_tutorial_stow": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "mission_specific_vr_interactions": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "authored_cinematics_head_motion_actor_visibility_shadows": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "recorded_movies_spatial_panel_and_surround": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "results_each_page_vr_confirm_back": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "credits_rewards_and_next_scene": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "return_acc_and_next_mission": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "death_retry_checkpoint_reload": {
+          "status": "unproven",
+          "evidence": []
+        },
+        "physical_quest_link_acceptance": {
+          "status": "unproven",
+          "evidence": []
+        }
+      }
+    }
+  ]
+}

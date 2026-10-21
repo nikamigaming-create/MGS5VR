@@ -3,6 +3,14 @@
 #include <cmath>
 
 namespace mgs5vr {
+std::optional<ArmPose> scaledLegPose(const ArmPose& native,float scale){
+    if(!valid(native.shoulder)||!valid(native.elbow)||!valid(native.wrist)
+       ||!std::isfinite(scale)||scale<1.f||scale>1.5f)return {};
+    auto result=native;
+    result.elbow.position=native.shoulder.position+(native.elbow.position-native.shoulder.position)*scale;
+    result.wrist.position=native.shoulder.position+(native.wrist.position-native.shoulder.position)*scale;
+    return result;
+}
 std::optional<std::array<size_t,14>> armHelperIndices(std::span<const uint32_t> names,
     std::span<const int32_t> parents){
     if(names.empty()||names.size()!=parents.size())return {};
@@ -171,6 +179,110 @@ std::optional<Pose> upperBodyPlacement(Pose chest,Vec3 shoulderCenter,Pose uprig
     const auto target=compose(uprightHead,Pose{{},{0,-.23f,-.04f}});
     return compose(target,inverse(Pose{chest.orientation,shoulderCenter}));
 }
+std::optional<Quat> anatomicalTorsoHeading(Quat locomotionHeading,Quat view,bool prone){
+    if(!valid(Pose{locomotionHeading,{}})||!valid(Pose{view,{}}))return {};
+    const auto yaw=[](Quat q){
+        const auto forward=rotate(q,{0,0,1}),right=rotate(q,{1,0,0});
+        return std::hypot(forward.x,forward.z)>.001f
+            ?std::atan2(forward.x,forward.z):std::atan2(-right.z,right.x);
+    };
+    float heading=yaw(locomotionHeading);
+    if(!prone){
+        constexpr float neckYaw=.872664626f; // 50 degrees; the torso owns the excess.
+        const float look=std::remainder(yaw(view)-heading,6.283185307f);
+        heading+=look-std::clamp(look,-neckYaw,neckYaw);
+    }
+    return Quat{0,std::sin(heading*.5f),0,std::cos(heading*.5f)};
+}
+std::optional<Quat> trackedTorsoHeading(Pose viewer,Vec3 handsMidpoint,Quat primaryAim){
+    if(!valid(viewer)||!valid(Pose{primaryAim,handsMidpoint}))return {};
+    const auto placement=handsMidpoint-viewer.position;
+    const auto look=rotate(viewer.orientation,{0,0,1});
+    const auto direction=rotate(primaryAim,{0,0,-1});
+    const float distance=std::hypot(placement.x,placement.z);
+    const float lookDistance=std::hypot(look.x,look.z),aimDistance=std::hypot(direction.x,direction.z);
+    if(distance<=.2f||lookDistance<=.1f||aimDistance<=.1f
+       ||placement.x*look.x+placement.z*look.z<=distance*lookDistance*.5f
+       ||direction.x*look.x+direction.z*look.z<=aimDistance*lookDistance*.5f)return {};
+    const float yaw=std::atan2(direction.x,direction.z);
+    return Quat{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
+}
+std::optional<Quat> BodyHeadingState::update(Quat locomotion,Quat view,bool prone,uint64_t time,RigContinuityKey key,
+                                          std::optional<Quat> handHeading){
+    if(!valid(Pose{locomotion,{}})||!valid(Pose{view,{}})||!time){reset();return {};}
+    const auto yaw=[](Quat q){const auto f=rotate(q,{0,0,1}),r=rotate(q,{1,0,0});
+        return std::hypot(f.x,f.z)>.001f?std::atan2(f.x,f.z):std::atan2(-r.z,r.x);};
+    const auto wrap=[](float a){return std::remainder(a,6.283185307f);};
+    const float base=yaw(locomotion),look=yaw(view);
+    if(!valid_||key!=key_||time<time_){heading_=base;locomotion_=base;valid_=true;key_=key;}
+    heading_=wrap(heading_+wrap(base-locomotion_));
+    if(prone)heading_=base;
+    else{
+        // Both hands moving around the viewer identify a body turn. Keep
+        // shoulder reach close to that direction while retaining independent
+        // neck look when hands stay in their existing world direction.
+        if(handHeading&&valid(Pose{*handHeading,{}})){
+            const float delta=wrap(yaw(*handHeading)-heading_);
+            heading_=wrap(heading_+delta);
+        }
+        constexpr float neckYaw=.872664626f;
+        const float delta=wrap(look-heading_);
+        heading_=wrap(heading_+delta-std::clamp(delta,-neckYaw,neckYaw));
+    }
+    locomotion_=base;time_=time;
+    return Quat{0,std::sin(heading_*.5f),0,std::cos(heading_*.5f)};
+}
+std::optional<Pose> fullBodyPlacement(Pose chest,Pose nativeHead,Pose uprightHead){
+    if(!valid(chest)||!valid(uprightHead)||!valid(nativeHead))return {};
+    const auto nativeHeading=nativeTorsoHeading(chest);if(!nativeHeading)return {};
+    const auto forward=rotate(*nativeHeading,{0,0,1});
+    const auto heading=rotate(uprightHead.orientation,{0,0,1});
+    if(std::hypot(heading.x,heading.z)<.001f)return {};
+    const float oldYaw=std::atan2(forward.x,forward.z);
+    const float yaw=std::remainder(std::atan2(heading.x,heading.z)-oldYaw,6.283185307f);
+    const Quat turn{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
+    // Anchor the measured eyes, including the authored prone head pitch.
+    // Looking down must not use a yaw-only offset to move the head joint.
+    const auto nativeEye=compose(nativeHead,Pose{{},nativeEyeFromHead}).position;
+    return Pose{turn,uprightHead.position-rotate(turn,nativeEye)};
+}
+std::optional<Quat> nativeTorsoHeading(Pose chest){
+    if(!valid(chest))return {};
+    const auto right=rotate(chest.orientation,{1,0,0}),forward=rotate(chest.orientation,{0,0,1});
+    const float yaw=std::hypot(right.x,right.z)>.1f?std::atan2(-right.z,right.x)
+        :std::atan2(forward.x,forward.z);
+    return Quat{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
+}
+std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 eye,float radius){
+    if(!valid(Pose{{},point})||!valid(Pose{{},eye})||!std::isfinite(radius)||radius<=0||radius>.2f)return {};
+    const auto delta=point-eye;const float distance=length(delta);
+    if(distance>=radius)return {};
+    const auto normal=distance>.001f?delta*(1/distance):Vec3{0,0,1};
+    // A tangent plane at the camera envelope keeps the solved elbow circle
+    // outside the eye without changing either bone length or the HMD pose.
+    return ArmSurface{eye+normal*radius,normal,0};
+}
+std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface){
+    const auto hint=native.elbow.position-native.shoulder.position;
+    // Lumbar -> chest -> neck is the anatomical chain. WAIST -> SPINE is
+    // an authored 3 mm pivot, not an independently solvable torso segment.
+    // The caller retains the pelvis and the lumbar anchor's position.
+    auto result=solveArm(native,neckTarget,hint,nullptr,chestSurface);
+    if(!result)return {};
+    const auto requested=compose(Pose{neckTarget.orientation,{}},inverse(Pose{native.wrist.orientation,{}})).orientation;
+    const auto fit=[&](Pose joint,Vec3 nativeAxis,Vec3 solvedAxis){
+        const auto localAxis=rotate(inverse(Pose{joint.orientation,{}}).orientation,nativeAxis);
+        const auto requestedOrientation=turn(requested,joint.orientation);
+        return basisRotation(localAxis,{0,0,1},solvedAxis,rotate(requestedOrientation,{0,0,1}));
+    };
+    const auto lumbar=fit(native.shoulder,native.elbow.position-native.shoulder.position,
+                         result->pose.elbow.position-result->pose.shoulder.position);
+    const auto chest=fit(native.elbow,native.wrist.position-native.elbow.position,
+                        result->pose.wrist.position-result->pose.elbow.position);
+    if(!lumbar||!chest)return {};
+    result->pose.shoulder.orientation=*lumbar;result->pose.elbow.orientation=*chest;
+    return result;
+}
 std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const ArmBasis* basis,const ArmSurface* surface){
     if(!valid(a.shoulder)||!valid(a.elbow)||!valid(a.wrist)||!valid(target)||!valid(Pose{{},hint}))return {};
     const auto upper=a.elbow.position-a.shoulder.position,lower=a.wrist.position-a.elbow.position;
@@ -225,6 +337,23 @@ std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const
     out.pose.wrist={normalize(target.orientation),wrist};
     return out;
 }
+std::optional<GroundedLegSolution> solveGroundedLeg(const ArmPose& native,Pose contact,float calibration){
+    if(!valid(native.shoulder)||!valid(native.elbow)||!valid(native.wrist)||!valid(contact)
+       ||!std::isfinite(calibration)||calibration<1.f||calibration>1.5f)return {};
+    const float reach=length(native.elbow.position-native.shoulder.position)
+        +length(native.wrist.position-native.elbow.position);
+    if(reach<.2f)return {};
+    const auto hip=native.shoulder.position;
+    const float scale=std::max(calibration,(length(contact.position-hip)+.002f)/reach);
+    if(!std::isfinite(scale)||scale>2.f)return {};
+    auto normalized=contact;normalized.position=hip+(contact.position-hip)*(1.f/scale);
+    auto leg=solveArm(native,normalized,native.elbow.position-hip);
+    if(!leg)return {};
+    leg->pose.elbow.position=hip+(leg->pose.elbow.position-hip)*scale;
+    leg->pose.wrist.position=hip+(leg->pose.wrist.position-hip)*scale;
+    if(length(leg->pose.wrist.position-contact.position)>.003f)return {};
+    return GroundedLegSolution{*leg,scale};
+}
 std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Quat wrist,bool right){
     const auto twist=[](Quat q,unsigned axis,float weight){
         if(q.w<0)q={-q.x,-q.y,-q.z,-q.w};
@@ -274,11 +403,14 @@ bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time
     if(time-since_>=150){attached_=true;candidate_=false;}
     return attached_;
 }
-std::optional<Pose> SupportPose::update(Pose nativeOffset,bool attached,bool manipulating){
-    if(!valid(nativeOffset)){reset();return {};}
+std::optional<Pose> SupportPose::update(Pose nativeOffset,bool attached,bool manipulating,std::optional<Pose> weaponInWrist){
+    if(!valid(nativeOffset)||(weaponInWrist&&!valid(*weaponInWrist))){reset();return {};}
     if(attached){
-        if(!attached_)acquired_=nativeOffset;
-        presented_=manipulating?nativeOffset:acquired_;
+        if(!attached_){
+            weaponAnchored_=weaponInWrist.has_value();weaponInWrist_=weaponInWrist.value_or(Pose{});
+            acquired_=compose(inverse(weaponInWrist_),nativeOffset);
+        }else if(weaponAnchored_&&weaponInWrist)weaponInWrist_=*weaponInWrist;
+        presented_=manipulating?nativeOffset:compose(weaponInWrist_,acquired_);
     }
     attached_=attached;
     return presented_;

@@ -2,6 +2,7 @@
 #include "mgs5vr/mailbox.hpp"
 #include <d3dcompiler.h>
 #include <algorithm>
+#include <array>
 #include <stdexcept>
 
 namespace mgs5vr {
@@ -13,7 +14,13 @@ V vertex(uint id:SV_VertexID){
     o.p=float4(o.uv*float2(2,-2)+float2(-1,1),0,1);return o;
 }
 Texture2D image:register(t0);SamplerState linearClamp:register(s0);
+cbuffer Filter:register(b0){float2 step;float2 padding;};
+float4 blurred(float2 uv){float4 sum=0;for(int y=-1;y<=1;++y)for(int x=-1;x<=1;++x)
+    sum+=image.SampleLevel(linearClamp,uv+float2(x,y)*step,0)*(x==0?2:1)*(y==0?2:1);return float4(sum.rgb*.75/16,sum.a/16);}
 float4 pixelLinear(V v):SV_TARGET{return image.SampleLevel(linearClamp,v.uv,0);}
+float4 pixelBlurLinear(V v):SV_TARGET{return blurred(v.uv);}
+float4 pixelBlurEncoded(V v):SV_TARGET{float4 c=blurred(v.uv);
+    c.rgb=c.rgb<=0.0031308?c.rgb*12.92:1.055*pow(max(c.rgb,0),1.0/2.4)-0.055;return c;}
 float4 pixelEncoded(V v):SV_TARGET{
     float4 c=image.SampleLevel(linearClamp,v.uv,0);
     c.rgb=c.rgb<=0.0031308?c.rgb*12.92:1.055*pow(max(c.rgb,0),1.0/2.4)-0.055;return c;
@@ -33,6 +40,11 @@ void EyeResampler::initialize(ID3D11Device* device){
     checkHr(device->CreateVertexShader(vertex->GetBufferPointer(),vertex->GetBufferSize(),nullptr,&vertex_),"Create XR resampler vertex shader");
     checkHr(device->CreatePixelShader(linear->GetBufferPointer(),linear->GetBufferSize(),nullptr,&linear_),"Create XR linear resampler");
     checkHr(device->CreatePixelShader(encoded->GetBufferPointer(),encoded->GetBufferSize(),nullptr,&encoded_),"Create XR encoded resampler");
+    const auto blurLinear=compile("pixelBlurLinear","ps_4_0"),blurEncoded=compile("pixelBlurEncoded","ps_4_0");
+    checkHr(device->CreatePixelShader(blurLinear->GetBufferPointer(),blurLinear->GetBufferSize(),nullptr,&blurLinear_),"Create XR frozen-surround blur");
+    checkHr(device->CreatePixelShader(blurEncoded->GetBufferPointer(),blurEncoded->GetBufferSize(),nullptr,&blurEncoded_),"Create XR encoded frozen-surround blur");
+    D3D11_BUFFER_DESC filter{};filter.ByteWidth=16;filter.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
+    checkHr(device->CreateBuffer(&filter,nullptr,&filter_),"Create XR frozen-surround filter");
     D3D11_SAMPLER_DESC sampler{};sampler.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
     sampler.AddressU=sampler.AddressV=sampler.AddressW=D3D11_TEXTURE_ADDRESS_CLAMP;sampler.MaxLOD=D3D11_FLOAT32_MAX;
     checkHr(device->CreateSamplerState(&sampler,&sampler_),"Create XR resampler filter");
@@ -41,7 +53,7 @@ void EyeResampler::initialize(ID3D11Device* device){
     D3D11_DEPTH_STENCIL_DESC depth{};depth.DepthFunc=D3D11_COMPARISON_ALWAYS;
     checkHr(device->CreateDepthStencilState(&depth,&depth_),"Create XR resampler depth state");
 }
-void EyeResampler::copy(ID3D11DeviceContext* context,ID3D11Texture2D* source,unsigned slice,ID3D11Texture2D* destination){
+void EyeResampler::copy(ID3D11DeviceContext* context,ID3D11Texture2D* source,unsigned slice,ID3D11Texture2D* destination,bool blur){
     if(!context||!source||!destination||context->GetType()!=D3D11_DEVICE_CONTEXT_IMMEDIATE)
         throw std::invalid_argument("XR resampling needs complete images and an immediate private context");
     Ptr<ID3D11Device> device,sourceDevice,targetDevice;context->GetDevice(&device);source->GetDevice(&sourceDevice);destination->GetDevice(&targetDevice);
@@ -79,7 +91,9 @@ void EyeResampler::copy(ID3D11DeviceContext* context,ID3D11Texture2D* source,uns
     context->RSSetViewports(1,&viewport);context->RSSetState(raster_.Get());
     context->IASetInputLayout(nullptr);context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     context->VSSetShader(vertex_.Get(),nullptr,0);context->GSSetShader(nullptr,nullptr,0);
-    context->PSSetShader(found->encoded?encoded_.Get():linear_.Get(),nullptr,0);
+    if(blur){const std::array<float,4> filter{5.f/target.Width,5.f/target.Height,0,0};
+        context->UpdateSubresource(filter_.Get(),0,nullptr,filter.data(),0,0);auto* buffer=filter_.Get();context->PSSetConstantBuffers(0,1,&buffer);}
+    context->PSSetShader(blur?(found->encoded?blurEncoded_.Get():blurLinear_.Get()):(found->encoded?encoded_.Get():linear_.Get()),nullptr,0);
     auto* image=image_.Get();auto* sampler=sampler_.Get();context->PSSetShaderResources(0,1,&image);context->PSSetSamplers(0,1,&sampler);
     context->Draw(3,0);
     image=nullptr;context->PSSetShaderResources(0,1,&image);context->OMSetRenderTargets(0,nullptr,nullptr);

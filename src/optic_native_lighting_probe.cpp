@@ -20,6 +20,15 @@
 namespace mgs5vr {
 namespace {
 using Microsoft::WRL::ComPtr;
+struct EyeDepth {
+    mgs5vr::EyeFrame eye{},copiedEye{};
+    bool ready{};
+    ComPtr<ID3D11DepthStencilView> native,view;
+    ComPtr<ID3D11Texture2D> copy;
+    D3D11_TEXTURE2D_DESC description{};
+    D3D11_DEPTH_STENCIL_VIEW_DESC viewDescription{};
+};
+std::array<EyeDepth,2> eyeDepths;
 constexpr GUID shaderKey{0x9d45d745,0x6cdb,0x4c10,{0xb1,0x4a,0xc3,0x26,0x06,0x10,0x9a,0xf3}};
 constexpr GUID debugNameKey{0x429b8c22,0x9188,0x4b0c,{0x87,0x42,0xac,0xb0,0xbf,0x85,0xc2,0x00}};
 constexpr uint32_t signature=0x4f4c5031u;
@@ -297,7 +306,7 @@ bool freshSource(const OpticNativeLightingSource& value) noexcept {
 void __fastcall nativeProgramFlush(uintptr_t state,uintptr_t contextOwner){
     nativeFlushBinding.state=nativeFlushBinding.contextOwner=0;
     originalNativeProgramFlush(state,contextOwner);
-    if(enabled.load()&&!nativeBinocularMaterialDrawing()&&opticLightingHousingSourceEligible(source)){
+    if(enabled.load()&&!nativeBinocularMaterialDrawing()&&opticLightingSourceEligible(source)){
         nativeFlushBinding={state,contextOwner,source};++nativeFlushScopes;}
 }
 bool registeredSceneResource(ID3D11Resource* resource) noexcept {
@@ -474,11 +483,35 @@ bool sceneUploadMatches(const OpticNativeGeometryPass& pass,const OpticNativeLig
         OpticLightingSceneUpload upload;upload.source=known.uploadSource;
         upload.context=known.context;upload.buffer=pass.sceneBuffer;upload.generation=known.generation;
         upload.byteWidth=known.byteWidth;upload.firstConstant=pass.firstConstant;upload.constantCount=pass.constantCount;
-        upload.complete=true;const auto at=static_cast<size_t>(pass.firstConstant)*16;
+        upload.complete=true;upload.viewIsWorld=pass.pixelScene;const auto at=static_cast<size_t>(pass.firstConstant)*16;
         std::memcpy(upload.projection.data(),known.bytes.data()+at+64,64);
         std::memcpy(upload.view.data(),known.bytes.data()+at+128,64);
-        return opticLightingSceneUploadMatches(upload,current,reinterpret_cast<uintptr_t>(context),
+        const bool matched=opticLightingSceneUploadMatches(upload,current,reinterpret_cast<uintptr_t>(context),
             pass.sceneBuffer,pass.generation,pass.firstConstant,pass.constantCount);
+        static uint32_t mismatches{};
+        if(!matched&&diagnosticsEnabled.load()&&mismatches<6){++mismatches;
+            float viewError=std::numeric_limits<float>::infinity(),projectionError=viewError;size_t viewOffset{},projectionOffset{};
+            const auto available=std::min<size_t>(480,known.byteWidth-at);
+            for(size_t offset=0;offset+64<=available;offset+=16){OpticLightingMatrix matrix{};
+                std::memcpy(matrix.data(),known.bytes.data()+at+offset,64);
+                const float v=std::min(opticLightingMatrixError(matrix,current.view),opticLightingMatrixError(matrix,current.view,true));
+                const float p=std::min(opticLightingMatrixError(matrix,current.projection),opticLightingMatrixError(matrix,current.projection,true));
+                if(v<viewError){viewError=v;viewOffset=offset;}if(p<projectionError){projectionError=p;projectionOffset=offset;}}
+            std::ostringstream line;line<<"Native depth camera upload mismatch source="<<current.eye.sourceSequence
+                <<" upload_source="<<upload.source.eye.sourceSequence<<" eye="<<current.eye.eye<<" upload_eye="<<upload.source.eye.eye
+                <<" same_source="<<sameSource(upload.source,current)<<" same_eye="<<opticLightingSameEye(upload.source.eye,current.eye)
+                <<" first_constant="<<pass.firstConstant<<" width="<<known.byteWidth
+                <<" best_view_offset="<<viewOffset<<" view_error="<<viewError
+                <<" best_projection_offset="<<projectionOffset<<" projection_error="<<projectionError;
+            if(mismatches==1){
+                line<<" expected_view=";for(const auto value:current.view)line<<value<<',';
+                line<<" uploaded_view=";for(const auto value:upload.view)line<<value<<',';
+                for(const auto offset:{320u,448u}){line<<" scene_"<<offset<<'=';
+                    for(size_t component=0;component<4;++component){float value{};
+                        std::memcpy(&value,known.bytes.data()+at+offset+component*4,4);line<<value<<',';}}
+            }
+            log(line.str());}
+        return matched;
     }
     return false;
 }
@@ -547,15 +580,15 @@ std::optional<OpticNativeGeometryPass> inspectGeometryPass(ID3D11DeviceContext* 
         if(targetCount.context==context&&targetCount.colors==3&&targetCount.depth)++threeMrtTargetMatches;
         if(bound.context==context&&bound.caller==nativeBase+0x248953u)++nativeBindMatches;
     }
-    if(targetCount.context!=context||targetCount.colors!=3||!targetCount.depth
-        ||!opticLightingHousingSourceEligible(source)||!nativeGeometryBindLayout
+    if(targetCount.context!=context||targetCount.colors>4||!targetCount.depth
+        ||!opticLightingSourceEligible(source)||!nativeGeometryBindLayout
         ||bound.context!=context||bound.caller!=nativeBase+0x248953u)return {};
     if(geometrySequence!=source.eye.sourceSequence||geometryActivation!=source.eye.activation
         ||geometryTracking!=source.eye.trackingSequence||geometryEye!=source.eye.eye){
         geometrySequence=source.eye.sourceSequence;geometryActivation=source.eye.activation;
         geometryTracking=source.eye.trackingSequence;geometryEye=source.eye.eye;geometryAttempts=0;
     }
-    if(geometryAttempts>=8)return {}; ++geometryAttempts;
+    if(geometryAttempts>=32)return {};
     ComPtr<ID3D11PixelShader> ps;ComPtr<ID3D11VertexShader> vs;
     context->PSGetShader(&ps,nullptr,nullptr);context->VSGetShader(&vs,nullptr,nullptr);
     if(!ps||!vs||ps.Get()!=bound.shader)return {};
@@ -566,8 +599,9 @@ std::optional<OpticNativeGeometryPass> inspectGeometryPass(ID3D11DeviceContext* 
     context->OMGetRenderTargets(8,raw.data(),&rawDepth);
     std::array<ComPtr<ID3D11RenderTargetView>,8> targets;ComPtr<ID3D11DepthStencilView> depth;depth.Attach(rawDepth);
     for(size_t i=0;i<targets.size();++i)targets[i].Attach(raw[i]);
-    if(!depth||!targets[0]||!targets[1]||!targets[2])return {};
-    for(size_t i=3;i<targets.size();++i)if(targets[i])return {};
+    if(!depth)return {};
+    const auto colors=static_cast<size_t>(std::count_if(targets.begin(),targets.end(),[](const auto& p){return p!=nullptr;}));
+    if(colors!=targetCount.colors||colors>4)return {};
     ++geometryDraws;
     D3D11_DEPTH_STENCIL_VIEW_DESC depthView{};depth->GetDesc(&depthView);
     ComPtr<ID3D11DepthStencilState> ds;UINT stencil{};context->OMGetDepthStencilState(&ds,&stencil);
@@ -575,44 +609,61 @@ std::optional<OpticNativeGeometryPass> inspectGeometryPass(ID3D11DeviceContext* 
     else {dd.DepthEnable=TRUE;dd.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ALL;dd.DepthFunc=D3D11_COMPARISON_LESS;}
     ComPtr<ID3D11BlendState> blend;FLOAT factors[4]{};UINT mask{};context->OMGetBlendState(&blend,factors,&mask);
     D3D11_BLEND_DESC bd{};if(blend)blend->GetDesc(&bd);else bd.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
-    bool opaque=true;for(size_t i=0;i<3;++i){const auto& b=bd.RenderTarget[bd.IndependentBlendEnable?i:0];
-        opaque=opaque&&!b.BlendEnable&&b.RenderTargetWriteMask==D3D11_COLOR_WRITE_ENABLE_ALL;}
+    bool opaque=true,fullWrites=true;for(size_t i=0;i<targets.size();++i)if(targets[i]){
+        const auto& b=bd.RenderTarget[bd.IndependentBlendEnable?i:0];
+        opaque=opaque&&!b.BlendEnable;fullWrites=fullWrites&&b.RenderTargetWriteMask==D3D11_COLOR_WRITE_ENABLE_ALL;}
     const bool writable=(depthView.Flags&D3D11_DSV_READ_ONLY_DEPTH)==0
         &&opticNativeMaterialDepthEligible(dd.DepthEnable!=FALSE,dd.DepthWriteMask==D3D11_DEPTH_WRITE_MASK_ALL,
             static_cast<uint32_t>(dd.DepthFunc));
+    // A native lighting pass can consume the completed scene depth without
+    // writing it. Require its sampled resource to be this exact bound DSV;
+    // the camera upload below must independently match this source eye.
+    bool depthReader=false;
+    if(depthView.Flags&D3D11_DSV_READ_ONLY_DEPTH){
+        ComPtr<ID3D11Resource> depthResource;depth->GetResource(&depthResource);
+        std::array<ID3D11ShaderResourceView*,128> views{};context->PSGetShaderResources(0,128,views.data());
+        for(auto* rawView:views){ComPtr<ID3D11ShaderResourceView> view;view.Attach(rawView);
+            if(view){ComPtr<ID3D11Resource> resource;view->GetResource(&resource);depthReader|=resource.Get()==depthResource.Get();}}
+    }
     const auto id=reinterpret_cast<uintptr_t>(ps.Get());
     if(diagnosticsEnabled.load()&&std::find(geometryShaders.begin(),geometryShaders.end(),id)==geometryShaders.end()){
         const auto empty=std::find(geometryShaders.begin(),geometryShaders.end(),uintptr_t{});
         if(empty!=geometryShaders.end()){*empty=id;std::ostringstream line;
-            line<<"Optic native three-MRT geometry candidate source="<<source.eye.sourceSequence
+            line<<"Optic native depth geometry candidate source="<<source.eye.sourceSequence
                 <<" tracking="<<source.eye.trackingSequence<<" activation="<<source.eye.activation<<" eye="<<source.eye.eye
                 <<" context=0x"<<std::hex<<reinterpret_cast<uintptr_t>(context)<<" native_ps=0x"<<id
                 <<" native_vs=0x"<<reinterpret_cast<uintptr_t>(vs.Get())<<std::dec
-                <<" native_bind_caller_verified=1 mrt_count=3 depth_flags="<<depthView.Flags
+                <<" native_bind_caller_verified=1 mrt_count="<<colors<<" depth_flags="<<depthView.Flags
                 <<" depth_enable="<<(dd.DepthEnable!=FALSE)<<" depth_write_mask="<<static_cast<UINT>(dd.DepthWriteMask)
                 <<" depth_comparison="<<static_cast<UINT>(dd.DepthFunc)<<" stencil_enable="<<(dd.StencilEnable!=FALSE)
                 <<" stencil_reference="<<stencil<<" opaque_mrt_writes="<<opaque<<" writable_depth="<<writable
                 <<" camera_upload_verified=0 shader_owner_verified=0 native_pair_verified="<<pairVerified
                 <<" material_family_verified="<<(family!=0)<<" read_only=1";
-            for(size_t i=0;i<3;++i){D3D11_RENDER_TARGET_VIEW_DESC view{};targets[i]->GetDesc(&view);
+            for(size_t i=0;i<targets.size();++i)if(targets[i]){D3D11_RENDER_TARGET_VIEW_DESC view{};targets[i]->GetDesc(&view);
                 line<<" mrt"<<i<<"_format="<<static_cast<UINT>(view.Format);}
             log(line.str());}
     }
-    if(!pairVerified||!family||!writable||!opaque||depthView.ViewDimension!=D3D11_DSV_DIMENSION_TEXTURE2D||depthView.Texture2D.MipSlice)return {};
+    // The depth join requires the actual native camera upload and writable
+    // geometry depth. Material-family identity remains mandatory for material
+    // insertion below, but unrelated cabin/hand shaders can supply scene depth.
+    if((!(writable&&opaque)&&!depthReader)||depthView.ViewDimension!=D3D11_DSV_DIMENSION_TEXTURE2D||depthView.Texture2D.MipSlice)return {};
     ComPtr<ID3D11Resource> depthObject;depth->GetResource(&depthObject);ComPtr<ID3D11Texture2D> depthTexture;
     if(FAILED(depthObject.As(&depthTexture)))return {};D3D11_TEXTURE2D_DESC size{};depthTexture->GetDesc(&size);
     D3D11_VIEWPORT viewport{};UINT count=1;context->RSGetViewports(&count,&viewport);
     if(count!=1||viewport.TopLeftX!=0||viewport.TopLeftY!=0||viewport.Width!=static_cast<float>(size.Width)
         ||viewport.Height!=static_cast<float>(size.Height)||size.ArraySize!=1||size.SampleDesc.Count!=1)return {};
-    for(size_t i=0;i<3;++i){D3D11_RENDER_TARGET_VIEW_DESC view{};targets[i]->GetDesc(&view);
+    for(size_t i=0;i<targets.size();++i)if(targets[i]){D3D11_RENDER_TARGET_VIEW_DESC view{};targets[i]->GetDesc(&view);
         if(view.ViewDimension!=D3D11_RTV_DIMENSION_TEXTURE2D||view.Texture2D.MipSlice)return {};
         ComPtr<ID3D11Resource> object;targets[i]->GetResource(&object);ComPtr<ID3D11Texture2D> texture;
         if(FAILED(object.As(&texture)))return {};D3D11_TEXTURE2D_DESC d{};texture->GetDesc(&d);
         if(d.Width!=size.Width||d.Height!=size.Height||d.ArraySize!=1||d.SampleDesc.Count!=1)return {};
     }
+    ++geometryAttempts;
     ComPtr<ID3D11Buffer> buffer;UINT first{},constants=4096;ComPtr<ID3D11DeviceContext1> context1;
-    if(SUCCEEDED(context->QueryInterface(IID_PPV_ARGS(&context1))))context1->VSGetConstantBuffers1(2,1,&buffer,&first,&constants);
-    else context->VSGetConstantBuffers(2,1,&buffer);
+    if(SUCCEEDED(context->QueryInterface(IID_PPV_ARGS(&context1)))){
+        if(depthReader)context1->PSGetConstantBuffers1(2,1,&buffer,&first,&constants);
+        else context1->VSGetConstantBuffers1(2,1,&buffer,&first,&constants);
+    }else {if(depthReader)context->PSGetConstantBuffers(2,1,&buffer);else context->VSGetConstantBuffers(2,1,&buffer);}
     if(!buffer)return {};D3D11_BUFFER_DESC description{};buffer->GetDesc(&description);
     if(!(description.BindFlags&D3D11_BIND_CONSTANT_BUFFER)||!opticLightingSceneRangeEligible(description.ByteWidth,first,constants))return {};
     ComPtr<ID3D11Resource> resource;if(FAILED(buffer.As(&resource)))return {};
@@ -624,9 +675,17 @@ std::optional<OpticNativeGeometryPass> inspectGeometryPass(ID3D11DeviceContext* 
         sceneResourceIds[static_cast<size_t>(known-sceneBuffers.data())]=reinterpret_cast<uintptr_t>(resource.Get());
     }
     OpticNativeGeometryPass pass{reinterpret_cast<uintptr_t>(ps.Get()),reinterpret_cast<uintptr_t>(vs.Get()),
-        reinterpret_cast<uintptr_t>(buffer.Get()),first,constants,generation.load(),true,false,true,true};
+        reinterpret_cast<uintptr_t>(buffer.Get()),first,constants,generation.load(),true,false,pairVerified,
+        writable&&opaque&&family!=0&&colors==3&&targets[0]&&targets[1]&&targets[2]&&fullWrites};
+    pass.pixelScene=depthReader;
     pass.cameraUploadVerified=sceneUploadMatches(pass,source,context);
-    if(pass.cameraUploadVerified){++geometryReady;return pass;}
+    if(pass.cameraUploadVerified){
+        auto& retained=eyeDepths[source.eye.eye];
+        if(!opticLightingSameEye(retained.eye,source.eye))retained.ready=false;
+        retained.eye=source.eye;
+        retained.native=depth;retained.viewDescription=depthView;
+        ++geometryReady;return pass;
+    }
     return {};
 }
 // This emits unclassified D3D binding evidence, never a light/material identity.
@@ -842,6 +901,11 @@ OpticNativeLightingScope::OpticNativeLightingScope(const EyeFrame& eye,uintptr_t
     :OpticNativeLightingScope(OpticNativeLightingSource{eye,camera,view,projection,headPass,
         binocularWorld?*binocularWorld:OpticLightingMatrix{},binocularWorld!=nullptr}){}
 OpticNativeLightingScope::~OpticNativeLightingScope(){source=previous_;}
+void OpticNativeLightingScope::refreshProjection(const OpticLightingMatrix& matrix) noexcept {
+    if(!source.nativeCamera)return;
+    source.projection=matrix;
+    if(!opticLightingSourceEligible(source))source={};
+}
 
 void setOpticNativeMaterialDrawCallback(OpticNativeMaterialDrawCallback value) noexcept {
     materialDrawCallback.store(value);
@@ -854,8 +918,42 @@ bool opticNativeSceneUploadVerified(ID3D11DeviceContext* context,const OpticNati
 }
 
 bool opticNativeBinocularMaterialEnabled() noexcept {return enabled.load()&&nativeMaterialEnabled.load();}
+bool snapshotNativeEyeDepth(ID3D11DeviceContext* context,const EyeFrame& eye) noexcept {
+    if(!context||eye.eye>1)return false;
+    try{
+        std::lock_guard lock(mutex);auto& depth=eyeDepths[eye.eye];
+        depth.ready=false;
+        if(!depth.native||!opticLightingSameEye(depth.eye,eye))return false;
+        ComPtr<ID3D11Resource> nativeResource;depth.native->GetResource(&nativeResource);
+        ComPtr<ID3D11Texture2D> texture;if(FAILED(nativeResource.As(&texture)))return false;
+        D3D11_TEXTURE2D_DESC desc{};texture->GetDesc(&desc);
+        ComPtr<ID3D11Device> device,sourceDevice;context->GetDevice(&device);texture->GetDevice(&sourceDevice);
+        if(device.Get()!=sourceDevice.Get()||desc.ArraySize!=1||desc.SampleDesc.Count!=1)return false;
+        const auto& old=depth.description;
+        if(!depth.copy||desc.Width!=old.Width||desc.Height!=old.Height||desc.Format!=old.Format
+           ||desc.MipLevels!=old.MipLevels||!depth.view){
+            depth.copy.Reset();depth.view.Reset();depth.description=desc;
+            desc.BindFlags=D3D11_BIND_DEPTH_STENCIL;desc.CPUAccessFlags=desc.MiscFlags=0;desc.Usage=D3D11_USAGE_DEFAULT;
+            if(FAILED(device->CreateTexture2D(&desc,nullptr,&depth.copy)))return false;
+            auto view=depth.viewDescription;view.Flags=0;
+            if(FAILED(device->CreateDepthStencilView(depth.copy.Get(),&view,&depth.view)))return false;
+        }
+        context->CopyResource(depth.copy.Get(),texture.Get());
+        depth.copiedEye=eye;depth.ready=true;
+        static bool reported{};if(!reported){reported=true;log("Physical props joined to verified native per-eye scene depth");}
+        return true;
+    }catch(...){return false;}
+}
+bool nativeEyeDepthView(const EyeFrame& eye,ID3D11Device* device,ID3D11DepthStencilView** output) noexcept {
+    if(output)*output=nullptr;if(!device||!output||eye.eye>1)return false;
+    try{std::lock_guard lock(mutex);const auto& depth=eyeDepths[eye.eye];
+        if(!depth.ready||!depth.view||!opticLightingSameEye(depth.copiedEye,eye))return false;
+        ComPtr<ID3D11Device> owner;depth.view->GetDevice(&owner);if(owner.Get()!=device)return false;
+        *output=depth.view.Get();(*output)->AddRef();return true;
+    }catch(...){return false;}
+}
 void installOpticNativeLightingProbe(ID3D11Device* device,bool materialEnabled,bool diagnosticEnabled) noexcept {
-    if(!opticNativeLightingObserversRequired(materialEnabled,diagnosticEnabled)||!device)return;
+    if(!device)return;
     try{
         std::lock_guard lock(mutex);if(installed){nativeMaterialEnabled=materialEnabled;diagnosticsEnabled=diagnosticEnabled;enabled=true;return;}
         nativeBase=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
@@ -930,7 +1028,7 @@ void invalidateOpticNativeLightingProbe() noexcept {
     try{std::lock_guard lock(mutex);pending={};accepted={};selectedSequence=selectedActivation=selectedTracking=nextSelection=0;
         selectedMask=0;acceptedCursor=0;nextStatus=0;
         for(auto& id:sceneResourceIds)id.store(0);
-        sceneBuffers={};geometryShaders={};familyCache={};negativeFamilyCache={};
+        sceneBuffers={};geometryShaders={};familyCache={};negativeFamilyCache={};eyeDepths={};
         familyCacheCursor=negativeFamilyCacheCursor=0;nextFamilyHashWindow=0;familyHashAttempts=0;}catch(...){}
 }
 void stopOpticNativeLightingProbe() noexcept {

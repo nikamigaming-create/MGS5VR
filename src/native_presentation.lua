@@ -31,6 +31,26 @@ end
 local titleValue = type(gvars) == 'table' and gvars.ini_isTitleMode or false
 local title = titleValue == true or (type(titleValue) == 'number' and titleValue ~= 0)
 local missionCode = type(vars) == 'table' and vars.missionCode or nil
+
+-- The native end-of-mission controller can retain a Seq_Demo_* name after
+-- its scene finishes. Credits, results and rewards own the stereo menu and
+-- Confirm; player NORMAL_ACTION alone cannot classify that UI as a scene.
+-- Loaded result resources do not claim gameplay or an active 3D/movie shot.
+local endUi = false
+if not title and type(TppMission) == 'table'
+        and type(TppMission.GetMissionClearState) == 'function'
+        and type(TppDefine) == 'table' and type(TppDefine.MISSION_CLEAR_STATE) == 'table'
+        and queryBoolean(TppMission, 'IsDefiniteMissionClear') == true
+        and queryBoolean(TppUiCommand, 'IsResultBlockLoaded') == true
+        and queryBoolean(DemoDaemon, 'IsDemoPlaying') == false
+        and queryBoolean(TppVideoPlayer, 'IsVideoStopped') == true then
+    local ok, phase = pcall(TppMission.GetMissionClearState)
+    local phases = TppDefine.MISSION_CLEAR_STATE
+    endUi = ok and type(phase) == 'number' and
+        (phase == phases.MISSION_GAME_END or phase == phases.SHOW_CREDIT_END
+            or phase == phases.BLACK_TELEPHOHE_END or phase == phases.REWARD_END)
+end
+if endUi then return 'native-popup:mission-end' end
 local helicopterSpace = false
 if type(missionCode) == 'number' and type(TppMission) == 'table'
         and type(TppMission.IsHelicopterSpace) == 'function' then
@@ -39,7 +59,21 @@ if type(missionCode) == 'number' and type(TppMission) == 'table'
 end
 
 if sequenceName == 'Seq_Game_AvatarEdit' then return 'avatar-edit' end
+if title and missionCode == 10010 and sequenceName == 'Seq_Game_TitleMenu' then
+    return 'title-hospital-menu'
+end
 if title and helicopterSpace then return 'title-cabin' end
+-- Sortie equipment selection replaces the retail camera with a front-end
+-- preview. Keep that complete native canvas on a spatial panel; applying the
+-- seated first-person camera stretches its backdrop and separates the UI.
+local sortieCanvas = sequenceName == 'Seq_Game_MissionPreparationTop'
+    or sequenceName == 'Seq_Game_MissionPreparation_SelectItem'
+    or sequenceName == 'Seq_Game_MissionPreparation_SelectSlot'
+    or sequenceName == 'Seq_Game_MissionPreparation_SelectDetail'
+if not title and helicopterSpace and sortieCanvas
+        and queryBoolean(DemoDaemon, 'IsDemoPlaying') == false then
+    return 'native-popup:sortie'
+end
 
 -- Rewards have their own BonusPopup controller, separate from both the
 -- iDroid and IsShowPopup. A live foreground popup owns Confirm even when
@@ -55,6 +89,14 @@ local function presentation(owner)
     return owner
 end
 
+-- The prologue keeps this sequence from StartNameEntry through its native
+-- NameEntryClose/fade callback. IsShowPopup is false while the name/birthday
+-- form itself is open. It still owns a spatial menu and the authored bed
+-- body; it must not become locomotion or ordinary wrist HUD.
+if missionCode == 10010 and sequenceName == 'Seq_Game_FewDaysLater2' then
+    return presentation('profile-menu')
+end
+
 -- These hospital lessons read PlayerVars.rightStickX/Y while an authored
 -- scene can still be playing. They need native look input, not locomotion or
 -- combat input. Match both the mission and exact interactive sequence; a
@@ -62,8 +104,9 @@ end
 local lookLesson = missionCode == 10010 and
     (sequenceName == 'Seq_Game_FewDaysLater0' or sequenceName == 'Seq_Game_FewDaysLater1')
 if lookLesson then
-    if title then return presentation('scripted-look-title') end
-    return presentation('scripted-look')
+    local lesson = sequenceName == 'Seq_Game_FewDaysLater0' and '0' or '1'
+    if title then return presentation('scripted-opening-look-' .. lesson) end
+    return presentation('scripted-look-' .. lesson)
 end
 
 local namedDemo = type(sequenceName) == 'string' and string.sub(sequenceName, 1, 9) == 'Seq_Demo_'
@@ -81,12 +124,23 @@ if activeDemo == true then
         if title then return presentation('scripted-look-title') end
         return presentation('scripted-look')
     end
-    if not title and nonPlayableDemo == false then
+    -- Hospital QuietAppear is isInGame=true and retains NORMAL_ACTION /
+    -- PARTS_ACTIVE while its named demo still owns the bed camera and actors.
+    -- Those flags admit background gameplay only outside an authored demo
+    -- sequence. They cannot turn an active Seq_Demo_* shot into gameplay.
+    if not title and not namedDemo and nonPlayableDemo == false then
         local normalAction = checkStatus('NORMAL_ACTION')
         local partsActive = checkStatus('PARTS_ACTIVE')
         if normalAction == true and partsActive == true then
             return presentation('closed')
         end
+    end
+    -- A cleared-save hospital opening plays a real native scene while retail
+    -- retains TitleMode. It is distinct from startup notices and Press Start.
+    -- A recorded movie never claims this 3D opening owner.
+    if title and missionCode == 10010 and sequenceName == 'Seq_Demo_StartHasTitleMission'
+            and queryBoolean(TppVideoPlayer, 'IsVideoStopped') == true then
+        return presentation('scripted-opening-demo')
     end
     if title then return presentation('scripted-demo-title') end
     return presentation('scripted-demo')

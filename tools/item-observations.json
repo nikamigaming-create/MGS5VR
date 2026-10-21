@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "observations": [
+    {
+      "id": "native_cabin_player",
+      "target": "/Assets/tpp/mecha/uth/Scenes/uth0_intr0_def.fmdl",
+      "label": "Helicopter cassette player beside iDroid",
+      "status": "native_geometry_reviewed_and_vr_interaction_observed",
+      "native_representation": "Embedded in the existing helicopter interior model",
+      "vr_actions": ["insert a physical tape", "release to seat", "eject by touching the existing player", "Continue through the native title menu"],
+      "animation": "Native lid animation has not been located or driven; do not equate the mod's tape movement with a retail cutscene animation",
+      "collision": "Owned interior measurements define the mod's player, case, seat and floor contact volumes",
+      "evidence": ["private/cabin-owned-current/seat-inventory.json", "artifacts/bot/runs/20261012T191009165360Z/KEEP", "artifacts/bot/runs/20261012T193635692919Z/KEEP"]
+    },
+    {
+      "id": "cutscene_player_model",
+      "target": "/Assets/tpp/item/pcp/Scenes/pcp0_main0_def.fmdl",
+      "label": "Separate cutscene cassette player",
+      "status": "owned_model_located",
+      "native_representation": "Separate rigged prop; not the cabin player's embedded geometry",
+      "vr_actions": [],
+      "animation": "Model has two bones. Clip binding and native playback remain unverified",
+      "evidence": ["private/cabin-owned-current/inventory.json"]
+    },
+    {
+      "id": "physical_cassette",
+      "target": "/Assets/tpp/item/cct/Scenes/cct0_main1_def.fmdl",
+      "label": "Cassette tape",
+      "status": "native_geometry_and_vr_interaction_observed",
+      "vr_actions": ["grip", "carry", "drop onto the native brown seat", "recover", "insert", "eject"],
+      "animation": "Mod physics and tracked poses move the tape. Native cutscene insertion binding remains unverified",
+      "evidence": ["artifacts/bot/runs/20261012T191009165360Z/KEEP"]
+    },
+    {
+      "id": "physical_binoculars",
+      "target": "/Assets/tpp/item/tel/Scenes/tel0_main0_def.fmdl",
+      "label": "Physical binoculars",
+      "status": "native_geometry_and_scoped_vr_interactions_observed",
+      "vr_actions": ["equip and stow", "hand aim", "zoom", "acquire visible enemies", "clear", "explicitly mark"],
+      "animation": "Tracked pose drives the held prop; native acquire/mark and binocular optics remain in use",
+      "evidence": ["docs/FIELD_IDROID_COMBAT_FIXES.md", "artifacts/dev/idroid-stick-dog-current/markers-tabs-final", "artifacts/bot/runs/20261012T193635692919Z/KEEP"]
+    },
+    {
+      "id": "left_hand_idroid",
+      "target": "/Assets/tpp/item/idr/Scenes/idr0_main0_def.fmdl",
+      "label": "Left bionic hand iDroid",
+      "status": "native_geometry_and_scoped_vr_interactions_observed",
+      "vr_actions": ["open", "handheld navigation", "page tabs", "stow", "reopen"],
+      "animation": "Native cinematic contact and projector are the authored reference; scoped checks do not certify every forced tutorial",
+      "evidence": ["docs/FIELD_IDROID_COMBAT_FIXES.md", "docs/CURRENT.md", "artifacts/bot/runs/20261012T193959514809Z/KEEP"]
+    },
+    {
+      "id": "normal_nvg",
+      "target": "EQP_IT_Nvg",
+      "label": "Night vision goggles",
+      "status": "native_use_observed_in_scoped_simulator_run",
+      "vr_actions": ["native equipment on", "native equipment off", "re-equip"],
+      "animation": "Native visual effect retained; headset-obstructing equipped mesh is hidden by the mod",
+      "evidence": ["docs/NVG_VISIBILITY_FIX.md"]
+    },
+    {
+      "id": "hospital_scissors_shape",
+      "target": "/Assets/tpp/item/cpr/Scenes/cpr0_main0_def.fmdl",
+      "label": "Hospital scissors prop",
+      "status": "owned_geometry_reviewed",
+      "vr_actions": [],
+      "animation": "Two model bones; clip binding and native gameplay interaction not checked",
+      "evidence": ["private/camera-prop-candidates/inventory.json", "private/camera-prop-candidates/native-candidate-shapes.png"]
+    }
+  ]
+}

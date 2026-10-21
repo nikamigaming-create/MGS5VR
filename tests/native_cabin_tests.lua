@@ -33,7 +33,7 @@ return function(source)
    _Activate=function(block)check(block=='mgs5vr_cabin' and calls.bird.enabled,'activate through native rat lifecycle');calls.rats.mgs5vr_cabin_rat_00=true;calls.rats.mgs5vr_cabin_rat_01=true end,
    _Deactivate=function()calls.rats.mgs5vr_cabin_rat_00=false;calls.rats.mgs5vr_cabin_rat_01=false end}
   local original=function(value)calls.clear=calls.clear+1;return value end
-  e.title_sequence={ClearTitleMode=original}
+  e.title_sequence={ClearTitleMode=original,SetOnSelectFlag=function(flag)calls.selection=flag;return flag end}
   setmetatable(e,{__index=_G})
   local function run(requested)
    local fn=assert(loadstring('local requested='..tostring(requested)..'\n'..source))
@@ -65,5 +65,17 @@ return function(source)
  e,c,r=fixture();r(true);e.vars.missionCode=30010
  check(r(false)=='cabin actors retired after saved scene loaded' and c.load==1 and e.vars.buddyType==1,
   'restore the saved buddy choice only after the destination scene arrives')
+ e,c,r=fixture()
+ local setter=e.title_sequence.SetOnSelectFlag
+ r(true)
+ check(e.title_sequence.SetOnSelectFlag(0)==1 and c.selection==1,'helicopter-title Continue uses native ACC branch')
+ check(e.title_sequence.SetOnSelectFlag(2)==2 and c.selection==2,'New Game is not redirected')
+ check(e.title_sequence.SetOnSelectFlag(3)==3 and c.selection==3,'MGO is not redirected')
+ e.gvars.ini_isTitleMode=false
+ check(e.title_sequence.SetOnSelectFlag(0)==0,'late non-title selection stays native')
+ r(false)
+ check(e.title_sequence.SetOnSelectFlag==setter,'retire the title handoff wrapper')
+ e,c,r=fixture();e.vars.missionCode=10010;r(true)
+ check(e.title_sequence.SetOnSelectFlag(0)==0,'hospital onboarding retains native Continue')
  return 'native cabin isolated lifecycle checks passed: '..checks
 end

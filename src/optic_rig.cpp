@@ -74,9 +74,29 @@ WeaponScopeSample ScopePoseStabilizer::update(Pose owner,WeaponScopeSample scope
 
 std::optional<WeaponScopeGeometry> nativeWeaponScopeGeometry(Pose rear,Pose front,
     const std::array<uint8_t,4>& optical){
-    if(!finitePose(rear)||!finitePose(front)||optical[3]!=1||facing(rear,front)<.999f)return {};
+    if(!finitePose(rear)||!finitePose(front)||facing(rear,front)<.999f)return {};
     const auto delta=compose(inverse(rear),front).position;
     if(std::abs(delta.x)>.001f||std::abs(delta.y)>.001f||delta.z<=0)return {};
+    // Baked stock ar00_aw4 / ar03_aw5 sights have no independent st02/st03
+    // model or magnifier hinge. Their shared native CNP span is 174.913 mm.
+    // Apertures below are measured from their owned FMDLs, inset 0.2 mm.
+    // Match the native optical descriptor as well; iron sights cannot borrow it.
+    if(std::abs(delta.z-.174913f)<.0005f){
+        const Pose basis{{0,1,0,0},{}};
+        if(optical==std::array<uint8_t,4>{1,0,0,2}){
+            // Octagonal glass: 16.9645 mm circumradius, inscribed aperture.
+            return WeaponScopeGeometry{compose(rear,Pose{basis.orientation,{0,0,.0089097f}}),
+                compose(front,basis),.0154731f,25,{1,0,0},true,false};
+        }
+        if(optical==std::array<uint8_t,4>{1,2,0,1}){
+            // CNPs describe the forward dot sight; the fixed magnifier's rear
+            // glass is 172.063 mm behind that rear CNP. It is not a flip sight.
+            return WeaponScopeGeometry{compose(rear,Pose{basis.orientation,{0,0,-.1722631f}}),
+                compose(rear,Pose{basis.orientation,{0,0,-.0147061f}}),
+                .0147864f,26,{1,2,0},true,true};
+        }
+    }
+    if(optical[3]!=1)return {};
     // Measurements from the owned sight FMDL aperture and named FCNP pair.
     // Length identifies the assembled sight, not the weapon's name/grade.
     // Insets place the portal at the glass, 0.2 mm toward the eye to avoid

@@ -11,19 +11,13 @@ std::array<Vec3,7> openingPropOffsets() noexcept {
     // The native title camera's LOCAL basis is also the physical cabin basis.
     // Keep the rack on the authored bench, below and beyond the face plane so
     // the tapes remain room props while the Continue target stays reachable.
-    return {{
-        { .60f, -.30f, -1.40f }, // radio/deck
-        {-.12f, -.58f, -1.35f }, // Continue
-        { .11f, -.58f, -1.35f }, // Download MGSV: GZ Save Data
-        { .34f, -.58f, -1.35f }, // Metal Gear Online
-        {-.12f, -.76f, -1.35f }, // Options
-        { .11f, -.76f, -1.35f }, // Delete Save Data
-        { .34f, -.76f, -1.35f }  // Quit Game
-    }};
+    std::array<Vec3,7> offsets{};offsets[0]=cabinPlayerPose().position;
+    const auto homes=cabinTapeHomes();for(size_t i=0;i<6;++i)offsets[i+1]=homes[i].position;
+    return offsets;
 }
 
 std::array<float,7> openingPropScales() noexcept {
-    return {{1.45f,1.75f,1.75f,1.75f,1.75f,1.75f,1.75f}};
+    return {{1,1,1,1,1,1,1}};
 }
 
 bool openingCabinEnabled() noexcept {
@@ -55,11 +49,7 @@ bool openingPropsAvailable() noexcept {
             if(!count||count>=value.size())return std::filesystem::path{};
             std::filesystem::path path(value.data());return path.is_absolute()?path:root/path;
         };
-        return std::filesystem::is_regular_file(configured(L"radio_fmdl",
-                   L"retail-assets\\Assets\\tpp\\item\\rdi\\Scenes\\rdi0_main0_def.fmdl"))
-            &&std::filesystem::is_regular_file(configured(L"radio_diffuse_dds",
-                   L"retail-assets\\Assets\\tpp\\item\\rdi\\Pictures\\rdi0_main0_def_c00_bsm.dds"))
-            &&std::filesystem::is_regular_file(configured(L"cassette_fmdl",
+        return std::filesystem::is_regular_file(configured(L"cassette_fmdl",
                    L"retail-assets\\Assets\\tpp\\item\\cct\\Scenes\\cct0_main1_def.fmdl"))
             &&std::filesystem::is_regular_file(configured(L"cassette_diffuse_dds",
                    L"retail-assets\\Assets\\tpp\\item\\cct\\Pictures\\cct0_main1_def_c00_bsm.dds"));
@@ -70,13 +60,14 @@ void OpeningSelector::reset() noexcept {
     phase_=Phase::idle;
     target_=-1;
     confirmUntil_=0;
-    previousTrigger_=false;
+    routeUntil_=pulseUntil_=0;direction_=OpeningPulse::none;
     initialized_=false;
     origin_={};
+    props_.reset();
 }
 
 OpeningSelectorFrame OpeningSelector::update(bool title,bool assetsAvailable,bool dogAvailable,Pose head,
-    const std::array<TrackedHand,2>& hands,uint64_t now,std::optional<Pose> anchoredOrigin){
+    const std::array<TrackedHand,2>& hands,uint64_t now,std::optional<Pose> anchoredOrigin,OpeningNativeFocus focus,CabinLayout layout){
     OpeningSelectorFrame frame{};
     if(!title||!assetsAvailable){
         // Remember a held trigger while disabled so re-entering the title
@@ -97,58 +88,68 @@ OpeningSelectorFrame OpeningSelector::update(bool title,bool assetsAvailable,boo
     // real bones.  This selector must never turn an authored pose into a
     // claimed pet or gate Continue on a synthetic state.
     (void)dogAvailable;
-    frame.continueReady=true;
+    frame.continueReady=focus.ready&&std::find(focus.actions.begin(),focus.actions.begin()+focus.count,2)
+        !=focus.actions.begin()+focus.count;
 
-    int handIndex=-1;
-    Vec3 relative{};
-    const auto offsets=openingPropOffsets();
-    int hovered=-1;float nearest=.15f*.15f;
-    for(unsigned side=0;side<2;++side){
-        const auto& hand=hands[side];
-        if(!hand.gripTracked||!valid(hand.grip))continue;
-        const auto handRelative=compose(inverse(origin_),hand.grip).position;
-        for(size_t i=1;i<offsets.size();++i){
-            const auto delta=handRelative-offsets[i];
-            const float distance=dot(delta,delta);
-            if(std::isfinite(distance)&&distance<=nearest){
-                nearest=distance;hovered=static_cast<int>(i-1);handIndex=static_cast<int>(side);relative=handRelative;
-            }
-        }
-    }
-    (void)relative;
-    const bool pressed=handIndex>=0&&hands[static_cast<size_t>(handIndex)].trigger>.68f;
-    const bool rising=pressed&&!previousTrigger_;previousTrigger_=pressed;
-    if(phase_==Phase::idle&&rising&&hovered>=0){
-        // The native title enters with CONTINUE focused.  Sending a guessed
-        // six-Up/six-Down traversal was what routed a bad title state into
-        // the GZ/FOB screens.  Keep the only proven route bounded to that
-        // initial focus and refuse every other action until its native focus
-        // reader is verified.
-        if(hovered!=0||!frame.continueReady){
+    std::array<CabinHand,2> cabinHands{};
+    for(size_t side=0;side<2;++side){const auto& hand=hands[side];
+        cabinHands[side]={compose(inverse(origin_),hand.grip),hand.gripTracked,hand.squeeze,hand.trigger,
+            compose(inverse(origin_),Pose{{},hand.indexTip}).position,hand.indexTipTracked};}
+    frame.bench=props_.update(cabinHands,now,layout);
+    const int hovered=frame.bench.hovered;
+    if(phase_==Phase::idle&&frame.bench.activated>=0){
+        const int inserted=frame.bench.activated;
+        constexpr std::array<uint8_t,6> nativeActions{2,3,5,4,7,8};
+        if(!focus.ready||std::find(focus.actions.begin(),focus.actions.begin()+focus.count,nativeActions[inserted])
+           ==focus.actions.begin()+focus.count){
             frame.blocked=true;
-            frame.selection=hovered;
-            if(hovered>=0)frame.action=static_cast<OpeningTapeAction>(hovered);
+            frame.selection=inserted;
+            frame.action=static_cast<OpeningTapeAction>(inserted);
             return frame;
         }
-        target_=hovered;
+        target_=inserted;
         // Hold the native confirm long enough to cross at least one full
         // simulator/native input transaction, but never long enough to
         // become a second menu selection if the save-data prompt appears.
-        phase_=Phase::confirm;
-        confirmUntil_=now+160;
+        phase_=Phase::navigate;routeUntil_=now+5000;
+    }
+
+    if(phase_!=Phase::idle&&phase_!=Phase::confirm){
+        constexpr std::array<uint8_t,6> nativeActions{2,3,5,4,7,8};
+        if(!focus.ready||now>=routeUntil_||frame.bench.inserted!=target_){
+            frame.blocked=true;phase_=Phase::idle;target_=-1;
+        }else if(phase_==Phase::release){
+            // Let the native input see a release, and observe the resulting
+            // focus before generating another edge. Never count guessed rows.
+            if(now>=pulseUntil_+140&&focus.row!=priorRow_)phase_=Phase::navigate;
+        }else if(pulseUntil_&&now<pulseUntil_)frame.pulse=direction_;
+        else {
+            const auto end=focus.actions.begin()+focus.count;
+            const auto desired=std::find(focus.actions.begin(),end,nativeActions[target_]);
+            if(desired==end){frame.blocked=true;phase_=Phase::idle;target_=-1;}
+            else if(focus.row==static_cast<size_t>(desired-focus.actions.begin())){
+                phase_=Phase::confirm;confirmUntil_=now+160;
+            }else{
+                priorRow_=focus.row;direction_=focus.row<desired-focus.actions.begin()?OpeningPulse::down:OpeningPulse::up;
+                pulseUntil_=now+80;frame.pulse=direction_;phase_=Phase::release;
+            }
+        }
+        if(phase_==Phase::release&&now<pulseUntil_)frame.pulse=direction_;
     }
 
     frame.selection=phase_==Phase::idle?hovered:target_;
     if(frame.selection>=0)frame.action=static_cast<OpeningTapeAction>(frame.selection);
     if(phase_==Phase::confirm){
-        if(now<confirmUntil_)frame.pulse=OpeningPulse::confirm;
+        constexpr std::array<uint8_t,6> nativeActions{2,3,5,4,7,8};
+        if(now<confirmUntil_&&focus.ready&&focus.actions[focus.row]==nativeActions[target_]
+           &&frame.bench.inserted==target_)frame.pulse=OpeningPulse::confirm;
         else {phase_=Phase::idle;target_=-1;confirmUntil_=0;}
     }
     return frame;
 }
 
 OpeningSelectorFrame OpeningSelector::updateCabin(bool active,Pose head,
-    const std::array<TrackedHand,2>& hands,uint64_t now){
+    const std::array<TrackedHand,2>& hands,uint64_t now,std::optional<Pose> anchoredOrigin,CabinLayout layout){
     OpeningSelectorFrame frame{};
     if(!active||!valid(head))return frame;
     if(!initialized_){
@@ -156,8 +157,14 @@ OpeningSelectorFrame OpeningSelector::updateCabin(bool active,Pose head,
         origin_=head;
     }
     frame.cabinActive=true;
+    if(anchoredOrigin&&valid(*anchoredOrigin))origin_=*anchoredOrigin;
     frame.origin=origin_;
-    (void)hands;(void)now;
+    std::array<CabinHand,2> cabinHands{};
+    for(size_t side=0;side<2;++side){const auto& hand=hands[side];
+        cabinHands[side]={compose(inverse(origin_),hand.grip),hand.gripTracked,hand.squeeze,hand.trigger,
+            compose(inverse(origin_),Pose{{},hand.indexTip}).position,hand.indexTipTracked};}
+    frame.bench=props_.update(cabinHands,now,layout);
+    frame.selection=frame.bench.hovered;
     return frame;
 }
 

@@ -1,4 +1,6 @@
 #pragma once
+#include "cabin_props.hpp"
+#include "cabin_studio.hpp"
 #include "core.hpp"
 #include "optic_rig.hpp"
 #include "room_bounds.hpp"
@@ -9,8 +11,17 @@
 #include <mutex>
 
 namespace mgs5vr {
+std::optional<float> physicalFloorHeightOffset(float headY,float floorY,float units,float standingEyeHeight);
 enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch, sceneUnavailable, staleRig };
-struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{},nativeIdroidOpen{}; uint32_t rigRejectFlags{}; uint64_t rigAgeMs{}; uint64_t sceneTransitionActivation{}; };
+enum class PlayerPosture { unknown,standing,crouched,prone };
+struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{},nativeIdroidOpen{}; uint32_t rigRejectFlags{}; uint64_t rigAgeMs{}; uint64_t sceneTransitionActivation{};
+    // Read-only provenance: 1 authored mode, 2 reference rebase, 3 avatar
+    // source, 4 authored source, 5 unowned shot, 6 player-owner join,
+    // 7 player resume, 8 pending camera, 9 scene resume, 10 explicit recenter.
+    uint8_t activationCause{};uintptr_t sourceCamera{},sourcePlayerOwner{};uint64_t ownerHeadTime{};
+    // Last retirement entry: 1 loading, 2 menu, 3 missing exact skin join.
+    uint8_t awaitCause{},awaitJoinFlags{};uint64_t awaitTime{},awaitOwnerAge{};
+};
 // New pixels require a currently accepted camera publication. Suspended
 // sources can retain only an image that was admitted before the suspension.
 constexpr bool mayAcceptNewStereoPair(HeadCameraStatus status) noexcept {
@@ -37,6 +48,8 @@ struct TrackedHand {
     bool gripTracked{},aimTracked{};
     float trigger{},squeeze{};
     bool triggerTouched{},thumbTouched{};
+    Vec3 indexTip{};
+    bool indexTipTracked{};
 };
 struct ControllerFrame {
     std::array<TrackedHand,2> hands{};
@@ -69,6 +82,8 @@ struct ControllerFrame {
     // stretches when the user chooses a more comfortable panel size.
     float idroidScreenWidth{.45f};
     float idroidScreenDepth{.09f},playerHeightOffset{};
+    float physicalFloorY{}; // Runtime STAGE floor expressed in this sample's LOCAL space.
+    bool physicalFloorTracked{};
     // Display fit relative to the native hologram socket, not the hand rig.
     Vec3 idroidScreenOffset{};
     Quat idroidScreenRotation{};
@@ -104,11 +119,14 @@ struct ControllerFrame {
     float snapYaw{}; // Absolute world-Y turn carried by this tracking publication.
     bool frontEnd{}; // Native Title/loading backdrop and floating menu.
     bool loading{}; // Native loading/help terminal owns a live, actionable screen.
-    bool avatarEditor{}; // Native name/appearance layout belongs on a quad over the retained hospital view.
+    bool avatarEditor{}; // Full native appearance preview/canvas on a quad over retained hospital stereo.
+    bool nativeSceneCanvas{}; // Native credit/result/reward canvas; retain the clear stereo world behind it.
     bool scriptedDemo{}; // Native demo state; accept its authored camera without a player-head publication.
     bool scriptedLook{}; // Hospital look lessons retain their interactive native pitch/roll.
+    uint64_t headLookLessonKey{}; // Positive, fresh native hospital lesson routed through HMD motion.
     bool authoredCamera{}; // Follow the current native shot, including its position, pitch and roll.
     bool openingSelector{}; // Physical title tape rack owns a native pulse.
+    bool openingNativeMenu{}; // Explicit native menu access keeps props optional.
     bool openingBackend{}; // Actual title only; never suppress loading/prologue UI.
     bool cabinPlay{}; // Post-loading helicopter cabin sandbox owns tracked interaction.
     bool cabinDeployHint{}; // Actual ACC, not field transit; render only on the source LEFT forearm.
@@ -116,14 +134,22 @@ struct ControllerFrame {
     std::array<float,2> cabinMove{}; // Title-cabin thumbstick locomotion; does not enter the native gamepad.
     NativeRoomBounds cabinBounds{}; // Sampled native actor envelope, not a walking boundary.
     int openingSelection{-1}; // Hovered/active tape, in openingTapeLabels order.
+    CabinBenchFrame openingBench{};
+    CabinLayout openingLayout{};
+    std::shared_ptr<const CabinStudioFrame> studio;
+    bool openingPropsActive{};
+    bool cameraWorldFrozen{}; // Acknowledged mod-owned native pause, never a stock menu.
     Pose openingOrigin{};
     Pose openingWorldOrigin{}; // Native anchor captured once, before collision correction.
     bool openingWorldAnchored{};
+    PlayerPosture playerPosture{PlayerPosture::unknown};
+    bool fullBody{},seatedMode{},cinematicFreeMove{true};
+    std::array<float,2> cinematicMove{};
 };
 // A platform overlay takes input focus, not ownership of the game scene.
 // Keep presentation settings and native scene identity; discard every action.
 inline ControllerFrame passiveControllerFrame(ControllerFrame frame,int64_t time,uint64_t epoch){
-    frame.hands={};frame.optic={};frame.strikeCurl={};frame.cabinMove={};
+    frame.hands={};frame.optic={};frame.strikeCurl={};frame.cabinMove={};frame.cinematicMove={};
     frame.presentationFocused=false;
     frame.weaponReady=frame.supportGrip=frame.vehicleControls=frame.nativeActionControls=frame.wheelGrip=false;
     frame.rightWheelGrip=frame.vehicleWeaponIntent=false;
@@ -143,6 +169,8 @@ struct WeaponRigDiagnostics {
     uint32_t instanceFirst{},playerIndex{},resourceHandle{},flags{},mode{};
     std::array<uint8_t,4> optical{};
     Pose muzzleInGrip{};
+    Vec3 nativeAimTarget{}; // Original weapon instance +0x140, before the shot adapter's private copy.
+    bool nativeAimTargetRead{};
     Pose sightRear{},sightFront{},sightRearInWrist{},sightFrontInWrist{},sightRearLocal{},sightFrontLocal{};
     bool sightQueryAttempted{},sightRearRead{},sightFrontRead{},sightRearValid{},sightFrontValid{};
     bool sampled{},componentAccepted{},instanceIndexMatched{},resourceAccepted{};
@@ -152,6 +180,18 @@ struct WeaponRigDiagnostics {
     uint64_t magnifierModelCode{};
 };
 struct HeadCameraSample {
+    struct BodyRig {
+        bool valid{},spineClamped{},mounted{};
+        uint32_t rejection{}; // 1 source, 2 spine, 3 eye fit, 4 leg, 5 final eyes.
+        uint32_t floorQueries{},floorContacts{},headContacts{};
+        Pose pelvis{},chest{},head{},eye{};
+        Vec3 eyeError{}; // Solved anatomical eyes minus this skin transaction's submitted viewer.
+        std::array<Pose,2> feet{};
+        std::array<float,2> floorClearance{};
+        std::array<float,2> legScale{1.f,1.f};
+        float legCalibration{1.f};
+        std::array<float,2> nativeFloorClearance{};
+    };
     Pose nativePose{}, headPose{};
     uint64_t trackingSequence{}, activation{};
     bool applied{};
@@ -162,6 +202,8 @@ struct HeadCameraSample {
     uint64_t playerSequence{};
     uintptr_t playerOwner{};
     Vec3 playerHead{};
+    uintptr_t anatomicalEyeModel{}; // Matching original skin, retained only by an admitted frozen/menu frame.
+    BodyRig body;
     Pose cabinBasePose{}; // Passenger anchor before tracked head motion, from this exact player publication.
     bool cabinBaseTracked{};
     ControllerFrame controllers{};
@@ -193,6 +235,21 @@ struct HeadCameraSample {
     Pose idroidDevice{}; // Native device root from this solved wrist/socket transaction, WORLD space.
     bool idroidDeviceTracked{};
     WeaponRigDiagnostics weaponRig{}; // Same retained skin/camera publication; not a native draw observation.
+    // Cinematic follow state used for this submitted view, before tracked head motion.
+    Pose cinematicBasePose{};
+    Vec3 cinematicFreeOffset{};
+    bool cinematicFollowValid{};
+    Quat locomotionHeading{}; // Accepted native heading plus snap, before physical HMD neck look.
+    bool locomotionHeadingTracked{};
+    // Untouched owned skin from this rig transaction. Keep these distinct
+    // from the retargeted body/eye fit: a fitted eye can match a misplaced
+    // viewer perfectly while its original native head was elsewhere.
+    bool nativeBodySourceTracked{};
+    Pose nativeBodySourceRoot{},nativeBodySourceChest{},nativeBodySourceHead{},nativeBodySourceEye{};
+    // Exact native projectile view paired with this player publication. The
+    // world view remains anchored to Snake; this is never a retained image.
+    Pose rocketArmCamera{};
+    bool rocketArmGuidance{};
 };
 // Native listener adapters consume the center-head pose from the camera's
 // existing publication, never a newer tracking sample or an individual eye.
@@ -202,13 +259,22 @@ std::optional<Pose> trackedListenerPose(const HeadCameraSample& frame,
 // the character's published head bone; the root places that character in world.
 std::optional<Vec3> playerHeadPosition(const std::array<float,16>& worldFromPlayer,
                                      const std::array<float,16>& playerFromHead);
+// Supplied only by the validated player skin transaction, before retargeting.
+// The camera owner's cached HEAD affine is an independent animated frame.
+struct NativeBodyHead {
+    uintptr_t owner{},model{};
+    Pose worldFromHead{};
+    Pose worldFromRoot{},worldFromChest{};
+    bool bodyFramesTracked{};
+};
 // Experimental render-camera control. Does not change native weapon ballistics.
 class HeadCamera {
 public:
     void configure(bool enabled,float nativeUnitsPerMeter=1,bool requirePlayerHead=false);
     bool publishPlayerHead(uintptr_t camera,uintptr_t owner,Pose sourceCamera,
                            const std::array<float,16>& worldFromPlayer,
-                           const std::array<float,16>& playerFromHead,uint64_t milliseconds);
+                           const std::array<float,16>& playerFromHead,uint64_t milliseconds,
+                           bool verifiedRocketArmGuidance=false);
     void track(Pose head,bool validTracking,uint64_t milliseconds);
     void trackStereo(Pose head,const std::array<EyeView,2>& views,bool validTracking,uint64_t milliseconds,
                      ControllerFrame controllers={});
@@ -221,12 +287,14 @@ public:
     // A publisher timeout alone is not a loading/menu transition.
     void awaitScene(bool nativeLoading);
     void cancel(HeadCameraStop reason=HeadCameraStop::manual);
-    HeadCameraSample resolve(uintptr_t camera,Pose nativePose,uint64_t milliseconds);
+    HeadCameraSample resolve(uintptr_t camera,Pose nativePose,uint64_t milliseconds,
+                            std::optional<NativeBodyHead> nativeHead={});
     // Samples the steady clock while holding the same lock as the tracked pose.
     // A pose published between an earlier timestamp and lock acquisition must
     // not be mistaken for a clock reversal.
     HeadCameraSample resolveCurrent(uintptr_t camera,Pose nativePose);
-    HeadCameraSample resolveCurrentForRig(uintptr_t camera,Pose nativePose);
+    HeadCameraSample resolveCurrentForRig(uintptr_t camera,Pose nativePose,
+                                         std::optional<NativeBodyHead> nativeHead={});
     bool publishRigFrame(uintptr_t camera,uintptr_t owner,Pose sourceCamera,HeadCameraSample frame);
     std::optional<Pose> openingTrackingOrigin(uint64_t milliseconds) const;
     bool available() const;
@@ -241,19 +309,26 @@ public:
     // This is not evidence that its pixels have reached a final eye.
     std::optional<HeadCameraSample> publishedRigFrame(uint64_t milliseconds) const;
 private:
-    HeadCameraSample resolveLocked(uintptr_t camera,Pose nativePose,uint64_t milliseconds,bool useRig=true);
+    bool joinNativeBodyHeadLocked(uintptr_t camera,Pose sourceCamera,
+                                 const NativeBodyHead& nativeHead,uint64_t milliseconds);
+    HeadCameraSample resolveLocked(uintptr_t camera,Pose nativePose,uint64_t milliseconds,
+                                  bool useRig=true,bool nativeEyeJoined=false);
     Pose followCinematicLocked(Pose nativePose,uint64_t milliseconds,bool advance);
     void cancelLocked(HeadCameraStop reason);
     void suspendLocked(HeadCameraStop reason);
-    void awaitPlayerLocked();
+    void awaitPlayerLocked(uint8_t cause);
     mutable std::mutex mutex_;
     Pose head_{}, origin_{},frontEndOrigin_{},frontEndPanel_{};
     Pose lastTitleSource_{},avatarEditorBackdrop_{};
     uintptr_t camera_{},playerOwner_{};
     uint64_t time_{},sequence_{},activation_{};
+    uint8_t activationCause_{};
+    uint8_t awaitCause_{},awaitJoinFlags_{};uint64_t awaitTime_{},awaitOwnerAge_{};
     uint64_t sceneTransitionActivation_{},sceneTransitionAt_{}; // Intentional native shot/control handoffs only.
     uint64_t trackingEpoch_{};
     float units_{1};
+    float seatedHeadY_{};
+    bool seatedMode_{};
     float snapYaw_{};
     Vec3 snapTranslation_{}; // Native-yaw local, not a persistent world-space offset.
     bool enabled_{},tracking_{},pending_{},active_{};
@@ -263,6 +338,9 @@ private:
     bool nativeMenuOpen_{};
     bool nativeIdroidOpen_{};
     bool nativeIdroidPaused_{};
+    bool cameraFreezeAnchored_{};
+    Pose cameraFreezeNative_{};
+    Pose cameraFreezeHead_{};
     uint64_t menuGeneration_{};
     bool awaitingScene_{};
     HeadCameraSample lastView_{};
@@ -272,6 +350,8 @@ private:
     bool recenterPending_{};
     bool lastTitleSourceValid_{},avatarEditorBackdropValid_{};
     bool scriptedDemoActive_{};
+    Pose headLookLessonAnchor_{};
+    uint64_t headLookLessonKey_{};
     struct CinematicFollowState {
         Pose pose{};
         Vec3 rawPosition{};
@@ -279,6 +359,7 @@ private:
         uintptr_t camera{};
         uint64_t time{},activation{};
         bool valid{};
+        Vec3 freeOffset{};
     } cinematicFollow_;
     struct DriverViewState {
         float nativeYaw{},rootYaw{},lookYaw{};
@@ -301,6 +382,8 @@ private:
         Pose sourceCamera{};
         Vec3 position{};
         uint64_t time{},sequence{};
+        bool rocketArmGuidance{};
+        Quat rootHeading{};
     };
     std::array<PlayerHead,8> playerHeads_{};
     uint64_t playerSequence_{},ownerHeadTime_{};

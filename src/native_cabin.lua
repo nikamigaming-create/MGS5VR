@@ -1,6 +1,26 @@
 -- Game-owned D-Dog lifecycle for the title helicopter only. No save, unlock,
 -- synthetic mesh, or field actor placement. `requested` is supplied by C++.
 if type(mvars)~='table' or type(title_sequence)~='table' then return 'unavailable' end
+-- Retail title_sequence.lua: Continue selects 0, RestartHeli selects 1;
+-- both enter Seq_Demo_CheckDlc and the normal native loading lifecycle.
+-- Only the unlocked helicopter title gets the ACC landing policy. Hospital
+-- onboarding, New Game (2), MGO (3), saves and native progression stay owned
+-- by the game. Menu and cassette Continue dispatch through this same setter.
+local handoff=mvars.mgs5vr_titleAccHandoff
+if requested and gvars.ini_isTitleMode and TppMission.IsHelicopterSpace(vars.missionCode) then
+ if not handoff and type(title_sequence.SetOnSelectFlag)=='function' then
+  handoff={original=title_sequence.SetOnSelectFlag}
+  handoff.wrapper=function(flag)
+   if flag==0 and gvars.ini_isTitleMode and TppMission.IsHelicopterSpace(vars.missionCode) then flag=1 end
+   return handoff.original(flag)
+  end
+  mvars.mgs5vr_titleAccHandoff=handoff
+  title_sequence.SetOnSelectFlag=handoff.wrapper
+ end
+elseif handoff then
+ if title_sequence.SetOnSelectFlag==handoff.wrapper then title_sequence.SetOnSelectFlag=handoff.original end
+ mvars.mgs5vr_titleAccHandoff=nil
+end
 local scope='heli_common_sequence.lua'
 local saved=mvars.mgs5vr_cabinBuddyRestore
 local function cabinRats(enabled)

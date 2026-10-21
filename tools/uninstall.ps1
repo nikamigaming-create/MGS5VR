@@ -8,6 +8,8 @@ $mgsRecordPath = Join-Path $mgsTarget 'mgs5vr-install.json'
 $mgsRecord = Get-Content -Raw -LiteralPath $mgsRecordPath | ConvertFrom-Json
 if ($mgsRecord.schema -ne 1 -or $mgsRecord.product -ne 'MGS5VR theatre preview' -or $mgsRecord.game_dir -ne $mgsTarget) { throw 'Installation record does not match this directory.' }
 $mgsOwnedNames = @('dinput8.dll','mgs5vr.ini','mgs5vr-controls.ini','mgs5vr_controls.exe',
+    'assets\controls\left.mesh','assets\controls\right.mesh','assets\controls\left.png','assets\controls\right.png',
+    'assets\controls\LICENSE.txt','assets\controls\provenance.json',
     'retail-assets\Assets\tpp\item\tel\Scenes\tel0_main0_def.fmdl',
     'retail-assets\Assets\tpp\item\tel\Pictures\tel0_main0_def_c00_bsm.dds',
     'retail-assets\Assets\tpp\item\cct\Scenes\cct0_main1_def.fmdl',
