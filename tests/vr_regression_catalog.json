@@ -3504,6 +3504,7 @@
       "source_paths": [
         "src/vehicle_weapon.cpp",
         "include/mgs5vr/vehicle_weapon.hpp",
+        "include/mgs5vr/vehicle_view.hpp",
         "include/mgs5vr/mounted_grip.hpp",
         "include/mgs5vr/vehicle_pedals.hpp",
         "src/input_bridge.cpp",

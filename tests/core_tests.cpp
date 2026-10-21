@@ -2903,6 +2903,7 @@ int main(){
     {
         HeadCamera driver;driver.configure(true,1,true);
         ControllerFrame input;input.vehicleControls=true;input.vehicleMounted=true;input.handheldMenus=true;
+        input.vehicleView={true,false,true,true,25600,1.570796327f};
         input.referenceEpoch=1;input.predictedXrTime=1;
         auto root=identityMatrix;root[12]=100.f;
         root[0]=root[10]=0;root[2]=-1;root[8]=1;
@@ -2937,13 +2938,14 @@ int main(){
             "deliberate vehicle right-stick native look retains its angular response in the seated VR view");
         input.vehicleViewInput={};
         root[0]=root[10]=-std::sin(.2f);root[2]=-std::cos(.2f);root[8]=std::cos(.2f);
+        input.vehicleView.heading+=.2f;
         movingChase.orientation={0,std::sin(-.8f),0,std::cos(-.8f)};
         driver.trackStereo({},rigEyes,true,130,input);
         driver.publishPlayerHead(31,42,movingChase,root,head,130);
         const auto turning=driver.resolve(31,movingChase,130);
         expect(turning.applied&&same(rotate(turning.nativePose.orientation,{0,0,1}),
                 Vec3{std::cos(.4f),0,-std::sin(.4f)}),
-            "vehicle heading advances once while the native look offset remains relative to the seated body");
+            "vehicle heading advances once while native look remains relative to the carrier");
         input.vehicleControls=false;
         movingChase.orientation={0,std::sin(-.2f),0,std::cos(-.2f)};
         driver.trackStereo({},rigEyes,true,390,input);
@@ -4837,6 +4839,30 @@ int main(){
         hand.position={.7f,0,0};expect(!step(true,14).held,"excess reach releases snapped hand");
         hand.position={};expect(!step(true,15).held,"returning in reach while squeezed cannot regrab");
         step(false,16);step(true,17);expect(!step(true,300).held,"stale publication releases mounted grip");
+    }
+    {
+        VehicleViewHeading view;
+        NativeVehicleView foot{true,true,false,false,65535,0};
+        NativeVehicleView jeep{true,false,true,true,25600,2.872148f};
+        expect(near(view.update(.584f,.5f,foot,false,100),.584f),"ordinary view retains native heading before entry");
+        expect(near(view.update(.219f,0,jeep,false,110),1.084f),"entry retains pre-action yaw and the consumed snap without HMD double composition");
+        expect(near(view.update(1.301f,0,jeep,false,120),1.084f),"entry actor and chase-camera swing do not rotate fixed vehicle view");
+        jeep.heading+=.2f;
+        expect(near(view.update(1.501f,0,jeep,false,130),1.284f),"actual carrier yaw turns seated view");
+        expect(near(view.update(1.601f,0,jeep,true,140),1.384f),"deliberate seated native look remains available");
+        NativeVehicleView exiting{true,false,false,false,65535,0};
+        view.update(1.601f,0,jeep,false,500);
+        expect(near(view.update(2.125f,0,exiting,false,510),1.384f),"exit camera auto-orbit cannot turn the retained view");
+        expect(near(view.update(2.31f,0,foot,false,600),1.384f),"native normal-action handoff preserves yaw");
+        expect(near(view.update(2.51f,0,foot,true,610),1.584f),"ordinary smooth look works after exit with retained heading offset");
+        view.reset();
+        expect(near(view.update(-.8f,0,foot,false,700),-.8f),"new authored camera owner clears old vehicle offset");
+        expect(near(view.update(-1.05f,0,foot,false,710,true),-.8f),
+            "Y captures the previous view even when retail alignment precedes the occupancy status");
+        expect(near(view.update(-1.2f,0,foot,false,720),-.8f),
+            "releasing Y during the early normal-action entry phase retains the captured view");
+        expect(near(view.update(-1.4f,0,jeep,false,730),-.8f),
+            "later native vehicle occupancy cannot replace the Y-edge heading");
     }
     std::cout<<checks<<" contract checks, "<<failures<<" failures. These tests do not prove in-game or headset behavior.\n";
     return failures?1:0;

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "56d5a6b01274",
+  "candidate": "6b560649c200",
   "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -358,7 +358,7 @@
     {
       "id": "FP03",
       "title": "Contextual Y actions force camera yaw: Fulton, vehicle entry and climbing",
-      "status": "reproduced_unfixed",
+      "status": "jeep_entry_exit_fixed_scoped_other_actions_open",
       "acceptance": [
         "before/during/after extraction at multiple headings",
         "native actor/engine camera/HMD yaw telemetry",
@@ -391,6 +391,39 @@
         {
           "run": "20261021T200417973648Z",
           "result": "No exit dispatched: native network notice owned menu. Observed notice dismissed with existing menus.confirm in200457570168; subsequent native exit200533374378 succeeded.",
+          "acceptance": false
+        },
+        {
+          "candidate": "6b560649c200",
+          "runs": [
+            "20261021T205413282806Z",
+            "20261021T205645741573Z",
+            "20261021T205323517729Z",
+            "20261021T205610386534Z",
+            "20261021T205710624856Z",
+            "20261021T205545904242Z",
+            "20261021T205348077880Z"
+          ],
+          "result": "Preserve pre-Y view before native occupancy changes; follow read-only actual vehicle heading rather than animated actor root. Retained settled entries at62.1 and37.6 degrees vary0.0221/0.0232 degrees; exits at62.1 and37.7 vary0.0188/0.0180 degrees. Deliberate seated right look changes62.11 to37.66 degrees. Short native on-foot walk after exit completes. Both settled62-degree eyes reviewed.",
+          "limits": [
+            "Earlier148-degree entry/exit and initial62-degree run were observed but scratch evidence expired; excluded from retained acceptance.",
+            "Four retained entry headings, driving turns, Fulton, table/sandbag climb, cancellation and physical Quest remain unverified.",
+            "Final entry attempt205748007157 did not acquire vehicle after approach; retained as failed interaction, not camera acceptance."
+          ],
+          "implementation": "Native local-owner/phase/ridden-ID validation; exact active TppVehicle2 record; Y-edge preserves view before ON_VEHICLE; native NORMAL_ACTION returns ordinary ownership without fixed entry timer."
+        },
+        {
+          "candidate": "9f86dc0de955",
+          "runs": [
+            "20261021T202237701821Z",
+            "20261021T202505737910Z"
+          ],
+          "result": "Rejected intermediate: entry still turns14.37 degrees because native alignment starts before occupancy; exit variation0.0191 degrees. Added pre-action Y-edge capture in final candidate."
+        },
+        {
+          "candidate": "6b560649c200",
+          "run": "20261021T205449251525Z",
+          "result": "Deliberate-look recipe refused before dispatch because outcome already satisfied. Corrected observable outcome; subsequent205545904242 changes view. No production change for recipe refusal.",
           "acceptance": false
         }
       ],
@@ -601,6 +634,16 @@
             "Existing edge-on handset presentation and support-finger contact remain open.",
             "Capture cadence~3fps does not establish headset performance or temporal stereo acceptance."
           ]
+        },
+        {
+          "candidate": "6b560649c200",
+          "runs": [
+            "20261021T204714804564Z",
+            "20261021T205153724491Z",
+            "20261021T205258259927Z"
+          ],
+          "result": "Seated open first interrupted by native Challenge Tasks help, then Exit Tutorial notice on stow. Reviewed and dismissed using existing VR menu bindings. Subsequent ordinary open/stow succeeds with view62.092 degrees throughout138 samples. Both eyes show left-hand projection still edge-on in neutral test pose.",
+          "limitation": "Ownership/heading continuity only; handset alignment and physical readability remain unresolved."
         }
       ]
     },

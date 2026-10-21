@@ -29,7 +29,7 @@ source work has been consolidated and pushed.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Production candidate checked in game and installed: `56d5a6b01274`.
+Production candidate checked in game and installed: `6b560649c200`.
 Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).
@@ -59,18 +59,23 @@ cover step-out, mounted weapons and native iDroid alignment. Do not interpret
 
 ## Vehicle rotation continuation
 
-FP03 is now reproduced in the native deployed jeep with a fixed HMD. Entry
-from33.45 degrees settles164.56 degrees after an additional intermediate swing;
-exit also rotates the view. Driver view currently follows Snake's animated
-root and starts with zero look offset; exit restores native chase-camera yaw.
-The actual vehicle heading and exact local ridden-ID lookup are resolved from
-owned native code and read-only live data. Private continuation:
-`private/current-vehicle-heading-contract.md`. No production repair was made
-in this investigation. Use the vehicle's heading changes while preserving the
-pre-action viewing direction; also handle exit and existing snap-turn state.
-Do not mask entry with a fixed timer or certify Fulton/climbing from jeep work.
+Development6b560 preserves the pre-Y view before native occupancy changes,
+follows the actual TppVehicle2 carrier heading and retains the heading through
+exit. Earlier9f86 still moved14 degrees on entry and was rejected. The final
+candidate has retained settled entries at62/38 degrees and exits within0.03
+degrees. Deliberate seated look changes62 to38 degrees; ordinary iDroid reopen
+and stow preserve that view. Native tutorial notices interrupted the first
+roundtrip and were reviewed and dismissed. The handset remains edge-on in the
+neutral test pose: ownership continuity is not alignment acceptance.
 
-Runs193830194950,193922082738,195034107680 and200533374378 are retained.
-The native network notice interrupting200417973648 was dismissed with the
-existing VR Confirm binding in200457570168; no exit input was dispatched by
-the interrupted case. Owned game/simulator then closed; Steam retained.
+Retained runs and limits are in FREE_PLAY_ACCEPTANCE.json. Earlier148-degree
+and initial62-degree scratch runs expired and are excluded from retained
+acceptance. A final entry approach did not acquire the jeep; it is a failed
+interaction, not a yaw pass. Four retained headings, actual driving turns,
+Fulton, table/sandbag climbing and physical Quest remain open. Do not certify
+all Y actions from the jeep correction. Read-only native research remains in
+private/current-vehicle-heading-contract.md; production now implements it.
+
+Owned game/simulator closed after these checks; Steam retained. No test panel
+or runner left open. Continue the unresolved gameplay list, especially native
+action variants, cover step-out and handheld projection; do not expand harnesses.

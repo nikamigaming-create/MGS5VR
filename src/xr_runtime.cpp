@@ -539,6 +539,7 @@ struct Session {
         if(priorFocused)presentationEpoch=nextRigPresentationEpoch();
         publishControlInputAudit({});
         controllerFrame=passiveControllerFrame(controllerFrame,time,referenceEpoch);
+        controllerFrame.vehicleView=nativeVehicleView();
         controllerFrame.presentationEpoch=presentationEpoch;
         idroidBackRecovery.suspend();requestNativeIdroidClose(false);requestHandheldIdroidOpen(0);priorIdroidTap=false;nativeControls.suspend();
         snapControls.reset();smoothControls.reset();cabinTurn.reset();cinematicTurn.reset();rigControls.suspend();controls.suspend();
@@ -619,6 +620,7 @@ struct Session {
         openingBackend=title;
         const auto mode=(cabinPlay||cabinTransit)&&!title&&detectedMode==TravelMode::unknown?TravelMode::onFoot:detectedMode;
         controllerFrame.vehicleMounted=detectedMode==TravelMode::vehicle;
+        controllerFrame.vehicleView=nativeVehicleView();
         if(loading!=priorLoadingTips){
             const bool wasLoading=priorLoadingTips;
             priorLoadingTips=loading;
@@ -1496,7 +1498,7 @@ struct Session {
         if(cabinYaw)snapYaw=std::remainder(snapYaw+cabinYaw,6.283185307f);
         if(cinematicYaw)snapYaw=std::remainder(snapYaw+cinematicYaw,6.283185307f);
         controllerFrame.snapYaw=snapYaw;
-        if(controllerFrame.vehicleControls&&!nativeInput.exclusive&&!stickNavigation
+        if(rigInput&&!nativeInput.exclusive&&!stickNavigation
            &&!center&&!headToggle&&!utilityCenter)
             controllerFrame.vehicleViewInput={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
         // Apply LAST: the generic menu mapping otherwise overwrites the zero
@@ -1565,6 +1567,8 @@ struct Session {
             controllerFrame.allowMotionMelee=controllerFrame.allowAnimalTouch=false;
         }
         lastMappedWeaponReady=controllerFrame.weaponReady&&pad.leftTrigger>127;
+        controllerFrame.contextInteract=rigInput&&!nativeInput.exclusive&&(pad.buttons&XINPUT_GAMEPAD_Y)
+            &&(activeControl("gameplay.interact")||activeControl("vehicle.interact"));
         gamepadMailbox().publish(pad,true,packetTime,controls.hasPhysicalIntent(physical));
         publishControlInputAudit({controlContext,editorInputOwned?editorPhysical:physical,packetTime,pad.buttons,rigInput,static_cast<int>(mode),
             {pad.leftX,pad.leftY,pad.rightX,pad.rightY},{pad.leftTrigger,pad.rightTrigger}});

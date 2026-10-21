@@ -129,7 +129,8 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     lastTitleSource_={};avatarEditorBackdrop_={};lastTitleSourceValid_=avatarEditorBackdropValid_=false;
     scriptedDemoActive_=false;cinematicFollow_={};sceneTransitionActivation_=0;
     headLookLessonKey_=0;
-    snapYaw_=0;snapTranslation_={};recenterPending_=false;driverView_={};
+    snapYaw_=0;snapTranslation_={};recenterPending_=false;driverView_={};vehicleHeading_.reset();
+    vehicleHeadingCamera_=vehicleHeadingOwner_=vehicleHeadingEpoch_=0;
     clearPlayerRootSamples();
     resetStabilization(this);
 }
@@ -764,7 +765,11 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         nativePose=headLookLessonAnchor_;
     }else headLookLessonKey_=0;
     if((!spatialMenu||liveHandheldMenu)&&!controllers_.authoredCamera){
-        if((controllers_.vehicleMounted||controllers_.cabinTransit)&&!controllers_.nativeGamepad){
+        // Horses and other native mounts keep their established camera path.
+        // This adapter resolves the actual TppVehicle2 carrier only.
+        const bool otherCarrier=controllers_.vehicleView.valid&&controllers_.vehicleView.object!=65535
+            &&(controllers_.vehicleView.object>>9)!=50;
+        if((controllers_.cabinTransit||(controllers_.vehicleMounted&&otherCarrier))&&!controllers_.nativeGamepad){
             PlayerRootSample root;
             if(!getPlayerRootSample(camera,result.playerOwner,result.playerSequence,time,root)){
                 rig_={};suspendLocked(HeadCameraStop::playerHeadUnavailable);return result;
@@ -803,7 +808,20 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             // seat; HMD turning/leaning and cabin walking are applied below.
             if(view.passenger)nativePose.position=root.position+rotate(root.orientation,view.headLocalOffset);
         }else driverView_={};
+        if(!otherCarrier&&!controllers_.cabinTransit&&!controllers_.cabinPlay&&!controllers_.frontEnd
+           &&!controllers_.scriptedDemo&&!controllers_.nativeGamepad){
+            if(vehicleHeadingCamera_!=camera||vehicleHeadingOwner_!=result.playerOwner
+               ||vehicleHeadingEpoch_!=controllers_.referenceEpoch){
+                vehicleHeading_.reset();vehicleHeadingCamera_=camera;vehicleHeadingOwner_=result.playerOwner;
+                vehicleHeadingEpoch_=controllers_.referenceEpoch;
+            }
+            const bool looking=std::abs(controllers_.vehicleViewInput[0])>.18f
+                ||std::abs(controllers_.vehicleViewInput[1])>.18f;
+            nativePose.orientation=yawRotation(vehicleHeading_.update(horizontalYaw(nativePose.orientation),
+                controllers_.snapYaw,controllers_.vehicleView,looking,time,controllers_.contextInteract));
+        }else vehicleHeading_.reset();
     }
+    if(controllers_.authoredCamera||controllers_.nativeGamepad)vehicleHeading_.reset();
     // The native camera can look down, lean, recoil or bank. Its yaw supplies
     // gameplay heading; gravity and physical HMD pitch/roll supply the VR view.
     // A full native/activation rotation tilts the tracking space when turning.

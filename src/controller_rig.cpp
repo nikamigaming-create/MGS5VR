@@ -2328,6 +2328,49 @@ TravelMode nativeTravelMode() noexcept{
     }
     return now>=sampledAt&&now-sampledAt<=150?cached:TravelMode::unknown;
 }
+NativeVehicleView nativeVehicleView() noexcept{
+    // Same local double-buffered status as nativeTravelMode. The retail
+    // GetGameObjectIdIsRiddenToLocal getter reads its object ID at +b6.
+    if(!enabled.load())return {};
+    const auto owner=playerOwner.load();
+    const auto index=get<uint32_t>(base+0x2bd3fd4);
+    if(get<uintptr_t>(owner)!=base+0x23b8218||index>=16||get<uint32_t>(owner+0x3a0)!=index)return {};
+    for(unsigned attempt=0;attempt<2;++attempt){
+        const auto phase=get<uint32_t>(base+0x2bd3fd0);if(phase>1)return {};
+        const auto state=base+0x2bd3ff0+(phase*16ull+index)*0xe0;
+        std::array<uint32_t,5> flags{};Vec3 stateRoot{},ownerRoot{};uint16_t ridden{};
+        if(get<uintptr_t>(state)!=base+0x2190b28||!read(state+0xc0,flags)
+           ||!read(state+0x40,stateRoot)||!read(owner+0x60,ownerRoot)||!read(state+0xb6,ridden))return {};
+        const auto difference=stateRoot-ownerRoot;
+        if(!valid(Pose{{},difference})||dot(difference,difference)>4)return {};
+        NativeVehicleView result{true,(flags[0]&(1u<<7))!=0,(flags[0]&(1u<<26))!=0,false,ridden,0};
+        // SendCommand's registry resolves type and instance separately. Read
+        // only the occupied TppVehicle2 record, never a nearby guessed vehicle.
+        if((ridden>>9)==50){
+            const auto registry=get<uintptr_t>(base+0x2c389a0);
+            const auto entry=get<uintptr_t>(registry+0x30+50*8);
+            const auto entity=get<uintptr_t>(get<uintptr_t>(entry+8)+0x20);
+            const auto slot=unsigned(ridden&511);
+            const auto records=get<uintptr_t>(entity+0x30);
+            const auto active=get<uintptr_t>(get<uintptr_t>(entity+0x1c8)+8);
+            Vec3 position{};float heading{};
+            if(get<uintptr_t>(registry)==base+0x23073c0&&get<uintptr_t>(entity)==base+0x22ed930
+               &&slot<get<uint16_t>(entity+0x1e0)&&records&&active
+               &&(get<uint32_t>(active+(slot/32)*4)&(1u<<(slot%32)))
+               &&read(records+slot*128ull+0x20,position)&&read(records+slot*128ull+0x2c,heading)
+               &&valid(Pose{{},position})&&std::isfinite(heading)
+               &&dot(position-ownerRoot,position-ownerRoot)<400
+               &&records==get<uintptr_t>(entity+0x30)){
+                result.heading=heading;result.headingValid=true;
+            }
+        }
+        if(phase!=get<uint32_t>(base+0x2bd3fd0))continue;
+        if(owner!=playerOwner.load()||index!=get<uint32_t>(base+0x2bd3fd4)
+           ||ridden!=get<uint16_t>(state+0xb6))return {};
+        return result;
+    }
+    return {};
+}
 PlayerPosture nativePlayerPosture() noexcept{
     // Live Lua registration was read from the owned game: STAND=4,
     // SQUAT=5, CRAWL=6. Join the same double-buffered local-player table

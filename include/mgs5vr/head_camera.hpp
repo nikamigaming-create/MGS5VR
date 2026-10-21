@@ -8,6 +8,7 @@
 #include "hud.hpp"
 #include "stale_demo_recovery.hpp"
 #include "native_demo_state.hpp"
+#include "vehicle_view.hpp"
 #include <mutex>
 
 namespace mgs5vr {
@@ -64,6 +65,8 @@ struct ControllerFrame {
     // Native occupancy survives iDroid focus and presentation-only frames.
     // Input availability must not move seated eyes back to the chase camera.
     bool vehicleMounted{};
+    NativeVehicleView vehicleView{};
+    bool contextInteract{};
     // Actual native look input from this XR packet. A vehicle's chase-camera
     // orbit does not set the driver's initial seated facing.
     std::array<float,2> vehicleViewInput{};
@@ -155,6 +158,7 @@ inline ControllerFrame passiveControllerFrame(ControllerFrame frame,int64_t time
     frame.rightWheelGrip=frame.vehicleWeaponIntent=false;
     frame.cabinDeployHint=false;
     frame.vehicleViewInput={};
+    frame.contextInteract=false;
     frame.allowMotionMelee=frame.allowAnimalTouch=frame.commandControls=frame.equipmentOpen=false;
     frame.equipmentCategory=0;frame.openingSelection=-1;
     frame.predictedXrTime=time;frame.referenceEpoch=epoch;
@@ -370,6 +374,9 @@ private:
         bool passenger{};
         Vec3 headLocalOffset{};
     } driverView_;
+    VehicleViewHeading vehicleHeading_;
+    uintptr_t vehicleHeadingCamera_{},vehicleHeadingOwner_{};
+    uint64_t vehicleHeadingEpoch_{};
     std::array<EyeView,2> views_{};
     ControllerFrame controllers_{};
     struct RigFrame { uintptr_t camera{},owner{}; Pose sourceCamera{}; HeadCameraSample sample{}; } rig_;
