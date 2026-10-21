@@ -1803,6 +1803,8 @@ void pump(void* state){
         publishNativeCabinTransit(cabinTransit);
         publishNativeSceneMenu(sceneMenuActive);
         publishNativeSceneCanvas(nativeCanvasActive);
+        publishNativeSortiePreview(nativeCanvasActive&&presentationLength==6
+            &&std::memcmp(presentationValue,"sortie",6)==0);
         publishNativeProfileMenu(profileMenuActive&&!nativePopupActive);
         setTop(state,top);
         const bool requested=openingCabinEnabled()&&nativeTitleMenuOpen()&&headCamera().status().active;

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "73fe7d0b521d",
-  "candidate_status": "Checked support-finger candidate built;58 groups and installer checks passed. Actual-game moving contact/recoil/reload/free-hand verification pending. Published play unchanged; full field bug list active.",
+  "candidate": "bc7dd67830ce",
+  "candidate_status": "Sortie head preview repaired and observed in both eyes with clear first-person return. Remaining field fixes active.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -628,11 +628,19 @@
     {
       "id": "FP14",
       "title": "Sortie character preview has no visible head",
-      "status": "reproduced_visual_failure_cause_unresolved",
+      "status": "fixed_in_development",
       "evidence": [
         {
           "run": "20261020T223141980039Z",
           "scope": "native sortie preparation and drop-time preview show headless character"
+        },
+        {
+          "candidate": "bc7dd67830ce",
+          "run": "20261021T134958388735Z",
+          "result": "complete_head_and_body_visible_in_both_sortie_eyes",
+          "return_run": "20261021T135550994795Z",
+          "scope": "SelectItem and drop-time preview restore the head; native departure returns to clear first-person horseback view in both eyes.",
+          "limitation": "Simulator verification; no physical-headset acceptance claim. Transition runner failed after loading confirmation while native cinematic continued; retained failure is not relabeled as a runner pass."
         }
       ],
       "acceptance": [

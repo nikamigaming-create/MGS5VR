@@ -330,6 +330,13 @@ void restore(Binding& b){
     b={};
 }
 void restoreStaleVisibilityIfAllowed() noexcept {
+    if(mgs5vr::nativeSortiePreviewActive()){
+        std::unique_lock lock(hiddenMutex,std::try_to_lock);
+        if(!lock.owns_lock())return;
+        for(auto& binding:hidden)if(binding.model)restore(binding);
+        fullBodyReady={};
+        return;
+    }
     const auto now=GetTickCount64();
     const auto observedLast=lastFirstPersonUpdateMs.load();
     if(!observedLast||now<observedLast||now-observedLast<250)return;
@@ -385,7 +392,7 @@ void requestFullBodyVisibility(bool enabled) noexcept{
 void publishFullBodyVisibility(uintptr_t owner,uintptr_t model,bool ready) noexcept{
     // Read the admitted skin transaction before taking the visibility lock,
     // keeping camera/visibility lock order independent of native callbacks.
-    const auto frame=ready&&fullBodyRequested.load()
+    const auto frame=ready&&fullBodyRequested.load()&&!nativeSortiePreviewActive()
         ?headCamera().publishedRigFrame(steadyMilliseconds()):std::nullopt;
     FullBodyReady candidate{};
     if(frame&&frame->applied&&frame->body.valid&&frame->controllers.fullBody
@@ -597,6 +604,11 @@ void updateAuthoredPlayerVisibility() noexcept {
     updatePlayerVisibility(headNearby?head.owner:0,headNearby,false,true);
 }
 void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool authoredBody) noexcept {
+    // The sortie panel renders the complete native character. Its actor can
+    // reuse the player models concealed in the cabin, but is not a view from
+    // Snake's eyes. Restore our visibility edits while this exact preview owns
+    // presentation; ordinary menus and first-person play retain their policy.
+    if(nativeSortiePreviewActive())firstPerson=false;
     if(!base)return;
     fadeOwner.store(firstPerson&&!hideArms&&!authoredBody?owner:0);
     // A recent solve from this model alone is insufficient after a tracking,

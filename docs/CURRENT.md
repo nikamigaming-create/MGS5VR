@@ -1,3 +1,15 @@
+# October 21 gameplay result: sortie preview head restored
+
+Development bc7dd67830ce restores only mod-owned hiding during the exact native
+sortie preview. Both eyes now show Snake's complete head on SelectItem and
+ASAP/drop-time screens. Departure returns to clear first-person horseback view
+in both eyes. FP14 fixed in development; physical headset acceptance not claimed.
+Retained runs: 20261021T134958388735Z, 20261021T135550994795Z.
+Native loading confirmation progressed despite runner transition failure; that
+failure remains retained. Current field work is in mission10020 tutorial, with
+ordinary stow and rifle support-hand movement/reload next. Published play unchanged.
+Local and origin have only main; old remote branch tips are archive tags.
+
 # October 21 consolidation on main
 
 User requires one development branch, main, and gameplay fixes as outcomes.

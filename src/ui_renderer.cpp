@@ -111,6 +111,7 @@ std::atomic_bool cabinPlayMode{};
 std::atomic_bool cabinTransitMode{};
 std::atomic_bool sceneMenuMode{};
 std::atomic_bool nativeSceneCanvasMode{};
+std::atomic_bool nativeSortiePreviewMode{};
 std::atomic_bool avatarEditMode{};
 std::atomic_uint64_t sceneClearUntil{};
 uintptr_t base{};
@@ -1543,6 +1544,8 @@ bool nativeCabinTransit() noexcept {return cabinTransitMode.load();}
 void publishNativeSceneMenu(bool active) noexcept {sceneMenuMode.store(active);}
 void publishNativeSceneCanvas(bool active) noexcept {nativeSceneCanvasMode.store(active);}
 bool nativeSceneCanvasActive() noexcept {return nativeSceneCanvasMode.load();}
+void publishNativeSortiePreview(bool active) noexcept {nativeSortiePreviewMode.store(active);}
+bool nativeSortiePreviewActive() noexcept {return nativeSortiePreviewMode.load();}
 bool nativeLoadingTipsOpen() noexcept {
     if(!enabled.load()||!menuReaderVerified)return false;
     // IsEndLoadingTips obtains this UiSystem and its loading-tip terminal.

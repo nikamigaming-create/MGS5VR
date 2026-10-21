@@ -72,6 +72,8 @@ bool nativeCabinTransit() noexcept;
 void publishNativeSceneMenu(bool active) noexcept;
 void publishNativeSceneCanvas(bool active) noexcept;
 bool nativeSceneCanvasActive() noexcept;
+void publishNativeSortiePreview(bool active) noexcept;
+bool nativeSortiePreviewActive() noexcept;
 bool nativeLoadingTipsOpen() noexcept;
 // Source time of the latest expanded native equipment-description draw.
 uint64_t nativeEquipmentPickerDrawTime() noexcept;

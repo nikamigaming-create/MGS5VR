@@ -59,5 +59,5 @@ alignment; FP03 Y-action rotation reproduction. Broader checklist stays active.
 - [ ] Release test inputs, restore test poses and close test-opened menus.
 - [ ] Preserve published play build, personal bindings/settings, saves and established VR interactions.
 
-No defect above is claimed closed. Keep this checklist and the JSON ledger in
+FP14 is fixed in development; all unchecked defects remain open. Keep this checklist and the JSON ledger in
 sync as evidence changes; retain the full scope across continuation turns.
