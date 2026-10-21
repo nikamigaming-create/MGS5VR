@@ -2026,6 +2026,21 @@ int main(){
         const auto recenteredStride=nativeEyes.resolve(7,independentCamera,2060,original);
         expect(same(recenteredStride.nativePose.position,crawlStride.nativePose.position),
             "recenter cannot reseed anatomical height from a transient lowered animation frame");
+        // Retained Mother Base cover: camera yaw differs from the wall-facing
+        // actor. Rotating its .60 m eye footprint into view yaw crossed the wall.
+        input.playerPosture=PlayerPosture::crouched;
+        original.model=14;original.wallCover=true;
+        original.worldFromRoot={{0,-.708316f,0,.705895f},{.671257f,0,-18.3761f}};
+        original.worldFromChest={{.544735f,-.736943f,.2287f,.328443f},{.551112f,.664783f,-18.3739f}};
+        original.worldFromHead={{.252559f,-.541534f,.22732f,.768948f},{.20093f,.802117f,-18.3525f}};
+        const Pose coverCamera{{0,.0153247f,0,.999883f},{.634334f,.757389f,-17.7507f}};
+        capturedRoot[12]=.671257f;capturedRoot[13]=0;capturedRoot[14]=-18.3761f;
+        nativeEyes.trackStereo({},eyes,true,2080,input);
+        nativeEyes.publishPlayerHead(7,8,coverCamera,capturedRoot,cached,2080);
+        const auto covered=nativeEyes.resolve(7,coverCamera,2080,original);
+        expect(covered.applied&&same(covered.nativePose.position,
+            compose(original.worldFromHead,Pose{{},nativeEyeFromHead}).position),
+            "captured cover eyes retain their wall-relative footprint despite independent view yaw");
     }
     const auto headPoint=playerHeadPosition(playerRoot,headBone);
     expect(headPoint&&same(*headPoint,{500.1f,301.6f,1300}),"animated head position uses local-then-world transform order");

@@ -79,6 +79,19 @@ bool verified(){
 }
 
 namespace mgs5vr {
+bool nativeWallCover(uintptr_t player) noexcept{
+    if(!enabled.load(std::memory_order_relaxed)||read<uintptr_t>(player)!=base+0x23b8218)return false;
+    const auto index=read<uint32_t>(player+0x3a0);
+    const auto character=read<uintptr_t>(player+0x370);
+    const auto cover=read<uintptr_t>(character+0xa0);
+    if(!character||read<uintptr_t>(cover)!=base+0x23b59d0||read<uintptr_t>(cover+8)!=character)return false;
+    const auto instances=read<uintptr_t>(cover+0x38);
+    const auto records=read<uintptr_t>(cover+0x68);
+    if(!instances||!records)return false;
+    const auto first=read<uint32_t>(instances+0x24);
+    if(index<first||index-first>15)return false;
+    return read<uint8_t>(records+static_cast<uintptr_t>(index-first)*0x3b0+0x10)==2;
+}
 void installNativeCover(uintptr_t imageBase){
     if(enabled.load())return;
     base=imageBase;

@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current checked development is `8e63070500b9`, with scoped cover gameplay checks.
+Current checked development is `4060b9259cea`, with scoped cover gameplay checks.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -41,6 +41,11 @@ that route. The complete field list above remains the work queue.
   camera position are retained while raising the rifle; guarded firing expends
   three rounds without moving the actor, and ordinary cover exit works. Runs
   230508/231018/231215/231251 retained. This does not close the broader FP04 item.
+- [x] **This pass: full-body camera through Mother Base cover wall.** Preserve
+  native wall-relative eye placement instead of rotating it toward view yaw.
+  Both-eye wall visibility, lateral lean, upward peek, return and walking exit
+  checked on4060b; runs234550/234616/234646 retained. Right-shoulder intrusion,
+  original Afghan translucent figure, wider cover and physical Quest stay open.
 
 ## Closure requirements
 

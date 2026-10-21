@@ -7,6 +7,7 @@
 #include "mgs5vr/cabin_studio.hpp"
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/head_camera.hpp"
+#include "mgs5vr/native_cover.hpp"
 #include "mgs5vr/paused_rig.hpp"
 #include "mgs5vr/paused_parts.hpp"
 #include "mgs5vr/input_bridge.hpp"
@@ -516,7 +517,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // Q/P still contains the native animation under skinPublicationMutex.
         // The owner's cached HEAD affine has a different prone eye basis.
         nativeHead=NativeBodyHead{owner,model,compose(*root,bone(q,p,4)),*root,
-            compose(*root,bone(q,p,2)),true};
+            compose(*root,bone(q,p,2)),true,nativeWallCover(owner)};
     }
     auto frame=headCamera().resolveCurrentForRig(camera,nativeCamera,nativeHead);
     probe.applied=frame.applied;probe.frameOwner=frame.playerOwner;probe.activation=frame.activation;

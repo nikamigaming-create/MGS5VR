@@ -4,4 +4,5 @@
 namespace mgs5vr {
 void installNativeCover(uintptr_t imageBase);
 void stopNativeCover() noexcept;
+bool nativeWallCover(uintptr_t player) noexcept;
 }

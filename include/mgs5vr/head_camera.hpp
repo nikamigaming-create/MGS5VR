@@ -270,6 +270,7 @@ struct NativeBodyHead {
     Pose worldFromHead{};
     Pose worldFromRoot{},worldFromChest{};
     bool bodyFramesTracked{};
+    bool wallCover{}; // Same owned native skin transaction; preserve its wall-relative eye footprint.
 };
 // Experimental render-camera control. Does not change native weapon ballistics.
 class HeadCamera {

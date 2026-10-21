@@ -38,6 +38,7 @@ struct PlayerRootSample {
     uintptr_t eyeModel{}; // Original owned skin, never the cached camera HEAD basis.
     Quat anatomicalHeading{};
     bool bodyFramesTracked{};
+    bool wallCover{};
 };
 struct CameraStabilizationState {
     Vec3 headLocalOffset{};
@@ -51,6 +52,7 @@ struct CameraStabilizationState {
     Vec3 postureSum{};
     float postureWeight{};
     bool anatomical{};
+    bool wallCover{};
     uintptr_t anatomicalModel{};
 };
 std::mutex playerRootMutex;
@@ -440,6 +442,7 @@ bool HeadCamera::joinNativeBodyHeadLocked(uintptr_t camera,Pose sourceCamera,
     // root and chest heading come from one validated original skin, avoiding
     // the camera cache's different root placement during a prone animation.
     current->second.eyePosition=eye;current->second.eyeModel=nativeHead.model;
+    current->second.wallCover=nativeHead.wallCover;
     if(nativeHead.bodyFramesTracked){
         current->second.position=nativeHead.worldFromRoot.position;
         current->second.anatomicalHeading=*heading;
@@ -895,7 +898,8 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             };
             // Crawling chest yaw oscillates on every stride. Measure and
             // transport its eye offset in the actor root frame instead.
-            const auto anatomicalHeading=rootSample.bodyFramesTracked&&controllers_.playerPosture!=PlayerPosture::prone
+            const bool wallCover=anatomical&&rootSample.wallCover;
+            const auto anatomicalHeading=rootSample.bodyFramesTracked&&controllers_.playerPosture!=PlayerPosture::prone&&!wallCover
                 ?rootSample.anatomicalHeading:rootSample.orientation;
             const auto targetHeadLocalOffset=rotate(inverseQuat(anatomical?anatomicalHeading:rootSample.orientation),worldHeadOffset);
             const bool advanceOffset=!anatomical||!state.anatomicalModel||(nativeEyeJoined&&rootSample.eyeModel);
@@ -909,6 +913,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 state.headLocalOffset=targetHeadLocalOffset;
                 state.heading=rootSample.orientation;
                 state.posture=controllers_.playerPosture;
+                state.wallCover=wallCover;
                 state.anatomical=anatomical;
                 state.anatomicalModel=anatomical?rootSample.eyeModel:0;
                 state.valid=true;
@@ -918,9 +923,14 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 dt=std::min(dt,.05f);
                 const auto posture=controllers_.playerPosture;
                 if(posture!=PlayerPosture::unknown){
-                    if(posture!=state.posture){
+                    if(posture!=state.posture||wallCover!=state.wallCover){
                         state.postureUntil=time+900;state.postureSum={};state.postureWeight=0;
+                        // Cover changes the offset's coordinate frame even
+                        // when SQUAT stays set. Never transport a chest-local
+                        // gait anchor as a wall/root-local anchor.
+                        if(wallCover!=state.wallCover)state.headLocalOffset=targetHeadLocalOffset;
                     }
+                    state.wallCover=wallCover;
                     state.posture=posture;
                     if(state.postureUntil){
                         const auto alpha=smoothingAlpha(dt,headStabilizationTau);
@@ -983,7 +993,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 // Preserve that native prone footprint. View yaw and HMD neck
                 // look still own orientation, not the anchored eye position.
                 const auto heading=anatomical&&rootSample.bodyFramesTracked
-                    ?(controllers_.playerPosture==PlayerPosture::prone?anatomicalHeading
+                    ?(controllers_.playerPosture==PlayerPosture::prone||wallCover?anatomicalHeading
                         :yawRotation(horizontalYaw(nativePose.orientation))):state.heading;
                 auto cameraAnchor=rootSample.position+rotate(heading,state.headLocalOffset);
                 if(!anatomical){

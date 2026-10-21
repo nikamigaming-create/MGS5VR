@@ -7,6 +7,12 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Full-body cover no longer places the camera through the reproduced Mother
+  Base wall. Candidate `4060b9259cea` preserves the native wall-relative eye
+  footprint instead of rotating it into view yaw. Both eyes retain the solid
+  wall during 22cm lateral lean, 25cm upward peek and return; native cover stays
+  active and walking away exits it. Right-shoulder intrusion during lateral
+  lean remains visible. The earlier Afghan translucent figure is not identified.
 - Raising the rifle at the reproduced concrete barrier no longer triggers the
   native automatic peek. Submitted camera position stays unchanged at recorded
   precision, with real weapon readiness and cover mode2. A separate guarded
@@ -38,7 +44,7 @@ worktree is needed for the remaining field fixes.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Current candidate with completed scoped gameplay checks: `8e63070500b9`.
+Current candidate with completed scoped gameplay checks: `4060b9259cea`.
 Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).
@@ -64,6 +70,16 @@ Other unresolved reports include Y-action rotation, arm reach, physical floating
 iDroid alignment, mounted weapons, small-rock traversal and cabin interactions.
 Continue actual defect fixes; do not create another harness project or stop on
 another narrow pass as if the whole release were complete.
+
+Latest cover continuation: before runs233250/233314 compare full-body on/off
+at the Mother Base wall. They change camera position as well as visibility,
+so they cannot identify the Afghan translucent figure. With full-body on,
+the old camera crossed the wall; off retained it. Candidate4060b preserves
+the cover eye offset in actor-root space and settles cover entry/exit even
+when the crouch flag stays unchanged. Runs234550/234616/234646 retain both-eye
+lean/peek/return and normal exit. See active_work.cover_wall_anchor in the
+ledger. Next: right-shoulder/body intrusion and wider cover behavior. Neither
+headset acceptance nor exposed-head/native-benefit eligibility is established.
 
 The neutral head/neck correction is now implemented and checked with the fixed
 camera height. Earlier camera-only candidate: `8483ea95dba9`, commit `1217caf`.

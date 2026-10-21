@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "8e63070500b9",
+  "candidate": "4060b9259cea",
   "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1152,6 +1152,32 @@
         "Translucent body intrusion visible during lean-right in both eyes; visual cover acceptance remains open"
       ],
       "cleanup": "Game and simulator closed; Steam retained; no test menu or runner left open"
+    },
+    "cover_wall_anchor": {
+      "candidate": "4060b9259cea",
+      "status": "reproduced_wall_penetration_fixed_scoped_gameplay_checked",
+      "before_runs": [
+        "20261021T233250891586Z",
+        "20261021T233314836148Z"
+      ],
+      "retained_runs": [
+        "20261021T234550558241Z",
+        "20261021T234616559916Z",
+        "20261021T234646887148Z"
+      ],
+      "reproduction": "Mother Base wall near x0.67,z-18.38: full-body on placed eyes near z-17.75, through wall; off near z-18.36 retained wall. Body switch also changes camera, so it does not identify original Afghan translucent figure.",
+      "change": "Owned native mode2 cover joins original skin; stabilize eye offset in actor-root frame, preserve its native footprint independent of view yaw, settle cover transitions even when posture remains crouched.",
+      "gameplay": "Same wall plane near x2.35,z-18.37: both eyes show solid wall during 22cm lateral lean and 25cm upward peek. Center/return camera [1.7529,0.799483,-18.3045]; lean [1.533,0.799483,-18.298]; up [1.7529,1.04948,-18.3045]. Cover retained throughout; ordinary walk-away exits.",
+      "limits": [
+        "Right shoulder intrudes during lateral lean",
+        "Original Afghan translucent figure identity unresolved",
+        "No physical Quest acceptance",
+        "Assistance settings and exposure/native benefit eligibility remain open",
+        "Other surfaces and postures unverified"
+      ],
+      "build_checks": "Required build and installer checks passed; private/current-cover-wall-build.log",
+      "cleanup": "Owned game/simulator closed; inputs and settings restored; Steam retained; published play unchanged",
+      "physical_headset_acceptance": false
     }
   }
 }
