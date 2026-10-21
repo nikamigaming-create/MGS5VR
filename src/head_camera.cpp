@@ -123,7 +123,7 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     requirePlayerHead_=requirePlayerHead;playerHeads_={};playerSequence_=ownerHeadTime_=0;suspended_=false;
     controllers_={};rig_={};nativeMenuOpen_=false;nativeIdroidOpen_=false;nativeIdroidPaused_=false;awaitingScene_=false;lastView_={};cameraRenderTime_=0;menuAnchored_=false;trackingEpoch_=0;
     cameraFreezeAnchored_=false;
-    seatedHeadY_=0;seatedMode_=false;
+    seatedHeadY_=0;seatedMode_=false;fieldPostureUntil_=0;
     menuGeneration_=0;
     staleDemoRecoveryDwell_.reset();
     lastTitleSource_={};avatarEditorBackdrop_={};lastTitleSourceValid_=avatarEditorBackdropValid_=false;
@@ -279,6 +279,8 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
         }else if(!freezeAnchor&&cameraFreezeAnchored_){
             cameraFreezeAnchored_=false;rig_={};resetStabilization(this);
         }
+        if(controllers_.cabinTransit&&!controllers.cabinTransit)
+            fieldPostureUntil_=time+900;
         head_=head;views_=views;controllers_=controllers;trackingEpoch_=controllers.referenceEpoch;time_=time;++sequence_;
     }else {controllers_={};suspendLocked(HeadCameraStop::trackingLost);}
 }
@@ -879,6 +881,12 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 ?rootSample.anatomicalHeading:rootSample.orientation;
             const auto targetHeadLocalOffset=rotate(inverseQuat(anatomical?anatomicalHeading:rootSample.orientation),worldHeadOffset);
             const bool advanceOffset=!anatomical||!state.anatomicalModel||(nativeEyeJoined&&rootSample.eyeModel);
+            // Helicopter exit retains the crouched posture flag while the
+            // authored head descends. Do not freeze its first airborne sample.
+            // Limit settling to this handoff; ordinary gait remains anchored.
+            if(time<fieldPostureUntil_&&state.postureUntil<fieldPostureUntil_){
+                state.postureUntil=fieldPostureUntil_;state.postureSum={};state.postureWeight=0;
+            }
             if(!state.valid){
                 state.headLocalOffset=targetHeadLocalOffset;
                 state.heading=rootSample.orientation;
@@ -892,7 +900,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 dt=std::min(dt,.05f);
                 const auto posture=controllers_.playerPosture;
                 if(posture!=PlayerPosture::unknown){
-                    if(state.posture!=PlayerPosture::unknown&&posture!=state.posture){
+                    if(posture!=state.posture){
                         state.postureUntil=time+900;state.postureSum={};state.postureWeight=0;
                     }
                     state.posture=posture;

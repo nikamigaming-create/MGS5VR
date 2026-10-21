@@ -326,6 +326,7 @@ private:
     uint8_t awaitCause_{},awaitJoinFlags_{};uint64_t awaitTime_{},awaitOwnerAge_{};
     uint64_t sceneTransitionActivation_{},sceneTransitionAt_{}; // Intentional native shot/control handoffs only.
     uint64_t trackingEpoch_{};
+    uint64_t fieldPostureUntil_{}; // Native helicopter exit may retain its seated/crouched flag.
     float units_{1};
     float seatedHeadY_{};
     bool seatedMode_{};

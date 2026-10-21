@@ -1892,6 +1892,27 @@ int main(){
         expect(view.applied&&near(view.nativePose.position.y,2.25f),
             "standing height follows the runtime floor after a crouch-to-stand calibration");
     }
+    {
+        HeadCamera exitView;exitView.configure(true,1,true);
+        const std::array<EyeView,2> eyes{EyeView{Pose{{},{-.032f,0,0}},squareEye},EyeView{Pose{{},{.032f,0,0}},squareEye}};
+        ControllerFrame input;input.fullBody=true;input.playerPosture=PlayerPosture::crouched;input.cabinTransit=true;
+        auto head=identityMatrix;head[13]=1.3f;
+        exitView.trackStereo({},eyes,true,100,input);exitView.toggle();
+        exitView.publishPlayerHead(7,8,{},identityMatrix,head,100);exitView.resolve(7,{},100);
+        input.cabinTransit=false;
+        HeadCameraSample settled;
+        for(uint64_t t=120;t<=1320;t+=20){
+            head[13]=1.3f-.55f*std::min(1.f,float(t-120)/500.f);
+            exitView.trackStereo({},eyes,true,t,input);
+            exitView.publishPlayerHead(7,8,{},identityMatrix,head,t);settled=exitView.resolve(7,{},t);
+        }
+        expect(settled.applied&&near(settled.nativePose.position.y,.75f+nativeEyeFromHead.y),
+            "helicopter exit settles native eye height even when crouched posture never changes");
+        head[13]+=.18f;exitView.trackStereo({},eyes,true,1340,input);
+        exitView.publishPlayerHead(7,8,{},identityMatrix,head,1340);
+        expect(same(exitView.resolve(7,{},1340).nativePose.position,settled.nativePose.position),
+            "settled helicopter exit resumes gait suppression without a stance-toggle workaround");
+    }
     auto headBone=std::array<float,16>{1,0,0,0,0,1,0,0,0,0,1,0,0,1.6f,0.1f,1};
     {
         HeadCamera bodyView;bodyView.configure(true,1,true);
