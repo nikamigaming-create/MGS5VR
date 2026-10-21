@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "c2b3f553cbb8",
-  "candidate_status": "Sortie head repaired; bare-hand wrist-driven torso coupling removed in repeated gameplay. Remaining field defects active.",
+  "candidate": "ca16f0e84503",
+  "candidate_status": "Authored clavicle now contributes to full-body reach. Reproduced standing50cm reach error reduced11.3cm to1.1mm; crouched20.5cm to5.4cm. Remaining crouched reach and physical acceptance open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -332,6 +332,16 @@
           "followup_run": "20261021T141139376668Z",
           "reload": "Native manipulation seen; magazine replenished from5 to9 and subsequent reacquisition shows curled grip in both eyes. Mid-reload pair capture failed when grip lease expired; retained failure.",
           "limitations": "Does not close all precision weapons, bolt-action or physical headset coverage."
+        },
+        {
+          "candidate": "ca16f0e84503",
+          "runs": [
+            "20261021T181742546277Z",
+            "20261021T181931084497Z"
+          ],
+          "scope": "Adjacent regression check after clavicle change: selected back-slot rifle, moving acquired support, three native discharges, reload and reacquisition.",
+          "result": "Three one-round discharges confirmed, both-eye post-shot view retains gun/contact/curled support fingers. Reload capture timed out after left eye, so no paired mid-reload claim. Follow-up selected state reports9 rounds and moving support reacquires in all three poses; both eyes reviewed.",
+          "limits": "Not all weapons, bolt actions, damage or physical headset. Failed capture remains recorded."
         }
       ]
     },
@@ -811,6 +821,30 @@
           "scope": "Revised three-dimensional shoulder objective, same native Afghanistan free-roam arrival and crouched 50/65/80cm controller poses.",
           "result": "Rejected: palm errors 24.2/39.1/53.9cm, worse than baseline. Full body remained valid and eye error below 0.004cm, so this was not a fallback result. Both experimental production edits removed.",
           "limitations": "Suite observed_pass only confirmed requested poses were dispatched; it does not indicate correct reach. No headset acceptance, publication or pinning."
+        },
+        {
+          "candidate": "ca16f0e84503",
+          "scope": "Full-body clavicle contribution before the ordinary two-bone arm solve; no arm stretch, torso/eye movement or foot movement. Prone and mounted constraints remain on existing path.",
+          "runs": [
+            "20261021T181416249027Z",
+            "20261021T181502669719Z",
+            "20261021T181612422134Z"
+          ],
+          "palm_error_m": {
+            "crouched_50_65_80cm": [
+              0.0538041428,
+              0.1960842298,
+              0.3411257135
+            ],
+            "standing_50_65_80cm": [
+              0.001112462,
+              0.0668602391,
+              0.2071063762
+            ]
+          },
+          "result": "Standing50cm gap corrected to1.1mm; crouched50cm improved from20.5cm to5.4cm. Body remained admitted with near-zero eye error and unchanged native foot clearance. Both eyes reviewed for reach, standing downward body view and crouched body view; continuous arms retained. Native stand/crouch/prone/stand and short walk completed.",
+          "limits": "Crouched gap is not fixed;65/80cm exceed current rig reach. No physical-headset acceptance. Generic suite pass indicates pose dispatch only; geometric reach measured separately.",
+          "next": "Investigate native head/neck rest pose using private/reach-next-investigation.json. Offline calculation is not a live fix."
         }
       ]
     }

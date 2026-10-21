@@ -16,16 +16,15 @@ source work has been consolidated and pushed.
 - Free Roam is reachable through Missions -> Mission List -> Free Roam. Existing
   VR bindings completed Afghanistan destination/LZ selection, sortie, flight and
   on-foot helicopter exit. The controls guide now describes the native route.
-- Short reach is now reproduced: at 50cm forward controller reach, the full-body
-  palm is 20.5cm short crouched and 11.3cm short standing. Two pelvis/shoulder-fit
-  experiments made crouching worse and were removed; the defect remains open.
+- The authored clavicle now contributes to full-body arm reach. At 50cm forward,
+  standing palm error fell from 11.3cm to 1.1mm; crouched error fell from 20.5cm
+  to 5.4cm. Continuous arms, posture changes, a short walk, moving rifle support
+  and three shots were checked. Crouched/farther reach and headset remain open.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Production source checked in game: `c2b3f553cbb8`; restored development rebuild
-`436f50fc8654` uses that unchanged production source after removing both failed
-reach experiments. It built, passed required checks and is installed, but this
-rebuild has not had a new gameplay run. Recorded runs and precise
+Production candidate checked in game and installed: `ca16f0e84503`.
+Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).
 
@@ -44,3 +43,8 @@ Other unresolved reports include Y-action rotation, arm reach, physical floating
 iDroid alignment, mounted weapons, small-rock traversal and cabin interactions.
 Continue actual defect fixes; do not create another harness project or stop on
 another narrow pass as if the whole release were complete.
+
+Next reach investigation: `private/reach-next-investigation.json` and its native
+standing/crouched skeleton snapshots. The native head remains tilted relative to
+the tracked view; an offline head/neck fit suggests a remaining correction but
+has not been implemented or verified. Do not ship that calculation as a fix.

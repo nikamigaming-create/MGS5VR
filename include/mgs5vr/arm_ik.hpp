@@ -38,6 +38,9 @@ struct ArmPose { Pose shoulder,elbow,wrist; };
 std::optional<ArmPose> scaledLegPose(const ArmPose& native,float scale);
 struct ArmSolution { ArmPose pose; bool reachClamped{}; };
 struct GroundedLegSolution { ArmSolution leg; float scale{1}; };
+// Protract the authored clavicle only when its fixed shoulder cannot reach.
+// Returns the clavicle pose; neither arm segment nor the chest is stretched.
+std::optional<Pose> reachingClavicle(Pose clavicle,const ArmPose& arm,Pose target);
 // Fit only this frame's leg reach. Calibration is a lower bound, never a
 // high-water mark from earlier head motion. Arms retain their own size limits.
 std::optional<GroundedLegSolution> solveGroundedLeg(const ArmPose& native,Pose contact,float calibration=1.f);

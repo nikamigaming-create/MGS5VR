@@ -1006,8 +1006,22 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             bendHistory[side]=rotate(inverse(*root).orientation,rotate(torso,{side?-.25f:.25f,-1.f,-.15f}));
         }
     }
+    const auto fitClavicle=[&](size_t side,Pose target){
+        // Grounded prone shoulders and authored mounted contacts retain their
+        // existing constraints. The reproduced loss is in the full-body rig.
+        if(!frame.body.valid||frame.body.mounted||frame.controllers.playerPosture==PlayerPosture::prone)return;
+        const size_t clavicle=side?9:5,shoulder=clavicle+1;
+        const auto before=bone(q,p,clavicle);
+        const ArmPose arm{bone(q,p,shoulder),bone(q,p,shoulder+1),bone(q,p,shoulder+2)};
+        if(const auto fitted=reachingClavicle(before,arm,target)){
+            const auto delta=compose(*fitted,inverse(before));
+            replace(q,p,clavicle,*fitted);
+            for(size_t i=shoulder;i<=shoulder+2;++i)replace(q,p,i,compose(delta,bone(q,p,i)));
+        }
+    };
     auto wristTarget=compose(grips[1],gripFromWrist[1]);
     auto rightTarget=(wheel.hands&2)?rightAnimated:clearWrist(wristTarget);
+    if(!(wheel.hands&2))fitClavicle(1,rightTarget);
     const ArmPose rightAnimatedArm{bone(q,p,10),bone(q,p,11),bone(q,p,12)};
     auto right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
     probe.stage=7;
@@ -1309,6 +1323,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
         if(wheel.hands&1)target=leftAnimated;
         else if(supportBlend<1)target=clearWrist(target);
+        if(!(wheel.hands&1))fitClavicle(0,target);
         const auto left=groundedArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],armBasis[0]);
         probe.stage=11;
         if(!left)return false;

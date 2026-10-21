@@ -11,7 +11,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Natural mounted-weapon controls — FP11/FP15.** Implement physical grip-and-aim and stick aiming for mortars and each turret type; verify native pivots/limits, contact, release, firing and exit. MountedGrip helper exists but has no production adapter.
 - [ ] **Small-rock slipping and stops — FP16.** Reported; locate/repeat affected rocks, distinguish native collision/fall state from camera/body presentation.
 - [ ] **Right-wrist shoulder/opposite-arm coupling — FP17.** Reported in physical VR. Reproduced: right wrist +/-30 degrees rotates chest and shifts fixed-input left palm8.5/12cm. Acquired-weapon-only torso correction removes wrist-driven heading in two Mother Base repeats. Remaining opposite-palm movement is at most 1.13cm and follows native idle animation. Physical headset and reach remain open.
-- [ ] **Shortened arm reach — FP17.** Reproduced in game: at50cm tracked reach, full-body palm is20.5cm short crouched and11.3cm short standing; arms-only standing matches within0.04cm. Two shoulder-fit candidates rejected for worse crouched reach (23.7/24.2cm) and removed from source; defect remains open. Physical Quest validation remains required.
+- [ ] **Shortened arm reach — FP17.** Native clavicle contribution restored in development ca16. At50cm tracked reach, standing palm error fell11.3cm ->1.1mm and crouched20.5cm ->5.4cm. Both-eye arm continuity, posture transitions, short walk and supported rifle handling checked. Remaining crouched gap, farther reach and physical Quest validation stay open. Two earlier pelvis-fit regressions were removed.
 - [ ] **Precision-weapon support loss — FP02.** Moving supported rifle and3 back-slot shots retain contact in082239, but open support fingers reproduced in both eyes. Read-only shared palettes match; candidate73fe7d0b521d cups acquired long-gun support outside native manipulation. Curled fingers now visible after moving aim and3 shots; native reload5->9 and reacquisition observed. Mid-reload pair capture failed on grip lease; broader verification remains open. Bolt-action and physical headset remain open.
 - [ ] **Tutorial camera handoff and retained iDroid — FP07/FP12.** Exact retained-terminal timeout, cinematic return and ordinary stow/reopen pass onff0dd2c746a6 after fixing reproduced ownership loss. Scoped simulator subcase complete; physical Quest, alignment and remaining tutorial lessons stay open.
 - [ ] **Idle/tracking-loss camera and weapon continuity — FP01/FP02.** Camera fallback not reproduced in simulator. Rifle disappearance reproduced in both eyes during tracking loss. Combined candidate 148d5ca51161 built/installed; 58 test groups and installer checks passed; scoped field loss/recovery and safe held-trigger checks passed on both primary slots (runs023544/023824/024003/024113 below). Other transitions and physical Quest remain open.
@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Development `c2b3f553cbb8` includes the sortie-head, support-finger and bare-hand
+Development `ca16f0e84503` includes the clavicle reach correction plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
 investigation did not identify the Mission List category. Guidance now describes
