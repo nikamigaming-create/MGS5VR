@@ -17,7 +17,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Idle/tracking-loss camera and weapon continuity — FP01/FP02.** Camera fallback not reproduced in simulator. Rifle disappearance reproduced in both eyes during tracking loss. Combined candidate 148d5ca51161 built/installed; 58 test groups and installer checks passed; scoped field loss/recovery and safe held-trigger checks passed on both primary slots (runs023544/023824/024003/024113 below). Other transitions and physical Quest remain open.
 - [ ] **Floating in seated and standing modes — FP05.** Reproduced helicopter-exit latch fixed: initial crouched camera formerly1.18/1.369m above root versus native eye~0.76m; two fresh corrected exits0.775/0.788m. Standing/crouch/prone/walk retain native leg scale. Physical seated/standing report remains open.
 - [ ] **Body size and tight-corridor sticking — FP04.** Exact reported corridor unresolved; compare full-body on/off, capsule movement and physical lean without weakening collision.
-- [ ] **Natural cover and native benefits — FP04.** Automatic aim-out moves actual actor/view ~0.924m: reproduced. Off/immersive toggle required; no automatic aim-out movement in either mode. Preserve native benefits when physical crouch/lean/occlusion qualify, including ordinary geometry/posture effects with assistance off.
+- [ ] **Natural cover and native benefits — FP04.** Reproduced automatic aim-out fixed in8e630: stationary-head camera position unchanged with native readiness and cover mode2; guarded3-round discharge retains cover/root position; physical lean/up/return and exit checked. Lean-right shows translucent body intrusion in both eyes. Off/immersive toggle, broader surfaces/postures, non-VR and headset remain open. Preserve native benefits only when physical crouch/lean/occlusion qualify, including ordinary geometry/posture effects with assistance off.
 - [ ] **Helicopter/transit body presentation — FP06.** Open; verify body, view and hand continuity through native transit.
 - [ ] **Handheld iDroid — FP07.** Left bionic hand; native contact/projector alignment, readable stereo screen, ordinary/forced stow and immediate reopening. Edge-on presentation remains under investigation.
 - [ ] **Rocket arm — FP08.** Native flight/live view and left-arm steering remain unverified.
@@ -30,11 +30,17 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Development `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
+Current checked development is `8e63070500b9`, with scoped cover gameplay checks.
+Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
 investigation did not identify the Mission List category. Guidance now describes
 that route. The complete field list above remains the work queue.
+
+- [x] **This pass: reproduced barrier automatic aim-out.** Native cover mode2 and
+  camera position are retained while raising the rifle; guarded firing expends
+  three rounds without moving the actor, and ordinary cover exit works. Runs
+  230508/231018/231215/231251 retained. This does not close the broader FP04 item.
 
 ## Closure requirements
 

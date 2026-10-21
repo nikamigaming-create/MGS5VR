@@ -13,6 +13,7 @@
 #include "mgs5vr/native_performance.hpp"
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/vehicle_weapon.hpp"
+#include "mgs5vr/native_cover.hpp"
 #include "mgs5vr/process_exit.hpp"
 #include "mgs5vr/native_actions.hpp"
 #include "mgs5vr/game_target.hpp"
@@ -72,6 +73,7 @@ void cleanupBeforeExit() noexcept {
     stopRequested.store(true);
     stopNativeActions();
     stopVehicleWeaponInput();
+    stopNativeCover();
     stopNativePerformance();
     if(wakeWorker)SetEvent(wakeWorker);
     try{gamepadMailbox().publish({},false,steadyMilliseconds());}catch(...){}
@@ -233,6 +235,9 @@ DWORD WINAPI initialize(void*){
         if(target->nativeAdapter)
             try{installVehicleWeaponInput(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)));}
             catch(const std::exception& e){log(std::string("Vehicle firearm input unavailable: ")+e.what());}
+        if(target->nativeAdapter)
+            try{installNativeCover(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)));}
+            catch(const std::exception& e){log(std::string("Native cover unavailable: ")+e.what());}
         if(target->nativeAdapter)
             try{installNativeActions(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),folder,
                 GetPrivateProfileIntW(L"diagnostics",L"native_actions",0,ini.c_str())==1);}

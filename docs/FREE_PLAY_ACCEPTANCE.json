@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "6b560649c200",
+  "candidate": "8e63070500b9",
   "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -434,7 +434,7 @@
     {
       "id": "FP04",
       "title": "Tight corridor sticking and body size",
-      "status": "reproduce",
+      "status": "automatic_aim_out_fixed_scoped_cover_visuals_settings_and_corridor_open",
       "acceptance": [
         "same passage full body on/off",
         "lean/recenter and native capsule position",
@@ -536,6 +536,61 @@
           "view_displacement_m": 0.9234982403882407,
           "head_pose_unchanged": true,
           "finding": "Same displacement as raised-head test: raising weapon alone produces approximately 0.924 m native-root/view movement; physical upward peek is not required",
+          "physical_headset_acceptance": false
+        },
+        {
+          "candidate": "8e63070500b9",
+          "runs": [
+            "20261021T230508891007Z",
+            "20261021T231018067219Z",
+            "20261021T231215334862Z",
+            "20261021T231251705193Z"
+          ],
+          "scope": "Afghanistan Free Roam concrete barrier: stationary head ready, physical lean/up/return, guarded firearm discharge and walk-away exit",
+          "aim": {
+            "run": "20261021T230508891007Z",
+            "native_cover_modes": [
+              2
+            ],
+            "weapon_readiness": "0x40061, 0x1040045, render readiness bit set",
+            "submitted_camera_position_before_and_during": [
+              1633.52,
+              324.064,
+              1029.39
+            ],
+            "movement": "unchanged at serialized precision",
+            "adapter_log": "Native cover suppressed local automatic ready-to-peek request"
+          },
+          "physical_pose": {
+            "run": "20261021T231018067219Z",
+            "native_root_unchanged": true,
+            "native_cover_retained": true,
+            "visual_limit": "Translucent body intrusion above view during lean-right; not visually accepted as seamless cover"
+          },
+          "fire": {
+            "run": "20261021T231215334862Z",
+            "native_cover_before_and_after": true,
+            "primary_hip_ammo_before": 31,
+            "primary_hip_ammo_after": 28,
+            "native_position_before_and_after": [
+              1637.9321289063,
+              323.90231323242,
+              1030.5715332031
+            ],
+            "hit_or_damage_acceptance": false
+          },
+          "exit": {
+            "run": "20261021T231251705193Z",
+            "native_cover_before": true,
+            "native_cover_after": false
+          },
+          "excluded_firing_run": "20261021T230620437369Z discharged nine rounds but began outside cover; not cover acceptance",
+          "limits": [
+            "Assistance Off/immersive setting not implemented",
+            "Cover benefit eligibility and physical exposure not audited",
+            "Other surfaces, postures, non-VR fallback and physical Quest unverified",
+            "Translucent body intrusion visible during lean-right in both eyes; visual cover acceptance remains open"
+          ],
           "physical_headset_acceptance": false
         }
       ]
@@ -1074,6 +1129,29 @@
     "research_dossier": "D:/Dev/Tools/Ghidrust/workspace/evidence/mgs5vr/idroid-post-tutorial-close",
     "runtime_note": "Per-game Meta preference and -MetaLink launch checks pass. Windows global runtime was observed as Virtual Desktop at final cleanup; direct restoration to mandated Meta default was denied by Windows registry permissions. Global value remains Virtual Desktop. No SteamVR switch occurred.",
     "overall_goal_status": "active_all_unresolved_field_fixes",
-    "current_checkpoint": "Helicopter-exit height and 50cm crouched reach repaired; all remaining FIELD_FIXES stay active. No harness source changes in these fixes."
+    "current_checkpoint": "Helicopter-exit height and 50cm crouched reach repaired; all remaining FIELD_FIXES stay active. No harness source changes in these fixes.",
+    "cover_followup": {
+      "candidate": "8e63070500b9",
+      "rejected_candidate": "ffdd224d59da",
+      "retained_reproduction": "artifacts/bot/runs/20261021T223745313501Z",
+      "review": "artifacts/bot/runs/20261021T223745313501Z/cover-review.json",
+      "finding": "Native mode2 still transitioned to aim-out mode3 under real readiness. GetTickCount64 was 31ms behind the steadyMilliseconds clock used by camera samples, invalidating the freshness guard.",
+      "change": "Use camera steadyMilliseconds clock; first adapted transition logs once.",
+      "status": "automatic_aim_out_fixed_scoped_barrier_firing_lean_exit_checked",
+      "physical_headset_acceptance": false,
+      "retained_runs": [
+        "20261021T230508891007Z",
+        "20261021T231018067219Z",
+        "20261021T231215334862Z",
+        "20261021T231251705193Z"
+      ],
+      "limits": [
+        "Assistance Off/immersive setting not implemented",
+        "Cover benefit eligibility and physical exposure not audited",
+        "Other surfaces, postures, non-VR fallback and physical Quest unverified",
+        "Translucent body intrusion visible during lean-right in both eyes; visual cover acceptance remains open"
+      ],
+      "cleanup": "Game and simulator closed; Steam retained; no test menu or runner left open"
+    }
   }
 }

@@ -943,7 +943,9 @@
         "tools/gameplay_bot/locomotion.py",
         "include/mgs5vr/head_camera.hpp",
         "include/mgs5vr/input_bridge.hpp",
-        "include/mgs5vr/native_actions.hpp"
+        "include/mgs5vr/native_actions.hpp",
+        "src/native_cover.cpp",
+        "include/mgs5vr/native_cover.hpp"
       ],
       "automated_tests": [
         "contracts",
@@ -998,7 +1000,8 @@
       "missing_checks": [
         "Continuous walk/run/posture with independent head motion.",
         "Cover, peek, roll, ladders, ledges and doors across real native contexts.",
-        "Physical stance inference is not implemented."
+        "Physical stance inference is not implemented.",
+        "Native cover ready-to-peek adapter: scoped barrier aim, firing, lean/up/return and exit checked on8e630; assistance toggle, exposure/benefits, lean body visibility, other surfaces/postures, non-VR fallback and physical Quest remain open."
       ],
       "sustained_regression": {
         "status": "missing",
