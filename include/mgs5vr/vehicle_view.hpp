@@ -21,6 +21,12 @@ public:
         if(!fresh)lookUntil_=0;
         const bool seated=sample.valid&&(sample.mounted||sample.headingValid);
         const bool wasEngaged=engaged_;
+        // A ledge catch can align Snake without an interact press. Capture
+        // the preceding normal frame before that authored alignment turns the
+        // native camera; the HMD must not inherit the actor's forced rotation.
+        if(fresh&&sample.valid&&!sample.normalAction&&normalAction_&&!seated&&!engaged_){
+            engaged_=true;pendingAction_=false;sawAction_=true;lookUntil_=0;
+        }
         if(interact&&!interact_){
             // Retail begins aligning Snake before ON_VEHICLE changes. Capture
             // the preceding camera transaction at the effective VR Y edge.
@@ -62,6 +68,7 @@ public:
             normalHeading_=heading_;normalReady_=true;
         }
         native_=native;snap_=snap;time_=time;initialized_=true;interact_=interact;seated_=seated;
+        normalAction_=sample.valid&&sample.normalAction;
         return heading_;
     }
     void reset(){*this={};}
@@ -70,5 +77,6 @@ private:
     uint64_t time_{},lookUntil_{};
     uint16_t carrier_{65535};
     bool initialized_{},normalReady_{},engaged_{},pendingAction_{},sawAction_{},interact_{},seated_{};
+    bool normalAction_{};
 };
 }

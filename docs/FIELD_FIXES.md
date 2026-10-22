@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current gameplay-checked development is `428a0c0872fc`, adding tutorial exit-notice handoff, Rocket Arm steering and restored flight handset to seated helicopter body/eye continuity, marker pinch contact, loose-sheet settling and prior fixes. Physical pitch, contact, discharge and other mounted types remain open.
+Current gameplay-checked development is `829065fcfb30`, adding automatic ledge-heading continuity and tutorial exit-notice handoff, Rocket Arm steering and restored flight handset to seated helicopter body/eye continuity, marker pinch contact, loose-sheet settling and prior fixes. Physical pitch, contact, discharge and other mounted types remain open.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -78,6 +78,8 @@ that route. The complete field list above remains the work queue.
 - [x] **This batch: Rocket Arm handset missing after sortie selection.** Flight ownership now survives the unrelated terminal closing flag. Live flight pixels reviewed in both eyes and ordinary iDroid reopen/stow retained. Broader FP08 remains open.
 
 - [x] **This pass: Exit Tutorial freezes the old handset view.** Recover the immediately following paused notice using the same owned menu anchor; no stale skin is admitted as gameplay. Readable spatial notice reviewed in both eyes, dismissal and immediate iDroid reopening/stow pass in064303.
+
+- [x] **This pass: automatic ledge catch turns the fixed headset view.** Baseline turns approximately180 degrees. Fresh normal-to-native-action heading capture retains the VR view through catch and ordinary Y climb-back; view-relative walking resumes. Both-eye held/return views reviewed on829065, retained075341/075452/075558/075640. Other contextual actions and physical Quest remain open.
 
 ## Closure requirements
 

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "33b6939020999aa355222a9c356479bb96fee71d48f5bccf7fb4c6b474c2e659",
-  "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
+  "candidate": "829065fcfb30ede52fa77531a14bbf8378b7182daa7c7a795d9ffc362f09b798",
+  "candidate_status": "Scoped gameplay checked development; full release and physical-headset acceptance incomplete",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -425,6 +425,16 @@
           "run": "20261021T205449251525Z",
           "result": "Deliberate-look recipe refused before dispatch because outcome already satisfied. Corrected observable outcome; subsequent205545904242 changes view. No production change for recipe refusal.",
           "acceptance": false
+        },
+        {
+          "candidate_sha256": "829065fcfb30ede52fa77531a14bbf8378b7182daa7c7a795d9ffc362f09b798",
+          "runs": [
+            "20261022T075341637648Z",
+            "20261022T075452807842Z",
+            "20261022T075558931851Z",
+            "20261022T075640990268Z"
+          ],
+          "result": "Automatic ledge catches no longer rotate the VR view. Baseline073026/073150 turned the view from -88.294 to91.726 degrees with an unchanged HMD. Preserve the preceding fresh normal-action heading through automatic authored alignment, as well as explicit Y actions. On829065fcfb30, held VR yaw stays1.725826 degrees while native camera yaw reaches91.737862; climb-back stays1.725219..1.726273. Three subsequent leftward steps move1.907m with the intended view-relative direction. Both held and climbed-back eyes reviewed. Other contextual actions and physical Quest remain open."
         }
       ],
       "reports": [
@@ -1082,7 +1092,7 @@
     }
   ],
   "active_work": {
-    "candidate": "73fe7d0b521d",
+    "candidate": "829065fcfb30",
     "targets": [
       "tutorial camera handoff freeze",
       "held-rifle right tracking loss"
@@ -1130,7 +1140,7 @@
       "review": "Start/middle/end show live map/world; sparse left-eye observation only, not continuous stereo acceptance."
     },
     "tutorial_exact_reproduction_pending": false,
-    "session": "Owned game/simulator closed after mounted attempt070544; no active gameplay runner. Steam retained.",
+    "session": "Owned game/simulator closed after075640; Steam retained; no background gameplay runner.",
     "next_actions": [
       "Resume unresolved FP02 moving support/contact and precision-weapon recoil/bolt-action checks; open fingers remain a visual failure.",
       "Continue FP07 native left-hand handset/contact/projector alignment; exact timeout lifecycle subcase now passes.",
@@ -1153,7 +1163,7 @@
     },
     "build_slots": {
       "published_pin": "b627c7cacc9a",
-      "development": "56d5a6b01274",
+      "development": "829065fcfb30",
       "installed": "development",
       "pin_matches_play": true,
       "physical_runtime": "Explicit Meta Quest Link in both local Play commands"
@@ -1168,7 +1178,7 @@
     "research_dossier": "D:/Dev/Tools/Ghidrust/workspace/evidence/mgs5vr/idroid-post-tutorial-close",
     "runtime_note": "Per-game Meta preference and -MetaLink launch checks pass. Windows global runtime was observed as Virtual Desktop at final cleanup; direct restoration to mandated Meta default was denied by Windows registry permissions. Global value remains Virtual Desktop. No SteamVR switch occurred.",
     "overall_goal_status": "active_all_unresolved_field_fixes",
-    "current_checkpoint": "Development428a0c0872fc unchanged. Latest mortar attempt rejected already-broken fixture before entry; no new gameplay delivery. Continue whole-list batch work.",
+    "current_checkpoint": "Automatic ledge catches no longer rotate the VR view. Baseline073026/073150 turned the view from -88.294 to91.726 degrees with an unchanged HMD. Preserve the preceding fresh normal-action heading through automatic authored alignment, as well as explicit Y actions. On829065fcfb30, held VR yaw stays1.725826 degrees while native camera yaw reaches91.737862; climb-back stays1.725219..1.726273. Three subsequent leftward steps move1.907m with the intended view-relative direction. Both held and climbed-back eyes reviewed. Other contextual actions and physical Quest remain open.",
     "cover_followup": {
       "candidate": "8e63070500b9",
       "rejected_candidate": "ffdd224d59da",
@@ -1590,6 +1600,33 @@
       "retained_run": "20261022T070544866546Z",
       "result": "Fixture already broken before entry; physical pitch and firing not reached. Prior combat attempts fired no rounds because muzzle rays were obstructed; camp-clear reconnaissance stopped on active detection. Destruction cause unknown.",
       "cleanup": "Inputs released; owned game/simulator closed; Steam retained."
+    },
+    "automatic_ledge_heading": {
+      "candidate_sha256": "829065fcfb30ede52fa77531a14bbf8378b7182daa7c7a795d9ffc362f09b798",
+      "baseline_runs": [
+        "20261022T073026928204Z",
+        "20261022T073150684858Z"
+      ],
+      "retained_runs": [
+        "20261022T075341637648Z",
+        "20261022T075452807842Z",
+        "20261022T075558931851Z",
+        "20261022T075640990268Z"
+      ],
+      "result": "Automatic ledge catches no longer rotate the VR view. Baseline073026/073150 turned the view from -88.294 to91.726 degrees with an unchanged HMD. Preserve the preceding fresh normal-action heading through automatic authored alignment, as well as explicit Y actions. On829065fcfb30, held VR yaw stays1.725826 degrees while native camera yaw reaches91.737862; climb-back stays1.725219..1.726273. Three subsequent leftward steps move1.907m with the intended view-relative direction. Both held and climbed-back eyes reviewed. Other contextual actions and physical Quest remain open.",
+      "limits": [
+        "Scoped native ledge catch and climb-back in simulator",
+        "Fulton, other climbing surfaces and physical Quest remain open"
+      ],
+      "cleanup": "Owned game/simulator closed after075640; Steam retained; no background gameplay runner."
+    },
+    "rejected_cover_assistance": {
+      "candidate": "892e1cb61501",
+      "runs": [
+        "20261022T073943268858Z",
+        "20261022T074037704354Z"
+      ],
+      "result": "Returning inactive mode from the selector did not exit held native mode2. Removed the option from source and removed the test-added setting; existing immersive cover remains unchanged. Native assistance entry/exit integration remains open."
     }
   }
 }

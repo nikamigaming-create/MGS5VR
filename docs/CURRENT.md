@@ -7,6 +7,10 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Automatic ledge catches no longer rotate the VR view. Baseline073026/073150 turned the view from -88.294 to91.726 degrees with an unchanged HMD. Preserve the preceding fresh normal-action heading through automatic authored alignment, as well as explicit Y actions. On829065fcfb30, held VR yaw stays1.725826 degrees while native camera yaw reaches91.737862; climb-back stays1.725219..1.726273. Three subsequent leftward steps move1.907m with the intended view-relative direction. Both held and climbed-back eyes reviewed. Other contextual actions and physical Quest remain open. Owned game/simulator closed; Steam retained; published play unchanged. Retained075341/075452/075558/075640.
+
+- Cover-assistance option experiment892e1cb61501 failed: mode2 remained active after switching Off at the known Mother Base wall. The option and its temporary preference were removed; no nonworking control is included in the candidate. Retained073943/074037. Native cover entry/exit integration still needs work.
+
 The 22 October execution order is whole-list review, related production fixes in
 one candidate, then a combined gameplay check. Do not resume isolated mortar
 retries as the default work loop. FIELD_FIXES has 19 open broad rows; these mix
@@ -24,7 +28,7 @@ background gameplay runner remains. Published play and checked dev unchanged.
 
 - Tutorial exit-notice handoff on 428a0c0872fc: closing the paused Challenge Tasks terminal briefly retired the VR camera before Exit Tutorial opened, leaving a frozen edge-on handset image. Preserve the same paused anchor only for an immediately following Pause within250ms, with matching player, activation and tracking reference. Gameplay still requires a fresh native player publication. Baseline062745 loses the active camera; final064303 retains it and shows the readable Exit Tutorial panel in both eyes. Notice dismissal and immediate ordinary iDroid reopen/stow pass. Owned session closed; Steam retained; published play unchanged.
 
-Current gameplay-checked development is `428a0c0872fc`, including the tutorial exit-notice handoff fix. Published play remains unchanged.
+Current gameplay-checked development is `829065fcfb30`, including automatic ledge-heading continuity and the earlier tutorial exit-notice handoff fix. Published play remains unchanged.
 
 - Rocket Arm batch on fb83026e1682: left-hand pitch/yaw now steer native flight, with movement-stick override and normal weapon return. Brief skin-publication gaps no longer reset held steering. The closed terminal retained its closing bit after sortie selection, suppressing the independent flight handset; that unrelated gate now applies only to terminal presentation. Retained060632 shows trajectory response and live flight pixels on the handset in both eyes. Ordinary iDroid reopen/stow passes in061327 after reviewed Challenge Tasks and Exit Tutorial notices. Target impact, Blast Arm, wider contact/poses and physical Quest remain open. Owned simulator/game closed; Steam retained; published play unchanged.
 

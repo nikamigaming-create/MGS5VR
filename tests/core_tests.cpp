@@ -5065,6 +5065,25 @@ int main(){
             "releasing Y during the early normal-action entry phase retains the captured view");
         expect(near(view.update(-1.4f,0,jeep,false,730),-.8f),
             "later native vehicle occupancy cannot replace the Y-edge heading");
+        view.reset();
+        view.update(.4f,0,foot,false,1000);
+        expect(near(view.update(-.9f,0,exiting,false,1010),.4f),
+            "automatic ledge entry retains the preceding normal view without a Y press");
+        expect(near(view.update(1.3f,0,exiting,false,1020),.4f),
+            "continued native ledge alignment cannot orbit a fixed headset");
+        expect(near(view.update(1.4f,0,foot,false,1100),.4f),
+            "automatic action return retains the physical heading");
+        expect(near(view.update(1.5f,0,foot,true,1110),.5f),
+            "normal look remains available after an automatic action");
+        view.reset();
+        view.update(.4f,0,foot,false,2000);
+        expect(near(view.update(-.9f,0,exiting,false,2600),-.9f),
+            "an old normal frame cannot anchor a later unrelated action");
+        view.reset();
+        view.update(.4f,0,foot,false,3000);
+        view.update(.6f,0,{},false,3010);
+        expect(near(view.update(-.9f,0,exiting,false,3020),-.9f),
+            "unknown native ownership cannot manufacture an automatic action edge");
     }
     std::cout<<checks<<" contract checks, "<<failures<<" failures. These tests do not prove in-game or headset behavior.\n";
     return failures?1:0;
