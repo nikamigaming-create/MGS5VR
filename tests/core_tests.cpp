@@ -1778,6 +1778,22 @@ int main(){
         expect(!rocketArmCameraOwned(other),"forced camera modes do not certify native flight");
         other=owner;other.readerVerified=false;
         expect(!rocketArmCameraOwned(other),"unknown native reader cannot enable remote camera acceptance");
+        RocketArmSteering steering;
+        const Pose neutral{{.5f,0,0,.8660254f},{-.2f,-.2f,-.5f}};
+        expect(steering.update(neutral,{},true,false,1,2,3)==std::array<float,2>{},
+            "rocket flight begins with neutral hand steering");
+        const auto turned=compose(Pose{{0,.258819f,0,.965926f},{}},neutral);
+        const auto axes=steering.update(turned,{},true,false,1,2,3);
+        expect(axes[0]<-.6f&&near(axes[1],0),"left-hand yaw produces only horizontal rocket steering");
+        expect(steering.update(turned,{},true,true,1,2,3)==std::array<float,2>{}
+            &&steering.update(turned,{},true,false,1,2,3)==std::array<float,2>{},
+            "manual rocket steering rebases the physical hand without a release jump");
+        expect(steering.update(neutral,{},false,false,1,2,3)==std::array<float,2>{}
+            &&steering.update(turned,{},true,false,1,2,3)==std::array<float,2>{},
+            "flight end or tracking loss clears steering before reacquisition");
+        const auto pitched=compose(Pose{{.258819f,0,0,.965926f},{}},turned);
+        const auto elevated=steering.update(pitched,{},true,false,1,2,3);
+        expect(near(elevated[0],0)&&elevated[1]>.6f,"left-hand pitch produces vertical rocket steering");
         HeadCamera flight;flight.configure(true,1,true);flight.track({},true,100);flight.toggle();
         auto head=identityMatrix;head[13]=1.6f;
         expect(flight.publishPlayerHead(7,8,{},identityMatrix,head,100),"ordinary head publication admitted");

@@ -1152,6 +1152,9 @@ class Live:
         return self.observe()
 
     def execute(self, step):
+        if step.get('op') == 'rocket_arm_flight':
+            from .rocket_arm import inspect_flight
+            return inspect_flight(self)
         if step.get('op') == 'commands_select':
             from .commands import select
             return select(self, step)

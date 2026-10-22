@@ -20,7 +20,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Natural cover and native benefits — FP04.** Reproduced automatic aim-out fixed in8e630: stationary-head camera position unchanged with native readiness and cover mode2; guarded3-round discharge retains cover/root position; physical lean/up/return and exit checked. Lean-right shows translucent body intrusion in both eyes. Off/immersive toggle, broader surfaces/postures, non-VR and headset remain open. Preserve native benefits only when physical crouch/lean/occlusion qualify, including ordinary geometry/posture effects with assistance off.
 - [ ] **Helicopter/transit body presentation — FP06.** Open; verify body, view and hand continuity through native transit.
 - [ ] **Handheld iDroid — FP07.** Left bionic hand; native contact/projector alignment, readable stereo screen, ordinary/forced stow and immediate reopening. Native projector endpoint fitting is enabled in development44f0 after reproducing a roughly20cm endpoint mismatch; front/turned stereo views and ordinary stow checked. Physical orientation, forced tutorial lifecycle and wider configuration acceptance remain open.
-- [ ] **Rocket arm — FP08.** Native flight/live view and left-arm steering remain unverified.
+- [ ] **Rocket arm — FP08.** Left-hand steering and missing flight handset fixed on fb83026e1682. Native trajectory, flight pixels in both eyes, stick override, weapon return and iDroid reopen/stow checked in060632/061327. Target impact, Blast Arm, wider contact/poses and physical Quest remain open.
 - [ ] **Cabin paper/pen — FP09.** Marker pickup now seats its barrel in the palm. Combined run013111 completes keyboard caption, freehand ink and board pinning, visible in both eyes on371a. Shorter wrist guidance clears the sleeve in the reproduced camera-hold view on6c9889 (run013931, both eyes). Paper-edge pinch and both-hand carrying now meet visibly on58d2; combined typing, writing and pinning pass in020748. Marker shaft/pinch contact is corrected on e64919 and both-hand writing reviewed in both eyes in045333. Wider hand orientations and prompt readability remain open.
 - [ ] **Cabin gallery/workbench/cassettes — FP10.** Front-slot print presentation fixed and visible in both eyes on371a; new copy remains until taken/replaced. Combined cassette handling, both-hand camera use and note editor completed. Flat-sheet stacking and field-paper ray corrected in source; loose sheets now settle flat instead of balancing on edges (both-eye combined run045333). Wider stacking acceptance and cassette presentation remain open.
 - [ ] **ACC loadout holsters — FP11.** Native physical interaction and live acceptance incomplete.
@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current gameplay-checked development is `c412aa09c268`, adding seated helicopter body/eye continuity to marker pinch contact, loose-sheet settling and prior fixes. Physical pitch, contact, discharge and other mounted types remain open.
+Current gameplay-checked development is `fb83026e1682`, adding Rocket Arm steering and restored flight handset to seated helicopter body/eye continuity, marker pinch contact, loose-sheet settling and prior fixes. Physical pitch, contact, discharge and other mounted types remain open.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -73,6 +73,9 @@ that route. The complete field list above remains the work queue.
 - [x] **This pass: loose sheets balanced indefinitely on edges.** Settle toward the nearer face while preserving heading and support. Ten previously tilted sheets now stay flat with no displacement across the combined workbench run; both-eye seat views reviewed. Final-build restart050252 restores all32 papers, including the10 corrected sheets flat.
 
 - [x] **This pass: torso and legs disappear during helicopter transit.** Admit the original native skin eye and keep the seated lower body attached to the carrier. The anchor follows the boarding-to-seat pose change without following small idle head movements. Both-eye seated and post-disembark body views reviewed on c412aa, retained052947/053027/053103. Extraction boarding and physical Quest remain open.
+
+- [x] **This batch: left-hand motion did not steer Rocket Arm.** Physical pitch/yaw now change native trajectory; stick override and normal weapon return checked.
+- [x] **This batch: Rocket Arm handset missing after sortie selection.** Flight ownership now survives the unrelated terminal closing flag. Live flight pixels reviewed in both eyes and ordinary iDroid reopen/stow retained. Broader FP08 remains open.
 
 ## Closure requirements
 

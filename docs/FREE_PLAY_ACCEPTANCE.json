@@ -706,9 +706,21 @@
     {
       "id": "FP08",
       "title": "Rocket-arm live view and left-arm steering",
-      "status": "reproduce",
+      "status": "scoped_fix_remaining_acceptance",
       "acceptance": [
         "native flight, view continuity, steering and recovery"
+      ],
+      "evidence": [
+        {
+          "run": "20261022T060632097290Z",
+          "candidate_sha256": "fb83026e1682e53c415d42ec2cf6dd8db898b32de86ae23917fe1048b63a221b",
+          "result": "Native hand pitch/yaw, stick override, flight display in both eyes and weapon recovery."
+        },
+        {
+          "run": "20261022T061327862709Z",
+          "candidate_sha256": "fb83026e1682e53c415d42ec2cf6dd8db898b32de86ae23917fe1048b63a221b",
+          "result": "Exit Tutorial notice dismissed; ordinary iDroid reopening/stowing pass."
+        }
       ]
     },
     {
@@ -1507,6 +1519,35 @@
       "cleanup": "Owned simulator/game closed with workspace.py stop-sim; Steam retained. Published play unchanged.",
       "checks": "Required development build checks pass, including camera contracts for stale HEAD versus skin eye, stable idle and later boarding-to-seat transition. These are supporting checks, not gameplay delivery.",
       "setup_failures": "Initial session command stalled at the Choose a Rival help card; recovered through the reviewed acknowledgment with run on the same live session. An invalid30-sample private route setting was corrected; initial loading-resume captures caught black native fades and are excluded from visual acceptance."
+    },
+    "rocket_arm_batch": {
+      "candidate_sha256": "fb83026e1682e53c415d42ec2cf6dd8db898b32de86ae23917fe1048b63a221b",
+      "result": "Rocket Arm batch on fb83026e1682: left-hand pitch/yaw now steer native flight, with movement-stick override and normal weapon return. Brief skin-publication gaps no longer reset held steering. The closed terminal retained its closing bit after sortie selection, suppressing the independent flight handset; that unrelated gate now applies only to terminal presentation. Retained060632 shows trajectory response and live flight pixels on the handset in both eyes. Ordinary iDroid reopen/stow passes in061327 after reviewed Challenge Tasks and Exit Tutorial notices. Target impact, Blast Arm, wider contact/poses and physical Quest remain open. Owned simulator/game closed; Steam retained; published play unchanged.",
+      "baseline_runs": [
+        "20261022T054019715611Z",
+        "20261022T055806738646Z"
+      ],
+      "retained_runs": [
+        "20261022T060632097290Z",
+        "20261022T061327862709Z"
+      ],
+      "failed_candidate": {
+        "sha256_prefix": "5ef89b7bf828",
+        "run": "20261022T055422905331Z",
+        "failure": "Right axes did not steer; publication gaps reset neutral. Corrected native movement axes and bounded fresh ownership."
+      },
+      "checks": "Required development build checks pass; actual flight trajectory and both-eye display reviewed.",
+      "cleanup": "Owned simulator/game closed; Steam retained; published play unchanged.",
+      "remaining": [
+        "Target impact/damage",
+        "Blast Arm",
+        "Wider contact and moving stereo presentation",
+        "Physical Quest Link"
+      ],
+      "failures": [
+        "060632 post-flight menu expectation failed on native Challenge Tasks help;061138 then encountered Exit Tutorial notice. Reviewed cleanup and ordinary reopen/stow passed in061327.",
+        "Earlier startup access violation retained in Windows CrashDumps and private/current-rocket-startup-crash.txt. Two subsequent game-only launches worked; cause unproven."
+      ]
     }
   }
 }

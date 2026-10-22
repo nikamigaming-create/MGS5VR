@@ -21,6 +21,7 @@
 #include "mgs5vr/cabin_walk.hpp"
 #include "mgs5vr/vehicle_weapon.hpp"
 #include "mgs5vr/vehicle_pedals.hpp"
+#include "mgs5vr/rocket_arm.hpp"
 #include "mgs5vr/eye_resampler.hpp"
 #include <Xinput.h>
 #include <openxr/openxr.h>
@@ -215,6 +216,7 @@ struct Session {
     bool borrowedReloadSent{};
     uint64_t borrowedReloadPulseUntil{};
     std::optional<HeadCameraSample> handUseRigHistory;
+    RocketArmSteering rocketSteering;
     RigInput rigControls;
     RigOptics opticsControls;
     bool binocularSelected{};
@@ -922,12 +924,16 @@ struct Session {
                 &&idroidHandUseSourceFresh(handUseRigHistory->playerOwner,handUseRigHistory->activation,
                     handUseRigHistory->controllers.referenceEpoch,handUseRigHistory->sampleTime,
                     nativeStatus.activation,referenceEpoch,now)
-                &&handheldIdroidOwned(handUseRigHistory->playerOwner,nativeStatus.activation)){
+                &&(handUseRigHistory->rocketArmGuidance
+                   ||handheldIdroidOwned(handUseRigHistory->playerOwner,nativeStatus.activation))){
             // A source-camera/skin publication gap cannot steal a continuously
             // held support/reload chord. Renderers still require fresh joined
             // frames; this cached native contact is used only by arbitration.
             handUseRig=handUseRigHistory;
         }else handUseRigHistory.reset();
+        const bool rocketFlightOwned=handUseRig&&handUseRig->rocketArmGuidance&&nativeStatus.active&&!nativeStatus.suspended
+            &&idroidHandUseSourceFresh(handUseRig->playerOwner,handUseRig->activation,
+                handUseRig->controllers.referenceEpoch,handUseRig->sampleTime,nativeStatus.activation,referenceEpoch,now);
         const bool handUseOwner=handUseRig&&handUseRig->activation==nativeStatus.activation
             &&handUseRig->controllers.referenceEpoch==referenceEpoch
             &&handheldIdroidOwned(handUseRig->playerOwner,nativeStatus.activation);
@@ -1009,7 +1015,8 @@ struct Session {
             mode==TravelMode::horse?ControlContext::horse:ControlContext::gameplay;
         const uint32_t axisOwner=static_cast<uint32_t>(controlContext)
             |(uint32_t(idroidFocus)<<4)|(uint32_t(idroidRouting)<<5)
-            |(uint32_t(cabinPlay||cabinTransit)<<6)|(uint32_t(scriptedDemo)<<7)|(uint32_t(loading)<<8);
+            |(uint32_t(cabinPlay||cabinTransit)<<6)|(uint32_t(scriptedDemo)<<7)|(uint32_t(loading)<<8)
+            |(uint32_t(rocketFlightOwned)<<9);
         const auto routedPhysical=axisOwnership.update(physical,axisOwner);
         if(priorIdroidRouting&&!idroidRouting){
             // Native closing precedes both Terminal Stop and the menu flag.
@@ -1459,6 +1466,9 @@ struct Session {
         // where the head pose owns view motion, but it dropped vertical
         // turret/camera aim for trucks, armored vehicles, and helicopters.
         const bool mounted=mode==TravelMode::horse||mode==TravelMode::vehicle||mode==TravelMode::nativeAction;
+        const bool rocketGuidanceInput=rigInput&&!nativeInput.exclusive&&!nativeStatus.nativeMenuOpen
+            &&!stickNavigation&&!editorInputOwned&&!controllerFrame.cameraWorldFrozen
+            &&!controllerFrame.studio->freezeRequested&&!center&&!headToggle&&!utilityCenter&&rocketFlightOwned;
         if(rigInput&&!nativeInput.exclusive&&!stickNavigation
            &&!mountedViewOwnsRightStick(mode,rigInput,nativeInput.exclusive,stickNavigation))
             {pad.rightX=0;pad.rightY=0;}
@@ -1472,7 +1482,7 @@ struct Session {
             &&!editorInputOwned&&!nativeStatus.nativeMenuOpen&&!nativeInput.exclusive&&!nativeGamepadActive()
             &&!controllerFrame.cameraWorldFrozen&&!center&&!headToggle&&!utilityCenter&&priorFocused;
         controllerFrame.cinematicMove=cinematicMoving?controls.axis("axes.move",routedPhysical):std::array<float,2>{};
-        const bool turnAvailable=rigInput&&!cabinTurning&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter
+        const bool turnAvailable=rigInput&&!rocketGuidanceInput&&!cabinTurning&&!nativeInput.exclusive&&!stickNavigation&&!center&&!headToggle&&!utilityCenter
             &&!controllerFrame.cameraWorldFrozen&&!controllerFrame.studio->freezeRequested;
         const auto turnMode=controls.setting("settings.turn_mode");
         const auto smoothAxis=controls.axis("axes.turn",routedPhysical);
@@ -1587,6 +1597,17 @@ struct Session {
             // vehicleViewInput above contains only deliberate stick input.
             // Native hand aiming must not rotate the tracking origin along
             // with the barrel, feeding its own movement back into the grip.
+        }
+        const auto rocketStick=controls.axis("axes.move",routedPhysical);
+        const bool rocketManual=std::hypot(rocketStick[0],rocketStick[1])>.15f;
+        const auto rocketAxes=rocketSteering.update(controllerFrame.hands[0].aim,
+            handUseRig?handUseRig->headPose:Pose{},rocketGuidanceInput&&controllerFrame.hands[0].aimTracked,
+            rocketManual,handUseRig?handUseRig->playerOwner:0,nativeStatus.activation,referenceEpoch);
+        if(rocketGuidanceInput){
+            // The native projectile owns the movement stick, never a turn of
+            // Snake's VR tracking space. Explicit stick input rebases the hand.
+            pad.leftX=static_cast<int16_t>((rocketManual?rocketStick[0]:rocketAxes[0])*32767.f);
+            pad.leftY=static_cast<int16_t>((rocketManual?rocketStick[1]:rocketAxes[1])*32767.f);
         }
         lastMappedWeaponReady=controllerFrame.weaponReady&&pad.leftTrigger>127;
         controllerFrame.contextInteract=rigInput&&!nativeInput.exclusive&&(pad.buttons&XINPUT_GAMEPAD_Y)
