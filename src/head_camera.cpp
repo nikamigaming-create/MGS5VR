@@ -896,10 +896,14 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 headPoint.y-rootSample.position.y,
                 headPoint.z-rootSample.position.z
             };
-            // Crawling chest yaw oscillates on every stride. Measure and
-            // transport its eye offset in the actor root frame instead.
             const bool wallCover=anatomical&&rootSample.wallCover;
-            const auto anatomicalHeading=rootSample.bodyFramesTracked&&controllers_.playerPosture!=PlayerPosture::prone&&!wallCover
+            // Low postures retain their native footprint. The cover flag
+            // clears before the crouched exit animation straightens; turning
+            // its long eye offset into view yaw sends the eyes through walls.
+            // Crawling chest yaw also oscillates independently of the root.
+            const bool nativeFootprint=wallCover||controllers_.playerPosture==PlayerPosture::prone
+                ||controllers_.playerPosture==PlayerPosture::crouched;
+            const auto anatomicalHeading=rootSample.bodyFramesTracked&&!nativeFootprint
                 ?rootSample.anatomicalHeading:rootSample.orientation;
             const auto targetHeadLocalOffset=rotate(inverseQuat(anatomical?anatomicalHeading:rootSample.orientation),worldHeadOffset);
             const bool advanceOffset=!anatomical||!state.anatomicalModel||(nativeEyeJoined&&rootSample.eyeModel);
@@ -993,7 +997,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 // Preserve that native prone footprint. View yaw and HMD neck
                 // look still own orientation, not the anchored eye position.
                 const auto heading=anatomical&&rootSample.bodyFramesTracked
-                    ?(controllers_.playerPosture==PlayerPosture::prone||wallCover?anatomicalHeading
+                    ?(nativeFootprint?anatomicalHeading
                         :yawRotation(horizontalYaw(nativePose.orientation))):state.heading;
                 auto cameraAnchor=rootSample.position+rotate(heading,state.headLocalOffset);
                 if(!anatomical){

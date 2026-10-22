@@ -7,6 +7,12 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Candidate `4447439fc8bc` fixes the reproduced crouched cover-exit wall
+  penetration. Both eyes now retain the wall after exit and through the
+  previously obscured left/right reach check. The shoulder reach correction
+  also keeps the shoulder outside an18cm eye envelope, reducing near-eye sleeve
+  intrusion without hiding the arm. Native cover lean/up/return and ordinary
+  exit remain functional. Wider cover and physical Quest remain open.
 - Full-body cover no longer places the camera through the reproduced Mother
   Base wall. Candidate `4060b9259cea` preserves the native wall-relative eye
   footprint instead of rotating it into view yaw. Both eyes retain the solid
@@ -44,7 +50,7 @@ worktree is needed for the remaining field fixes.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Current candidate with completed scoped gameplay checks: `4060b9259cea`.
+Current candidate with completed scoped gameplay checks: `4447439fc8bc`.
 Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).
@@ -80,6 +86,19 @@ when the crouch flag stays unchanged. Runs234550/234616/234646 retain both-eye
 lean/peek/return and normal exit. See active_work.cover_wall_anchor in the
 ledger. Next: right-shoulder/body intrusion and wider cover behavior. Neither
 headset acceptance nor exposed-head/native-benefit eligibility is established.
+
+Latest continuation supersedes that next step: read-only joint samples in
+20261021T235748151162Z locate the lean intrusion at the shoulder, about13cm
+from the eyes. Candidate d731962c1f2d adds a constrained clavicle reach and
+improves clearance, but its exit/reach runs20261022T001435264845Z and
+001507602216Z reveal the separate camera-through-wall failure. Do not use
+their reported input pass as visual acceptance. The cover flag clears while
+the native crouched head is still offset; retaining the native footprint for
+crouched poses fixes that transition. Final4447 runs002654/002713/002733
+retain lean/up/return, exit and both-eye reach results. Peripheral sleeve
+visibility remains; the original Afghan translucent figure is still not
+identified. Continue assistance settings, exposure/benefits, broader cover
+and the rest of FIELD_FIXES. Game/simulator and read-only sampler are closed.
 
 The neutral head/neck correction is now implemented and checked with the fixed
 camera height. Earlier camera-only candidate: `8483ea95dba9`, commit `1217caf`.

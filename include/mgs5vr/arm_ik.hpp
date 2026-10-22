@@ -38,14 +38,14 @@ struct ArmPose { Pose shoulder,elbow,wrist; };
 std::optional<ArmPose> scaledLegPose(const ArmPose& native,float scale);
 struct ArmSolution { ArmPose pose; bool reachClamped{}; };
 struct GroundedLegSolution { ArmSolution leg; float scale{1}; };
-// Protract the authored clavicle only when its fixed shoulder cannot reach.
-// Returns the clavicle pose; neither arm segment nor the chest is stretched.
-std::optional<Pose> reachingClavicle(Pose clavicle,const ArmPose& arm,Pose target);
 // Fit only this frame's leg reach. Calibration is a lower bound, never a
 // high-water mark from earlier head motion. Arms retain their own size limits.
 std::optional<GroundedLegSolution> solveGroundedLeg(const ArmPose& native,Pose contact,float calibration=1.f);
 // A contact returned by native world collision, in the arm solve's space.
 struct ArmSurface { Vec3 point,normal; float clearance{}; };
+// Protract for reach, optionally keeping the shoulder outside a head surface.
+// Returns the clavicle pose; neither arm segment nor the chest is stretched.
+std::optional<Pose> reachingClavicle(Pose clavicle,const ArmPose& arm,Pose target,const ArmSurface* shoulderSurface=nullptr);
 std::optional<Vec3> outsideArmSurface(Vec3 point,const ArmSurface& surface);
 // Axes in the authored joint frames, independent of the current weapon animation.
 struct ArmBasis { Vec3 upperAxis,forearmAxis; Vec3 elbowBend{0,0,1},wristUp{0,1,0}; };

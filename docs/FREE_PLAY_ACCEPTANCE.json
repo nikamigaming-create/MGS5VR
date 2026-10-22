@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "4060b9259cea",
+  "candidate": "4447439fc8bc",
   "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1177,6 +1177,45 @@
       ],
       "build_checks": "Required build and installer checks passed; private/current-cover-wall-build.log",
       "cleanup": "Owned game/simulator closed; inputs and settings restored; Steam retained; published play unchanged",
+      "physical_headset_acceptance": false
+    },
+    "cover_exit_and_shoulder": {
+      "candidate": "4447439fc8bc",
+      "status": "scoped_cover_exit_and_shoulder_clearance_fixed_gameplay_checked",
+      "shoulder_before": "20261021T235748151162Z",
+      "rejected_candidate": "d731962c1f2d",
+      "rejected_runs": [
+        "20261022T001435264845Z",
+        "20261022T001507602216Z"
+      ],
+      "rejected_reason": "Shoulder clearance improved, but exiting native cover rotated the remaining crouched eye offset into view yaw and through the wall. Left eye obscured during reach; input predicate pass is not visual acceptance.",
+      "retained_runs": [
+        "20261022T002654017393Z",
+        "20261022T002713754966Z",
+        "20261022T002733502962Z"
+      ],
+      "changes": [
+        "Constrain the clavicle reach circle when its shoulder endpoint enters an18cm eye envelope; preserve arm segment lengths and hand target",
+        "Keep crouched native eye footprint in actor-root space through cover exit, which clears BEHIND before the animation straightens"
+      ],
+      "review": "Both final eyes show solid wall in cover lean and after exit. Both hands and forearms visible in repeated left/right50cm reach after exit, without the prior left-eye obstruction. Peripheral sleeve remains visible; no geometry hidden.",
+      "shoulder_distance_metres": {
+        "before_lean": 0.132,
+        "after_center": 0.18,
+        "after_lean": 0.1806,
+        "after_peek_up": 0.2735,
+        "after_return": 0.18
+      },
+      "joint_evidence": "arm-samples.jsonl in baseline235748 and final002654; non-atomic read-only palette samples, compared to nearby capture time, not exact compositor-frame joins",
+      "native_state": "BEHIND true through center/lean/up/return; ordinary walk-away clears it. Full-body valid throughout final inspection.",
+      "limits": [
+        "Original Afghan translucent figure identity unresolved",
+        "Broader surfaces, assistance settings, exposure/native benefit eligibility remain open",
+        "Physical Quest and full-game acceptance remain open",
+        "50cm pose/visual reach comparison is not universal reach acceptance"
+      ],
+      "checks": "tools/build.ps1 -SkipBootstrap; required build and installer checks passed",
+      "cleanup": "Game/simulator and read-only sampler closed; Steam retained; published play unchanged; poses/settings restored",
       "physical_headset_acceptance": false
     }
   }

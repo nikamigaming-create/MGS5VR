@@ -1042,7 +1042,18 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const size_t clavicle=side?9:5,shoulder=clavicle+1;
         const auto before=bone(q,p,clavicle);
         const ArmPose arm{bone(q,p,shoulder),bone(q,p,shoulder+1),bone(q,p,shoulder+2)};
-        if(const auto fitted=reachingClavicle(before,arm,target)){
+        auto fitted=reachingClavicle(before,arm,target);
+        if(fitted){
+            const auto shoulderPose=compose(compose(*fitted,inverse(before)),arm.shoulder);
+            // A cover reach can lift the shoulder beside the eye while the
+            // elbow stays clear. Constrain the clavicle's shoulder endpoint
+            // on its reach circle, including clearance for the upper sleeve.
+            if(const auto surface=headClearanceSurface(shoulderPose.position,eyeInModel,.18f)){
+                fitted=reachingClavicle(before,arm,target,&*surface);
+                if(fitted)++headContacts;
+            }
+        }
+        if(fitted){
             const auto delta=compose(*fitted,inverse(before));
             replace(q,p,clavicle,*fitted);
             for(size_t i=shoulder;i<=shoulder+2;++i)replace(q,p,i,compose(delta,bone(q,p,i)));

@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current checked development is `4060b9259cea`, with scoped cover gameplay checks.
+Current checked development is `4447439fc8bc`, with scoped cover gameplay checks.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -46,6 +46,16 @@ that route. The complete field list above remains the work queue.
   Both-eye wall visibility, lateral lean, upward peek, return and walking exit
   checked on4060b; runs234550/234616/234646 retained. Right-shoulder intrusion,
   original Afghan translucent figure, wider cover and physical Quest stay open.
+- [x] **This pass: crouched cover exit through wall.** Native cover clears before
+  its crouched animation settles. Preserve the native low-posture eye footprint
+  through that transition. Both eyes retain the wall after exit and through
+  left/right50cm reach on4447; retained20261022 runs002713/002733. Earlier
+  d731 exit/reach failed visually despite passing input predicates.
+- [x] **This pass: shoulder reach enters eye area during cover lean.** Constrain
+  the clavicle's shoulder endpoint while retaining the hand target and native
+  bone lengths. Near-eye sleeve intrusion is reduced; arms remain visible.
+  Retained baseline235748 and final002654 joint samples and both-eye captures.
+  This does not identify the Afghan translucent figure or close broader FP04.
 
 ## Closure requirements
 

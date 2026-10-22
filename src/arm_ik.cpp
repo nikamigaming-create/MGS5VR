@@ -337,20 +337,21 @@ std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const
     out.pose.wrist={normalize(target.orientation),wrist};
     return out;
 }
-std::optional<Pose> reachingClavicle(Pose clavicle,const ArmPose& arm,Pose target){
+std::optional<Pose> reachingClavicle(Pose clavicle,const ArmPose& arm,Pose target,const ArmSurface* shoulderSurface){
     if(!valid(clavicle)||!valid(arm.shoulder)||!valid(arm.elbow)||!valid(arm.wrist)||!valid(target))return {};
     const float reach=length(arm.elbow.position-arm.shoulder.position)
         +length(arm.wrist.position-arm.elbow.position);
     const auto ray=target.position-arm.shoulder.position;
     const float distance=length(ray);
     if(reach<.1f||reach>.7f)return {};
-    if(distance<=reach-.001f)return clavicle;
+    if(distance<=reach-.001f&&!shoulderSurface)return clavicle;
+    if(distance<.001f)return {};
     // A virtual straight arm provides the remaining reach for the clavicle
     // solve. Its elbow is the real shoulder. The ordinary two-bone arm solve
     // subsequently restores the elbow bend and wrist orientation.
     auto straight=target;straight.position=arm.shoulder.position+ray*(reach/distance);
     const auto fit=solveArm({clavicle,arm.shoulder,straight},target,
-        arm.shoulder.position-clavicle.position);
+        arm.shoulder.position-clavicle.position,nullptr,shoulderSurface);
     return fit?std::optional<Pose>{fit->pose.shoulder}:std::nullopt;
 }
 std::optional<GroundedLegSolution> solveGroundedLeg(const ArmPose& native,Pose contact,float calibration){

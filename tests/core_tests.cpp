@@ -2041,6 +2041,12 @@ int main(){
         expect(covered.applied&&same(covered.nativePose.position,
             compose(original.worldFromHead,Pose{{},nativeEyeFromHead}).position),
             "captured cover eyes retain their wall-relative footprint despite independent view yaw");
+        original.wallCover=false;
+        nativeEyes.trackStereo({},eyes,true,2100,input);
+        nativeEyes.publishPlayerHead(7,8,coverCamera,capturedRoot,cached,2100);
+        const auto coverExit=nativeEyes.resolve(7,coverCamera,2100,original);
+        expect(coverExit.applied&&same(coverExit.nativePose.position,covered.nativePose.position),
+            "clearing cover before its crouched animation ends cannot rotate the eyes through the wall");
     }
     const auto headPoint=playerHeadPosition(playerRoot,headBone);
     expect(headPoint&&same(*headPoint,{500.1f,301.6f,1300}),"animated head position uses local-then-world transform order");
@@ -3629,6 +3635,22 @@ int main(){
         const auto surface=headClearanceSurface({.03f,0,0},{},.14f);
         const auto safe=surface?outsideArmSurface({.03f,0,0},*surface):std::nullopt;
         expect(safe&&near(safe->x,.14f)&&!headClearanceSurface({.3f,0,0},{},.14f),"camera envelope stops a penetrating limb while retaining an unobstructed hand");
+        const Pose coverClavicle{{},{-.081f,-.157f,-.172f}};
+        const ArmPose coverArm{Pose{{},{-.116f,-.043f,-.045f}},Pose{{},{-.095f,-.198f,.192f}},Pose{{},{-.068f,-.311f,.419f}}};
+        const auto shoulderPlane=headClearanceSurface(coverArm.shoulder.position,{},.18f);
+        const auto cleared=shoulderPlane?reachingClavicle(coverClavicle,coverArm,coverArm.wrist,&*shoulderPlane):std::nullopt;
+        bool shoulderClear=false,handRetained=false;
+        if(cleared){
+            const auto delta=compose(*cleared,inverse(coverClavicle));
+            const ArmPose shifted{compose(delta,coverArm.shoulder),compose(delta,coverArm.elbow),compose(delta,coverArm.wrist)};
+            const auto clearedArm=solveArm(shifted,coverArm.wrist,coverArm.elbow.position-coverArm.shoulder.position);
+            shoulderClear=dot(shifted.shoulder.position,shifted.shoulder.position)>=.18f*.18f-1e-5f;
+            if(clearedArm){
+                const auto error=clearedArm->pose.wrist.position-coverArm.wrist.position;
+                handRetained=dot(error,error)<=.002f*.002f;
+            }
+        }
+        expect(shoulderClear&&handRetained,"captured cover reach clears the shoulder from the eyes without losing its hand target");
     }
     // A prone wrist can remain above the floor while the unconstrained elbow
     // bends through it. Exercise contact on rotated slopes, not just flat Y=0.
