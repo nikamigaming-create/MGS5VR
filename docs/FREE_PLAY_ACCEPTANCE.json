@@ -638,10 +638,11 @@
     {
       "id": "FP06",
       "title": "Transit helicopter body exclusion",
-      "status": "reproduce",
+      "status": "partial",
       "acceptance": [
         "native seated body, transit, boarding/disembarking"
-      ]
+      ],
+      "latest_result": "Helicopter transit body on c412aa09c268: seated torso/legs now remain visible in both eyes. Native eye identity is admitted during transit, and the seat anchor settles through the later boarding-to-seated pose change while ignoring small idle head motion. Native pelvis/legs stay attached to the carrier. Four view directions retain mounted body and less than0.2mm fitted eye error in052947. Ordinary disembark053027 and on-foot body053103 pass; seated and on-foot belt views reviewed in both eyes. Extraction boarding, wider transit and physical Quest remain open."
     },
     {
       "id": "FP07",
@@ -1476,6 +1477,36 @@
         "reason": "Read-only case waited for optional workbench availability while native title menu remained open. Normal workbench flow opens prop mode through existing system.idroid action."
       },
       "final_combined_result": "Completed cassette recovery/insertion/ejection, both-hand camera use, note caption editing, right-hand freehand writing, board pinning and left-hand board writing on final checked build. Final left-marker pair also reviewed. Owned session closed with stop-sim."
+    },
+    "helicopter_transit_body": {
+      "candidate_sha256": "c412aa09c268eeaa40b0ad5043458186515bbeb0a920afb746cc2a1ef8cc1cf1",
+      "baseline_run": "20261022T051406127825Z",
+      "failed_candidates": [
+        {
+          "sha256_prefix": "1bbaac705854",
+          "run": "20261022T051925150310Z",
+          "failure": "Native eye identity joined, but fitted eye remained26\u201331cm below cached passenger anchor; body rejected."
+        },
+        {
+          "sha256_prefix": "a563468ce054",
+          "run": "20261022T052431705550Z",
+          "failure": "One-time skin-eye calibration still retained the early boarding pose; later seated body rejected with33cm eye error."
+        }
+      ],
+      "retained_runs": [
+        "20261022T052947030507Z",
+        "20261022T053027984989Z",
+        "20261022T053103346360Z"
+      ],
+      "result": "Helicopter transit body on c412aa09c268: seated torso/legs now remain visible in both eyes. Native eye identity is admitted during transit, and the seat anchor settles through the later boarding-to-seated pose change while ignoring small idle head motion. Native pelvis/legs stay attached to the carrier. Four view directions retain mounted body and less than0.2mm fitted eye error in052947. Ordinary disembark053027 and on-foot body053103 pass; seated and on-foot belt views reviewed in both eyes. Extraction boarding, wider transit and physical Quest remain open.",
+      "remaining": [
+        "Extraction boarding",
+        "Wider helicopter/transit conditions",
+        "Physical Quest Link"
+      ],
+      "cleanup": "Owned simulator/game closed with workspace.py stop-sim; Steam retained. Published play unchanged.",
+      "checks": "Required development build checks pass, including camera contracts for stale HEAD versus skin eye, stable idle and later boarding-to-seat transition. These are supporting checks, not gameplay delivery.",
+      "setup_failures": "Initial session command stalled at the Choose a Rival help card; recovered through the reviewed acknowledgment with run on the same live session. An invalid30-sample private route setting was corrected; initial loading-resume captures caught black native fades and are excluded from visual acceptance."
     }
   }
 }

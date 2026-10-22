@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current checked development is `eedcaa06226a`, adding marker pinch contact and loose-sheet settling to physical mortar yaw/release and prior cabin fixes. Physical pitch, contact, discharge and other mounted types remain open.
+Current gameplay-checked development is `c412aa09c268`, adding seated helicopter body/eye continuity to marker pinch contact, loose-sheet settling and prior fixes. Physical pitch, contact, discharge and other mounted types remain open.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -71,6 +71,8 @@ that route. The complete field list above remains the work queue.
 
 - [x] **This pass: marker buried in the palm.** Fit its socket and thumb/index articulation together. Both-hand writing completes and both final eyes reviewed in retained045333. Wider orientations and physical Quest remain open.
 - [x] **This pass: loose sheets balanced indefinitely on edges.** Settle toward the nearer face while preserving heading and support. Ten previously tilted sheets now stay flat with no displacement across the combined workbench run; both-eye seat views reviewed. Final-build restart050252 restores all32 papers, including the10 corrected sheets flat.
+
+- [x] **This pass: torso and legs disappear during helicopter transit.** Admit the original native skin eye and keep the seated lower body attached to the carrier. The anchor follows the boarding-to-seat pose change without following small idle head movements. Both-eye seated and post-disembark body views reviewed on c412aa, retained052947/053027/053103. Extraction boarding and physical Quest remain open.
 
 ## Closure requirements
 

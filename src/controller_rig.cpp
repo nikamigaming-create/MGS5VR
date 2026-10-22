@@ -804,7 +804,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const float yaw=std::atan2(forward.x,forward.z);
         Quat torso{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
         const auto travelMode=nativeTravelMode();
-        const bool mountedBody=travelMode==TravelMode::horse||frame.controllers.vehicleMounted
+        const bool mountedBody=travelMode==TravelMode::horse||frame.controllers.vehicleMounted||frame.controllers.cabinTransit
             ||frame.controllers.nativeActionControls;
         if(frame.locomotionHeadingTracked&&!frame.controllers.frontEnd
            &&!frame.controllers.authoredCamera&&!frame.controllers.cabinPlay
@@ -839,7 +839,6 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const auto fallbackUprightHead=uprightHead;
         bool fullBody=frame.controllers.fullBody&&nativeHead.has_value()&&frame.anatomicalEyeModel==model
             &&!frame.controllers.frontEnd&&!frame.controllers.authoredCamera
-            &&!frame.controllers.cabinTransit
             &&(frame.controllers.cabinPlay||travelMode==TravelMode::onFoot||mountedBody)&&parent[0]==-1&&parent[1]==0&&parent[2]==1&&parent[3]==2&&parent[4]==3
             &&parent[13]==0&&parent[14]==13&&parent[15]==14&&parent[16]==15
             &&parent[17]==0&&parent[18]==17&&parent[19]==18&&parent[20]==19;

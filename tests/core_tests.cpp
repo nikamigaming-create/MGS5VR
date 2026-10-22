@@ -2986,6 +2986,39 @@ int main(){
             "a passenger's handheld iDroid follows the same moving cabin and preserves the seated fit");
     }
     {
+        HeadCamera passenger;passenger.configure(true,1,true);
+        ControllerFrame input;input.cabinTransit=true;input.fullBody=true;
+        input.referenceEpoch=1;input.predictedXrTime=1;
+        auto root=identityMatrix;root[12]=100.f;
+        auto cachedHead=identityMatrix;cachedHead[13]=1.2f;
+        NativeBodyHead seated{42,99,Pose{{},{100,.8f,0}}};
+        const Pose seatCamera{{},{100,1.2f,0}};
+        passenger.trackStereo({},rigEyes,true,100,input);passenger.toggle();
+        passenger.publishPlayerHead(31,42,seatCamera,root,cachedHead,100);
+        passenger.resolve(31,seatCamera,100);
+        const auto joined=passenger.resolve(31,seatCamera,100,seated);
+        const auto eye=compose(seated.worldFromHead,Pose{{},nativeEyeFromHead}).position;
+        expect(joined.applied&&joined.anatomicalEyeModel==99&&same(joined.nativePose.position,eye),
+            "transit calibrates the seat from the joined skin eye, not the stale standing HEAD marker");
+        seated.worldFromHead.position.y+=.04f;
+        cachedHead[13]=1.5f;
+        passenger.trackStereo({},rigEyes,true,110,input);
+        passenger.publishPlayerHead(31,42,seatCamera,root,cachedHead,110);
+        const auto idle=passenger.resolve(31,seatCamera,110,seated);
+        expect(idle.applied&&idle.anatomicalEyeModel==99&&same(idle.nativePose.position,eye),
+            "joined seated idle animation does not pump the calibrated VR viewpoint");
+        seated.worldFromHead.position.y-=.4f;
+        HeadCameraSample settled;
+        for(uint64_t t=130;t<=1130;t+=20){
+            passenger.trackStereo({},rigEyes,true,t,input);
+            passenger.publishPlayerHead(31,42,seatCamera,root,cachedHead,t);
+            settled=passenger.resolve(31,seatCamera,t,seated);
+        }
+        expect(settled.applied&&same(settled.nativePose.position,
+            compose(seated.worldFromHead,Pose{{},nativeEyeFromHead}).position),
+            "a later boarding-to-seat animation settles the passenger eye instead of retaining standing height");
+    }
+    {
         HeadCamera driver;driver.configure(true,1,true);
         ControllerFrame input;input.vehicleControls=true;input.vehicleMounted=true;input.handheldMenus=true;
         input.vehicleView={true,false,true,true,25600,1.570796327f};

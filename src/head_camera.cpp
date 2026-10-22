@@ -793,6 +793,30 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                     view.headLocalOffset=rotate(inverseQuat(root.orientation),result.playerHead-root.position);
                 }
             }
+            if(view.passenger){
+                // The cached HEAD marker can still describe the standing
+                // boarding pose. Follow its larger transition into the seat,
+                // but keep ordinary seated idle head motion out of VR.
+                if(controllers_.fullBody&&nativeEyeJoined&&root.eyeModel){
+                    const auto target=rotate(inverseQuat(root.orientation),root.eyePosition-root.position);
+                    if(view.eyeModel!=root.eyeModel){
+                        view.headLocalOffset=target;view.eyeModel=root.eyeModel;view.eyeSettling=false;
+                    }else{
+                        const auto delta=target-view.headLocalOffset;
+                        const float distanceSquared=dot(delta,delta);
+                        if(distanceSquared>.08f*.08f)view.eyeSettling=true;
+                        if(view.eyeSettling){
+                            const float dt=time>=view.eyeTime?std::min(.25f,float(time-view.eyeTime)*.001f):0.f;
+                            view.headLocalOffset=view.headLocalOffset+delta*smoothingAlpha(dt,.12f);
+                            if(distanceSquared<.005f*.005f){view.headLocalOffset=target;view.eyeSettling=false;}
+                        }
+                    }
+                    view.eyeTime=time;
+                }else if(!controllers_.fullBody&&view.eyeModel){
+                    view.headLocalOffset=rotate(inverseQuat(root.orientation),result.playerHead-root.position);
+                    view.eyeModel=0;
+                }
+            }
             const bool looking=!view.passenger&&(std::abs(controllers_.vehicleViewInput[0])>.18f
                 ||std::abs(controllers_.vehicleViewInput[1])>.18f);
             if(looking)view.lookUntil=time+250;
@@ -867,9 +891,10 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         rig_={};
     }
     suspended_=false;reason_=HeadCameraStop::none;
-    if(controllers_.cabinPlay&&!controllers_.frontEnd&&!controllers_.authoredCamera
+    if((controllers_.cabinPlay||controllers_.cabinTransit)&&!controllers_.frontEnd&&!controllers_.authoredCamera
        &&nativeEyeJoined&&result.playerSequence){
-        // The cabin keeps its room anchor rather than field head stabilization,
+        // Cabin play and helicopter transit retain their room/seat anchors,
+        // rather than field head stabilization,
         // but body admission still needs this exact original-skin eye identity.
         PlayerRootSample cabinRoot;
         if(getPlayerRootSample(camera,result.playerOwner,result.playerSequence,time,cabinRoot))

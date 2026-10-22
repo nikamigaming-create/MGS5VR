@@ -382,6 +382,9 @@ private:
         bool valid{};
         bool passenger{};
         Vec3 headLocalOffset{};
+        uintptr_t eyeModel{};
+        uint64_t eyeTime{};
+        bool eyeSettling{};
     } driverView_;
     VehicleViewHeading vehicleHeading_;
     uintptr_t vehicleHeadingCamera_{},vehicleHeadingOwner_{};
