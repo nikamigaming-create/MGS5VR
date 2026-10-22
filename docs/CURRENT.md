@@ -7,6 +7,14 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Cabin continuation on `6c9889a537db` shortens forearm guidance to stay clear
+  of the sleeve in the reproduced camera-hold view, checked in both eyes.
+  The combined workbench still completes. Sheet support now includes ink-quad
+  thickness. Paper pinch contact remains open: measured distal thumb/index
+  origins are about6cm apart, while paper is attached at palm centre. Fix the
+  pinch and socket together; do not apply a paper-only visual offset.
+  Retained run: `20261022T013931320198Z`.
+
 - Cabin batch on `371a33ec2baf`: printed photos now remain at the camera's
   authored front slot until taken/replaced, verified in both eyes. Loose-sheet
   support, marker barrel pickup and field-paper ray coordinates are corrected
@@ -67,7 +75,7 @@ worktree is needed for the remaining field fixes.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Current candidate with scoped gameplay checks: `371a33ec2baf`.
+Current candidate with scoped gameplay checks: `6c9889a537db`.
 Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).

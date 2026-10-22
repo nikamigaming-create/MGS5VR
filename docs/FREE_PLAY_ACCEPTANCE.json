@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "371a33ec2baf5e419e27c23bbd431a1d7c45b0a7dfbb86d2d804d568b8a11ed2",
+  "candidate": "6c9889a537dbcf56fcdefeefd885182511a3d715ea3883c06a1d724b7cdf029a",
   "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1284,6 +1284,29 @@
         "No physical Quest acceptance or whole-game completion."
       ],
       "cleanup": "Owned game/simulator closed; Steam retained; published play unchanged. No persistent runner."
+    },
+    "cabin_contact_continuation": {
+      "candidate": "6c9889a537dbcf56fcdefeefd885182511a3d715ea3883c06a1d724b7cdf029a",
+      "changes": [
+        "Shorten the left-forearm guidance quad from20x5cm to14x3.5cm, retaining its4:1 aspect and wrist-side edge. The old far edge extended30cm behind the wrist and into the sleeve.",
+        "Include the ink quad in loose-sheet support thickness so the upper backing does not intersect the lower face."
+      ],
+      "runs": [
+        {
+          "id": "20261022T013803902261Z",
+          "result": "startup failed: missing opening_position observation; inputs released"
+        },
+        {
+          "id": "20261022T013931320198Z",
+          "result": "combined21-phase workbench completed; both left-camera eyes show shorter guidance clear of sleeve in reproduced pose; camera/printing/writing/board actions retained"
+        }
+      ],
+      "limits": [
+        "This addresses the reproduced sleeve overlap, not all wrist readability/orientations or physical Quest.",
+        "Ink-aware stack support passed focused regression; live stacked-sheet acceptance remains open.",
+        "Paper finger contact remains open. Read-only non-atomic native palette samples near right-note capture place thumb/index distal origins about6cm apart; paper edge is anchored at palm origin. A proper pinch pose and matching paper socket are needed. Do not fix only by moving paper graphics."
+      ],
+      "cleanup": "Owned game/simulator and read-only sampler closed; Steam retained; published play unchanged."
     }
   }
 }

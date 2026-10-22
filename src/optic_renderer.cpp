@@ -938,10 +938,12 @@ bool createAccWristHintResources(ID3D11Device* device,std::string_view binding){
     if(!resources.wristHintVertices){
         // X runs along the forearm toward the palm. Keep this help toward the
         // elbow, behind the compact status readout, with the authored 4:1
-        // pixel aspect unchanged: 20 cm by 5 cm.
+        // pixel aspect unchanged: 14 cm by 3.5 cm. The old far edge was
+        // 30 cm behind the wrist (including its mount setback), past the
+        // native forearm and into the sleeve when the elbow bent.
         const std::array<LensVertex,4> vertices{{
-            {{-.285f,-.025f,.001f},{0,1}},{{-.285f,.025f,.001f},{0,0}},
-            {{-.085f,-.025f,.001f},{1,1}},{{-.085f,.025f,.001f},{1,0}}}};
+            {{-.225f,-.0175f,.001f},{0,1}},{{-.225f,.0175f,.001f},{0,0}},
+            {{-.085f,-.0175f,.001f},{1,1}},{{-.085f,.0175f,.001f},{1,0}}}};
         D3D11_BUFFER_DESC vb{};vb.ByteWidth=sizeof(vertices);vb.Usage=D3D11_USAGE_IMMUTABLE;vb.BindFlags=D3D11_BIND_VERTEX_BUFFER;
         D3D11_SUBRESOURCE_DATA data{};data.pSysMem=vertices.data();ComPtr<ID3DBlob> ps;
         if(!compile(device,wristHintPixelShaderSource,"ps_4_0",ps.GetAddressOf())

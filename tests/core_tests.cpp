@@ -2613,7 +2613,7 @@ int main(){
             std::shared_ptr<const CabinStudioFrame> stack;
             for(uint64_t t=100;t<=2100;t+=20)stack=copies.update(true,true,Pose{},Pose{},idle,t);
             const auto gap=stack->papers[1].pose.position.y-stack->papers[0].pose.position.y;
-            expect(gap>=.0013f&&gap<.0016f,"Loose photo copies settle with sheet thickness instead of collapsing onto one flickering plane");
+            expect(gap>=.0019f&&gap<.0021f,"Loose photo copies include ink-surface thickness instead of intersecting the next backing");
             const auto top=stack->papers[1].pose.position.y;
             for(uint64_t t=2120;t<=4120;t+=20)stack=copies.update(true,true,Pose{},Pose{},idle,t);
             expect(near(stack->papers[1].pose.position.y,top),"A resting print stack does not creep upward across frames");

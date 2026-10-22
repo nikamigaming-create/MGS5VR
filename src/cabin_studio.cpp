@@ -50,6 +50,13 @@ Vec3 paperExtent(Pose pose,Vec3 half){
         std::abs(x.y)*half.x+std::abs(y.y)*half.y+std::abs(z.y)*half.z,
         std::abs(x.z)*half.x+std::abs(y.z)*half.y+std::abs(z.z)*half.z};
 }
+Vec3 paperSupportExtent(const StudioPaper& paper){
+    auto half=studioPaperHalf(paper.photo!=0);
+    // The ink quad sits 1 mm above the paper centre, outside the thinner
+    // backing mesh. Include it so an upper backing cannot cut through ink.
+    half.z=std::max(half.z,.001f);
+    return paperExtent(paper.pose,half);
+}
 }
 void requestCameraFreeze(bool requested,uint64_t activation,uint64_t referenceEpoch) noexcept{
     try{std::lock_guard lock(freezeMutex);
@@ -429,14 +436,14 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
         }
         std::stable_sort(loose.begin(),loose.end(),[](const auto* a,const auto* b){return a->pose.position.y<b->pose.position.y;});
         for(size_t i=0;i<loose.size();++i){
-            auto& paper=*loose[i];const auto half=paperExtent(paper.pose,studioPaperHalf(paper.photo!=0));
+            auto& paper=*loose[i];const auto half=paperSupportExtent(paper);
             float support=-std::numeric_limits<float>::infinity();
             const auto next=paper.pose.position+paper.velocity*dt;
             if(std::abs(rotate(paper.pose.orientation,{0,0,1}).y)>.98f){
                 for(size_t j=0;j<i;++j){
                     const auto& below=*loose[j];
                     if(std::abs(rotate(below.pose.orientation,{0,0,1}).y)<=.98f)continue;
-                    const auto extent=paperExtent(below.pose,studioPaperHalf(below.photo!=0));
+                    const auto extent=paperSupportExtent(below);
                     const auto delta=next-below.pose.position;
                     if(std::abs(delta.x)<half.x+extent.x&&std::abs(delta.z)<half.z+extent.z
                        &&paper.pose.position.y>=below.pose.position.y-extent.y)
