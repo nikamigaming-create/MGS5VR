@@ -1675,8 +1675,26 @@
         "Native benefit eligibility, broader surfaces, non-VR and Quest remain open",
         "No firing/impact acceptance from this Mother Base run"
       ],
-      "next": "Resolve actual native weapon model publication/visibility using the retained inside/outside Mother Base comparison; do not repeat pose-only visual retries or claim the native_firearm predicate proves a visible gun.",
+      "next": "Use an eligible weapon/context for cover presentation. The Mother Base lethal-loadout absence is explained by native KILLING_WEAPON restriction; see weapon_restriction_comparison. Do not patch it as missing weapon publication.",
       "cleanup": "Owned game/simulator closed. Inputs/poses released, personal cover override removed, Steam retained, published play unchanged."
+    },
+    "weapon_restriction_comparison": {
+      "status": "misdiagnosed_missing_gun_resolved_by_native_restriction_comparison",
+      "candidate": "3d64af394fb308f394dac58c93906982df1788899ac93749b99664dd59634063",
+      "production_changed": false,
+      "summary": "The Mother Base missing-gun investigation was a restricted-loadout comparison, not proof of broken weapon publication. Retained native flags524289 include KILLING_WEAPON (0x80000); all three saved definitions use lethal ammunition. On the same unchanged candidate3d64af394fb3, native Afghanistan sortie193143 clears that restriction, switches resources 93476 ->159074 ->27873, and renders the rifle and pistol in both final eyes. No loadout/save edits or visibility override. Do not patch native weapon restrictions or repeat Mother Base lethal-weapon selection as a rendering test. Cover weapon presentation still requires an eligible weapon/context; this does not close broader FP04/FP02.",
+      "retained_runs": [
+        "20261022T192126703607Z",
+        "20261022T192402202906Z",
+        "20261022T193143564332Z"
+      ],
+      "native_contract": "RVA9d44cd registers KILLING_WEAPON=0x80000; native parts ammo AM_30043=BL_Rf556x45mm, AM_60303=BL_Rf762mmSniperMag, AM_10305=BL_Hg9x19mm",
+      "limits": [
+        "No cover firearm acceptance claimed",
+        "No physical Quest acceptance",
+        "Floating-looking keyboard hint needs motion/route identification before treating it as a new defect"
+      ],
+      "cleanup": "Owned game/simulator closed; Steam retained; no personal settings or published pin changed"
     }
   }
 }
