@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current gameplay-checked development is `e64919c6caa5`, adding marker pinch contact and loose-sheet settling to physical mortar yaw/release and prior cabin fixes. Physical pitch, contact, discharge and other mounted types remain open.
+Current checked development is `eedcaa06226a`, adding marker pinch contact and loose-sheet settling to physical mortar yaw/release and prior cabin fixes. Physical pitch, contact, discharge and other mounted types remain open.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -70,7 +70,7 @@ that route. The complete field list above remains the work queue.
   This does not close physical grip aiming, firing/impact or broader FP15.
 
 - [x] **This pass: marker buried in the palm.** Fit its socket and thumb/index articulation together. Both-hand writing completes and both final eyes reviewed in retained045333. Wider orientations and physical Quest remain open.
-- [x] **This pass: loose sheets balanced indefinitely on edges.** Settle toward the nearer face while preserving heading and support. Ten previously tilted sheets now stay flat with no displacement across the combined workbench run; both-eye seat views reviewed. Fresh-restart persistence remains unchecked.
+- [x] **This pass: loose sheets balanced indefinitely on edges.** Settle toward the nearer face while preserving heading and support. Ten previously tilted sheets now stay flat with no displacement across the combined workbench run; both-eye seat views reviewed. Final-build restart050252 restores all32 papers, including the10 corrected sheets flat.
 
 ## Closure requirements
 
