@@ -1695,6 +1695,19 @@
         "Floating-looking keyboard hint needs motion/route identification before treating it as a new defect"
       ],
       "cleanup": "Owned game/simulator closed; Steam retained; no personal settings or published pin changed"
+    },
+    "cross_head_reach": {
+      "candidate": "144735d34e492efe1d85cee433d5af4f937df5a656a7ac262b9c06fc34a11511",
+      "source_commit": "6da316e",
+      "status": "scoped_camera_freeze_fixed_broader_reach_open",
+      "summary": "Cross-head reach freeze fixed on144735d34e49 (source6da316e). Captured ACC baseline195850 rejects the right elbow head-clearance solve and stops fresh rig publication. If the requested wrist has no feasible elbow bend, limit the reach at the head/bone sphere intersections while preserving both native bone lengths and wrist orientation. Combined200406 right/left cross-head and neutral-return cases retain active camera and fresh6/12/9/11ms rig samples; both final eyes reviewed. Close sleeve/forearm crowding remains visible, so broader FP17 and physical Quest remain open. Adjacent200731 closes Choose a Rival help, stows, reopens and turns the left iDroid; its last stow step times out at a Daily Bonus notice. Cleanup then closes the terminal, confirmed in200843. Do not call the entire combined suite a pass. No ACC pickup implementation. Owned sessions closed; published play unchanged.",
+      "retained_runs": [
+        "20261022T195850933033Z",
+        "20261022T200406336687Z",
+        "20261022T200731484800Z",
+        "20261022T200843068855Z"
+      ],
+      "next": "ACC native physical weapon contact/pickup remains unimplemented; close cross-body sleeve crowding and wider/physical headset reach remain open. Do not repeat the restricted Mother Base lethal-weapon investigation."
     }
   }
 }
