@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "3d64af394fb308f394dac58c93906982df1788899ac93749b99664dd59634063",
+  "candidate": "0d935edd73240994908759cdec488f070f392dd69983b0166835bc8bfe3bb3f1",
   "candidate_status": "Scoped gameplay checked development; full release and physical-headset acceptance incomplete",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1092,7 +1092,7 @@
     }
   ],
   "active_work": {
-    "candidate": "829065fcfb30",
+    "candidate": "0d935edd73240994908759cdec488f070f392dd69983b0166835bc8bfe3bb3f1",
     "targets": [
       "tutorial camera handoff freeze",
       "held-rifle right tracking loss"
@@ -1176,9 +1176,9 @@
       "note": "Do not infer crash cause or camera freeze from native ExitProcess code0."
     },
     "research_dossier": "D:/Dev/Tools/Ghidrust/workspace/evidence/mgs5vr/idroid-post-tutorial-close",
-    "runtime_note": "Per-game Meta preference and -MetaLink launch checks pass. Windows global runtime was observed as Virtual Desktop at final cleanup; direct restoration to mandated Meta default was denied by Windows registry permissions. Global value remains Virtual Desktop. No SteamVR switch occurred.",
+    "runtime_note": "Both Play commands explicitly select Meta Quest Link; CheckOnly passes. Windows global ActiveRuntime currently Virtual Desktop; tools/set-meta-openxr-runtime.ps1 failed registry write access. Administrator restoration pending; no Steam restart.",
     "overall_goal_status": "active_all_unresolved_field_fixes",
-    "current_checkpoint": "Automatic ledge catches no longer rotate the VR view. Baseline073026/073150 turned the view from -88.294 to91.726 degrees with an unchanged HMD. Preserve the preceding fresh normal-action heading through automatic authored alignment, as well as explicit Y actions. On829065fcfb30, held VR yaw stays1.725826 degrees while native camera yaw reaches91.737862; climb-back stays1.725219..1.726273. Three subsequent leftward steps move1.907m with the intended view-relative direction. Both held and climbed-back eyes reviewed. Other contextual actions and physical Quest remain open.",
+    "current_checkpoint": "ACC primary rifle pickup/carry/return implemented on0d935edd7324 (source2018df5). Touch the actual visible receiver and squeeze either hand; the complete native assembly follows that rendered palm and returns to its original mount on release. The initial a3e760 candidate acquired the grip but the later native equipment update restored the parked pose; the verified native assembly publication hook corrects that overwrite. Right-hand translation/20-degree turn203751 and left-hand translation/turn204105 show the complete rifle in both final eyes. Read-only final census restores assembly0 to[-0.728,1198.420044,0.1975] and leaves assembly1/hidden assembly2 unchanged. No copied model, inventory/save change or visibility override. Second-rifle pickup is NOT accepted:204813 targets its actual native camera-relative receiver, but the rendered palm remains0.510m short. Earlier204231 operator timeout occurred before grip; the game stayed fresh and204436 resumed from the confirmed pose. Other loadouts, menu/tracking interruptions and physical Quest remain open. Owned sessions closed; published play unchanged.",
     "cover_followup": {
       "candidate": "8e63070500b9",
       "rejected_candidate": "ffdd224d59da",
@@ -1708,6 +1708,23 @@
         "20261022T200843068855Z"
       ],
       "next": "ACC native physical weapon contact/pickup remains unimplemented; close cross-body sleeve crowding and wider/physical headset reach remain open. Do not repeat the restricted Mother Base lethal-weapon investigation."
+    },
+    "acc_native_gear": {
+      "candidate": "0d935edd73240994908759cdec488f070f392dd69983b0166835bc8bfe3bb3f1",
+      "source_commit": "2018df5",
+      "status": "primary_rifle_both_hands_carry_return_checked_broader_FP11_open",
+      "summary": "ACC primary rifle pickup/carry/return implemented on0d935edd7324 (source2018df5). Touch the actual visible receiver and squeeze either hand; the complete native assembly follows that rendered palm and returns to its original mount on release. The initial a3e760 candidate acquired the grip but the later native equipment update restored the parked pose; the verified native assembly publication hook corrects that overwrite. Right-hand translation/20-degree turn203751 and left-hand translation/turn204105 show the complete rifle in both final eyes. Read-only final census restores assembly0 to[-0.728,1198.420044,0.1975] and leaves assembly1/hidden assembly2 unchanged. No copied model, inventory/save change or visibility override. Second-rifle pickup is NOT accepted:204813 targets its actual native camera-relative receiver, but the rendered palm remains0.510m short. Earlier204231 operator timeout occurred before grip; the game stayed fresh and204436 resumed from the confirmed pose. Other loadouts, menu/tracking interruptions and physical Quest remain open. Owned sessions closed; published play unchanged.",
+      "retained_runs": [
+        "20261022T203013446091Z",
+        "20261022T203127998522Z",
+        "20261022T203751535693Z",
+        "20261022T204105637389Z",
+        "20261022T204231221118Z",
+        "20261022T204436114146Z",
+        "20261022T204813026393Z"
+      ],
+      "cleanup_receipt": "private/current-gear-batch-stop.log",
+      "next": "Resolve second-rifle usable approach with native cabin movement/clearance before changing contact or body geometry; verify menu/tracking interruption returns and other loadouts. Do not treat static controller predicates as weapon acquisition proof."
     }
   }
 }

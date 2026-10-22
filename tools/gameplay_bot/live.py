@@ -493,6 +493,11 @@ def static_grip_capture_allowed(held, state, bindings):
         if not finite_number(value.get("value")) or not 0 < value["value"] <= 1:
             return False
         tokens.add(value["hand"] + "_grip")
+    cabin_grips=(state.get('cabin') is True and state.get('rendered',{}).get('cabin_play') is True
+        and state.get('menu') is False and state.get('idroid') is False
+        and state.get('loading') is False and state.get('gamepad') is False
+        and controls.get('native_buttons')==0 and controls.get('native_axes')==[0,0,0,0]
+        and controls.get('native_triggers')==[0,0])
     mounted = (state.get('rendered', {}).get('mounted_weapon_tracked') is True
         and state['rendered'].get('mounted_weapon_action') == 0x46
         and state['rendered'].get('mounted_weapon_hands') ==
@@ -500,7 +505,7 @@ def static_grip_capture_allowed(held, state, bindings):
         and controls.get('travel_mode') == 4 and controls.get('native_axes') == [0,0,0,0]
         and controls.get('native_triggers') == [255,0]
         and state.get('menu') is False and state.get('idroid') is False)
-    if ("right_grip" not in tokens and not mounted) or not held_input_evidence(state, sorted(tokens)):
+    if ("right_grip" not in tokens and not mounted and not cabin_grips) or not held_input_evidence(state, sorted(tokens)):
         return False
     support_borrowed=(handheld_free and tokens=={'left_grip','right_grip'}
             and state.get('rendered',{}).get('idroid_stowed') is True
@@ -547,14 +552,16 @@ def static_grip_capture_allowed(held, state, bindings):
                 # from a gun. The sampled native support owner explicitly
                 # stows that terminal, so this one inactive focus mapping
                 # does not make a stationary support capture a menu action.
-                if ((support_borrowed or support_without_terminal or faulted_support or mounted)
+                # Closed ACC inspection has no terminal to focus and requires
+                # a sampled neutral native packet before admitting either grip.
+                if ((support_borrowed or support_without_terminal or faulted_support or mounted or cabin_grips)
                         and action.get('name') == 'system.idroid_focus'
                         and action.get('modifier') is True and binding.get('gesture') == 'level'):
                     continue
                 if action.get("name") not in allowed or action.get("modifier") is not True:
                     return False
                 matched.add(action["name"])
-    return "gameplay.ready_weapon" in matched or (mounted and "gameplay.support_grip" in matched)
+    return "gameplay.ready_weapon" in matched or ((mounted or cabin_grips) and "gameplay.support_grip" in matched)
 
 
 def require_presentation_transition(state, target):
