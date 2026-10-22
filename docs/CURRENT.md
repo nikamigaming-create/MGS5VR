@@ -264,3 +264,19 @@ Published play and checked development unchanged; no new gameplay fix claimed.
 ### ACC carry interruption follow-up, 22 October
 
 ACC first-rifle right-hand tracking interruption checks pass on unchanged bb66ebf47b0b. Menu interruption221634 was observed returning assembly0 to its mount, but its scratch run expired before retention; do not use it as ledger acceptance. Its native root watcher remains private/current-gear-interrupt-roots.json. The subsequent native help notice stopped that sequence and cleanup closed it. Attempt221834 cannot arm tracking loss because the session lacks the explicit diagnostic launch flag; no loss is applied. Fresh fault-enabled222214 verifies native carry, raw right grip/aim loss(mask12), mount return, recovery with squeeze still held(no spontaneous reacquisition), fresh-grip pickup and final mount return. Assemblies1/2 remain unchanged. Both final eyes reviewed for carried/lost/reacquired states; exact native root samples retained. No production change or rebuild. Other loadouts, left-hand interruption/chord behavior and physical Quest remain open. Owned sessions closed; published play unchanged.
+
+
+### Alternate mounted fixture, 22 October
+
+On unchanged bb66ebf47b0b, direct native route223742 reaches the second authored
+machinegun at[72.7759,333.7447,84.7871]. Both final eyes224040 show the native
+gun and rear handles. Entry attempts never establish a mounted action; the
+retained224339 pre-action view already lacks the gun, and backward movement
+224649 does not restore it. The last view shows nearby enemy gunfire. Native
+lookup identifies locator hw03_gim_n0001|srt_hw03_tpod0_def_v00 as type82,
+ID41992, broken=false; this does not prove it remains rendered or unrecovered.
+The disappearance cause is unconfirmed. Do not repeat entry or change
+visibility/action admission based on this attempt. Static action writes0x45
+and0x47 remain semantically unconfirmed;0x44 is searchlight. No production
+change, rebuild, mounted-controls delivery or broad checklist closure. Owned
+game/simulator closed, no background bot/watchers, published play unchanged.

@@ -1602,10 +1602,18 @@
     },
     "execution_order": "Review whole remaining list; batch related reproduced production fixes; build once and check combined gameplay plus adjacent transitions. No isolated fixture retries as default loop.",
     "mounted_latest_attempt": {
-      "candidate": "428a0c0872fc",
-      "retained_run": "20261022T070544866546Z",
-      "result": "Fixture already broken before entry; physical pitch and firing not reached. Prior combat attempts fired no rounds because muzzle rays were obstructed; camp-clear reconnaissance stopped on active detection. Destruction cause unknown.",
-      "cleanup": "Inputs released; owned game/simulator closed; Steam retained."
+      "candidate": "bb66ebf47b0b",
+      "production_changes": false,
+      "delivered_fix": false,
+      "retained_runs": [
+        "20261022T223742723376Z",
+        "20261022T224040053195Z",
+        "20261022T224339476276Z",
+        "20261022T224649676181Z"
+      ],
+      "observation": "Second authored machinegun reached and visible in both final eyes; later pre-action view lacks gun. Backstep does not restore it; nearby enemy gunfire visible. No mounted action established. Native type82 ID41992 reports broken=false; disappearance cause unconfirmed.",
+      "next": "Determine native fixture disappearance before another entry attempt; do not infer action45/47 semantics or patch visibility.",
+      "cleanup": "private/current-mounted-alt-stop.log; owned MGSV/simulator closed; Steam retained; published play unchanged."
     },
     "automatic_ledge_heading": {
       "candidate_sha256": "829065fcfb30ede52fa77531a14bbf8378b7182daa7c7a795d9ffc362f09b798",
