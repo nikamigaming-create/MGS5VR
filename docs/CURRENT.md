@@ -259,3 +259,8 @@ entry/route loop as delivery. Review remaining reproduced defects as a batch;
 untested contexts and physical Quest checks remain open. Owned game/simulator
 and observers closed (private/current-mounted-types-stop.log); Steam retained.
 Published play and checked development unchanged; no new gameplay fix claimed.
+
+
+### ACC carry interruption follow-up, 22 October
+
+ACC first-rifle right-hand tracking interruption checks pass on unchanged bb66ebf47b0b. Menu interruption221634 was observed returning assembly0 to its mount, but its scratch run expired before retention; do not use it as ledger acceptance. Its native root watcher remains private/current-gear-interrupt-roots.json. The subsequent native help notice stopped that sequence and cleanup closed it. Attempt221834 cannot arm tracking loss because the session lacks the explicit diagnostic launch flag; no loss is applied. Fresh fault-enabled222214 verifies native carry, raw right grip/aim loss(mask12), mount return, recovery with squeeze still held(no spontaneous reacquisition), fresh-grip pickup and final mount return. Assemblies1/2 remain unchanged. Both final eyes reviewed for carried/lost/reacquired states; exact native root samples retained. No production change or rebuild. Other loadouts, left-hand interruption/chord behavior and physical Quest remain open. Owned sessions closed; published play unchanged.

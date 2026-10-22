@@ -1761,6 +1761,16 @@
         "20261022T220859668670Z"
       ],
       "next": "Continue remaining field fixes as related batches; do not repeat these six passing poses without a new change. Wider field/weapon/physical headset arm acceptance remains open."
+    },
+    "acc_carry_interruptions": {
+      "candidate": "bb66ebf47b0b1cd168e3b1c0377534dadb0af2ce078061a541c22f11b5fd43e9",
+      "status": "scoped_existing_behavior_verified_no_production_change",
+      "summary": "ACC first-rifle right-hand tracking interruption checks pass on unchanged bb66ebf47b0b. Menu interruption221634 was observed returning assembly0 to its mount, but its scratch run expired before retention; do not use it as ledger acceptance. Its native root watcher remains private/current-gear-interrupt-roots.json. The subsequent native help notice stopped that sequence and cleanup closed it. Attempt221834 cannot arm tracking loss because the session lacks the explicit diagnostic launch flag; no loss is applied. Fresh fault-enabled222214 verifies native carry, raw right grip/aim loss(mask12), mount return, recovery with squeeze still held(no spontaneous reacquisition), fresh-grip pickup and final mount return. Assemblies1/2 remain unchanged. Both final eyes reviewed for carried/lost/reacquired states; exact native root samples retained. No production change or rebuild. Other loadouts, left-hand interruption/chord behavior and physical Quest remain open. Owned sessions closed; published play unchanged.",
+      "retained_runs": [
+        "20261022T221834552081Z",
+        "20261022T222214435234Z"
+      ],
+      "expired_scratch_run": "20261022T221634609786Z"
     }
   }
 }
