@@ -117,3 +117,12 @@ or evidence collection. Supporting checks remain necessary but are not delivery.
 Work through docs/FIELD_FIXES.md without stopping after a narrow subcase. Keep
 known failures explicit; do not claim 100 percent working from incomplete coverage.
 Close leftover test sessions and do not leave background harnesses running.
+
+User direction, 22 October 2026:
+
+Review the whole remaining defect list before selecting changes. Group related,
+already reproduced gameplay fixes into a candidate, then build and test the batch
+and its adjacent interactions together. Do not spend a separate build/deploy/test
+cycle on every narrow subcase. Reproduce unknown failures before changing their
+working flows; an untested combination is not itself a diagnosed defect. Report
+actual gameplay deliveries and remaining failures, not harness work as progress.

@@ -1130,7 +1130,7 @@
       "review": "Start/middle/end show live map/world; sparse left-eye observation only, not continuous stereo acceptance."
     },
     "tutorial_exact_reproduction_pending": false,
-    "session": "Owned game72840 live, no active input runner; bounded read-only witness82127. Native authored explanation. Steam retained; Meta lease restoration due on cleanup.",
+    "session": "Owned game/simulator closed after mounted attempt070544; no active gameplay runner. Steam retained.",
     "next_actions": [
       "Resume unresolved FP02 moving support/contact and precision-weapon recoil/bolt-action checks; open fingers remain a visual failure.",
       "Continue FP07 native left-hand handset/contact/projector alignment; exact timeout lifecycle subcase now passes.",
@@ -1168,7 +1168,7 @@
     "research_dossier": "D:/Dev/Tools/Ghidrust/workspace/evidence/mgs5vr/idroid-post-tutorial-close",
     "runtime_note": "Per-game Meta preference and -MetaLink launch checks pass. Windows global runtime was observed as Virtual Desktop at final cleanup; direct restoration to mandated Meta default was denied by Windows registry permissions. Global value remains Virtual Desktop. No SteamVR switch occurred.",
     "overall_goal_status": "active_all_unresolved_field_fixes",
-    "current_checkpoint": "Mounted operator camera/body corrected in scoped live run031244; full FIELD_FIXES remains active, especially physical mounted grip/aim and unresolved visual geometry.",
+    "current_checkpoint": "Development428a0c0872fc unchanged. Latest mortar attempt rejected already-broken fixture before entry; no new gameplay delivery. Continue whole-list batch work.",
     "cover_followup": {
       "candidate": "8e63070500b9",
       "rejected_candidate": "ffdd224d59da",
@@ -1431,7 +1431,7 @@
         "both_hand_stick_release": "native axes neutral"
       },
       "failures": [
-        "Right-hand acquisition chased native pitch, oscillating about 15\u201318 degrees during a pure yaw movement.",
+        "Right-hand acquisition chased native pitch, oscillating about 15–18 degrees during a pure yaw movement.",
         "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
       ],
       "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
@@ -1486,7 +1486,7 @@
       "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
       "baseline_run": "20261022T044008503318Z",
       "retained_run": "20261022T045333990203Z",
-      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u201390 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20–90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
       "remaining": [
         "Wider marker grip orientations",
         "Broader FP09/FP10",
@@ -1509,7 +1509,7 @@
         {
           "sha256_prefix": "1bbaac705854",
           "run": "20261022T051925150310Z",
-          "failure": "Native eye identity joined, but fitted eye remained26\u201331cm below cached passenger anchor; body rejected."
+          "failure": "Native eye identity joined, but fitted eye remained26–31cm below cached passenger anchor; body rejected."
         },
         {
           "sha256_prefix": "a563468ce054",
@@ -1583,6 +1583,13 @@
       ],
       "result": "Native crouched traversal from Afghan LZ over the rocky rise completed10 segments before failing the neutral settling bound at about(85.963,314.492,240.694). With full-body off, reverse segments completed and forward movement exceeded the bounded1m envelope after release. Preferences restored. These are movement-bound failures, not proof of the reported VR slipping/sticking cause; no collision change made.",
       "status": "reported_defect_unresolved"
+    },
+    "execution_order": "Review whole remaining list; batch related reproduced production fixes; build once and check combined gameplay plus adjacent transitions. No isolated fixture retries as default loop.",
+    "mounted_latest_attempt": {
+      "candidate": "428a0c0872fc",
+      "retained_run": "20261022T070544866546Z",
+      "result": "Fixture already broken before entry; physical pitch and firing not reached. Prior combat attempts fired no rounds because muzzle rays were obstructed; camp-clear reconnaissance stopped on active detection. Destruction cause unknown.",
+      "cleanup": "Inputs released; owned game/simulator closed; Steam retained."
     }
   }
 }

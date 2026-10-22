@@ -7,6 +7,21 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+The 22 October execution order is whole-list review, related production fixes in
+one candidate, then a combined gameplay check. Do not resume isolated mortar
+retries as the default work loop. FIELD_FIXES has 19 open broad rows; these mix
+remaining defects, unimplemented interactions and wider/headset acceptance.
+Keep those distinctions explicit rather than treating every open row as an
+identified code bug or claiming an entire row fixed from a subcase.
+
+Latest mounted investigation on unchanged development428a0c0872fc delivered no
+new fix. Native combat attempts could not fire through obstructed muzzle rays;
+the camp-clear sequence stopped because detection was already active. Retained
+070544866546Z then rejected mortar002 as already broken before entry. No physical
+pitch/firing check occurred and the destruction source remains unknown. Inputs
+released; stop-sim closed the owned game/simulator, with Steam retained. No
+background gameplay runner remains. Published play and checked dev unchanged.
+
 - Tutorial exit-notice handoff on 428a0c0872fc: closing the paused Challenge Tasks terminal briefly retired the VR camera before Exit Tutorial opened, leaving a frozen edge-on handset image. Preserve the same paused anchor only for an immediately following Pause within250ms, with matching player, activation and tracking reference. Gameplay still requires a fresh native player publication. Baseline062745 loses the active camera; final064303 retains it and shows the readable Exit Tutorial panel in both eyes. Notice dismissal and immediate ordinary iDroid reopen/stow pass. Owned session closed; Steam retained; published play unchanged.
 
 Current gameplay-checked development is `428a0c0872fc`, including the tutorial exit-notice handoff fix. Published play remains unchanged.
