@@ -7,6 +7,8 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+Final checked development is `ddaac67a8fb2`. It differs from the gameplay-tested `fb83026e1682` only in PE/debug timestamps; every other binary byte is identical. Published play remains unchanged.
+
 - Rocket Arm batch on fb83026e1682: left-hand pitch/yaw now steer native flight, with movement-stick override and normal weapon return. Brief skin-publication gaps no longer reset held steering. The closed terminal retained its closing bit after sortie selection, suppressing the independent flight handset; that unrelated gate now applies only to terminal presentation. Retained060632 shows trajectory response and live flight pixels on the handset in both eyes. Ordinary iDroid reopen/stow passes in061327 after reviewed Challenge Tasks and Exit Tutorial notices. Target impact, Blast Arm, wider contact/poses and physical Quest remain open. Owned simulator/game closed; Steam retained; published play unchanged.
 
 - Helicopter transit body on c412aa09c268: seated torso/legs now remain visible in both eyes. Native eye identity is admitted during transit, and the seat anchor settles through the later boarding-to-seated pose change while ignoring small idle head motion. Native pelvis/legs stay attached to the carrier. Four view directions retain mounted body and less than0.2mm fitted eye error in052947. Ordinary disembark053027 and on-foot body053103 pass; seated and on-foot belt views reviewed in both eyes. Extraction boarding, wider transit and physical Quest remain open. Owned simulator/game closed; published play unchanged.

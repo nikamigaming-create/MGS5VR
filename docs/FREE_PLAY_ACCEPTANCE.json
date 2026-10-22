@@ -1547,7 +1547,9 @@
       "failures": [
         "060632 post-flight menu expectation failed on native Challenge Tasks help;061138 then encountered Exit Tutorial notice. Reviewed cleanup and ordinary reopen/stow passed in061327.",
         "Earlier startup access violation retained in Windows CrashDumps and private/current-rocket-startup-crash.txt. Two subsequent game-only launches worked; cause unproven."
-      ]
+      ],
+      "final_checked_sha256": "ddaac67a8fb259300995934f0f2b7474655bdb224fdfe862f010917f96274a51",
+      "final_build_equivalence": "Final clean build differs from live-tested fb83026e1682 only at PE COFF and debug-directory timestamps (file offsets288-289 and2158148-2158149). Every other byte identical; .text, .data, .pdata, .rsrc and .reloc identical."
     }
   }
 }
