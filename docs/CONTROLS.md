@@ -563,6 +563,12 @@ and **MISSIONS TO DEPLOY** hint. During ordinary field-helicopter travel, cabin
 movement follows the live helicopter and checks native clearance. **Y** retains
 the native exit action when offered. Authored cinematics retain game ownership.
 
+In the ACC, touch a parked rifle's receiver with either hand and squeeze that
+hand's grip to inspect it. The complete native weapon follows the hand; release
+the grip to return it to its mount. Approach the forward rifle through the
+center aisle and face its receiver rather than reaching across the seat or
+across your body. This inspection does not change the equipped loadout.
+
 **Block firing near cover** (`settings.block_firing_near_cover`) defaults to
 **Off**. For a currently held, tracked local firearm, nearby cover no longer
 vetoes firing through the native proximity check. Bullets still collide with the
