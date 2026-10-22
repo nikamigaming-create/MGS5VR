@@ -1217,6 +1217,42 @@
       "checks": "tools/build.ps1 -SkipBootstrap; required build and installer checks passed",
       "cleanup": "Game/simulator and read-only sampler closed; Steam retained; published play unchanged; poses/settings restored",
       "physical_headset_acceptance": false
+    },
+    "idroid_projector_fit": {
+      "status": "scoped_development_fix; FP07 remains open",
+      "candidate_dll_sha256": "44f0ed657fab4d44a8c4f40b8263507286124a261a9e11b16214c9d57d730e02",
+      "change": "Enable the guarded native cone draw/bounds fit by default, preserving the authored left wrist/device mount and screen settings. Explicit diagnostics idroid_effect_retarget=0 remains available.",
+      "baseline": {
+        "run": "20261022T004701435184Z",
+        "diagnostics": "private/current-idroid-projector-baseline.log",
+        "measured_far_center_error_m": [
+          0.2012,
+          0.2022
+        ],
+        "limit": "Rounded read-only samples, not atomic compositor joins."
+      },
+      "opt_in_comparison": [
+        "20261022T005011508686Z",
+        "20261022T005058647055Z",
+        "20261022T005126047194Z"
+      ],
+      "normal_settings_run": "20261022T005654925788Z",
+      "observed": [
+        "Native help transition/dismissal, front and turned handset in both eyes, ordinary stow.",
+        "Retarget-only startup and successful exact-player three-particle draw fitting with diagnostics disabled.",
+        "Screen/device remain attached; native textured light and bright patches remain visible. This change fits geometry, not light intensity."
+      ],
+      "failures": [
+        "Normal-settings run completed all gameplay cases but operator transport timed out while restoring the left grip. Owned session was closed with stop-sim.",
+        "Reopen comparison reached Daily Bonus Received; subsequent dismissal attempt dispatched nothing because automatic cleanup had already stowed the device. No complete forced-tutorial lifecycle claim."
+      ],
+      "remaining": [
+        "Forced tutorial stow/reopen",
+        "Physical Quest comfort and hand orientation",
+        "Precise cinematic physical screen bounds",
+        "Wider screen configurations and motion acceptance"
+      ],
+      "cleanup": "Original ini restored byte-for-byte; owned game/simulator closed; published play unchanged."
     }
   }
 }

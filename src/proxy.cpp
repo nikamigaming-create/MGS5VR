@@ -226,7 +226,7 @@ DWORD WINAPI initialize(void*){
                     if(GetPrivateProfileIntW(L"diagnostics",L"controller_rig_experiment",0,ini.c_str())==1)
                         installControllerRig(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),
                             GetPrivateProfileIntW(L"diagnostics",L"idroid_effect_probe",0,ini.c_str())==1,
-                            GetPrivateProfileIntW(L"diagnostics",L"idroid_effect_retarget",0,ini.c_str())==1);
+                            GetPrivateProfileIntW(L"diagnostics",L"idroid_effect_retarget",1,ini.c_str())==1);
                     log("Native VR camera requires a matching player head-bone publication; ADS no longer supplies its position");
                 }
             }catch(const std::exception& e){log(std::string("Camera observer unavailable: ")+e.what());}

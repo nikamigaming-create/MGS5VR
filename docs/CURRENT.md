@@ -7,6 +7,14 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Development `44f0ed657fab` enables native iDroid projector fitting by default.
+  The matched native cone previously ended about20cm from the screen centre.
+  Both-eye front/turned views and ordinary stow were checked with normal settings;
+  native light texture/bright patches remain visible. FP07 stays open for forced
+  tutorial lifecycle, wider configurations and physical Quest. The final run
+  completed gameplay cases but its simulator pose-restore RPC timed out; the
+  owned session was closed. See active_work.idroid_projector_fit in the ledger.
+
 - Candidate `4447439fc8bc` fixes the reproduced crouched cover-exit wall
   penetration. Both eyes now retain the wall after exit and through the
   previously obscured left/right reach check. The shoulder reach correction
@@ -50,7 +58,7 @@ worktree is needed for the remaining field fixes.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Current candidate with completed scoped gameplay checks: `4447439fc8bc`.
+Current candidate with scoped gameplay checks: `44f0ed657fab`.
 Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).

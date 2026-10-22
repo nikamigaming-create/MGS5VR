@@ -12,7 +12,8 @@
 namespace mgs5vr {
 // Diagnostics are read-only. Separately enabling retarget admits only the
 // canonical player Light's current draw transform/bounds, never device bones,
-// cached models, controllers, menus or saves. Both options default off.
+// cached models, controllers, menus or saves. The game enables retargeting by
+// default; diagnostic collection remains opt-in.
 void installIdroidEffectProbe(uintptr_t imageBase,bool configured=false,bool retarget=false) noexcept;
 void stopIdroidEffectProbe() noexcept;
 

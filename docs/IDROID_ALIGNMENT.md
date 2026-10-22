@@ -227,3 +227,15 @@ at commit `c777fa14f5549205458c1ce8bd09d1e5c6784ba0` and its referenced
 The executable guards and offsets were recovered from the legally owned
 1.0.15.4 native view; local static records and owned binary assets remain in
 ignored private research storage. No game asset is shipped with the adapter.
+
+## 21 October 2026 default projector fitting
+
+The native cone draw/bounds fit now defaults on; diagnostics remain off.
+Baseline samples place its far centre about20.1–20.2cm from the configured
+screen centre. Runs20261022T004701435184Z and005011508686Z compare native
+and fitted presentation. Normal-settings candidate44f0ed657fab run005654925788Z
+retains both-eye front/turned views, help dismissal and ordinary stow. Its
+operator cleanup RPC timed out after all cases; stop-sim closed the session.
+Native textured light/bright patches remain; this is an endpoint geometry fit,
+not light-intensity suppression. Forced tutorial lifecycle and physical Quest
+remain open. The authored left wrist contact and screen offsets are unchanged.
