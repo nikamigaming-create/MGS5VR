@@ -149,6 +149,7 @@ struct ControllerFrame {
     bool openingWorldAnchored{};
     PlayerPosture playerPosture{PlayerPosture::unknown};
     bool fullBody{},seatedMode{},cinematicFreeMove{true};
+    bool coverAssistance{true};
     std::array<float,2> cinematicMove{};
 };
 // A platform overlay takes input focus, not ownership of the game scene.

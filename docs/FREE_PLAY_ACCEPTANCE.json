@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "829065fcfb30ede52fa77531a14bbf8378b7182daa7c7a795d9ffc362f09b798",
+  "candidate": "304fe91f6b9ca39265a352d08965f3aec00d997bcff56ff674d0814842d46c6d",
   "candidate_status": "Scoped gameplay checked development; full release and physical-headset acceptance incomplete",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1441,7 +1441,7 @@
         "both_hand_stick_release": "native axes neutral"
       },
       "failures": [
-        "Right-hand acquisition chased native pitch, oscillating about 15–18 degrees during a pure yaw movement.",
+        "Right-hand acquisition chased native pitch, oscillating about 15\u00e2\u20ac\u201c18 degrees during a pure yaw movement.",
         "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
       ],
       "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
@@ -1496,7 +1496,7 @@
       "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
       "baseline_run": "20261022T044008503318Z",
       "retained_run": "20261022T045333990203Z",
-      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20–90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u00e2\u20ac\u201c90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
       "remaining": [
         "Wider marker grip orientations",
         "Broader FP09/FP10",
@@ -1519,7 +1519,7 @@
         {
           "sha256_prefix": "1bbaac705854",
           "run": "20261022T051925150310Z",
-          "failure": "Native eye identity joined, but fitted eye remained26–31cm below cached passenger anchor; body rejected."
+          "failure": "Native eye identity joined, but fitted eye remained26\u00e2\u20ac\u201c31cm below cached passenger anchor; body rejected."
         },
         {
           "sha256_prefix": "a563468ce054",
@@ -1627,6 +1627,27 @@
         "20261022T074037704354Z"
       ],
       "result": "Returning inactive mode from the selector did not exit held native mode2. Removed the option from source and removed the test-added setting; existing immersive cover remains unchanged. Native assistance entry/exit integration remains open."
+    },
+    "cover_assistance": {
+      "candidate_sha256": "304fe91f6b9ca39265a352d08965f3aec00d997bcff56ff674d0814842d46c6d",
+      "result": "Cover assistance now uses the native active-state exit gate as well as entry selection. Off releases standing and crouched mode2 to mode0/normal action, retains crouch, and prevents reattachment at the same wall. On restores entry; native collision blocks forward movement with Off and three backward steps complete. Both standing/crouched Off eye pairs reviewed. Attached-cover ready-weapon checks still fail to publish a firearm; this is not a full cover acceptance pass.",
+      "retained_runs": [
+        "20261022T082101240902Z",
+        "20261022T082139191521Z",
+        "20261022T082220770747Z",
+        "20261022T082303567913Z",
+        "20261022T082327879467Z",
+        "20261022T082721634416Z",
+        "20261022T082826714660Z",
+        "20261022T082855452785Z",
+        "20261022T082935764026Z"
+      ],
+      "remaining_failure": "Ready weapon did not publish rendered.native_firearm while attached at Mother Base, including after equipment selection and armed re-entry. Initial082327 and repeat082721 failures retained. Outside-cover equipment/ready passed in scratch082612, but that run expired before retention and is not acceptance evidence. Cause and baseline comparison remain unresolved.",
+      "limits": [
+        "Broader surfaces, native benefit eligibility, non-VR and physical Quest remain open",
+        "No whole-game or release acceptance claim"
+      ],
+      "cleanup": "Owned game/simulator closed; Steam retained. Temporary personal cover setting removed; published play unchanged."
     }
   }
 }

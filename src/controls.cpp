@@ -232,6 +232,7 @@ const std::vector<SettingDefinition>& settingDefinitions(){
         {"settings.scope_pose_stabilization",1,0,1},
         {"settings.enemy_world_markers",0,0,1},{"settings.god_mode",0,0,1},
         {"settings.block_firing_near_cover",0,0,1},
+        {"settings.cover_assistance",1,0,1},
         {"settings.tracked_weapon_obstruction",1,0,1},
         {"settings.binocular_pitch_degrees",-90,-180,180},{"settings.binocular_yaw_degrees",0,-180,180},
         {"settings.binocular_roll_degrees",0,-180,180},{"settings.binocular_auto_mark",1,0,1},

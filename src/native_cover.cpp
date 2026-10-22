@@ -13,6 +13,10 @@ uintptr_t base{};
 std::atomic_bool enabled{};
 using WeaponReady=bool(*)(void*,uint32_t);
 WeaponReady originalReady{};
+using CoverExit=bool(*)(void*,uint32_t);
+using CoverMode=uint8_t(*)(void*,uint32_t);
+CoverExit originalExit{};
+CoverMode originalMode{};
 
 template<class T> T read(uintptr_t address){
     T value{};
@@ -51,6 +55,37 @@ bool localImmersiveCover(uintptr_t weapon,uint32_t index){
     return read<uint8_t>(record+0x10)==2;
 }
 
+bool assistanceOff(uintptr_t cover,uint32_t index){
+    using namespace mgs5vr;
+    const auto status=headCamera().status();
+    const auto frame=headCamera().publishedView();
+    const auto now=steadyMilliseconds();
+    if(!enabled.load(std::memory_order_relaxed)||!status.active||status.suspended
+       ||status.nativeMenuOpen||status.nativeIdroidOpen||!frame||!frame->applied
+       ||frame->activation!=status.activation||!frame->playerOwner||!frame->sampleTime
+       ||now<frame->sampleTime||now-frame->sampleTime>150||frame->menuOpen)return false;
+    const auto& c=frame->controllers;
+    if(c.coverAssistance||!c.presentationFocused||c.nativeGamepad||c.vehicleMounted||c.vehicleControls
+       ||c.equipmentOpen||c.commandControls||c.frontEnd||c.loading||c.scriptedDemo||c.authoredCamera)return false;
+    const auto player=frame->playerOwner;
+    if(read<uintptr_t>(player)!=base+0x23b8218||read<uint32_t>(player+0x3a0)!=index)return false;
+    const auto character=read<uintptr_t>(player+0x370);
+    return character&&read<uintptr_t>(character+0xa0)==cover
+        &&read<uintptr_t>(cover)==base+0x23b59d0&&read<uintptr_t>(cover+8)==character;
+}
+
+bool exitCover(void* cover,uint32_t index){
+    // Let the native state callback perform its complete exit, including
+    // posture and animation cleanup. A zero requested mode alone is only
+    // "no pending change" and cannot release an already attached player.
+    return assistanceOff(reinterpret_cast<uintptr_t>(cover),index)||originalExit(cover,index);
+}
+
+uint8_t selectMode(void* cover,uint32_t index){
+    if(assistanceOff(reinterpret_cast<uintptr_t>(cover),index))return 0;
+    return originalMode(cover,index);
+}
+
 bool ready(void* weapon,uint32_t index){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
     const bool result=originalReady(weapon,index);
@@ -68,7 +103,14 @@ bool ready(void* weapon,uint32_t index){
 }
 
 bool verified(){
-    return read<uintptr_t>(base+0x23b3e80+0x28)==base+0x1051ac0
+    return read<std::array<unsigned char,14>>(base+0x10c6610)==std::array<unsigned char,14>{
+            0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20,0x4c,0x8b,0x49,0x08}
+        &&read<std::array<unsigned char,20>>(base+0x10d3fe0)==std::array<unsigned char,20>{
+            0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x6c,0x24,0x10,0x48,0x89,0x74,0x24,0x18,0x48,0x89,0x7c,0x24,0x20}
+        &&read<std::array<unsigned char,25>>(base+0x10c81f9)==std::array<unsigned char,25>{
+            0x8b,0xd7,0xe8,0x10,0xe4,0xff,0xff,0x84,0xc0,0x0f,0x84,0xc5,0x37,0,0,
+            0x8b,0xd7,0x48,0x8b,0xcb,0xe8,0xfe,0xad,0xff,0xff}
+        &&read<uintptr_t>(base+0x23b3e80+0x28)==base+0x1051ac0
         &&read<std::array<unsigned char,22>>(base+0x1051ac0)==std::array<unsigned char,22>{
             0x48,0x8b,0x41,0x38,0x44,0x8b,0xca,0x44,0x2b,0x48,0x24,0x4d,0x69,0xc9,0x10,0x06,0,0,0x4c,0x03,0x49,0x58}
         &&read<std::array<unsigned char,20>>(base+0x10c84a1)==std::array<unsigned char,20>{
@@ -96,16 +138,29 @@ void installNativeCover(uintptr_t imageBase){
     if(enabled.load())return;
     base=imageBase;
     if(!verified()){log("Native cover adapter unavailable: ready-to-peek signatures differ");return;}
-    auto* target=reinterpret_cast<void*>(base+0x1051ac0);
-    auto result=MH_CreateHook(target,reinterpret_cast<void*>(&ready),reinterpret_cast<void**>(&originalReady));
-    if(result!=MH_OK){log("Native cover adapter unavailable: readiness hook creation failed");return;}
-    enabled.store(true);
-    result=MH_EnableHook(target);
-    if(result!=MH_OK){
-        enabled.store(false);MH_RemoveHook(target);
-        log("Native cover adapter unavailable: readiness hook enable failed");return;
+    struct Hook {uintptr_t rva;void* replacement;void** original;};
+    const std::array hooks{
+        Hook{0x1051ac0,reinterpret_cast<void*>(&ready),reinterpret_cast<void**>(&originalReady)},
+        Hook{0x10c6610,reinterpret_cast<void*>(&exitCover),reinterpret_cast<void**>(&originalExit)},
+        Hook{0x10d3fe0,reinterpret_cast<void*>(&selectMode),reinterpret_cast<void**>(&originalMode)}};
+    size_t created{};
+    for(const auto& hook:hooks){
+        if(MH_CreateHook(reinterpret_cast<void*>(base+hook.rva),hook.replacement,hook.original)!=MH_OK)break;
+        ++created;
     }
-    log("Native cover ready-to-peek adapter installed for local immersive wall cover");
+    bool installed=created==hooks.size();
+    if(installed)for(const auto& hook:hooks){
+        if(MH_EnableHook(reinterpret_cast<void*>(base+hook.rva))!=MH_OK){installed=false;break;}
+    }
+    if(!installed){
+        for(size_t i=0;i<created;++i){
+            auto* target=reinterpret_cast<void*>(base+hooks[i].rva);
+            MH_DisableHook(target);MH_RemoveHook(target);
+        }
+        log("Native cover adapter unavailable: hook installation failed");return;
+    }
+    enabled.store(true);
+    log("Native cover adapter installed: physical peek and local assistance entry/exit");
 }
 void stopNativeCover() noexcept{enabled.store(false);}
 }

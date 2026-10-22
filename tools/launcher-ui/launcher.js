@@ -206,6 +206,7 @@ const settingCopy={
  scope_eye_relief_cm:['Scope eye distance','Preferred distance from your eye to the scope glass.'],
  scope_pose_stabilization:['Steady scope glass','Remove small scope attachment shakes. The glass and its view move together; intentional hand movement follows immediately.'],
  block_firing_near_cover:['Block firing near cover','Off by default: nearby cover does not veto firing your tracked gun. Bullets still hit the world normally; ammunition and reload rules stay active.'],
+ cover_assistance:['Cover assistance','On keeps native wall attachment with physical leaning and aiming. Off releases wall attachment. World collision, crouching and bullet obstruction still apply.'],
  enemy_world_markers:['Enemy markers in the world','Show enemies you have already marked at their world positions in both eyes. Binocular marking and the iDroid map keep working. HUD Off hides these labels.'],
  god_mode:['God mode','Prevent damage to Snake in single-player gameplay. Turning this off restores normal damage. Mission and target failure rules still apply.'],
  tracked_weapon_obstruction:['Use tracked gun for cover clearance','Applies when Block firing near cover is On. Check clearance from the tracked barrel with native filters and radius. Off uses the original body/posture sweep.'],

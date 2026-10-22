@@ -892,6 +892,7 @@ struct Session {
         controllerFrame.playerHeightOffset=controls.setting("settings.player_height_offset_cm")*.01f;
         controllerFrame.playerPosture=nativePlayerPosture();
         controllerFrame.fullBody=controls.setting("settings.full_body")!=0;
+        controllerFrame.coverAssistance=controls.setting("settings.cover_assistance")!=0;
         controllerFrame.seatedMode=controls.setting("settings.seated_mode")!=0;
         controllerFrame.cinematicFreeMove=controls.setting("settings.cinematic_free_move")!=0;
         requestFullBodyVisibility(controllerFrame.fullBody);
