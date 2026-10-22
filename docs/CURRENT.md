@@ -7,6 +7,16 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Mounted interruption follow-up: retained042545 on the second intact mortar
+  receives native OnPlayerMortar(0,41477), then a visible explosion destroys
+  the emplacement during left-hand yaw, before any firing step. Live broken
+  becomes true, saved broken stays false, and player life remains7801. The
+  explosion source is unknown. Do not attribute the earlier interruption to
+  RT or change the handheld shot adapter on that assumption. Physical pitch
+  was not reached. Machine-gun entry did not engage; no new native action ID
+  was inferred. Observer restored and owned test sessions closed. No additional
+  gameplay defect is closed by this investigation.
+
 - Mortar physical yaw/release on `a8c9efb80813`: either hand turns native
   yaw11.67/12.08 degrees while view yaw stays fixed. Both-hand stick override
   and release leave neutral aim axes. The first adapter chased native pitch

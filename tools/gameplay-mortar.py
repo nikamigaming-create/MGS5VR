@@ -12,7 +12,7 @@ from gameplay_bot.navigation import NavigationAtlas
 from gameplay_bot.route import navigate, set_posture
 from gameplay_bot.perception import read_enemy_snapshot
 from gameplay_bot.combat import fresh_rig, mul, inverse, controller_pair, paired_aim_position
-from gameplay_bot.emplacement import bind_fixture, fixture, look_at_mount
+from gameplay_bot.emplacement import bind_fixture, fixture, look_at_mount, _observe_fixture
 from gameplay_bot.locomotion import move_local
 from gameplay_bot.recording import Recording
 from gameplay_bot.session import preserved_tracking_poses
@@ -81,11 +81,18 @@ def inspect_physical_grips(live, policy, anchor, output, result):
             if state['rendered'].get('mounted_weapon_hands')==mask:return state
             if time.monotonic()>=until:raise BotFault('Physical grip did not acquire the native handle')
             time.sleep(.025)
-    def place(side,contact,degrees=0.):
+    def place(side,contact,degrees=0.,axis='yaw'):
         grip=live.text_result(live.call('get_controller_pose',{'hand':side,'pose_type':'grip','base_space':'local'}))['pose']
         aim=live.text_result(live.call('get_controller_pose',{'hand':side,'pose_type':'aim','base_space':'local'}))['pose']
         pair=controller_pair(grip,aim);half=math.radians(degrees)/2
-        attitude=mul([0.,math.sin(half),0.,math.cos(half)],contact['orientation'])
+        direction=[0.,1.,0.]
+        if axis=='pitch':
+            state=sample();frame=state['rendered']
+            bearing=math.radians(state['native']['player_camera_yaw'])
+            to_local=mul(frame['head_pose']['orientation'],mul([0.,1.,0.,0.],inverse(frame['native_pose']['orientation'])))
+            direction=rotate(to_local,[-math.cos(bearing),0.,math.sin(bearing)])
+        rotation=[v*math.sin(half) for v in direction]+[math.cos(half)]
+        attitude=mul(rotation,contact['orientation'])
         aim_attitude=mul(attitude,inverse(pair['orientation']))
         for kind,point,q in (('grip',contact['position'],attitude),
                             ('aim',paired_aim_position(contact['position'],aim_attitude,pair),aim_attitude)):
@@ -93,27 +100,28 @@ def inspect_physical_grips(live, policy, anchor, output, result):
                 'position':point,'orientation':q})
     def yaw(pose):
         f=rotate(pose['orientation'],[0.,0.,1.]);return math.degrees(math.atan2(f[0],f[2]))
-    for side,mask in (('right',2),('left',1)):
+    for side,mask,axis in (('right',2,'yaw'),('left',1,'yaw'),('right',2,'pitch'),('left',1,'pitch')):
         live.release();state=sample();contact=state['rendered']['mounted_'+side+'_grip']
         place(side,contact);time.sleep(.12)
         try:
             live.input([channel(side+'_grip')],5.,lease_seconds=5.)
-            before=wait_grip(mask);place(side,contact,12.)
+            before=wait_grip(mask);place(side,contact,12.,axis)
             samples=[];until=time.monotonic()+1.6
             while time.monotonic()<until:
                 state=sample(mask);samples.append(state);time.sleep(.025)
             change=(state['native']['player_camera_yaw']-before['native']['player_camera_yaw']+180.)%360.-180.
+            pitch=before['native']['player_camera_pitch']-state['native']['player_camera_pitch']
             viewer=(yaw(state['rendered']['native_pose'])-yaw(before['rendered']['native_pose'])+180.)%360.-180.
-            row={'hand':side,'before':before,'after':state,'samples':samples,
-                 'native_yaw_delta':change,'viewer_yaw_delta':viewer};checks.append(row)
+            row={'hand':side,'axis':axis,'before':before,'after':state,'samples':samples,
+                 'native_yaw_delta':change,'native_elevation_delta':pitch,'viewer_yaw_delta':viewer};checks.append(row)
             atomic_json(output/'progress.json',result)
-            if not 5.<change<20. or abs(viewer)>1.:
+            if not 5.<(change if axis=='yaw' else pitch)<20. or abs(viewer)>1.:
                 raise BotFault('Physical handle aim did not turn the native weapon independently of the viewer')
-            if any(abs(s['rendered']['mounted_weapon_axes'][1])>.001 for s in samples):
+            if axis=='yaw' and any(abs(s['rendered']['mounted_weapon_axes'][1])>.001 for s in samples):
                 raise BotFault('Pure physical yaw chased native pitch animation')
             if state['rendered']['mounted_weapon_axes']!=[0,0]:
                 raise BotFault('Physical handle continued steering after the hand settled')
-            row['eyes']=live.capture('mortar-physical-'+side,static_grips=True)
+            row['eyes']=live.capture('mortar-physical-'+side+'-'+axis,static_grips=True)
         finally:live.release()
         released=wait_grip(0)
         if released['controls']['native_axes'][2:]!=[0,0]:
@@ -280,6 +288,7 @@ def run(live, nav, policy, output, seconds):
                 raise BotFault('Mortar entry was not acknowledged; no trigger dispatched')
             time.sleep(.025)
         result['entered'] = state
+        result.setdefault('fixture_phases',{})['entered']=_observe_fixture(live,policy)
         # Y preserves the viewer's heading; LOCAL identity is not necessarily
         # the emplacement's forward direction. Look along the native aiming
         # bearing through the existing physical-head transform, including its
@@ -395,6 +404,7 @@ def run(live, nav, policy, output, seconds):
             if time.monotonic() >= end:
                 raise BotFault('Mortar ready modifier was not delivered; no shot dispatched')
         result['downrange_aim']['held_state'] = state
+        result['fixture_phases']['before_trigger']=_observe_fixture(live,policy)
         result['downrange_aim']['eyes'] = live.capture('mortar-downrange-aim-held', static_grips=True)
         live.events.emit('mortar_downrange_aim_held', state=state, target=target,
                          impact_proven=False, visual_source='native_source_eye_recording')
@@ -425,6 +435,7 @@ def run(live, nav, policy, output, seconds):
             result['response'].append(state)
             time.sleep(.05)
         live.release()
+        result['fixture_phases']['after_trigger']=_observe_fixture(live,policy)
         result['fired_eyes'] = live.capture('mortar-trigger-response')
         result['exit_action'] = live.execute({'op': 'action', 'name': 'gameplay.interact', 'seconds': .18,
             'native_before': {'mission': policy['mission'], 'location': policy['location'], 'popup': False,
@@ -439,6 +450,7 @@ def run(live, nav, policy, output, seconds):
                 raise BotFault('Mortar exit was not acknowledged')
             time.sleep(.025)
         result['after'] = state
+        result['fixture_phases']['exited']=_observe_fixture(live,policy)
         result['after_eyes'] = live.capture('mortar-exited')
         result['status'] = 'observed_mortar_entry_trigger_exit'
     except Exception as error:

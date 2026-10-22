@@ -1439,7 +1439,23 @@
         "Identify why fixture reports broken after the firing sequence; prior owner-loss failure remains retained",
         "Prove actual discharge and impact",
         "Other emplacement types and physical Quest"
-      ]
+      ],
+      "interruption_followup": {
+        "run": "20261022T042545939959Z",
+        "candidate": "a8c9efb80813",
+        "fixture": "slopedWest_mortar001",
+        "native_id": 41477,
+        "native_event": "Player.OnPlayerMortar(arg0=0,arg1=41477)",
+        "entry_broken": false,
+        "outcome": "Visible explosion destroys emplacement during left-hand yaw; native NORMAL_ACTION returns true before any RT/firing step.",
+        "live_broken_after": true,
+        "saved_broken_after": false,
+        "player_life_before_after": 7801,
+        "interpretation": "Post-trigger ownership loss is not evidence of a trigger-specific defect. Destruction also occurs before firing. Explosion source is not established. Do not change the shot adapter based on this failure alone.",
+        "physical_pitch": "Not reached; remains unverified.",
+        "machinegun": "Nearby type82 entry attempt did not engage; only native action1 sampled. No adapter action ID inferred.",
+        "cleanup": "Native event observer restored; bounded memory reader exited; owned game/simulator closed; Steam retained."
+      }
     }
   }
 }
