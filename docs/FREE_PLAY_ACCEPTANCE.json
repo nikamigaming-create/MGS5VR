@@ -700,6 +700,12 @@
           ],
           "result": "Seated open first interrupted by native Challenge Tasks help, then Exit Tutorial notice on stow. Reviewed and dismissed using existing VR menu bindings. Subsequent ordinary open/stow succeeds with view62.092 degrees throughout138 samples. Both eyes show left-hand projection still edge-on in neutral test pose.",
           "limitation": "Ownership/heading continuity only; handset alignment and physical readability remain unresolved."
+        },
+        {
+          "run": "20261022T064303055713Z",
+          "candidate_sha256": "428a0c0872fceff0010da50e1e417cb012bb2a8f6b68ffb08be0766696430dad",
+          "result": "Challenge Tasks Exit Tutorial now retains active VR and readable spatial notice in both eyes; dismissal and immediate iDroid reopening/stow pass.",
+          "limitations": "Other lessons and physical headset unverified."
         }
       ]
     },
@@ -790,6 +796,12 @@
             "Existing edge-on handset presentation and support-finger contact remain open.",
             "Capture cadence~3fps does not establish headset performance or temporal stereo acceptance."
           ]
+        },
+        {
+          "run": "20261022T064303055713Z",
+          "candidate_sha256": "428a0c0872fceff0010da50e1e417cb012bb2a8f6b68ffb08be0766696430dad",
+          "result": "Challenge Tasks Exit Tutorial now retains active VR and readable spatial notice in both eyes; dismissal and immediate iDroid reopening/stow pass.",
+          "limitations": "Other lessons and physical headset unverified."
         }
       ]
     },
@@ -1550,6 +1562,27 @@
       ],
       "final_checked_sha256": "ddaac67a8fb259300995934f0f2b7474655bdb224fdfe862f010917f96274a51",
       "final_build_equivalence": "Final clean build differs from live-tested fb83026e1682 only at PE COFF and debug-directory timestamps (file offsets288-289 and2158148-2158149). Every other byte identical; .text, .data, .pdata, .rsrc and .reloc identical."
+    },
+    "tutorial_exit_notice": {
+      "candidate_sha256": "428a0c0872fceff0010da50e1e417cb012bb2a8f6b68ffb08be0766696430dad",
+      "baseline_run": "20261022T062745206613Z",
+      "retained_run": "20261022T064303055713Z",
+      "result": "Tutorial exit-notice handoff on 428a0c0872fc: closing the paused Challenge Tasks terminal briefly retired the VR camera before Exit Tutorial opened, leaving a frozen edge-on handset image. Preserve the same paused anchor only for an immediately following Pause within250ms, with matching player, activation and tracking reference. Gameplay still requires a fresh native player publication. Baseline062745 loses the active camera; final064303 retains it and shows the readable Exit Tutorial panel in both eyes. Notice dismissal and immediate ordinary iDroid reopen/stow pass. Owned session closed; Steam retained; published play unchanged.",
+      "checks": "Required build checks and focused immediate/expired handoff, foreign camera and fresh gameplay return checks passed. Actual native tutorial sequence and both-eye pixels reviewed.",
+      "remaining": [
+        "Other tutorial lessons",
+        "Physical Quest Link"
+      ],
+      "intermediate_failures": "063259 missed native sampling for a short destination confirmation; subsequent route attempts stayed in ACC or reached a mission-acceptance prompt and were stopped. Fresh owned session064303 completed the original Free Roam route and all tutorial cases."
+    },
+    "rock_traversal_followup": {
+      "candidate_sha256": "ddaac67a8fb259300995934f0f2b7474655bdb224fdfe862f010917f96274a51",
+      "runs": [
+        "20261022T062444550136Z",
+        "20261022T062556873588Z"
+      ],
+      "result": "Native crouched traversal from Afghan LZ over the rocky rise completed10 segments before failing the neutral settling bound at about(85.963,314.492,240.694). With full-body off, reverse segments completed and forward movement exceeded the bounded1m envelope after release. Preferences restored. These are movement-bound failures, not proof of the reported VR slipping/sticking cause; no collision change made.",
+      "status": "reported_defect_unresolved"
     }
   }
 }

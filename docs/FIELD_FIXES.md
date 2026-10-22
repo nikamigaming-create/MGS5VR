@@ -13,7 +13,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Right-wrist shoulder/opposite-arm coupling — FP17.** Reported in physical VR. Reproduced: right wrist +/-30 degrees rotates chest and shifts fixed-input left palm8.5/12cm. Acquired-weapon-only torso correction removes wrist-driven heading in two Mother Base repeats. Remaining opposite-palm movement is at most 1.13cm and follows native idle animation. Physical headset and reach remain open.
 - [ ] **Shortened arm reach — FP17.** Clavicle contribution and neutral head/neck fit reduce 50cm palm error to standing1.0mm/crouched1.6mm on56d5, from11.3/20.5cm. Both-eye continuity, native-scale legs, posture changes, walking, wrist isolation and supported rifle handling checked. Farther reach, broader interactions and physical Quest validation stay open.
 - [ ] **Precision-weapon support loss — FP02.** Moving supported rifle and3 back-slot shots retain contact in082239, but open support fingers reproduced in both eyes. Read-only shared palettes match; candidate73fe7d0b521d cups acquired long-gun support outside native manipulation. Curled fingers now visible after moving aim and3 shots; native reload5->9 and reacquisition observed. Mid-reload pair capture failed on grip lease; broader verification remains open. Bolt-action and physical headset remain open.
-- [ ] **Tutorial camera handoff and retained iDroid — FP07/FP12.** Exact retained-terminal timeout, cinematic return and ordinary stow/reopen pass onff0dd2c746a6 after fixing reproduced ownership loss. Scoped simulator subcase complete; physical Quest, alignment and remaining tutorial lessons stay open.
+- [ ] **Tutorial camera handoff and retained iDroid — FP07/FP12.** Exact retained-terminal timeout, cinematic return and ordinary stow/reopen pass onff0dd2c746a6 after fixing reproduced ownership loss. Challenge Tasks exit-notice camera retirement is also fixed on 428a0c0872fc: readable spatial notice in both eyes and immediate reopen/stow in064303. Physical Quest, alignment and remaining tutorial lessons stay open.
 - [ ] **Idle/tracking-loss camera and weapon continuity — FP01/FP02.** Camera fallback not reproduced in simulator. Rifle disappearance reproduced in both eyes during tracking loss. Combined candidate 148d5ca51161 built/installed; 58 test groups and installer checks passed; scoped field loss/recovery and safe held-trigger checks passed on both primary slots (runs023544/023824/024003/024113 below). Other transitions and physical Quest remain open.
 - [ ] **Floating in seated and standing modes — FP05.** Reproduced helicopter-exit latch fixed: initial crouched camera formerly1.18/1.369m above root versus native eye~0.76m; two fresh corrected exits0.775/0.788m. Standing/crouch/prone/walk retain native leg scale. Physical seated/standing report remains open.
 - [ ] **Body size and tight-corridor sticking — FP04.** Exact reported corridor unresolved; compare full-body on/off, capsule movement and physical lean without weakening collision.
@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current gameplay-checked development is `fb83026e1682`, adding Rocket Arm steering and restored flight handset to seated helicopter body/eye continuity, marker pinch contact, loose-sheet settling and prior fixes. Physical pitch, contact, discharge and other mounted types remain open.
+Current gameplay-checked development is `428a0c0872fc`, adding tutorial exit-notice handoff, Rocket Arm steering and restored flight handset to seated helicopter body/eye continuity, marker pinch contact, loose-sheet settling and prior fixes. Physical pitch, contact, discharge and other mounted types remain open.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -76,6 +76,8 @@ that route. The complete field list above remains the work queue.
 
 - [x] **This batch: left-hand motion did not steer Rocket Arm.** Physical pitch/yaw now change native trajectory; stick override and normal weapon return checked.
 - [x] **This batch: Rocket Arm handset missing after sortie selection.** Flight ownership now survives the unrelated terminal closing flag. Live flight pixels reviewed in both eyes and ordinary iDroid reopen/stow retained. Broader FP08 remains open.
+
+- [x] **This pass: Exit Tutorial freezes the old handset view.** Recover the immediately following paused notice using the same owned menu anchor; no stale skin is admitted as gameplay. Readable spatial notice reviewed in both eyes, dismissal and immediate iDroid reopening/stow pass in064303.
 
 ## Closure requirements
 

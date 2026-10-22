@@ -3176,6 +3176,30 @@ int main(){
         expect(reopened.applied&&reopened.menuIdroid&&!reopened.menuWorldQuad
             &&!guide.status().suspended,
             "native player resumption returns the same terminal to the tracked LEFT handset");
+        guide.setNativeMenuOpen(true,true,false,true);
+        guide.trackStereo({},rigEyes,true,2000,input);
+        expect(guide.resolve(31,thirdPerson,2000).applied,"paused terminal keeps its owned anchor");
+        guide.setNativeMenuOpen(false);
+        expect(!guide.resolve(31,thirdPerson,2000).applied&&guide.status().awaitingPlayer,
+            "terminal close cannot treat a paused skin as resumed gameplay");
+        guide.trackStereo({},rigEyes,true,2010,input);
+        guide.setNativeMenuOpen(true,false,true);
+        const auto exitNotice=guide.resolve(31,thirdPerson,2010);
+        expect(exitNotice.applied&&exitNotice.menuWorldQuad&&!exitNotice.menuIdroid&&guide.status().active,
+            "immediate Exit Tutorial notice reclaims the same paused menu anchor");
+        expect(!guide.resolve(99,thirdPerson,2010).applied,"exit notice cannot adopt another camera");
+        guide.setNativeMenuOpen(false);
+        expect(!guide.resolve(31,thirdPerson,2010).applied,
+            "dismissing exit notice still requires fresh gameplay publication");
+        guide.publishPlayerHead(31,42,thirdPerson,playerRoot,headBone,2010);
+        expect(guide.resolve(31,thirdPerson,2010).applied,"fresh gameplay resumes after exit notice");
+        guide.setNativeMenuOpen(true,true,false,true);
+        guide.trackStereo({},rigEyes,true,4000,input);
+        expect(guide.resolve(31,thirdPerson,4000).applied,"second paused terminal retains its owned anchor");
+        guide.setNativeMenuOpen(false);guide.resolve(31,thirdPerson,4000);
+        guide.trackStereo({},rigEyes,true,4300,input);guide.setNativeMenuOpen(true,false,true);
+        expect(!guide.resolve(31,thirdPerson,4300).applied,
+            "an expired terminal-close handoff cannot revive an old menu world");
     }
     for(const bool handheld:{false,true}){
         HeadCamera cabin;cabin.configure(true,1,true);

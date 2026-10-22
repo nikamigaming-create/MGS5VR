@@ -126,7 +126,7 @@ void HeadCamera::configure(bool enabled,float units,bool requirePlayerHead){
     controllers_={};rig_={};nativeMenuOpen_=false;nativeIdroidOpen_=false;nativeIdroidPaused_=false;awaitingScene_=false;lastView_={};cameraRenderTime_=0;menuAnchored_=false;trackingEpoch_=0;
     cameraFreezeAnchored_=false;
     seatedHeadY_=0;seatedMode_=false;fieldPostureUntil_=0;
-    menuGeneration_=0;
+    menuGeneration_=0;pausedMenuClosedAt_=0;
     staleDemoRecoveryDwell_.reset();
     lastTitleSource_={};avatarEditorBackdrop_={};lastTitleSourceValid_=avatarEditorBackdropValid_=false;
     scriptedDemoActive_=false;cinematicFollow_={};sceneTransitionActivation_=0;
@@ -312,7 +312,23 @@ void HeadCamera::setNativeMenuOpen(bool open,bool idroid,bool pause,bool idroidP
     const auto nextIdroid=open&&idroid&&!pause;
     const auto nextPaused=nextIdroid&&idroidPaused;
     if(open==nativeMenuOpen_&&nextIdroid==nativeIdroidOpen_&&nextPaused==nativeIdroidPaused_)return;
-    const bool retainMenuAnchor=open&&nativeMenuOpen_&&menuAnchored_;
+    // A paused tutorial closes its terminal just before opening Exit Tutorial.
+    // The intervening gameplay camera has no new skin and retires the active
+    // view. Only the immediately following Pause may reclaim this same menu
+    // anchor; gameplay must still join a fresh native player publication.
+    if(!open&&nativeMenuOpen_&&nativeIdroidPaused_&&menuAnchored_)
+        pausedMenuClosedAt_=time_;
+    const bool resumePausedMenu=open&&pause&&pausedMenuClosedAt_&&time_>=pausedMenuClosedAt_
+        &&time_-pausedMenuClosedAt_<=250&&awaitingPlayer_&&!awaitingScene_
+        &&reason_==HeadCameraStop::playerHeadUnavailable&&camera_&&playerOwner_
+        &&lastView_.applied&&lastView_.activation==activation_&&lastView_.playerOwner==playerOwner_
+        &&lastView_.controllers.referenceEpoch==controllers_.referenceEpoch
+        &&!controllers_.loading&&!controllers_.frontEnd&&!controllers_.scriptedDemo;
+    const bool retainMenuAnchor=open&&((nativeMenuOpen_&&menuAnchored_)||resumePausedMenu);
+    if(resumePausedMenu){
+        active_=true;pending_=awaitingPlayer_=suspended_=false;reason_=HeadCameraStop::none;
+    }
+    if(open)pausedMenuClosedAt_=0;
     nativeMenuOpen_=open;nativeIdroidOpen_=nextIdroid;nativeIdroidPaused_=nextPaused;++menuGeneration_;rig_={};
     if(open)staleDemoRecoveryDwell_.reset();
     if(open){
@@ -339,6 +355,7 @@ void HeadCamera::cancelLocked(HeadCameraStop reason){
     headLookLessonKey_=0;
     active_=pending_=suspended_=awaitingPlayer_=awaitingScene_=false;camera_=playerOwner_=0;rig_={};lastView_={};cameraRenderTime_=0;menuAnchored_=false;
     cameraFreezeAnchored_=false;
+    pausedMenuClosedAt_=0;
     avatarEditorBackdropValid_=false;avatarEditorBackdrop_={};
     scriptedDemoActive_=false;cinematicFollow_={};sceneTransitionActivation_=0;
     staleDemoRecoveryDwell_.reset();

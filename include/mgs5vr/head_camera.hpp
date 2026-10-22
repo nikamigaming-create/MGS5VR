@@ -361,6 +361,7 @@ private:
     uint64_t cameraRenderTime_{}; // Source liveness survives invalidating a previous scene's pixels.
     Pose menuNative_{},menuHead_{},menuPanel_{};
     bool menuAnchored_{};
+    uint64_t pausedMenuClosedAt_{};
     bool recenterPending_{};
     bool lastTitleSourceValid_{},avatarEditorBackdropValid_{};
     bool scriptedDemoActive_{};

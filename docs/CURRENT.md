@@ -7,7 +7,9 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
-Final checked development is `ddaac67a8fb2`. It differs from the gameplay-tested `fb83026e1682` only in PE/debug timestamps; every other binary byte is identical. Published play remains unchanged.
+- Tutorial exit-notice handoff on 428a0c0872fc: closing the paused Challenge Tasks terminal briefly retired the VR camera before Exit Tutorial opened, leaving a frozen edge-on handset image. Preserve the same paused anchor only for an immediately following Pause within250ms, with matching player, activation and tracking reference. Gameplay still requires a fresh native player publication. Baseline062745 loses the active camera; final064303 retains it and shows the readable Exit Tutorial panel in both eyes. Notice dismissal and immediate ordinary iDroid reopen/stow pass. Owned session closed; Steam retained; published play unchanged.
+
+Current gameplay-checked development is `428a0c0872fc`, including the tutorial exit-notice handoff fix. Published play remains unchanged.
 
 - Rocket Arm batch on fb83026e1682: left-hand pitch/yaw now steer native flight, with movement-stick override and normal weapon return. Brief skin-publication gaps no longer reset held steering. The closed terminal retained its closing bit after sortie selection, suppressing the independent flight handset; that unrelated gate now applies only to terminal presentation. Retained060632 shows trajectory response and live flight pixels on the handset in both eyes. Ordinary iDroid reopen/stow passes in061327 after reviewed Challenge Tasks and Exit Tutorial notices. Target impact, Blast Arm, wider contact/poses and physical Quest remain open. Owned simulator/game closed; Steam retained; published play unchanged.
 
