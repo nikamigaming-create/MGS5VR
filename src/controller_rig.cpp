@@ -199,6 +199,10 @@ struct CabinGearHold {
     uint32_t assembly{};
     Pose parked{},inPalm{},last{};
 };
+using CabinGearSetter=void(*)(void*,uint32_t,const float*);
+CabinGearSetter originalCabinGearSetter{};
+struct CabinGearPublication {std::array<CabinGearHold,2> holds;uint64_t sampleTime{};};
+std::atomic<std::shared_ptr<const CabinGearPublication>> cabinGearPublication;
 std::array<CabinGearHold,2> cabinGear;
 std::array<GearContact,2> cabinGearContact;
 std::atomic<uint8_t> cabinGearMask{};
@@ -221,8 +225,28 @@ void placeCabinGear(const CabinGearHold& held,Pose pose){
     const auto x=rotate(pose.orientation,{1,0,0}),y=rotate(pose.orientation,{0,1,0}),z=rotate(pose.orientation,{0,0,1});
     alignas(16) const std::array<float,16> matrix{x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,
         pose.position.x,pose.position.y,pose.position.z,1};
-    using SetRoot=void(*)(void*,uint32_t,const float*);
-    reinterpret_cast<SetRoot>(base+0xd495c0)(reinterpret_cast<void*>(held.custom),held.assembly,matrix.data());
+    if(originalCabinGearSetter)originalCabinGearSetter(reinterpret_cast<void*>(held.custom),held.assembly,matrix.data());
+}
+void setCabinGearRoot(void* custom,uint32_t assembly,const float* incoming){
+    // Native equipment publication follows body skin. Substitute only the
+    // same parked assembly using its completed body pose; no player lock is
+    // acquired from this equipment callback and no animation work is invoked.
+    const auto publication=cabinGearPublication.load();
+    const auto now=steadyMilliseconds();
+    if(enabled.load()&&publication&&now>=publication->sampleTime&&now-publication->sampleTime<=150){
+        for(const auto& held:publication->holds){
+            if(held.custom!=reinterpret_cast<uintptr_t>(custom)||held.assembly!=assembly||!cabinGearIdentity(held))continue;
+            std::array<float,16> source{};
+            if(!read(reinterpret_cast<uintptr_t>(incoming),source))break;
+            const auto requested=nativeAffinePose(source);if(!requested)break;
+            const auto delta=requested->position-held.parked.position;
+            const auto a=requested->orientation,b=held.parked.orientation;
+            // A different authored mount/loadout/scene wins immediately.
+            if(dot(delta,delta)>.000025f||std::abs(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w)<.9999f)break;
+            placeCabinGear(held,held.last);return;
+        }
+    }
+    originalCabinGearSetter(custom,assembly,incoming);
 }
 void returnCabinGear(CabinGearHold& held){
     if(cabinGearIdentity(held)){
@@ -237,7 +261,7 @@ void returnCabinGear(CabinGearHold& held){
 }
 void updateCabinGear(const HeadCameraSample* frame){
     const auto now=steadyMilliseconds();
-    const bool allowed=frame&&frame->controllers.cabinPlay&&!frame->controllers.cabinTransit
+    const bool allowed=originalCabinGearSetter&&frame&&frame->controllers.cabinPlay&&!frame->controllers.cabinTransit
         &&!frame->menuOpen&&!frame->controllers.authoredCamera&&!frame->controllers.nativeGamepad
         &&frame->controllers.presentationFocused&&frame->sampleTime<=now&&now-frame->sampleTime<=150;
     uint8_t mask{};
@@ -286,6 +310,8 @@ void updateCabinGear(const HeadCameraSample* frame){
         if(held.model){held.last=compose(palm,held.inPalm);placeCabinGear(held,held.last);mask|=uint8_t(1u<<side);}
     }
     cabinGearTime.store(now);cabinGearMask.store(mask);
+    if(mask)cabinGearPublication.store(std::make_shared<const CabinGearPublication>(CabinGearPublication{cabinGear,now}));
+    else cabinGearPublication.store({});
 }
 struct AssembledSight {
     Pose center{},magnifier{};
@@ -2289,6 +2315,16 @@ void installControllerRig(uintptr_t imageBase,bool idroidEffectProbe,bool idroid
     scopePartsVerified=matches(0xd45930,std::array<unsigned char,10>{
         0x41,0x83,0xf8,0x0b,0x0f,0x87,0xb9,0,0,0});
     log(scopePartsVerified?"Native assembled magnifier adapter enabled":"Native magnifier part signature differs; flip sights disabled");
+    if(matches(0xd495c0,std::array<unsigned char,15>{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x6c,0x24,0x18,0x48,0x89,0x74,0x24,0x20})
+       &&get<uintptr_t>(base+0x233ad90+0x38)==base+0xd495c0){
+        auto address=reinterpret_cast<void*>(base+0xd495c0);
+        const auto created=MH_CreateHook(address,reinterpret_cast<void*>(&setCabinGearRoot),reinterpret_cast<void**>(&originalCabinGearSetter));
+        if(created!=MH_OK||MH_EnableHook(address)!=MH_OK){
+            if(created==MH_OK)MH_RemoveHook(address);
+            originalCabinGearSetter=nullptr;
+        }
+    }
+    log(originalCabinGearSetter?"Native cabin assembly publication enabled":"Native cabin pickup unavailable: assembly publication not verified");
     groundQueryVerified=matches(0xa0fb50,std::array<unsigned char,9>{0x48,0x89,0x4c,0x24,0x08,0x48,0x83,0xec,0x18})
         &&matches(0x1b9b130,std::array<unsigned char,10>{0x48,0x83,0xec,0x38,0xf3,0x0f,0x10,0x44,0x24,0x60})
         &&matches(0x1b9b21e,std::array<unsigned char,18>{0xf3,0x0f,0x10,0x84,0x24,0xe0,0,0,0,0x0f,0xc6,0xc0,0,0x0f,0x29,0x44,0x24,0x50})
@@ -2358,7 +2394,7 @@ void observeControllerRigOwner(uintptr_t owner) noexcept{
     if(playerOwner.load()==owner)return;
     std::lock_guard publicationLock(skinPublicationMutex);
     for(auto& held:cabinGear)returnCabinGear(held);
-    cabinGearContact={};cabinGearMask.store(0);
+    cabinGearContact={};cabinGearMask.store(0);cabinGearPublication.store({});
     playerOwner.store(owner);pausedSkin={};pausedParts={};
 }
 void stopControllerRig() noexcept{

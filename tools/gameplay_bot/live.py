@@ -1603,6 +1603,18 @@ class Live:
                         # final-eye captures. Movement, buttons, triggers and
                         # arbitrary remaps still use a state-only checkpoint.
                         captures = []
+                        if step.get("inspection_pose") is not None:
+                            # One explicitly requested cabin grip movement, owned by
+                            # this same expiring input lease. No second input runner.
+                            pose=step["inspection_pose"]
+                            if (step.get("static_grip_capture") is not True or held_state.get("cabin") is not True
+                                    or not static_grip_capture_allowed(self.held,held_state,self.bindings)
+                                    or not isinstance(pose,dict) or set(pose)!={"hand","position","orientation"}):
+                                raise BotFault("Cabin inspection motion requires an owned grip-only capture")
+                            self.execute({"op":"pose",**pose})
+                            held_state=self.observe(native=native_during)
+                            if not static_grip_capture_allowed(self.held,held_state,self.bindings) or not matches(held_state,during):
+                                raise BotFault("Cabin grip ownership changed during inspection motion")
                         if step.get("static_grip_capture") is True:
                             if not static_grip_capture_allowed(self.held, held_state, self.bindings):
                                 raise BotFault("This action is not a stationary weapon/support grip inspection")
