@@ -2588,6 +2588,36 @@ int main(){
             contact[side].squeeze=0;picked=bilateral.update(true,true,Pose{},Pose{},contact,1400);
             expect(picked->papers[0].hand<0,"Either hand releases its note");
         }
+        {
+            CabinStudio fieldNotes;std::array<StudioHand,2> fieldHands{};
+            const Pose room{{0,.70710678f,0,.70710678f},{4,2,-3}};
+            auto printed=fieldNotes.update(true,false,Pose{},room,fieldHands,100,4321);
+            fieldHands[0].tracked=true;fieldHands[0].squeeze=1;
+            fieldHands[0].grip=printed->papers.front().fieldPose;
+            printed=fieldNotes.update(true,false,Pose{},room,fieldHands,150,4321);
+            expect(printed->papers.front().hand==0,"A field print is physically picked up at the camera output");
+            fieldHands[1].tracked=fieldHands[1].aimTracked=true;
+            fieldHands[1].aim=compose(printed->papers.front().fieldPose,Pose{{},{0,0,.25f}});
+            fieldHands[1].trigger=1;
+            printed=fieldNotes.update(true,false,Pose{},room,fieldHands,200,4321);
+            expect(printed->editor==static_cast<int>(printed->papers.front().id),
+                "Field paper selection uses the tracking-space ray even when the cabin anchor is translated and rotated");
+        }
+        {
+            CabinStudio copies;std::array<StudioHand,2> idle{};
+            StudioPaper first{},second{};first.id=1;second.id=2;
+            first.photo=second.photo=4321;
+            first.pose=second.pose=Pose{{-.70710678f,0,0,.70710678f},studioPrintHome};
+            first.ink=second.ink=std::make_shared<const StudioInk>();
+            copies.restore(std::vector<StudioPaper>{first,second});
+            std::shared_ptr<const CabinStudioFrame> stack;
+            for(uint64_t t=100;t<=2100;t+=20)stack=copies.update(true,true,Pose{},Pose{},idle,t);
+            const auto gap=stack->papers[1].pose.position.y-stack->papers[0].pose.position.y;
+            expect(gap>=.0013f&&gap<.0016f,"Loose photo copies settle with sheet thickness instead of collapsing onto one flickering plane");
+            const auto top=stack->papers[1].pose.position.y;
+            for(uint64_t t=2120;t<=4120;t+=20)stack=copies.update(true,true,Pose{},Pose{},idle,t);
+            expect(near(stack->papers[1].pose.position.y,top),"A resting print stack does not creep upward across frames");
+        }
         CabinStudio studio;std::array<StudioHand,2> hands{};
         for(auto& hand:hands)hand.tracked=true;
         hands[1].grip.position=studioCameraHome;
@@ -2600,6 +2630,17 @@ int main(){
         frame=studio.update(true,true,Pose{},Pose{},hands,1300,1234);
         expect(shot&&frame->shutter==shot&&frame->papers.size()==1&&frame->papers[0].photo==1234,
             "A shutter hold produces one photo identity and one physical print");
+        const auto output=frame->papers.front().id;
+        hands[1].grip.position.x+=.1f;
+        frame=studio.update(true,true,Pose{},Pose{},hands,1320);
+        expect(frame->outputPaper==output&&same(frame->papers.front().pose.position,
+            compose(frame->camera,studioCameraPrintPose).position),
+            "A fresh cabin print remains in the moving camera's front film slot instead of falling immediately");
+        hands[0].grip=frame->papers.front().pose;hands[0].squeeze=1;
+        frame=studio.update(true,true,Pose{},Pose{},hands,1330);
+        expect(frame->papers.front().hand==0&&!frame->outputPaper,
+            "Taking the front-slot print releases camera ownership of that copy");
+        hands[0].squeeze=0;studio.update(true,true,Pose{},Pose{},hands,1340);
         hands[1].squeeze=hands[1].trigger=0;studio.update(true,true,Pose{},Pose{},hands,1350);
         hands[0].grip={{-.70710678f,0,0,.70710678f},studioNotesHome};
         hands[0].squeeze=1;frame=studio.update(true,true,Pose{},Pose{},hands,1400);

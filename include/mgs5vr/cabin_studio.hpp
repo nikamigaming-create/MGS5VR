@@ -49,6 +49,7 @@ struct CabinStudioFrame {
     uint64_t lastPhoto{};
     uint64_t selectedPhoto{},confirmPhoto{};
     uint32_t confirmPaper{};
+    uint32_t outputPaper{}; // Transient copy retained by the camera's film slot until taken.
     Pose shutterPose{};
     uint8_t inputMask{},hapticMask{};
     uint8_t cameraCandidateMask{};
@@ -62,6 +63,9 @@ inline constexpr size_t studioTextLimit=96;
 inline constexpr Vec3 studioNotesHome{.775f,-2.207f,-.900f};
 inline constexpr Vec3 studioCameraHome{.760f,-2.130f,-1.180f};
 inline constexpr Pose studioCameraLens{{},{-.019f,.003f,-.071f}};
+// The film slot is on the front (-Z) at y=-.050, z=-.062. A photo
+// extends forward from that slot, face up, rather than below the rear finder.
+inline constexpr Pose studioCameraPrintPose{{-.70710678f,0,0,.70710678f},{0,-.050f,-.116f}};
 inline constexpr Vec3 studioCameraHalf{.093f,.076f,.071f};
 inline constexpr Vec3 studioCameraRightGrip{.076f,-.007f,.010f};
 inline constexpr Vec3 studioCameraLeftGrip{-.061f,-.007f,.010f};

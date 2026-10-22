@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <mutex>
+#include <limits>
 
 namespace mgs5vr {
 namespace {
@@ -32,10 +33,11 @@ Pose rigid(Pose pose){
         static_cast<float>(q.z/length),static_cast<float>(q.w/length)};
     return pose;
 }
-void settle(Pose& pose,Vec3& velocity,float dt,Vec3 half){
+void settle(Pose& pose,Vec3& velocity,float dt,Vec3 half,
+    float support=-std::numeric_limits<float>::infinity()){
     velocity.y-=9.81f*dt;pose.position=pose.position+velocity*dt;
     const auto p=pose.position;
-    const float floor=cabinNativeSupportHeight(p);
+    const float floor=std::max(cabinNativeSupportHeight(p),support);
     if(p.y-half.y<floor){pose.position.y=floor+half.y;
         velocity.y=std::abs(velocity.y)<.12f?0:std::abs(velocity.y)*.08f;
         velocity.x*=std::max(0.f,1-12*dt);velocity.z*=std::max(0.f,1-12*dt);}
@@ -135,7 +137,10 @@ void joinStudioHands(CabinStudioFrame& frame,const std::array<Pose,2>& inputGrip
         if(frame.cameraHand==static_cast<int>(side)){
             frame.camera=compose(correction,frame.camera);
             frame.shutterPose=compose(frame.camera,studioCameraLens);
-            for(auto& paper:frame.papers)if(paper.field&&paper.hand<0)paper.fieldPose=compose(correction,paper.fieldPose);
+            for(auto& paper:frame.papers)if(paper.hand<0){
+                if(paper.field)paper.fieldPose=compose(correction,paper.fieldPose);
+                else if(paper.id==frame.outputPaper)paper.pose=compose(roomCorrection,paper.pose);
+            }
         }
         if(frame.markerHand==static_cast<int>(side))frame.marker=compose(roomCorrection,frame.marker);
         for(auto& paper:frame.papers)if(paper.hand==static_cast<int>(side)){
@@ -151,6 +156,7 @@ void CabinStudio::restore(std::vector<StudioPaper> papers){
     restore(std::move(collection));
 }
 void CabinStudio::restore(StudioCollection collection){
+    frame_.outputPaper=0;
     auto& papers=collection.papers;
     if(papers.size()>studioPaperLimit)papers.resize(studioPaperLimit);
     frame_.papers.clear();
@@ -167,8 +173,10 @@ void CabinStudio::print(uint64_t photo,bool field){
     // Each copy owns its ID, location and ink. It is never a gallery entry.
     for(auto& p:frame_.papers)if(p.field&&p.hand<0)p.field=false;
     StudioPaper paper{};paper.id=nextId_++;paper.photo=photo;paper.field=field;
-    paper.pose={flat,studioPrintHome+Vec3{0,.0015f*static_cast<float>(frame_.papers.size()),0}};
-    paper.fieldPose=compose(frame_.camera,Pose{{},{0,-.123f,.045f}});
+    paper.fieldPose=compose(frame_.camera,studioCameraPrintPose);
+    paper.pose=field?Pose{flat,studioPrintHome+Vec3{0,.0015f*static_cast<float>(frame_.papers.size()),0}}
+        :compose(inverse(frame_.roomTracking),paper.fieldPose);
+    frame_.outputPaper=paper.id;
     paper.ink=std::make_shared<const StudioInk>();frame_.papers.push_back(std::move(paper));++frame_.revision;
 }
 void CabinStudio::control(StudioControl button,uint64_t now){
@@ -218,7 +226,7 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
     const float dt=last_&&now>=last_?std::min(.05f,static_cast<float>(now-last_)*.001f):0;last_=now;
     if(!initialized_){initialized_=true;frame_.camera=compose(room,Pose{{},studioCameraHome});frame_.marker={{},studioMarkerHome};
         for(size_t i=0;i<2;++i){squeezed_[i]=hands[i].squeeze>.55f;triggered_[i]=hands[i].trigger>.65f;}}
-    if(!allowed){frame_.editor=-1;frame_.cameraHand=frame_.markerHand=-1;
+    if(!allowed){frame_.editor=-1;frame_.cameraHand=frame_.markerHand=-1;frame_.outputPaper=0;
         cameraContact_={};
         frame_.freezeRequested=false;frame_.confirmPhoto=0;frame_.confirmPaper=0;
         for(auto& paper:frame_.papers){paper.hand=-1;paper.field=false;}
@@ -341,13 +349,20 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 frame_.camera=compose(hand.grip,attachment_[side]);
                 frame_.inputMask|=uint8_t(1u<<side);}
             else if(markerDistance<.035f*.035f&&markerDistance<paperDistance){
-                frame_.markerHand=static_cast<int>(side);markerDropped_=false;attachment_[side]=compose(inverse(local),frame_.marker);}
+                frame_.markerHand=static_cast<int>(side);markerDropped_=false;
+                attachment_[side]=compose(inverse(local),frame_.marker);
+                // The closed pen grip surrounds its barrel. Keeping an arbitrary
+                // pickup offset could leave the fingers beside the pen or at
+                // its writing tip; retain orientation but seat the barrel.
+                attachment_[side].position={};
+                frame_.marker=compose(local,attachment_[side]);}
             else if(selected||cabin){
                 if(cabin&&!selected&&near(local.position,studioNotesHome,.055f)&&frame_.papers.size()<studioPaperLimit){
                     StudioPaper paper{};paper.id=nextId_++;paper.pose={flat,studioNotesHome};paper.ink=std::make_shared<const StudioInk>();
                     frame_.papers.push_back(std::move(paper));selected=&frame_.papers.back();++frame_.revision;
                 }
                 if(selected){selected->hand=static_cast<int>(side);selected->pinned=false;
+                    if(selected->id==frame_.outputPaper)frame_.outputPaper=0;
                     const auto grip=selected->field?hand.grip:local;
                     auto& paperPose=selected->field?selected->fieldPose:selected->pose;
                     attachment_[side]=compose(inverse(grip),paperPose);
@@ -389,7 +404,7 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
             }else if(edge){
                 for(const auto& paper:frame_.papers){if(paper.hand<0)continue;
                     const auto half=studioPaperHalf(paper.photo!=0);
-                    if(intersectPanel(Panel{paper.field?paper.fieldPose:paper.pose,half.x*2,half.y*2,1,1},aim,1.2f)){
+                    if(intersectPanel(Panel{paper.field?paper.fieldPose:paper.pose,half.x*2,half.y*2,1,1},paper.field?hand.aim:aim,1.2f)){
                         frame_.editor=static_cast<int>(paper.id);
                         frame_.confirmPaper=0;
                         const auto localHead=compose(inverse(room),head);
@@ -403,11 +418,36 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
         if(cameraDropped_&&frame_.cameraHand<0){auto local=compose(inverse(room),frame_.camera);
             settle(local,cameraVelocity_,dt,paperExtent(local,studioCameraHalf));frame_.camera=rigid(compose(room,local));}
         if(markerDropped_&&frame_.markerHand<0)settle(frame_.marker,markerVelocity_,dt,{.008f,.008f,.08f});
-        for(auto& paper:frame_.papers)if(paper.hand<0&&!paper.pinned)
-            settle(paper.pose,paper.velocity,dt,paperExtent(paper.pose,studioPaperHalf(paper.photo!=0)));
+        // Settle lower sheets first so a print stack has physical thickness.
+        // Previously every copy fell onto the same seat plane and overlapped.
+        std::vector<StudioPaper*> loose;
+        for(auto& paper:frame_.papers)if(paper.hand<0&&!paper.pinned){
+            if(paper.id==frame_.outputPaper){
+                paper.pose=compose(inverse(room),compose(frame_.camera,studioCameraPrintPose));
+                paper.velocity={};
+            }else loose.push_back(&paper);
+        }
+        std::stable_sort(loose.begin(),loose.end(),[](const auto* a,const auto* b){return a->pose.position.y<b->pose.position.y;});
+        for(size_t i=0;i<loose.size();++i){
+            auto& paper=*loose[i];const auto half=paperExtent(paper.pose,studioPaperHalf(paper.photo!=0));
+            float support=-std::numeric_limits<float>::infinity();
+            const auto next=paper.pose.position+paper.velocity*dt;
+            if(std::abs(rotate(paper.pose.orientation,{0,0,1}).y)>.98f){
+                for(size_t j=0;j<i;++j){
+                    const auto& below=*loose[j];
+                    if(std::abs(rotate(below.pose.orientation,{0,0,1}).y)<=.98f)continue;
+                    const auto extent=paperExtent(below.pose,studioPaperHalf(below.photo!=0));
+                    const auto delta=next-below.pose.position;
+                    if(std::abs(delta.x)<half.x+extent.x&&std::abs(delta.z)<half.z+extent.z
+                       &&paper.pose.position.y>=below.pose.position.y-extent.y)
+                        support=std::max(support,below.pose.position.y+extent.y);
+                }
+            }
+            settle(paper.pose,paper.velocity,dt,half,support);
+        }
     }else {
         for(auto& paper:frame_.papers)if(paper.field&&paper.hand<0)
-            paper.fieldPose=compose(frame_.camera,Pose{{},{0,-.123f,.045f}});
+            paper.fieldPose=compose(frame_.camera,studioCameraPrintPose);
         cameraDropped_=false;
     }
     return std::make_shared<const CabinStudioFrame>(frame_);

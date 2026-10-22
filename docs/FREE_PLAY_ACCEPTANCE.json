@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "4447439fc8bc",
+  "candidate": "371a33ec2baf5e419e27c23bbd431a1d7c45b0a7dfbb86d2d804d568b8a11ed2",
   "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1253,6 +1253,37 @@
         "Wider screen configurations and motion acceptance"
       ],
       "cleanup": "Original ini restored byte-for-byte; owned game/simulator closed; published play unchanged."
+    },
+    "cabin_batch": {
+      "candidate": "371a33ec2baf5e419e27c23bbd431a1d7c45b0a7dfbb86d2d804d568b8a11ed2",
+      "changes": [
+        "Present new photographs from the authored front film slot, retained until taken or replaced; output follows the same solved palm as the camera.",
+        "Settle loose flat sheets on lower sheets instead of collapsing all copies onto the seat plane.",
+        "Centre the picked-up marker barrel in the palm while preserving orientation.",
+        "Use tracking-space aim for tracking-space field paper selection."
+      ],
+      "runs": [
+        {
+          "id": "20261022T011905606948Z",
+          "result": "combined workbench completed; initial spawn-only printing still dropped immediately; paper contact and prompt clipping visible"
+        },
+        {
+          "id": "20261022T012944764296Z",
+          "result": "failed before workbench: missing opening_position observation; inputs released"
+        },
+        {
+          "id": "20261022T013111456118Z",
+          "result": "all 21 combined action phases completed; final-eye front/side pair shows print in front slot; both board eyes show retained photo, TAPE caption and freehand stroke"
+        }
+      ],
+      "verification": "Required development build and installer checks passed. Same-session combined cassette pickup/drop/recovery/insert/eject, both-hand camera printing, note editor, marker writing and board pinning completed.",
+      "limits": [
+        "FP09 and FP10 remain open: held-paper finger contact and wrist-prompt clipping remain visible.",
+        "Flat-stack stability and field-space selection have regression checks, not a dedicated live reproduction/acceptance.",
+        "Marker writing succeeds; exact pen/finger contact still needs visual review.",
+        "No physical Quest acceptance or whole-game completion."
+      ],
+      "cleanup": "Owned game/simulator closed; Steam retained; published play unchanged. No persistent runner."
     }
   }
 }

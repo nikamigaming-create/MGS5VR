@@ -21,8 +21,8 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Helicopter/transit body presentation — FP06.** Open; verify body, view and hand continuity through native transit.
 - [ ] **Handheld iDroid — FP07.** Left bionic hand; native contact/projector alignment, readable stereo screen, ordinary/forced stow and immediate reopening. Native projector endpoint fitting is enabled in development44f0 after reproducing a roughly20cm endpoint mismatch; front/turned stereo views and ordinary stow checked. Physical orientation, forced tutorial lifecycle and wider configuration acceptance remain open.
 - [ ] **Rocket arm — FP08.** Native flight/live view and left-arm steering remain unverified.
-- [ ] **Cabin paper/pen — FP09.** Grip/contact, writing/pinning and prompt clipping remain open.
-- [ ] **Cabin gallery/workbench/cassettes — FP10.** Note editor, printing/stacking and cassette presentation remain open.
+- [ ] **Cabin paper/pen — FP09.** Marker pickup now seats its barrel in the palm. Combined run013111 completes keyboard caption, freehand ink and board pinning, visible in both eyes on371a. Paper finger contact, exact pen contact and wrist-prompt clipping remain open.
+- [ ] **Cabin gallery/workbench/cassettes — FP10.** Front-slot print presentation fixed and visible in both eyes on371a; new copy remains until taken/replaced. Combined cassette handling, both-hand camera use and note editor completed. Flat-sheet stacking and field-paper ray corrected in source; their wider live acceptance and cassette presentation remain open.
 - [ ] **ACC loadout holsters — FP11.** Native physical interaction and live acceptance incomplete.
 - [x] **ACC free-roam destination entry — FP13.** Resolved route: Missions -> Mission List -> Free Roam. Existing VR bindings reach all three destination entries; Afghanistan selection, landing zone, sortie, flight and on-foot exit verified on c2b3. No unlock/save edits or forced visibility. Controls guide corrected; handset alignment remains FP07.
 - [x] **Headless sortie preview — FP14.** Restored in development: complete head in both eyes on native sortie screens; clear first-person return after departure. Runs 134958388735Z and 135550994795Z.
@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current checked development is `44f0ed657fab`, adding scoped native iDroid projector fitting to the cover fixes.
+Current checked development is `371a33ec2baf`, adding the cabin batch to scoped native iDroid projector and cover fixes.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row

@@ -7,6 +7,15 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Cabin batch on `371a33ec2baf`: printed photos now remain at the camera's
+  authored front slot until taken/replaced, verified in both eyes. Loose-sheet
+  support, marker barrel pickup and field-paper ray coordinates are corrected
+  in source. The combined cassette/camera/note/pen/board sequence completed;
+  caption, freehand ink and photo remain on the board in both eyes. Paper
+  finger contact and wrist-prompt clipping still fail visual review. Flat-stack
+  and field-ray changes have focused checks, not full live acceptance.
+  FP09/FP10 remain open. Retained run: `20261022T013111456118Z`.
+
 - Development `44f0ed657fab` enables native iDroid projector fitting by default.
   The matched native cone previously ended about20cm from the screen centre.
   Both-eye front/turned views and ordinary stow were checked with normal settings;
@@ -58,7 +67,7 @@ worktree is needed for the remaining field fixes.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Current candidate with scoped gameplay checks: `44f0ed657fab`.
+Current candidate with scoped gameplay checks: `371a33ec2baf`.
 Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).
