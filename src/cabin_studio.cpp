@@ -1,4 +1,5 @@
 #include "mgs5vr/cabin_studio.hpp"
+#include "mgs5vr/arm_ik.hpp"
 #include <algorithm>
 #include <cmath>
 #include <atomic>
@@ -72,6 +73,28 @@ void acknowledgeCameraFreeze(StudioFreeze status,bool owned) noexcept{freezeOwne
 StudioFreeze cameraFreezeState() noexcept{return freezeStatus.load();}
 bool cameraWorldFrozen() noexcept{return freezeOwned.load();}
 Vec3 studioPaperHalf(bool photo) noexcept{return photo?Vec3{.044f,.0535f,.0007f}:Vec3{.038f,.038f,.0006f};}
+Pose studioPaperContact(size_t side) noexcept{
+    // Native left cinematic locals and right live palette agree on these
+    // chain lengths and mirrored X offsets. Use the same curl as the skin.
+    const float sign=side?-1.f:1.f;
+    const auto chain=[&](unsigned finger,float curl){
+        const std::array<Vec3,3> offsets=finger==0
+            ?std::array<Vec3,3>{{{sign*.008f,-.009f,.026f},{sign*.043f,-.019f,.008f},{sign*.030f,-.011f,0}}}
+            :std::array<Vec3,3>{{{sign*.087f,.018f,.029f},{sign*.043f,0,0},{sign*.027f,0,0}}};
+        Pose result{};
+        for(unsigned j=0;j<3;++j)result=compose(result,Pose{*fingerJointRotation(side!=0,finger,j,curl),offsets[j]});
+        return result;
+    };
+    const auto thumb=chain(0,studioPaperThumbCurl),index=chain(1,studioPaperIndexCurl);
+    const auto palm=*anatomicalGrip(Pose{},{sign*.087f,.018f,.029f},{sign*.078f,.012f,-.037f});
+    const auto unit=[](Vec3 v){return v*(1/std::sqrt(dot(v,v)));};
+    const auto cross=[](Vec3 a,Vec3 b){return Vec3{a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};};
+    const auto z=unit(thumb.position-index.position);
+    auto x=rotate(palm.orientation,{0,0,side?-1.f:1.f});x=unit(x-z*dot(x,z));
+    const auto y=cross(z,x),p=(thumb.position+index.position)*.5f;
+    const auto contact=*nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,p.x,p.y,p.z,1});
+    return compose(inverse(palm),contact);
+}
 Pose studioCameraPalm(Pose camera,size_t side) noexcept{
     // Anatomical +X points into the right palm and out of the left palm.
     // Turn the socket so both palms cup the body from its respective side.
@@ -336,8 +359,19 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
         }else if(squeeze&&(cabin||!squeezed_[side])){
             StudioPaper* selected{};float paperDistance=.035f*.035f;
             for(auto& paper:frame_.papers){if(paper.hand>=0||(!cabin&&!paper.field))continue;
-                const auto distance=surfaceDistance(paper.field?paper.fieldPose:paper.pose,studioPaperHalf(paper.photo!=0),
-                    paper.field?hand.grip.position:local.position);
+                const auto grip=paper.field?hand.grip:local;
+                const auto touch=compose(grip,studioPaperContact(side));
+                const auto pose=paper.field?paper.fieldPose:paper.pose;
+                const auto half=studioPaperHalf(paper.photo!=0);
+                auto distance=surfaceDistance(pose,half,grip.position);
+                // A fingertip pinch requires the sheet between the fingers,
+                // not merely somewhere near the extended contact point.
+                // Preserve the existing forgiving palm pickup on loose props.
+                const auto normal=rotate(pose.orientation,{0,0,1});
+                const auto pinchNormal=rotate(touch.orientation,{0,0,1});
+                const auto tipDistance=surfaceDistance(pose,half,touch.position);
+                if(std::abs(dot(normal,pinchNormal))>.85f&&tipDistance<.015f*.015f)
+                    distance=std::min(distance,tipDistance);
                 if(distance<paperDistance){paperDistance=distance;selected=&paper;}}
             const auto cameraDistance=frame_.cameraHand<0
                 ?surfaceDistance(frame_.camera,studioCameraHalf,hand.grip.position):100.f;
@@ -364,7 +398,8 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 attachment_[side].position={};
                 frame_.marker=compose(local,attachment_[side]);}
             else if(selected||cabin){
-                if(cabin&&!selected&&near(local.position,studioNotesHome,.055f)&&frame_.papers.size()<studioPaperLimit){
+                if(cabin&&!selected&&(near(local.position,studioNotesHome,.055f)
+                    ||near(compose(local,studioPaperContact(side)).position,studioNotesHome,.055f))&&frame_.papers.size()<studioPaperLimit){
                     StudioPaper paper{};paper.id=nextId_++;paper.pose={flat,studioNotesHome};paper.ink=std::make_shared<const StudioInk>();
                     frame_.papers.push_back(std::move(paper));selected=&frame_.papers.back();++frame_.revision;
                 }
@@ -372,10 +407,11 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                     if(selected->id==frame_.outputPaper)frame_.outputPaper=0;
                     const auto grip=selected->field?hand.grip:local;
                     auto& paperPose=selected->field?selected->fieldPose:selected->pose;
-                    attachment_[side]=compose(inverse(grip),paperPose);
+                    attachment_[side]=studioPaperContact(side);
                     const auto half=studioPaperHalf(selected->photo!=0);
-                    const Vec3 paperEdge{side?-half.x-.006f:half.x+.006f,0,0};
-                    attachment_[side].position=rotate(attachment_[side].orientation,paperEdge*-1.f);
+                    const Vec3 paperEdge{side?-half.x+.004f:half.x-.004f,0,0};
+                    attachment_[side].position=attachment_[side].position
+                        +rotate(attachment_[side].orientation,paperEdge*-1.f);
                     paperPose=compose(grip,attachment_[side]);}
             }
             if(frame_.cameraHand==static_cast<int>(side)||frame_.markerHand==static_cast<int>(side)

@@ -2645,7 +2645,8 @@ int main(){
         hands[0].grip={{-.70710678f,0,0,.70710678f},studioNotesHome};
         hands[0].squeeze=1;frame=studio.update(true,true,Pose{},Pose{},hands,1400);
         expect(frame->papers.size()==2&&frame->papers.back().hand==0,"A fresh note is peeled from the physical stack");
-        hands[0].grip=cabinNativeBoard;studio.update(true,true,Pose{},Pose{},hands,1450);
+        const auto paperAttachment=compose(inverse(hands[0].grip),frame->papers.back().pose);
+        hands[0].grip=compose(cabinNativeBoard,inverse(paperAttachment));studio.update(true,true,Pose{},Pose{},hands,1450);
         hands[0].squeeze=0;frame=studio.update(true,true,Pose{},Pose{},hands,1500);
         expect(frame->papers.back().pinned&&frame->papers.back().hand<0,"Releasing an aligned note on the native board attaches it");
         hands[0].squeeze=1;frame=studio.update(true,true,Pose{},Pose{},hands,1550);

@@ -7,6 +7,13 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Paper grip on `58d2f6882464` now puts the edge between thumb/index contact
+  instead of attaching it to an open palm. Both-eye right-note and left-note
+  board views reviewed; the combined editor, pen-stroke and board sequence
+  completes in retained `20261022T020748508921Z`. Earlier failed runs and
+  driver target corrections are recorded in active_work.paper_pinch. Broader
+  pen contact, loose-prop presentation and physical Quest remain open.
+
 - Cabin continuation on `6c9889a537db` shortens forearm guidance to stay clear
   of the sleeve in the reproduced camera-hold view, checked in both eyes.
   The combined workbench still completes. Sheet support now includes ink-quad
@@ -75,7 +82,7 @@ worktree is needed for the remaining field fixes.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Current candidate with scoped gameplay checks: `6c9889a537db`.
+Current candidate with scoped gameplay checks: `58d2f6882464`.
 Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).

@@ -113,8 +113,16 @@ def workbench(live, timeout=90., film=False):
         pose['orientation']=mul(pose['orientation'],[.5,0.,0.,.8660254])
         move(hand,pose,.25)
     def paper_grip(hand,body,photo=False):
-        half=.044 if photo else .038
-        return shifted(body,[-half-.006 if hand=='right' else half+.006,0.,0.])
+        # Carry the acquired paper by its actual contact, including the native
+        # pinch orientation; a controller pose is not the paper's face pose.
+        rendered=observe()['rendered'];current=rendered['studio']
+        paper=next(p for p in current['papers'] if p['hand']==(1 if hand=='right' else 0))
+        pose=paper['field_pose'] if paper['field'] else compose(current['room'],paper['pose'])
+        tracking_from_native=compose(rendered['head_pose'],compose(
+            {'position':[0.,0.,0.],'orientation':[0.,1.,0.,0.]},inverse_pose(rendered['native_pose'])))
+        palm=compose(tracking_from_native,rendered[hand+'_palm'])
+        attachment=compose(inverse_pose(palm),pose)
+        return compose(body,inverse_pose(attachment))
     def hold(*channels):
         live.input([{'hand':hand,'component':component,'value':1.} for hand,component in channels],.1,lease_seconds=5.)
         time.sleep(.10)
@@ -240,22 +248,36 @@ def workbench(live, timeout=90., film=False):
             checkpoint('left-camera-live-view-and-print')
             room=studio()['room'];move('left',compose(room,studio()['camera_home']))
             live.release();time.sleep(.30);rest('left')
-            note_home=compose(room,studio()['notes_home']);head=approach(note_home)
+            current=studio()
+            reusable=next((p for p in reversed(current['papers']) if not p['photo'] and not p['pinned']),None)
+            note_home=compose(room,reusable['pose'] if reusable else current['notes_home']);head=approach(note_home)
             hold(('right','Grip'))
-            move('right',compose(studio()['room'],studio()['notes_home']))
+            move('right',note_home)
+            # Persistent loose prints can cover the notepad after earlier
+            # physical runs. Move an encountered print aside through the same
+            # grip/release path; never delete or rewrite the collection.
+            for _ in range(3):
+                acquired=wait(lambda s:any(p['hand']==1 for p in s['rendered']['studio']['papers']),
+                              'notepad-contact-acquired')
+                held_paper=next(p for p in acquired['rendered']['studio']['papers'] if p['hand']==1)
+                if not held_paper['photo']:break
+                move('right',compose(studio()['room'],{'position':[.20,-2.0,-1.10],'orientation':[0.,0.,0.,1.]}))
+                live.release();time.sleep(.25)
+                move('right',compose(studio()['room'],studio()['notes_home']));hold(('right','Grip'))
             right_note=wait(lambda s:any(p['hand']==1 and not p['photo'] for p in s['rendered']['studio']['papers']),
                             'right-sticky-note-grip-before-contact')
             right_note_id=next(p['id'] for p in right_note['rendered']['studio']['papers'] if p['hand']==1 and not p['photo'])
             move('right',paper_grip('right',shifted(head,[.12,-.18,-.45])))
             checkpoint('right-hand-sticky-note')
+            move('right',paper_grip('right',note_home))
             live.release()
             wait(lambda s:any(p['id']==right_note_id and p['hand']<0 for p in s['rendered']['studio']['papers']),
                  'right-sticky-note-released')
             rest('right')
             if movie:movie.begin('sticky-note-caption-and-marker')
-            note_home=compose(room,studio()['notes_home'])
+            current=studio();note_home=compose(current['room'],next(p for p in current['papers'] if p['id']==right_note_id)['pose'])
             head=approach(note_home)
-            room=studio()['room'];note_home=compose(room,studio()['notes_home'])
+            current=studio();room=current['room'];note_home=compose(room,next(p for p in current['papers'] if p['id']==right_note_id)['pose'])
             move('left',note_home);hold(('left','Grip'))
             picked=wait(lambda s:any(p['hand']==0 and not p['photo'] for p in s['rendered']['studio']['papers']),'sticky-note-peeled')
             note=next(p for p in picked['rendered']['studio']['papers'] if p['hand']==0 and not p['photo'])

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "6c9889a537dbcf56fcdefeefd885182511a3d715ea3883c06a1d724b7cdf029a",
+  "candidate": "58d2f68824644822607124b8856da75b6a4b15be77e7b5a76057f3c96dc90d88",
   "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -718,7 +718,8 @@
         "pinch/contact animation",
         "writing plus pinning",
         "readability throughout held poses"
-      ]
+      ],
+      "paper_pinch_evidence": "active_work.paper_pinch"
     },
     {
       "id": "FP10",
@@ -1307,6 +1308,36 @@
         "Paper finger contact remains open. Read-only non-atomic native palette samples near right-note capture place thumb/index distal origins about6cm apart; paper edge is anchored at palm origin. A proper pinch pose and matching paper socket are needed. Do not fix only by moving paper graphics."
       ],
       "cleanup": "Owned game/simulator and read-only sampler closed; Steam retained; published play unchanged."
+    },
+    "paper_pinch": {
+      "candidate": "58d2f68824644822607124b8856da75b6a4b15be77e7b5a76057f3c96dc90d88",
+      "change": "Fit thumb/index articulation and paper-edge socket together from native finger chain dimensions. Carry, writing and board placement share the actual paper pose. Aligned close fingertip contact can recover a pinned paper; existing palm pickup remains.",
+      "baseline": "Retained013931 native palette: thumb/index distal origins separated about6cm with paper anchored at palm origin. Read-only samples are non-atomic; final eyes establish the visible gap.",
+      "runs": [
+        {
+          "id": "20261022T015145088949Z",
+          "result": "failed note pickup; loose photo acquired during approach"
+        },
+        {
+          "id": "20261022T015653530184Z",
+          "result": "failed note pickup; same loose photo obstructed notepad"
+        },
+        {
+          "id": "20261022T020240564462Z",
+          "result": "right-note contact visible in both eyes; editor check failed because driver inferred attachment from raw grip constrained against furniture, aiming about7cm away from visible note"
+        },
+        {
+          "id": "20261022T020748508921Z",
+          "result": "combined workbench completed; both-eye right-note and left-note/board captures reviewed; caption, freehand stroke and photo remain on board"
+        }
+      ],
+      "driver_corrections": "Infer paper attachment from source-joined solved palm, move encountered loose print aside with physical grip/release, reuse a loose note across both hands instead of filling persistence with new notes.",
+      "limits": [
+        "Scoped paper contact and interaction sequence, not every orientation/physical Quest acceptance.",
+        "Collection approached its32-paper limit; final run reuses notes and does not certify creation of each camera print. Earlier013111 evidence covers front-slot print creation.",
+        "Exact marker/finger contact, wider readability, loose-prop resting presentation and remaining FP09/10 coverage stay open."
+      ],
+      "cleanup": "Owned session closed; no bot or sampler remains; Steam and published play preserved."
     }
   }
 }

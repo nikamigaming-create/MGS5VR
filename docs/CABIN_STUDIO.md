@@ -46,8 +46,8 @@ closed to native menus; the launch/title cabin's authored backdrop stays live.
 Taking a photo normally leaves the field live. Capture uses the native lens
 scene; mod-added props and tracked hands are not baked into the photo.
 
-Photographs become grabbable prints in the cabin. A field print is offered
-below the camera and can be held; stowing it keeps it in the cabin collection
+Photographs become grabbable prints in the cabin. The latest print is offered
+at the camera's front film slot and can be held; stowing it keeps it in the cabin collection
 for the next visit. The same gallery is shared by the launch cabin, native ACC,
 Mother Base and ordinary field scenes, without a mission-number whitelist.
 Mounted vehicles, cutscenes, native menus and equipped binoculars own their
@@ -78,7 +78,7 @@ verified native scene depth from the exact eye camera and projection; the
 native pixel scene's inverse view is checked before accepting that depth.
 Held tapes, camera, marker and papers follow the solved native palms, including
 the arm's reach and surface limits. The camera has an authored side-palm socket;
-paper is held at its edge. Native firearm wrist aiming cannot override a held
+paper is held at its edge with a matching native-chain thumb/index pinch. Native firearm wrist aiming cannot override a held
 studio prop. Native left-hand iDroid contact remains its existing cinematic fit.
 World enemy labels are masked by the physical binocular housing. Binocular
 reticles and native acquired marks remain inside their actual optical view.
