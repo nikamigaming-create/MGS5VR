@@ -243,3 +243,17 @@ Second ACC rifle carry/return verified on unchanged0d935edd7324: use the center 
 ### Eligible field cover, 22 October
 
 Eligible Afghanistan cover checked on unchanged0d935edd7324. Retained211522 completes native landing and shows all three saved guns in both eyes outside cover. At the roadside concrete barrier near[151.884,329.196,51.683], standing contact does not attach; crouched entry212552 sets native BEHIND. Combined212627 shows the rifle in both eyes while ready, with native root unchanged through center,22cm right lean,25cm upward peek and return. The previous Mother Base missing-gun views are not reproduced in this eligible context. This is scoped visibility/pose evidence, not continuous-video or physical-headset acceptance. The planned exit212728 was rejected before input because BEHIND had already cleared. Ordinary rifle readiness212827 passes; later re-entry212935 does not attach. The intervening native transition/movement remains unexplained; no exit success or collision defect is inferred. No production changes or rebuild were needed. Owned game/simulator closed; published play unchanged.
+
+## Mounted follow-up checkpoint, 22 October
+
+No production change after 2018df5. Native sortie214014 and approach214701 reached
+slopedWest gun001; registry type82/id41991 reported not broken, but the gun was
+not clearly visible at the authored location. Entry214840 stayed native action1.
+Do not infer a machine-gun action ID or change controls from that failed entry.
+The second authored position near[72.776,333.745,84.787] has no confirmed live
+fixture identity. Bounded route215515 ended at its deadline before reaching it;
+this is not evidence of a gameplay collision defect. Do not repeat this isolated
+entry/route loop as delivery. Review remaining reproduced defects as a batch;
+untested contexts and physical Quest checks remain open. Owned game/simulator
+and observers closed (private/current-mounted-types-stop.log); Steam retained.
+Published play and checked development unchanged; no new gameplay fix claimed.
