@@ -1,4 +1,4 @@
-# Current MGS5VR work — 21 October 2026
+# Current MGS5VR work — 22 October 2026
 
 Work only in this checkout on `main`. Local and origin have only main; earlier
 branch tips are archive tags. No open GitHub PR remained to merge. Previously
@@ -6,6 +6,8 @@ verified source work has been consolidated on main. No feature branch or
 worktree is needed for the remaining field fixes.
 
 ## Current result
+
+- Machine-gun physical aiming fixed on484c334480b4: either hand now controls native yaw/pitch; release, stick override and exit are checked. Physical aiming keeps view orientation fixed. Right-hand contact is reviewed in both final eyes; full contact views, firing/impact, other turret types and physical Quest remain open. Owned sessions closed; published play unchanged.
 
 - Cross-body arm-segment clearance fixed on bb66ebf47b0b. Baseline220020 has right/left forearms only10.2/10.6cm from the eye midpoint despite joint-only clearance. Check both complete bone segments and constrain the fallback direction at the head-sphere tangent, preserving native lengths and wrist orientation. First candidate220527 still penetrates because boundary rounding skips the tangent constraint; retained as a failed candidate. Corrected220859 samples12.0/12.4cm minimum, with reduced sleeve crowding in both final eyes, active camera, both neutral returns and ordinary left iDroid open/stow. The handset is viewed obliquely here; no new projector-readability claim. These are bounded simulator poses, not continuous-motion or physical-headset acceptance. Broader FP17 stays open. Owned sessions closed; published play unchanged.
 
@@ -40,7 +42,7 @@ background gameplay runner remains. Published play and checked dev unchanged.
 
 - Tutorial exit-notice handoff on 428a0c0872fc: closing the paused Challenge Tasks terminal briefly retired the VR camera before Exit Tutorial opened, leaving a frozen edge-on handset image. Preserve the same paused anchor only for an immediately following Pause within250ms, with matching player, activation and tracking reference. Gameplay still requires a fresh native player publication. Baseline062745 loses the active camera; final064303 retains it and shows the readable Exit Tutorial panel in both eyes. Notice dismissal and immediate ordinary iDroid reopen/stow pass. Owned session closed; Steam retained; published play unchanged.
 
-Current scoped gameplay-checked development is `bb66ebf47b0b`, adding full arm-segment head clearance to native ACC primary-rifle physical carry/return and the cross-head reach freeze correction to cover-assistance entry/exit, automatic ledge-heading continuity and the earlier tutorial exit-notice handoff fix. Published play remains unchanged.
+Current scoped gameplay-checked development is `484c334480b4`, adding confirmed machine-gun physical aiming to full arm-segment head clearance to native ACC primary-rifle physical carry/return and the cross-head reach freeze correction to cover-assistance entry/exit, automatic ledge-heading continuity and the earlier tutorial exit-notice handoff fix. Published play remains unchanged.
 
 - Rocket Arm batch on fb83026e1682: left-hand pitch/yaw now steer native flight, with movement-stick override and normal weapon return. Brief skin-publication gaps no longer reset held steering. The closed terminal retained its closing bit after sortie selection, suppressing the independent flight handset; that unrelated gate now applies only to terminal presentation. Retained060632 shows trajectory response and live flight pixels on the handset in both eyes. Ordinary iDroid reopen/stow passes in061327 after reviewed Challenge Tasks and Exit Tutorial notices. Target impact, Blast Arm, wider contact/poses and physical Quest remain open. Owned simulator/game closed; Steam retained; published play unchanged.
 
@@ -280,3 +282,8 @@ visibility/action admission based on this attempt. Static action writes0x45
 and0x47 remain semantically unconfirmed;0x44 is searchlight. No production
 change, rebuild, mounted-controls delivery or broad checklist closure. Owned
 game/simulator closed, no background bot/watchers, published play unchanged.
+
+
+### Machine-gun physical aiming, 22 October
+
+Machine-gun physical aiming enabled on484c334480b4. Native OnPlayerMachineGun(0,41992) and the live action table identify action0x47; baseline225829 has104 mounted samples without the physical adapter. Admit that confirmed action alongside mortar0x46. Retained231846 verifies right/left six-degree yaw requests settle at5.36/5.42 degrees, neutral pitch and unchanged view orientation. Retained233242 verifies right/left pitch5.39/5.40 degrees with unchanged view, both-grip stick override, neutral release and ordinary exit. Deliberate stick input changes native aim and view by3.25 degrees; only physical-hand aiming is claimed to hold the view fixed. Right yaw contact reviewed in both final eyes; left yaw contact reviewed in the recorded native right-eye source, not final composition. Pitch/both-hand final-eye pairs look away from the handles because the diagnostic reads native aiming yaw before entry settles; they do not close full contact visibility. Firing/impact, wider poses, Gatling/other emplacements and physical Quest remain open. Fresh native BreakGimmick identifies actual fixture destruction in225829; the responsible attacker is unconfirmed. After native BreakGimmick, Gimmick.IsBrokenGimmick(...,1) is true while the default query remains false; default false must not be used to declare a live fixture intact. Owned sessions closed, temporary procedure removed, published play unchanged.

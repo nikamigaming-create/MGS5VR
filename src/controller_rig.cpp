@@ -838,8 +838,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     const auto rightAnimated=bone(q,p,12),leftAnimated=bone(q,p,8);
     MountedAimSample mountedAim{};
-    // The retained retail entry/axes/exit take identifies action 0x46. Other
-    // stationary actions are not inferred to be weapon operators. Its native
+    // Retail mount events and live action storage identify mortar 0x46 and
+    // machine gun 0x47. Other stationary actions are not inferred to be weapon
+    // operators. The native
     // action storage plus admission generation owns this grip lease; native
     // input still selects the actual emplacement and enforces its limits.
     const auto actionContext=get<uintptr_t>(character+0x138);
@@ -848,7 +849,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const bool actionOwnerMatches=actionContext&&actionTable&&actionIndex<16
         &&get<uint32_t>(actionContext+0x218)==actionIndex;
     const auto actionId=actionOwnerMatches?get<uint16_t>(actionTable+actionIndex*2ull):uint16_t{};
-    const bool stationaryWeapon=actionId==0x46&&frame.controllers.nativeActionControls
+    const bool stationaryWeapon=(actionId==0x46||actionId==0x47)&&frame.controllers.nativeActionControls
         &&frame.controllers.presentationFocused&&!frame.controllers.nativeGamepad&&!frame.menuOpen;
     const auto actionOwner=stationaryWeapon?actionTable+actionIndex*2ull:uintptr_t{};
     if(stationaryWeapon!=mountedActionAdmitted||actionOwner!=mountedActionOwner){

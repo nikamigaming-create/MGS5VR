@@ -499,7 +499,7 @@ def static_grip_capture_allowed(held, state, bindings):
         and controls.get('native_buttons')==0 and controls.get('native_axes')==[0,0,0,0]
         and controls.get('native_triggers')==[0,0])
     mounted = (state.get('rendered', {}).get('mounted_weapon_tracked') is True
-        and state['rendered'].get('mounted_weapon_action') == 0x46
+        and state['rendered'].get('mounted_weapon_action') in (0x46, 0x47)
         and state['rendered'].get('mounted_weapon_hands') ==
             ((1 if 'left_grip' in tokens else 0) | (2 if 'right_grip' in tokens else 0))
         and controls.get('travel_mode') == 4 and controls.get('native_axes') == [0,0,0,0]
