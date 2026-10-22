@@ -74,8 +74,10 @@ inline constexpr Vec3 studioPrintHome{.390f,-2.209f,-1.130f};
 inline constexpr Vec3 studioBoardCenter=cabinNativeBoard.position;
 Vec3 studioPaperHalf(bool photo) noexcept;
 inline constexpr float studioPaperThumbCurl=.10f,studioPaperIndexCurl=.88f;
+inline constexpr float studioMarkerThumbCurl=.10f,studioMarkerIndexCurl=.70f;
 // Paper contact in the anatomical palm, derived from this profile's finger chains.
 Pose studioPaperContact(size_t side) noexcept;
+Pose studioMarkerGrip(size_t side) noexcept;
 Pose studioCameraPalm(Pose camera,size_t side) noexcept;
 // Native anatomical frames in one shared space: +X left, +Y up, +Z forward.
 // The mod-authored camera has a -Z lens and rests outside the right hip.

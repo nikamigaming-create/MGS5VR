@@ -7,6 +7,8 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20–90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, fresh-restart persistence and physical Quest remain open. Owned session closed; published play unchanged. Retained run: `20261022T045333990203Z`.
+
 - Mounted interruption follow-up: retained042545 on the second intact mortar
   receives native OnPlayerMortar(0,41477), then a visible explosion destroys
   the emplacement during left-hand yaw, before any firing step. Live broken

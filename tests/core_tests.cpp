@@ -2546,6 +2546,28 @@ int main(){
         CabinStudioFrame joined;joined.available=true;
         joined.camera={{},{2,1,3}};
         joinStudioBody(joined,pelvis,hip);
+        {
+            for(const auto orientation:{Quat{},Quat{.34202014f,0,0,.93969262f}}){
+                CabinStudio falling;std::array<StudioHand,2> idle{};
+                StudioPaper loose{},pinned{};loose.id=1;loose.photo=4321;
+                loose.pose={orientation,studioPrintHome+Vec3{0,.15f,0}};
+                loose.ink=std::make_shared<const StudioInk>();pinned=loose;
+                pinned.id=2;pinned.pinned=true;pinned.pose.position=studioBoardCenter;
+                falling.restore(std::vector<StudioPaper>{loose,pinned});
+                std::shared_ptr<const CabinStudioFrame> settled;
+                for(uint64_t t=100;t<=2100;t+=20)settled=falling.update(true,true,Pose{},Pose{},idle,t);
+                const auto normal=rotate(settled->papers[0].pose.orientation,{0,0,1});
+                expect(std::abs(normal.y)>.9999f,"Released edge-balanced sheets tip onto a flat face");
+                expect(orientation.x==0?normal.y>0:normal.y<0,"Settling preserves the nearer face rather than flipping every sheet face up");
+                expect(same(settled->papers[1].pose.position,pinned.pose.position)
+                    &&same(rotate(settled->papers[1].pose.orientation,{0,0,1}),rotate(orientation,{0,0,1})),
+                    "Pinned papers retain their authored board pose during loose-sheet settling");
+                const auto revision=settled->revision;const auto position=settled->papers[0].pose.position;
+                for(uint64_t t=2120;t<=4120;t+=20)settled=falling.update(true,true,Pose{},Pose{},idle,t);
+                expect(settled->revision==revision&&same(settled->papers[0].pose.position,position),
+                    "Settled sheets stop moving and stop requesting persistence writes");
+            }
+        }
         CabinStudio studio;std::array<StudioHand,2> hands{};
         auto frame=studio.update(true,false,Pose{{},{2,1.7f,3}},Pose{},hands,100,0,false,
             StudioFreeze::live,joined.fieldCameraHolster);

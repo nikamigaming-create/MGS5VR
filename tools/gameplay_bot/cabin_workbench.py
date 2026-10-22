@@ -126,6 +126,14 @@ def workbench(live, timeout=90., film=False):
     def hold(*channels):
         live.input([{'hand':hand,'component':component,'value':1.} for hand,component in channels],.1,lease_seconds=5.)
         time.sleep(.10)
+    def marker_grip(body):
+        rendered=observe()['rendered'];current=rendered['studio']
+        side='right' if current['marker_hand']==1 else 'left'
+        tracking_from_native=compose(rendered['head_pose'],compose(
+            {'position':[0.,0.,0.],'orientation':[0.,1.,0.,0.]},inverse_pose(rendered['native_pose'])))
+        palm=compose(tracking_from_native,rendered[side+'_palm'])
+        attachment=compose(inverse_pose(palm),compose(current['room'],current['marker']))
+        return compose(body,inverse_pose(attachment))
     def checkpoint(label):
         # The operator acknowledgement precedes the engine/compositor consuming
         # a changed head pose. Require a fresh native publication of that pose.
@@ -249,8 +257,16 @@ def workbench(live, timeout=90., film=False):
             room=studio()['room'];move('left',compose(room,studio()['camera_home']))
             live.release();time.sleep(.30);rest('left')
             current=studio()
-            reusable=next((p for p in reversed(current['papers']) if not p['photo'] and not p['pinned']),None)
-            note_home=compose(room,reusable['pose'] if reusable else current['notes_home']);head=approach(note_home)
+            reusable=min((p for p in current['papers'] if not p['photo'] and not p['pinned']),
+                key=lambda p:math.dist(p['pose']['position'],current['notes_home']['position']),default=None)
+            if reusable and reusable['pose']['position'][1]<current['notes_home']['position'][1]-.15:
+                reusable=next((p for p in current['papers'] if not p['photo'] and p['pinned'] and p['text']=='TAPE'),reusable)
+            note_home=compose(room,reusable['pose'] if reusable else current['notes_home'])
+            note_offset=(0.,.65,.32)
+            if reusable and reusable['pinned']:
+                normal=rotate(note_home['orientation'],[0.,0.,1.])
+                note_offset=[n*.55+(.10 if i==1 else 0.) for i,n in enumerate(normal)]
+            head=approach(note_home,note_offset)
             hold(('right','Grip'))
             move('right',note_home)
             # Persistent loose prints can cover the notepad after earlier
@@ -263,7 +279,10 @@ def workbench(live, timeout=90., film=False):
                 if not held_paper['photo']:break
                 move('right',compose(studio()['room'],{'position':[.20,-2.0,-1.10],'orientation':[0.,0.,0.,1.]}))
                 live.release();time.sleep(.25)
-                move('right',compose(studio()['room'],studio()['notes_home']));hold(('right','Grip'))
+                current=studio()
+                remaining=next((p for p in current['papers'] if reusable and p['id']==reusable['id']),None)
+                move('right',compose(current['room'],remaining['pose'] if remaining else current['notes_home']))
+                hold(('right','Grip'))
             right_note=wait(lambda s:any(p['hand']==1 and not p['photo'] for p in s['rendered']['studio']['papers']),
                             'right-sticky-note-grip-before-contact')
             right_note_id=next(p['id'] for p in right_note['rendered']['studio']['papers'] if p['hand']==1 and not p['photo'])
@@ -290,7 +309,7 @@ def workbench(live, timeout=90., film=False):
             live.release(keep=(('left','Grip',None),))
             keys=['Q','W','E','R','T','Y','U','I','O','P','7','A','S','D','F','G','H','J','K','L','8','9',
                   'Z','X','C','V','B','N','M','.',',','5','6','SPACE','BACK','CLEAR','DONE','0','1','2','3','4','-','TRASH']
-            for letter in ('T','A','P','E','DONE'):
+            for letter in ('CLEAR','T','A','P','E','DONE'):
                 current=studio();key=keys.index(letter)
                 target=compose(current['room'],shifted(current['keyboard'],[(key%11-5)*.045,(.5-key//11)*.045,.25]))
                 aim_at('right',target,.15);hold(('left','Grip'),('right','Trigger'))
@@ -301,12 +320,13 @@ def workbench(live, timeout=90., film=False):
             move('right',marker_pose);hold(('left','Grip'),('right','Grip'))
             wait(lambda s:s['rendered']['studio']['marker_hand']==1,'physical-marker-grabbed')
             for dx in (-.020,-.010,0.,.010,.020):
-                move('right',shifted(note_pose,[dx,-.025,.08]),.12)
+                move('right',marker_grip(shifted(note_pose,[dx,-.025,.08])),.12)
                 hold(('left','Grip'),('right','Grip'),('right','Trigger'))
             live.release(keep=(('left','Grip',None),('right','Grip',None)))
             wait(lambda s:any(p['id']==note_id and p['strokes']>0 for p in s['rendered']['studio']['papers']),'freehand-marker-stroke')
+            checkpoint('marker-tip-and-grip-writing-pose')
             if movie:movie.mark('marker-stroke-drawn');time.sleep(.6)
-            move('right',compose(room,studio()['marker_home']))
+            move('right',marker_grip(compose(room,studio()['marker_home'])))
             live.release(keep=(('left','Grip',None),))
             if movie:movie.begin('attach-note-and-photo-to-wall')
             board=studio()['board']
@@ -341,6 +361,24 @@ def workbench(live, timeout=90., film=False):
             live.call('set_head_pose',{'base_space':'local','position':head['position'],'orientation':gaze})
             rest('left');rest('right')
             checkpoint('native-board-polaroid-and-sharpie-note')
+            current=studio();marker_world=compose(current['room'],current['marker'])
+            approach(marker_world);current=studio()
+            move('left',compose(current['room'],current['marker']));hold(('left','Grip'))
+            wait(lambda s:s['rendered']['studio']['marker_hand']==0,'left-marker-grabbed')
+            current=studio();paper=next(p for p in current['papers'] if p['id']==note_id)
+            paper_world=compose(current['room'],paper['pose']);normal=rotate(paper_world['orientation'],[0.,0.,1.])
+            approach(paper_world,[n*.55+(.10 if i==1 else 0.) for i,n in enumerate(normal)])
+            current=studio();paper=next(p for p in current['papers'] if p['id']==note_id)
+            stroke_count=paper['strokes'];paper_world=compose(current['room'],paper['pose'])
+            for dx in (-.020,-.010,0.,.010,.020):
+                move('left',marker_grip(shifted(paper_world,[dx,.01,.08])),.12)
+                hold(('left','Grip'),('left','Trigger'))
+            live.release(keep=(('left','Grip',None),))
+            wait(lambda s:any(p['id']==note_id and p['strokes']>stroke_count for p in s['rendered']['studio']['papers']),
+                 'left-marker-board-stroke')
+            checkpoint('left-marker-tip-and-grip-writing-pose')
+            current=studio();approach(compose(current['room'],current['marker_home']))
+            move('left',marker_grip(compose(studio()['room'],studio()['marker_home'])));live.release()
             if movie:movie.end()
             return {'status':'observed_workbench_loop','outcomes':outcomes,'captures':captures,
                     'film':movie.takes if movie else None,

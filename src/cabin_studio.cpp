@@ -73,7 +73,7 @@ void acknowledgeCameraFreeze(StudioFreeze status,bool owned) noexcept{freezeOwne
 StudioFreeze cameraFreezeState() noexcept{return freezeStatus.load();}
 bool cameraWorldFrozen() noexcept{return freezeOwned.load();}
 Vec3 studioPaperHalf(bool photo) noexcept{return photo?Vec3{.044f,.0535f,.0007f}:Vec3{.038f,.038f,.0006f};}
-Pose studioPaperContact(size_t side) noexcept{
+static Pose studioPinchContact(size_t side,float thumbCurl,float indexCurl) noexcept{
     // Native left cinematic locals and right live palette agree on these
     // chain lengths and mirrored X offsets. Use the same curl as the skin.
     const float sign=side?-1.f:1.f;
@@ -85,7 +85,7 @@ Pose studioPaperContact(size_t side) noexcept{
         for(unsigned j=0;j<3;++j)result=compose(result,Pose{*fingerJointRotation(side!=0,finger,j,curl),offsets[j]});
         return result;
     };
-    const auto thumb=chain(0,studioPaperThumbCurl),index=chain(1,studioPaperIndexCurl);
+    const auto thumb=chain(0,thumbCurl),index=chain(1,indexCurl);
     const auto palm=*anatomicalGrip(Pose{},{sign*.087f,.018f,.029f},{sign*.078f,.012f,-.037f});
     const auto unit=[](Vec3 v){return v*(1/std::sqrt(dot(v,v)));};
     const auto cross=[](Vec3 a,Vec3 b){return Vec3{a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};};
@@ -94,6 +94,16 @@ Pose studioPaperContact(size_t side) noexcept{
     const auto y=cross(z,x),p=(thumb.position+index.position)*.5f;
     const auto contact=*nativeAffinePose({x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,p.x,p.y,p.z,1});
     return compose(inverse(palm),contact);
+}
+Pose studioPaperContact(size_t side) noexcept{
+    return studioPinchContact(side,studioPaperThumbCurl,studioPaperIndexCurl);
+}
+Pose studioMarkerGrip(size_t side) noexcept{
+    const auto pinch=studioPinchContact(side,studioMarkerThumbCurl,studioMarkerIndexCurl);
+    // The shaft follows anatomical -Z, toward the index side of either hand.
+    // Seat the 12 mm barrel between thumb/index, 25 mm behind its -80 mm tip,
+    // instead of burying the barrel at the palm centre.
+    return Pose{{},pinch.position+Vec3{0,0,.080f-.025f}};
 }
 Pose studioCameraPalm(Pose camera,size_t side) noexcept{
     // Anatomical +X points into the right palm and out of the left palm.
@@ -391,11 +401,7 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 frame_.inputMask|=uint8_t(1u<<side);}
             else if(markerDistance<.035f*.035f&&markerDistance<paperDistance){
                 frame_.markerHand=static_cast<int>(side);markerDropped_=false;
-                attachment_[side]=compose(inverse(local),frame_.marker);
-                // The closed pen grip surrounds its barrel. Keeping an arbitrary
-                // pickup offset could leave the fingers beside the pen or at
-                // its writing tip; retain orientation but seat the barrel.
-                attachment_[side].position={};
+                attachment_[side]=studioMarkerGrip(side);
                 frame_.marker=compose(local,attachment_[side]);}
             else if(selected||cabin){
                 if(cabin&&!selected&&(near(local.position,studioNotesHome,.055f)
@@ -475,18 +481,37 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
             auto& paper=*loose[i];const auto half=paperSupportExtent(paper);
             float support=-std::numeric_limits<float>::infinity();
             const auto next=paper.pose.position+paper.velocity*dt;
-            if(std::abs(rotate(paper.pose.orientation,{0,0,1}).y)>.98f){
-                for(size_t j=0;j<i;++j){
-                    const auto& below=*loose[j];
-                    if(std::abs(rotate(below.pose.orientation,{0,0,1}).y)<=.98f)continue;
-                    const auto extent=paperSupportExtent(below);
-                    const auto delta=next-below.pose.position;
-                    if(std::abs(delta.x)<half.x+extent.x&&std::abs(delta.z)<half.z+extent.z
-                       &&paper.pose.position.y>=below.pose.position.y-extent.y)
-                        support=std::max(support,below.pose.position.y+extent.y);
-                }
+            for(size_t j=0;j<i;++j){
+                const auto& below=*loose[j];
+                if(std::abs(rotate(below.pose.orientation,{0,0,1}).y)<=.98f)continue;
+                const auto extent=paperSupportExtent(below);
+                const auto delta=next-below.pose.position;
+                if(std::abs(delta.x)<half.x+extent.x&&std::abs(delta.z)<half.z+extent.z
+                   &&paper.pose.position.y>=below.pose.position.y-extent.y)
+                    support=std::max(support,below.pose.position.y+extent.y);
             }
             settle(paper.pose,paper.velocity,dt,half,support);
+            const float floor=std::max(cabinNativeSupportHeight(paper.pose.position),support);
+            if(paper.pose.position.y-half.y<=floor+.002f&&paper.velocity.y<.15f){
+                // A thin sheet cannot remain balanced indefinitely on an edge.
+                // Tip toward its nearer face, without imposing a new heading,
+                // and keep its lowest corner on the supporting surface.
+                const auto normal=rotate(paper.pose.orientation,{0,0,1});
+                const float side=normal.y<0?-1.f:1.f;
+                const Vec3 axis{-normal.z*side,0,normal.x*side};
+                const float length=std::hypot(axis.x,axis.z);
+                if(length>.00001f){
+                    const float tilt=std::atan2(length,std::abs(normal.y));
+                    const float angle=tilt*(tilt<.002f?1.f:1.f-std::exp(-dt/.12f));
+                    const float sine=std::sin(angle*.5f)/length;
+                    const Quat turn{axis.x*sine,0,axis.z*sine,std::cos(angle*.5f)};
+                    paper.pose.orientation=compose(Pose{turn,{}},paper.pose).orientation;
+                    const auto extent=paperSupportExtent(paper);
+                    paper.pose.position.y=floor+extent.y;
+                    settle(paper.pose,paper.velocity,0,extent,support);
+                    if(tilt<.002f)++frame_.revision;
+                }
+            }
         }
     }else {
         for(auto& paper:frame_.papers)if(paper.field&&paper.hand<0)

@@ -1456,6 +1456,19 @@
         "machinegun": "Nearby type82 entry attempt did not engage; only native action1 sampled. No adapter action ID inferred.",
         "cleanup": "Native event observer restored; bounded memory reader exited; owned game/simulator closed; Steam retained."
       }
+    },
+    "cabin_marker_settling_batch": {
+      "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
+      "baseline_run": "20261022T044008503318Z",
+      "retained_run": "20261022T045333990203Z",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u201390 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, fresh-restart persistence and physical Quest remain open. Owned session closed; published play unchanged.",
+      "remaining": [
+        "Wider marker grip orientations",
+        "Fresh-restart settled-paper persistence",
+        "Broader FP09/FP10",
+        "Physical Quest Link"
+      ],
+      "cleanup": "workspace.py stop-sim succeeded; owned game/runtime closed, Steam retained"
     }
   }
 }

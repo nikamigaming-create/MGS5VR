@@ -21,8 +21,8 @@ Live continuation: [CURRENT.md](CURRENT.md).
 - [ ] **Helicopter/transit body presentation — FP06.** Open; verify body, view and hand continuity through native transit.
 - [ ] **Handheld iDroid — FP07.** Left bionic hand; native contact/projector alignment, readable stereo screen, ordinary/forced stow and immediate reopening. Native projector endpoint fitting is enabled in development44f0 after reproducing a roughly20cm endpoint mismatch; front/turned stereo views and ordinary stow checked. Physical orientation, forced tutorial lifecycle and wider configuration acceptance remain open.
 - [ ] **Rocket arm — FP08.** Native flight/live view and left-arm steering remain unverified.
-- [ ] **Cabin paper/pen — FP09.** Marker pickup now seats its barrel in the palm. Combined run013111 completes keyboard caption, freehand ink and board pinning, visible in both eyes on371a. Shorter wrist guidance clears the sleeve in the reproduced camera-hold view on6c9889 (run013931, both eyes). Paper-edge pinch and both-hand carrying now meet visibly on58d2; combined typing, writing and pinning pass in020748. Exact pen contact, wider hand orientations and prompt readability remain open.
-- [ ] **Cabin gallery/workbench/cassettes — FP10.** Front-slot print presentation fixed and visible in both eyes on371a; new copy remains until taken/replaced. Combined cassette handling, both-hand camera use and note editor completed. Flat-sheet stacking and field-paper ray corrected in source; their wider live acceptance and cassette presentation remain open.
+- [ ] **Cabin paper/pen — FP09.** Marker pickup now seats its barrel in the palm. Combined run013111 completes keyboard caption, freehand ink and board pinning, visible in both eyes on371a. Shorter wrist guidance clears the sleeve in the reproduced camera-hold view on6c9889 (run013931, both eyes). Paper-edge pinch and both-hand carrying now meet visibly on58d2; combined typing, writing and pinning pass in020748. Marker shaft/pinch contact is corrected on e64919 and both-hand writing reviewed in both eyes in045333. Wider hand orientations and prompt readability remain open.
+- [ ] **Cabin gallery/workbench/cassettes — FP10.** Front-slot print presentation fixed and visible in both eyes on371a; new copy remains until taken/replaced. Combined cassette handling, both-hand camera use and note editor completed. Flat-sheet stacking and field-paper ray corrected in source; loose sheets now settle flat instead of balancing on edges (both-eye combined run045333). Wider stacking acceptance and cassette presentation remain open.
 - [ ] **ACC loadout holsters — FP11.** Native physical interaction and live acceptance incomplete.
 - [x] **ACC free-roam destination entry — FP13.** Resolved route: Missions -> Mission List -> Free Roam. Existing VR bindings reach all three destination entries; Afghanistan selection, landing zone, sortie, flight and on-foot exit verified on c2b3. No unlock/save edits or forced visibility. Controls guide corrected; handset alignment remains FP07.
 - [x] **Headless sortie preview — FP14.** Restored in development: complete head in both eyes on native sortie screens; clear first-person return after departure. Runs 134958388735Z and 135550994795Z.
@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current checked development is `a8c9efb80813`, adding physical mortar yaw and release to the native stationary-operator eye/body and prior cabin fixes. Physical pitch, contact, discharge and other mounted types remain open.
+Current gameplay-checked development is `e64919c6caa5`, adding marker pinch contact and loose-sheet settling to physical mortar yaw/release and prior cabin fixes. Physical pitch, contact, discharge and other mounted types remain open.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -68,6 +68,9 @@ that route. The complete field list above remains the work queue.
   error and rejected the full body; final031244 has matching anchor/eye through
   both axes and active mounted body. Barrel-facing and exit pairs reviewed.
   This does not close physical grip aiming, firing/impact or broader FP15.
+
+- [x] **This pass: marker buried in the palm.** Fit its socket and thumb/index articulation together. Both-hand writing completes and both final eyes reviewed in retained045333. Wider orientations and physical Quest remain open.
+- [x] **This pass: loose sheets balanced indefinitely on edges.** Settle toward the nearer face while preserving heading and support. Ten previously tilted sheets now stay flat with no displacement across the combined workbench run; both-eye seat views reviewed. Fresh-restart persistence remains unchecked.
 
 ## Closure requirements
 

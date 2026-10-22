@@ -1544,7 +1544,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             // Cup the top instead of leaving the fingers hovering open above
             // it. The thumb has its own opposing hinge and needs less curl.
             const float propCurl=cameraContact?(finger==0?.50f:finger==1?.42f:.60f)
-                :markerContact?(finger==0?.50f:.62f)
+                :markerContact?(finger==0?studioMarkerThumbCurl:finger==1?studioMarkerIndexCurl:.60f)
                 :paperContact?(finger==0?studioPaperThumbCurl:finger==1?studioPaperIndexCurl:.25f)
                 :(finger==0?.35f:finger==1?.42f:.25f);
             const float curl=propContact?propCurl:(opticContact||rifleSupportContact)?std::clamp(controllerCurl,finger==0?.55f:.72f,finger==0?.65f:.82f)
