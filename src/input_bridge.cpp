@@ -59,7 +59,10 @@ TravelMode travelModeFromPlayerStatus(const std::array<uint32_t,5>& flags) noexc
     if(status(37))return TravelMode::unknown;
     if(status(26))return TravelMode::vehicle;
     if(status(25))return TravelMode::horse;
-    if(!status(7)&&status(4)&&status(145)&&!status(134)
+    // BEHIND clears NORMAL_ACTION too, but wall cover still uses the player's
+    // handheld gun and physical aim. Treating it as a stationary weapon drops
+    // that rig and routes the right stick into native action aiming.
+    if(!status(7)&&status(4)&&status(145)&&!status(90)&&!status(134)
        &&!status(87)&&!status(88)&&!status(83)&&!status(58)&&!status(56)&&!status(59))
         return TravelMode::nativeAction;
     return TravelMode::onFoot;

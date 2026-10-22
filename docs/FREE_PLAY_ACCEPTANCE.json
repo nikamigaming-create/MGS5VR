@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "304fe91f6b9ca39265a352d08965f3aec00d997bcff56ff674d0814842d46c6d",
+  "candidate": "3d64af394fb308f394dac58c93906982df1788899ac93749b99664dd59634063",
   "candidate_status": "Scoped gameplay checked development; full release and physical-headset acceptance incomplete",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1642,12 +1642,41 @@
         "20261022T082855452785Z",
         "20261022T082935764026Z"
       ],
-      "remaining_failure": "Ready weapon did not publish rendered.native_firearm while attached at Mother Base, including after equipment selection and armed re-entry. Initial082327 and repeat082721 failures retained. Outside-cover equipment/ready passed in scratch082612, but that run expired before retention and is not acceptance evidence. Cause and baseline comparison remain unresolved.",
+      "remaining_failure": "Standing-cover readiness rejection is traced and corrected by standing_cover_controls. Weapon presentation still fails final-eye acceptance, including outside cover; see that follow-up.",
       "limits": [
         "Broader surfaces, native benefit eligibility, non-VR and physical Quest remain open",
         "No whole-game or release acceptance claim"
       ],
       "cleanup": "Owned game/simulator closed; Steam retained. Temporary personal cover setting removed; published play unchanged."
+    },
+    "standing_cover_controls": {
+      "candidate_sha256": "3d64af394fb308f394dac58c93906982df1788899ac93749b99664dd59634063",
+      "result": "Standing cover no longer acquires stationary-weapon controls. Native BEHIND clears NORMAL_ACTION; exclude BEHIND from stationary-action classification while retaining vehicle/horse precedence. Baseline082327/082721 rejected the weapon component and failed readiness. On3d64af394fb3, standing cover retains travel mode1, admits the component, and passes equipment/ready plus center/lean/up/return. Crouch, return to standing, Off release and walking away pass. Final-eye weapon presentation is still NOT accepted: the complete gun is absent in these Mother Base views, including the retained outside-cover comparison085521; close-wall right-hand/sleeve views are also incomplete.",
+      "baseline_runs": [
+        "20261022T082327879467Z",
+        "20261022T082721634416Z"
+      ],
+      "retained_runs": [
+        "20261022T083613469216Z",
+        "20261022T084333513304Z",
+        "20261022T084404888923Z",
+        "20261022T084432767768Z",
+        "20261022T084616976944Z",
+        "20261022T084848294374Z",
+        "20261022T085013871743Z",
+        "20261022T085122631139Z",
+        "20261022T085248502495Z",
+        "20261022T085329430602Z",
+        "20261022T085439663572Z",
+        "20261022T085521351890Z"
+      ],
+      "limits": [
+        "Weapon/component predicates do not prove visible gun or correct grip",
+        "Native benefit eligibility, broader surfaces, non-VR and Quest remain open",
+        "No firing/impact acceptance from this Mother Base run"
+      ],
+      "next": "Resolve actual native weapon model publication/visibility using the retained inside/outside Mother Base comparison; do not repeat pose-only visual retries or claim the native_firearm predicate proves a visible gun.",
+      "cleanup": "Owned game/simulator closed. Inputs/poses released, personal cover override removed, Steam retained, published play unchanged."
     }
   }
 }

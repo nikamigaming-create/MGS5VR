@@ -4039,6 +4039,13 @@ int main(){
         expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,"ordinary standing action keeps tracked foot aiming");
         set(7,false);
         expect(travelModeFromPlayerStatus(status)==TravelMode::nativeAction,"observed mortar standing action keeps both native aiming axes");
+        set(90);
+        expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,
+            "standing wall cover retains handheld VR weapons despite NORMAL_ACTION clearing");
+        set(26);
+        expect(travelModeFromPlayerStatus(status)==TravelMode::vehicle,
+            "vehicle ownership still wins over a retiring cover flag");
+        set(26,false);set(90,false);
         for(const auto bit:{134u,87u,88u,83u,58u,56u,59u}){
             set(bit);
             expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,"carry, CQC, treatment and optics do not acquire stationary aim");
