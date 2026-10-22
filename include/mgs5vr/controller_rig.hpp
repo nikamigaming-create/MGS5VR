@@ -9,6 +9,7 @@ void observeControllerRigOwner(uintptr_t owner) noexcept;
 PlayerPosture nativePlayerPosture() noexcept;
 void stopControllerRig() noexcept;
 bool controllerRigEnabled() noexcept;
+uint8_t cabinWeaponHands(uint64_t now) noexcept;
 // After the native model's own palette publication, move only an exactly
 // owned magnifier hinge to the zoom mode from that completed body frame.
 void refreshNativeWeaponMagnifier(uintptr_t modelInterface,uint32_t index) noexcept;

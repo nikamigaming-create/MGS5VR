@@ -774,6 +774,11 @@ struct Session {
         const auto cabinPublished=headCamera().publishedView();
         const auto openingLayout=cabinPublished?cabinPublished->controllers.openingLayout:CabinLayout{};
         auto propHands=controllerFrame.hands;
+        const auto gearHands=cabinWeaponHands(now);
+        for(size_t side=0;side<2;++side)if(gearHands&(1u<<side)){
+            propHands[side].gripTracked=propHands[side].aimTracked=propHands[side].indexTipTracked=false;
+            propHands[side].squeeze=propHands[side].trigger=0;
+        }
         const auto contactFrame=headCamera().publishedRigFrame(now);
         if(contactFrame&&contactFrame->activation==nativeStatus.activation
             &&contactFrame->controllers.referenceEpoch==referenceEpoch
@@ -817,7 +822,7 @@ struct Session {
         std::array<StudioHand,2> studioHands{};
         for(size_t side=0;side<2;++side){const auto& hand=controllerFrame.hands[side];
             studioHands[side]={hand.grip,hand.aim,hand.gripTracked,hand.aimTracked,hand.squeeze,hand.trigger};
-            if(std::any_of(openingFrame.bench.tapes.begin(),openingFrame.bench.tapes.end(),[&](const auto& tape){return tape.hand==static_cast<int>(side);}))
+            if((gearHands&(1u<<side))||std::any_of(openingFrame.bench.tapes.begin(),openingFrame.bench.tapes.end(),[&](const auto& tape){return tape.hand==static_cast<int>(side);}))
                 studioHands[side].tracked=studioHands[side].aimTracked=false;
         }
         const bool studioCabin=controllerFrame.openingPropsActive;
