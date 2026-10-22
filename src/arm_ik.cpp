@@ -283,6 +283,29 @@ std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,cons
     result->pose.shoulder.orientation=*lumbar;result->pose.elbow.orientation=*chest;
     return result;
 }
+namespace {
+std::optional<ArmSolution> finishArm(const ArmPose& a,Pose target,Vec3 elbow,Vec3 wrist,const ArmBasis* basis,bool clamped){
+    const auto upper=a.elbow.position-a.shoulder.position,lower=a.wrist.position-a.elbow.position;
+    ArmSolution out{a,clamped};
+    out.pose.shoulder.orientation=turn(swing(upper,elbow-a.shoulder.position),a.shoulder.orientation);
+    auto forearmRotation=turn(swing(lower,wrist-elbow),a.elbow.orientation);
+    if(basis){
+        // The native elbow is a hinge. Pronation belongs to its downstream
+        // twist helpers; rotating the elbow itself knots the upper sleeve.
+        const auto upperRotation=basisRotation(basis->upperAxis,basis->elbowBend,elbow-a.shoulder.position,wrist-elbow);
+        if(!upperRotation)return {};
+        out.pose.shoulder.orientation=*upperRotation;
+        const auto axis=unit(wrist-elbow);
+        const auto up=rotate(*upperRotation,basis->wristUp);
+        const auto lowerRotation=basisRotation(basis->forearmAxis,basis->wristUp,axis,up);
+        if(!lowerRotation)return {};
+        forearmRotation=*lowerRotation;
+    }
+    out.pose.elbow={forearmRotation,elbow};
+    out.pose.wrist={normalize(target.orientation),wrist};
+    return out;
+}
+}
 std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const ArmBasis* basis,const ArmSurface* surface){
     if(!valid(a.shoulder)||!valid(a.elbow)||!valid(a.wrist)||!valid(target)||!valid(Pose{{},hint}))return {};
     const auto upper=a.elbow.position-a.shoulder.position,lower=a.wrist.position-a.elbow.position;
@@ -318,24 +341,41 @@ std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const
     }
     const auto elbow=center+bend*away;
     const auto wrist=a.shoulder.position+forward*reach;
-    ArmSolution out{a,std::abs(requested-reach)>0.0001f};
-    out.pose.shoulder.orientation=turn(swing(upper,elbow-a.shoulder.position),a.shoulder.orientation);
-    auto forearmRotation=turn(swing(lower,wrist-elbow),a.elbow.orientation);
-    if(basis){
-        // The native elbow is a hinge. Pronation belongs to its downstream
-        // twist helpers; rotating the elbow itself knots the upper sleeve.
-        const auto upperRotation=basisRotation(basis->upperAxis,basis->elbowBend,elbow-a.shoulder.position,wrist-elbow);
-        if(!upperRotation)return {};
-        out.pose.shoulder.orientation=*upperRotation;
-        const auto axis=unit(wrist-elbow);
-        const auto up=rotate(*upperRotation,basis->wristUp);
-        const auto lowerRotation=basisRotation(basis->forearmAxis,basis->wristUp,axis,up);
-        if(!lowerRotation)return {};
-        forearmRotation=*lowerRotation;
-    }
-    out.pose.elbow={forearmRotation,elbow};
-    out.pose.wrist={normalize(target.orientation),wrist};
-    return out;
+    return finishArm(a,target,elbow,wrist,basis,std::abs(requested-reach)>0.0001f);
+}
+
+std::optional<ArmSolution> solveArmAroundHead(const ArmPose& a,Pose target,Vec3 hint,
+    const ArmBasis* basis,Vec3 eye,float elbowRadius,float wristRadius){
+    const auto unconstrained=solveArm(a,target,hint,basis);
+    if(!unconstrained||!valid(Pose{{},eye})||!std::isfinite(elbowRadius)||!std::isfinite(wristRadius)
+       ||elbowRadius<=0||elbowRadius>.3f||wristRadius<=0||wristRadius>.3f)return {};
+    // An extended arm can put its entire elbow circle inside the head.
+    // In that case no bend can preserve the requested wrist. Clamp the reach
+    // at the two sphere intersections instead of discarding the whole frame.
+    const auto endpoint=[&](Vec3 center,float radius,Vec3 wanted,float clearance)->std::optional<Vec3>{
+        auto direction=wanted-center;
+        if(length(direction)<.00001f)return {};
+        direction=unit(direction);
+        const auto head=eye-center;
+        const float distance=length(head);
+        if(distance<.00001f)return radius>=clearance?std::optional<Vec3>{center+direction*radius}:std::nullopt;
+        const auto axis=head*(1.f/distance);
+        const float limit=(radius*radius+distance*distance-clearance*clearance)/(2.f*radius*distance);
+        if(limit< -1.f)return {};
+        if(limit<1.f&&dot(direction,axis)>limit){
+            auto tangent=direction-axis*dot(direction,axis);
+            if(length(tangent)<.00001f)tangent=hint-axis*dot(hint,axis);
+            if(length(tangent)<.00001f)tangent=cross(axis,std::abs(axis.y)<.8f?Vec3{0,1,0}:Vec3{1,0,0});
+            direction=axis*limit+unit(tangent)*std::sqrt(std::max(0.f,1.f-limit*limit));
+        }
+        return center+direction*radius;
+    };
+    const auto elbow=endpoint(a.shoulder.position,length(a.elbow.position-a.shoulder.position),
+        unconstrained->pose.elbow.position,elbowRadius);
+    if(!elbow)return {};
+    const auto wrist=endpoint(*elbow,length(a.wrist.position-a.elbow.position),target.position,wristRadius);
+    if(!wrist)return {};
+    return finishArm(a,target,*elbow,*wrist,basis,true);
 }
 std::optional<Pose> reachingClavicle(Pose clavicle,const ArmPose& arm,Pose target,const ArmSurface* shoulderSurface){
     if(!valid(clavicle)||!valid(arm.shoulder)||!valid(arm.elbow)||!valid(arm.wrist)||!valid(target))return {};

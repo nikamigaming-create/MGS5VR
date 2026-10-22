@@ -86,6 +86,9 @@ std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 eye,float radius)
 std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface=nullptr);
 std::optional<ArmSolution> solveArm(const ArmPose& animated,Pose wristTarget,Vec3 bendHint,
                                   const ArmBasis* basis=nullptr,const ArmSurface* elbowSurface=nullptr);
+// Reach-limited fallback when no elbow bend clears the head at the desired wrist.
+std::optional<ArmSolution> solveArmAroundHead(const ArmPose& animated,Pose wristTarget,Vec3 bendHint,
+    const ArmBasis* basis,Vec3 eye,float elbowRadius,float wristRadius);
 // Local corrective rotations observed on this profile's seven arm helpers.
 std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Quat wrist,bool right);
 inline constexpr std::array<uint32_t,14> armHelperNames{

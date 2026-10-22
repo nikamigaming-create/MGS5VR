@@ -3789,6 +3789,25 @@ int main(){
         }
         expect(shoulderClear&&handRetained,"captured cover reach clears the shoulder from the eyes without losing its hand target");
     }
+    // Captured ACC cross-body reach: its fully extended elbow circle lies
+    // inside the head, so changing bend alone cannot produce a fresh rig.
+    for(float mirror:{-1.f,1.f}){
+        const auto point=[&](Vec3 v){return Vec3{v.x*mirror,v.y,v.z};};
+        const ArmPose captured{Pose{{},point({.146109819f,.868967772f,1.13547063f})},
+            Pose{{},point({.113356858f,.614989877f,1.01267648f})},
+            Pose{{},point({-.0319590271f,.54805994f,1.21124291f})}};
+        const Pose target{{},point({-.576682746f,1.16215992f,1.85379744f})};
+        const auto eye=point({-.045841407f,.966918945f,1.35511446f});
+        const auto hint=point({.124659181f,-1.f,-.263552815f});
+        const auto solved=solveArmAroundHead(captured,target,hint,nullptr,eye,.12f,.14f);
+        const auto squared=[](Vec3 v){return dot(v,v);};
+        expect(solved&&solved->reachClamped
+            &&near(squared(solved->pose.elbow.position-captured.shoulder.position),squared(captured.elbow.position-captured.shoulder.position))
+            &&near(squared(solved->pose.wrist.position-solved->pose.elbow.position),squared(captured.wrist.position-captured.elbow.position))
+            &&squared(solved->pose.elbow.position-eye)>=.12f*.12f-1e-6f
+            &&squared(solved->pose.wrist.position-eye)>=.14f*.14f-1e-6f,
+            "captured cross-body reach stays live with native bone lengths and head clearance on either arm");
+    }
     // A prone wrist can remain above the floor while the unconstrained elbow
     // bends through it. Exercise contact on rotated slopes, not just flat Y=0.
     for(int i=-4;i<=4;++i){

@@ -674,7 +674,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             }
         }
         if(solution)if(const auto surface=headClearanceSurface(solution->pose.elbow.position,eyeInModel,.12f)){
-            const auto contact=solveArm(animated,target,hint,&basis,&*surface);
+            auto contact=solveArm(animated,target,hint,&basis,&*surface);
+            if(!contact)contact=solveArmAroundHead(animated,target,hint,&basis,eyeInModel,.12f,.14f);
             if(!contact){if(probe.enabled){probe.armFailure=2;probe.headSurface=*surface;}return std::optional<ArmSolution>{};}solution=contact;++headContacts;
         }
         return solution;
