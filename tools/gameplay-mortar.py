@@ -7,11 +7,11 @@ import subprocess
 import time
 
 from gameplay_bot.core import BotFault, Events, atomic_json
-from gameplay_bot.live import InputLease, Live, ROOT, game_identity
+from gameplay_bot.live import InputLease, Live, ROOT, game_identity, channel, rotate
 from gameplay_bot.navigation import NavigationAtlas
 from gameplay_bot.route import navigate, set_posture
 from gameplay_bot.perception import read_enemy_snapshot
-from gameplay_bot.combat import fresh_rig, mul
+from gameplay_bot.combat import fresh_rig, mul, inverse, controller_pair, paired_aim_position
 from gameplay_bot.emplacement import bind_fixture, fixture, look_at_mount
 from gameplay_bot.locomotion import move_local
 from gameplay_bot.recording import Recording
@@ -56,6 +56,83 @@ def aim_adjustment(yaw_error, pitch_error):
     # same short chord reproduced an X pulse followed by Y with native X=0.
     # A .30 stick was also delivered without moving the native mortar pitch.
     return axis, -.6 if error > 0 else .6, .35 if axis == 'Y' else min(.35, max(.20, abs(error)*.012))
+
+
+def inspect_physical_grips(live, policy, anchor, output, result):
+    """One selected physical-handle check inside the existing native mortar run."""
+    for side, name in (('left','gameplay.support_grip'),('right','gameplay.ready_weapon')):
+        action=next(a for a in live.bindings['actions'] if a['name']==name)
+        if (action.get('modifier') is not True or len(action['bindings'])!=1
+                or action['bindings'][0]['gesture']!='level'
+                or action['bindings'][0]['inputs']!=[side+'_grip']):
+            raise BotFault('Physical mortar check requires the audited effective grip modifiers')
+    checks=result.setdefault('physical_grips',[])
+    def sample(mask=None):
+        state,_=fresh_rig(live,anchor)
+        if not stationary_mortar(state,policy) or state['rendered'].get('mounted_weapon_action')!=0x46:
+            raise BotFault('Physical grip lost the observed native mortar action')
+        if mask is not None and state['rendered'].get('mounted_weapon_hands')!=mask:
+            raise BotFault('Native handle grip did not remain acquired')
+        return state
+    def wait_grip(mask):
+        until=time.monotonic()+1.5
+        while True:
+            state=sample()
+            if state['rendered'].get('mounted_weapon_hands')==mask:return state
+            if time.monotonic()>=until:raise BotFault('Physical grip did not acquire the native handle')
+            time.sleep(.025)
+    def place(side,contact,degrees=0.):
+        grip=live.text_result(live.call('get_controller_pose',{'hand':side,'pose_type':'grip','base_space':'local'}))['pose']
+        aim=live.text_result(live.call('get_controller_pose',{'hand':side,'pose_type':'aim','base_space':'local'}))['pose']
+        pair=controller_pair(grip,aim);half=math.radians(degrees)/2
+        attitude=mul([0.,math.sin(half),0.,math.cos(half)],contact['orientation'])
+        aim_attitude=mul(attitude,inverse(pair['orientation']))
+        for kind,point,q in (('grip',contact['position'],attitude),
+                            ('aim',paired_aim_position(contact['position'],aim_attitude,pair),aim_attitude)):
+            live.call('set_controller_pose',{'hand':side,'pose_type':kind,'base_space':'local',
+                'position':point,'orientation':q})
+    def yaw(pose):
+        f=rotate(pose['orientation'],[0.,0.,1.]);return math.degrees(math.atan2(f[0],f[2]))
+    for side,mask in (('right',2),('left',1)):
+        live.release();state=sample();contact=state['rendered']['mounted_'+side+'_grip']
+        place(side,contact);time.sleep(.12)
+        try:
+            live.input([channel(side+'_grip')],5.,lease_seconds=5.)
+            before=wait_grip(mask);place(side,contact,12.)
+            samples=[];until=time.monotonic()+1.6
+            while time.monotonic()<until:
+                state=sample(mask);samples.append(state);time.sleep(.025)
+            change=(state['native']['player_camera_yaw']-before['native']['player_camera_yaw']+180.)%360.-180.
+            viewer=(yaw(state['rendered']['native_pose'])-yaw(before['rendered']['native_pose'])+180.)%360.-180.
+            row={'hand':side,'before':before,'after':state,'samples':samples,
+                 'native_yaw_delta':change,'viewer_yaw_delta':viewer};checks.append(row)
+            atomic_json(output/'progress.json',result)
+            if not 5.<change<20. or abs(viewer)>1.:
+                raise BotFault('Physical handle aim did not turn the native weapon independently of the viewer')
+            if any(abs(s['rendered']['mounted_weapon_axes'][1])>.001 for s in samples):
+                raise BotFault('Pure physical yaw chased native pitch animation')
+            if state['rendered']['mounted_weapon_axes']!=[0,0]:
+                raise BotFault('Physical handle continued steering after the hand settled')
+            row['eyes']=live.capture('mortar-physical-'+side,static_grips=True)
+        finally:live.release()
+        released=wait_grip(0)
+        if released['controls']['native_axes'][2:]!=[0,0]:
+            raise BotFault('Released physical handle retained native aiming input')
+        row['released']=released
+    live.release();state=sample()
+    for side in ('left','right'):place(side,state['rendered']['mounted_'+side+'_grip'])
+    try:
+        live.input([channel('left_grip'),channel('right_grip')],5.,lease_seconds=5.)
+        before=wait_grip(3)
+        live.input([{'hand':'right','component':'Thumbstick','sub_component':'X','value':.6}],.3,lease_seconds=.3)
+        time.sleep(.3);live.release(keep={('left','Grip',None),('right','Grip',None)})
+        time.sleep(.5);state=sample(3)
+        if state['controls']['native_axes'][2:]!=[0,0]:
+            raise BotFault('Held handles fought the released native aiming stick')
+        checks.append({'hands':'both','before':before,'after':state,
+            'eyes':live.capture('mortar-physical-both-after-stick',static_grips=True)})
+    finally:live.release()
+    wait_grip(0);atomic_json(output/'progress.json',result)
 
 
 def run(live, nav, policy, output, seconds):
@@ -215,6 +292,8 @@ def run(live, nav, policy, output, seconds):
         state, _ = fresh_rig(live, anchor)
         result['aim_forward'] = state
         result['entered_eyes'] = live.capture('mortar-entered')
+        if policy.get('physical_grips') is True:
+            inspect_physical_grips(live,policy,anchor,output,result)
         result['aim_ready'] = live.execute({'op': 'action', 'name': 'gameplay.ready_weapon', 'seconds': 1.5,
             'native_before': {'mission': policy['mission'], 'location': policy['location'],
                               'popup': False, 'status_NORMAL_ACTION': False},

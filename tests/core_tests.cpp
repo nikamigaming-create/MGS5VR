@@ -4911,6 +4911,10 @@ int main(){
         hand.orientation={0,std::sin(.1f),0,std::cos(.1f)};
         const auto turned=step(true,5);
         expect(turned.held&&turned.requestedAim.orientation.y>acquired.requestedAim.orientation.y,"controller rotation requests native aim change");
+        const auto rebased=grip.update(owner,hand,contact,aim,true,true,5,.1f,.5f,true);
+        const auto settledAxes=mountedAimAxes(aim,rebased.requestedAim);
+        expect(rebased.held&&near(settledAxes[0],0)&&near(settledAxes[1],0),
+            "manual stick aiming rebases a held physical grip instead of steering back to its old bearing");
         expect(!step(true,6,false).held&&!step(true,7).held,"tracking loss drops grip and held recovery cannot reacquire");
         step(false,8);expect(step(true,9).held,"fresh squeeze after recovery can acquire");
         owner.mount=7;expect(!step(true,10).held&&!step(true,11).held,"changed native mount rejects old grip ownership");
@@ -4918,6 +4922,30 @@ int main(){
         hand.position={.7f,0,0};expect(!step(true,14).held,"excess reach releases snapped hand");
         hand.position={};expect(!step(true,15).held,"returning in reach while squeezed cannot regrab");
         step(false,16);step(true,17);expect(!step(true,300).held,"stale publication releases mounted grip");
+        step(false,301);step(true,302);++owner.generation;
+        expect(!step(true,303).held&&!step(true,304).held,
+            "a new stationary action on the same player cannot inherit the previous emplacement grip");
+        const auto yawAxes=mountedAimAxes({},Pose{{0,std::sin(.1f),0,std::cos(.1f)},{}});
+        const auto pitchAxes=mountedAimAxes({},Pose{{-std::sin(.1f),0,0,std::cos(.1f)},{}});
+        expect(yawAxes[0]<0&&near(yawAxes[1],0)&&pitchAxes[1]>0&&near(pitchAxes[0],0),
+            "mounted native aim axes keep yaw and elevation independent");
+        MountedAimServo servo;
+        const Pose yawRequest{{0,std::sin(.1f),0,std::cos(.1f)},{}};
+        const Pose readyDrift{{-std::sin(.02f),0,0,std::cos(.02f)},{}};
+        servo.update({},{});
+        auto command=servo.update(readyDrift,{});
+        expect(near(command[0],0)&&near(command[1],0),"native ready-camera drift cannot aim an unchanged physical hand");
+        command=servo.update(readyDrift,yawRequest);
+        expect(command[0]<0&&near(command[1],0),"physical yaw does not chase native pitch animation");
+        servo.update(yawRequest,yawRequest);
+        command=servo.update({},yawRequest);
+        expect(near(command[0],0)&&near(command[1],0),"settled physical aim does not oscillate when delayed native motion returns");
+        servo.update({}, {},true);
+        expect(servo.update({},yawRequest)[0]<0,"manual rebase permits a subsequent physical turn");
+        MountedAimMailbox mailbox;
+        mailbox.publish({1,2,3,100,{.5f,0},2});
+        expect(mailbox.read(199).hands==2&&!mailbox.read(201).hands&&!mailbox.read(99).hands,
+            "expired or backward-clock mounted requests cannot keep steering the native weapon");
     }
     {
         VehicleViewHeading view;

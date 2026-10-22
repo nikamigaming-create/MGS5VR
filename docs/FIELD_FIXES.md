@@ -8,7 +8,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 - [ ] **Y-action forced rotation — FP03.** Jeep entry/exit fixed in development6b560: retained entries at62/38 degrees and exits hold within0.03 degrees; deliberate seated look and iDroid stow/reopen retain continuity. Uses pre-Y heading and actual carrier motion. Four retained headings, driving turns, Fulton and table/sandbag climbing remain open; latest approach did not acquire vehicle.
 - [ ] **Mortar operator viewpoint — FP15.** Reproduced stationary-pose mismatch fixed on33b693: old camera62.8cm above native operator eye; both aiming axes now retain native eye and active mounted body. Barrel-facing views and ordinary exit reviewed in both eyes in031244. Physical grip contact, translucent geometry, firing/impact, other emplacements and physical Quest remain open.
-- [ ] **Natural mounted-weapon controls — FP11/FP15.** Implement physical grip-and-aim and stick aiming for mortars and each turret type; verify native pivots/limits, contact, release, firing and exit. MountedGrip helper exists but has no production adapter.
+- [ ] **Natural mounted-weapon controls — FP11/FP15.** Implement physical grip-and-aim and stick aiming for mortars and each turret type; verify native pivots/limits, contact, release, firing and exit. Mortar action0x46 has a production adapter on a8c9ef. Retained040830 checks either-hand yaw, no unintended pitch command, fixed view, two-hand stick override/release and entry/trigger/exit. Earlier035529 pitch oscillation is corrected by physical-intent braking. Physical pitch, stereo contact, firing/impact and other types remain open; fixture reports broken after the firing sequence.
 - [ ] **Small-rock slipping and stops — FP16.** Reported; locate/repeat affected rocks, distinguish native collision/fall state from camera/body presentation.
 - [ ] **Right-wrist shoulder/opposite-arm coupling — FP17.** Reported in physical VR. Reproduced: right wrist +/-30 degrees rotates chest and shifts fixed-input left palm8.5/12cm. Acquired-weapon-only torso correction removes wrist-driven heading in two Mother Base repeats. Remaining opposite-palm movement is at most 1.13cm and follows native idle animation. Physical headset and reach remain open.
 - [ ] **Shortened arm reach — FP17.** Clavicle contribution and neutral head/neck fit reduce 50cm palm error to standing1.0mm/crouched1.6mm on56d5, from11.3/20.5cm. Both-eye continuity, native-scale legs, posture changes, walking, wrist isolation and supported rifle handling checked. Farther reach, broader interactions and physical Quest validation stay open.
@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current checked development is `33b693902099`, adding native stationary-operator eye/body placement to the prior cabin batch.
+Current checked development is `a8c9efb80813`, adding physical mortar yaw and release to the native stationary-operator eye/body and prior cabin fixes. Physical pitch, contact, discharge and other mounted types remain open.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row

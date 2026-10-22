@@ -11,6 +11,7 @@
 #include "mgs5vr/paused_rig.hpp"
 #include "mgs5vr/paused_parts.hpp"
 #include "mgs5vr/input_bridge.hpp"
+#include "mgs5vr/mounted_grip.hpp"
 #include "mgs5vr/vehicle_weapon.hpp"
 #include "mgs5vr/weapon_obstruction.hpp"
 #include "mgs5vr/log.hpp"
@@ -143,6 +144,11 @@ uint64_t meleeTracking{};
 std::array<float,2> meleeCurl{};
 std::array<WheelSteering,2> wheelSteering;
 float wheelSteeringAxis{};
+std::array<MountedGrip,2> mountedGrips;
+std::array<MountedAimServo,2> mountedAimServos;
+uintptr_t mountedActionOwner{};
+uint64_t mountedActionGeneration{};
+bool mountedActionAdmitted{};
 std::array<Vec3,2> bendHistory{};
 SupportContact supportContact;
 SupportPose supportPose;
@@ -699,9 +705,61 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         meleeTracking=0;meleeCurl={};
         for(auto& hand:wheelSteering)hand.reset();
         wheelSteeringAxis=0;wheelMailbox().publish({});
+        for(auto& hand:mountedGrips)hand.reset();
+        for(auto& servo:mountedAimServos)servo.reset();
+        mountedActionAdmitted=false;mountedActionOwner=0;++mountedActionGeneration;
+        mountedAimMailbox().publish({});
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
     const auto rightAnimated=bone(q,p,12),leftAnimated=bone(q,p,8);
+    MountedAimSample mountedAim{};
+    // The retained retail entry/axes/exit take identifies action 0x46. Other
+    // stationary actions are not inferred to be weapon operators. Its native
+    // action storage plus admission generation owns this grip lease; native
+    // input still selects the actual emplacement and enforces its limits.
+    const auto actionContext=get<uintptr_t>(character+0x138);
+    const auto actionIndex=get<uint32_t>(owner+0x3a0);
+    const auto actionTable=get<uintptr_t>(get<uintptr_t>(actionContext+0x60)+0x18);
+    const bool actionOwnerMatches=actionContext&&actionTable&&actionIndex<16
+        &&get<uint32_t>(actionContext+0x218)==actionIndex;
+    const auto actionId=actionOwnerMatches?get<uint16_t>(actionTable+actionIndex*2ull):uint16_t{};
+    const bool stationaryWeapon=actionId==0x46&&frame.controllers.nativeActionControls
+        &&frame.controllers.presentationFocused&&!frame.controllers.nativeGamepad&&!frame.menuOpen;
+    const auto actionOwner=stationaryWeapon?actionTable+actionIndex*2ull:uintptr_t{};
+    if(stationaryWeapon!=mountedActionAdmitted||actionOwner!=mountedActionOwner){
+        ++mountedActionGeneration;mountedActionAdmitted=stationaryWeapon;mountedActionOwner=actionOwner;
+    }
+    const MountedGripOwner mountedOwner{owner,actionOwner,frame.activation,
+        frame.controllers.referenceEpoch,mountedActionGeneration};
+    const auto toLocal=[&](Pose world){return compose(frame.headPose,compose(Pose{{0,1,0,0},{}},
+        compose(inverse(frame.nativePose),world)));};
+    const auto nativeAimLocal=toLocal(nativeCamera);
+    std::array<std::array<float,2>,2> mountedAxes{};
+    for(size_t side=0;side<2;++side){
+        const auto contact=toLocal(compose(*root,compose(side?rightAnimated:leftAnimated,
+            inverse(gripFromWrist[side]))));
+        const auto& hand=frame.controllers.hands[side];
+        const bool available=stationaryWeapon&&hand.gripTracked&&valid(contact);
+        if(stationaryWeapon)frame.mountedWeaponGrips[side]=contact;
+        const auto held=mountedGrips[side].update(mountedOwner,hand.grip,contact,nativeAimLocal,
+            available,frame.controllers.mountedHandGrip[side],frame.sampleTime,.16f,.40f,
+            frame.controllers.mountedStickAiming);
+        if(held.held){
+            mountedAim.hands|=static_cast<uint8_t>(1u<<side);
+            mountedAxes[side]=mountedAimServos[side].update(nativeCamera,
+                nativeTrackedPose(frame.nativePose,frame.headPose,held.requestedAim),
+                held.acquired||frame.controllers.mountedStickAiming);
+        }else mountedAimServos[side].reset();
+    }
+    if(stationaryWeapon){
+        mountedAim.player=owner;mountedAim.activation=frame.activation;
+        mountedAim.referenceEpoch=frame.controllers.referenceEpoch;mountedAim.time=frame.sampleTime;
+        // A second hand supports its own native contact without fighting the
+        // primary hand's requested bearing. Either hand can operate alone.
+        mountedAim.axes=mountedAxes[(mountedAim.hands&2)?1:0];
+        frame.mountedWeaponTracked=true;frame.mountedWeaponAction=actionId;
+        frame.mountedWeaponHands=mountedAim.hands;frame.mountedWeaponAxes=mountedAim.axes;
+    }
     probe.stage=6;
     WheelSample wheel{};wheel.time=frame.sampleTime;
     unsigned wheelHands{};
@@ -1061,8 +1119,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         }
     };
     auto wristTarget=compose(grips[1],gripFromWrist[1]);
-    auto rightTarget=(wheel.hands&2)?rightAnimated:clearWrist(wristTarget);
-    if(!(wheel.hands&2))fitClavicle(1,rightTarget);
+    auto rightTarget=((wheel.hands|mountedAim.hands)&2)?rightAnimated:clearWrist(wristTarget);
+    if(!((wheel.hands|mountedAim.hands)&2))fitClavicle(1,rightTarget);
     const ArmPose rightAnimatedArm{bone(q,p,10),bone(q,p,11),bone(q,p,12)};
     auto right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
     probe.stage=7;
@@ -1362,9 +1420,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             target.position=tracked.position+(attached.position-tracked.position)*supportBlend;
             target.orientation=blendRotation(tracked.orientation,attached.orientation,supportBlend);
         }
-        if(wheel.hands&1)target=leftAnimated;
+        if((wheel.hands|mountedAim.hands)&1)target=leftAnimated;
         else if(supportBlend<1)target=clearWrist(target);
-        if(!(wheel.hands&1))fitClavicle(0,target);
+        if(!((wheel.hands|mountedAim.hands)&1))fitClavicle(0,target);
         const auto left=groundedArm({bone(q,p,6),bone(q,p,7),bone(q,p,8)},target,bendHistory[0],armBasis[0]);
         probe.stage=11;
         if(!left)return false;
@@ -1471,7 +1529,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // binocular is a VR-only physical item, so its tracked hands still
         // need the authored curl pass at full contact or they remain open and
         // appear to float behind the housing.
-        if(!presentationGrips[side]||frame.controllers.vehicleControls
+        if(!presentationGrips[side]||frame.controllers.vehicleControls||(mountedAim.hands&(1u<<side))
            ||(contact>=1&&!binocularHeld&&!rifleSupportContact))continue;
         for(size_t finger=0;finger<5;++finger)for(size_t joint=0;joint<3;++joint){
             const auto i=fingers[side][finger]+joint;
@@ -1686,6 +1744,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     publishAnimalHands(frame,renderedPalms,handContacts);
     publishSmallAnimalHands(frame,renderedPalms,handContacts);
     wheelMailbox().publish(wheel);
+    mountedAimMailbox().publish(mountedAim);
     if(wheel.engaged)log("Driver authored wheel contact acquired; hands="+std::to_string(wheel.hands));
     for(const auto& strike:strikes)if(strike)publishMeleeSweep(*strike);
     // The engine may reuse animated helper/finger channels next frame. Only the

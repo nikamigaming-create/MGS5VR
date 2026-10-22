@@ -71,6 +71,8 @@ struct ControllerFrame {
     // orbit does not set the driver's initial seated facing.
     std::array<float,2> vehicleViewInput{};
     bool nativeActionControls{}; // Native stationary/action aim; no handheld firearm replacement.
+    bool mountedStickAiming{};
+    std::array<bool,2> mountedHandGrip{};
     bool nativeGamepad{}; // Physical XInput owns actions and native animated hands.
     bool wheelGrip{};
     bool rightWheelGrip{},vehicleWeaponIntent{};
@@ -156,6 +158,7 @@ inline ControllerFrame passiveControllerFrame(ControllerFrame frame,int64_t time
     frame.presentationFocused=false;
     frame.weaponReady=frame.supportGrip=frame.vehicleControls=frame.nativeActionControls=frame.wheelGrip=false;
     frame.rightWheelGrip=frame.vehicleWeaponIntent=false;
+    frame.mountedHandGrip={};frame.mountedStickAiming=false;
     frame.cabinDeployHint=false;
     frame.vehicleViewInput={};
     frame.contextInteract=false;
@@ -231,6 +234,11 @@ struct HeadCameraSample {
     bool driverWheelTracked{},driverWheelHeld{};
     uint8_t driverWheelHands{};
     float driverWheelAxis{};
+    std::array<Pose,2> mountedWeaponGrips{}; // Original native anatomical palms, LOCAL space.
+    bool mountedWeaponTracked{};
+    uint8_t mountedWeaponHands{};
+    uint16_t mountedWeaponAction{};
+    std::array<float,2> mountedWeaponAxes{};
     // Final native anatomical palm frames from the published first-person
     // skin. Handheld devices use these instead of guessing a palm side from
     // the controller grip alone.

@@ -119,6 +119,12 @@ WheelSample WheelSteering::update(Pose tracked,Pose contact,bool available,bool 
 void WheelMailbox::publish(WheelSample sample){std::lock_guard lock(mutex_);sample_=sample;}
 WheelSample WheelMailbox::read(uint64_t time) const{std::lock_guard lock(mutex_);return time>=sample_.time&&time-sample_.time<=100?sample_:WheelSample{};}
 WheelMailbox& wheelMailbox(){static WheelMailbox box;return box;}
+void MountedAimMailbox::publish(MountedAimSample sample){std::lock_guard lock(mutex_);sample_=sample;}
+MountedAimSample MountedAimMailbox::read(uint64_t time) const{
+    std::lock_guard lock(mutex_);
+    return time>=sample_.time&&time-sample_.time<=100?sample_:MountedAimSample{};
+}
+MountedAimMailbox& mountedAimMailbox(){static MountedAimMailbox box;return box;}
 void RumbleMailbox::publish(RumbleSample sample){std::lock_guard lock(mutex_);sample_=sample;}
 RumbleSample RumbleMailbox::read(uint64_t time) const{std::lock_guard lock(mutex_);return time>=sample_.time&&time-sample_.time<=250?sample_:RumbleSample{};}
 RumbleMailbox& rumbleMailbox(){static RumbleMailbox box;return box;}

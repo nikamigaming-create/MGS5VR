@@ -117,6 +117,21 @@ private:
     WheelSample sample_{};
 };
 WheelMailbox& wheelMailbox();
+struct MountedAimSample {
+    uintptr_t player{};
+    uint64_t activation{},referenceEpoch{},time{};
+    std::array<float,2> axes{};
+    uint8_t hands{};
+};
+class MountedAimMailbox {
+public:
+    void publish(MountedAimSample sample);
+    MountedAimSample read(uint64_t time) const;
+private:
+    mutable std::mutex mutex_;
+    MountedAimSample sample_{};
+};
+MountedAimMailbox& mountedAimMailbox();
 struct RumbleSample { float low{},high{};uint64_t time{}; };
 class RumbleMailbox {
 public:

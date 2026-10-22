@@ -1393,6 +1393,53 @@
       ],
       "native_followup": "Bounded read-only action samples show 0x46 during stationary mortar; samples in private/current-mounted-action-samples.jsonl.",
       "cleanup": "Owned game/simulator and bounded sampler closed; neutral input, no test menu, Steam retained; published play unchanged."
+    },
+    "mounted_physical_grips": {
+      "candidate": "a498914d4114",
+      "run": "20261022T035529277583Z",
+      "status": "scoped_physical_yaw_and_release_checked_broader_mounted_open",
+      "implemented": "Native action 0x46 physical palm contacts, either-hand aim, manual stick rebasing, release and stale-owner clearing. Other action types excluded.",
+      "observed": {
+        "right_yaw_degrees": 11.390363693236992,
+        "left_yaw_degrees": 11.903748035431306,
+        "viewer_yaw_degrees": 0,
+        "both_hand_stick_release": "native axes neutral"
+      },
+      "failures": [
+        "Right-hand acquisition chased native pitch, oscillating about 15\u201318 degrees during a pure yaw movement.",
+        "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
+      ],
+      "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
+      "correction_in_progress": "Per-axis physical-intent/braking servo implemented and live checked in 20261022T040830026047Z on a8c9efb80813.",
+      "cleanup": "Owned MGSV/simulator closed; Steam retained; released state menu=false, pause=false, NORMAL_ACTION=true.",
+      "corrected_run": {
+        "candidate": "a8c9efb80813",
+        "run": "20261022T040830026047Z",
+        "status": "observed_mortar_entry_trigger_exit",
+        "right_yaw_degrees": 11.66874885559099,
+        "left_yaw_degrees": 12.079476356506206,
+        "viewer_yaw_degrees": 0,
+        "unintended_pitch_axes": [
+          0
+        ],
+        "settled_axes": [
+          0,
+          0
+        ],
+        "both_hand_stick_release_axes": [
+          0,
+          0
+        ],
+        "shot_proven": false,
+        "fixture_after_run_broken": true
+      },
+      "remaining": [
+        "Physical pitch and mechanical-limit sweeps",
+        "Final-compositor both-eye contact and motion acceptance",
+        "Identify why fixture reports broken after the firing sequence; prior owner-loss failure remains retained",
+        "Prove actual discharge and impact",
+        "Other emplacement types and physical Quest"
+      ]
     }
   }
 }

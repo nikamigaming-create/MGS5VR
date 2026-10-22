@@ -7,6 +7,17 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Mortar physical yaw/release on `a8c9efb80813`: either hand turns native
+  yaw11.67/12.08 degrees while view yaw stays fixed. Both-hand stick override
+  and release leave neutral aim axes. The first adapter chased native pitch
+  during pure yaw; the intent/braking correction removes those pitch commands
+  and settles without oscillation in retained040830. Entry, existing stick
+  axes, trigger input and exit complete. This is not discharge/impact proof:
+  fixture reports broken afterwards, and earlier035529 lost mounted ownership.
+  Physical pitch, both-eye hand contact, other types and Quest remain open.
+  Held recording is a native source eye, not stereo acceptance. Published play
+  remains unchanged.
+
 - Mounted camera/body batch on `33b693902099`: the mortar's STAND flag outlives
   its standing pose. The old camera stayed62.8cm above the native operator eye,
   and stationary actions excluded the full body. Both now use the native
@@ -92,7 +103,7 @@ worktree is needed for the remaining field fixes.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Current candidate with scoped gameplay checks: `33b693902099`.
+Current development candidate: `a8c9efb80813`, with scoped physical mortar yaw/release checks above.
 Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).

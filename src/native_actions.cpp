@@ -1140,6 +1140,12 @@ bool publishFastInput(const std::string& request,std::string& result){
             pose("weapon_support_grip",frame.weaponSupportGrip);
             pose("driver_left_wheel_grip",frame.driverWheelGrips[0]);
             pose("driver_right_wheel_grip",frame.driverWheelGrips[1]);
+            pose("mounted_left_grip",frame.mountedWeaponGrips[0]);
+            pose("mounted_right_grip",frame.mountedWeaponGrips[1]);
+            out<<",\"mounted_weapon_tracked\":"<<frame.mountedWeaponTracked
+               <<",\"mounted_weapon_hands\":"<<unsigned(frame.mountedWeaponHands)
+               <<",\"mounted_weapon_action\":"<<frame.mountedWeaponAction
+               <<",\"mounted_weapon_axes\":["<<frame.mountedWeaponAxes[0]<<','<<frame.mountedWeaponAxes[1]<<']';
             out<<",\"driver_wheel_tracked\":"<<frame.driverWheelTracked
                <<",\"driver_wheel_held\":"<<frame.driverWheelHeld
                <<",\"driver_wheel_hands\":"<<unsigned(frame.driverWheelHands)

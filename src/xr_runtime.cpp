@@ -1566,6 +1566,28 @@ struct Session {
             pad={};controllerFrame.cabinMove={};controllerFrame.weaponReady=controllerFrame.supportGrip=false;
             controllerFrame.allowMotionMelee=controllerFrame.allowAnimalTouch=false;
         }
+        const bool mountedGripInput=rigInput&&mode==TravelMode::nativeAction&&!nativeInput.exclusive
+            &&!nativeStatus.nativeMenuOpen&&!liveIdroid&&!stickNavigation&&!editorInputOwned
+            &&!controllerFrame.cameraWorldFrozen&&!controllerFrame.studio->freezeRequested
+            &&!center&&!headToggle&&!utilityCenter;
+        controllerFrame.mountedHandGrip={mountedGripInput&&controllerFrame.hands[0].gripTracked&&controllerFrame.supportGrip,
+            mountedGripInput&&right&&activeControl("gameplay.ready_weapon")};
+        controllerFrame.mountedStickAiming=mountedGripInput&&(pad.rightX||pad.rightY);
+        const auto mountedGrip=mountedAimMailbox().read(packetTime);
+        const auto heldMountedHands=static_cast<uint8_t>((controllerFrame.mountedHandGrip[0]?1:0)
+            |(controllerFrame.mountedHandGrip[1]?2:0));
+        if(mountedGripInput&&handUseRig&&mountedGrip.player==handUseRig->playerOwner
+           &&mountedGrip.activation==nativeStatus.activation&&mountedGrip.referenceEpoch==referenceEpoch
+           &&mountedGrip.hands&&(mountedGrip.hands&heldMountedHands)==mountedGrip.hands){
+            pad.leftTrigger=255;
+            if(!controllerFrame.mountedStickAiming){
+                pad.rightX=static_cast<int16_t>(mountedGrip.axes[0]*32767.f);
+                pad.rightY=static_cast<int16_t>(mountedGrip.axes[1]*32767.f);
+            }
+            // vehicleViewInput above contains only deliberate stick input.
+            // Native hand aiming must not rotate the tracking origin along
+            // with the barrel, feeding its own movement back into the grip.
+        }
         lastMappedWeaponReady=controllerFrame.weaponReady&&pad.leftTrigger>127;
         controllerFrame.contextInteract=rigInput&&!nativeInput.exclusive&&(pad.buttons&XINPUT_GAMEPAD_Y)
             &&(activeControl("gameplay.interact")||activeControl("vehicle.interact"));
