@@ -82,6 +82,7 @@ std::optional<Quat> nativeTorsoHeading(Pose chest);
 // the native upper body; the spine solve then limits it to anatomical reach.
 std::optional<Pose> fullBodyPlacement(Pose chest,Pose nativeHead,Pose uprightHead);
 std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 eye,float radius);
+std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 eye,float radius);
 // Native lumbar, chest, neck channels; the separate waist pivot stays native.
 std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface=nullptr);
 std::optional<ArmSolution> solveArm(const ArmPose& animated,Pose wristTarget,Vec3 bendHint,

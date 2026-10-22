@@ -3807,6 +3807,16 @@ int main(){
             &&squared(solved->pose.elbow.position-eye)>=.12f*.12f-1e-6f
             &&squared(solved->pose.wrist.position-eye)>=.14f*.14f-1e-6f,
             "captured cross-body reach stays live with native bone lengths and head clearance on either arm");
+        bool segmentsClear=solved.has_value();
+        if(solved)for(int step=0;step<=100;++step){
+            const float t=step*.01f;
+            const auto& p=solved->pose;
+            const auto upper=p.shoulder.position+(p.elbow.position-p.shoulder.position)*t;
+            const auto lower=p.elbow.position+(p.wrist.position-p.elbow.position)*t;
+            segmentsClear=segmentsClear&&squared(upper-eye)>=.12f*.12f-1e-6f
+                &&squared(lower-eye)>=.12f*.12f-1e-6f;
+        }
+        expect(segmentsClear,"cross-body sleeve clearance includes both bone segments between the joints");
     }
     // A prone wrist can remain above the floor while the unconstrained elbow
     // bends through it. Exercise contact on rotated slopes, not just flat Y=0.

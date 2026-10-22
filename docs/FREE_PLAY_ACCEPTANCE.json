@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "0d935edd73240994908759cdec488f070f392dd69983b0166835bc8bfe3bb3f1",
+  "candidate": "bb66ebf47b0b1cd168e3b1c0377534dadb0af2ce078061a541c22f11b5fd43e9",
   "candidate_status": "Scoped gameplay checked development; full release and physical-headset acceptance incomplete",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1087,6 +1087,12 @@
           },
           "result": "50cm gap corrected in crouch and standing. Body valid in all posture/walk phases, legs1.0, camera retains corrected exit height. Both final eyes reviewed. Fixed opposite palm moves at most0.1mm through right-wrist0/+30/-30/0 degrees.",
           "limits": "65/80cm still reach-limited; no arbitrary arm elongation. Broad interactions and physical Quest remain unaccepted. Earlier1f05 experiment exposed camera floating and was removed until camera fix; it is not the final accepted candidate."
+        },
+        {
+          "run": "20261022T220859668670Z",
+          "candidate": "bb66ebf47b0b1cd168e3b1c0377534dadb0af2ce078061a541c22f11b5fd43e9",
+          "result": "scoped_arm_segment_clearance_corrected",
+          "summary": "Cross-body arm-segment clearance fixed on bb66ebf47b0b. Baseline220020 has right/left forearms only10.2/10.6cm from the eye midpoint despite joint-only clearance. Check both complete bone segments and constrain the fallback direction at the head-sphere tangent, preserving native lengths and wrist orientation. First candidate220527 still penetrates because boundary rounding skips the tangent constraint; retained as a failed candidate. Corrected220859 samples12.0/12.4cm minimum, with reduced sleeve crowding in both final eyes, active camera, both neutral returns and ordinary left iDroid open/stow. The handset is viewed obliquely here; no new projector-readability claim. These are bounded simulator poses, not continuous-motion or physical-headset acceptance. Broader FP17 stays open. Owned sessions closed; published play unchanged."
         }
       ]
     }
@@ -1707,7 +1713,7 @@
         "20261022T200731484800Z",
         "20261022T200843068855Z"
       ],
-      "next": "ACC native physical weapon contact/pickup remains unimplemented; close cross-body sleeve crowding and wider/physical headset reach remain open. Do not repeat the restricted Mother Base lethal-weapon investigation."
+      "next": "Camera freeze and scoped arm-segment intrusion are corrected. ACC primary rifles now support physical carry/return. Wider interactions and physical headset reach remain open."
     },
     "acc_native_gear": {
       "candidate": "0d935edd73240994908759cdec488f070f392dd69983b0166835bc8bfe3bb3f1",
@@ -1744,6 +1750,17 @@
       ],
       "cleanup_receipt": "private/current-field-cover-stop.log",
       "next": "Investigate the native cover-clear transition before claiming release/benefit acceptance; remaining mounted physical controls and other FIELD_FIXES defects stay in scope. Do not repeat restricted Mother Base gun visibility comparisons."
+    },
+    "arm_segment_clearance": {
+      "candidate": "bb66ebf47b0b1cd168e3b1c0377534dadb0af2ce078061a541c22f11b5fd43e9",
+      "status": "scoped_segment_intrusion_fixed_broader_headset_open",
+      "summary": "Cross-body arm-segment clearance fixed on bb66ebf47b0b. Baseline220020 has right/left forearms only10.2/10.6cm from the eye midpoint despite joint-only clearance. Check both complete bone segments and constrain the fallback direction at the head-sphere tangent, preserving native lengths and wrist orientation. First candidate220527 still penetrates because boundary rounding skips the tangent constraint; retained as a failed candidate. Corrected220859 samples12.0/12.4cm minimum, with reduced sleeve crowding in both final eyes, active camera, both neutral returns and ordinary left iDroid open/stow. The handset is viewed obliquely here; no new projector-readability claim. These are bounded simulator poses, not continuous-motion or physical-headset acceptance. Broader FP17 stays open. Owned sessions closed; published play unchanged.",
+      "retained_runs": [
+        "20261022T220020019230Z",
+        "20261022T220527220866Z",
+        "20261022T220859668670Z"
+      ],
+      "next": "Continue remaining field fixes as related batches; do not repeat these six passing poses without a new change. Wider field/weapon/physical headset arm acceptance remains open."
     }
   }
 }

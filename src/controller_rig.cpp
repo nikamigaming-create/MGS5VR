@@ -796,8 +796,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 }
             }
         }
-        if(solution)if(const auto surface=headClearanceSurface(solution->pose.elbow.position,eyeInModel,.12f)){
+        if(solution)if(const auto surface=armHeadClearanceSurface(solution->pose,eyeInModel,.12f)){
             auto contact=solveArm(animated,target,hint,&basis,&*surface);
+            if(contact&&armHeadClearanceSurface(contact->pose,eyeInModel,.1199f))contact.reset();
             if(!contact)contact=solveArmAroundHead(animated,target,hint,&basis,eyeInModel,.12f,.14f);
             if(!contact){if(probe.enabled){probe.armFailure=2;probe.headSurface=*surface;}return std::optional<ArmSolution>{};}solution=contact;++headContacts;
         }

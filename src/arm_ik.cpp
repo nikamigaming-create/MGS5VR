@@ -262,6 +262,15 @@ std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 eye,float radius)
     // outside the eye without changing either bone length or the HMD pose.
     return ArmSurface{eye+normal*radius,normal,0};
 }
+std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 eye,float radius){
+    const auto nearest=[&](Vec3 a,Vec3 b){
+        const auto line=b-a;const float squared=dot(line,line);
+        return a+line*(squared>1e-8f?std::clamp(dot(eye-a,line)/squared,0.f,1.f):0.f);
+    };
+    const auto upper=nearest(arm.shoulder.position,arm.elbow.position);
+    const auto lower=nearest(arm.elbow.position,arm.wrist.position);
+    return headClearanceSurface(dot(upper-eye,upper-eye)<dot(lower-eye,lower-eye)?upper:lower,eye,radius);
+}
 std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface){
     const auto hint=native.elbow.position-native.shoulder.position;
     // Lumbar -> chest -> neck is the anatomical chain. WAIST -> SPINE is
@@ -360,7 +369,14 @@ std::optional<ArmSolution> solveArmAroundHead(const ArmPose& a,Pose target,Vec3 
         const float distance=length(head);
         if(distance<.00001f)return radius>=clearance?std::optional<Vec3>{center+direction*radius}:std::nullopt;
         const auto axis=head*(1.f/distance);
-        const float limit=(radius*radius+distance*distance-clearance*clearance)/(2.f*radius*distance);
+        float limit=(radius*radius+distance*distance-clearance*clearance)/(2.f*radius*distance);
+        // Clear the whole bone, not only its endpoint. Past the sphere's
+        // tangent point, the ray cone is stricter than endpoint separation.
+        // A source anchor already inside the envelope retains the endpoint
+        // fallback; it cannot be repaired by rotating this bone alone.
+        const float tangentSquared=distance*distance-elbowRadius*elbowRadius;
+        if(distance>=elbowRadius-1e-5f&&radius*radius>=tangentSquared)
+            limit=std::min(limit,std::sqrt(std::max(0.f,tangentSquared))/distance);
         if(limit< -1.f)return {};
         if(limit<1.f&&dot(direction,axis)>limit){
             auto tangent=direction-axis*dot(direction,axis);
