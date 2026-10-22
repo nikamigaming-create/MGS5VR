@@ -11,7 +11,7 @@ from gameplay_bot.live import InputLease, Live, ROOT, game_identity
 from gameplay_bot.navigation import NavigationAtlas
 from gameplay_bot.route import navigate, set_posture
 from gameplay_bot.perception import read_enemy_snapshot
-from gameplay_bot.combat import fresh_rig
+from gameplay_bot.combat import fresh_rig, mul
 from gameplay_bot.emplacement import bind_fixture, fixture, look_at_mount
 from gameplay_bot.locomotion import move_local
 from gameplay_bot.recording import Recording
@@ -203,13 +203,15 @@ def run(live, nav, policy, output, seconds):
                 raise BotFault('Mortar entry was not acknowledged; no trigger dispatched')
             time.sleep(.025)
         result['entered'] = state
-        # Entry changes the native camera heading. The approach's close-range
-        # HMD bearing would otherwise keep looking away from the barrel/arc.
-        # Look straight along the mounted camera with a physical simulator
-        # pose; preserved_tracking_poses restores the user's original pose.
+        # Y preserves the viewer's heading; LOCAL identity is not necessarily
+        # the emplacement's forward direction. Look along the native aiming
+        # bearing through the existing physical-head transform, including its
+        # retained origin/snap offset, instead of looking into Snake's pack.
+        point = state['rendered']['native_pose']['position']
+        yaw = math.radians(state['native']['player_camera_yaw'])
+        look_at_mount(live, anchor, [point[0]+math.sin(yaw), point[1], point[2]+math.cos(yaw)])
         head = live.text_result(live.call('get_head_pose', {'base_space': 'local'}))['pose']
-        head['orientation'] = [0., 0., 0., 1.]
-        live.call('set_head_pose', {'base_space': 'local', **head})
+        forward_head = list(head['orientation'])
         state, _ = fresh_rig(live, anchor)
         result['aim_forward'] = state
         result['entered_eyes'] = live.capture('mortar-entered')
@@ -245,7 +247,8 @@ def run(live, nav, policy, output, seconds):
                                        'eyes': live.capture('mortar-aim-' + axis.lower() +
                                                             ('plus' if sign > 0 else 'minus'))})
             atomic_json(output/'progress.json', result)
-        head['orientation'] = [math.sin(math.radians(12.5)), 0., 0., math.cos(math.radians(12.5))]
+        head['orientation'] = mul(forward_head,
+            [math.sin(math.radians(12.5)), 0., 0., math.cos(math.radians(12.5))])
         live.execute({'op':'motion','seconds':.75,'head':{'offset':[0.,0.,0.],'orientation':head['orientation']}})
         result['arc_look'] = live.execute({'op': 'action', 'name': 'gameplay.ready_weapon', 'seconds': 1.2,
             'native_before': {'mission': policy['mission'], 'location': policy['location'],
@@ -253,7 +256,7 @@ def run(live, nav, policy, output, seconds):
             'while_held': {'controls.native_triggers': [255, 0]},
             'static_grip_capture': True,
             'capture_while_held': 'mortar-native-arc-looking-up'})
-        head['orientation'] = [0., 0., 0., 1.]
+        head['orientation'] = forward_head
         live.execute({'op':'motion','seconds':.75,'head':{'offset':[0.,0.,0.],'orientation':head['orientation']}})
         target = policy.get('aim_target')
         if (not isinstance(target, list) or len(target) != 3

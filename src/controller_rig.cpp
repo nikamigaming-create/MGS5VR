@@ -746,7 +746,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const float yaw=std::atan2(forward.x,forward.z);
         Quat torso{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
         const auto travelMode=nativeTravelMode();
-        const bool mountedBody=travelMode==TravelMode::horse||frame.controllers.vehicleMounted;
+        const bool mountedBody=travelMode==TravelMode::horse||frame.controllers.vehicleMounted
+            ||frame.controllers.nativeActionControls;
         if(frame.locomotionHeadingTracked&&!frame.controllers.frontEnd
            &&!frame.controllers.authoredCamera&&!frame.controllers.cabinPlay
            &&!frame.controllers.cabinTransit&&!frame.controllers.vehicleMounted

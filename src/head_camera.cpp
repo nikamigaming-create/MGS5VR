@@ -885,7 +885,8 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             // anchored Pause/photo frames retain their admitted tag above.
             result.anatomicalEyeModel=nativeEyeJoined?rootSample.eyeModel:0;
             auto& state=stabilizationState(this);
-            const bool anatomical=controllers_.fullBody&&!controllers_.vehicleMounted;
+            const bool mountedOperator=controllers_.vehicleMounted||controllers_.nativeActionControls;
+            const bool anatomical=controllers_.fullBody&&!mountedOperator;
             if(state.valid&&(state.anatomical!=anatomical
                 ||(anatomical&&rootSample.eyeModel&&state.anatomicalModel!=rootSample.eyeModel)))state={};
             float dt=0;
@@ -979,11 +980,13 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             // Preserve the owned update clock when the camera beats its skin
             // to this millisecond; that skin must still receive the full dt.
             if(advanceOffset)state.time=time;
-            if(controllers_.vehicleMounted&&!controllers_.nativeGamepad){
+            if(mountedOperator&&!controllers_.nativeGamepad){
                 // The standing shoulder fit moves eyes .35 m behind and
                 // .25 m above the native head. In a fixed cab that puts the
                 // wheel outside arm reach and the shoulder mesh at the eyes.
-                // A seated driver uses this exact authored head publication;
+                // Drivers and stationary weapon operators use this exact
+                // authored head publication. A mortar keeps STAND set while
+                // its operator bends, so the on-foot stance latch is stale.
                 // physical HMD motion remains relative to it below.
                 nativePose.position=controllers_.fullBody&&nativeEyeJoined
                     ?rootSample.eyePosition:result.playerHead;

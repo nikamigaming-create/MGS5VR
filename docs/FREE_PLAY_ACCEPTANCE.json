@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "58d2f68824644822607124b8856da75b6a4b15be77e7b5a76057f3c96dc90d88",
+  "candidate": "33b6939020999aa355222a9c356479bb96fee71d48f5bccf7fb4c6b474c2e659",
   "candidate_status": "checked_development_scoped_gameplay_fixes_full_field_list_open",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -842,12 +842,25 @@
     {
       "id": "FP15",
       "title": "Mortar viewpoint is inside emplacement instead of behind it",
-      "status": "reproduce",
+      "status": "partial",
       "report": "User can fire but cannot see aiming or impacts; viewpoint appears inside mortar.",
       "acceptance": [
         "Native mortar entry from multiple headings; verify eye position relative to authored operator seat and barrel in both eyes",
         "Physical aim, visible trajectory/target feedback, firing and exit remain usable",
         "Seated/standing and return to ordinary on-foot view; no arbitrary camera offset accepted without native operator-frame evidence"
+      ],
+      "evidence": [
+        {
+          "run": "20261022T031244836544Z",
+          "candidate": "33b6939020999aa355222a9c356479bb96fee71d48f5bccf7fb4c6b474c2e659",
+          "scope": "Native operator eye/body placement and both-eye barrel-facing view through stick axes and ordinary exit.",
+          "limitations": [
+            "Physical grip aiming still has no production adapter.",
+            "Actual shell discharge, impact, ballistic accuracy and other emplacement types unproven.",
+            "Translucent geometry remains visible near the operator; not identified or closed.",
+            "No physical Quest acceptance."
+          ]
+        }
       ]
     },
     {
@@ -1130,7 +1143,7 @@
     "research_dossier": "D:/Dev/Tools/Ghidrust/workspace/evidence/mgs5vr/idroid-post-tutorial-close",
     "runtime_note": "Per-game Meta preference and -MetaLink launch checks pass. Windows global runtime was observed as Virtual Desktop at final cleanup; direct restoration to mandated Meta default was denied by Windows registry permissions. Global value remains Virtual Desktop. No SteamVR switch occurred.",
     "overall_goal_status": "active_all_unresolved_field_fixes",
-    "current_checkpoint": "Helicopter-exit height and 50cm crouched reach repaired; all remaining FIELD_FIXES stay active. No harness source changes in these fixes.",
+    "current_checkpoint": "Mounted operator camera/body corrected in scoped live run031244; full FIELD_FIXES remains active, especially physical mounted grip/aim and unresolved visual geometry.",
     "cover_followup": {
       "candidate": "8e63070500b9",
       "rejected_candidate": "ffdd224d59da",
@@ -1338,6 +1351,48 @@
         "Exact marker/finger contact, wider readability, loose-prop resting presentation and remaining FP09/10 coverage stay open."
       ],
       "cleanup": "Owned session closed; no bot or sampler remains; Steam and published play preserved."
+    },
+    "mounted_camera_body": {
+      "candidate": "33b6939020999aa355222a9c356479bb96fee71d48f5bccf7fb4c6b474c2e659",
+      "change": "Stationary actions use the current native operator eye and mounted full-body admission, preserving authored pelvis/legs instead of the stale on-foot standing anchor.",
+      "baseline": {
+        "run": "20261022T023132694777Z",
+        "eye_height_error_m": 0.628,
+        "full_body_valid": false,
+        "limit": "Legacy exact vehicle-ID predicate rejects stationary mortar action; not a mount/fire acceptance pass."
+      },
+      "final": {
+        "run": "20261022T031244836544Z",
+        "status": "observed_mortar_entry_trigger_exit",
+        "eye_anchor_difference_at_recorded_precision": [
+          0,
+          0,
+          0
+        ],
+        "mounted_body_valid_through_all_four_axes": true,
+        "review": "Both-eye barrel-facing Y-minus and exited pairs reviewed. Entry, four stick axes, ready/trigger input and ordinary exit complete.",
+        "shot_proven": false,
+        "impact_proven": false
+      },
+      "prior_attempts": [
+        {
+          "run": "20261022T024608312017Z",
+          "result": "Camera/body match, entry/axes/trigger/exit observed; LOCAL head reset looked backward into equipment. Not usable-view acceptance."
+        },
+        {
+          "run": "20261022T025747271826Z",
+          "result": "Native fixture reports broken. Further local entries did not mount. Other mortar also broken; machine-gun entry not established. Fresh normal Continue/deployment restored intact mortar for final run."
+        }
+      ],
+      "supporting_driver_change": "Use native aim bearing through looking_head instead of assuming LOCAL identity faces the mortar; preserve the resulting heading while looking up. Not a gameplay delivery.",
+      "limits": [
+        "Physical grip aiming still has no production adapter.",
+        "Actual shell discharge, impact, ballistic accuracy and other emplacement types unproven.",
+        "Translucent geometry remains visible near the operator; not identified or closed.",
+        "No physical Quest acceptance."
+      ],
+      "native_followup": "Bounded read-only action samples show 0x46 during stationary mortar; samples in private/current-mounted-action-samples.jsonl.",
+      "cleanup": "Owned game/simulator and bounded sampler closed; neutral input, no test menu, Steam retained; published play unchanged."
     }
   }
 }

@@ -7,7 +7,7 @@ Detailed evidence and test requirements: [acceptance ledger](FREE_PLAY_ACCEPTANC
 Live continuation: [CURRENT.md](CURRENT.md).
 
 - [ ] **Y-action forced rotation — FP03.** Jeep entry/exit fixed in development6b560: retained entries at62/38 degrees and exits hold within0.03 degrees; deliberate seated look and iDroid stow/reopen retain continuity. Uses pre-Y heading and actual carrier motion. Four retained headings, driving turns, Fulton and table/sandbag climbing remain open; latest approach did not acquire vehicle.
-- [ ] **Mortar operator viewpoint — FP15.** Reported inside the emplacement; establish native operator position and usable view of aiming/firing in both eyes.
+- [ ] **Mortar operator viewpoint — FP15.** Reproduced stationary-pose mismatch fixed on33b693: old camera62.8cm above native operator eye; both aiming axes now retain native eye and active mounted body. Barrel-facing views and ordinary exit reviewed in both eyes in031244. Physical grip contact, translucent geometry, firing/impact, other emplacements and physical Quest remain open.
 - [ ] **Natural mounted-weapon controls — FP11/FP15.** Implement physical grip-and-aim and stick aiming for mortars and each turret type; verify native pivots/limits, contact, release, firing and exit. MountedGrip helper exists but has no production adapter.
 - [ ] **Small-rock slipping and stops — FP16.** Reported; locate/repeat affected rocks, distinguish native collision/fall state from camera/body presentation.
 - [ ] **Right-wrist shoulder/opposite-arm coupling — FP17.** Reported in physical VR. Reproduced: right wrist +/-30 degrees rotates chest and shifts fixed-input left palm8.5/12cm. Acquired-weapon-only torso correction removes wrist-driven heading in two Mother Base repeats. Remaining opposite-palm movement is at most 1.13cm and follows native idle animation. Physical headset and reach remain open.
@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current checked development is `58d2f6882464`, adding native-chain paper pinch/contact to the cabin batch.
+Current checked development is `33b693902099`, adding native stationary-operator eye/body placement to the prior cabin batch.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -61,6 +61,13 @@ that route. The complete field list above remains the work queue.
   articulation and the paper-edge contact together. Both-hand note views
   reviewed in both eyes on58d2; combined typing, freehand writing and board
   pinning complete in020748. Broader FP09 and physical Quest remain open.
+
+- [x] **This pass: stationary mortar retains standing camera and drops full body.**
+  Native STAND remains set while the operator bends. Follow its current authored
+  eye and preserve native mounted pelvis/legs. Baseline023132 had62.8cm vertical
+  error and rejected the full body; final031244 has matching anchor/eye through
+  both axes and active mounted body. Barrel-facing and exit pairs reviewed.
+  This does not close physical grip aiming, firing/impact or broader FP15.
 
 ## Closure requirements
 

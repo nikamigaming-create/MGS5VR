@@ -7,6 +7,16 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Mounted camera/body batch on `33b693902099`: the mortar's STAND flag outlives
+  its standing pose. The old camera stayed62.8cm above the native operator eye,
+  and stationary actions excluded the full body. Both now use the native
+  mounted pose. Retained031244 shows zero anchor/eye difference at recorded
+  precision through both aiming axes, active mounted body, barrel-facing views
+  in both eyes and ordinary exit. Physical grip aiming, shot/impact proof,
+  translucent geometry, other emplacements and physical Quest remain open.
+  The first view check looked backward because LOCAL head identity ignored
+  preserved Y heading; its corrected check follows native aim bearing.
+
 - Paper grip on `58d2f6882464` now puts the edge between thumb/index contact
   instead of attaching it to an open palm. Both-eye right-note and left-note
   board views reviewed; the combined editor, pen-stroke and board sequence
@@ -82,7 +92,7 @@ worktree is needed for the remaining field fixes.
 - Earlier tracking-loss weapon continuity and tutorial iDroid ownership repairs
   remain included. Their evidence is scoped, not full-game acceptance.
 
-Current candidate with scoped gameplay checks: `58d2f6882464`.
+Current candidate with scoped gameplay checks: `33b693902099`.
 Required build and installer checks passed. Exact runs, rejected experiments and
 limits are in [FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json).
 The complete unresolved list is [FIELD_FIXES.md](FIELD_FIXES.md).
