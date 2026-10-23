@@ -3905,6 +3905,17 @@ int main(){
         expect(same(rotate(corrections[4],{0,1,0}),rotate(axisRotation(0,35),{0,1,0}))
             &&same(rotate(corrections[5],{0,1,0}),rotate(axisRotation(0,75),{0,1,0})),
                "forearm helper joints distribute 100 degrees of wrist twist at 35 and 75 percent");
+        const auto neutral=armCorrectiveTranslations({}, {},right);
+        const auto raised=armCorrectiveTranslations(axisRotation(2,right?45.f:-45.f),
+            axisRotation(2,right?-30.f:30.f),right);
+        const auto returned=armCorrectiveTranslations(axisRotation(2,right?-45.f:45.f),
+            axisRotation(2,right?30.f:-30.f),right);
+        expect(std::abs(neutral[0]-(right?-.003f:.003f))<1e-5f&&std::abs(neutral[1])<1e-5f,
+               "neutral garment channels use the authored shoulder floor and zero wrist bulge");
+        expect(std::abs(raised[0]-(right?-.14142136f:.14142136f))<1e-5f&&std::abs(raised[1]-.0175f)<1e-5f,
+               "native axis projections drive shoulder slide and wrist bulge from the tracked pose");
+        expect(std::abs(returned[0]-neutral[0])<1e-5f&&std::abs(returned[1])<1e-5f,
+               "returning the tracked arm clears the previous animation's slide and bulge");
     }
     const Pose watchElbow{{},{-.3f,-.3f,-.4f}},watchWrist{{},{0,-.3f,-.4f}};
     const auto watch=forearmPanel(watchElbow,watchWrist,{0,1,0});

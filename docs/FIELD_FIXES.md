@@ -30,7 +30,7 @@ Live continuation: [CURRENT.md](CURRENT.md).
 
 ## Current execution checkpoint
 
-Current checked development is `aaffbee70236`, adding stereo shoulder clearance to confirmed machine-gun physical aiming to full arm-segment head clearance to ACC primary-rifle pickup/carry/return and the cross-head reach freeze correction to native cover-assistance entry/exit, automatic ledge-heading continuity and tutorial exit-notice handoff, Rocket Arm steering and restored flight handset to seated helicopter body/eye continuity, marker pinch contact, loose-sheet settling and prior fixes. Physical pitch, contact, discharge and other mounted types remain open.
+Current checked development is `93106336e75f`, correcting stale shoulder-slide and wrist-bulge deformation on top of `aaffbee70236` and the earlier gameplay fixes. Mounted pitch/contact/impact and other types, extreme cross-head sleeve crowding, and the other unchecked defects remain open.
 Prior gameplay-checked `6b560649c200` includes the jeep heading correction and helicopter-exit height and head/neck reach corrections plus the sortie-head, support-finger and bare-hand
 wrist/torso corrections summarized in CURRENT.md. FP13's native free-roam route
 was verified through on-foot arrival on 21 October; the earlier missing root-row
@@ -84,6 +84,8 @@ that route. The complete field list above remains the work queue.
 - [x] **This batch: cover assistance Off leaves Snake attached.** Use native exit cleanup together with entry prevention. Standing/crouched Off clears mode2 to0 and restores normal action; On restores entry; wall collision and walking away retained. Both Off eye pairs reviewed. Retained082101/082139/082220/082303/082826/082855/082935. Attached-cover ready-weapon checks failed and remain open; this does not close FP04.
 
 - [x] **This batch: standing cover incorrectly uses stationary-weapon controls.** Native BEHIND now retains on-foot VR control and weapon-component admission. Actual standing-cover mode/ready checks, lean/up/return, crouch/stand and Off/walk pass on3d64af394fb3. Final gun and right-hand presentation remain unaccepted; the gun is also absent in retained outside-cover085521. This fixes the control gate, not the whole weapon-presentation report.
+
+- [x] **This batch: garment deformation follows the old native arm pose.** Recompute shoulder-slide X and wrist-bulge Y from the completed tracked arm using the owned outfit native driver rules. Historical right/left shoulder translations of -12.46/+5.11cm become the required -0.3/+0.3cm for that tracked pose. Candidate `93106336e75f`, retained `20261023T124233015633Z`: both reaches/returns, both lean/return directions, left iDroid open/stow pass. Both final eyes reviewed for reaches, right lean and iDroid; stable rendered palettes follow the driven channels. Extreme right cross-head sleeve crowding remains, and the handset is oblique. No broad FP17, projector readability or physical Quest closure. Owned sessions closed; published play unchanged.
 
 ## Closure requirements
 

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "aaffbee702362983f16b58f4ccbe87851d6b3583981c1380c8489b3f49c1d7c2",
-  "candidate_status": "Built and scoped combined ACC gameplay checked; exact cover visuals, full release and physical-headset acceptance incomplete",
+  "candidate": "93106336e75fc4feac0ea92a9d471fd392b3414a041de94aed61b3ca93e669b9",
+  "candidate_status": "Built and scoped garment correction checked in combined ACC gameplay; extreme cross-head sleeve crowding, full release and physical-headset acceptance incomplete",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1172,12 +1172,25 @@
           "candidate": "aaffbee702362983f16b58f4ccbe87851d6b3583981c1380c8489b3f49c1d7c2",
           "result": "live_mesh_identified_no_stable_corrective_jump",
           "summary": "Unchanged aaffbee70236 run030337 confirms live model code84a033c711e29aed exactly matches the owned sna5_main0_def.fmdl path hash. Both reaches/returns, both leans/returns and iDroid open/stow complete; cross-head sleeve crowding remains in both reviewed final eyes.1550 whole-palette samples passed repeated palette/root equality; the suspected helper jump with nearly stationary arm joints does not recur. The earlier bone-by-bone transition sample does not justify changing corrective rotations. Neither topology nor this check proves a skin deformation bug; crowding remains a visual acceptance concern. No production fix or rebuild. Stop repeating this cross-head batch by default; resume remaining gameplay interaction work unless new garment evidence identifies a defect. Owned session and reader closed; published play unchanged."
+        },
+        {
+          "run": "20261023T124233015633Z",
+          "candidate": "93106336e75fc4feac0ea92a9d471fd392b3414a041de94aed61b3ca93e669b9",
+          "result": "stale_shoulder_slide_and_wrist_bulge_corrected",
+          "summary": "Native garment translation channels now use the solved tracked arm instead of the pre-IK animation. Owned FRDV type12 and native evaluator confirm projection, clamp and units; 60 original-pose samples match within 0.000000029m. Historical right/left shoulder offsets -12.46/+5.11cm should be -0.3/+0.3cm for the captured tracked pose. 1061 stable candidate palettes match both channels within 0.000000061m. Both-arm reaches/returns, both lean/returns and left iDroid open/stow pass; both final eyes reviewed for reaches, right lean and iDroid.",
+          "limits": [
+            "Extreme right cross-head sleeve crowding remains visible; FP17 remains open",
+            "Handset oblique; no projector-readability acceptance",
+            "Physical Quest and wider garment/weapon poses remain open"
+          ],
+          "baseline": "20261023T123830466301Z",
+          "cleanup": "Owned game/simulator and bounded reader closed; Steam and published play retained"
         }
       ]
     }
   ],
   "active_work": {
-    "candidate": "aaffbee702362983f16b58f4ccbe87851d6b3583981c1380c8489b3f49c1d7c2",
+    "candidate": "93106336e75fc4feac0ea92a9d471fd392b3414a041de94aed61b3ca93e669b9",
     "targets": [
       "tutorial camera handoff freeze",
       "held-rifle right tracking loss"
@@ -1943,6 +1956,19 @@
       "baseline": "20261023T021519910146Z",
       "accepted_scoped_run": "20261023T023957429745Z",
       "physical_headset_acceptance": false
+    },
+    "garment_translation_correction": {
+      "run": "20261023T124233015633Z",
+      "candidate": "93106336e75fc4feac0ea92a9d471fd392b3414a041de94aed61b3ca93e669b9",
+      "result": "stale_shoulder_slide_and_wrist_bulge_corrected",
+      "summary": "Native garment translation channels now use the solved tracked arm instead of the pre-IK animation. Owned FRDV type12 and native evaluator confirm projection, clamp and units; 60 original-pose samples match within 0.000000029m. Historical right/left shoulder offsets -12.46/+5.11cm should be -0.3/+0.3cm for the captured tracked pose. 1061 stable candidate palettes match both channels within 0.000000061m. Both-arm reaches/returns, both lean/returns and left iDroid open/stow pass; both final eyes reviewed for reaches, right lean and iDroid.",
+      "limits": [
+        "Extreme right cross-head sleeve crowding remains visible; FP17 remains open",
+        "Handset oblique; no projector-readability acceptance",
+        "Physical Quest and wider garment/weapon poses remain open"
+      ],
+      "baseline": "20261023T123830466301Z",
+      "cleanup": "Owned game/simulator and bounded reader closed; Steam and published play retained"
     }
   }
 }

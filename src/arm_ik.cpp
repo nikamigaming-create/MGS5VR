@@ -481,6 +481,16 @@ std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Qu
     return {twist(clavicle,2,-1),twist(upper,0,right?-.75f:-.70f),twist(upper,0,-.45f),
         twist(elbow,1,-.55f),twist(wrist,0,.35f),twist(wrist,0,.75f),twist(wrist,1,-.55f)};
 }
+std::array<float,2> armCorrectiveTranslations(Quat upper,Quat wrist,bool right){
+    // The owned outfit's native helper driver projects the rotated authored
+    // axis onto its measurement axis, scales/clamps it, then converts decimetres
+    // to metres. Keeping the pre-IK translation stretches the sleeve whenever
+    // the tracked arm differs from the native weapon/idle animation.
+    const float shoulder=2.f*rotate(upper,{-1,0,0}).y;
+    const float wristBulge=-.35f*rotate(wrist,{0,1,0}).x*(right?-1.f:1.f);
+    return {std::clamp(shoulder,right?-2.f:.03f,right?-.03f:2.f)*.1f,
+            std::clamp(wristBulge,0.f,99999.f)*.1f};
+}
 std::optional<Pose> forearmPanel(Pose elbow,Pose wrist,Vec3 dorsal,float surfaceLift){
     if(!valid(elbow)||!valid(wrist)||!valid(Pose{{},dorsal})
        ||!std::isfinite(surfaceLift)||surfaceLift<0||surfaceLift>.1f)return {};

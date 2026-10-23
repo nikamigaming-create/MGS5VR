@@ -1600,11 +1600,14 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const size_t clavicle=side?9:5;
         const auto local=[&](size_t i){return compose(inverse(bone(q,p,parent[i])),bone(q,p,i)).orientation;};
         const auto corrections=armCorrectiveRotations(local(clavicle),local(clavicle+1),local(clavicle+2),local(clavicle+3),side!=0);
+        const auto translations=armCorrectiveTranslations(local(clavicle+1),local(clavicle+3),side!=0);
         for(size_t j=0;j<7;++j){
             const auto i=(*helpers)[side*7+j],anchor=static_cast<size_t>(armHelperParents[side*7+j]);
-            // Retain the native shoulder-slide and wrist-bulge translations;
-            // these channels are animated, not constant asset bind offsets.
-            const auto offset=compose(inverse(bone(originalQ,originalP,anchor)),bone(originalQ,originalP,i)).position;
+            // Re-evaluate the driven channels from this same solved arm.
+            // Other local components retain the outfit's authored animation.
+            auto offset=compose(inverse(bone(originalQ,originalP,anchor)),bone(originalQ,originalP,i)).position;
+            if(j==1)offset.x=translations[0];
+            if(j==6)offset.y=translations[1];
             if(!valid(Pose{{},offset})||dot(offset,offset)>0.16f)return false;
             replace(q,p,i,compose(bone(q,p,anchor),Pose{corrections[j],offset}));
         }

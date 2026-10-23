@@ -24,8 +24,11 @@ rigid placement, preserving their shared sleeve weights. The shoulder line sits
 18 cm below and 16 cm behind the head anchor; the former 6 cm setback exposed the
 native shirt's open shoulder ends in ordinary bent-arm poses. Authored joint axes define the
 elbow hinge; the elbow itself does not inherit wrist roll. Verified arm corrective
-joints 97-110 retain their native animated local translations and use recomputed
-native local rotations. This preserves shoulder slide and wrist bulge channels.
+joints are resolved by name and parentage. Their rotations and driven
+shoulder-slide/wrist-bulge translations are recomputed from the completed tracked
+arm. Copying those translations from the pre-IK animation stretched the sleeve
+when the tracked pose differed from the native idle or weapon pose. Other local
+translation components retain their native animation.
 The two forearm twist helpers carry 35% and 75% of wrist twist. Elbow and wrist
 flexion helpers counter-rotate by 55%; shoulder weights retain the native
 left/right difference. Other descendants retain their native animation.

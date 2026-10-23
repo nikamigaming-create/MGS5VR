@@ -94,6 +94,9 @@ std::optional<ArmSolution> solveArmAroundHead(const ArmPose& animated,Pose wrist
     const ArmBasis* basis,Vec3 eye,float elbowRadius,float wristRadius);
 // Local corrective rotations observed on this profile's seven arm helpers.
 std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Quat wrist,bool right);
+// Native shoulder-slide X and wrist-bulge Y, driven by the solved local
+// rotations. These replace channels, rather than adding to animated offsets.
+std::array<float,2> armCorrectiveTranslations(Quat upper,Quat wrist,bool right);
 inline constexpr std::array<uint32_t,14> armHelperNames{
     0x8cb42ff9,0x17c46537,0x668bcff7,0xf8ae9203,0x9ccbd1fd,0xc7a9a0c4,0x6cae37b1,
     0x82901b42,0x4b89fc94,0x18f26b1e,0x24ce95fb,0x0831f646,0x9bed7bf0,0xa4b3e85d};
