@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "1b64aed9530e9dc5db62afeedd8f36f0693ffc5ab21387b7fb3e8bd54f3cd6b4",
+  "candidate": "aaffbee702362983f16b58f4ccbe87851d6b3583981c1380c8489b3f49c1d7c2",
   "candidate_status": "Built and scoped combined ACC gameplay checked; exact cover visuals, full release and physical-headset acceptance incomplete",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1105,7 +1105,7 @@
     }
   ],
   "active_work": {
-    "candidate": "1b64aed9530e9dc5db62afeedd8f36f0693ffc5ab21387b7fb3e8bd54f3cd6b4",
+    "candidate": "aaffbee702362983f16b58f4ccbe87851d6b3583981c1380c8489b3f49c1d7c2",
     "targets": [
       "tutorial camera handoff freeze",
       "held-rifle right tracking loss"
@@ -1815,7 +1815,12 @@
         "Gatling and other emplacements",
         "physical Quest Link"
       ],
-      "cleanup": "private/current-machinegun-final-stop.log; temporary body dispatch/procedure removed; published play unchanged."
+      "cleanup": "private/current-machinegun-final-stop.log; temporary body dispatch/procedure removed; published play unchanged.",
+      "discharge_followup": {
+        "summary": "Machine-gun discharge verified on unchanged1b64aed9530e before the reload fix. Retained021053 mounts the exact second slopedWest type82 fixture, sends RT, releases and exits; live broken(...,1) remains false before/after and native source-eye video shows a muzzle flash. Both final mounted views reviewed. The immediate exit snapshot precedes animation completion; later read-only native observation restores NORMAL_ACTION at[73.438,334.558,83.962]. Impact and full contact/headset/other-emplacement acceptance remain open. Route020845 arrived without an interruption; this does not reproduce or close the unspecified rock/corridor reports. No mounted production change was required.",
+        "run": "20261023T021053897633Z",
+        "impact_proven": false
+      }
     },
     "cover_current_fit": {
       "candidate": "484c334480b4100a8ff841e69bc2f5b8fbe331513dd5271148a772d022b8f344",
@@ -1859,6 +1864,13 @@
       ],
       "physical_headset_acceptance": false,
       "whole_row_closed": false
+    },
+    "rifle_reload_contact": {
+      "candidate": "aaffbee702362983f16b58f4ccbe87851d6b3583981c1380c8489b3f49c1d7c2",
+      "summary": "Supported-rifle reload loss fixed onaaffbee70236. Baseline021519 loses acquired support0.484s into native reload with both physical grips held and unchanged weapon identity. Native magazine-hand motion was overwriting the acquired contact, and missing reload muzzle publication dropped firing-wrist calibration. Preserve the acquired distance-check offset and same-weapon local barrel calibration for the primary wrist; leave native reload animation and two-hand guidance policy intact. Final023957 passes moving aim, three native back-slot discharges, reload5->9 and return, with support retained in all17 reload samples including14 native manipulation samples. Native source-eye sequence reviewed for magazine-hand motion; both final post-reload eyes reviewed. Final observation has zero physical inputs and support detached after ordinary release. Required build/installer checks pass. The intermediatefa894 candidate was narrowed before acceptance so cached calibration cannot enable animation-driven two-hand aiming. No whole FP02, bolt-action or physical Quest claim. Owned sessions closed; temporary test dispatch removed; published play unchanged.",
+      "baseline": "20261023T021519910146Z",
+      "accepted_scoped_run": "20261023T023957429745Z",
+      "physical_headset_acceptance": false
     }
   }
 }

@@ -152,6 +152,7 @@ bool mountedActionAdmitted{};
 std::array<Vec3,2> bendHistory{};
 SupportContact supportContact;
 SupportPose supportPose;
+std::optional<Vec3> supportBarrelInGrip;
 float supportBlend{};
 float aimBlend{};
 Quat guidedOffset=identityQuaternion();
@@ -835,7 +836,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         boundOwner=owner;boundModel=model;activation=frame.activation;
         supportContact.reset();supportPose.reset();
         supportBlend=0;aimBlend=0;guidedOffset=identityQuaternion();heldSupportOffset={};supportAt=now;
-        supportWeapon=0;heldCloseSupport=false;
+        supportWeapon=0;heldCloseSupport=false;supportBarrelInGrip.reset();
         for(auto& motion:meleeMotion)motion.reset();
         meleeTracking=0;meleeCurl={};
         for(auto& hand:wheelSteering)hand.reset();
@@ -1407,16 +1408,27 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             }
         }
     }
+    // Reload temporarily withdraws the muzzle publication, but the same
+    // acquired firearm still needs its local grip calibration. Dropping that
+    // calibration swings the tracked wrist and its support contact even when
+    // neither controller moved. Never reuse it across weapons or releases.
+    auto primaryBarrelInGrip=barrelInGrip;
+    if(!nativeManipulation||!firearmActive||weaponSupportIdentity!=supportWeapon
+       ||!frame.controllers.weaponReady||!supportContact.attached()){
+        supportBarrelInGrip=barrelInGrip;
+    }else if(!barrelInGrip){
+        primaryBarrelInGrip=supportBarrelInGrip;
+    }
     // OpenXR grip describes a palm, not a gun barrel. Runtime aim accounts
     // for each controller profile's pointing angle. Swing the common wrist
     // owner using the native muzzle socket before solving support contact;
     // changing only the weapon would detach its grip, sights and shot path.
     const auto calibratedWeaponAim=frame.controllers.hands[1].aimTracked
         ?weaponAimWithPitch(frame.controllers.hands[1].aim,frame.controllers.weaponAimPitch):std::nullopt;
-    if(!propHands[1]&&barrelInGrip&&calibratedWeaponAim){
+    if(!propHands[1]&&primaryBarrelInGrip&&calibratedWeaponAim){
         probe.stage=9;
         const auto aim=compose(rootInverse,nativeTrackedPose(frame.nativePose,frame.headPose,*calibratedWeaponAim));
-        if(const auto aimed=aimedWeaponGrip(grips[1],aim,*barrelInGrip)){
+        if(const auto aimed=aimedWeaponGrip(grips[1],aim,*primaryBarrelInGrip)){
             grips[1]=*aimed;
             rightTarget=clearWrist(compose(grips[1],gripFromWrist[1]));
             right=groundedArm(rightAnimatedArm,rightTarget,bendHistory[1],armBasis[1]);
@@ -1492,7 +1504,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const auto presentedSupport=binocularSupportWrist
         ?compose(inverse(right->pose.wrist),*binocularSupportWrist)
         :supportPose.update(supportOffset,nearSupport,nativeManipulation,supportWeaponInWrist).value_or(supportOffset);
-    if(!binocularHeld&&nearSupport)heldSupportOffset=presentedSupport;
+    // The animated hand may leave the foregrip to work the magazine. Render
+    // that authored motion, but keep the acquired contact for distance/release
+    // checks; otherwise the animation itself detaches an unmoved controller.
+    if(!binocularHeld&&nearSupport&&!nativeManipulation)heldSupportOffset=presentedSupport;
     attached=compose(right->pose.wrist,presentedSupport);
     bool guiding=!binocularHeld&&!compactSupport&&nearSupport&&nativeManipulation&&aimBlend>0;
     if(!compactSupport&&barrelInGrip&&frame.controllers.hands[0].gripTracked&&nearSupport){
