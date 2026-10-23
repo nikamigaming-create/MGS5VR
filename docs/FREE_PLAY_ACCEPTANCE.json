@@ -812,6 +812,13 @@
           "candidate_sha256": "428a0c0872fceff0010da50e1e417cb012bb2a8f6b68ffb08be0766696430dad",
           "result": "Challenge Tasks Exit Tutorial now retains active VR and readable spatial notice in both eyes; dismissal and immediate iDroid reopening/stow pass.",
           "limitations": "Other lessons and physical headset unverified."
+        },
+        {
+          "candidate": "484c334480b4",
+          "run": "20261023T001704334441Z",
+          "result": "observed_native_intel_request_and_lesson_transition",
+          "scope": "Physical hand aim corrected by2.82 degrees to the live native village radio volume. Native request36864 accepted=1; sequence advanced to Seq_Game_CustumMarkerTutorial. Both final eyes reviewed, with magnified scene inside the right ocular. Earlier steady hand pose misses the native volume vertically, explaining the transient candidate and rejected request without a production change.",
+          "limitation": "No general binocular/headset acceptance. Adjacent001818 zoom2->4 and explicit native waypoint [350.385,320.486,1094.83] observed, but marker is outside authored village bounds384<x<768 and1024<z<1280. Corrected mark002230 dispatches zero steps because authored timeout already entered the explanation cinematic. Marking lesson remains open."
         }
       ]
     },
