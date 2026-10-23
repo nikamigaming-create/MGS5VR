@@ -839,6 +839,22 @@
           "result": "observed_native_intel_request_and_lesson_transition",
           "scope": "Physical hand aim corrected by2.82 degrees to the live native village radio volume. Native request36864 accepted=1; sequence advanced to Seq_Game_CustumMarkerTutorial. Both final eyes reviewed, with magnified scene inside the right ocular. Earlier steady hand pose misses the native volume vertically, explaining the transient candidate and rejected request without a production change.",
           "limitation": "No general binocular/headset acceptance. Adjacent001818 zoom2->4 and explicit native waypoint [350.385,320.486,1094.83] observed, but marker is outside authored village bounds384<x<768 and1024<z<1280. Corrected mark002230 dispatches zero steps because authored timeout already entered the explanation cinematic. Marking lesson remains open."
+        },
+        {
+          "candidate": "aaffbee70236",
+          "run": "20261023T074548779172Z",
+          "result": "observed_physical_intel_and_authored_village_mark_handoff",
+          "scope": "Native intel target36864 accepted=1. Physical mark inserts waypoint[514.145,319.247,1132.41] inside village bounds; read-only native sequence advances from CustumMarkerTutorial to RescueMillerExplanation about3.81s after placement. Both final eyes reviewed; markerA visible inside the right physical ocular. Earlier074146 confirms ordinary iDroid stow, physical equip and raise. No production change.",
+          "witnesses": [
+            "review.txt",
+            "current-intel-tutorial-watch.json",
+            "current-intel-followup-watch.json"
+          ],
+          "limitations": [
+            "Bot mark outcome stops after2s review threshold; subsequent native trace establishes the later handoff. Do not describe the whole suite as passing.",
+            "Fresh initial intel lesson has native enablebit0 clear during instruction and set afterward; not a contemporaneous trace of earlier065644 rejection.",
+            "No physical Quest, full-mission, broad stereo-motion or all-binocular-interactions acceptance."
+          ]
         }
       ]
     },

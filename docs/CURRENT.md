@@ -7,6 +7,9 @@ worktree is needed for the remaining field fixes.
 
 ## Current result
 
+- Mission1 physical intel and village marking handoff now verified on unchanged aaffbee70236 (retained074548). Target36864 accepted=1; mark[514.145,319.247,1132.41] is inside the authored village; read-only native sequence reaches RescueMillerExplanation3.81s later. Both final eyes reviewed. The bot stops after its2s review threshold, so do not label the entire suite a pass. Fresh074146 trace shows intel enablebit0 clear during the opening instruction, then set afterward; earlier rejection was not sampled contemporaneously. No production change or rebuild. Remaining FP12 is broader mission/menu/weapon and physical-headset coverage. Owned sessions closed. Do not repeat this tutorial by default; no general binocular defect was established.
+
+
 - Second cabin rifle on unchanged aaffbee70236: retained062844/063157 verify right-hand actual carry, exact native mount return on tracking loss and Menu interruption, no held-squeeze reacquisition after tracking recovery, fresh-squeeze recovery and final return. Native joins within13ms; carry and returned mount reviewed in both eyes, with full receiver/contact view limited at image edge. Left-hand063322 stops before acquisition at reach guard and remains open. Use the fresh-camera center-aisle approach; old diagonal/saved-offset attempts did not acquire. No production change or rebuild; temporary dispatch removed and owned session closed. See FIELD_FIXES for scope.
 
 - iDroid ordinary lifecycle follow-up on unchanged aaffbee70236: retained060859 completes three Menu-toggle stow/reopen cycles and final stow after reviewed Rival help dismissal. Earlier055733 single Back retained the map; this is not evidence of persistent stow failure. No production change. Stable stereo motion, forced lessons and physical Quest remain open; see FIELD_FIXES follow-up. Owned session closed. Do not repeat ordinary toggle checks by default.
