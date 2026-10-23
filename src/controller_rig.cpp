@@ -778,7 +778,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             rotate(rootInverse.orientation,surface->normal),clearance};
     };
     const auto clearWrist=[&](Pose target){
-        if(const auto surface=headClearanceSurface(target.position,eyeInModel,.14f)){
+        if(const auto surface=headClearanceSurface(target.position,eyesInModel[0],eyesInModel[1],.14f)){
             target.position=*outsideArmSurface(target.position,*surface);++headContacts;
         }
         if(const auto surface=modelSurface(target.position,.055f))
@@ -799,10 +799,17 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 }
             }
         }
-        if(solution)if(const auto surface=armHeadClearanceSurface(solution->pose,eyeInModel,.12f)){
+        if(solution)if(const auto surface=armHeadClearanceSurface(solution->pose,eyesInModel[0],eyesInModel[1],.12f)){
             auto contact=solveArm(animated,target,hint,&basis,&*surface);
-            if(contact&&armHeadClearanceSurface(contact->pose,eyeInModel,.1199f))contact.reset();
-            if(!contact)contact=solveArmAroundHead(animated,target,hint,&basis,eyeInModel,.12f,.14f);
+            if(contact&&armHeadClearanceSurface(contact->pose,eyesInModel[0],eyesInModel[1],.1199f))contact.reset();
+            if(!contact){
+                // Only the reach-limited fallback needs a containing sphere.
+                // Normal solving uses the exact capsule and keeps the target.
+                const auto center=(eyesInModel[0]+eyesInModel[1])*.5f;
+                const auto half=eyesInModel[1]-center;
+                const float padding=std::sqrt(dot(half,half));
+                contact=solveArmAroundHead(animated,target,hint,&basis,center,.12f+padding,.14f+padding);
+            }
             if(!contact){if(probe.enabled){probe.armFailure=2;probe.headSurface=*surface;}return std::optional<ArmSolution>{};}solution=contact;++headContacts;
         }
         return solution;

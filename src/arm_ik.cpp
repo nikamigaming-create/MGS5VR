@@ -288,6 +288,30 @@ std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 leftEye,Vec3 righ
     }
     return surface;
 }
+std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 leftEye,Vec3 rightEye,float radius){
+    // Closest points of each bone and the eye segment, including endpoint
+    // minima. The resulting plane supports the entire stereo capsule.
+    const auto nearest=[&](Vec3 a,Vec3 b){
+        const auto u=b-a,v=rightEye-leftEye,w=a-leftEye;
+        const float aa=dot(u,u),bb=dot(u,v),cc=dot(v,v),dd=dot(u,w),ee=dot(v,w);
+        if(aa<1e-8f)return a;
+        if(cc<1e-8f)return a+u*std::clamp(-dd/aa,0.f,1.f);
+        const float determinant=aa*cc-bb*bb;
+        float s=determinant>1e-8f?std::clamp((bb*ee-cc*dd)/determinant,0.f,1.f):0.f;
+        const float t=(bb*s+ee)/cc;
+        if(t<0)s=std::clamp(-dd/aa,0.f,1.f);
+        else if(t>1)s=std::clamp((bb-dd)/aa,0.f,1.f);
+        return a+u*s;
+    };
+    const auto upper=nearest(arm.shoulder.position,arm.elbow.position);
+    const auto lower=nearest(arm.elbow.position,arm.wrist.position);
+    const auto upperSurface=headClearanceSurface(upper,leftEye,rightEye,radius);
+    const auto lowerSurface=headClearanceSurface(lower,leftEye,rightEye,radius);
+    if(!upperSurface)return lowerSurface;
+    if(!lowerSurface)return upperSurface;
+    return dot(upper-upperSurface->point,upperSurface->normal)<dot(lower-lowerSurface->point,lowerSurface->normal)
+        ?upperSurface:lowerSurface;
+}
 std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface){
     const auto hint=native.elbow.position-native.shoulder.position;
     // Lumbar -> chest -> neck is the anatomical chain. WAIST -> SPINE is

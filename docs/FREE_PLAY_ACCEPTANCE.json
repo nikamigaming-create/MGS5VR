@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "449707db66344bca54ff08dd631263d5f70b7908a6243854252d68e7bdfa85ec",
+  "candidate": "1b64aed9530e9dc5db62afeedd8f36f0693ffc5ab21387b7fb3e8bd54f3cd6b4",
   "candidate_status": "Built and scoped combined ACC gameplay checked; exact cover visuals, full release and physical-headset acceptance incomplete",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
@@ -1105,7 +1105,7 @@
     }
   ],
   "active_work": {
-    "candidate": "484c334480b4100a8ff841e69bc2f5b8fbe331513dd5271148a772d022b8f344",
+    "candidate": "1b64aed9530e9dc5db62afeedd8f36f0693ffc5ab21387b7fb3e8bd54f3cd6b4",
     "targets": [
       "tutorial camera handoff freeze",
       "held-rifle right tracking loss"
@@ -1840,6 +1840,16 @@
       "baseline_run": "20261022T002654017393Z",
       "build_log": "private/current-stereo-shoulder-build.log",
       "next": "Check exact crouched-cover sleeve presentation when a stable native cover fixture is available; avoid repeating completed ACC checks without a relevant change. Continue remaining FIELD_FIXES defects."
+    },
+    "stereo_limb_clearance": {
+      "summary": "Stereo limb clearance corrected on1b64aed9530e. The previous shoulder-only stereo fix left wrist and complete arm-segment checks centered between the eyes. Retained012345 samples show right/left arm-to-eye minima9.13/11.12cm despite the12cm rule. Wrist targets and bone contacts now use the actual eye capsule; only infeasible reaches use its containing sphere, retaining native bone lengths. Required build checks pass. Retained014423 checks both cross-head reaches and neutral returns; sampled minima improve to13.44/14.61cm. Both cross-head final-eye pairs reviewed; extreme right-arm sleeve crowding remains visible, so broad FP17 is not closed. Operator timeout interrupts the following lean case, with cleanup initially unable to release. Fresh014544 observation confirms neutral head and active camera;014622 completes both lean/return directions and ordinary left iDroid open/stow. Both lean pairs and oblique iDroid pair reviewed; no projector-readability claim. Owned game/simulator and bounded reader closed. Published play unchanged; physical Quest and original cover visual acceptance remain open.",
+      "candidate": "1b64aed9530e9dc5db62afeedd8f36f0693ffc5ab21387b7fb3e8bd54f3cd6b4",
+      "runs": [
+        "20261023T014423677105Z",
+        "20261023T014622564163Z"
+      ],
+      "physical_headset_acceptance": false,
+      "whole_row_closed": false
     }
   }
 }

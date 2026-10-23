@@ -3803,6 +3803,16 @@ int main(){
         expect(axisSafe&&dot(*axisSafe-leftEye,*axisSafe-leftEye)>=.18f*.18f-1e-6f
             &&dot(*axisSafe-rightEye,*axisSafe-rightEye)>=.18f*.18f-1e-6f,
             "degenerate eye-axis contact chooses a plane supporting both eyes");
+        for(float side:{-1.f,1.f}){
+            const ArmPose nearEye{Pose{{},{side*.12f,-.25f,0}},Pose{{},{side*.12f,.25f,0}},Pose{{},{side*.4f,.3f,0}}};
+            const auto plane=armHeadClearanceSurface(nearEye,{-.03f,0,0},{.03f,0,0},.12f);
+            expect(!armHeadClearanceSurface(nearEye,{},.1199f)&&plane.has_value(),
+                "a midpoint-clear bone crossing 9 cm from either eye still requires stereo clearance");
+            const auto moved=plane?outsideArmSurface({side*.12f,0,0},*plane):std::nullopt;
+            expect(moved&&dot(*moved-Vec3{-.03f,0,0},*moved-Vec3{-.03f,0,0})>=.12f*.12f-1e-6f
+                &&dot(*moved-Vec3{.03f,0,0},*moved-Vec3{.03f,0,0})>=.12f*.12f-1e-6f,
+                "segment contact plane preserves clearance at both eyes");
+        }
     }
     // Captured ACC cross-body reach: its fully extended elbow circle lies
     // inside the head, so changing bend alone cannot produce a fresh rig.

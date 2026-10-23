@@ -84,6 +84,7 @@ std::optional<Pose> fullBodyPlacement(Pose chest,Pose nativeHead,Pose uprightHea
 std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 eye,float radius);
 std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 leftEye,Vec3 rightEye,float radius);
 std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 eye,float radius);
+std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 leftEye,Vec3 rightEye,float radius);
 // Native lumbar, chest, neck channels; the separate waist pivot stays native.
 std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface=nullptr);
 std::optional<ArmSolution> solveArm(const ArmPose& animated,Pose wristTarget,Vec3 bendHint,
