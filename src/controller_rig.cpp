@@ -761,6 +761,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     }
     const auto rootInverse=inverse(*root);
     const auto eyeInModel=compose(rootInverse,Pose{{},frame.nativePose.position}).position;
+    const std::array<Vec3,2> eyesInModel{
+        compose(rootInverse,nativeEyePose(frame.nativePose,frame.headPose,frame.views[0].pose)).position,
+        compose(rootInverse,nativeEyePose(frame.nativePose,frame.headPose,frame.views[1].pose)).position};
     const float groundCeiling=frame.nativePose.position.y+.05f;
     unsigned groundContacts{},headContacts{};
     const auto modelSurface=[&](Vec3 point,float clearance,bool footQuery=false,float footLift=0)->std::optional<ArmSurface>{
@@ -1232,7 +1235,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             // A cover reach can lift the shoulder beside the eye while the
             // elbow stays clear. Constrain the clavicle's shoulder endpoint
             // on its reach circle, including clearance for the upper sleeve.
-            if(const auto surface=headClearanceSurface(shoulderPose.position,eyeInModel,.18f)){
+            if(const auto surface=headClearanceSurface(shoulderPose.position,eyesInModel[0],eyesInModel[1],.18f)){
                 fitted=reachingClavicle(before,arm,target,&*surface);
                 if(fitted)++headContacts;
             }

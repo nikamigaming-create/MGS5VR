@@ -271,6 +271,23 @@ std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 eye,fl
     const auto lower=nearest(arm.elbow.position,arm.wrist.position);
     return headClearanceSurface(dot(upper-eye,upper-eye)<dot(lower-eye,lower-eye)?upper:lower,eye,radius);
 }
+std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 leftEye,Vec3 rightEye,float radius){
+    if(!valid(Pose{{},point})||!valid(Pose{{},leftEye})||!valid(Pose{{},rightEye}))return {};
+    // The capsule joining the actual eyes preserves the existing clearance
+    // at either eye, including asymmetric runtime eye offsets. Its tangent
+    // plane supports the complete capsule, so a constrained shoulder cannot
+    // clear one eye by moving into the other.
+    const auto axis=rightEye-leftEye;const float squared=dot(axis,axis);
+    if(squared<1e-8f)return headClearanceSurface(point,leftEye,radius);
+    const auto closest=leftEye+axis*std::clamp(dot(point-leftEye,axis)/squared,0.f,1.f);
+    auto surface=headClearanceSurface(point,closest,radius);
+    if(surface&&length(point-closest)<=.001f){
+        const auto direction=unit(axis);
+        const auto normal=unit(cross(direction,std::abs(direction.y)<.8f?Vec3{0,1,0}:Vec3{1,0,0}));
+        surface=ArmSurface{closest+normal*radius,normal,0};
+    }
+    return surface;
+}
 std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface){
     const auto hint=native.elbow.position-native.shoulder.position;
     // Lumbar -> chest -> neck is the anatomical chain. WAIST -> SPINE is

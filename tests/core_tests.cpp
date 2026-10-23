@@ -3788,6 +3788,21 @@ int main(){
             }
         }
         expect(shoulderClear&&handRetained,"captured cover reach clears the shoulder from the eyes without losing its hand target");
+        // Native cover sample: 18.0 cm from the midpoint still places the
+        // shoulder only 15.4 cm from the right eye.
+        const Vec3 capturedShoulder{-.16114673f,-.07050278f,-.03834737f};
+        const Vec3 leftEye{.02998421f,0,-.00097323f},rightEye{-.02998421f,0,.00097323f};
+        const auto stereoPlane=headClearanceSurface(capturedShoulder,leftEye,rightEye,.18f);
+        const auto stereoSafe=stereoPlane?outsideArmSurface(capturedShoulder,*stereoPlane):std::nullopt;
+        expect(!headClearanceSurface(capturedShoulder,{},.18f)&&stereoSafe
+            &&dot(*stereoSafe-leftEye,*stereoSafe-leftEye)>=.18f*.18f-1e-6f
+            &&dot(*stereoSafe-rightEye,*stereoSafe-rightEye)>=.18f*.18f-1e-6f,
+            "captured midpoint-clear shoulder must retain sleeve clearance at both runtime eyes");
+        const auto onAxis=headClearanceSurface({},leftEye,rightEye,.18f);
+        const auto axisSafe=onAxis?outsideArmSurface({},*onAxis):std::nullopt;
+        expect(axisSafe&&dot(*axisSafe-leftEye,*axisSafe-leftEye)>=.18f*.18f-1e-6f
+            &&dot(*axisSafe-rightEye,*axisSafe-rightEye)>=.18f*.18f-1e-6f,
+            "degenerate eye-axis contact chooses a plane supporting both eyes");
     }
     // Captured ACC cross-body reach: its fully extended elbow circle lies
     // inside the head, so changing bend alone cannot produce a fresh rig.

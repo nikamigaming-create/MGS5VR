@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "bb66ebf47b0b1cd168e3b1c0377534dadb0af2ce078061a541c22f11b5fd43e9",
-  "candidate_status": "Scoped gameplay checked development; full release and physical-headset acceptance incomplete",
+  "candidate": "449707db66344bca54ff08dd631263d5f70b7908a6243854252d68e7bdfa85ec",
+  "candidate_status": "Built and scoped combined ACC gameplay checked; exact cover visuals, full release and physical-headset acceptance incomplete",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1829,6 +1829,17 @@
         "20261023T011325074947Z"
       ],
       "next": "Measure native upper-sleeve extent and both-eye clearance in a stable crouched lean before changing the solver. Do not repeat the long original-fixture approach or claim the old figure identified. Other FIELD_FIXES rows remain in scope."
+    },
+    "stereo_shoulder_clearance": {
+      "candidate": "449707db66344bca54ff08dd631263d5f70b7908a6243854252d68e7bdfa85ec",
+      "status": "implemented_scoped_adjacent_checks_original_cover_visuals_open",
+      "summary": "Stereo shoulder-clearance correction implemented on449707db6634. Retained native cover samples from002654 show a shoulder18.0cm from the eye midpoint but only15.4cm from the right eye. The clavicle constraint now uses the capsule joining the current runtime eye positions, retaining its18cm radius and native bone lengths; wrist targets and weapon sockets are unchanged. Build and required checks pass. Combined ACC run20261023T012345674933Z completes both-arm cross-head reach/return, both22cm lean/return directions and ordinary left iDroid open/stow. Sampled minimum shoulder-to-eye distance is18.38cm. Both final eyes reviewed for both cross-head poses, right lean and iDroid; the extreme right cross-head pose still crowds the view, and the handset is oblique. Do not claim full rig or projector readability acceptance. Exact crouched-cover visual improvement and physical Quest remain open. Owned game/simulator and bounded bone reader closed; published play unchanged.",
+      "retained_runs": [
+        "20261023T012345674933Z"
+      ],
+      "baseline_run": "20261022T002654017393Z",
+      "build_log": "private/current-stereo-shoulder-build.log",
+      "next": "Check exact crouched-cover sleeve presentation when a stable native cover fixture is available; avoid repeating completed ACC checks without a relevant change. Continue remaining FIELD_FIXES defects."
     }
   }
 }
