@@ -1,3 +1,4 @@
+#include "mgs5vr/forearm_visibility.hpp"
 #include "mgs5vr/scene_capture.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
@@ -65,6 +66,7 @@ void reportPair(){
 HRESULT STDMETHODCALLTYPE finish(ID3D11DeviceContext* context,BOOL restore,ID3D11CommandList** output){
     ++finishCalls;
     const auto result=originalFinish(context,restore,output);
+    if(SUCCEEDED(result)&&!restore)resetForearmBindings(context);
     try{
         std::lock_guard lock(mutex);
         const auto found=recording.find(context);

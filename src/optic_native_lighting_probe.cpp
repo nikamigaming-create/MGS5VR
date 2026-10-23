@@ -1,3 +1,4 @@
+#include "mgs5vr/forearm_visibility.hpp"
 #include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
@@ -517,6 +518,7 @@ bool sceneUploadMatches(const OpticNativeGeometryPass& pass,const OpticNativeLig
 }
 void countTargets(ID3D11DeviceContext* context,UINT count,ID3D11RenderTargetView* const* targets,
     ID3D11DepthStencilView* depth) noexcept {
+    bindForearmTargets(context,count,targets);
     if(!enabled.load()||count==D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL)return;
     UINT colors{};if(targets&&count<=8)for(UINT i=0;i<count;++i)if(targets[i])++colors;
     targetCount={context,colors,depth!=nullptr};
@@ -539,21 +541,21 @@ void countTargets(ID3D11DeviceContext* context,UINT count,ID3D11RenderTargetView
     }
 }
 HRESULT STDMETHODCALLTYPE immediateMap(ID3D11DeviceContext* c,ID3D11Resource* r,UINT s,D3D11_MAP t,UINT f,D3D11_MAPPED_SUBRESOURCE* m){
-    if(t!=D3D11_MAP_READ)stampSceneWrite(r);const auto result=originalImmediateMap(c,r,s,t,f,m);if(SUCCEEDED(result))mappedScene(c,r,s,t,f,m);return result;}
+    if(t!=D3D11_MAP_READ)stampSceneWrite(r);const auto result=originalImmediateMap(c,r,s,t,f,m);if(SUCCEEDED(result)){mappedScene(c,r,s,t,f,m);mapForearmConstants(c,r,s,t,m);}return result;}
 HRESULT STDMETHODCALLTYPE deferredMap(ID3D11DeviceContext* c,ID3D11Resource* r,UINT s,D3D11_MAP t,UINT f,D3D11_MAPPED_SUBRESOURCE* m){
-    if(t!=D3D11_MAP_READ)stampSceneWrite(r);const auto result=originalDeferredMap(c,r,s,t,f,m);if(SUCCEEDED(result))mappedScene(c,r,s,t,f,m);return result;}
-void STDMETHODCALLTYPE immediateUnmap(ID3D11DeviceContext* c,ID3D11Resource* r,UINT s){unmappingScene(c,r,s);originalImmediateUnmap(c,r,s);}
-void STDMETHODCALLTYPE deferredUnmap(ID3D11DeviceContext* c,ID3D11Resource* r,UINT s){unmappingScene(c,r,s);originalDeferredUnmap(c,r,s);}
+    if(t!=D3D11_MAP_READ)stampSceneWrite(r);const auto result=originalDeferredMap(c,r,s,t,f,m);if(SUCCEEDED(result)){mappedScene(c,r,s,t,f,m);mapForearmConstants(c,r,s,t,m);}return result;}
+void STDMETHODCALLTYPE immediateUnmap(ID3D11DeviceContext* c,ID3D11Resource* r,UINT s){unmappingScene(c,r,s);unmapForearmConstants(c,r,s);originalImmediateUnmap(c,r,s);}
+void STDMETHODCALLTYPE deferredUnmap(ID3D11DeviceContext* c,ID3D11Resource* r,UINT s){unmappingScene(c,r,s);unmapForearmConstants(c,r,s);originalDeferredUnmap(c,r,s);}
 void STDMETHODCALLTYPE immediateUpdate(ID3D11DeviceContext* c,ID3D11Resource* r,UINT s,const D3D11_BOX* b,const void* d,UINT row,UINT depth){
-    stampSceneWrite(r);const auto upload=prepareSceneUpdate(c,r,s,b,d);originalImmediateUpdate(c,r,s,b,d,row,depth);finishSceneUpdate(c,upload);}
+    stampSceneWrite(r);updateForearmConstants(c,r,s,b,d);const auto upload=prepareSceneUpdate(c,r,s,b,d);originalImmediateUpdate(c,r,s,b,d,row,depth);finishSceneUpdate(c,upload);}
 void STDMETHODCALLTYPE deferredUpdate(ID3D11DeviceContext* c,ID3D11Resource* r,UINT s,const D3D11_BOX* b,const void* d,UINT row,UINT depth){
-    stampSceneWrite(r);const auto upload=prepareSceneUpdate(c,r,s,b,d);originalDeferredUpdate(c,r,s,b,d,row,depth);finishSceneUpdate(c,upload);}
-void STDMETHODCALLTYPE immediateCopy(ID3D11DeviceContext* c,ID3D11Resource* d,ID3D11Resource* s){stampSceneWrite(d);invalidateSceneWrite(c,d);originalImmediateCopy(c,d,s);}
-void STDMETHODCALLTYPE deferredCopy(ID3D11DeviceContext* c,ID3D11Resource* d,ID3D11Resource* s){stampSceneWrite(d);invalidateSceneWrite(c,d);originalDeferredCopy(c,d,s);}
+    stampSceneWrite(r);updateForearmConstants(c,r,s,b,d);const auto upload=prepareSceneUpdate(c,r,s,b,d);originalDeferredUpdate(c,r,s,b,d,row,depth);finishSceneUpdate(c,upload);}
+void STDMETHODCALLTYPE immediateCopy(ID3D11DeviceContext* c,ID3D11Resource* d,ID3D11Resource* s){stampSceneWrite(d);invalidateSceneWrite(c,d);updateForearmConstants(c,d,0,nullptr,nullptr);originalImmediateCopy(c,d,s);}
+void STDMETHODCALLTYPE deferredCopy(ID3D11DeviceContext* c,ID3D11Resource* d,ID3D11Resource* s){stampSceneWrite(d);invalidateSceneWrite(c,d);updateForearmConstants(c,d,0,nullptr,nullptr);originalDeferredCopy(c,d,s);}
 void STDMETHODCALLTYPE immediateCopyRegion(ID3D11DeviceContext* c,ID3D11Resource* d,UINT ds,UINT x,UINT y,UINT z,ID3D11Resource* s,UINT ss,const D3D11_BOX* b){
-    stampSceneWrite(d);invalidateSceneWrite(c,d);originalImmediateCopyRegion(c,d,ds,x,y,z,s,ss,b);}
+    stampSceneWrite(d);invalidateSceneWrite(c,d);updateForearmConstants(c,d,0,nullptr,nullptr);originalImmediateCopyRegion(c,d,ds,x,y,z,s,ss,b);}
 void STDMETHODCALLTYPE deferredCopyRegion(ID3D11DeviceContext* c,ID3D11Resource* d,UINT ds,UINT x,UINT y,UINT z,ID3D11Resource* s,UINT ss,const D3D11_BOX* b){
-    stampSceneWrite(d);invalidateSceneWrite(c,d);originalDeferredCopyRegion(c,d,ds,x,y,z,s,ss,b);}
+    stampSceneWrite(d);invalidateSceneWrite(c,d);updateForearmConstants(c,d,0,nullptr,nullptr);originalDeferredCopyRegion(c,d,ds,x,y,z,s,ss,b);}
 void STDMETHODCALLTYPE immediateTargets(ID3D11DeviceContext* c,UINT n,ID3D11RenderTargetView* const* r,ID3D11DepthStencilView* d){
     originalImmediateTargets(c,n,r,d);countTargets(c,n,r,d);}
 void STDMETHODCALLTYPE deferredTargets(ID3D11DeviceContext* c,UINT n,ID3D11RenderTargetView* const* r,ID3D11DepthStencilView* d){
@@ -566,9 +568,9 @@ void STDMETHODCALLTYPE deferredTargetsUavs(ID3D11DeviceContext* c,UINT n,ID3D11R
 // pass, then forward the original buffer and byte offset without reading,
 // modifying, replaying or waiting for its contents.
 void STDMETHODCALLTYPE immediateIndexedIndirect(ID3D11DeviceContext* c,ID3D11Buffer* args,UINT offset){
-    observeOpticNativeLightingDraw(c,OpticNativeLightingDrawKind::indexedIndirect);originalImmediateIndexedIndirect(c,args,offset);}
+    observeOpticNativeLightingDraw(c,OpticNativeLightingDrawKind::indexedIndirect);ForearmDraw forearms(c);originalImmediateIndexedIndirect(c,args,offset);}
 void STDMETHODCALLTYPE deferredIndexedIndirect(ID3D11DeviceContext* c,ID3D11Buffer* args,UINT offset){
-    observeOpticNativeLightingDraw(c,OpticNativeLightingDrawKind::indexedIndirect);originalDeferredIndexedIndirect(c,args,offset);}
+    observeOpticNativeLightingDraw(c,OpticNativeLightingDrawKind::indexedIndirect);ForearmDraw forearms(c);originalDeferredIndexedIndirect(c,args,offset);}
 void STDMETHODCALLTYPE immediateIndirect(ID3D11DeviceContext* c,ID3D11Buffer* args,UINT offset){
     observeOpticNativeLightingDraw(c,OpticNativeLightingDrawKind::indirect);originalImmediateIndirect(c,args,offset);}
 void STDMETHODCALLTYPE deferredIndirect(ID3D11DeviceContext* c,ID3D11Buffer* args,UINT offset){

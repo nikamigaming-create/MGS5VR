@@ -1,4 +1,4 @@
-# Current MGS5VR work — 22 October 2026
+# Current MGS5VR work — 23 October 2026
 
 Work only in this checkout on `main`. Local and origin have only main; earlier
 branch tips are archive tags. No open GitHub PR remained to merge. Previously
@@ -6,6 +6,10 @@ verified source work has been consolidated on main. No feature branch or
 worktree is needed for the remaining field fixes.
 
 ## Current result
+
+- Final rebuilt candidate17b044cba72e reaches the ACC through ordinary Continue in retained20261023T142213567316Z; owned game/simulator then closed, with no background runner.
+
+- Fixed-length body/forearm batch (17b044cba72e): removed leg calibration and dynamic length scaling; both legs keep native thigh/shin lengths, with shared pelvis placement satisfying head/spine and floor reach. Thigh clothing helpers now follow their solved joints. When full body is off/unavailable, the owned sna5 outfit hides shoulder/upper-sleeve triangles while retaining native hands, forearms, left bionic arm and attachments; full-body mode retains complete geometry. This simple cut still has a rough open sleeve edge in extreme close views and is not all-outfit acceptance. Extra cuff reconstruction was removed after startup failures; it is not in this candidate. The same retained gameplay implementation was checked on8330791606ab: cabin body run20261023T134930413251Z completes16 phases with both leg scales1 and eye error below0.001mm; explicit full_body=0 run20261023T135658962746Z passes both-arm reach/return and left iDroid front/turned/stow, with both final eyes reviewed and full_body restored to1. Adjacent production fixes evaluate acquired support on the current weapon transform, keep mounted aiming with the operating hand until release, adopt the correct horizontal posture/cover basis, and settle dropped markers using rotated extents. Those changes have focused checks; broad field acceptance remains open. No physical Quest or whole-game claim. Published play remains unchanged.
 
 - Garment deformation fixed in development `93106336e75f`: shoulder slide and wrist bulge now follow the solved tracked arm instead of the unrelated native idle/weapon pose. The owned native driver confirms the translation rules; the retained failure had right/left shoulder offsets of -12.46/+5.11cm where the tracked pose requires -0.3/+0.3cm. Combined run `20261023T124233015633Z` passes both-arm reaches/returns, both lean/return directions and left iDroid open/stow. Both final eyes reviewed for reaches, right lean and iDroid. Extreme right cross-head sleeve crowding remains visible; this does not close FP17 or establish projector readability or physical Quest acceptance. Build and installer checks pass. Owned test processes closed; published `play/` unchanged. Continue remaining FIELD_FIXES gameplay defects, not repeated ordinary ACC checks.
 

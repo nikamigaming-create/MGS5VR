@@ -6,6 +6,8 @@
 #include "core.hpp"
 
 namespace mgs5vr {
+// Render-only forearm policy shares the native player visibility owner.
+void setForearmPlayer(uintptr_t owner,uintptr_t model) noexcept;
 void requestFullBodyVisibility(bool enabled) noexcept;
 void publishFullBodyVisibility(uintptr_t owner,uintptr_t model,bool ready) noexcept;
 // Keep the native body visible for scripted scenes, even while immersive

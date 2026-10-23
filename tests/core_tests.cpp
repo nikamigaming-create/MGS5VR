@@ -2064,6 +2064,24 @@ int main(){
         expect(coverExit.applied&&same(coverExit.nativePose.position,covered.nativePose.position),
             "clearing cover before its crouched animation ends cannot rotate the eyes through the wall");
     }
+    {
+        HeadCamera postureFrame;postureFrame.configure(true,1,true);
+        const std::array<EyeView,2> rigEyes{EyeView{Pose{{},{-.032f,0,0}},squareEye},EyeView{Pose{{},{.032f,0,0}},squareEye}};
+        ControllerFrame input;input.fullBody=true;input.playerPosture=PlayerPosture::standing;
+        NativeBodyHead body{8,9,Pose{{},{0,1.6f,.4f}},Pose{},Pose{{0,.70710678f,0,.70710678f},{}},true};
+        auto cached=identityMatrix;cached[13]=1.6f;
+        postureFrame.trackStereo({},rigEyes,true,100,input);postureFrame.toggle();
+        postureFrame.publishPlayerHead(7,8,{},identityMatrix,cached,100);
+        postureFrame.resolve(7,{},100,body);
+        input.playerPosture=PlayerPosture::crouched;body.worldFromHead.position.y=1.f;
+        postureFrame.trackStereo({},rigEyes,true,120,input);
+        postureFrame.publishPlayerHead(7,8,{},identityMatrix,cached,120);
+        const auto crouched=postureFrame.resolve(7,{},120,body);
+        const auto nativeEye=compose(body.worldFromHead,Pose{{},nativeEyeFromHead}).position;
+        expect(crouched.applied&&near(crouched.nativePose.position.x,nativeEye.x)
+            &&near(crouched.nativePose.position.z,nativeEye.z)&&crouched.nativePose.position.y>nativeEye.y,
+            "crouch uses its native horizontal footprint immediately while height eases, even with a turned chest");
+    }
     const auto headPoint=playerHeadPosition(playerRoot,headBone);
     expect(headPoint&&same(*headPoint,{500.1f,301.6f,1300}),"animated head position uses local-then-world transform order");
     auto invalidRoot=playerRoot;invalidRoot[0]=std::numeric_limits<float>::quiet_NaN();
@@ -2583,6 +2601,25 @@ int main(){
                 expect(settled->revision==revision&&same(settled->papers[0].pose.position,position),
                     "Settled sheets stop moving and stop requesting persistence writes");
             }
+        }
+        {
+            CabinStudio marker;std::array<StudioHand,2> holding{};
+            holding[1].tracked=true;holding[1].grip.position=studioMarkerHome;
+            marker.update(true,true,{}, {},holding,100);
+            holding[1].squeeze=1;
+            auto dropped=marker.update(true,true,{}, {},holding,120);
+            expect(dropped->markerHand==1,"marker contact acquires before rotated release");
+            holding[1].grip.orientation={.70710678f,0,0,.70710678f};
+            holding[1].grip.position.y+=.2f;
+            marker.update(true,true,{}, {},holding,140);
+            marker.update(true,true,{}, {},holding,160);
+            holding[1].squeeze=0;
+            for(uint64_t t=180;t<=2180;t+=20)dropped=marker.update(true,true,{}, {},holding,t);
+            const auto tip=compose(dropped->marker,Pose{{},{0,0,-.08f}}).position;
+            const auto tail=compose(dropped->marker,Pose{{},{0,0,.08f}}).position;
+            const auto floor=cabinNativeSupportHeight(dropped->marker.position);
+            expect(dropped->markerHand<0&&std::min(tip.y,tail.y)>=floor-.0001f,
+                "a vertically released marker rests on its endpoint instead of penetrating the cabin support");
         }
         CabinStudio studio;std::array<StudioHand,2> hands{};
         auto frame=studio.update(true,false,Pose{{},{2,1.7f,3}},Pose{},hands,100,0,false,
@@ -3713,36 +3750,50 @@ int main(){
             expect(!physicalFloorHeightOffset(0,0,1,1.6f)&&!physicalFloorHeightOffset(1.6f,0,0,1.6f),
                 "unknown floor height or invalid scale cannot authorize height correction");
             const ArmPose shortLeg{Pose{{},{0,1,0}},Pose{{},{0,.6f,.1f}},Pose{{},{0,.2f,0}}};
-            const auto fittedLeg=scaledLegPose(shortLeg,1.25f);
             const auto magnitude=[](Vec3 v){return std::sqrt(dot(v,v));};
-            expect(fittedLeg&&same(fittedLeg->shoulder.position,shortLeg.shoulder.position)
-                &&same(fittedLeg->wrist.position,{0,0,0})
-                &&near(magnitude(fittedLeg->elbow.position-fittedLeg->shoulder.position),
-                    1.25f*magnitude(shortLeg.elbow.position-shortLeg.shoulder.position)),
-                "floor leg fit preserves hip and proportions while reaching the floor");
-            expect(!scaledLegPose(shortLeg,.9f)&&!scaledLegPose(shortLeg,1.6f),
-                "floor leg fit rejects shrinking and excessive extension");
-            const Pose floorContact{{},{0,.1f,0}};
-            const auto neutral=solveGroundedLeg(shortLeg,floorContact,1.1f);
+            const Pose floorContact{{},{0,.2f,0}};
+            const auto neutral=solveGroundedLeg(shortLeg,floorContact);
             auto raisedLeg=shortLeg;
             raisedLeg.shoulder.position.y+=.6f;raisedLeg.elbow.position.y+=.6f;raisedLeg.wrist.position.y+=.6f;
-            const auto raised=solveGroundedLeg(raisedLeg,floorContact,1.1f);
-            const auto returned=solveGroundedLeg(shortLeg,floorContact,1.1f);
-            expect(neutral&&raised&&returned&&same(raised->leg.pose.wrist.position,floorContact.position)
-                &&same(raised->leg.pose.shoulder.position,raisedLeg.shoulder.position)
-                &&raised->scale>1.5f&&near(returned->scale,neutral->scale)
-                &&same(returned->leg.pose.elbow.position,neutral->leg.pose.elbow.position),
-                "elevated seated/standing legs reach native floor and return without retaining transient size");
+            const auto raised=solveGroundedLeg(raisedLeg,floorContact);
+            const auto returned=solveGroundedLeg(shortLeg,floorContact);
             auto crouchedLeg=shortLeg;
             crouchedLeg.shoulder.position.y-=.3f;crouchedLeg.elbow.position.y-=.3f;crouchedLeg.wrist.position.y-=.3f;
-            const auto crouched=solveGroundedLeg(crouchedLeg,floorContact,1.1f);
-            expect(crouched&&near(crouched->scale,1.1f)
-                &&near(magnitude(crouched->leg.pose.elbow.position-crouched->leg.pose.shoulder.position),
-                        1.1f*magnitude(shortLeg.elbow.position-shortLeg.shoulder.position)),
-                "crouching retains calibrated limb length and bends the knee");
-            expect(!solveGroundedLeg(raisedLeg,Pose{{},{0,-1,0}},1.1f)
-                &&!solveGroundedLeg(shortLeg,floorContact,.9f),
-                "grounded leg rejects unattainable floor and invalid calibration");
+            const auto crouched=solveGroundedLeg(crouchedLeg,floorContact);
+            for(const auto* result:{&neutral,&raised,&returned,&crouched}){
+                expect(result->has_value(),"fixed-length leg solve remains valid across height changes");
+                if(*result){
+                    const auto& fitted=(*result)->leg.pose;
+                    expect(near((*result)->scale,1.f)
+                        &&near(magnitude(fitted.elbow.position-fitted.shoulder.position),magnitude(shortLeg.elbow.position-shortLeg.shoulder.position))
+                        &&near(magnitude(fitted.wrist.position-fitted.elbow.position),magnitude(shortLeg.wrist.position-shortLeg.elbow.position)),
+                        "standing, crouching and unreachable floor targets never grow or shrink either leg segment");
+                }
+            }
+            expect(neutral&&raised&&returned&&crouched&&raised->leg.reachClamped
+                &&!neutral->leg.reachClamped&&!crouched->leg.reachClamped
+                &&same(neutral->leg.pose.wrist.position,floorContact.position)
+                &&same(returned->leg.pose.elbow.position,neutral->leg.pose.elbow.position),
+                "unreachable floors clamp reach without retaining any transient limb size");
+            expect(!solveGroundedLeg(shortLeg,Pose{Quat{0,0,0,0},{}}),
+                "grounded leg rejects an invalid foot pose");
+            const ArmPose back{Pose{{},{0,1.6f,0}},Pose{{},{0,1.8f,.1f}},Pose{{},{0,2.f,0}}};
+            const Pose neckTarget{{},{0,1.45f,0}};
+            const std::array<ArmPose,2> legs{raisedLeg,raisedLeg};
+            const std::array<Pose,2> contacts{floorContact,floorContact};
+            const auto pelvis=groundedPelvisShift(back,neckTarget,legs,contacts);
+            expect(pelvis&&pelvis->y<-.5f,"shared pelvis moves to satisfy native leg reach instead of stretching legs");
+            if(pelvis){
+                const Pose shift{{},*pelvis};
+                const auto leg=solveGroundedLeg({compose(shift,raisedLeg.shoulder),compose(shift,raisedLeg.elbow),compose(shift,raisedLeg.wrist)},floorContact);
+                const auto body=solveSpine({compose(shift,back.shoulder),compose(shift,back.elbow),compose(shift,back.wrist)},neckTarget);
+                expect(leg&&body&&!leg->leg.reachClamped&&!body->reachClamped
+                    &&same(leg->leg.pose.wrist.position,floorContact.position)&&same(body->pose.wrist.position,neckTarget.position),
+                    "coupled pelvis fit retains both exact foot contact and tracked neck with native segment lengths");
+            }
+            expect(!groundedPelvisShift(back,Pose{{},{0,3,0}},legs,contacts),
+                "physically incompatible head and floor constraints cannot authorize a stretched body");
+
         }
         const auto chestBefore=nativeTorsoHeading(Pose{{.70090926f,0,0,.71325045f},{}});
         const auto chestAfter=nativeTorsoHeading(Pose{{.71325045f,0,0,.70090926f},{}});
@@ -3974,6 +4025,12 @@ int main(){
     const auto movedContact=supportPose.update(stowingSupport,true,false,weaponMoved);
     const auto expectedContact=compose(weaponMoved,compose(inverse(weaponAtGrab),acquiredSupport));
     expect(movedContact&&same(movedContact->position,expectedContact.position),"support stays on the acquired weapon point when its attachment moves relative to the wrist");
+    const Pose nextWeapon{{0,.5f,0,.8660254f},{.2f,0,.1f}};
+    const auto beforeDetach=supportPose.contact(nextWeapon);
+    const auto nextContact=compose(nextWeapon,compose(inverse(weaponAtGrab),acquiredSupport));
+    expect(beforeDetach&&same(beforeDetach->position,nextContact.position)
+        &&!same(beforeDetach->position,movedContact->position),
+        "support proximity uses the current moving weapon contact before the detach decision");
     const auto missingAttachment=supportPose.update(stowingSupport,true,false,std::nullopt);
     expect(missingAttachment&&same(missingAttachment->position,expectedContact.position),"missing weapon attachment cannot snap acquired support into the wrist frame");
     expect(!support.update(true,true,.25f,1000)&&!support.update(true,true,.25f,1200),"a free palm away from the weapon support grip stays one-handed");
@@ -5082,6 +5139,11 @@ int main(){
         const auto settledAxes=mountedAimAxes(aim,rebased.requestedAim);
         expect(rebased.held&&near(settledAxes[0],0)&&near(settledAxes[1],0),
             "manual stick aiming rebases a held physical grip instead of steering back to its old bearing");
+        aim.orientation={0,std::sin(.3f),0,std::cos(.3f)};
+        const auto follower=grip.update(owner,hand,contact,aim,true,true,5,.1f,.5f,true);
+        const auto transferred=grip.update(owner,hand,contact,aim,true,true,5,.1f,.5f);
+        expect(follower.held&&transferred.held&&near(mountedAimAxes(aim,transferred.requestedAim)[0],0),
+            "a supporting mounted hand takes over at the live bearing without its old aim request");
         expect(!step(true,6,false).held&&!step(true,7).held,"tracking loss drops grip and held recovery cannot reacquire");
         step(false,8);expect(step(true,9).held,"fresh squeeze after recovery can acquire");
         owner.mount=7;expect(!step(true,10).held&&!step(true,11).held,"changed native mount rejects old grip ownership");

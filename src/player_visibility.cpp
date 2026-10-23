@@ -634,11 +634,12 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool 
     for(auto& b:hidden)if(b.model&&(!firstPerson||b.owner!=owner||!owned(b)||(b.body&&(
         b.headOnly?!(authoredBody||(ready&&!hideArms&&b.model==fullBodyReady.model)):
         (authoredBody||b.hideArms!=hideArms||(ready&&!hideArms&&b.model==fullBodyReady.model))))))restore(b);
-    if(!firstPerson||get<uintptr_t>(owner)!=base+0x23b8218)return;
+    if(!firstPerson||get<uintptr_t>(owner)!=base+0x23b8218){setForearmPlayer(0,0);return;}
     const auto character=get<uintptr_t>(owner+0x370);
     if(!character||get<uintptr_t>(character)!=base+0x2295210)return;
     const auto component=get<uintptr_t>(character+0x10),bodyParts=get<uintptr_t>(component+0x10);
     const auto bodyModel=get<uintptr_t>(bodyParts+0x68);
+    setForearmPlayer(owner,!hideArms&&!authoredBody&&!(ready&&bodyModel==fullBodyReady.model)?bodyModel:0);
     Binding body{owner,character,bodyParts,0,0,bodyModel,true};
     // Do this at player publication, before FOX builds the visible draw list.
     // A scene-only hide is too late for already-prepared arm geometry.

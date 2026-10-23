@@ -466,7 +466,8 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
     if(cabin){
         if(cameraDropped_&&frame_.cameraHand<0){auto local=compose(inverse(room),frame_.camera);
             settle(local,cameraVelocity_,dt,paperExtent(local,studioCameraHalf));frame_.camera=rigid(compose(room,local));}
-        if(markerDropped_&&frame_.markerHand<0)settle(frame_.marker,markerVelocity_,dt,{.008f,.008f,.08f});
+        if(markerDropped_&&frame_.markerHand<0)
+            settle(frame_.marker,markerVelocity_,dt,paperExtent(frame_.marker,{.008f,.008f,.08f}));
         // Settle lower sheets first so a print stack has physical thickness.
         // Previously every copy fell onto the same seat plane and overlapped.
         std::vector<StudioPaper*> loose;

@@ -146,6 +146,7 @@ std::array<WheelSteering,2> wheelSteering;
 float wheelSteeringAxis{};
 std::array<MountedGrip,2> mountedGrips;
 std::array<MountedAimServo,2> mountedAimServos;
+int mountedAimHand=-1;
 uintptr_t mountedActionOwner{};
 uint64_t mountedActionGeneration{};
 bool mountedActionAdmitted{};
@@ -163,9 +164,6 @@ uint64_t supportAt{};
 std::array<HandPresentationCache,2> handPresentation;
 StationaryBodyState stationaryBody;
 BodyHeadingState bodyHeading;
-uintptr_t legFitOwner{},legFitModel{};
-float standingLegScale=1.f;
-bool legFitCalibrated{},legFitSeated{};
 struct ShotRig {
     uintptr_t owner{},character{},camera{},model{};
     Pose sourceCamera{},wristWorld{};
@@ -696,10 +694,6 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     std::lock_guard lock(rigMutex);
     const RigContinuityKey continuity{owner,model,frame.activation,frame.controllers.referenceEpoch,
         frame.controllers.presentationEpoch};
-    if(legFitOwner!=owner||legFitModel!=model||legFitSeated!=frame.controllers.seatedMode){
-        legFitOwner=owner;legFitModel=model;legFitSeated=frame.controllers.seatedMode;
-        standingLegScale=1.f;legFitCalibrated=false;
-    }
     std::array<std::optional<HandPresentationPose>,2> presentationHands;
     std::array<std::optional<Pose>,2> presentationGrips;
     if(frame.controllers.nativeGamepad){
@@ -843,6 +837,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         wheelSteeringAxis=0;wheelMailbox().publish({});
         for(auto& hand:mountedGrips)hand.reset();
         for(auto& servo:mountedAimServos)servo.reset();
+        mountedAimHand=-1;
         mountedActionAdmitted=false;mountedActionOwner=0;++mountedActionGeneration;
         mountedAimMailbox().publish({});
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
@@ -872,6 +867,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         compose(inverse(frame.nativePose),world)));};
     const auto nativeAimLocal=toLocal(nativeCamera);
     std::array<std::array<float,2>,2> mountedAxes{};
+    std::array<MountedGripSample,2> mountedHeld{};
     for(size_t side=0;side<2;++side){
         const auto contact=toLocal(compose(*root,compose(side?rightAnimated:leftAnimated,
             inverse(gripFromWrist[side]))));
@@ -880,20 +876,29 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         if(stationaryWeapon)frame.mountedWeaponGrips[side]=contact;
         const auto held=mountedGrips[side].update(mountedOwner,hand.grip,contact,nativeAimLocal,
             available,frame.controllers.mountedHandGrip[side],frame.sampleTime,.16f,.40f,
-            frame.controllers.mountedStickAiming);
+            frame.controllers.mountedStickAiming||mountedAimHand!=static_cast<int>(side));
+        mountedHeld[side]=held;
         if(held.held){
             mountedAim.hands|=static_cast<uint8_t>(1u<<side);
-            mountedAxes[side]=mountedAimServos[side].update(nativeCamera,
-                nativeTrackedPose(frame.nativePose,frame.headPose,held.requestedAim),
-                held.acquired||frame.controllers.mountedStickAiming);
         }else mountedAimServos[side].reset();
     }
+    // Keep the operating hand until it releases. The other hand follows its
+    // live handle without accumulating an aim request behind the operator.
+    const int aimHand=mountedAimHand>=0&&(mountedAim.hands&(1u<<mountedAimHand))
+        ?mountedAimHand:(mountedAim.hands&2)?1:(mountedAim.hands&1)?0:-1;
+    for(size_t side=0;side<2;++side){
+        if(static_cast<int>(side)!=aimHand){mountedAimServos[side].reset();continue;}
+        mountedAxes[side]=mountedAimServos[side].update(nativeCamera,
+            nativeTrackedPose(frame.nativePose,frame.headPose,mountedHeld[side].requestedAim),
+            mountedHeld[side].acquired||mountedAimHand!=aimHand||frame.controllers.mountedStickAiming);
+    }
+    mountedAimHand=aimHand;
     if(stationaryWeapon){
         mountedAim.player=owner;mountedAim.activation=frame.activation;
         mountedAim.referenceEpoch=frame.controllers.referenceEpoch;mountedAim.time=frame.sampleTime;
         // A second hand supports its own native contact without fighting the
         // primary hand's requested bearing. Either hand can operate alone.
-        mountedAim.axes=mountedAxes[(mountedAim.hands&2)?1:0];
+        if(aimHand>=0)mountedAim.axes=mountedAxes[aimHand];
         frame.mountedWeaponTracked=true;frame.mountedWeaponAction=actionId;
         frame.mountedWeaponHands=mountedAim.hands;frame.mountedWeaponAxes=mountedAim.axes;
     }
@@ -1084,6 +1089,68 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                     }
                 }
             }
+            std::array<Pose,2> footContacts=placedFeet;
+            std::array<std::optional<ArmSurface>,2> footSurfaces;
+            if(!mountedBody){
+                std::array<ArmPose,2> legs;
+                for(size_t side=0;side<2;++side){
+                    const size_t hip=side?17:13,knee=hip+1,ankle=hip+2;
+                    const ArmPose native{bone(q,p,hip),bone(q,p,knee),bone(q,p,ankle)};
+                    auto contact=placedFeet[side];
+                    if(frame.controllers.cabinPlay){
+                        // The native seated animation projects its feet ahead of
+                        // the chair. A room-scale body must support the tracked
+                        // pelvis instead; retain a small authored fore/aft offset
+                        // and let the existing floor/reach solve bend the knees.
+                        auto footWorld=compose(*root,contact);
+                        const auto hipWorld=compose(*root,native.shoulder);
+                        footWorld.position.x=hipWorld.position.x+(footWorld.position.x-hipWorld.position.x)*.15f;
+                        footWorld.position.z=hipWorld.position.z+(footWorld.position.z-hipWorld.position.z)*.15f;
+                        contact=compose(rootInverse,footWorld);
+                    }
+                    std::optional<ArmSurface> floor;
+                    // Keep the native support level inside the search when the
+                    // eye-placed ankle rises; a fixed 75 cm ray lost the floor.
+                    const auto nativeAnkle=bone(originalQ,originalP,ankle);
+                    const float footLift=rotate(root->orientation,contact.position-nativeAnkle.position).y;
+                    if(const auto surface=modelSurface(contact.position,.09f,true,footLift)){
+                        floor=surface;++frame.body.floorQueries;
+                        // Retain native gait lift, including prone toe posture.
+                        // Eye/body yaw can move a foot to a different point on a
+                        // slope; preventing only penetration leaves that foot
+                        // floating over the new ground. Join both floor queries
+                        // to this original/retargeted skin pair instead.
+                        if(const auto originalFloor=modelSurface(bone(originalQ,originalP,ankle).position,.09f,true)){
+                            const float originalClearance=dot(bone(originalQ,originalP,ankle).position-originalFloor->point,originalFloor->normal);
+                            frame.body.nativeFloorClearance[side]=originalClearance;
+                            const float placedClearance=dot(contact.position-surface->point,surface->normal);
+                            const auto worldNormal=rotate(root->orientation,surface->normal);
+                            if(worldNormal.y>.35f){
+                                const float verticalCorrection=(std::max(.09f,originalClearance)-placedClearance)/worldNormal.y;
+                                contact.position=contact.position+rotate(rootInverse.orientation,{0,verticalCorrection,0});
+                            }
+                        }
+                        if(const auto point=outsideArmSurface(contact.position,*surface)){
+                            if(dot(*point-contact.position,*point-contact.position)>1e-8f)++frame.body.floorContacts;
+                            contact.position=*point;
+                        }
+                    }
+                    legs[side]=native;footContacts[side]=contact;footSurfaces[side]=floor;
+                }
+                const Pose shiftBefore{{},pelvisShift};
+                const ArmPose placedSpine{compose(shiftBefore,nativeSpine.shoulder),
+                    compose(shiftBefore,nativeSpine.elbow),compose(shiftBefore,nativeSpine.wrist)};
+                if(const auto correction=groundedPelvisShift(placedSpine,neckTarget,legs,footContacts)){
+                    const Pose shift{{},*correction};
+                    const auto fitted=solveSpine({compose(shift,placedSpine.shoulder),
+                        compose(shift,placedSpine.elbow),compose(shift,placedSpine.wrist)},
+                        neckTarget,chestFloor?&*chestFloor:nullptr);
+                    if(fitted&&!fitted->reachClamped){
+                        spine=fitted;pelvisShift=pelvisShift+*correction;
+                        for(size_t i=0;i<count;++i){auto placed=bone(q,p,i);placed.position=placed.position+*correction;replace(q,p,i,placed);}
+                    }
+                }
+            }
             if(!spine){frame.body.rejection=2;probe.bodyRejection=2;return false;}
             // Descendants still use the untouched native animation baseline.
             // Include the complete eye-centered placement in joint deltas.
@@ -1123,68 +1190,32 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 // Floor queries belong to the eye-placed native gait,
                 // not to feet at their obsolete animation-space location.
                 const ArmPose native{bone(q,p,hip),bone(q,p,knee),bone(q,p,ankle)};
-                auto contact=placedFeet[side];
-                if(frame.controllers.cabinPlay){
-                    // The native seated animation projects its feet ahead of
-                    // the chair. A room-scale body must support the tracked
-                    // pelvis instead; retain a small authored fore/aft offset
-                    // and let the existing floor/reach solve bend the knees.
-                    auto footWorld=compose(*root,contact);
-                    const auto hipWorld=compose(*root,native.shoulder);
-                    footWorld.position.x=hipWorld.position.x+(footWorld.position.x-hipWorld.position.x)*.15f;
-                    footWorld.position.z=hipWorld.position.z+(footWorld.position.z-hipWorld.position.z)*.15f;
-                    contact=compose(rootInverse,footWorld);
-                }
-                std::optional<ArmSurface> floor;
-                // Keep the native support level inside the search when the
-                // eye-placed ankle rises; a fixed 75 cm ray lost the floor.
-                const auto nativeAnkle=bone(originalQ,originalP,ankle);
-                const float footLift=rotate(root->orientation,contact.position-nativeAnkle.position).y;
-                if(const auto surface=modelSurface(contact.position,.09f,true,footLift)){
-                    floor=surface;++frame.body.floorQueries;
-                    // Retain native gait lift, including prone toe posture.
-                    // Eye/body yaw can move a foot to a different point on a
-                    // slope; preventing only penetration leaves that foot
-                    // floating over the new ground. Join both floor queries
-                    // to this original/retargeted skin pair instead.
-                    if(const auto originalFloor=modelSurface(bone(originalQ,originalP,ankle).position,.09f,true)){
-                        const float originalClearance=dot(bone(originalQ,originalP,ankle).position-originalFloor->point,originalFloor->normal);
-                        frame.body.nativeFloorClearance[side]=originalClearance;
-                        const float placedClearance=dot(contact.position-surface->point,surface->normal);
-                        const auto worldNormal=rotate(root->orientation,surface->normal);
-                        if(worldNormal.y>.35f){
-                            const float verticalCorrection=(std::max(.09f,originalClearance)-placedClearance)/worldNormal.y;
-                            contact.position=contact.position+rotate(rootInverse.orientation,{0,verticalCorrection,0});
-                        }
-                    }
-                    if(const auto point=outsideArmSurface(contact.position,*surface)){
-                        if(dot(*point-contact.position,*point-contact.position)>1e-8f)++frame.body.floorContacts;
-                        contact.position=*point;
-                    }
-                }
-                if(floor&&frame.controllers.physicalFloorTracked&&!legFitCalibrated
-                   &&frame.controllers.playerPosture==PlayerPosture::standing){
-                    // Calibrate once on entering standing mode. Later head
-                    // excursions must not permanently lengthen this body.
-                    const auto magnitude=[](Vec3 v){return std::sqrt(dot(v,v));};
-                    const float reach=magnitude(native.elbow.position-native.shoulder.position)
-                        +magnitude(native.wrist.position-native.elbow.position);
-                    const float needed=magnitude(contact.position-native.shoulder.position);
-                    if(reach>.2f){standingLegScale=std::clamp(needed/reach*1.005f,1.f,1.5f);legFitCalibrated=true;}
-                }
+                auto contact=footContacts[side];
+                const auto& floor=footSurfaces[side];
                 std::optional<ArmSolution> leg;
                 if(floor&&frame.controllers.playerPosture!=PlayerPosture::prone){
-                    const auto grounded=solveGroundedLeg(native,contact,
-                        frame.controllers.seatedMode?1.f:standingLegScale);
+                    const auto grounded=solveGroundedLeg(native,contact);
                     if(grounded){leg=grounded->leg;frame.body.legScale[side]=grounded->scale;}
                 }else leg=solveArm(native,contact,native.elbow.position-native.shoulder.position);
-                frame.body.legCalibration=frame.controllers.seatedMode?1.f:standingLegScale;
+                frame.body.legCalibration=1.f;
                 if(!leg){frame.body.rejection=4;probe.bodyRejection=4;return false;}
                 replace(q,p,hip,leg->pose.shoulder);replace(q,p,knee,leg->pose.elbow);replace(q,p,ankle,leg->pose.wrist);
-                const auto footDelta=compose(leg->pose.wrist,inverse(bone(originalQ,originalP,ankle)));
-                for(size_t i=ankle+1;i<count;++i){
-                    bool foot=false;for(int32_t ancestor=parent[i];ancestor>=0;ancestor=parent[ancestor])if(ancestor==static_cast<int32_t>(ankle)){foot=true;break;}
-                    if(foot)replace(q,p,i,compose(footDelta,bone(originalQ,originalP,i)));
+                const std::array<size_t,3> joints{hip,knee,ankle};
+                const std::array<Pose,3> solved{leg->pose.shoulder,leg->pose.elbow,leg->pose.wrist};
+                std::array<Pose,3> deltas;
+                for(size_t joint=0;joint<3;++joint)deltas[joint]=compose(solved[joint],inverse(bone(originalQ,originalP,joints[joint])));
+                // Thigh garment helpers are siblings of the knee, not foot
+                // descendants. Leaving them in the pre-IK palette tears the
+                // trouser mesh even when hip/knee/ankle lengths are correct.
+                // Transport each branch with its nearest solved joint.
+                for(size_t i=0;i<count;++i){
+                    if(i==hip||i==knee||i==ankle)continue;
+                    for(int32_t ancestor=parent[i];ancestor>=0;ancestor=parent[ancestor]){
+                        const auto joint=std::find(joints.begin(),joints.end(),static_cast<size_t>(ancestor));
+                        if(joint==joints.end())continue;
+                        replace(q,p,i,compose(deltas[static_cast<size_t>(joint-joints.begin())],bone(originalQ,originalP,i)));
+                        break;
+                    }
                 }
                 frame.body.feet[side]=compose(*root,leg->pose.wrist);
                 if(floor)frame.body.floorClearance[side]=dot(leg->pose.wrist.position-floor->point,floor->normal);
@@ -1469,7 +1500,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     auto contactWrist=right->pose.wrist;
     if(aimBlend>0)if(const auto solved=groundedArm(rightAnimatedArm,clearWrist(compose(contactPrimary,gripFromWrist[1])),bendHistory[1],armBasis[1]))
         contactWrist=solved->pose.wrist;
-    const auto contactPose=compose(contactWrist,wasAttached?heldSupportOffset:supportOffset);
+    const auto currentSupport=wasAttached&&!nativeManipulation
+        ?supportPose.contact(supportWeaponInWrist).value_or(heldSupportOffset):heldSupportOffset;
+    const auto contactPose=compose(contactWrist,wasAttached?currentSupport:supportOffset);
     const auto attachedGrip=compose(contactPose,inverse(gripFromWrist[0]));
     const auto separation=grips[0].position-attachedGrip.position;
     const auto handSeparation=grips[0].position-grips[1].position;

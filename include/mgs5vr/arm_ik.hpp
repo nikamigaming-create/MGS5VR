@@ -35,12 +35,14 @@ private:
 struct StationaryBodyPose {Vec3 pelvis,leftHip,rightHip,leftShoulder,rightShoulder;Pose chest;};
 std::optional<Pose> stationaryLowerBodyDelta(const StationaryBodyPose& body,Pose torsoDelta);
 struct ArmPose { Pose shoulder,elbow,wrist; };
-std::optional<ArmPose> scaledLegPose(const ArmPose& native,float scale);
 struct ArmSolution { ArmPose pose; bool reachClamped{}; };
 struct GroundedLegSolution { ArmSolution leg; float scale{1}; };
-// Fit only this frame's leg reach. Calibration is a lower bound, never a
-// high-water mark from earlier head motion. Arms retain their own size limits.
-std::optional<GroundedLegSolution> solveGroundedLeg(const ArmPose& native,Pose contact,float calibration=1.f);
+// Unreachable contacts clamp reach; they never change the skeleton's size.
+std::optional<GroundedLegSolution> solveGroundedLeg(const ArmPose& native,Pose contact);
+// A common pelvis translation lets the fixed-length spine reach the neck and
+// both fixed-length legs reach their floor contacts without moving the eyes.
+std::optional<Vec3> groundedPelvisShift(const ArmPose& spine,Pose neck,
+    const std::array<ArmPose,2>& legs,const std::array<Pose,2>& feet);
 // A contact returned by native world collision, in the arm solve's space.
 struct ArmSurface { Vec3 point,normal; float clearance{}; };
 // Protract for reach, optionally keeping the shoulder outside a head surface.
@@ -129,6 +131,9 @@ private:
 class SupportPose {
 public:
     std::optional<Pose> update(Pose nativeOffset,bool attached,bool manipulating,std::optional<Pose> weaponInWrist=Pose{});
+    // Evaluate the acquired contact on this frame's weapon before deciding
+    // whether the tracked support hand has pulled away from it.
+    std::optional<Pose> contact(std::optional<Pose> weaponInWrist) const;
     void reset(){*this={};}
 private:
     bool attached_{};

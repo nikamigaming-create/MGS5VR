@@ -126,3 +126,13 @@ and its adjacent interactions together. Do not spend a separate build/deploy/tes
 cycle on every narrow subcase. Reproduce unknown failures before changing their
 working flows; an untested combination is not itself a diagnosed defect. Report
 actual gameplay deliveries and remaining failures, not harness work as progress.
+
+User direction, 23 October 2026:
+
+Never lengthen legs. Preserve native thigh and shin lengths through calibration,
+headset motion, posture changes and floor fitting. Fit the pelvis and joints
+within those lengths instead of scaling the skeleton. Prioritize body/head IK
+and arm presentation, then continue the remaining field fixes in batches.
+When full-body presentation is off or unavailable, show hands and forearms,
+without shoulders or upper sleeves. Preserve the left bionic/rocket arm, left
+forearm HUD and left-hand iDroid interactions.

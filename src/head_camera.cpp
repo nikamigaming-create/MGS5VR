@@ -54,6 +54,7 @@ struct CameraStabilizationState {
     bool anatomical{};
     bool wallCover{};
     uintptr_t anatomicalModel{};
+    bool nativeFootprint{};
 };
 std::mutex playerRootMutex;
 std::unordered_map<uintptr_t,PlayerRootSample> playerRoots;
@@ -961,6 +962,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 state.heading=rootSample.orientation;
                 state.posture=controllers_.playerPosture;
                 state.wallCover=wallCover;
+                state.nativeFootprint=nativeFootprint;
                 state.anatomical=anatomical;
                 state.anatomicalModel=anatomical?rootSample.eyeModel:0;
                 state.valid=true;
@@ -972,12 +974,17 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 if(posture!=PlayerPosture::unknown){
                     if(posture!=state.posture||wallCover!=state.wallCover){
                         state.postureUntil=time+900;state.postureSum={};state.postureWeight=0;
-                        // Cover changes the offset's coordinate frame even
-                        // when SQUAT stays set. Never transport a chest-local
-                        // gait anchor as a wall/root-local anchor.
-                        if(wallCover!=state.wallCover)state.headLocalOffset=targetHeadLocalOffset;
+                        // Cover and low postures use the native root frame;
+                        // standing uses the chest frame. Never interpolate
+                        // horizontal coordinates from one basis in the other.
+                        // Height still eases through the posture transition.
+                        if(wallCover!=state.wallCover||nativeFootprint!=state.nativeFootprint){
+                            state.headLocalOffset.x=targetHeadLocalOffset.x;
+                            state.headLocalOffset.z=targetHeadLocalOffset.z;
+                        }
                     }
                     state.wallCover=wallCover;
+                    state.nativeFootprint=nativeFootprint;
                     state.posture=posture;
                     if(state.postureUntil){
                         const auto alpha=smoothingAlpha(dt,headStabilizationTau);

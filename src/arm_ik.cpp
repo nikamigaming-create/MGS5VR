@@ -3,14 +3,6 @@
 #include <cmath>
 
 namespace mgs5vr {
-std::optional<ArmPose> scaledLegPose(const ArmPose& native,float scale){
-    if(!valid(native.shoulder)||!valid(native.elbow)||!valid(native.wrist)
-       ||!std::isfinite(scale)||scale<1.f||scale>1.5f)return {};
-    auto result=native;
-    result.elbow.position=native.shoulder.position+(native.elbow.position-native.shoulder.position)*scale;
-    result.wrist.position=native.shoulder.position+(native.wrist.position-native.shoulder.position)*scale;
-    return result;
-}
 std::optional<std::array<size_t,14>> armHelperIndices(std::span<const uint32_t> names,
     std::span<const int32_t> parents){
     if(names.empty()||names.size()!=parents.size())return {};
@@ -451,22 +443,33 @@ std::optional<Pose> reachingClavicle(Pose clavicle,const ArmPose& arm,Pose targe
         arm.shoulder.position-clavicle.position,nullptr,shoulderSurface);
     return fit?std::optional<Pose>{fit->pose.shoulder}:std::nullopt;
 }
-std::optional<GroundedLegSolution> solveGroundedLeg(const ArmPose& native,Pose contact,float calibration){
-    if(!valid(native.shoulder)||!valid(native.elbow)||!valid(native.wrist)||!valid(contact)
-       ||!std::isfinite(calibration)||calibration<1.f||calibration>1.5f)return {};
-    const float reach=length(native.elbow.position-native.shoulder.position)
-        +length(native.wrist.position-native.elbow.position);
-    if(reach<.2f)return {};
-    const auto hip=native.shoulder.position;
-    const float scale=std::max(calibration,(length(contact.position-hip)+.002f)/reach);
-    if(!std::isfinite(scale)||scale>2.f)return {};
-    auto normalized=contact;normalized.position=hip+(contact.position-hip)*(1.f/scale);
-    auto leg=solveArm(native,normalized,native.elbow.position-hip);
-    if(!leg)return {};
-    leg->pose.elbow.position=hip+(leg->pose.elbow.position-hip)*scale;
-    leg->pose.wrist.position=hip+(leg->pose.wrist.position-hip)*scale;
-    if(length(leg->pose.wrist.position-contact.position)>.003f)return {};
-    return GroundedLegSolution{*leg,scale};
+std::optional<GroundedLegSolution> solveGroundedLeg(const ArmPose& native,Pose contact){
+    const auto leg=solveArm(native,contact,native.elbow.position-native.shoulder.position);
+    return leg?std::optional<GroundedLegSolution>{{*leg,1.f}}:std::nullopt;
+}
+std::optional<Vec3> groundedPelvisShift(const ArmPose& spine,Pose neck,
+    const std::array<ArmPose,2>& legs,const std::array<Pose,2>& feet){
+    const std::array<ArmPose,3> chains{spine,legs[0],legs[1]};
+    const std::array<Pose,3> targets{neck,feet[0],feet[1]};
+    std::array<Vec3,3> centers{},residuals{};std::array<float,3> radii{};
+    for(size_t i=0;i<3;++i){
+        const auto& c=chains[i];
+        if(!valid(c.shoulder)||!valid(c.elbow)||!valid(c.wrist)||!valid(targets[i]))return {};
+        radii[i]=length(c.elbow.position-c.shoulder.position)+length(c.wrist.position-c.elbow.position)-.002f;
+        if(radii[i]<.05f||radii[i]>1.5f)return {};
+        centers[i]=targets[i].position-c.shoulder.position;
+    }
+    Vec3 shift{};
+    // Dykstra projections retain the closest feasible pelvis position, rather
+    // than moving each hip independently or stretching either leg.
+    for(unsigned iteration=0;iteration<64;++iteration)for(size_t i=0;i<3;++i){
+        const auto request=shift+residuals[i],delta=request-centers[i];
+        const float distance=length(delta);
+        const auto projected=distance>radii[i]?centers[i]+delta*(radii[i]/distance):request;
+        residuals[i]=request-projected;shift=projected;
+    }
+    for(size_t i=0;i<3;++i)if(length(shift-centers[i])>radii[i]+.0005f)return {};
+    return shift;
 }
 std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Quat wrist,bool right){
     const auto twist=[](Quat q,unsigned axis,float weight){
@@ -526,6 +529,10 @@ bool SupportContact::update(bool ready,bool tracked,float distance,uint64_t time
     if(!candidate_){candidate_=true;since_=time;}
     if(time-since_>=150){attached_=true;candidate_=false;}
     return attached_;
+}
+std::optional<Pose> SupportPose::contact(std::optional<Pose> weaponInWrist) const{
+    if(!attached_||(weaponInWrist&&!valid(*weaponInWrist)))return {};
+    return compose(weaponAnchored_&&weaponInWrist?*weaponInWrist:weaponInWrist_,acquired_);
 }
 std::optional<Pose> SupportPose::update(Pose nativeOffset,bool attached,bool manipulating,std::optional<Pose> weaponInWrist){
     if(!valid(nativeOffset)||(weaponInWrist&&!valid(*weaponInWrist))){reset();return {};}

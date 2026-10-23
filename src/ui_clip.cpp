@@ -1,5 +1,6 @@
 #include "mgs5vr/ui_clip.hpp"
 #include "mgs5vr/cabin_cover.hpp"
+#include "mgs5vr/forearm_visibility.hpp"
 #include "mgs5vr/optic_native_lighting_probe.hpp"
 #include "mgs5vr/log.hpp"
 #include <d3d11.h>
@@ -53,7 +54,7 @@ CreateBuffer originalBuffer{};
 HRESULT STDMETHODCALLTYPE observeCabinBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,
     const D3D11_SUBRESOURCE_DATA* data,ID3D11Buffer** output){
     const auto result=originalBuffer(device,desc,data,output);
-    if(SUCCEEDED(result)&&output&&*output)observeCabinCoverBuffer(device,desc,data,*output);
+    if(SUCCEEDED(result)&&output&&*output){observeCabinCoverBuffer(device,desc,data,*output);observeForearmBuffer(device,desc,data,*output);}
     // Explicit local investigation only. Never alter the native resource.
     static const auto folder=[](){std::array<wchar_t,32768> path{};
         GetModuleFileNameW(nullptr,path.data(),static_cast<DWORD>(path.size()));
@@ -88,6 +89,18 @@ void bindCoverBuffers(SetVertexBuffers original,ID3D11DeviceContext* context,UIN
 }
 void STDMETHODCALLTYPE vertexBuffers(ID3D11DeviceContext* c,UINT slot,UINT count,ID3D11Buffer* const* b,const UINT* s,const UINT* o){bindCoverBuffers(originalVertexBuffers,c,slot,count,b,s,o);}
 void STDMETHODCALLTYPE immediateVertexBuffers(ID3D11DeviceContext* c,UINT slot,UINT count,ID3D11Buffer* const* b,const UINT* s,const UINT* o){bindCoverBuffers(originalImmediateVertexBuffers,c,slot,count,b,s,o);}
+using Clear=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*);
+Clear originalClear{},originalImmediateClear{};
+void STDMETHODCALLTYPE clearContext(ID3D11DeviceContext* c){originalClear(c);resetForearmBindings(c);}
+void STDMETHODCALLTYPE clearImmediateContext(ID3D11DeviceContext* c){originalImmediateClear(c);resetForearmBindings(c);}
+using SetIndex=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,ID3D11Buffer*,DXGI_FORMAT,UINT);
+using SetConstants=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT,ID3D11Buffer* const*);
+SetIndex originalIndex{},originalImmediateIndex{};
+SetConstants originalConstants{},originalImmediateConstants{};
+void STDMETHODCALLTYPE indexBuffer(ID3D11DeviceContext* c,ID3D11Buffer* b,DXGI_FORMAT f,UINT o){originalIndex(c,b,f,o);bindForearmIndex(c,b,f,o);}
+void STDMETHODCALLTYPE immediateIndexBuffer(ID3D11DeviceContext* c,ID3D11Buffer* b,DXGI_FORMAT f,UINT o){originalImmediateIndex(c,b,f,o);bindForearmIndex(c,b,f,o);}
+void STDMETHODCALLTYPE vertexConstants(ID3D11DeviceContext* c,UINT start,UINT count,ID3D11Buffer* const* b){originalConstants(c,start,count,b);bindForearmConstants(c,start,count,b);}
+void STDMETHODCALLTYPE immediateVertexConstants(ID3D11DeviceContext* c,UINT start,UINT count,ID3D11Buffer* const* b){originalImmediateConstants(c,start,count,b);bindForearmConstants(c,start,count,b);}
 using Draw=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT);
 using DrawIndexed=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT,INT);
 using DrawInstanced=void(STDMETHODCALLTYPE*)(ID3D11DeviceContext*,UINT,UINT,UINT,UINT);
@@ -215,13 +228,13 @@ struct ClipDraw {
         if(scissorBound){context->RSSetState(priorRaster.Get());context->RSSetScissorRects(rectCount,priorRects.data());}}
 };
 void STDMETHODCALLTYPE draw(ID3D11DeviceContext* c,UINT a,UINT b){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalDraw(c,a,b);}
-void STDMETHODCALLTYPE indexed(ID3D11DeviceContext* c,UINT a,UINT b,INT d){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalIndexed(c,a,b,d);}
+void STDMETHODCALLTYPE indexed(ID3D11DeviceContext* c,UINT a,UINT b,INT d){ClipDraw clip(c);observeOpticNativeLightingDraw(c);ForearmDraw forearms(c);originalIndexed(c,a,b,d);}
 void STDMETHODCALLTYPE instanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,UINT e){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalInstanced(c,a,b,d,e);}
-void STDMETHODCALLTYPE indexedInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,INT e,UINT f){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalIndexedInstanced(c,a,b,d,e,f);}
+void STDMETHODCALLTYPE indexedInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,INT e,UINT f){ClipDraw clip(c);observeOpticNativeLightingDraw(c);ForearmDraw forearms(c);originalIndexedInstanced(c,a,b,d,e,f);}
 void STDMETHODCALLTYPE immediateDraw(ID3D11DeviceContext* c,UINT a,UINT b){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalImmediateDraw(c,a,b);}
-void STDMETHODCALLTYPE immediateIndexed(ID3D11DeviceContext* c,UINT a,UINT b,INT d){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalImmediateIndexed(c,a,b,d);}
+void STDMETHODCALLTYPE immediateIndexed(ID3D11DeviceContext* c,UINT a,UINT b,INT d){ClipDraw clip(c);observeOpticNativeLightingDraw(c);ForearmDraw forearms(c);originalImmediateIndexed(c,a,b,d);}
 void STDMETHODCALLTYPE immediateInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,UINT e){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalImmediateInstanced(c,a,b,d,e);}
-void STDMETHODCALLTYPE immediateIndexedInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,INT e,UINT f){ClipDraw clip(c);observeOpticNativeLightingDraw(c);originalImmediateIndexedInstanced(c,a,b,d,e,f);}
+void STDMETHODCALLTYPE immediateIndexedInstanced(ID3D11DeviceContext* c,UINT a,UINT b,UINT d,INT e,UINT f){ClipDraw clip(c);observeOpticNativeLightingDraw(c);ForearmDraw forearms(c);originalImmediateIndexedInstanced(c,a,b,d,e,f);}
 }
 UiClipScope::UiClipScope(const std::array<float,16>& canvas) noexcept:saved_(active),savedBounds_(activeBounds){
     active=uiClipPlanes(canvas);if(!active)return;
@@ -242,6 +255,9 @@ void installUiClip(ID3D11Device* device){
         if(MH_CreateHook(address,replacement,original)!=MH_OK||MH_EnableHook(address)!=MH_OK)throw std::runtime_error("UI clipping hook failed");};
     hook(d[12],reinterpret_cast<void*>(&createVs),reinterpret_cast<void**>(&originalVs));
     hook(d[3],reinterpret_cast<void*>(&observeCabinBuffer),reinterpret_cast<void**>(&originalBuffer));
+    hook(c[110],reinterpret_cast<void*>(&clearContext),reinterpret_cast<void**>(&originalClear));
+    hook(c[19],reinterpret_cast<void*>(&indexBuffer),reinterpret_cast<void**>(&originalIndex));
+    hook(c[7],reinterpret_cast<void*>(&vertexConstants),reinterpret_cast<void**>(&originalConstants));
     hook(c[18],reinterpret_cast<void*>(&vertexBuffers),reinterpret_cast<void**>(&originalVertexBuffers));
     hook(c[12],reinterpret_cast<void*>(&indexed),reinterpret_cast<void**>(&originalIndexed));
     hook(c[13],reinterpret_cast<void*>(&draw),reinterpret_cast<void**>(&originalDraw));
@@ -249,6 +265,9 @@ void installUiClip(ID3D11Device* device){
     hook(c[21],reinterpret_cast<void*>(&instanced),reinterpret_cast<void**>(&originalInstanced));
     ComPtr<ID3D11DeviceContext> immediate;device->GetImmediateContext(&immediate);
     auto** i=*reinterpret_cast<void***>(immediate.Get());
+    if(i[110]!=c[110])hook(i[110],reinterpret_cast<void*>(&clearImmediateContext),reinterpret_cast<void**>(&originalImmediateClear));
+    if(i[19]!=c[19])hook(i[19],reinterpret_cast<void*>(&immediateIndexBuffer),reinterpret_cast<void**>(&originalImmediateIndex));
+    if(i[7]!=c[7])hook(i[7],reinterpret_cast<void*>(&immediateVertexConstants),reinterpret_cast<void**>(&originalImmediateConstants));
     if(i[18]!=c[18])hook(i[18],reinterpret_cast<void*>(&immediateVertexBuffers),reinterpret_cast<void**>(&originalImmediateVertexBuffers));
     // FOX draws cabin geometry on the immediate context and composites on a
     // deferred context. Their entry points can differ on the active driver.

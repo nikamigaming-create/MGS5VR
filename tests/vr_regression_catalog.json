@@ -1229,6 +1229,8 @@
       "kind": "gameplay",
       "source_paths": [
         "src/player_visibility.cpp",
+        "src/forearm_visibility.cpp",
+        "include/mgs5vr/forearm_visibility.hpp",
         "src/render_camera.cpp",
         "src/head_camera.cpp",
         "include/mgs5vr/head_camera.hpp",
