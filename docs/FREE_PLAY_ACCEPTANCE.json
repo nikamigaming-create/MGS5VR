@@ -1778,7 +1778,16 @@
         "20261022T221834552081Z",
         "20261022T222214435234Z"
       ],
-      "expired_scratch_run": "20261022T221634609786Z"
+      "expired_scratch_run": "20261022T221634609786Z",
+      "latest_followup": {
+        "summary": "ACC carry interruption gaps checked on unchanged1b64aed9530e. Retained015418 verifies first-rifle left-hand carry, tracking loss(mask3), exact native mount return, recovery at the receiver with squeeze still held, no pickup on subsequent held-hand movement, fresh-squeeze reacquisition and final return. Root joins are within11ms; before-loss and held-recovery movement reviewed in both final eyes. Retained015756 verifies right-hand carry, ordinary Menu opening while grip remains held, native mount return and ordinary stow; carry/return reviewed in both final eyes. Effective Menu+left-grip recenter chord is preserved and not substituted. Native Choose a Rival notice reviewed and closed before the menu case. No production change or rebuild; this is closure of two scoped verification gaps, not a new defect fix or whole FP11 acceptance. Other loadouts, second-rifle interruptions and physical Quest remain open. Owned game/simulator and bounded readers closed; temporary dispatch removed; published play unchanged.",
+        "candidate": "1b64aed9530e9dc5db62afeedd8f36f0693ffc5ab21387b7fb3e8bd54f3cd6b4",
+        "runs": [
+          "20261023T015418318360Z",
+          "20261023T015756969741Z"
+        ],
+        "production_change": false
+      }
     },
     "machinegun_physical_controls": {
       "candidate": "484c334480b4100a8ff841e69bc2f5b8fbe331513dd5271148a772d022b8f344",
