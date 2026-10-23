@@ -1807,6 +1807,16 @@
         "physical Quest Link"
       ],
       "cleanup": "private/current-machinegun-final-stop.log; temporary body dispatch/procedure removed; published play unchanged."
+    },
+    "cover_current_fit": {
+      "candidate": "484c334480b4100a8ff841e69bc2f5b8fbe331513dd5271148a772d022b8f344",
+      "status": "scoped_existing_behavior_verified_original_fixture_open",
+      "summary": "Current cover batch on unchanged 484c334480b4: retained 20261023T003608337759Z checks crouched native cover, 22cm right lean, 25cm upward peek, rifle readiness and return at the roadside barrier. Both final eyes reviewed for lean, peek and ready rifle; no overhead translucent silhouette appears at this fixture. Native root remains fixed and full-body fit stays valid. Retained 20261023T003827007826Z exits cover and returns to native standing. The old 20261021T231018067219Z silhouette occurred at a different distant fixture and remains unresolved; this comparison does not establish its repair. No production changes or rebuild. Owned game/simulator and runners are closed; published play unchanged.",
+      "retained_runs": [
+        "20261023T003608337759Z",
+        "20261023T003827007826Z"
+      ],
+      "next": "Do not repeat this passing barrier sequence without a relevant change. Original distant silhouette, wider cover benefits and physical Quest remain open."
     }
   }
 }
