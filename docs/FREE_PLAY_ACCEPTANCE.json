@@ -1817,6 +1817,18 @@
         "20261023T003827007826Z"
       ],
       "next": "Do not repeat this passing barrier sequence without a relevant change. Original distant silhouette, wider cover benefits and physical Quest remain open."
+    },
+    "original_cover_followup": {
+      "candidate": "484c334480b4100a8ff841e69bc2f5b8fbe331513dd5271148a772d022b8f344",
+      "status": "old_silhouette_not_reproduced_right_eye_sleeve_crowding_open",
+      "summary": "Original Afghan barrier revisited on unchanged 484c334480b4. Retained 20261023T011152744090Z repeats center rifle-ready/release, right lean, upward peek and return at [1636.700,323.969,1030.177], about1.3m along the wall from the old sample. Native BEHIND and root remain stable through all four phases. Rifle-ready and post-release lean reviewed in both final eyes: the old overhead translucent figure does not recur, but the right sleeve crowds the right-eye lean view with head_contacts=0. No solver change is justified until native sleeve geometry and per-eye clearance are measured. The old figure visually differs from Snake, making a nearby NPC a hypothesis, not confirmed identity. Read-only nearby-actors.jsonl is retained. Subsequent 20261023T011325074947Z dispatches no cover sequence because BEHIND is already false; nearby alerted soldiers and player displacement are recorded, without assigning causality. No production fix or rebuild. Owned game/simulator and read-only watcher closed; Steam and published play retained.",
+      "retained_runs": [
+        "20261023T010553890123Z",
+        "20261023T011115935987Z",
+        "20261023T011152744090Z",
+        "20261023T011325074947Z"
+      ],
+      "next": "Measure native upper-sleeve extent and both-eye clearance in a stable crouched lean before changing the solver. Do not repeat the long original-fixture approach or claim the old figure identified. Other FIELD_FIXES rows remain in scope."
     }
   }
 }
