@@ -1,7 +1,7 @@
 # Current MGS5VR work — 24 October 2026
 
-**The completed body/arm candidate is ready for physical testing through
-[Play-Dev.cmd](../Play-Dev.cmd). Release readiness remains the active goal.**
+**Development `5d44f0706d11` has passed automated checks. Its final live
+comparison is waiting for Steam to be opened. Release readiness remains active.**
 Work on main only; do not redo implemented repairs or repeat the failed mounted
 approach. The full report map is [FIELD_FIXES.md](FIELD_FIXES.md).
 
@@ -29,7 +29,7 @@ statistics, not per-frame percentiles or physical display measurements.
 Details: `artifacts/release-handheld-stall-outcome.json` and
 `artifacts/release-handheld-stall-performance.json`.
 
-## Frame-handoff correction awaiting build and comparison
+## Built frame-handoff candidate; live comparison blocked
 
 Retained current-candidate logs show producer completion waiting for the next
 native Present before XR can see an already completed image. The source change
@@ -38,14 +38,23 @@ admit completed copies without using the native immediate context. Atomic
 readiness promotion preserves a slot already claimed by the consumer; EVENT
 compatibility and the three-slot bound remain. GPU regressions cover a future
 completion marker, no-more-Present delivery and concurrent stereo pixel/lineage
-reuse. A combined candidate run must establish whether this reduces repeats.
+reuse. All 58 groups and installer checks passed. Development DLL:
+`5d44f0706d1117c5a7c8e2bac46bb74a475704aceee0c2b3a4ab67b407aebf70`, source `78110e0`.
+
+The launch refused because Steam is no longer running. The user has been asked
+to open it; do not start/restart Steam or bypass its game launch. No game,
+simulator or bot is left running, and the failed launch created no runtime
+lease. Both retained build payloads verify. The saved headset runtime is Meta.
+A combined candidate run must establish whether this reduces repeats; no
+performance improvement or current-candidate gameplay pass is claimed.
+Details: `artifacts/release-shared-fence-status.json`.
 
 Microsoft API contracts: [shared fence creation](https://learn.microsoft.com/en-us/windows/win32/api/d3d11_3/nf-d3d11_3-id3d11fence-createsharedhandle)
 and [opening on the receiving device](https://learn.microsoft.com/en-us/windows/win32/api/d3d11_4/nf-d3d11_4-id3d11device5-opensharedfence).
 
-## Checked candidate
+## Last completed gameplay review (preceding candidate)
 
-- Development DLL: `a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6`.
+- Reviewed DLL: `a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6`.
 - Gameplay source: `f11d0d0878268a59e4c06d5c334078610a5f21ef`; body/cuff batch `5ba674f`.
 - All 58 groups and installer checks passed. Both retained build slots verify.
 - Published play remains `b627c7cacc9a` / October 19.1. No package, publication

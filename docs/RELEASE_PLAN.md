@@ -10,7 +10,7 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current execution produced checked candidate `a6dc5fb91151`; see
+Current execution built candidate `5d44f0706d11`, awaiting live comparison; see
 [CURRENT.md](CURRENT.md) for its smoke results and remaining visual limits.
 The identities below record the original audit baseline.
 
@@ -217,3 +217,29 @@ both slots verify. Never remove settings, saves, source or retained evidence.
   immediate reopening. The prior run stays failed. Candidate `a6dc5fb91151`
   is ready through Play-Dev. Next: physical Quest feedback and a newly
   reproducible field case; frame repeats remain measured and unresolved.
+
+## Immediate resume point: shared-fence comparison
+
+Source `78110e0`, development `5d44f0706d11`: all 58 groups and installer
+checks pass. Steam is absent; a request for the user to open it is pending.
+No owned game, simulator or bot is running. Published play is unchanged.
+
+1. Confirm Steam is running and no physical game session is in use. Do not
+   start/restart Steam. Launch `workspace.py launch-sim` alone, without chaining
+   commands behind its inherited Steam handles.
+2. Use `private/release-startup-notices.json` for the exact known notices, then
+   `workspace.py bot --command continue --seconds 90`. A blank capture during
+   the completed notice transition does not authorize replaying its confirm.
+3. Run `workspace.py bot --command run --suite
+   private/release-handheld-stall-combined.json --seconds 900` once. It combines
+   Pause, seven sustained left-iDroid cycles and immediate reopening.
+4. Retain the run and compare its settled front/turned/stowed timing with
+   `artifacts/release-handheld-stall-performance.json` (a6dc baseline). The
+   private summarizer accepts the new run directory and output JSON path.
+   Inspect both final eyes; source/tracking identity and no empty image are
+   required alongside any fresh-frame improvement.
+5. Keep the handoff change only with demonstrated benefit and no regression.
+   If rejected, undo that change on main and rebuild development normally; do
+   not create another retained binary slot. Close the owned test session.
+6. Physical Quest acceptance and exact remaining field cases still apply;
+   neither GPU checks nor this ACC comparison certify them.

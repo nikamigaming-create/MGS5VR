@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6",
-  "candidate_status": "Checked body/arm and handheld-stall candidate: 58 groups and installer checks pass; 27-case sustained/menu/reopen group passes. Physical Quest, extreme cloth/outfits, field diagnosis and frame repeats remain open.",
+  "candidate": "5d44f0706d1117c5a7c8e2bac46bb74a475704aceee0c2b3a4ab67b407aebf70",
+  "candidate_status": "Shared-fence handoff candidate passed 58 groups and installer checks; live comparison pending because Steam is absent. Prior a6dc 27-case gameplay pass is not a pass for this candidate.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2328,5 +2328,21 @@
     "performance": "Settled window medians: submissions about90Hz; fresh pairs75.83 front,76.12 turned,62.42 stowed. Repeats remain; no no-drops claim. Window percentiles are not per-frame percentiles.",
     "physical_headset_acceptance": false,
     "cleanup": "Owned game/simulator closed; Steam retained; no test menus/harnesses. Published play unchanged; Meta launch preference preserved."
+  },
+  "shared_fence_candidate": {
+    "candidate": "5d44f0706d1117c5a7c8e2bac46bb74a475704aceee0c2b3a4ab67b407aebf70",
+    "source": {
+      "commit": "78110e0e4e633463021131a23ef0736a503670c3",
+      "source_sha256": "2d1134d8cdbd8e87a2f72bd664c93100297b9dfb31058b3ea3e3bc398e638df0",
+      "changes": []
+    },
+    "automated": "58 groups and installer checks passed; real two-device GPU tests include no-more-Present delivery and concurrent pixel/lineage reuse",
+    "native_validation": "pending; launch refused because Steam is absent",
+    "previous_reviewed_candidate": "a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6",
+    "previous_reviewed_run": "20261025T044511277442Z",
+    "publication": "none; published play unchanged",
+    "blocker": "One signed-in Steam client must already be running. User rules prohibit restarting Steam; user has been asked to open it.",
+    "cleanup": "No game, simulator or bot running; launch failed before creating a runtime lease. Saved headset runtime remains Meta.",
+    "next": "Run the existing 27-case combined suite once on this candidate, compare current settled performance against a6dc, inspect both eyes, then retain or revert this handoff change based on evidence. No performance improvement claimed yet."
   }
 }

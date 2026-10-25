@@ -14,6 +14,12 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Current candidate — 24 October
 
+Development `5d44f0706d11` / source `78110e0` adds a shared producer-fence
+read on the XR device to remove a completed-image admission delay. Its 58
+groups and installer checks pass; live comparison is blocked by Steam being
+closed. The prior candidate result below remains scoped to that candidate.
+No improvement in current gameplay or pacing is claimed before comparison.
+
 Candidate `a6dc5fb91151` / source `f11d0d0` adds the reproduced handheld
 stale-skin correction. It passes 27 combined sustained/menu/reopen cases and
 58 test groups plus installer checks. The earlier extended run failed and is
