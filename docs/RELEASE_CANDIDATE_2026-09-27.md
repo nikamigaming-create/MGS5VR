@@ -1,5 +1,7 @@
 # Community test candidate RC2 — 27 September 2026
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 RC2 contains the adapted Coco fixes and the verified fixes below. It is a local
 community test build, with known mission and presentation failures still open.
 The entire game and physical-headset acceptance are not complete.

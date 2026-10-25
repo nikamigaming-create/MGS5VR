@@ -1,5 +1,7 @@
 # TPP rendering work in progress
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 Local work on 13 September; this is not a claim about the current public DLL.
 
 - Recon acquisition now uses a configurable, uninterrupted binocular dwell.

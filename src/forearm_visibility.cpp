@@ -1,5 +1,6 @@
 #include "mgs5vr/forearm_visibility.hpp"
 #include "mgs5vr/arm_ik.hpp"
+#include "mgs5vr/forearm_crop.hpp"
 #include "mgs5vr/log.hpp"
 #include <d3d11_1.h>
 #include <bcrypt.h>
@@ -111,11 +112,27 @@ void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,con
             }
             if(shoulder){face[1]=face[2]=face[0];std::memcpy(cropped.data()+at*2,face.data(),6);++removed;}
         }
+        // Native LOD ranges share triangles. Caps use only removed slots that
+        // belong to one draw range, without modifying vertex streams or skin
+        // publication. Unsupported/nonmanifold boundaries retain the safe cut.
+        constexpr std::array<ForearmIndexRange,4> leftLods{{{261,1788},{1413,2367},{2142,2703},{2661,2922}}};
+        constexpr std::array<ForearmIndexRange,4> rightLods{{{3219,7719},{7089,9384},{9015,10254},{10143,10743}}};
+        std::vector<uint16_t> nativeIndices(g.indexBytes.size()/2),closedIndices(cropped.size()/2);
+        std::memcpy(nativeIndices.data(),g.indexBytes.data(),g.indexBytes.size());
+        std::memcpy(closedIndices.data(),cropped.data(),cropped.size());
+        size_t caps{};
+        for(const size_t part:{size_t{0},size_t{4}}){
+            const auto& mesh=meshes[part];std::vector<Vec3> points(mesh.count);
+            static_assert(sizeof(Vec3)==12);
+            std::memcpy(points.data(),g.positionBytes.data()+mesh.positions,mesh.count*12);
+            caps+=closeForearmCuffs(points,nativeIndices,closedIndices,part?rightLods:leftLods,mesh.right);
+        }
+        std::memcpy(cropped.data(),closedIndices.data(),cropped.size());
         struct Guard {Guard(){building=true;}~Guard(){building=false;}} guard;
         D3D11_SUBRESOURCE_DATA initial{};initial.pSysMem=cropped.data();
         if(FAILED(device->CreateBuffer(&g.indexDescription,&initial,&g.cropped)))return;
         g.indices->SetPrivateDataInterface(croppedKey,g.cropped.Get());
-        log("Native forearm-only indices ready; shoulder triangles removed="+std::to_string(removed));
+        log("Native forearm-only indices ready; shoulder triangles removed="+std::to_string(removed)+" cuff triangles="+std::to_string(caps));
     }catch(...){}
 }
 void mapForearmConstants(ID3D11DeviceContext* c,ID3D11Resource* r,UINT sub,D3D11_MAP type,const D3D11_MAPPED_SUBRESOURCE* mapped) noexcept {

@@ -1,5 +1,7 @@
 # Current handoff - 28 September 2026
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 Read the user's VR mandate in AGENTS.md. Preserve physical hand-held binoculars,
 hand aiming, zoom, visible-enemy acquisition and marking. Never substitute stock
 binocular stick controls or a second screen. Do not leave test-opened Pause menus.

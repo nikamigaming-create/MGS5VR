@@ -1,5 +1,7 @@
 # Full gameplay polish worklist
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 Requested scope: all gameplay and interactions, September 6, 2026. A checked
 implementation still needs final-eye and physical evidence where applicable.
 Use native game behavior and the player's owned assets; retain the left forearm

@@ -1,12 +1,14 @@
 # VR performance
 
+Historical measurements and implementation rationale follow. Current source/build identities and unaccepted performance scope are in [CURRENT.md](CURRENT.md) and [REGRESSION_COVERAGE.md](REGRESSION_COVERAGE.md). Desktop preview stays 1280 x 720; VR uses runtime-recommended per-eye dimensions/FOV. Older resolutions below identify their original runs, not current setup instructions.
+
 ![MGS5VR field manual — original Snake artwork](images/field-header.svg)
 
 The target is 90 fresh stereo frames per second, with room below the 11.11 ms
 display interval. A 90 Hz headset alone does not establish that the game renders
 90 new frames. Settings and in-game acceptance are still being measured.
 
-The latest physical Quest 3 test retained native **2560×1440**, Post Processing
+The historical physical Quest 3 test retained native **2560×1440**, Post Processing
 **High** for native AA, and received positive user feedback. The user accepts
 roughly 86 fresh FPS as a useful fidelity compromise; this is not a locked-90
 claim. Keep DOF and motion blur disabled, SSAO and volumetric clouds off, effects,
@@ -19,7 +21,7 @@ reads the active OpenXR recommendation without changing Windows resolution or
 using DSR. No upscaler, generated frames or third-party clarity plugin is included.
 
 The VR graphics adapter selects the engine's variable frame-rate option and
-removes desktop V-sync from the game mirror. The next local candidate adapts
+removes desktop V-sync from the game mirror. The implementation described here adapts
 the producer cap to the runtime display period: 96 FPS for 72 Hz, 120 FPS for
 90 Hz and 160 FPS for 120 Hz. It stays bounded to 60–180 FPS and falls back to
 120 FPS without an active runtime. Small period jitter does not reset pacing.
@@ -60,7 +62,7 @@ SIM recording cannot establish a guarantee for the entire game.
 
 ## Provenance
 
-The next candidate includes the adaptive-period idea and pacing calculation
+The implemented pacing change includes the adaptive-period idea and pacing calculation
 from [s-ilent's contribution](https://github.com/s-ilent/MGS5VR/commit/7dd09a2470c6dd6fb0194a2a14aef32181918596),
 with producer bounds, period jitter handling and reset on session loss/exit.
 Its asynchronous immediate-context worker has not been imported. Native D3D11

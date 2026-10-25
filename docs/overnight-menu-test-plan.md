@@ -1,5 +1,7 @@
 # Overnight native VR menu testing
 
+Current execution is governed by [RELEASE_PLAN.md](RELEASE_PLAN.md) and [FIELD_FIXES.md](FIELD_FIXES.md). This document supplies supporting contracts; it does not authorize restarting an old queue or running unattended tests. Preserve the left-hand iDroid and bounded cleanup.
+
 This plan extends the retained ACC and Map results. Its queue is not a claim
 that every native page, transaction or controller has passed. Read the current
 DLL/configuration/fixture identity and actual final-eye page before admitting
@@ -157,7 +159,7 @@ sampled inputs, outcome facts and both final-eye captures. Promote only a
 finished bounded run with cleanup verified; failed experiments retain their
 failure status. Sequential stills do not prove continuous stereo or absence of
 blinking. Use final-eye motion video and separate physical-headset usability
-for those claims. Preserve left-arm ordinary HUD, right-hand iDroid, physical
+for those claims. Preserve left-arm ordinary HUD, left-hand iDroid, physical
 optics and 1280 x 720 desktop independently of recommended VR eye sizes.
 
 The root owns the one live game/session, fixture activation and release. Build

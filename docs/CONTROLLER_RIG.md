@@ -1,5 +1,11 @@
 # Controller rig experiment
 
+Current code audit: [FIELD_FIXES.md](FIELD_FIXES.md). Native fixed-length legs,
+shared pelvis fit, clavicle reach, wrist isolation and garment drivers are already
+implemented. Forearm-only cropping is limited to identified sna5 geometry;
+rough cuffs and wider outfit/headset acceptance remain. Older observations below
+retain their original scope; follow [RELEASE_PLAN.md](RELEASE_PLAN.md) for next work.
+
 Work in progress for the exact TPP 1.0.15.4 executable in the profile. This is
 disabled by default. AM MRS-4 and WU pistol interactions have simulator observations;
 physical alignment and complete weapon acceptance remain unproven. See the
@@ -101,7 +107,9 @@ Release the chord: it stays equipped. Tap B again to stow. With binoculars
 unselected, bare B remains the native pickup/carry hold.
 Left-stick click changes 2×/4× magnification and
 right trigger follows the binocular ray for marking or waypoint placement.
-This does not implement per-weapon scopes or native analysis/intel.
+Separate production adapters provide authored weapon scopes and native binocular
+intel/acquisition/marking. Their full weapon/mission matrix is not certified by
+this rig description; see FIELD_FIXES FP12 and WEAPON_SCOPES.md.
 Its authored primary socket stays at the tracked right grip; orientation uses
 the runtime's same-frame grip-to-aim calibration, not a simulator-neutral wrist
 rotation. The left support socket uses that controller's own calibration.

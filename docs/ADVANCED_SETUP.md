@@ -31,12 +31,15 @@ unchanged. No administrator access is requested.
   [Microsoft Visual C++ x64 runtime](https://aka.ms/vc14/vc_redist.x64.exe).
 - **Only a large screen:** use the game's Action Type controls and load
   Continue → Resume Game. Current TPP builds enter tracked VR automatically;
-  `system.toggle_vr` is optional and unbound by default. Check that PC VR is
-  connected and its software is the active OpenXR runtime.
+  the public `system.toggle_vr` default is Menu + B held 550 ms. Personal bindings
+  may differ. Check that PC VR is connected and its software is the active OpenXR
+  runtime.
 - **Menu missing / viewpoint inside the hospital bed:** this is a reported
-  startup defect, not a requirement to finish the prologue first. The current
-  source corrects title-camera anchoring; the hospital case still needs a rerun.
-  See [current rendering work](RENDER_FIX_NOTES.md). Please include your build
+  startup report, not a requirement to finish the prologue first. Title-camera
+  anchoring has a source repair; reconcile historical hospital reports against
+  the exact build before calling them current failures.
+  See [current field status](FIELD_FIXES.md) and the
+  [historical rendering report](RENDER_FIX_NOTES.md). Please include your build
   version, headset/runtime and whether the problem is the title, pause or an
   in-prologue prompt when reporting it.
 
@@ -93,63 +96,43 @@ precedence. See Microsoft's [execution policy documentation](https://learn.micro
 
 ## Runtime and resolution
 
-The launch script supports a requested native game size before launch; it does
-not yet automatically match Virtual Desktop Ultra/Godlike. The current XR eye
-textures still take their dimensions from the native game render target, so
-changing a runtime quality preset alone does not resize that native target.
-Independent eye-target sizing from OpenXR's recommended per-eye dimensions,
-with a separate small desktop mirror, remains to be implemented. Do not change
-Windows desktop resolution just to enlarge a copied XR image.
+Desktop preview stays **1280 x 720**. Native stereo rendering uses the active
+OpenXR runtime's per-eye recommendation and correct FOVs, independently of the
+mirror. Use the launcher's **Detect XR -> Headset recommendation** or explicit
+custom sizing with the game closed; do not change Windows desktop resolution
+or judge headset sharpness from the preview. See [launcher resolution](LAUNCHER.md#resolution-without-changing-your-desktop).
 
-A simulator is not required for headset play. Connect through your headset's PC
-software and select it as the active OpenXR runtime. The physical baseline uses
-Quest 3, Touch controllers and the Meta PC runtime. Other hardware remains
-unverified; the controls assume the game's **Action Type** layout.
+This checkout's physical headset uses wired Meta Quest Link and Meta OpenXR.
+`Play.cmd` restores published `play/`; `Play-Dev.cmd` installs checked `build/dev/`.
+Both call the shared launcher with `-MetaLink`. Preserve the saved per-game
+`HeadsetRuntime` and the user's Windows Meta runtime. Do not select SteamVR.
+For an extracted public release, use its launcher or `Launch-Headset.cmd` with
+the user's selected runtime. A simulator is not needed for physical play.
 
-The latest physical 2560x1440/native-AA session received positive feedback, and
-that resolution is retained for the tester. Start at 1920x1080 on other hardware;
-the higher setting is not a universal performance recommendation. Close the game
-before requesting that mode:
-
-```powershell
-$mgsRuntime = (Get-ItemProperty 'HKLM:\SOFTWARE\Khronos\OpenXR\1').ActiveRuntime
-.\tools\launch-simulator.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\MGS_TPP' -RuntimeManifest $mgsRuntime -RenderWidth 2560 -RenderHeight 1440
-```
-
-Despite its name, this launcher uses the supplied runtime. A physical run omits
-`-Headless` and `-OperatorDir`. It selects Windowed mode, backs up changed graphics
-settings in the extracted mod's `artifacts` folder, and preserves the global
-OpenXR runtime selection. If more than one Steam account has a graphics config,
-supply `-GraphicsConfig` with the chosen account's absolute
-`userdata/<account>/287700/local/TPP_GRAPHICS_CONFIG` path.
-
-Check `Game Present ... size=2560x1440` in the game's `mgs5vr.log`: the game may
-substitute unsupported display modes. Enlarging an XR image alone cannot recover
-detail missing from the native render. The [sharpness review](HEADSET_SHARPNESS_REVIEW.md)
-records the earlier dimensional checks; [performance notes](PERFORMANCE.md)
-describe the current profile and measurement limits.
+Earlier 1920x1080/2560x1440 and simulator dimensions in capture reports identify
+historical tests, not today's required preview or a universal headset preset.
+Measure runtime frame pacing at the actual eye dimensions; keep DOF and motion
+blur disabled. [Performance and evidence limits](PERFORMANCE.md).
 
 ## Large screen, menus and transitions
 
-Tap left Menu for iDroid; from gameplay, hold it for at least 0.55 seconds for
-Pause. Both menus float in front of the tracked stereo world. Holding Menu
-inside iDroid opens its native Help instead. A confirms, B goes back, sticks
-navigate, grips act as LB/RB, and triggers retain LT/RT. Close iDroid with B or
-hold Menu again to unpause. Release held inputs once before moving or firing
-again. The manual left-grip + left-stick-click VR toggle remains available.
+Public defaults: tap Menu for iDroid, hold Menu for Pause (native Help while in
+iDroid). The handset is in the **left bionic hand**; hold left grip to focus its
+menu controls. Ordinary status stays on the left forearm. Pause and an explicitly
+selected off-wrist menu use a spatial stereo panel. Ordinary and tutorial stow
+must preserve the native lifecycle and immediate reopening.
 
-Title, loading and cutscene transitions can still use the large in-headset screen.
+Left grip + Menu recenters without changing facing. Menu + B held 550 ms changes
+VR/screen presentation. Menu + left-stick click held 650 ms opens the headset
+controls/settings editor. The installed personal config is authoritative; use
+[CONTROLS.md](CONTROLS.md) rather than historical chords. Release held inputs
+and center sticks when ownership changes.
 
-Hold both grips and click the right stick to recenter the large screen. To resize
-it, edit `mgs5vr.ini` with the game closed: defaults are `width_cm=800` and
-`distance_cm=600`, with a supported range of 100-3000 cm. Other controller profiles
-have incomplete bindings. Cinematic skipping uses the game's controls; automatic
-save loading and universal cinematic skipping are not implemented.
-
-The module stays loaded until process exit; restart before replacing it. With
-Meta XR Operator, shutdown can take roughly 20 seconds. Cleanup allows up to 30
-seconds, but later sessions have stalled at instance destruction. Shutdown
-reliability and all cinematic/loading transitions remain open acceptance items.
+Title/loading/cinematic presentation follows native scene ownership. Universal
+cinematic skipping and complete transition acceptance are not implied by basic
+menu support. Close the game before replacing its loaded DLL. Bounded local
+sessions use the workspace launcher/cleanup below; do not leave Pause, test-opened
+menus or a runner behind, and never restart Steam for cleanup.
 
 ## Check the OpenXR runtime
 
@@ -167,38 +150,36 @@ In a source build the executable is under `build/Release/`.
 
 ## Build from source
 
-Requires Windows x64, Visual Studio 2022 C++ build tools and Windows SDK, Git,
-CMake 3.24+, and Python 3. Run from the repository:
+Requires Windows x64, Visual Studio 2022 C++ tools, Windows SDK, Git, CMake 3.24+
+and Python 3. From this checkout on `main`:
 
 ```powershell
 .\tools\build.ps1
 ```
 
-Dependencies are pinned: Khronos OpenXR SDK 1.1.49 (`977f6675...`) and MinHook
-1.3.4 (`c3fcafdc...`). The OpenXR loader is statically linked. The Visual C++
-runtime is required. Outputs are in `build/Release/`. CI runs five native suites
-that do not need a GPU; the sixth exercises two hardware D3D11 devices locally.
-CI does not run the game or certify headset playability.
+This builds and runs the required checks, stages checked `build/dev/` and leaves
+published `play/` and the installed game unchanged. `-Deploy` explicitly installs
+development. `Play-Dev.cmd` or `workspace.py launch-sim` also selects development;
+`Play.cmd` verifies/restores the published slot. Compiler intermediates are not
+an additional playable build. Both retained slot manifests must remain intact.
 
-Stage a player package without dependency SDK headers and libraries:
-
-```powershell
-cmake --install build --config Release --component MGS5VR --prefix dist/MGS5VR-development
-```
-
-See [contributing](../CONTRIBUTING.md), [architecture](ARCHITECTURE.md), and the
-[acceptance matrix](ACCEPTANCE.md) for implementation and evidence requirements.
+Dependencies are pinned in CMakeLists.txt. GPU-dependent checks need local
+hardware; CI does not launch the game or certify a headset. Do not keep dated
+local packages or use the old `dist/MGS5VR-development` staging workflow.
+For an authorized release, use `tools/package-release.py` against clean committed
+source matching checked development, then publish/verify before pinning the
+exact candidate. See [RELEASE_PLAN.md](RELEASE_PLAN.md),
+[contributing](../CONTRIBUTING.md) and [acceptance](ACCEPTANCE.md).
 
 ## Simulator testing
 
-`tools/launch-simulator.ps1` takes `-GameDir`, `-RuntimeManifest`, optional
-`-OperatorDir`, and `-Headless` for Elliott's headless simulator. The runtime and
-Operator must already be installed. Headless runs default to a normal 1280x720
-window; other launches preserve the selected resolution. Supply both
-`-RenderWidth` and `-RenderHeight` for another supported mode and check the actual
-rendered dimensions in the log.
+Use `python tools/workspace.py launch-sim`, then bounded `workspace.py bot`
+cases. It deploys development by default; `--slot play` selects the published
+comparison without changing the pin. Default bot action is observation; Pause
+requires an explicit case. Retain reviewed runs with `workspace.py pin` and
+close exact-owned sessions with `workspace.py stop-sim`.
 
-The launcher sets runtime variables only for the launched process and preserves
-the system OpenXR registry. Use semantic OpenXR/controller inputs for test
-automation, not OS keyboard/mouse injection or window activation. Simulator
-validation is separate from physical headset acceptance.
+Simulator leases restore the per-game runtime and preserve the Windows Meta
+selection. Keep Steam running. No desktop keyboard/mouse, focus or window-control
+automation. Both-eye simulator review is separate from physical Quest acceptance.
+See [runner documentation](../tools/gameplay_bot/README.md).

@@ -1,5 +1,7 @@
 # Immediate handoff — September 19
 
+> Historical checkpoint. Build paths, hand ownership, controls and next steps below describe that date. Follow [CURRENT.md](CURRENT.md), [CONTROLS.md](CONTROLS.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for current work; iDroid now belongs in the left bionic hand.
+
 User priority: restore visible, live 3D first, then finish the tester fixes and release. No flat-screen workaround, speculative feature work, long log searches, repeated permission questions, or duplicate SIM sessions. The user explicitly requested this concise handoff; coding stopped.
 
 ## Do these in order

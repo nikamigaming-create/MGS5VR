@@ -86,14 +86,14 @@ std::optional<Pose> fullBodyPlacement(Pose chest,Pose nativeHead,Pose uprightHea
 std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 eye,float radius);
 std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 leftEye,Vec3 rightEye,float radius);
 std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 eye,float radius);
-std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 leftEye,Vec3 rightEye,float radius);
+std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 leftEye,Vec3 rightEye,float radius,float sleeveRadius=0);
 // Native lumbar, chest, neck channels; the separate waist pivot stays native.
 std::optional<ArmSolution> solveSpine(const ArmPose& native,Pose neckTarget,const ArmSurface* chestSurface=nullptr);
 std::optional<ArmSolution> solveArm(const ArmPose& animated,Pose wristTarget,Vec3 bendHint,
                                   const ArmBasis* basis=nullptr,const ArmSurface* elbowSurface=nullptr);
 // Reach-limited fallback when no elbow bend clears the head at the desired wrist.
 std::optional<ArmSolution> solveArmAroundHead(const ArmPose& animated,Pose wristTarget,Vec3 bendHint,
-    const ArmBasis* basis,Vec3 eye,float elbowRadius,float wristRadius);
+    const ArmBasis* basis,Vec3 eye,float elbowRadius,float wristRadius,float sleeveRadius=0);
 // Local corrective rotations observed on this profile's seven arm helpers.
 std::array<Quat,7> armCorrectiveRotations(Quat clavicle,Quat upper,Quat elbow,Quat wrist,bool right);
 // Native shoulder-slide X and wrist-bulge Y, driven by the solved local

@@ -1,5 +1,11 @@
 # Contributing
 
+Local development in this checkout follows [AGENTS.md](AGENTS.md): one `main`,
+no extra branches/worktrees, two retained build slots. Start with the
+[release plan](docs/RELEASE_PLAN.md) and [code/acceptance map](docs/FIELD_FIXES.md).
+External contributors may submit PRs; that does not change this checkout's rule.
+`tools/build.ps1` checks development without replacing published `play/`.
+
 MGS5VR is an experimental, MIT-licensed native VR mod. Contributions to its
 source, tests and documentation use that license; existing third-party notices
 remain in place. All runtime integration code and build tooling live in this

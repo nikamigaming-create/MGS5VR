@@ -1,11 +1,19 @@
 # MGS5VR gameplay runner
 
+Current work: [release plan](../../docs/RELEASE_PLAN.md) and
+[field fixes](../../docs/FIELD_FIXES.md). Most recent repairs are already
+implemented; run the selected combined groups, not the entire historical queue.
+Retaining a run is not accepting it automatically, and `workspace.py pin` is
+not `workspace.py pin-build`. Review exact build, final eyes and scope first.
+The retained Mother Base route already reaches the platform; intact-gun entry
+eligibility remains unresolved. Do not repeat approach loops or destroyed fixtures.
+
 For local work use `python tools/workspace.py launch-sim`, then
 `python tools/workspace.py bot --command continue` and
 `python tools/workspace.py bot`. Steam remains running. The current build is
 always `build/dev/`; pinned `play/` stays unchanged. Bot scratch runs have
 bounded retention. The default command
-only observes. Use `workspace.py pin` before citing a run as acceptance evidence,
+only observes. Review and use `workspace.py pin` before citing a run as acceptance evidence,
 and `workspace.py stop-sim` for exact-owned test-session cleanup.
 
 To compare the published baseline, stop the owned simulator session, use

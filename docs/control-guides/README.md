@@ -1,5 +1,9 @@
 # Control guides
 
+For current work use the [release plan](../RELEASE_PLAN.md). These guides are
+references, not acceptance or a separate implementation backlog. Regenerate only
+when effective defaults or the renderer change; preserve personal bindings.
+
 The four packaged PNG pages use the public default controls. They are generated
 from **effective bindings**, exported by the same native parser used in the game
 and launcher:

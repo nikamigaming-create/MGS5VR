@@ -1,5 +1,7 @@
 # VR 1.0 polish and acceptance
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 Updated October 14, 2026. The target is playable TPP from start to finish:
 all cutscenes, every playable body and outfit, native mission progression,
 working VR interactions and comfortable physical-headset use. A successful

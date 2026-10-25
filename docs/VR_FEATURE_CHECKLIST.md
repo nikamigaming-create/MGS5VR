@@ -1,13 +1,13 @@
 # VR feature checklist
 
-Built does not mean every issue is fixed. Source paths, bounded simulator runs, and headset acceptance are different evidence; most interaction families remain partial.
+Updated 24 October 2026. [FIELD_FIXES.md](FIELD_FIXES.md) maps actual repairs to remaining work. Built does not mean every issue is fixed. Source paths, bounded simulator runs, and headset acceptance are different evidence; most interaction families remain partial.
 
 1. **Tracked stereo and head movement (TPP):** implemented; broad transitions and headset motion remain open.
 2. **Tracked hands, forearms and body rig:** implemented; physical fit and extremes remain open.
 3. **Finger poses:** grip, trigger and supported touch sensors animate fingers; no individual finger tracking.
 4. **Weapon grip:** right-hand ready/aim and left-hand support exist; selected firearm coverage only.
 5. **Wrist UI:** equipment, Commands and weapon/status panels exist; some layers and fit remain unfinished.
-6. **iDroid:** world and palm-held presentations exist; screen fit, exit and handset cleanup remain unfinished.
+6. **iDroid:** left cinematic contact/projector, ordinary stow/reopen, scene handoff and exit-notice repairs are implemented. Continuous stereo, forced unfinished lessons and physical fit remain unaccepted.
 7. **Cabin and Continue:** physical cassette path reaches gameplay in current simulator evidence; headset acceptance open.
 8. **Binoculars:** tracked stereo lens, equip/stow, zoom and mark paths exist; tutorial/intel coverage incomplete.
 9. **Weapon scopes:** authored optics work for selected sights; not all weapons or modes.
@@ -23,20 +23,20 @@ Built does not mean every issue is fixed. Source paths, bounded simulator runs, 
 19. **Rat pickup:** native interaction path exists; current-build pickup/release is not verified.
 20. **Horse:** basic mount, ride, orders and dismount have simulator observations; full transitions remain open.
 21. **Vehicles:** truck entry, wheel steering and exit observed; other vehicles and mounted roles incomplete.
-22. **Powered prosthetic arm:** native access path exists; special abilities and guided-camera return are incomplete.
+22. **Powered prosthetic arm:** left-hand Rocket Arm steering, flight display and normal return are implemented with scoped simulator evidence; impact, Blast Arm and physical acceptance remain.
 23. **HUD and world cues:** wrist status and selected cues exist; captions, notifications and marker issues remain.
 24. **Controls editor:** external and in-headset remapping exist. The spatial editor has contextual 3D controller feedback and confirmed live remapping; ACC, conflict rejection and automatic binocular mode passed a bounded simulator run. Physical-headset fit and broader mode coverage remain open.
 25. **Native gamepad:** XInput/native-button mode and VR handoff exist; full context matrix not accepted.
 26. **Ground Zeroes:** third-person stereo preview and selected actions exist; first-person rig and HUD are absent.
-27. **Pause redesign:** a large centered quad over paused stereo gameplay is the new requirement; block game movement while retaining live head/hand tracking. Root is implementing it, with no test result yet. Prior wrist-panel clipping applies to the old design.
+27. **Pause:** spatial stereo panel over paused gameplay is implemented, retaining live head/hand tracking. Wider context and physical acceptance remain. Prior wrist-panel reports describe the earlier design.
 28. **Presentation toggle:** immersive VR and large-screen modes have a held-button switch.
-29. **Settings:** the launcher exposes VR tuning, validation and backups. The headset panel edits action/button/chord/axis bindings; general tuning still uses the launcher.
+29. **Settings:** launcher tuning/validation/backups and the headset editor exist. The headset gear panel exposes the registered gameplay settings alongside action/button/chord/axis binding edits; broader physical usability remains unaccepted.
 30. **Training lessons:** ten recorded lessons sit beside interactive 3D controllers; cues use current bindings.
 31. **Control coverage:** eight decoder contexts and 97 semantic actions are exported from native config; the headset editor distinguishes ACC, launch cabin and iDroid presentation modes. Not every action is gameplay-tested.
 32. **Field terminal:** 3D lesson playback, controller inspection and settings UI are implemented; product flow still receives QA.
 33. **Install/update tools:** launcher install, update, backup and recovery paths exist; full user-environment matrix remains open.
 34. **Runtime diagnostics:** native snapshots, captures, bounded cases and evidence sidecars exist; they do not replace visual review.
 
-**Not built as accepted features:** physical stand/crouch/prone inference, roomscale body following, hand-to-head NVG gesture, stance indicator, complete left-handed rig, in-headset settings, full Ground Zeroes first-person VR, and exhaustive mission/weapon/item/buddy/vehicle support.
+**No blanket acceptance is claimed for:** physical stand/crouch/prone inference, roomscale body following, hand-to-head NVG gesture, stance indicator, complete left-handed rig, full Ground Zeroes first-person VR, and exhaustive mission/weapon/item/buddy/vehicle support.
 
-Sources: [historical feature register](../tools/gameplay_bot/catalogs/historical-features.json), [release checkpoint](RELEASE_ACCEPTANCE_2026-09-27.md), [controls](CONTROLS.md), [gameplay gaps](GAMEPLAY_FEATURES.md), [controller rig](CONTROLLER_RIG.md), [system access](SYSTEMS_ACCESS.md), [simulator coverage](DUAL_GAME_SIM_COVERAGE.md), and [launcher](LAUNCHER.md). Main implementation: `src/xr_runtime.cpp`, `src/head_camera.cpp`, `src/controller_rig.cpp`, `src/controls.cpp`, `src/input_bridge.cpp`, `src/idroid_rig.cpp`, `src/menu_surface.cpp`.
+Sources: [historical feature register](../tools/gameplay_bot/catalogs/historical-features.json), [current execution plan](RELEASE_PLAN.md), [controls](CONTROLS.md), [gameplay gaps](GAMEPLAY_FEATURES.md), [controller rig](CONTROLLER_RIG.md), [system access](SYSTEMS_ACCESS.md), [simulator coverage](DUAL_GAME_SIM_COVERAGE.md), and [launcher](LAUNCHER.md). Main implementation: `src/xr_runtime.cpp`, `src/head_camera.cpp`, `src/controller_rig.cpp`, `src/controls.cpp`, `src/input_bridge.cpp`, `src/idroid_rig.cpp`, `src/menu_surface.cpp`.

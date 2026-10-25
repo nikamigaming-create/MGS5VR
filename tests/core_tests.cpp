@@ -2,6 +2,7 @@
 #include "mgs5vr/mounted_grip.hpp"
 #include "mgs5vr/cabin_walk.hpp"
 #include "mgs5vr/arm_ik.hpp"
+#include "mgs5vr/forearm_crop.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/head_camera.hpp"
@@ -3865,6 +3866,44 @@ int main(){
                 "segment contact plane preserves clearance at both eyes");
         }
     }
+    {
+        // A sleeve can reach the eyes while its bone clears the smaller
+        // forearm envelope. Do not expand the hand envelope along with it.
+        const ArmPose clothed{Pose{{},{.16f,-.25f,0}},Pose{{},{.16f,.25f,0}},Pose{{},{.4f,.3f,0}}};
+        expect(!armHeadClearanceSurface(clothed,{-.03f,0,0},{.03f,0,0},.12f)
+            &&armHeadClearanceSurface(clothed,{-.03f,0,0},{.03f,0,0},.12f,.18f),
+            "upper sleeve clearance catches fabric crowding beyond a clear arm centerline");
+        const ArmPose forearmNear{Pose{{},{.4f,-.3f,0}},Pose{{},{.16f,-.15f,0}},Pose{{},{.16f,.15f,0}}};
+        expect(!armHeadClearanceSurface(forearmNear,{-.03f,0,0},{.03f,0,0},.12f,.18f),
+            "sleeve clearance does not displace a clear forearm or precision hand interaction");
+        std::vector<Vec3> points;
+        for(float x:{.3f,.5f,.8f})for(const auto yz:std::array<Vec3,4>{{{0,-.05f,-.05f},{0,.05f,-.05f},{0,.05f,.05f},{0,-.05f,.05f}}})
+            points.push_back({x,yz.y,yz.z});
+        std::vector<uint16_t> indices;
+        for(uint16_t ring=0;ring<2;++ring)for(uint16_t i=0;i<4;++i){
+            const uint16_t a=ring*4+i,b=ring*4+(i+1)%4,c=a+4,d=b+4;
+            indices.insert(indices.end(),{a,b,c,b,d,c});
+        }
+        auto cropped=indices;
+        for(size_t at=0;at<24;at+=3)cropped[at+1]=cropped[at+2]=cropped[at];
+        const auto cut=cropped;
+        const std::array<ForearmIndexRange,1> lod{{{0,indices.size()}}};
+        expect(closeForearmCuffs(points,indices,cropped,lod,false)==2
+            &&std::equal(cropped.begin()+24,cropped.end(),indices.begin()+24),
+            "native cuff closes the introduced four-edge hole without changing the retained forearm");
+        unsigned caps{};bool boundaryOnly=true;
+        for(size_t at=0;at<24;at+=3)if(cropped[at]!=cropped[at+1]){
+            ++caps;for(size_t i=0;i<3;++i)boundaryOnly&=cropped[at+i]>=4&&cropped[at+i]<8;
+        }
+        expect(caps==2&&boundaryOnly,"cuff cap uses existing boundary vertices and their native skin weights");
+        const std::array<ForearmIndexRange,2> shared{{{0,indices.size()},{0,indices.size()}}};
+        cropped=cut;
+        expect(closeForearmCuffs(points,indices,cropped,shared,false)==0&&cropped==cut,
+            "overlapping LOD draws cannot reuse shared triangle slots for a different cuff");
+        auto invalid=indices;invalid[0]=65535;
+        expect(closeForearmCuffs(points,invalid,cropped,lod,false)==0&&cropped==cut,
+            "invalid native topology leaves the existing safe crop intact");
+    }
     // Captured ACC cross-body reach: its fully extended elbow circle lies
     // inside the head, so changing bend alone cannot produce a fresh rig.
     for(float mirror:{-1.f,1.f}){
@@ -3893,6 +3932,17 @@ int main(){
                 &&squared(lower-eye)>=.12f*.12f-1e-6f;
         }
         expect(segmentsClear,"cross-body sleeve clearance includes both bone segments between the joints");
+        const auto clothed=solveArmAroundHead(captured,target,hint,nullptr,eye,.12f,.14f,.18f);
+        bool sleeveClear=clothed.has_value();
+        if(clothed)for(int step=0;step<=100;++step){
+            const float t=step*.01f;const auto& p=clothed->pose;
+            const auto upper=p.shoulder.position+(p.elbow.position-p.shoulder.position)*t;
+            const auto lower=p.elbow.position+(p.wrist.position-p.elbow.position)*t;
+            sleeveClear=sleeveClear&&squared(upper-eye)>=.18f*.18f-1e-6f&&squared(lower-eye)>=.12f*.12f-1e-6f;
+        }
+        expect(sleeveClear&&near(squared(clothed->pose.elbow.position-captured.shoulder.position),squared(captured.elbow.position-captured.shoulder.position))
+            &&near(squared(clothed->pose.wrist.position-clothed->pose.elbow.position),squared(captured.wrist.position-captured.elbow.position)),
+            "captured cross-head fallback clears the upper sleeve while retaining native arm lengths and forearm reach");
     }
     // A prone wrist can remain above the floor while the unconstrained elbow
     // bends through it. Exercise contact on rotated slopes, not just flat Y=0.

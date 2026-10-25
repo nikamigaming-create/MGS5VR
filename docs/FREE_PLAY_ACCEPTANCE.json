@@ -12,7 +12,7 @@
     {
       "id": "FP01",
       "title": "Right-controller inactivity or invalid tracking enters third person",
-      "status": "reproduce",
+      "status": "implemented_acceptance_pending",
       "acceptance": [
         "valid right hand stationary >6 seconds with left/head motion",
         "right grip invalid 7 seconds",
@@ -152,12 +152,19 @@
           "visual_review": "Both eyes at late loss and recovery retain selected rifle; open support fingers remain visible.",
           "limitation": "Scoped simulator static-grip fault; physical Quest, all weapon types, moving contact and other owners remain unproven."
         }
-      ]
+      ],
+      "status_before_2026_10_24_audit": "reproduce",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Valid/inferred pose retention and reference/owner recovery exist; physical idle report remains unreproduced in simulator.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP02",
       "title": "Precision weapon support grip detaches after firing",
-      "status": "reproduce",
+      "status": "implemented_acceptance_pending",
       "acceptance": [
         "native sniper selected",
         "support acquire, aim, fire, bolt cycle, follow-up shots",
@@ -353,12 +360,19 @@
           "failure": "Mid-reload right-eye capture failed: Static grip expired or gameplay input changed during optic capture. Entire reload capture case remains failed.",
           "limits": "No global weapon identity, hit/damage, every weapon or physical-headset claim."
         }
-      ]
+      ],
+      "status_before_2026_10_24_audit": "reproduce",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Support/contact through reload and tracking-loss weapon continuity/fresh trigger rearm exist; bolt, continuous motion and physical handling remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP03",
       "title": "Contextual Y actions force camera yaw: Fulton, vehicle entry and climbing",
-      "status": "jeep_entry_exit_fixed_scoped_other_actions_open",
+      "status": "implemented_acceptance_pending",
       "acceptance": [
         "before/during/after extraction at multiple headings",
         "native actor/engine camera/HMD yaw telemetry",
@@ -445,12 +459,19 @@
       ],
       "reports": [
         "October 20: user reports several Y-bound actions turn the player toward the same direction; not limited to Fulton."
-      ]
+      ],
+      "status_before_2026_10_24_audit": "jeep_entry_exit_fixed_scoped_other_actions_open",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Pre-context/automatic ledge heading and carrier-relative turns implemented; wider context headings/physical review remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP04",
       "title": "Tight corridor sticking and body size",
-      "status": "automatic_aim_out_fixed_scoped_cover_visuals_settings_and_corridor_open",
+      "status": "partial_implementation",
       "acceptance": [
         "same passage full body on/off",
         "lean/recenter and native capsule position",
@@ -609,12 +630,19 @@
           ],
           "physical_headset_acceptance": false
         }
-      ]
+      ],
+      "status_before_2026_10_24_audit": "automatic_aim_out_fixed_scoped_cover_visuals_settings_and_corridor_open",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Cover aim-out/readiness/exit and low-posture footprint corrections exist; exact corridor undiagnosed, wider cover acceptance open.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP05",
       "title": "Floating and transient size accumulation",
-      "status": "helicopter_exit_fixed_in_simulator_physical_modes_open",
+      "status": "implemented_acceptance_pending",
       "acceptance": [
         "42 native-game simulator height/posture phases passed on c6f6bebd10bd",
         "physical Quest confirmation required"
@@ -650,21 +678,35 @@
           "limits": "Physical Quest seated/standing behavior still unverified; not universal FP05 closure."
         },
         "Fixed-length body/forearm batch (17b044cba72e): removed leg calibration and dynamic length scaling; both legs keep native thigh/shin lengths, with shared pelvis placement satisfying head/spine and floor reach. Thigh clothing helpers now follow their solved joints. When full body is off/unavailable, the owned sna5 outfit hides shoulder/upper-sleeve triangles while retaining native hands, forearms, left bionic arm and attachments; full-body mode retains complete geometry. This simple cut still has a rough open sleeve edge in extreme close views and is not all-outfit acceptance. Extra cuff reconstruction was removed after startup failures; it is not in this candidate. The same retained gameplay implementation was checked on8330791606ab: cabin body run20261023T134930413251Z completes16 phases with both leg scales1 and eye error below0.001mm; explicit full_body=0 run20261023T135658962746Z passes both-arm reach/return and left iDroid front/turned/stow, with both final eyes reviewed and full_body restored to1. Adjacent production fixes evaluate acquired support on the current weapon transform, keep mounted aiming with the operating hand until release, adopt the correct horizontal posture/cover basis, and settle dropped markers using rotated extents. Those changes have focused checks; broad field acceptance remains open. No physical Quest or whole-game claim. Published play remains unchanged."
-      ]
+      ],
+      "status_before_2026_10_24_audit": "helicopter_exit_fixed_in_simulator_physical_modes_open",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Helicopter exit settling and fixed native leg lengths/shared pelvis fit exist; physical calibration/transitions remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP06",
       "title": "Transit helicopter body exclusion",
-      "status": "partial",
+      "status": "implemented_acceptance_pending",
       "acceptance": [
         "native seated body, transit, boarding/disembarking"
       ],
-      "latest_result": "Helicopter transit body on c412aa09c268: seated torso/legs now remain visible in both eyes. Native eye identity is admitted during transit, and the seat anchor settles through the later boarding-to-seated pose change while ignoring small idle head motion. Native pelvis/legs stay attached to the carrier. Four view directions retain mounted body and less than0.2mm fitted eye error in052947. Ordinary disembark053027 and on-foot body053103 pass; seated and on-foot belt views reviewed in both eyes. Extraction boarding, wider transit and physical Quest remain open."
+      "latest_result": "Helicopter transit body on c412aa09c268: seated torso/legs now remain visible in both eyes. Native eye identity is admitted during transit, and the seat anchor settles through the later boarding-to-seated pose change while ignoring small idle head motion. Native pelvis/legs stay attached to the carrier. Four view directions retain mounted body and less than0.2mm fitted eye error in052947. Ordinary disembark053027 and on-foot body053103 pass; seated and on-foot belt views reviewed in both eyes. Extraction boarding, wider transit and physical Quest remain open.",
+      "status_before_2026_10_24_audit": "partial",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Mounted transit body and carrier seat fit exist; extraction and wider physical transit remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP07",
       "title": "Handheld iDroid natural palm-up usability",
-      "status": "verify",
+      "status": "implemented_acceptance_pending",
       "acceptance": [
         "both-eye screen readability and native emitter alignment",
         "forced stow, immediate reopen, driving and walking"
@@ -724,12 +766,19 @@
           "result": "Challenge Tasks Exit Tutorial now retains active VR and readable spatial notice in both eyes; dismissal and immediate iDroid reopening/stow pass.",
           "limitations": "Other lessons and physical headset unverified."
         }
-      ]
+      ],
+      "status_before_2026_10_24_audit": "verify",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Left cinematic handset/contact/projector and ordinary lifecycle/scene repairs exist; continuous stereo/forced lesson/physical review remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP08",
       "title": "Rocket-arm live view and left-arm steering",
-      "status": "scoped_fix_remaining_acceptance",
+      "status": "implemented_acceptance_pending",
       "acceptance": [
         "native flight, view continuity, steering and recovery"
       ],
@@ -744,33 +793,54 @@
           "candidate_sha256": "fb83026e1682e53c415d42ec2cf6dd8db898b32de86ae23917fe1048b63a221b",
           "result": "Exit Tutorial notice dismissed; ordinary iDroid reopening/stowing pass."
         }
-      ]
+      ],
+      "status_before_2026_10_24_audit": "scoped_fix_remaining_acceptance",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Left-hand steering, flight display and ordinary return exist; impact/Blast Arm/physical remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP09",
       "title": "Cabin paper/pen grip and prompt clipping",
-      "status": "reproduce",
+      "status": "implemented_acceptance_pending",
       "acceptance": [
         "pinch/contact animation",
         "writing plus pinning",
         "readability throughout held poses"
       ],
-      "paper_pinch_evidence": "active_work.paper_pinch"
+      "paper_pinch_evidence": "active_work.paper_pinch",
+      "status_before_2026_10_24_audit": "reproduce",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Paper-edge pinch, marker contact, writing/typing/board pinning exist with retained scoped evidence; wider orientations remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP10",
       "title": "Cabin gallery/workbench and cassette presentation",
-      "status": "reproduce",
+      "status": "implemented_acceptance_pending",
       "acceptance": [
         "note editor open",
         "front-slot printing and visible stacking",
         "cassette geometry"
-      ]
+      ],
+      "status_before_2026_10_24_audit": "reproduce",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Print front slots, field-paper pose/rays, flat sheet and rotated marker settlement exist; wider stacking/cassettes/physical review remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP11",
       "title": "Mounted turret hand controls and ACC loadout holsters",
-      "status": "incomplete",
+      "status": "partial_implementation",
       "acceptance": [
         "native physical interaction implementation and live acceptance"
       ],
@@ -799,12 +869,19 @@
           "result": "gun_already_smoking_before_second_entry_cause_unresolved",
           "summary": "Quiet Gatling approach on unchanged aaffbee70236: retained103310 and103839 have an intact loaded field_antiair001 and all11 camp guards in phase0. Retained104011 reaches the rear at[396.898,271.675,2239.48] with the gun still intact. First entry104221 begins with native not_alert=false, records only posture actions3/5/6, and leaves the gun intact at the subsequent read. Second entry104333 already shows heavy smoke in BOTH before-images, before its stand/walk/Y inputs; later native IsBroken is true and actions remain1/2/3. Thus destruction cannot be attributed to the second stand input, and this was not an unalerted mounted-entry comparison. Responsible attacker remains unknown. Neither attempt observes mounted action0x45. Combat104700 and104913 expend zero rounds; the latter also reports a pose restoration mismatch. Camp not cleared. Do not repeat entry on this broken fixture or use these runs to justify a damage/control patch. Next mounted work requires a surviving fixture with nearby threats addressed. No gameplay change or rebuild; owned sessions closed, published play unchanged."
         }
-      ]
+      ],
+      "status_before_2026_10_24_audit": "incomplete",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Both-hand native ACC rifle grabs/returns/interruption recovery exist; mounted adapter admits mortar0x46/MG0x47 only. Other loadouts/types/physical review remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP12",
       "title": "Remaining mission, menu, weapon and historical acceptance gaps",
-      "status": "inventory",
+      "status": "inventory_acceptance_pending",
       "acceptance": [
         "reconcile community-issues.json, vr_regression_catalog.json and current evidence by exact build",
         "systematic cross-mode coverage with explicit untested combinations"
@@ -869,7 +946,14 @@
             "No physical Quest, full-mission, broad stereo-motion or all-binocular-interactions acceptance."
           ]
         }
-      ]
+      ],
+      "status_before_2026_10_24_audit": "inventory",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Native tutorial/scene/exit-notice repairs and binocular intel/marking exist; forced unfinished lessons, broader progression/mission combinations remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP13",
@@ -904,7 +988,14 @@
         "native area-selection entry and destination choice visibly usable through VR",
         "normal departure and arrival in unrestricted free roam",
         "preserve mission list and Mother Base routing"
-      ]
+      ],
+      "status_before_2026_10_24_audit": "native_free_roam_route_verified_in_simulator",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Missions -> Mission List -> Free Roam reaches on-foot arrival in retained scoped evidence; broader progression is not accepted.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP14",
@@ -928,12 +1019,19 @@
         "native character preview has complete head and body",
         "ordinary first-person head exclusion remains correct",
         "both-eye preview and return-to-game inspection"
-      ]
+      ],
+      "status_before_2026_10_24_audit": "fixed_in_development",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Native sortie preview visibility and first-person concealment restored; preserve in adjacent review.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP15",
       "title": "Mortar viewpoint is inside emplacement instead of behind it",
-      "status": "partial",
+      "status": "partial_implementation",
       "report": "User can fire but cannot see aiming or impacts; viewpoint appears inside mortar.",
       "acceptance": [
         "Native mortar entry from multiple headings; verify eye position relative to authored operator seat and barrel in both eyes",
@@ -964,12 +1062,19 @@
           "result": "camp_not_cleared_no_mounted_acceptance",
           "summary": "Camp-clear attempt on unchanged aaffbee70236 did not clear slopedWest. The saved back-slot rifle was selected through the wrist picker. Distant033624, ridge034016, close034143 and flank034343 combat attempts dispatched zero rounds: native muzzle rays were obstructed. The bounded CQC approach034239 ended outside its arrival radius; no takedown. Final034343 native read finds mortar002 broken, 001 intact and all three guards active in phase3, with player life7801. No mortar entry or firing was requested in this session. There is no same-session intact baseline for002, so its destruction time and cause are not established. This does not diagnose a VR production fault or close FP15. Stop repeating the occupied slopedWest fixture by default; another usable fixture or a genuinely cleared camp is required. Owned session closed; no source/build/pin changes."
         }
-      ]
+      ],
+      "status_before_2026_10_24_audit": "partial",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Native mounted eye/body and mortar/MG contacts exist; intact additional-type entry/action identity and firing/contact/impact acceptance remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP16",
       "title": "Small low rocks cause slipping, falling and brief locomotion stops",
-      "status": "reproduce",
+      "status": "reproduction_required",
       "report": "User reports running over certain relatively flat rocks causes slips/falls and brief stops. Exact sites not yet identified.",
       "acceptance": [
         "Record exact native location and repeat same rock both directions walking/running, seated/standing and full-body on/off",
@@ -986,12 +1091,19 @@
           "result": "LZ low-terrain walk traversed~5.7m with0.56m elevation rise; reported slip/stop not reproduced. Return route moved~10m across area but endpoint was3.6m outside requested goal; navigation failure, not a collision diagnosis.",
           "limits": "Exact reported rock location remains unknown; optional user question pending. No FP16 fix claimed."
         }
-      ]
+      ],
+      "status_before_2026_10_24_audit": "reproduce",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "No targeted repair established for the exact reported small-rock interruption; locate and diagnose before changing flow.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "FP17",
       "title": "Right wrist steers shoulders and opposite arm; apparent arm shortening in physical VR",
-      "status": "wrist_coupling_corrected_simulator_reach_and_headset_open",
+      "status": "implemented_with_remaining_visual_limits",
       "report": "Both hands vertical/parallel moderately extended; moving only right hand pulls left hand backward, rotating right wrist moves shoulders oppositely while view stays fixed. User distinguishes physical VR from Snakebot.",
       "acceptance": [
         "Hold HMD and left controller fixed; independently sweep right wrist yaw and right-hand forward translation with both hands vertical and parallel",
@@ -1188,10 +1300,43 @@
           "cleanup": "Owned game/simulator and bounded reader closed; Steam and published play retained"
         },
         "Fixed-length body/forearm batch (17b044cba72e): removed leg calibration and dynamic length scaling; both legs keep native thigh/shin lengths, with shared pelvis placement satisfying head/spine and floor reach. Thigh clothing helpers now follow their solved joints. When full body is off/unavailable, the owned sna5 outfit hides shoulder/upper-sleeve triangles while retaining native hands, forearms, left bionic arm and attachments; full-body mode retains complete geometry. This simple cut still has a rough open sleeve edge in extreme close views and is not all-outfit acceptance. Extra cuff reconstruction was removed after startup failures; it is not in this candidate. The same retained gameplay implementation was checked on8330791606ab: cabin body run20261023T134930413251Z completes16 phases with both leg scales1 and eye error below0.001mm; explicit full_body=0 run20261023T135658962746Z passes both-arm reach/return and left iDroid front/turned/stow, with both final eyes reviewed and full_body restored to1. Adjacent production fixes evaluate acquired support on the current weapon transform, keep mounted aiming with the operating hand until release, adopt the correct horizontal posture/cover basis, and settle dropped markers using rotated extents. Those changes have focused checks; broad field acceptance remains open. No physical Quest or whole-game claim. Published play remains unchanged."
-      ]
+      ],
+      "status_before_2026_10_24_audit": "wrist_coupling_corrected_simulator_reach_and_headset_open",
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "finding": "Wrist-isolated torso, acquired-support rule, clavicle reach and cross-head fallback exist; sleeve crowding/rough cuff/outfit and physical review remain.",
+        "source_map": "docs/FIELD_FIXES.md",
+        "acceptance_promoted": false
+      }
     }
   ],
   "active_work": {
+    "candidate": "17b044cba72e33e6d6eefc89be5f00bcb313ba0fee4bb8751da9d43e52b50e4f",
+    "source_commit": "5622052bd8799603ef8aae66235ec82d3c7bce6f",
+    "checkpoint": "Documentation and source audit complete; existing gameplay repairs retained. Follow the single execution plan, beginning with remaining body/arm presentation limits.",
+    "plan": "docs/RELEASE_PLAN.md",
+    "next_actions": [
+      "Review known cuff/outfit limits without undoing fixed native leg lengths and tracked garment repairs.",
+      "Use retained mounted bridge route; intact east AAG entry remains unproven. Diagnose native entry/action/contact before adding types.",
+      "Reproduce exact rocks/corridor and any new progression failure; batch justified fixes and adjacent review.",
+      "Reconcile dated catalog failures with retained later evidence and exact candidate; physical Quest Link acceptance remains separate."
+    ],
+    "runtime_requirement": "Wired Meta Quest Link / Meta OpenXR; both Play commands explicitly -MetaLink. Historical runtime observations in retained_work_history are not current setup instructions.",
+    "build_slots": {
+      "published_pin": "b627c7cacc9a",
+      "development": "17b044cba72e"
+    },
+    "scope": "Documentation pass only; no game session, new tests of gameplay, build, deployment, publication or pinning. Historical session and cleanup records keep their original scope in retained_work_history."
+  },
+  "implementation_audit": {
+    "date": "2026-10-24",
+    "source_commit": "5622052bd8799603ef8aae66235ec82d3c7bce6f",
+    "development_dll_sha256": "17b044cba72e33e6d6eefc89be5f00bcb313ba0fee4bb8751da9d43e52b50e4f",
+    "report": "docs/FIELD_FIXES.md",
+    "execution_plan": "docs/RELEASE_PLAN.md",
+    "scope": "Read-only production-code audit; documentation reconciliation. No new runtime/headset acceptance. Prior status strings and all evidence retained."
+  },
+  "retained_work_history": {
     "candidate": "17b044cba72e33e6d6eefc89be5f00bcb313ba0fee4bb8751da9d43e52b50e4f",
     "targets": [
       "tutorial camera handoff freeze",
@@ -1541,7 +1686,7 @@
         "both_hand_stick_release": "native axes neutral"
       },
       "failures": [
-        "Right-hand acquisition chased native pitch, oscillating about 15\u00e2\u20ac\u201c18 degrees during a pure yaw movement.",
+        "Right-hand acquisition chased native pitch, oscillating about 15â€“18 degrees during a pure yaw movement.",
         "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
       ],
       "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
@@ -1596,7 +1741,7 @@
       "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
       "baseline_run": "20261022T044008503318Z",
       "retained_run": "20261022T045333990203Z",
-      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u00e2\u20ac\u201c90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20â€“90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
       "remaining": [
         "Wider marker grip orientations",
         "Broader FP09/FP10",
@@ -1619,7 +1764,7 @@
         {
           "sha256_prefix": "1bbaac705854",
           "run": "20261022T051925150310Z",
-          "failure": "Native eye identity joined, but fitted eye remained26\u00e2\u20ac\u201c31cm below cached passenger anchor; body rejected."
+          "failure": "Native eye identity joined, but fitted eye remained26â€“31cm below cached passenger anchor; body rejected."
         },
         {
           "sha256_prefix": "a563468ce054",

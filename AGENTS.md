@@ -1,138 +1,103 @@
-# MGS5VR interaction mandate
+# MGS5VR — effective local rules
 
-Keep the desktop preview at 1280 × 720. VR uses the active runtime's per-eye
-recommendation and correct eye FOVs; never derive VR sharpness or stereo
-acceptance from the desktop preview size.
+Consolidated 24 October 2026 from the user's directions. This is the operative
+rulesheet. [Chronological directions](docs/RULES_HISTORY.md) preserve provenance,
+including superseded instructions; they are not a second instruction set.
 
-User direction, 28 September 2026:
+## Start and continue
 
-This is a complete VR game. Preserve the existing VR interactions. Use native
-game controls only when absolutely necessary; even then, retain a VR interaction
-for the player wherever possible. Implement necessary native integration behind
-that VR interaction rather than replacing it with stock gamepad operation.
+Read [docs/CURRENT.md](docs/CURRENT.md), then [docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md).
+Use [docs/FIELD_FIXES.md](docs/FIELD_FIXES.md) for the complete report list and
+[docs/FREE_PLAY_ACCEPTANCE.json](docs/FREE_PLAY_ACCEPTANCE.json) for retained evidence.
+Work from this checkout on `main`, the only local development branch. Do not
+create feature branches or worktrees. Historical contribution refs are not an
+instruction to merge old prototypes over the current rig.
 
-The binoculars remain physical hand-held binoculars: equip and hold them, aim
-with the hand, zoom, automatically acquire visible enemies, and explicitly mark
-targets using the existing VR bindings. A mission or tutorial compatibility fix
-must preserve those behaviors. Do not substitute native stick aiming or add a
-second binocular display.
+The release objective is full-game playability with established VR interactions
+preserved. Progress means reported gameplay defects repaired, not harness changes,
+test totals or evidence collection. Review the whole list, group related
+reproduced fixes, then build/test the batch and adjacent interactions together.
+Do not spend a separate build/deploy/test cycle on each narrow subcase.
 
-Reproduce reported failures in the actual game before changing a working flow.
-The release task is to fix defects and preserve established VR behavior.
+Inspect existing implementation and callers before proposing a fix. An unchecked
+acceptance box does not mean missing code. Separate implemented repairs, partial
+implementation, reproduced failures, unreproduced reports and acceptance gaps.
+Do not restart completed investigations. Reproduce unknown failures in the actual
+game before changing a working flow. Untested combinations are not diagnosed
+defects. Keep failures explicit; no blanket "100 percent working" claims.
 
-Do not automatically open Pause and leave a failed test on its Resume/Skip
-screen. Release test inputs and close test-opened menus during cleanup. The
-user has explicitly asked not to leave test sessions and panels open.
+## Preserve the VR game
 
-The weapon/status display and HUD popups stay on the LEFT bionic forearm.
-The right hand carries iDroid. Opening it must not move ordinary status onto
-the right arm. Preserve the established month of rig and interaction work.
-Do not shut down or restart Steam. No desktop or window-control automation.
+- Keep desktop preview **1280 x 720**. VR uses the active runtime's per-eye
+  recommendation and correct FOVs; desktop size cannot certify VR sharpness/stereo.
+- Use native game controls only when necessary, behind a retained VR interaction
+  wherever possible. Do not replace physical interactions with stock gamepad play.
+- Binoculars remain physical: equip/hold/inspect, hand aim, zoom, visible-enemy
+  acquisition and explicit marking with existing VR bindings. Preserve tutorial
+  compatibility without stick-aim substitution or a second binocular display.
+- Keep floating aiming reticles off. Preserve sights/reticles inside actual
+  optics and verify sight, muzzle, hit and hand alignment. No detached zoom window.
+- **iDroid belongs in the LEFT bionic hand**, using owned native cinematic contact
+  and emitter/projection evidence. Verify handset and screen together in both
+  eyes, including ordinary/forced stow and immediate reopening.
+- Ordinary status, weapon HUD and popups stay on the **LEFT forearm**. Pause and
+  explicitly selected off-wrist presentation use a spatial stereo panel.
+- Never lengthen legs. Preserve native thigh/shin lengths through calibration,
+  HMD motion, posture and floor fitting. Fit pelvis/joints within those lengths.
+  Prioritize body/head IK and arm presentation. With full body off/unavailable,
+  show hands and forearms without shoulders/upper sleeves. Preserve the left
+  bionic/rocket arm, left forearm HUD and left-hand iDroid interactions.
+- Audit effective personal bindings before changing chords. Preserve settings,
+  saves, native restrictions and tutorial progression. Owned data stays private.
 
-User direction, 29 September 2026:
+## Exactly two retained build slots
 
-Work from this checkout. `play/` is the fixed local test installation tree.
-Run `tools/build.ps1` to build, test, refresh it and synchronize the recorded
-local game installation. Do not make dated distribution folders for local
-iterations. ZIPs and public release assets are for explicitly requested GitHub
-releases. Read `docs/CURRENT.md` for current acceptance and next work.
+- `play/` contains the last successfully published release and matching launcher.
+  `Play.cmd` verifies/restores this pin for physical play.
+- `build/dev/` contains the latest completed checked candidate. `Play-Dev.cmd`
+  selects it for testing. Keep both launch paths ready.
+- `tools/build.ps1` builds/checks development only. `-Deploy`, `Play-Dev.cmd`
+  or `python tools/workspace.py launch-sim` explicitly installs development.
+  Building/debugging never replaces the published pin.
+- An authorized release is packaged from checked development. Only after
+  publication to the requested server/GitHub destinations succeeds and uploaded
+  payloads verify may `python tools/workspace.py pin-build` promote that exact
+  reviewed candidate. A source push, package or draft does not advance the pin.
+  Publication/pinning never implies physical-headset acceptance.
+- No dated local distribution folders, old binary snapshots or persistent
+  rollback builds. ZIPs/public assets are for explicitly requested releases.
+  Compiler output belongs to development; installed game files deploy one slot,
+  not a third retained version.
+- Staging/rollback exists only during updates; retain a failed transaction only
+  until recovery. Remove recognized obsolete builds with
+  `tools/clean-local-builds.ps1 -Apply` after both slots verify. Keep source,
+  personal settings, saves and test evidence.
 
-Keep floating aiming reticles off. Preserve physical gun sights and reticles
-inside their actual optics, with sight, muzzle, hit and hand alignment verified.
-Keep ordinary HUD on the bionic wrist/arm. Pause and explicitly selected
-off-wrist presentation belong on a spatial stereo panel. Preserve physical
-binocular inspection, hand aiming, zoom, acquisition and marking. Do not
-replace optics with a detached zoom window. Audit control chords using the
-effective personal bindings before proposing changes.
+## Runtime, bounded tests and cleanup
 
-The handheld iDroid's projection must match its native emitter and authored
-presentation; study native/cutscene evidence before changing alignment.
-Acceptance includes ordinary and forced tutorial stow and immediate reopening.
+Physical play uses **wired Meta Quest Link / Meta OpenXR**. Honor saved
+`HeadsetRuntime` before the Windows default, preserve the user's requested
+Windows 64-bit Meta runtime and both Play commands' explicit `-MetaLink`.
+Never switch physical play to SteamVR. Simulator leases restore per-game Meta.
 
-Use `tools/workspace.py bot` for bounded local runs. It defaults to observation;
-Pause is exercised only by an explicitly selected case. Promote a run to
-acceptance evidence before relying on it in the ledger; scratch runs expire.
-Full-game playability is the release objective. Scoped scene passes and unit
-checks do not certify whole missions, every weapon, or headset acceptance.
+Do not shut down or restart Steam. No desktop, focus or window-control automation.
+Use `tools/workspace.py bot` for bounded local runs. Default is observation;
+Pause requires an explicitly selected case. Use existing cases and retained
+routes; do not expand the harness as a substitute for defect work.
 
-User direction, 4 October 2026:
+Review both final eyes through motion/transitions. Source/tests/simulator passes
+do not certify whole missions, every weapon or physical-headset behavior.
+Retain reviewed evidence before citing it: `workspace.py pin` retains a run;
+`workspace.py pin-build` promotes the published build under separate authority.
+Scratch runs expire. Preserve failures and exact scope in the ledger.
 
-The handheld iDroid belongs in the LEFT bionic hand, matching Snake's native
-arrival cinematic. This supersedes the earlier right-hand iDroid direction.
-Keep ordinary status and HUD on the left forearm. Match the cinematic contact
-and projector from the owned native data, and verify handset motion together
-with its screen in both eyes.
+Always release test inputs, restore temporary poses/settings, close test-opened
+menus and owned sessions/readers, and leave no background harness. Never
+automatically open Pause and leave a failed test at Resume/Skip. Retain Steam.
 
-User direction, 10 October 2026:
+## Durable handoff
 
-Keep exactly two retained local builds: `play/` is the pinned playable build,
-and `build/dev/` is the working build for tests and debugging. The user selected
-the installed `6ac226f4bf2c` candidate as the initial pin; headset acceptance
-is still pending. This supersedes automatic replacement of `play/` during builds.
-`tools/build.ps1` builds and checks development only. `-Deploy`, `Play-Dev.cmd`
-or `workspace.py launch-sim` explicitly installs development for testing.
-`Play.cmd` verifies and restores the pinned build before physical play.
-Only an explicit user decision to promote a reviewed candidate authorizes
-`python tools/workspace.py pin-build`. Building or debugging never implies
-permission to replace the pin. Never label pinning as headset acceptance.
-Do not keep dated packages, old binary snapshots or persistent rollback builds.
-Transactional staging/rollback exists only during an update; retain a failed
-transaction only until recovery. Compiler output belongs to development, and
-the installed game is a deployment of one slot, not another retained version.
-Use `tools/clean-local-builds.ps1 -Apply` to remove recognized obsolete builds
-after both slots verify. Keep source, personal settings, saves and test evidence.
-
-This user's physical headset uses wired Meta Quest Link and Meta OpenXR, not
-SteamVR. Honor the saved MGS5VR `HeadsetRuntime` preference before Windows'
-global runtime. Both local Play commands use the shared headset launcher;
-the pinned payload remains unchanged. Simulator leases must restore the
-per-game Meta runtime. Do not switch a physical play session to SteamVR.
-
-User direction, 11 October 2026:
-
-`play/` must always contain the last successfully published release and its
-matching launcher, available for local play through `Play.cmd`. `build/dev/`
-contains the latest completed, checked candidate for the user's testing through
-`Play-Dev.cmd`. Keep both launch paths ready while development continues.
-An authorized release is packaged from checked development without replacing
-the published pin. After publication to the requested server/GitHub destinations
-succeeds and the uploaded payload is verified, pin that exact candidate. Both
-slots then match until the next development changes. Preparing a package,
-pushing source or creating a draft release does not advance the pin. This
-supersedes the earlier choice of an unpublished candidate as the normal play
-pin; publication and pinning still do not imply physical-headset acceptance.
-
-The user explicitly requested fixing the PC's physical-headset default after
-a Play-Dev launch selected SteamVR. Windows' 64-bit OpenXR ActiveRuntime is
-now Meta Quest Link, and both local Play commands explicitly pass `-MetaLink`
-to the shared headset launcher. Preserve this choice through development and
-simulator cleanup. Do not switch the physical session back to SteamVR.
-
-User direction, 21 October 2026:
-
-Use this checkout on main as the only local development branch. Consolidate
-outstanding work onto main; do not create feature branches or worktrees.
-Progress means reported gameplay defects fixed, not harness changes, test counts,
-or evidence collection. Supporting checks remain necessary but are not delivery.
-Work through docs/FIELD_FIXES.md without stopping after a narrow subcase. Keep
-known failures explicit; do not claim 100 percent working from incomplete coverage.
-Close leftover test sessions and do not leave background harnesses running.
-
-User direction, 22 October 2026:
-
-Review the whole remaining defect list before selecting changes. Group related,
-already reproduced gameplay fixes into a candidate, then build and test the batch
-and its adjacent interactions together. Do not spend a separate build/deploy/test
-cycle on every narrow subcase. Reproduce unknown failures before changing their
-working flows; an untested combination is not itself a diagnosed defect. Report
-actual gameplay deliveries and remaining failures, not harness work as progress.
-
-User direction, 23 October 2026:
-
-Never lengthen legs. Preserve native thigh and shin lengths through calibration,
-headset motion, posture changes and floor fitting. Fit the pelvis and joints
-within those lengths instead of scaling the skeleton. Prioritize body/head IK
-and arm presentation, then continue the remaining field fixes in batches.
-When full-body presentation is off or unavailable, show hands and forearms,
-without shoulders or upper sleeves. Preserve the left bionic/rocket arm, left
-forearm HUD and left-hand iDroid interactions.
+Update CURRENT, FIELD_FIXES and the evidence ledger after a meaningful batch;
+synchronize RELEASE_PLAN's next action. Historical reports keep their original
+build scope. Do not use old "current candidate" text as a new failure diagnosis,
+erase evidence or promote acceptance during documentation cleanup.

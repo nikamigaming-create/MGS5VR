@@ -1,5 +1,7 @@
 # Community recovery plan
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 For the latest installed build, field-kit drill-down and execution order, see the
 [27 September release acceptance checkpoint](RELEASE_ACCEPTANCE_2026-09-27.md).
 The dated implementation evidence below is preserved as history.

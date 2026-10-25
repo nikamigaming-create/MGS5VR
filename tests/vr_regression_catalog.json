@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "audited_on": "2026-10-03",
+  "audited_on": "2026-10-24",
   "title": "MGS5VR implemented behavior regression catalog",
   "scope": "Behavior families found in current source and retained public ledgers. This is an explicit audit denominator, not an exhaustive list of every weapon, action, mission, report or supported environment.",
   "baseline": {
-    "release": "experimental-2026-10-02",
-    "source_reference": "docs/RELEASE_2026-10-02.md",
-    "comparison": "The published build predates the current handheld-default/animation/performance candidate. Historical released-build still captures cannot clear a newer continuous native regression.",
-    "current_candidate": "Unreleased handheld-default, animation and performance investigation. Candidate 4df840eda253 passed 43 CTest groups and installer transactions; current ACC observations remain scoped. Exact process/configuration identities are retained locally.",
-    "current_candidate_id": "october-2-unreleased-handheld-investigation"
+    "release": "experimental-2026-10-19.1",
+    "source_reference": "docs/RELEASE_2026-10-19.1.md",
+    "comparison": "Published local play is b627c7cacc9a. The code audit covers later development17b044cba72e; neither publication nor source inspection certifies physical or complete gameplay acceptance.",
+    "current_candidate": "Checked development17b044cba72e from main 5622052bd8799603ef8aae66235ec82d3c7bce6f; documentation cleanup is newer than its packaged docs. Existing 58-group report is not a new runtime pass.",
+    "current_candidate_id": "main-5622052-development-17b044cba72e"
   },
   "rules": [
     "Source presence is implementation evidence, not a feature-complete claim.",
@@ -31,14 +31,14 @@
       "scoped_observation": "Current native measurements or bounded observations exist; complete feature acceptance remains open.",
       "retained_scoped": "Retained native observations exist from an earlier identified run/build; not a current blanket pass.",
       "unverified": "No accepted native outcome for the stated behavior.",
-      "blocked": "A current reported or reproduced defect prevents acceptance; its scope explicitly distinguishes a user report from native reproduction.",
+      "blocked": "Unresolved acceptance block from a reported/reproduced failure or its outstanding reconciliation; inspect dated scope and implementation_audit before asserting a current defect.",
       "not_applicable": "External tooling uses a different acceptance method.",
       "accepted_scoped": "Reviewed current-candidate native evidence with a matching public report and controlled local acceptance ID; only its declared scope."
     },
     "continuous": {
       "historical_partial": "A bounded historical continuous take exists, with explicit limitations.",
       "unverified": "No current continuous acceptance for the complete behavior.",
-      "blocked": "Current continuous evidence reveals a defect.",
+      "blocked": "Retained continuous failure has not received the required reviewed reconciliation; this status alone does not prove that old failure persists on newer code.",
       "not_applicable": "Native gameplay recording does not directly accept this external tool.",
       "accepted": "Reviewed current-candidate native transition recording with the required sustained duration and repetition count; no headset or full-game inference."
     },
@@ -49,7 +49,7 @@
       "accepted": "Reviewed current-candidate physical headset session identified by hardware/runtime; only its declared scope."
     },
     "release_gate": {
-      "blocked": "Known current defect requires repair/replay before acceptance.",
+      "blocked": "Conservative release block pending repair or evidence reconciliation as explicitly scoped; source presence alone cannot clear it.",
       "pending": "Missing native, continuous, headset or scenario coverage.",
       "experimental": "Unproven or incomplete experiment; exclude accepted-feature claims.",
       "tooling_only": "Contracts cover external tooling; end-user environments remain separate."
@@ -125,7 +125,6 @@
     "Roomscale body following and complete native traversal/collision.",
     "Hand-to-head NVG gesture.",
     "Complete left-handed rig.",
-    "In-headset settings editor.",
     "Complete Ground Zeroes first-person rig and HUD.",
     "Exhaustive weapons, items, buddies, vehicles, missions or full-game/headset readiness.",
     "Zero frame drops or sustained native refresh-rate acceptance."
@@ -230,7 +229,9 @@
         "docs/ACCEPTANCE.md",
         "docs/CURRENT.md",
         "docs/HEADSET_REVIEW.md",
-        "docs/HELICOPTER_IDLE_REPORT.md"
+        "docs/HELICOPTER_IDLE_REPORT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/ACCEPTANCE_HISTORY.md"
       ],
       "community_reports": [
         "R05",
@@ -323,7 +324,8 @@
       "native_fixtures": [],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/HEADSET_SHARPNESS_REVIEW.md"
+        "docs/HEADSET_SHARPNESS_REVIEW.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R40"
@@ -408,7 +410,9 @@
       "native_fixtures": [],
       "evidence_sources": [
         "docs/ACCEPTANCE.md",
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/ACCEPTANCE_HISTORY.md"
       ],
       "community_reports": [
         "R05",
@@ -495,7 +499,8 @@
       "auxiliary_tests": [],
       "native_fixtures": [],
       "evidence_sources": [
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R05"
@@ -582,7 +587,8 @@
       "native_fixtures": [],
       "evidence_sources": [
         "docs/ACCEPTANCE.md",
-        "docs/CONTROLS.md"
+        "docs/CONTROLS.md",
+        "docs/ACCEPTANCE_HISTORY.md"
       ],
       "community_reports": [
         "R01",
@@ -684,7 +690,9 @@
         "docs/COMMUNITY_VERIFICATION_2026-09-27.json",
         "docs/COMMUNITY_RECOVERY_PLAN.md",
         "docs/CURRENT.md",
-        "docs/REGRESSION_COVERAGE.md"
+        "docs/REGRESSION_COVERAGE.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/REGRESSION_COVERAGE_HISTORY.md"
       ],
       "community_reports": [
         "R01",
@@ -790,7 +798,8 @@
       "native_fixtures": [],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/CABIN_NATIVE_STATUS.md"
+        "docs/CABIN_NATIVE_STATUS.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R36"
@@ -965,7 +974,8 @@
       ],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/GAMEPLAY_FEATURES.md"
+        "docs/GAMEPLAY_FEATURES.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R07",
@@ -1058,7 +1068,8 @@
       "native_fixtures": [],
       "evidence_sources": [
         "docs/QUEST3_TESTER_FEEDBACK.md",
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R07",
@@ -1153,7 +1164,8 @@
       ],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/CONTROLLER_RIG.md"
+        "docs/CONTROLLER_RIG.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R05",
@@ -1174,11 +1186,11 @@
         },
         "native": {
           "status": "blocked",
-          "scope": "Native hands and selected grips are visible in retained runs. Newer current-candidate continuous iDroid evidence reveals a hand/stow defect and supersedes older still-only passes. The public six-cycle, 180-second motion fixture exists; it has not passed native iDroid acceptance."
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Fixed-length legs/shared pelvis, clavicle reach/wrist isolation, garment drivers and native hand publication exist. Rough cuff, cross-head sleeve crowding and outfit admission remain real limits."
         },
         "continuous": {
           "status": "blocked",
-          "scope": "Current-candidate dense source-eye and continuous capture review reproduced missing rig frames during opening, three to four missing/translucent stow frames, and device persistence for about 0.3 seconds. Older successful endpoint captures do not clear these transitions."
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Fixed-length legs/shared pelvis, clavicle reach/wrist isolation, garment drivers and native hand publication exist. Rough cuff, cross-head sleeve crowding and outfit admission remain real limits."
         },
         "headset": {
           "status": "historical_feedback",
@@ -1187,10 +1199,10 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Confirmed current-candidate hand/stow regression; a release claiming this repair must remain blocked."
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Fixed-length legs/shared pelvis, clavicle reach/wrist isolation, garment drivers and native hand publication exist. Rough cuff, cross-head sleeve crowding and outfit admission remain real limits."
       },
       "missing_checks": [
-        "Repair and continuously replay the iDroid hand/stow regression before promotion.",
+        "Review the implemented hand/stow repairs and later retained evidence, then continuously replay; repair only any remaining reproduced failure.",
         "Native equip/stow, reload, action animation and transition coverage.",
         "Tracking occlusion and physical reach extremes for each supported outfit/profile."
       ],
@@ -1221,6 +1233,44 @@
           "status": "missing",
           "scope": "At least one integrated ten-minute candidate soak with repeated natural interactions, movement and interruptions. It may cover several features; retain their individual outcomes and actual measured cadence."
         }
+      },
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "IK, contact transforms, finger curl and paused-parts rules are isolated; no test host plays native action animations."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "Native hands and selected grips are visible in retained runs. Newer current-candidate continuous iDroid evidence reveals a hand/stow defect and supersedes older still-only passes. The public six-cycle, 180-second motion fixture exists; it has not passed native iDroid acceptance."
+          },
+          "continuous": {
+            "status": "blocked",
+            "scope": "Current-candidate dense source-eye and continuous capture review reproduced missing rig frames during opening, three to four missing/translucent stow frames, and device persistence for about 0.3 seconds. Older successful endpoint captures do not clear these transitions."
+          },
+          "headset": {
+            "status": "historical_feedback",
+            "scope": "Earlier headset feedback exists; it is not a passing regression on the current candidate."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Confirmed current-candidate hand/stow regression; a release claiming this repair must remain blocked."
+        },
+        "missing_checks": [
+          "Repair and continuously replay the iDroid hand/stow regression before promotion.",
+          "Native equip/stow, reload, action animation and transition coverage.",
+          "Tracking occlusion and physical reach extremes for each supported outfit/profile."
+        ]
+      },
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "source_commit": "5622052bd8799603ef8aae66235ec82d3c7bce6f",
+        "report": "docs/FIELD_FIXES.md",
+        "finding": "Fixed-length legs/shared pelvis, clavicle reach/wrist isolation, garment drivers and native hand publication exist. Rough cuff, cross-head sleeve crowding and outfit admission remain real limits.",
+        "acceptance_promoted": false
       }
     },
     {
@@ -1251,7 +1301,9 @@
       "native_fixtures": [],
       "evidence_sources": [
         "docs/ACCEPTANCE.md",
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/ACCEPTANCE_HISTORY.md"
       ],
       "community_reports": [
         "R05",
@@ -1347,7 +1399,8 @@
       "evidence_sources": [
         "docs/CURRENT.md",
         "docs/DUAL_GAME_SIM_COVERAGE.md",
-        "docs/WEAPON_SCOPES.md"
+        "docs/WEAPON_SCOPES.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R08",
@@ -1445,7 +1498,8 @@
       ],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/QUEST3_TESTER_FEEDBACK.md"
+        "docs/QUEST3_TESTER_FEEDBACK.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R10",
@@ -1536,7 +1590,8 @@
       "native_fixtures": [],
       "evidence_sources": [
         "docs/WEAPON_SCOPES.md",
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R10",
@@ -1625,7 +1680,8 @@
       "native_fixtures": [],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/WEAPON_SCOPES.md"
+        "docs/WEAPON_SCOPES.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R11",
@@ -1702,7 +1758,8 @@
       "auxiliary_tests": [],
       "native_fixtures": [],
       "evidence_sources": [
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R40",
@@ -1791,7 +1848,8 @@
       ],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/CONTROLS.md"
+        "docs/CONTROLS.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R02",
@@ -1881,7 +1939,8 @@
       "evidence_sources": [
         "docs/COMMUNITY_VERIFICATION_2026-09-27.json",
         "docs/CURRENT.md",
-        "docs/GAMEPLAY_FEATURES.md"
+        "docs/GAMEPLAY_FEATURES.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R02",
@@ -1969,7 +2028,8 @@
       "auxiliary_tests": [],
       "native_fixtures": [],
       "evidence_sources": [
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R42"
@@ -2056,7 +2116,9 @@
       ],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/ACCEPTANCE.md"
+        "docs/ACCEPTANCE.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/ACCEPTANCE_HISTORY.md"
       ],
       "community_reports": [
         "R17",
@@ -2149,7 +2211,9 @@
       "evidence_sources": [
         "docs/CURRENT.md",
         "docs/GAMEPLAY_FEATURES.md",
-        "docs/REGRESSION_COVERAGE.md"
+        "docs/REGRESSION_COVERAGE.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/REGRESSION_COVERAGE_HISTORY.md"
       ],
       "community_reports": [
         "R22",
@@ -2334,7 +2398,8 @@
       "evidence_sources": [
         "docs/CURRENT.md",
         "docs/GAMEPLAY_FEATURES.md",
-        "docs/SYSTEMS_ACCESS.md"
+        "docs/SYSTEMS_ACCESS.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R22",
@@ -2443,7 +2508,8 @@
         "tools/gameplay_bot/suites/idroid-continuous-roundtrip.json"
       ],
       "evidence_sources": [
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R18",
@@ -2457,11 +2523,11 @@
         },
         "native": {
           "status": "blocked",
-          "scope": "Older bounded both-eye open/fit checks are retained. The current candidate's hand/stow regression prevents complete native animation acceptance. The public six-cycle, 180-second motion fixture exists; it has not passed native iDroid acceptance."
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Left cinematic contact, native connector/projector frame and effect-cone retargeting exist. Continuous stereo motion/readability and physical fit remain unaccepted."
         },
         "continuous": {
           "status": "blocked",
-          "scope": "Current-candidate dense source-eye and continuous capture review reproduced missing rig frames during opening, three to four missing/translucent stow frames, and device persistence for about 0.3 seconds. Older successful endpoint captures do not clear these transitions."
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Left cinematic contact, native connector/projector frame and effect-cone retargeting exist. Continuous stereo motion/readability and physical fit remain unaccepted."
         },
         "headset": {
           "status": "unverified",
@@ -2470,7 +2536,7 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Shares the confirmed current-candidate native hand/stow defect; do not promote the default/animation repair yet."
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Left cinematic contact, native connector/projector frame and effect-cone retargeting exist. Continuous stereo motion/readability and physical fit remain unaccepted."
       },
       "missing_checks": [
         "Continuous native device/hand animation and screen publication during opening, movement and stow.",
@@ -2504,6 +2570,44 @@
           "status": "missing",
           "scope": "At least one integrated ten-minute candidate soak with repeated natural interactions, movement and interruptions. It may cover several features; retain their individual outcomes and actual measured cadence."
         }
+      },
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "Default-on and explicit opt-out, socket projection, menu posture, UI readiness and stationary navigation contracts. Native display publication checks require exact body/device owner, generation, activation/focus epochs, palette and post-A8 temporal ordering, including the native local/world palette branch. They do not substitute native transforms or accept attachment visuals. Outgoing device-layout policy excludes the shared Mission Orders resource and does not suppress unknown layouts."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "Older bounded both-eye open/fit checks are retained. The current candidate's hand/stow regression prevents complete native animation acceptance. The public six-cycle, 180-second motion fixture exists; it has not passed native iDroid acceptance."
+          },
+          "continuous": {
+            "status": "blocked",
+            "scope": "Current-candidate dense source-eye and continuous capture review reproduced missing rig frames during opening, three to four missing/translucent stow frames, and device persistence for about 0.3 seconds. Older successful endpoint captures do not clear these transitions."
+          },
+          "headset": {
+            "status": "unverified",
+            "scope": "No current-candidate physical-headset acceptance is established."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Shares the confirmed current-candidate native hand/stow defect; do not promote the default/animation repair yet."
+        },
+        "missing_checks": [
+          "Continuous native device/hand animation and screen publication during opening, movement and stow.",
+          "Projection matches the native emitter at default and explicit fit settings.",
+          "Ordinary HUD stays on the left forearm; physical ergonomics remain open."
+        ]
+      },
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "source_commit": "5622052bd8799603ef8aae66235ec82d3c7bce6f",
+        "report": "docs/FIELD_FIXES.md",
+        "finding": "Left cinematic contact, native connector/projector frame and effect-cone retargeting exist. Continuous stereo motion/readability and physical fit remain unaccepted.",
+        "acceptance_promoted": false
       }
     },
     {
@@ -2552,7 +2656,8 @@
         "tools/gameplay_bot/suites/idroid-continuous-roundtrip.json"
       ],
       "evidence_sources": [
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R18",
@@ -2565,11 +2670,11 @@
         },
         "native": {
           "status": "blocked",
-          "scope": "Released-build and older candidate after-state stow/reopen passes exist. Current source plus continuous capture shows a hand/stow failure. The public six-cycle, 180-second motion fixture exists; it has not passed native iDroid acceptance."
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Native stow ordering, close-input ownership, terminal scene handoff and retired-player/exit-notice repairs exist; later scoped ordinary reopen evidence is retained in FREE_PLAY_ACCEPTANCE. Continuous/full lifecycle acceptance remains."
         },
         "continuous": {
           "status": "blocked",
-          "scope": "Current-candidate dense source-eye and continuous capture review reproduced missing rig frames during opening, three to four missing/translucent stow frames, and device persistence for about 0.3 seconds. Older successful endpoint captures do not clear these transitions."
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Native stow ordering, close-input ownership, terminal scene handoff and retired-player/exit-notice repairs exist; later scoped ordinary reopen evidence is retained in FREE_PLAY_ACCEPTANCE. Continuous/full lifecycle acceptance remains."
         },
         "headset": {
           "status": "unverified",
@@ -2578,10 +2683,10 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Confirmed native hand/stow regression on the current candidate."
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Native stow ordering, close-input ownership, terminal scene handoff and retired-player/exit-notice repairs exist; later scoped ordinary reopen evidence is retained in FREE_PLAY_ACCEPTANCE. Continuous/full lifecycle acceptance remains."
       },
       "missing_checks": [
-        "Fix the reproduced current defect and inspect the whole open/stow/reopen sequence, not just endpoints.",
+        "Reconcile historical failure with existing repairs and inspect the whole open/stow/reopen sequence; repair only a remaining reproduced failure.",
         "Final cleanup must release inputs and leave no test-opened iDroid or Pause.",
         "Repeat with native animation, tracking changes and personal opt-out."
       ],
@@ -2612,6 +2717,44 @@
           "status": "missing",
           "scope": "At least one integrated ten-minute candidate soak with repeated natural interactions, movement and interruptions. It may cover several features; retain their individual outcomes and actual measured cadence."
         }
+      },
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "State/runner outcome and cleanup contracts; native animation playback is not simulated. Exact native device-layout ownership, prior-open lineage, close-boundary epochs and missing-pose routing are isolated policy checks, not a native close-animation pass. The mod-owned world-pause policy retains spatial field pausing, excludes verified cabin play and handheld presentation, and releases before native closing; ACC child-page exit still needs native replay."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "Released-build and older candidate after-state stow/reopen passes exist. Current source plus continuous capture shows a hand/stow failure. The public six-cycle, 180-second motion fixture exists; it has not passed native iDroid acceptance."
+          },
+          "continuous": {
+            "status": "blocked",
+            "scope": "Current-candidate dense source-eye and continuous capture review reproduced missing rig frames during opening, three to four missing/translucent stow frames, and device persistence for about 0.3 seconds. Older successful endpoint captures do not clear these transitions."
+          },
+          "headset": {
+            "status": "unverified",
+            "scope": "No current-candidate physical-headset acceptance is established."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Confirmed native hand/stow regression on the current candidate."
+        },
+        "missing_checks": [
+          "Fix the reproduced current defect and inspect the whole open/stow/reopen sequence, not just endpoints.",
+          "Final cleanup must release inputs and leave no test-opened iDroid or Pause.",
+          "Repeat with native animation, tracking changes and personal opt-out."
+        ]
+      },
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "source_commit": "5622052bd8799603ef8aae66235ec82d3c7bce6f",
+        "report": "docs/FIELD_FIXES.md",
+        "finding": "Native stow ordering, close-input ownership, terminal scene handoff and retired-player/exit-notice repairs exist; later scoped ordinary reopen evidence is retained in FREE_PLAY_ACCEPTANCE. Continuous/full lifecycle acceptance remains.",
+        "acceptance_promoted": false
       }
     },
     {
@@ -2653,7 +2796,9 @@
         "docs/ACC_MENU_REGRESSION.md",
         "docs/CURRENT.md",
         "docs/REGRESSION_COVERAGE.md",
-        "docs/VR_MENU_COVERAGE.md"
+        "docs/VR_MENU_COVERAGE.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/REGRESSION_COVERAGE_HISTORY.md"
       ],
       "community_reports": [
         "R18",
@@ -2667,7 +2812,7 @@
         },
         "native": {
           "status": "blocked",
-          "scope": "A/B in actual Mother Base Helicopter Development proved the mod-owned tutorial pause stopped the child exit; removing it recovered Back and restoring it reproduced the failure. Candidate 278 checked spatial ACC/Mother Base Weapons/Items, Buddy and Helicopter scroll/Back plus weapon dialogs, ACC suit/gear interaction and native stow/first-tap reopen. These are late-game scoped observations, not early-account, every transaction or full guide acceptance. See docs/ACC_MENU_REGRESSION.md."
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Completed-guide cleanup and exit-notice repairs exist; free-roam route has scoped resolution. Forced unfinished lessons, earlier accounts and wider transactions remain unaccepted."
         },
         "continuous": {
           "status": "unverified",
@@ -2680,7 +2825,7 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Spatial Development freeze fixed and scoped late-game ACC/Mother Base exit/reopen paths checked. Earlier-account lessons, all four upgrade transactions and complete guide lifecycle acceptance remain open."
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Completed-guide cleanup and exit-notice repairs exist; free-roam route has scoped resolution. Forced unfinished lessons, earlier accounts and wider transactions remain unaccepted."
       },
       "missing_checks": [
         "Forced unfinished tutorial stow and immediate reopening with native progression preserved.",
@@ -2720,7 +2865,47 @@
       "open_user_report_ids": [
         "oct2-acc-development-freeze",
         "oct3-acc-free-roam-guidance"
-      ]
+      ],
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "Exact owner/status restoration, preservation of independent disabled entries, stationary navigation and guarded escape. Pure contracts distinguish unknown, inactive and active tutorial modes; unknown rejects forced terminal recovery and remains JSON null. Mocked short ACC Confirm tests require current two-eye supervisor review, one effective face-button edge, a sampled mapped A packet and subsequent neutral release; they reject unreviewed/chained actions, late or missing input proof, remapped holds/chords and changed native owners. This input-only result explicitly does not prove page navigation. Menu variant contracts preserve existing MENU IDs and independent first/unfinished/completed guidance, normal/confirmation/help and Development-state obligations. Unknown applicability remains unproven; parent-row evidence cannot promote variants or imply every legal native menu combination."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "A/B in actual Mother Base Helicopter Development proved the mod-owned tutorial pause stopped the child exit; removing it recovered Back and restoring it reproduced the failure. Candidate 278 checked spatial ACC/Mother Base Weapons/Items, Buddy and Helicopter scroll/Back plus weapon dialogs, ACC suit/gear interaction and native stow/first-tap reopen. These are late-game scoped observations, not early-account, every transaction or full guide acceptance. See docs/ACC_MENU_REGRESSION.md."
+          },
+          "continuous": {
+            "status": "unverified",
+            "scope": "No current-candidate continuous acceptance of this complete behavior is claimed."
+          },
+          "headset": {
+            "status": "unverified",
+            "scope": "No current-candidate physical-headset acceptance is established."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Spatial Development freeze fixed and scoped late-game ACC/Mother Base exit/reopen paths checked. Earlier-account lessons, all four upgrade transactions and complete guide lifecycle acceptance remain open."
+        },
+        "missing_checks": [
+          "Forced unfinished tutorial stow and immediate reopening with native progression preserved.",
+          "Development/support/deployment and nested dialog coverage.",
+          "Native failed-read coverage while holding Back; pure unknown-state contracts do not constitute native tutorial acceptance.",
+          "Do not widen completed-guide recovery to unknown or unfinished tutorials.",
+          "Current ACC Development report: review all four windows, visible selection/navigation, Back and immediate re-entry without purchases; record actual native eligibility and popup/tutorial state."
+        ]
+      },
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "source_commit": "5622052bd8799603ef8aae66235ec82d3c7bce6f",
+        "report": "docs/FIELD_FIXES.md",
+        "finding": "Completed-guide cleanup and exit-notice repairs exist; free-roam route has scoped resolution. Forced unfinished lessons, earlier accounts and wider transactions remain unaccepted.",
+        "acceptance_promoted": false
+      }
     },
     {
       "id": "idroid-cone",
@@ -2743,7 +2928,8 @@
       "auxiliary_tests": [],
       "native_fixtures": [],
       "evidence_sources": [
-        "docs/CURRENT.md"
+        "docs/CURRENT.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R18",
@@ -2838,7 +3024,8 @@
       ],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/COMMUNITY_RECOVERY_PLAN.md"
+        "docs/COMMUNITY_RECOVERY_PLAN.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R06",
@@ -2934,7 +3121,8 @@
       "native_fixtures": [],
       "evidence_sources": [
         "docs/CURRENT.md",
-        "docs/VR_CONTROL_PROMPTS.md"
+        "docs/VR_CONTROL_PROMPTS.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [
         "R19",
@@ -3021,7 +3209,9 @@
       "evidence_sources": [
         "docs/QUEST3_TESTER_FEEDBACK.md",
         "docs/CURRENT.md",
-        "docs/REGRESSION_COVERAGE.md"
+        "docs/REGRESSION_COVERAGE.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/REGRESSION_COVERAGE_HISTORY.md"
       ],
       "community_reports": [
         "R25",
@@ -3700,7 +3890,8 @@
       "auxiliary_tests": [],
       "native_fixtures": [],
       "evidence_sources": [
-        "docs/ACCEPTANCE.md"
+        "docs/ACCEPTANCE.md",
+        "docs/ACCEPTANCE_HISTORY.md"
       ],
       "community_reports": [],
       "coverage": {
@@ -3885,7 +4076,9 @@
         "docs/CURRENT.md",
         "docs/QUEST3_TESTER_FEEDBACK.md",
         "docs/REGRESSION_COVERAGE.md",
-        "docs/HEADSET_CONTROLS_EDITOR.md"
+        "docs/HEADSET_CONTROLS_EDITOR.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/REGRESSION_COVERAGE_HISTORY.md"
       ],
       "community_reports": [
         "R20",
@@ -4284,7 +4477,10 @@
       "evidence_sources": [
         "docs/CURRENT.md",
         "docs/ACCEPTANCE.md",
-        "docs/REGRESSION_COVERAGE.md"
+        "docs/REGRESSION_COVERAGE.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/ACCEPTANCE_HISTORY.md",
+        "docs/REGRESSION_COVERAGE_HISTORY.md"
       ],
       "community_reports": [
         "R40"
@@ -4296,7 +4492,7 @@
         },
         "native": {
           "status": "blocked",
-          "scope": "Candidate 4df capture-off closed ACC has 130.092 seconds of complete timing bins: 88.24 XR submissions/s but 40.14 fresh pairs/s, native GPU mean 14.85 ms and submit-stage max 653.33 ms with 33 over-budget cycles. Consumer mean 0.092 ms/max 5.955 ms has no over-budget cycle in this scope, but a separate recorded open interval reaches 121.168 ms consumption with 120.955 ms keyed-mutex Acquire. These are distinct workloads; no no-drops claim is supported."
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Adaptive native pacing and timing instrumentation exist. The retained 4df measurements describe their own workload, not a measurement of current development. No sustained no-drops or physical acceptance."
         },
         "continuous": {
           "status": "unverified",
@@ -4309,7 +4505,7 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Current native repeats and long submission/transfer stalls fail the requested sustained no-drops objective; capture cadence is not runtime performance."
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Adaptive native pacing and timing instrumentation exist. The retained 4df measurements describe their own workload, not a measurement of current development. No sustained no-drops or physical acceptance."
       },
       "missing_checks": [
         "Matched closed/open/stowed windows with owned process identity and actual display period.",
@@ -4343,6 +4539,44 @@
           "status": "missing",
           "scope": "At least one integrated ten-minute candidate soak with repeated natural interactions, movement and interruptions. It may cover several features; retain their individual outcomes and actual measured cadence."
         }
+      },
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "Native adapter and GPU timing fixtures; no test establishes a zero-drop gameplay guarantee. A bounded process-only display-period pacing diagnostic has interval/lease validation and exact-expiry contracts; it has not passed a native A/B performance trial. Exact submission-stage diagnostics separately count layer preparation and xrEndFrame, histogram boundaries/overflow, display-budget excess and actual submitted-layer categories; these are instrumentation contracts, not a performance pass."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "Candidate 4df capture-off closed ACC has 130.092 seconds of complete timing bins: 88.24 XR submissions/s but 40.14 fresh pairs/s, native GPU mean 14.85 ms and submit-stage max 653.33 ms with 33 over-budget cycles. Consumer mean 0.092 ms/max 5.955 ms has no over-budget cycle in this scope, but a separate recorded open interval reaches 121.168 ms consumption with 120.955 ms keyed-mutex Acquire. These are distinct workloads; no no-drops claim is supported."
+          },
+          "continuous": {
+            "status": "unverified",
+            "scope": "No current-candidate continuous acceptance of this complete behavior is claimed."
+          },
+          "headset": {
+            "status": "unverified",
+            "scope": "No current-candidate physical-headset acceptance is established."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Current native repeats and long submission/transfer stalls fail the requested sustained no-drops objective; capture cadence is not runtime performance."
+        },
+        "missing_checks": [
+          "Matched closed/open/stowed windows with owned process identity and actual display period.",
+          "Per-stage p50/p95/max, fresh/repeat counters, GPU/CPU and submit over-budget counts.",
+          "No-drops claim requires sustained native/headset evidence at unchanged eye size/FOV; do not use recording FPS."
+        ]
+      },
+      "implementation_audit": {
+        "date": "2026-10-24",
+        "source_commit": "5622052bd8799603ef8aae66235ec82d3c7bce6f",
+        "report": "docs/FIELD_FIXES.md",
+        "finding": "Adaptive native pacing and timing instrumentation exist. The retained 4df measurements describe their own workload, not a measurement of current development. No sustained no-drops or physical acceptance.",
+        "acceptance_promoted": false
       }
     },
     {
@@ -4452,7 +4686,8 @@
         "docs/BOT_AND_SHOWCASE_PLAN.md",
         "docs/NATIVE_CONTEXT_COVERAGE.md",
         "docs/CURRENT.md",
-        "docs/VR_MENU_COVERAGE.md"
+        "docs/VR_MENU_COVERAGE.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md"
       ],
       "community_reports": [],
       "coverage": {
@@ -4527,7 +4762,9 @@
         "docs/CONTROLS.md",
         "docs/CURRENT.md",
         "docs/QUEST3_TESTER_FEEDBACK.md",
-        "docs/REGRESSION_COVERAGE.md"
+        "docs/REGRESSION_COVERAGE.md",
+        "docs/CURRENT_HISTORY_2026-10-23.md",
+        "docs/REGRESSION_COVERAGE_HISTORY.md"
       ],
       "community_reports": [
         "R20",
@@ -4763,11 +5000,12 @@
         "Physical idle, headset removal/resume, focus and reference-space transitions with both final eyes, original pose ownership and native control recovery.",
         "Continuous stereo through gameplay and menu transitions; keep the runtime's recommended eyes/FOV separate from the 1280 by 720 desktop preview."
       ],
-      "resolution": "Scoped raw-validity-loss repair; original physical/simulator idle report remains open."
+      "resolution": "Scoped raw-validity-loss repair; original physical/simulator idle report remains open.",
+      "record_scope": "Historical report/observations; reconcile against the 24 October code audit and FIELD_FIXES before asserting a current missing repair."
     },
     {
       "id": "oct3-acc-free-roam-guidance",
-      "status": "open",
+      "status": "scoped_route_resolved_broader_acceptance_pending",
       "priority": "release_blocker",
       "feature_ids": [
         "idroid-native-guides"
@@ -4787,7 +5025,9 @@
         "Actual page/choice-reviewed Continue-to-ACC-to-free-roam flow, including every encountered information card and control restoration.",
         "All discovered menu child pages, native game states and eligible item grades/locks/costs/results on isolated verified fixtures; no generic confirmation of unknown pages."
       ],
-      "resolution": "Open. Scoped menu observations and stereo repairs do not establish full-game playability."
+      "resolution": "The free-roam route itself is scoped resolved in FP13: Missions -> Mission List -> Free Roam through on-foot arrival. Broader menu/progression coverage remains FP12; no whole-game acceptance.",
+      "record_scope": "Historical report/observations; reconcile against the 24 October code audit and FIELD_FIXES before asserting a current missing repair.",
+      "resolution_before_2026_10_24_audit": "Open. Scoped menu observations and stereo repairs do not establish full-game playability."
     },
     {
       "id": "oct2-acc-development-freeze",
@@ -4808,7 +5048,8 @@
         "Page-reviewed entry, navigation, neutral release, Back and immediate re-entry for each of the four Development windows with actual enabled/disabled item state; exclude purchases.",
         "Repeat natural hand/head movement and nested menu transitions without blindly dismissing unknown popups."
       ],
-      "resolution": "Not resolved; historical completed-guide and selected helicopter-menu passes remain narrower."
+      "resolution": "Not resolved; historical completed-guide and selected helicopter-menu passes remain narrower.",
+      "record_scope": "Historical report/observations; reconcile against the 24 October code audit and FIELD_FIXES before asserting a current missing repair."
     },
     {
       "id": "oct2-supply-drop-cues",
@@ -4829,7 +5070,8 @@
         "Identify a native supply request/landing in an appropriate retained combat state and verify useful stereo location cues while moving, before and after opening wrist/iDroid UI.",
         "Preserve physical firearm sights, disabled floating aiming reticles, binocular acquisition/marking and ordinary left-arm HUD; do not use globally enabled recon as a substitute for a supply cue."
       ],
-      "resolution": "Not resolved; no supply-marker native acceptance exists."
+      "resolution": "Not resolved; no supply-marker native acceptance exists.",
+      "record_scope": "Historical report/observations; reconcile against the 24 October code audit and FIELD_FIXES before asserting a current missing repair."
     },
     {
       "id": "oct2-intermittent-weapon-selection",
@@ -4851,7 +5093,8 @@
         "Record visible picker contents DURING effective-binding input, the native equipped identity afterward, neutral release, cancellation and immediate reuse.",
         "Exercise owned primary/secondary/support categories with movement and repeated interactions; preserve the left-arm presentation."
       ],
-      "resolution": "Not resolved; no symptom or cause is invented."
+      "resolution": "Not resolved; no symptom or cause is invented.",
+      "record_scope": "Historical report/observations; reconcile against the 24 October code audit and FIELD_FIXES before asserting a current missing repair."
     },
     {
       "id": "oct2-cutscene-camera-animation",
@@ -4872,7 +5115,22 @@
         "Identify the affected native scene, preserve authored camera/animation, and review both-eye continuous entry, shots and natural gameplay reacquisition.",
         "Exercise explicit Pause/skip only in its selected reversible case and verify released inputs and clean menu exit."
       ],
-      "resolution": "Not resolved; lower priority does not mean accepted."
+      "resolution": "Not resolved; lower priority does not mean accepted.",
+      "record_scope": "Historical report/observations; reconcile against the 24 October code audit and FIELD_FIXES before asserting a current missing repair."
     }
-  ]
+  ],
+  "historical_baseline": {
+    "release": "experimental-2026-10-02",
+    "source_reference": "docs/RELEASE_2026-10-02.md",
+    "comparison": "The published build predates the current handheld-default/animation/performance candidate. Historical released-build still captures cannot clear a newer continuous native regression.",
+    "current_candidate": "Unreleased handheld-default, animation and performance investigation. Candidate 4df840eda253 passed 43 CTest groups and installer transactions; current ACC observations remain scoped. Exact process/configuration identities are retained locally.",
+    "current_candidate_id": "october-2-unreleased-handheld-investigation"
+  },
+  "implementation_audit": {
+    "date": "2026-10-24",
+    "report": "docs/FIELD_FIXES.md",
+    "plan": "docs/RELEASE_PLAN.md",
+    "scope": "Production code and retained evidence reconciliation only. Later repairs exist; five conservative release blocks remain pending evidence reconciliation. No acceptance or sustained counters promoted. Historical observations retain their original candidates."
+  },
+  "historical_excluded_claims_note": "The old list included an in-headset settings editor. It now exists in src/controls_editor.cpp, including registered gameplay settings; broad physical usability is not accepted."
 }

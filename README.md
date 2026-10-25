@@ -5,19 +5,22 @@
 **The Phantom Pain in native stereo VR.** Tracked hands and weapons, physical
 binoculars and scopes, and equipment on your left wrist.
 
-**Current development status:** Coco's adaptations, physical binocular lesson
-integration and native A* navigation are retained. Full-game, weapon coverage,
-iDroid tutorial recovery and physical-headset acceptance remain open. Native
-handheld iDroid contact and projection alignment remain under repair. Local work keeps two
-builds: pinned `play/` matching the last published release and `build/dev/`
-holding the checked candidate for testing. `tools/build.ps1` refreshes
-development; `Play.cmd` restores the published pin and `Play-Dev.cmd` selects
-the development candidate. Successful publication advances the pin to the
-exact verified release payload.
-[Current build workflow, remaining reports and next tests](docs/CURRENT.md).
+**Development status — 24 October 2026:** main already includes the user-report
+repairs for body/arm fitting, native leg lengths, tracking and rifle support,
+contextual camera/cover/transit, left-hand iDroid, Rocket Arm and cabin interaction.
+Remaining code limits and verification gaps are separated in
+[Field fixes](docs/FIELD_FIXES.md); an open acceptance item does not mean missing code.
+
+Local work keeps two builds: published `play/` and checked `build/dev/`.
+`tools/build.ps1` refreshes development only; `Play.cmd` restores the published
+pin and `Play-Dev.cmd` selects development. Both use Meta Quest Link locally.
+Only successful verified publication advances the pin. Full-game and physical
+headset acceptance remain open.
+[Current handoff](docs/CURRENT.md) · [Exact release plan](docs/RELEASE_PLAN.md)
+· [Documentation map](docs/README.md).
 
 **[Download the public build](https://github.com/nikamigaming-create/MGS5VR/releases)**
-· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Current release and known issues](docs/RELEASE_2026-10-10.1.md)
+· [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Published baseline notes](docs/RELEASE_2026-10-19.1.md)
 · [Live native actions](docs/NATIVE_ACTIONS.md)
 
 Experimental Windows mod. Requires your own **TPP 1.0.15.4** and a PC-connected
@@ -82,9 +85,9 @@ up** runs with binoculars and changes a compatible weapon scope's zoom on foot.
 
 Recon cues default to `hud_mode = binoculars_only`; merely carrying binoculars
 or using a firearm scope does not enable them. `full` opts into normal-view
-world cues; `off` hides them. Native model-glow leakage and caption restoration
-remain under repair—this setting is not a claim that every native HUD effect
-is already handled.
+world cues; `off` hides them. Historical model-glow and caption reports retain
+their original scope in the acceptance records; this setting does not certify
+every native HUD effect.
 
 ## Tune it / get help
 
@@ -100,16 +103,17 @@ is already handled.
 - **Remove:** **Remove Mod** disables the active mod and retains a recoverable
   backup. The older **Uninstall.cmd** uses the original recorded-file removal.
 - **Launch or menu trouble:** [setup help](docs/ADVANCED_SETUP.md#quick-setup-help).
-  The reported hospital-bed/menu case is being fixed; do not assume finishing
-  the prologue is required or that it solves the issue.
+  For a hospital/menu report, identify the exact build and native scene; do
+  not assume finishing the prologue is required or that it solves the issue.
 
 ## What is still experimental?
 
-TPP is the priority. Missing captions and other HUD elements, blue enemy-outline
-tails, lens-flare alignment, some interactions, and complete weapon/gadget coverage
-are still being worked through. [Tester feedback](docs/QUEST3_TESTER_FEEDBACK.md)
-· [Current status](docs/STATUS.md) · [Latest rendering work](docs/RENDER_FIX_NOTES.md)
-· [Community recovery plan](docs/COMMUNITY_RECOVERY_PLAN.md)
+TPP is the priority. Additional mounted types, broader outfit/forearm presentation,
+exact rock/corridor reports and complete mission/weapon/gadget coverage remain
+open. Historical HUD/rendering reports retain their tested-build scope.
+[Tester feedback](docs/QUEST3_TESTER_FEEDBACK.md)
+· [Current status](docs/STATUS.md) · [Historical rendering notes](docs/RENDER_FIX_NOTES.md)
+· [Community report history](docs/COMMUNITY_RECOVERY_PLAN.md)
 
 **Ground Zeroes 1.0.0.5 is not a finished first-person VR port.** Its independent
 native stereo experiment runs in SIM; tracked player anchoring, arms, wrist HUD,

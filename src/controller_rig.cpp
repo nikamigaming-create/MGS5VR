@@ -794,16 +794,21 @@ bool apply(void* context,void* binding,PoseRestore& restore){
                 }
             }
         }
-        if(solution)if(const auto surface=armHeadClearanceSurface(solution->pose,eyesInModel[0],eyesInModel[1],.12f)){
+        // The owned sleeve extends beyond the upper-arm centerline. Use the
+        // same envelope as its shoulder instead of allowing the fabric six
+        // centimeters closer to the eyes along the middle of that bone.
+        // Forearm/hand clearance remains unchanged for optics and iDroid.
+        const float sleeveRadius=frame.body.valid?.18f:.12f;
+        if(solution)if(const auto surface=armHeadClearanceSurface(solution->pose,eyesInModel[0],eyesInModel[1],.12f,sleeveRadius)){
             auto contact=solveArm(animated,target,hint,&basis,&*surface);
-            if(contact&&armHeadClearanceSurface(contact->pose,eyesInModel[0],eyesInModel[1],.1199f))contact.reset();
+            if(contact&&armHeadClearanceSurface(contact->pose,eyesInModel[0],eyesInModel[1],.1199f,sleeveRadius-.0001f))contact.reset();
             if(!contact){
                 // Only the reach-limited fallback needs a containing sphere.
                 // Normal solving uses the exact capsule and keeps the target.
                 const auto center=(eyesInModel[0]+eyesInModel[1])*.5f;
                 const auto half=eyesInModel[1]-center;
                 const float padding=std::sqrt(dot(half,half));
-                contact=solveArmAroundHead(animated,target,hint,&basis,center,.12f+padding,.14f+padding);
+                contact=solveArmAroundHead(animated,target,hint,&basis,center,.12f+padding,.14f+padding,sleeveRadius+padding);
             }
             if(!contact){if(probe.enabled){probe.armFailure=2;probe.headSurface=*surface;}return std::optional<ArmSolution>{};}solution=contact;++headContacts;
         }

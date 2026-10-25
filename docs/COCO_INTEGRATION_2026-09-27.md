@@ -1,5 +1,7 @@
 # Coco patch integration status
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 The six supplied patches are preserved privately with their original hashes and attribution. Their behavioral changes have been integrated into the current tree with the ownership, tracking and camera publication checks required by the newer code. The old full files were not substituted for the current implementation.
 
 | Supplied change | Integrated behavior |

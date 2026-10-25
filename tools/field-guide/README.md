@@ -1,5 +1,10 @@
 # Local field-guide prototype
 
+This prototype and its dated evidence are historical tooling, not the current
+release queue. Use the [release plan](../../docs/RELEASE_PLAN.md). The supported
+launcher is built from `tools/launcher-ui/` by `tools/build.ps1` into checked
+development. Do not regenerate old showcase material instead of fixing gameplay.
+
 Build the static guide from the repository root:
 
     python tools/field-guide/build_guide.py

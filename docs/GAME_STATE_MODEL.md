@@ -1,5 +1,7 @@
 # Map and state routing for full-game VR tests
 
+Current execution is governed by [RELEASE_PLAN.md](RELEASE_PLAN.md) and [FIELD_FIXES.md](FIELD_FIXES.md). This document supplies supporting contracts; it does not authorize restarting an old queue or running unattended tests. Preserve the left-hand iDroid and bounded cleanup.
+
 The bot needs connected spatial and behavioral models. A spatial route reaches
 a place. A state route reaches a menu, native role, interaction, mission step or
 recovery state. Both planners use observed native outcomes and retain unknown
@@ -134,7 +136,7 @@ The first expanded native loop is field -> iDroid tabs -> Mother Base/developmen
 branches -> cancel/Back -> stow/reopen -> field control. ACC customization and
 deployment/return, forced tutorials, cover, mounted weapons and mission
 clear/death/retry follow as separate native states. Tests preserve physical
-weapons/optics/binoculars, left-arm ordinary HUD and right-hand iDroid; native
+weapons/optics/binoculars, left-arm ordinary HUD and left-hand iDroid; native
 integration stays behind VR interactions. Steam stays running and no desktop or
 window-control automation is part of this model.
 

@@ -1,5 +1,9 @@
 # Touch controls for the tracked VR experiment
 
+Current repair scope and execution: [FIELD_FIXES.md](FIELD_FIXES.md) and
+[RELEASE_PLAN.md](RELEASE_PLAN.md). Controls below are defaults; personal bindings
+remain authoritative. Left-hand iDroid and left-forearm status are separate owners.
+
 ![MGS5VR field manual — original Snake artwork](images/field-header.svg)
 
 [Editable default config](../config/mgs5vr-controls.ini) · [All control modes](images/control-modes.svg) · [Install and play](../README.md)
@@ -12,8 +16,8 @@ Choose **VR Settings / Controls** in the native launcher for editable settings,
 controller mappings and runtime options, or open **Edit-Controls.cmd** in the extracted release and choose the
 `mgs5vr-controls.ini` beside your **game's** `dinput8.dll`. The external editor
 checks conflicts while you type, refuses invalid saves, and backs up the previous
-file when saving. No game launch is needed to check a layout. This is not yet
-an in-game rebinding screen.
+file when saving. No game launch is needed to check a layout. The headset editor is also available with Menu + left-stick click held
+650 ms; its gear tab exposes gameplay tuning. These are default bindings.
 
 Open **mgs5vr-controls.ini in your MGSV game folder** (beside `dinput8.dll`).
 Save, release all buttons/grips/triggers and center both sticks for about two

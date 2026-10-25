@@ -1,5 +1,7 @@
 # Historical September 20 v2 headset test build
 
+> Historical checkpoint. Build paths, hand ownership, controls and next steps below describe that date. Follow [CURRENT.md](CURRENT.md), [CONTROLS.md](CONTROLS.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for current work; iDroid now belongs in the left bionic hand.
+
 **Superseded; do not use this note as a request to retest v2.** The current
 candidate and its remaining failures are recorded in
 [the September 20 release note](RELEASE_2026-09-20.md).

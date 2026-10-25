@@ -1,5 +1,7 @@
 # Native handheld iDroid alignment
 
+Current implementation audit: [FIELD_FIXES.md](FIELD_FIXES.md), FP07/12. Left cinematic contact, native projector/cone alignment, ordinary stow and scene/exit-notice repairs exist on main. Continuous both-eye, forced-lesson and physical acceptance remain. Older observations below retain their original build scope; next work is in [RELEASE_PLAN.md](RELEASE_PLAN.md).
+
 The left-hand iDroid uses its retail device and native pixels. The left bionic
 weapon/status display and ordinary HUD keep their existing owner and layout.
 
@@ -231,7 +233,7 @@ ignored private research storage. No game asset is shipped with the adapter.
 ## 21 October 2026 default projector fitting
 
 The native cone draw/bounds fit now defaults on; diagnostics remain off.
-Baseline samples place its far centre about20.1–20.2cm from the configured
+Baseline samples place its far centre about20.1â€“20.2cm from the configured
 screen centre. Runs20261022T004701435184Z and005011508686Z compare native
 and fitted presentation. Normal-settings candidate44f0ed657fab run005654925788Z
 retains both-eye front/turned views, help dismissal and ordinary stow. Its

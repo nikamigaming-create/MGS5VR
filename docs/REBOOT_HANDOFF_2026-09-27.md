@@ -1,5 +1,7 @@
 # Reboot handoff — 27 September 2026
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 **Superseded:** use [the 28 September handoff](REBOOT_HANDOFF_2026-09-28.md)
 and [RC3 notes](RELEASE_CANDIDATE_2026-09-28.md). Everything below is historical.
 

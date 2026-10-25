@@ -1,5 +1,7 @@
 # Development handoff
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 **Current reboot checkpoint — 2026-09-27:** Read [REBOOT_HANDOFF_2026-09-27.md](REBOOT_HANDOFF_2026-09-27.md) first. Installed candidate E96F still flickers; Mission 6/Mission 1 acceptance is unfinished. The ordered next work, exact hashes, evidence, and user constraints are saved there. Everything below is historical and must not be used as current launch/build status.
 
 ## Historical handoff — 2026-09-07

@@ -1,0 +1,293 @@
+> Historical record preserved on 24 October 2026. Use [documentation map](README.md), [current status](CURRENT.md) and [release plan](RELEASE_PLAN.md) for effective instructions. Claims below retain their original build scope.
+
+# Status: experimental native VR mod
+
+Updated 2026-09-13. The mod source, native adapters, tests and build tooling are
+open under the MIT license. The complete requested VR conversion remains unfinished.
+
+September 13.4 follows the Quest 3 / Virtual Desktop tester feedback: left-click
+sprint, separate grip+left-click zoom, configurable native smooth yaw, native
+mounted turning instead of a camera-only snap, a complete isolated native-button
+mode, and an external validating controls editor. Binocular hands acquire named
+anatomical palm contacts around the housing instead of retaining a gun-like
+controller wrist orientation. The final native skin solve moves the body, support,
+optical ray and lens together, including optional pitch/yaw/roll calibration.
+On DLL `B554764FE0301F548D2F31A5CACE526EC21D326298A1EE6768459ED41159D13E`,
+SIM carry, both-eye cupping/support, 2x/4x, yaw, lowering and stow were inspected.
+Nine automated suites pass, including the supplied tester's native-B pickup
+layout and X-chord arbitration. The supplied file also passes the released 13.3
+checker; its comments misdescribe X chords, and its binocular mode retains the
+old up-stick sprint. It has not been overwritten.
+
+These are not fixes for all reported rendering defects. Missing HUD/subtitles,
+stretched marked-enemy ghosts, displaced flares and the reported body-center
+drift remain open. Mounted turning and controller ergonomics still require
+physical feedback; no headset was launched. The full issue list is in
+[Quest 3 tester feedback](QUEST3_TESTER_FEEDBACK.md).
+
+Current source/build changes: annotated editable controller configuration with
+tap/hold/chord bindings; separated Touch face buttons from Vive/WMR fallback
+actions; deliberate four-category wrist selection fitted to both eyes; carried
+binoculars with their independent magnified scene; automatic owned binocular
+asset import; and a repaired ACC-to-mission camera handoff. The September 13.1
+optics hotfix fixes a reticle shader compilation failure and connects round
+weapon scopes to the native equipped resource and authored sight sockets.
+That 13.1 DLL is `7CD5079A5512B9EAF383FCAA6C23C9AE186DAF2B679E7C586C666A1AA29B407E`.
+Nine automated suites pass, now including an asset-free rendered lens/reticle
+pixel check. A fresh SIM run shows BAMBETOV SV's fixed 4× physical lens, two
+tracked shots, a partial reload, motion and lens closure when lowered.
+Binocular 2×/4×, support and stow were rerun on the same build.
+See [the actual both-game SIM coverage](DUAL_GAME_SIM_COVERAGE.md).
+
+The September 13.2 follow-up fixes variable-scope clicks being counted once per
+XR frame. Its M2000-D 2×/4×/8× cycle was observed one click at a time in SIM.
+Native equipment cards are now larger (75 cm instead of 42 cm), with a
+42–100 cm config setting and both-eye fitting. The 75 cm Support picker and
+M2000-D scope were rerun on the released DLL:
+`C3A6C5946FE90752AEDE2AE01F6AC82C5E483EE32F911CBC9522B47B50D7C07B`.
+Nine automated suites pass, including configurable width limits and both-eye
+fit at the maximum width. C4 remote detonation, decoy inflation and smoke throw
+were exercised in the preceding same-scope C5F23C89 build. Their grip+Y remote
+action is now documented beside the editable context-action binding.
+
+The September 13.3 source also calibrates four receiver-integrated launcher lenses
+and fixes close TPP weapon geometry being cut by the native near plane. The
+tracked scene uses a scoped 2 cm plane while retaining native far depth and
+restoring the normal camera between passes; GZ is unchanged. GROM, FB MR,
+Killer Bee and CGM 25 zoom/fire recordings on the development build are listed in the
+coverage notes. These are not guided-target or all-weapon completion claims.
+
+Wrist Commands now preserves an already-published weapon-ready or lowered-weapon
+CQC hold instead of clearing both triggers on opening. Releasing the original
+input still releases it; menu confirmation cannot fire, and a newly squeezed
+trigger cannot become a shot on close. The input regression tests cover these
+transitions. Full target interrogation and other guard actions remain unfinished.
+See the [non-weapon feature inventory](GAMEPLAY_FEATURES.md) for the remaining
+stealth, rescue, buddy, transport, UI and progression work.
+
+Still unfinished: complete per-weapon/sight coverage, complete weapon and
+gadget coverage, some powered-arm/reconnaissance interactions, Ground Zeroes'
+tracked first-person rig, and the complete combined showcase. The separate
+weapon-scope adapter has round-sight calibrations, not a completed all-weapons claim.
+GZ's independent native third-person stereo remains an explicit experiment.
+
+## Earlier September 9 release
+
+The [September 9 experimental release](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-09)
+contains the current merged source, the updated control guides and the support-hand
+release correction. Its local Release build and six native suites pass. A new SIM
+take shows one-handed fire, two-hand support and sideways withdrawal back to one
+hand. These changes still need physical headset regression coverage.
+
+The current build keeps iDroid and native Pause on a floating panel during
+tracked gameplay. Both eyes were observed with head movement and the iDroid
+handset attached. Pause no longer requires a new arm-animation publication to
+render its tracked world. Map tabs, lists, closing and reopening were exercised.
+The physical headset, title/loading transitions and later cutscenes still need
+coverage. The updated [control modes](images/control-modes.svg) include main-menu
+access and distinguish viewing zoom from native reconnaissance features.
+
+The September 9 release adds independent-eye 2×/4× viewing, motion-only palm and
+firearm-tip strikes using native kick contacts, and left-hand wheel control with
+haptic output. The September 8 public DLL remains available as the earlier baseline.
+Native truck-contact acceptance has been observed; enemy reactions/damage,
+powered arm abilities and physical wheel/haptic comfort are not certified.
+Truck entry, wheel acquisition, signed steering and exit were exercised. The
+small clip ends with a carried pistol on foot; it does not demonstrate shooting
+that gun while driving or sustained vehicle movement. See the
+[candidate review](OPTICS_MELEE_WHEEL_REVIEW.md) for the exact scope.
+
+The physical EB89CE69 follow-up received positive general gameplay feedback.
+The user identified access to horse/buddy commands, binoculars/zoom and physical
+fist/bionic-arm melee as the next gaps. Their current bindings and implementation
+requirements are recorded in [system access](SYSTEMS_ACCESS.md); those actions
+are not certified by the successful basic play session.
+
+The earlier physical 1440p/native-AA run received positive user feedback. The September 8
+release fixed double wrist selections, gated browsing on actual
+expanded-menu readiness, exposes the small native NVG label, and directs grenade
+preview/throwing from the tracked hand. A camera-visibility correction targets
+tree pop-in while turning left; that physical symptom remains unverified. See the
+[interaction and visibility results](INTERACTION_VISIBILITY_REVIEW.md).
+The [2026-09-08 experimental package](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-09-08)
+contains this tested DLL and adds double-click install/removal with a file picker.
+Its source is merged into main. Publication does not close the remaining gameplay
+or physical acceptance gaps.
+
+The candidate adds articulated free fingers, support-controller barrel
+aiming, a smaller wrist picker and right-stick selection while the left stick
+keeps moving. Its release build and six test suites pass. A small 15-second SIM
+clip and both-eye observations are recorded in the [hands/wrist review](HANDS_WRIST_REVIEW.md).
+The later 14.729-second interaction clip contains 40 reviewed frames with both
+hands visible through the sampled grenade throw. Earlier prone/slope occlusion,
+shoulder removal and physical acceptance of the new menu mapping remain open.
+
+The earlier physical Quest 3 run of `7BF543BE` received positive user feedback:
+the basic experience works well, with low resolution and jagged edges remaining.
+The retained physical profile is now 2560x1440 with native AA; the earlier 1080p
+compromise remains a starting point for other hardware. Read the [performance notes](PERFORMANCE.md) and the
+[physical sharpness review](HEADSET_SHARPNESS_REVIEW.md) for the baseline and limits.
+Earlier builds `C367CC6F` and `70779290` failed stereo or limb/UI presentation;
+they remain failed references. The current positive report is not acceptance of
+every interaction, material, arm pose or transition.
+
+The preceding SIM review covers equipment cards above the left wrist, all four
+equipment categories, wrist movement, closing, and a head turn/lean without the
+large sky rectangle. The silent 14.714-second clip is 670,771 bytes and contains
+54 reviewed frames at 3.6 captures/second, with no blank frames. Both final eyes
+were also inspected. Blue marker streaks, a dotted patch, arm/garment extremes,
+broader physical acceptance and a paused world behind the menu remain open. See
+[sky/capture review](SKY_CROP_REVIEW.md) and [wrist picker](WRIST_PICKER_REVIEW.md).
+
+Earlier simulator slices implemented real weapon/status UI on the **left
+forearm**, removed the flat gameplay reticle and destination labels, adjusted
+the visible rig, and added native equipment selection. Zoom is reserved so aiming
+stays in stereo. Hidden body/head meshes now retain their native shadow casting;
+an earlier 14.811-second, 1.38 MB SIM clip shows the full person silhouette and
+tracked arm movement in 44 reviewed frames at 2.903 captures/second.
+The preceding clip covered centered sky projection (since rolled back) and native audio-listener
+tracking. Both clips are silent and do not establish perceived localization,
+smoothness or full-mod acceptance.
+Read the [current review](SIM_HUD_REVIEW.md) and [complete controls](CONTROLS.md).
+
+The arm follow-up added guarded native ground contacts. Both sampled eyes showed
+the hands above the slope in the reproduced prone failure. Its 14.785-second
+SIM clip is 1.42 MB, with 51 reviewed frames at 3.386 captures/second. Other
+terrain, close garment/hand presentation and physical fit remain open.
+
+An earlier build opened iDroid and pause on the native menu screen and returned automatically to
+tracked VR. Map zoom, tab switching, both-eye return and the manual override were
+checked in SIM. The 14.879-second, 1.20 MB menu clip has 54 reviewed frames and no
+black captures. This does not establish all cinematic/loading transitions.
+
+An initial **physical Quest 3 combat run** is now recorded and reviewed. The user
+reported good overall playability and requested better arms and a less intrusive
+HUD. Movement, rifle fire/reload and manual theatre/native transitions are visible;
+the rig and HUD still fail complete acceptance. See [headset review and next
+slice](HEADSET_REVIEW.md) for timestamps, evidence limits and the implementation order.
+
+| Area | Implemented and observed | Still required |
+| --- | --- | --- |
+| Rendering | Native scene drawn twice in one transaction; centered coverage cropped to the runtime eye optics; sampled sky rectangle absent in current SIM views | Physical stereo regression check; dotted patch, shadow/culling/temporal acceptance |
+| Head motion | Native player head bone anchors the camera; simulator translations and rotations modify native eye matrices | Verified anatomical eye offset, world scale and all-state acceptance |
+| First person | Player-owned head/body hidden from normal rendering while preserving their native shadow; anatomical palm binding, shoulder anchors, forearm roll and native reload support; named hip mount hidden in VR | Cuff/garment deformation, stowed-equipment shadows, physical alignment, full reach/motion/stance acceptance |
+| HUD and markers | Native weapon/ammo UI on left forearm, equipment cards above it; flat reticle/destination labels suppressed | Escaping blue marker streaks, spatial damage/subtitle/context feedback, interactive wrist iDroid, full motion acceptance |
+| Weapons | AM MRS-4 and WU pistol ready/fire/reload and equipment categories exercised; ordinary shots use the authored muzzle | Impacts/obstruction, scoped and alternate modes, all-weapon and physical verification |
+| Movement | Native walking, strafe, turn and stance inputs reach gameplay | Correct first-person behavior across every stance and locomotion state |
+| Travel | D-Horse mount/walk/gallop/dismount and bounded mounted rifle shots in SIM; native travel input routing with neutral transition gates | Actual vehicle entry/driving/exit, mounted roles and physical riding comfort |
+| Audio | Native primary and virtual listeners consume the source center-head pose; head rotation/lean and theatre restoration observed in SIM | Physical localization, output/HRTF and occlusion checks |
+| Effects | Native AA through Post Processing High, DOF Disable, motion blur Off and camera shake Off | NVG presentation/performance, remaining cinematic effects and shared per-eye temporal resources |
+| Save | Continue/Resume loads the existing checkpoint and equipped rifle | Automatic startup state adapter |
+| Menus | iDroid/Pause float in the tracked world, including map tabs and Return to Title confirmation; held-input release protection on close | Physical regression check, every menu branch, interactive wrist iDroid and player-replacement transitions |
+| Cinematics | Default large-screen theatre preview and native game controls | Automatic cinematic classification and complete skip coverage |
+
+## Build and native runtime evidence
+
+All six local suites passed: core contracts including tracking suspension/recovery,
+D3D11 checks across two hardware devices, system DirectInput proxy parity, synthetic
+camera setter/getter calls and player visibility ownership/replacement checks, and
+process-exit cleanup, and the native frame-rate adapter. These checks do not certify the full mod.
+GitHub CI builds every target and runs five suites; the hardware D3D11 suite is
+explicitly excluded on hosted runners. Game/headset tests require a separate local run.
+
+Current simulator build SHA256:
+`EB89CE699E8700FE70F330DAE4FB449591E2601FD9AC3DFA998E9C3EFF412958`.
+It includes the interaction and visibility follow-up described in the
+[current review](INTERACTION_VISIBILITY_REVIEW.md), retaining native menu return,
+shadow and listener changes. The earlier positive physical sharpness baseline was
+`7BF543BE8E4EC882295AD8491DA6CCEB88B98BB878120DDBC54C0D6C371B170A`.
+The initial physical run used
+`4B299FF8E47EB5EE7934F1FA3E57424913F5DE4B2102752114428A2896A8FB07`,
+with the later physical rollback retained as
+`70779290C3A4872A458E73C03111B79B012C69BDEE7222CD4AF66B84C1460C15`.
+The initial controller/muzzle probe and first recording used
+`B22157DBCF1F00060057E5D3581314476962BA03ADD9C378183604F94AF43830`;
+later builds added right-grip readiness and bounded shot diagnostics to the
+actual firing caller. See [controller rig](CONTROLLER_RIG.md).
+The tested game is TPP 1.0.15.4, x64/D3D11, executable SHA256
+`085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`.
+
+The earlier 8CAAB92A baseline produced over 78,000 native scene pairs with zero reported scene
+capture failures/rejections. A verified duplicate desktop-present append is removed
+for the second eye while preserving the native target setup. A read-only 400-sample
+check found no duplicate entries in that vector. Measured native cadence was 57.75
+pairs/second over one eight-second interval without recording, and approximately
+50.7 pairs/second over an 88-second simulator PNG recording interval. These are
+bounded measurements, not a minimum frame-rate guarantee.
+
+Both images and their camera metadata share one native source/tracking/activation
+family. Copies are associated with their actual D3D11 command lists and published
+only after both lists execute. The consumer submits those source eye poses/FOVs.
+There is no alternate-eye rendering, generated eye, depth reconstruction or mono
+fallback substituted for an active stereo frame.
+
+Two head-camera cancellations were recorded in that earlier run: one stale-tracking event
+and one deliberate toggle off. This prevents claiming uninterrupted acceptance for
+all earlier footage. Native camera history is provisionally set to the current eye;
+other temporal resources are not yet isolated.
+
+The current camera keeps its activation and origin during tracking stalls, suspends
+eye submission, and resumes on fresh matching tracking. It no longer selects a
+third-person theatre quad because of a tracking timeout. Player visibility resolves
+through the camera's player appearance collection and verifies its ownership backlink;
+it does not hide other actors by scanning the global model list.
+
+An earlier test initially suffered black dropouts while the simulator's synthetic
+room helper occupied about 7 GB of dedicated GPU memory plus shared memory. Stopping
+that helper reduced total dedicated usage from roughly 11.7 GB to 5 GB. The following
+59-second recording contained 205 distinct captured frames and no fully black captures.
+This sampled observation does not establish a minimum frame rate or rule out shorter
+dropouts. No head-camera cancellation occurred in that session through this check.
+
+The simulator is Meta XR Simulator v205 with simulated Quest 3. Game UI and gameplay
+were driven through OpenXR actions, with all test launches windowed at 1280x720.
+The system runtime registry selection is preserved. Elliott's simulator passed a
+bounded headless OpenXR probe; its game-rendering path remains unverified. A physical
+runtime initially reported no available headset. On September 6, the Quest 3
+connected and the installed controller build completed an initial physical combat
+run with a clean Oculus shutdown. Full physical headset acceptance is outstanding.
+
+## Earlier recordings and failed acceptance
+
+Private local artifacts retain actual composited left-eye PNGs, action timestamps,
+capture metadata and variable-rate MP4s. They are development evidence, not a finished
+mod demo, and are excluded from the public source.
+
+- `controller-aim-left`: 29.25 seconds, 101 distinct captured frames, 3.45 captures/second.
+  Controller translations, yaw/pitch/roll, firing and reload with the head fixed.
+  The rifle/hands move in the native scene. No fully black frame was captured.
+  Sleeve intrusion, unheld weapon animation and face HUD remain defects. A separate
+  projectile-spawn probe confirmed the modified native origin/direction.
+- `controller-grip-aim-left`: 35.234 seconds, 121 distinct captured frames, 3.43 captures/second.
+  Uses the earlier 4B299FF8 build and right-grip weapon-ready mapping with the legacy
+  left trigger released. Controller movement, shots, reload and independent head
+  lean/yaw completed. Native firing diagnostics matched the rendered barrel; no
+  fully black captures occurred. Mobile encoding is a silent 35-second 720x754
+  H.264 Baseline MP4 with measured variable frame timing.
+- `fps-head-visibility-movement-left`: 59 seconds, 205 captured frames, 3.47 captures/second.
+  Head translation/rotation, walking, stance changes, firing (29 to 27 rounds), reload
+  (31/169), and walking with the weapon lowered completed. The hair/face obstruction
+  is removed. Shoulder/sleeve geometry still intrudes during some downward views,
+  and HUD/marker distortion is unresolved. This remains failed full-mod acceptance.
+- `native-stereo-six-dof-left`: 90.05 seconds, 441 captured frames, 4.90 captures/second.
+  The rotation/fire/reload actions happened after this recording ended; it only
+  contains the recorded translation portion of that attempted sequence.
+- `native-stereo-complete-sequence-left`: 60.14 seconds, 281 captured frames,
+  4.67 captures/second. The scripted sequence completed; complete visual acceptance
+  and correlation with the tracking cancellation remain outstanding.
+- `native-stereo-movement-effects-off-left`: 75.20 seconds, 238 captured frames,
+  3.16 captures/second. Movement reached the game, but lowering the gun visibly
+  returned to third person and the sequence ended prone. This fails persistent
+  first-person acceptance. HUD warping and body clipping remain visible defects.
+
+Recording cadence is separate from native game cadence. None of these recordings
+is a 60 FPS video. The earlier controller recordings show the tracked rifle, but
+none of these older clips contains the functioning forearm HUD shown in the
+new [SIM review](SIM_HUD_REVIEW.md). The required full-mod demonstration and
+acceptance remain incomplete. The user subsequently chose to test the
+experimental build on a Quest 3; that initial run is documented in
+[HEADSET_REVIEW.md](HEADSET_REVIEW.md). No zero-bug or all-weapons claim is made.
+
+See [acceptance](ACCEPTANCE.md) for the remaining observable gates and
+[architecture](ARCHITECTURE.md) for the rendering contracts. Private logs and raw
+analysis stay outside public source and distributions.

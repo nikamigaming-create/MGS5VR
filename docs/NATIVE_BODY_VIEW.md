@@ -1,5 +1,7 @@
 # Native body and view
 
+Current implementation audit: [FIELD_FIXES.md](FIELD_FIXES.md). Native thigh/shin lengths remain fixed; pelvis fit and garment drivers are implemented. Forearm-only cropping admits identified sna5 geometry; rough cuffs, other outfits and physical acceptance remain. Follow [RELEASE_PLAN.md](RELEASE_PLAN.md); earlier measurements below are scoped evidence.
+
 The headset gear tab exposes the complete gameplay tuning catalog, including
 full body and cinematic movement. Menu + left stick click opens the panel.
 Changes are validated and confirmed, saved into the personal controls file,

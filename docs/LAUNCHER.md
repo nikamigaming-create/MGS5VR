@@ -129,6 +129,11 @@ disabled until its independent adapters are ready.
 
 ## Build
 
+Use `tools/build.ps1` for a completed checked development candidate in
+`build/dev/`; published `play/` stays unchanged. The target-only command below
+is a developer component check, not a deployment or release. Follow
+[RELEASE_PLAN.md](RELEASE_PLAN.md) for the complete workflow.
+
 ### Local simulator override
 
 For testing through an already running Steam client, an explicit
@@ -146,7 +151,11 @@ The manifest must be an existing absolute path. Optional `api_layer_path` and
 `data_dir` accepts an existing absolute simulator data directory. An explicit
 `XR_RUNTIME_JSON` inherited by the game takes priority. The override is not
 included in the package and does not change the machine's OpenXR registry.
-Remove the override or set `enabled=0` when finishing simulator testing.
+For local runs prefer `workspace.py launch-sim` and `workspace.py stop-sim`,
+which own the simulator lease and restore the per-game Meta runtime. Never leave
+a simulator override active for physical play; preserve the explicit Meta Quest
+Link choice in both Play commands. Manual overrides must restore their previous
+per-game configuration during cleanup.
 
 ```powershell
 cmake --build build --config Release --target mgs5vr_launcher

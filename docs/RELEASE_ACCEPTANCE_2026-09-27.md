@@ -1,5 +1,7 @@
 # Release acceptance checkpoint — 27 September 2026
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 **Updated 28 September:** [RC3](RELEASE_CANDIDATE_2026-09-28.md) fixes the verified
 Mission 1 cinematic handoff. The full intro/return measured zero missing layers
 in 17,035 frame cycles. All 34 CTest groups, 7,298 native checks and 76 retail Lua

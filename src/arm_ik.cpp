@@ -280,7 +280,7 @@ std::optional<ArmSurface> headClearanceSurface(Vec3 point,Vec3 leftEye,Vec3 righ
     }
     return surface;
 }
-std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 leftEye,Vec3 rightEye,float radius){
+std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 leftEye,Vec3 rightEye,float radius,float sleeveRadius){
     // Closest points of each bone and the eye segment, including endpoint
     // minima. The resulting plane supports the entire stereo capsule.
     const auto nearest=[&](Vec3 a,Vec3 b){
@@ -297,7 +297,7 @@ std::optional<ArmSurface> armHeadClearanceSurface(const ArmPose& arm,Vec3 leftEy
     };
     const auto upper=nearest(arm.shoulder.position,arm.elbow.position);
     const auto lower=nearest(arm.elbow.position,arm.wrist.position);
-    const auto upperSurface=headClearanceSurface(upper,leftEye,rightEye,radius);
+    const auto upperSurface=headClearanceSurface(upper,leftEye,rightEye,std::max(radius,sleeveRadius));
     const auto lowerSurface=headClearanceSurface(lower,leftEye,rightEye,radius);
     if(!upperSurface)return lowerSurface;
     if(!lowerSurface)return upperSurface;
@@ -387,14 +387,16 @@ std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const
 }
 
 std::optional<ArmSolution> solveArmAroundHead(const ArmPose& a,Pose target,Vec3 hint,
-    const ArmBasis* basis,Vec3 eye,float elbowRadius,float wristRadius){
+    const ArmBasis* basis,Vec3 eye,float elbowRadius,float wristRadius,float sleeveRadius){
+    sleeveRadius=std::max(elbowRadius,sleeveRadius);
     const auto unconstrained=solveArm(a,target,hint,basis);
     if(!unconstrained||!valid(Pose{{},eye})||!std::isfinite(elbowRadius)||!std::isfinite(wristRadius)
-       ||elbowRadius<=0||elbowRadius>.3f||wristRadius<=0||wristRadius>.3f)return {};
+       ||elbowRadius<=0||elbowRadius>.3f||wristRadius<=0||wristRadius>.3f
+       ||!std::isfinite(sleeveRadius)||sleeveRadius>.3f)return {};
     // An extended arm can put its entire elbow circle inside the head.
     // In that case no bend can preserve the requested wrist. Clamp the reach
     // at the two sphere intersections instead of discarding the whole frame.
-    const auto endpoint=[&](Vec3 center,float radius,Vec3 wanted,float clearance)->std::optional<Vec3>{
+    const auto endpoint=[&](Vec3 center,float radius,Vec3 wanted,float clearance,float segmentClearance)->std::optional<Vec3>{
         auto direction=wanted-center;
         if(length(direction)<.00001f)return {};
         direction=unit(direction);
@@ -407,8 +409,8 @@ std::optional<ArmSolution> solveArmAroundHead(const ArmPose& a,Pose target,Vec3 
         // tangent point, the ray cone is stricter than endpoint separation.
         // A source anchor already inside the envelope retains the endpoint
         // fallback; it cannot be repaired by rotating this bone alone.
-        const float tangentSquared=distance*distance-elbowRadius*elbowRadius;
-        if(distance>=elbowRadius-1e-5f&&radius*radius>=tangentSquared)
+        const float tangentSquared=distance*distance-segmentClearance*segmentClearance;
+        if(distance>=segmentClearance-1e-5f&&radius*radius>=tangentSquared)
             limit=std::min(limit,std::sqrt(std::max(0.f,tangentSquared))/distance);
         if(limit< -1.f)return {};
         if(limit<1.f&&dot(direction,axis)>limit){
@@ -420,9 +422,9 @@ std::optional<ArmSolution> solveArmAroundHead(const ArmPose& a,Pose target,Vec3 
         return center+direction*radius;
     };
     const auto elbow=endpoint(a.shoulder.position,length(a.elbow.position-a.shoulder.position),
-        unconstrained->pose.elbow.position,elbowRadius);
+        unconstrained->pose.elbow.position,sleeveRadius,sleeveRadius);
     if(!elbow)return {};
-    const auto wrist=endpoint(*elbow,length(a.wrist.position-a.elbow.position),target.position,wristRadius);
+    const auto wrist=endpoint(*elbow,length(a.wrist.position-a.elbow.position),target.position,wristRadius,elbowRadius);
     if(!wrist)return {};
     return finishArm(a,target,*elbow,*wrist,basis,true);
 }

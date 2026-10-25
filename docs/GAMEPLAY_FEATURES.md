@@ -1,6 +1,6 @@
 # Gameplay beyond weapons
 
-Updated 13 September 2026. These are native game systems that the VR controls,
+Updated 24 October 2026. See [FIELD_FIXES.md](FIELD_FIXES.md) for the code audit and [RELEASE_PLAN.md](RELEASE_PLAN.md) for execution. These are native game systems that the VR controls,
 camera, hands and UI must preserve. A mapped button is not a claim that the whole
 interaction works. Multiplayer, FOB and MGO are outside this project request.
 
@@ -9,7 +9,7 @@ Its separate config maps all 14 native buttons, both analog triggers and all
 stick axes, retaining native holds/combos in both games. The table below describes
 normal VR presentation and remaining integration, not missing native input bits.
 See [Quest 3 / Virtual Desktop tester issues](QUEST3_TESTER_FEEDBACK.md) for the
-current hardware-reported gaps; renderer issues are not considered fixed by remapping.
+historical hardware reports, reconciled against FIELD_FIXES; renderer issues are not considered fixed by remapping.
 
 | System | Current access | Remaining work |
 | --- | --- | --- |
@@ -18,13 +18,13 @@ current hardware-reported gaps; renderer issues are not considered fixed by rema
 | Bodies and prisoners | Hold B for native pickup/carry; Y for native context; lowered trigger for native throw. | Carry, set down, throw, loading into vehicles/helicopters and rescue completion. There is no physical hand-grabbing system for bodies. |
 | Extraction | Held Y reaches native context actions. | TPP Fulton soldiers/objects and failures; helicopter prisoner extraction in both games. GZ does not acquire TPP's Fulton/buddy systems through a remap. |
 | Stealth and traversal | Walk, run, crouch/stand, prone, dive and context inputs are mapped. | All cover/peek, crawling/rolling, climbing, ladders, ledges, locked doors and hiding-place contexts; alert/Reflex/damage feedback and camera transitions. |
-| Reconnaissance | Physical binocular view, zoom, manual waypoint mark/clear and native NVG. | Automatic enemy acquisition/analysis/intel, readable target information and stable native marked-actor visuals. Manual waypoint placement is not automatic enemy scanning. |
+| Reconnaissance | Physical binocular equip/aim/zoom, automatic acquisition, explicit marking and native intel requests are implemented; village marking has scoped lesson evidence. NVG and selected authored weapon optics exist. | Wider target/unlock/tutorial cases, marked-actor presentation and physical readability. Do not restart the existing native integration. |
 | Buddy orders | Wrist Commands; D-Horse call/Stay back, riding and distraction knock exercised. D-Dog petting observed. | All D-Dog, Quiet and D-Walker orders, deployment/replacement, ability availability and their target interactions. Only the deployed native buddy occupies the active slot. |
 | Powered arms | Equipped native action remains accessible through ready/trigger and Commands. During Rocket/Blast Arm flight, tilt the left hand from its launch orientation to steer; return to neutral to stop steering. The movement stick overrides hand steering and resets its neutral orientation. | Stun and sonar need their own acceptance. Rocket Arm steering and normal weapon return have scoped simulator coverage; target impact, Blast Arm and physical-headset acceptance remain open. |
 | Items and support equipment | NVG on/off, C4 placement/detonation, decoy inflation and smoke have individual SIM observations. | Other grenades/mines, box/poster/hide/slide/eject actions, magazines, phantom cigar, stealth items, drugs and state-specific use/alternate controls. |
-| Transport | Horse basics and bounded mounted rifle shots; truck entry, wheel acquisition/steering and exit observed. | Sustained driving/braking, mounted turrets/mortars, Walker Gear/D-Walker, helicopter roles and all transitions. Personal gunfire while driving requires additional native integration. |
-| iDroid and progression | In-headset map/Pause, tabs and basic navigation. | Support drops/strikes, helicopter requests, deployment, development, Mother Base, mission completion/retry, death and replacement transitions. |
-| Presentation and feedback | TPP tracked arms, wrist ammo/equipment/Commands and floating native menus. | Spatial subtitles/damage/context feedback, all title/loading/cinematic cases, cuffs and action-specific hand animation. |
+| Transport | Horse basics and bounded mounted rifle shots; truck entry, wheel acquisition/steering and exit observed. | Sustained driving/braking, mounted turrets/mortars, Walker Gear/D-Walker, helicopter roles and all transitions. The vehicle-weapon handoff exists in `src/vehicle_weapon.cpp`; broad driving/fire acceptance remains. Physical mounted admission currently covers mortar and MG only. |
+| iDroid and progression | Left cinematic handset/projector, ordinary stow/reopen, scene handoff and exit-notice repairs are implemented; native menus and spatial Pause exist. | Forced unfinished lessons, continuous stereo and physical acceptance; broader Support drops/strikes, helicopter requests, deployment, development, Mother Base, mission completion/retry, death and replacement transitions. |
+| Presentation and feedback | Fixed-length native body/pelvis fit, tracked garment drivers, hands/forearms, left-forearm HUD, left-hand iDroid and spatial Pause. | Other outfits, rough cuffs, physical reach; broader Spatial subtitles/damage/context feedback, all title/loading/cinematic cases, cuffs and action-specific hand animation. |
 | Ground Zeroes | Independent native third-person stereo experiment; several native weapon/item actions exercised. | Player-head first person, tracked arms, weapon aim and wrist UI adapters; GZ-specific guard/rescue/mission interaction coverage. TPP offsets are not used as a substitute. |
 | Showcase | An 80-second TPP/GZ field edit exists; additional native scope footage is recorded. | Finished expanded combined film with accurate overlays; never label missing gameplay as complete. |
 

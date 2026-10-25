@@ -1,5 +1,7 @@
 # Community issue verification - updated 28 September 2026
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 Current RC5 DLL SHA-256: `c69b75c6099d77d773b6503caee339c51ae33411d3c65062c2b0ba28c51ca79e`. Meta XR Simulator v207. Physical headset acceptance is unrun.
 
 All 55 reports and 77 scoped claims are retained. Historical evidence keeps the binary actually tested.

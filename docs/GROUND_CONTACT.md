@@ -1,5 +1,7 @@
 # Native arm ground contact
 
+Current implementation audit: [FIELD_FIXES.md](FIELD_FIXES.md), FP04/05/16. Ground/posture and helicopter-exit corrections exist. No targeted production repair for the exact reported small-rock interruption or tight corridor was established. Follow [RELEASE_PLAN.md](RELEASE_PLAN.md); do not infer a diagnosis from a navigation guard.
+
 This adapter is specific to the profiled TPP 1.0.15.4 executable. It queries the
 game's collision scene during the same player skin publication that supplies the
 tracked eye frame. It does not infer ground height from the player root or bones.

@@ -1,5 +1,7 @@
 # Community test candidate RC5 - 28 September 2026
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 RC5 preserves the physical VR binoculars and fixes recognition of their actual
 Mission 1 lesson actions. The hand-held optic still equips, hand aims, zooms,
 automatically acquires visible enemies, and explicitly marks targets. No stock

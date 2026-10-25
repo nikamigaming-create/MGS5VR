@@ -120,7 +120,7 @@ Retain reviewed runs before recording them as evidence.
 `studio-manager --suite <policy.json>` runs bounded gallery, independent-print
 reload, owned Freeze or ACC binocular-routing cases in a declared native scene.
 The current retained gallery/Freeze runs and scoped limits are in
-[the acceptance ledger](CURRENT.md#october-12-camera-gallery-freeze-and-acc-grip-routing).
+[the acceptance ledger](FREE_PLAY_ACCEPTANCE.json).
 Preview stays 1280 x 720; actual eye targets and FOVs come from OpenXR. Simulator
 results do not certify physical headset ergonomics or whole-game readiness.
 `Play-Dev.cmd` tests the candidate; `Play.cmd` keeps the published build.

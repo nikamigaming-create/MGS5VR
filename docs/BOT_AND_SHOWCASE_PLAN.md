@@ -1,5 +1,7 @@
 # Gameplay bot, controls coverage and showcase
 
+> Historical report/specification. Statements such as "current", "next" and "unfinished" below refer to the original checkpoint, not today's implementation. Use [CURRENT.md](CURRENT.md), [FIELD_FIXES.md](FIELD_FIXES.md) and [RELEASE_PLAN.md](RELEASE_PLAN.md) for effective status and next work. Preserve this record; do not restart its old queue without checking the later code audit.
+
 Current checkpoint: [27 September live supervision, iDroid evidence and field-kit artifacts](BOT_SUPERVISION_STATUS_2026-09-27.md).
 The historical specification below remains the full scope; passing the new
 bounded sequences does not complete the community campaign or film.
