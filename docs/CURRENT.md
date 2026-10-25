@@ -1,10 +1,32 @@
 # Current MGS5VR work — 25 October 2026
 
-**Third-arm fix: ready in checked development `c6f7e1f7b7cb` through
-`Play-Dev.cmd`. The additional reopen handoff correction is on main, compiling
-only. Runtime tests have stopped at the user's direction. Not release accepted.**
-Work on main only; do not redo implemented repairs or repeat the failed mounted
-approach. The full report map is [FIELD_FIXES.md](FIELD_FIXES.md).
+**Current batch: duplicate bionic-shell correction, complete iDroid reopen
+handoff, and recovery of forearm-only cropping after native buffer replacement.
+Build and deploy this batch once for the user's play test. No simulator soak
+or repeated per-case test loop is authorized by the current request.**
+Work on main only. `build/dev/BUILD.json` identifies the checked candidate;
+`play/` remains the last published release. [FIELD_FIXES.md](FIELD_FIXES.md)
+separates implemented repairs from unresolved reports and acceptance gaps.
+
+## Batch contents — 25 October
+
+- The owned rigid bionic shell follows the same paused forearm palette as the
+  articulated hand, fixing the reported apparent third arm.
+- iDroid reopening preserves the last accepted hand/device camera publication
+  until its new skin arrives. The compositor now recognizes that wait as an
+  expected handoff: retain the accepted stereo image, reject new unjoined pixels,
+  and resume on the fresh rig. Camera/reference/presentation identities must match.
+  Native Help/Pause continues to use its existing spatial fallback.
+- Forearm-only cropping previously retained the first sixteen native object
+  buffers forever. Later replacement buffers could never register, leaving
+  shoulder geometry uncropped. The bounded cache now recycles the least recently
+  used completed entry and never evicts a mapped buffer. This is a source-level
+  lifecycle correction; it does not expand the admitted outfit geometry.
+
+Build/check/deploy uses `tools/build.ps1 -SkipBootstrap -Deploy`. The final
+outcome is recorded in FREE_PLAY_ACCEPTANCE and the development manifest.
+Physical testing belongs to the user through `Play-Dev.cmd`; no pin or release
+publication is part of this candidate deployment.
 
 ## Duplicate left forearm — 25 October
 
@@ -41,19 +63,17 @@ seventh cycle and first immediate reopen/stow, then caught an unjoined camera
 publication at the second reopening. All three overall runs remain failed.
 Visual record: `artifacts/release-rigid-shell-visual-review.json`.
 
-## Reopen handoff correction — source work after the checked candidate
+## Reopen failure and source correction
 
-The second immediate reopening reports `menu_idroid=true`, `rig_sequence=0`
-and no device transform while native input is still opening. Stereo already
-rejects that unjoined frame, but camera resolution overwrote the last accepted
-hand/device anchor before the new native skin arrived. The new production
-change preserves that accepted publication across the empty-rig boundary.
-Skin preparation still runs and the next fresh publication resumes normally.
-Ordinary native Help/Pause fallback remains unchanged.
-
-This additional change is compiled successfully without tests. It is not in checked `build/dev/`
-and has no new test or live result. The user explicitly stopped further testing;
-do not restart the soak loop or advertise a clean seven-cycle integrated pass.
+Run `20261025T115918951584Z` reports `menu_idroid=true`, `rig_sequence=0`
+and no device transform at the second immediate reopening. Stereo already
+rejected that unjoined frame, but camera resolution overwrote the accepted
+hand/device anchor. The original empty-rig correction also used a mismatch
+status that rejected retained stereo. This batch keeps the anchor and explicitly
+permits only the previously accepted stereo image during the expected wait.
+The focused regression covers retained pixels, rejection of the old stowed skin,
+fresh-skin recovery and the existing native Help/Pause fallback. It is included
+in the single combined build/check pass; no new native gameplay pass is claimed.
 
 ## Sustained iDroid correction and result
 

@@ -13,7 +13,7 @@
 
 namespace mgs5vr {
 std::optional<float> physicalFloorHeightOffset(float headY,float floorY,float units,float standingEyeHeight);
-enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch, sceneUnavailable, staleRig };
+enum class HeadCameraStop { none, manual, trackingLost, staleTracking, clockMismatch, cameraChanged, matrixMismatch, playerHeadUnavailable, rigFrameMismatch, sceneUnavailable, staleRig, awaitingRig };
 enum class PlayerPosture { unknown,standing,crouched,prone };
 struct HeadCameraStatus { bool enabled{},active{},pending{}; HeadCameraStop reason{}; uint64_t cancellations{},activation{}; bool suspended{},awaitingPlayer{},nativeMenuOpen{},nativeIdroidOpen{}; uint32_t rigRejectFlags{}; uint64_t rigAgeMs{}; uint64_t sceneTransitionActivation{};
     // Read-only provenance: 1 authored mode, 2 reference rebase, 3 avatar
@@ -32,7 +32,7 @@ constexpr bool mayAcceptNewStereoPair(HeadCameraStatus status) noexcept {
 // and eye poses. A rejected or delayed source rig is never published as new pixels.
 constexpr bool mayReprojectAcceptedStereo(HeadCameraStatus status) noexcept {
     return status.active&&(!status.suspended||status.reason==HeadCameraStop::trackingLost||status.reason==HeadCameraStop::staleTracking
-        ||status.reason==HeadCameraStop::playerHeadUnavailable||status.reason==HeadCameraStop::staleRig
+        ||status.reason==HeadCameraStop::playerHeadUnavailable||status.reason==HeadCameraStop::staleRig||status.reason==HeadCameraStop::awaitingRig
         ||(status.reason==HeadCameraStop::rigFrameMismatch&&status.rigRejectFlags==10&&status.rigAgeMs>150));
 }
 // A planned native menu/loading transition may retain explicitly frozen

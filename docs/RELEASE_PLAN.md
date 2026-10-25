@@ -10,8 +10,8 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current execution built candidate `c6f7e1f7b7cb`, with the shell fix reviewed; see
-[CURRENT.md](CURRENT.md) for its smoke results and remaining visual limits.
+Current execution batches the rigid-shell, reopen handoff and forearm-cache
+corrections before one build/check/deploy; see [CURRENT.md](CURRENT.md).
 The identities below record the original audit baseline.
 
 ## Starting point and authority
@@ -218,22 +218,22 @@ both slots verify. Never remove settings, saves, source or retained evidence.
   is ready through Play-Dev. Next: physical Quest feedback and a newly
   reproducible field case; frame repeats remain measured and unresolved.
 
-## Current execution checkpoint — 25 October
+## Current execution checkpoint — 25 October, latest direction
 
-- Checked development `c6f7e1f7b7cb`, source `f438de4`, contains the corrected
-  rigid bionic shell and shared-fence handoff. The shell follows the hand in
-  the reproduced Help/Pause scene. It is available through `Play-Dev.cmd`.
-- The later reopen trace exposed an empty-rig camera publication overwriting
-  the accepted hand/device anchor. Its production correction is now on main,
-  compiled successfully without tests; it is not yet in the checked development slot.
-- The user explicitly stopped further testing and requested code work. Do not
-  restart repeated smoke/soak loops. Preserve the existing failed runs and
-  scoped passes; do not claim a clean integrated seven-cycle soak.
-- Continue justified code fixes from FIELD_FIXES in a batch. Current remaining
-  scope: other outfits/extreme cloth, exact terrain/corridor, actual mounted
-  contact and wider progression. Undiagnosed coverage is not missing code.
-- Before a later release candidate is installed/published, reconcile its source,
-  compiled payload and validation honestly. Keep the published pin unchanged
-  until the authorized publication/upload-verification sequence is complete.
-- Owned game/simulator/bots are closed. Steam and Meta headset preference are
-  preserved. No release, new branch, worktree, package or pin was created.
+1. Finish the existing code batch on main: rigid prosthetic shell, retained
+   iDroid reopen camera/stereo, and forearm crop cache replacement. Preserve
+   fixed leg lengths, native interaction mappings and exact outfit admission.
+2. Commit code and this handoff, then run `tools/build.ps1 -SkipBootstrap -Deploy`
+   once. Required build checks are part of that batch. Repair a concrete build
+   failure if one appears; do not launch repeated gameplay/soak loops.
+3. Leave the checked candidate installed and available through `Play-Dev.cmd`
+   for the user. Keep Steam running, Meta Link selected, and all test sessions
+   closed. Record exact build/deploy outcome in the ledger.
+4. The remaining terrain/corridor location, actual additional mounted contacts,
+   other outfits/extreme cloth, broader progression and physical acceptance stay
+   explicit. Do not invent repairs or reopen already implemented work merely
+   because acceptance is incomplete. Use the user's next gameplay feedback.
+5. Publishing and changing the published pin remain separate from deployment.
+
+This checkpoint supersedes the repeated simulator workflow in historical plan
+sections above. The user wants accumulated code delivered as one candidate.

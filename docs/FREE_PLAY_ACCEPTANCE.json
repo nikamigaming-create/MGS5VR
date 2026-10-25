@@ -2,7 +2,7 @@
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
   "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
-  "candidate_status": "Third-arm fix is in checked development c6f7e1f7b7cb. A further reopen handoff correction is on main and compiled successfully without tests; no further tests or deployment at the user's direction. Not release accepted.",
+  "candidate_status": "Combined shell/reopen/forearm-cache batch ready for one build/check/deploy; no new simulator pass claimed.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1333,11 +1333,11 @@
   "active_work": {
     "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
     "source_commit": "f438de418252f2ada8448d70280b5523fd126f3a",
-    "checkpoint": "Third-arm fix is in checked development c6f7e1f7b7cb. A further reopen handoff correction is on main and compiled successfully without tests; no further tests or deployment at the user's direction. Not release accepted.",
+    "checkpoint": "Combined shell/reopen/forearm-cache batch ready for one build/check/deploy; no new simulator pass claimed.",
     "plan": "docs/RELEASE_PLAN.md",
     "next_actions": [
-      "Continue justified gameplay code fixes in a batch; no repeated runtime tests.",
-      "Keep third-arm candidate available through Play-Dev; new reopen source change is not yet in that checked payload."
+      "Build/check/deploy combined batch once.",
+      "Leave the candidate ready for user play; keep undiagnosed reports explicit."
     ],
     "runtime_requirement": "Wired Meta Quest Link / Meta OpenXR; both Play commands explicitly -MetaLink. Historical runtime observations in retained_work_history are not current setup instructions.",
     "build_slots": {
@@ -2377,7 +2377,17 @@
     "observed": "Second immediate reopening published menu_idroid=true with rig_sequence=0 and idroid_device_tracked=false; native input was not yet ready.",
     "existing_protection": "Stereo scene replay already rejects the unjoined frame; the trace alone does not establish a visible blank frame.",
     "code_change": "Keep last accepted tracked hand/device camera publication while ordinary handheld menu has no new rig. Skin preparation remains allowed and fresh publication resumes it.",
-    "validation": "Compilation succeeded. No tests, live rerun or candidate deployment requested after user stopped testing.",
+    "validation": "Included in the current combined build/check/deploy batch; no new native run.",
     "scope": "Does not alter native Help/Pause panel fallback or disabled/unestablished tracked rigs."
+  },
+  "release_batch_2026_10_25": {
+    "changes": [
+      "Paused rigid bionic shell follows current forearm palette.",
+      "Reopen retains accepted hand/device anchor and stereo until fresh skin.",
+      "Forearm crop object-buffer cache recycles completed entries after resource replacement."
+    ],
+    "validation": "Pending single combined build/check/deploy.",
+    "scope": "Native leg lengths and exact outfit admission unchanged. Physical and broad field acceptance remain open.",
+    "next": "Build/deploy once; user tests via Play-Dev. No repeated simulator loops."
   }
 }

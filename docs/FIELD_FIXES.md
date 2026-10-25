@@ -14,14 +14,12 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Current candidate — 25 October
 
-Development `c6f7e1f7b7cb` / source `f438de4` fixes the reported third-arm
-appearance: the rigid bionic shell now follows the same paused arm palette as
-the hand. The exact forced Help scene and ordinary Pause pass scoped both-eye
-motion review. All 58 groups and installer checks pass. The shared-fence change
-also shows fewer repeated frames in the completed ACC timing samples. The
-sustained runs remain interrupted by native notices and a reopen publication
-boundary. The latter now has a source correction, compiled successfully without tests; further
-testing has stopped at the user's direction. See CURRENT for exact status.
+The current source batch includes the apparent third-arm correction, complete
+iDroid reopen pose/stereo handoff, and recovery of forearm cropping after native
+object-buffer replacement. Build and deploy together for the user's testing;
+see CURRENT and `build/dev/BUILD.json` for the candidate identity. The cache fix
+preserves exact outfit admission and is not all-outfit acceptance. Earlier
+failed/interrupted runs remain failed; no repeated simulator soak is planned.
 
 Candidate `a6dc5fb91151` / source `f11d0d0` adds the reproduced handheld
 stale-skin correction. It passes 27 combined sustained/menu/reopen cases and

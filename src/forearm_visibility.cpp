@@ -44,8 +44,10 @@ struct Constants {
     const void* mapped{};
     std::vector<unsigned char> bytes;
     bool complete{};
+    uint64_t used{};
 };
 thread_local std::array<Constants,16> constants;
+thread_local uint64_t constantsClock{};
 template<class T> bool read(uintptr_t address,T& value){
     SIZE_T count{};return address&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(address),&value,sizeof(value),&count)&&count==sizeof(value);
 }
@@ -59,8 +61,30 @@ std::string digest(const void* bytes,ULONG count){
     for(auto b:hash){text+=hex[b>>4];text+=hex[b&15];}return text;
 }
 Constants* known(ID3D11DeviceContext* context,ID3D11Resource* resource){
-    for(auto& entry:constants)if(entry.resource.Get()==resource&&entry.context==context)return &entry;
+    for(auto& entry:constants)if(entry.resource.Get()==resource&&entry.context==context){
+        entry.used=++constantsClock;return &entry;
+    }
     return nullptr;
+}
+Constants* trackConstants(ID3D11DeviceContext* context,ID3D11Buffer* buffer){
+    if(auto* entry=known(context,buffer))return entry;
+    D3D11_BUFFER_DESC desc{};buffer->GetDesc(&desc);
+    if(!(desc.BindFlags&D3D11_BIND_CONSTANT_BUFFER)||desc.ByteWidth<208||desc.ByteWidth>65536)return nullptr;
+    Constants* slot=nullptr;
+    for(auto& entry:constants){
+        if(!entry.resource){slot=&entry;break;}
+        // A mapped native pointer remains owned until its matching Unmap.
+        if(!entry.mapped&&(!slot||entry.used<slot->used))slot=&entry;
+    }
+    if(!slot)return nullptr;
+    // Native scene/model reloads replace object buffers. The old fixed cache
+    // never released its first sixteen entries, permanently disabling cropping
+    // for later buffers. Recycle a completed least-recently-used snapshot.
+    Constants replacement;
+    replacement.resource=buffer;replacement.context=context;
+    replacement.bytes.resize(desc.ByteWidth);replacement.used=++constantsClock;
+    *slot=std::move(replacement);
+    return slot;
 }
 }
 void resetForearmBindings(ID3D11DeviceContext* c) noexcept {
@@ -223,9 +247,7 @@ ForearmDraw::ForearmDraw(ID3D11DeviceContext* c) noexcept {
         if(!object)return;
         auto* entry=known(c,object.Get());
         if(!entry){
-            D3D11_BUFFER_DESC desc{};object->GetDesc(&desc);
-            if(desc.ByteWidth<208||desc.ByteWidth>65536)return;
-            for(auto& free:constants)if(!free.resource){free.resource=object;free.context=c;free.bytes.resize(desc.ByteWidth);break;}
+            trackConstants(c,object.Get());
             return;
         }
         const size_t at=static_cast<size_t>(first)*16+64;

@@ -881,13 +881,19 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         }
     }
     if(useRig&&!authoredScene&&spatialMenu&&nativeIdroidOpen_&&!nativeIdroidPaused_
-       &&controllers_.handheldMenus&&!rig_.camera&&lastView_.rigSequence){
+       &&controllers_.handheldMenus&&!rig_.camera&&lastView_.rigSequence
+       &&lastView_.activation==activation_&&lastView_.playerOwner==result.playerOwner
+       &&lastView_.controllers.referenceEpoch==controllers_.referenceEpoch
+       &&lastView_.controllers.presentationEpoch==controllers_.presentationEpoch){
         // Opening or reopening the handset clears rig_ before its next native
         // skin publication. Stereo already rejects that unjoined frame, but
         // accepting it here also overwrites the last valid hand/device anchor.
         // Preserve the accepted view until the new skin joins. Rig preparation
         // uses useRig=false, so it can still produce the frame that resumes us.
-        suspendLocked(HeadCameraStop::rigFrameMismatch);
+        // This is an expected generation handoff, not a mismatched pose.
+        // Keep only the already accepted stereo pair while denying new pixels.
+        rigRejectFlags_=0;rigAgeMs_=0;
+        suspendLocked(HeadCameraStop::awaitingRig);
         return result;
     }
     if(useRig&&!authoredScene&&rig_.camera){

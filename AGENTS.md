@@ -101,3 +101,10 @@ Update CURRENT, FIELD_FIXES and the evidence ledger after a meaningful batch;
 synchronize RELEASE_PLAN's next action. Historical reports keep their original
 build scope. Do not use old "current candidate" text as a new failure diagnosis,
 erase evidence or promote acceptance during documentation cleanup.
+
+## Latest delivery direction — 25 October 2026
+
+Batch remaining justified gameplay fixes on main, then build/check/deploy one
+candidate for the user. Do not end after one small source edit. Do not restart
+per-case simulator or soak loops; the user will test the deployed candidate.
+Keep unresolved or undiagnosed reports explicit rather than inventing repairs.

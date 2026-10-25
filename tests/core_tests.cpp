@@ -3571,6 +3571,31 @@ int main(){
         expect(recovered.applied&&recovered.rigSequence>joined.rigSequence&&recovered.idroidDeviceTracked
             &&same(recovered.idroidDevice.position,resumed.idroidDevice.position)&&!handset.status().suspended,
             "recovered terminal camera and handset share the new skin transaction");
+        handset.setNativeMenuOpen(false);
+        auto stowed=handset.resolve(11,thirdPerson,400,NativeBodyHead{22,33,{}});
+        stowed.idroidDeviceTracked=false;
+        expect(stowed.applied&&handset.publishRigFrame(11,22,thirdPerson,stowed),
+            "native stow publishes its fresh arm skin before the next opening");
+        const auto closed=handset.resolve(11,thirdPerson,400);
+        handset.setNativeMenuOpen(true,true);
+        const auto opening=handset.resolve(11,thirdPerson,400);
+        const auto waiting=handset.status();
+        const auto retainedClosed=handset.publishedView();
+        expect(!opening.applied&&waiting.reason==HeadCameraStop::awaitingRig
+            &&!mayAcceptNewStereoPair(waiting)&&mayReprojectAcceptedStereo(waiting)
+            &&mayRetainStereoSurround(waiting)&&retainedClosed
+            &&retainedClosed->rigSequence==closed.rigSequence&&!retainedClosed->menuOpen,
+            "immediate reopen retains the last accepted stereo and arm anchor without admitting an empty rig");
+        expect(!handset.publishRigFrame(11,22,thirdPerson,stowed),
+            "the retained stowed arm cannot be relabeled as the reopened handset");
+        auto reopened=handset.resolve(11,thirdPerson,400,NativeBodyHead{22,33,{}});
+        reopened.idroidDeviceTracked=true;reopened.idroidDevice=resumed.idroidDevice;
+        expect(reopened.applied&&handset.publishRigFrame(11,22,thirdPerson,reopened)
+            &&handset.resolve(11,thirdPerson,400).idroidDeviceTracked&&!handset.status().suspended,
+            "skin preparation remains live and automatically completes the reopened handset join");
+        handset.setNativeMenuOpen(true,true,true);
+        expect(handset.resolve(11,thirdPerson,400).applied,
+            "native Help/Pause still permits its spatial camera fallback without a new skin");
     }
     handsCamera.trackStereo({},rigEyes,true,100,hands);handsCamera.toggle();
     const auto joinedHands=handsCamera.resolve(1,nativeCamera,100);
