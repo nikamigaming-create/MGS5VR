@@ -6,7 +6,11 @@ this plan. [FIELD_FIXES.md](FIELD_FIXES.md) separates implemented repairs from
 remaining code work and acceptance. Do not restart the three-day investigation
 from unchecked historical boxes.
 
-Current execution has produced body/arm candidate `1a64bb965bc6`; see
+The user has now explicitly set release readiness as an active goal: complete
+all justified fixes on main, then test the batch and continue through remaining
+field/progression checks. Do not stop merely because one cuff case passes.
+
+Previous execution produced body/arm candidate `1a64bb965bc6`; see
 [CURRENT.md](CURRENT.md) for its smoke results and remaining visual limits.
 The identities below record the original audit baseline.
 

@@ -3896,6 +3896,24 @@ int main(){
             ++caps;for(size_t i=0;i<3;++i)boundaryOnly&=cropped[at+i]>=4&&cropped[at+i]<8;
         }
         expect(caps==2&&boundaryOnly,"cuff cap uses existing boundary vertices and their native skin weights");
+        cropped=cut;
+        std::vector<Vec3> fitted;std::vector<std::array<uint16_t,2>> copies;
+        expect(closeForearmCuffs(points,indices,cropped,lod,false,.452f,&fitted,&copies)==2&&copies.size()==4,
+            "flat cuff reuses four dead native vertices without resizing the streams");
+        bool preserved=fitted.size()==points.size();
+        for(size_t i=8;i<points.size();++i)preserved&=same(fitted[i],points[i]);
+        for(const auto copy:copies)preserved&=copy[0]<4&&copy[1]>=4&&copy[1]<8
+            &&near(fitted[copy[0]].x,.472f)&&same(fitted[copy[0]],fitted[copy[1]]);
+        expect(preserved&&std::equal(cropped.begin()+24,cropped.end(),indices.begin()+24),
+            "cap copies preserve the skin source and distal forearm while fitting only the cut rim");
+        // A seam representative not directly referenced by retained indices
+        // still owns the welded rim and must never be reused as a cap slot.
+        auto seamed=points;seamed.insert(seamed.end(),points.begin()+4,points.begin()+8);
+        auto seamIndices=indices;for(auto& i:seamIndices)if(i>=4&&i<8)i+=8;
+        auto seamCut=seamIndices;for(size_t at=0;at<24;at+=3)seamCut[at+1]=seamCut[at+2]=seamCut[at];
+        expect(closeForearmCuffs(seamed,seamIndices,seamCut,lod,false,.452f,&fitted,&copies)==2
+            &&std::all_of(copies.begin(),copies.end(),[](const auto copy){return copy[0]<4;}),
+            "unindexed seam representatives cannot be consumed as unused cuff vertices");
         const std::array<ForearmIndexRange,2> shared{{{0,indices.size()},{0,indices.size()}}};
         cropped=cut;
         expect(closeForearmCuffs(points,indices,cropped,shared,false)==0&&cropped==cut,

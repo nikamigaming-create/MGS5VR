@@ -9,6 +9,7 @@ namespace mgs5vr {
 void resetForearmBindings(ID3D11DeviceContext*) noexcept;
 void setForearmPlayer(uintptr_t owner,uintptr_t model) noexcept;
 void bindForearmIndex(ID3D11DeviceContext*,ID3D11Buffer*,DXGI_FORMAT,UINT) noexcept;
+void bindForearmVertices(ID3D11DeviceContext*,UINT,UINT,ID3D11Buffer* const*,const UINT*,const UINT*) noexcept;
 void bindForearmConstants(ID3D11DeviceContext*,UINT,UINT,ID3D11Buffer* const*) noexcept;
 void bindForearmTargets(ID3D11DeviceContext*,UINT,ID3D11RenderTargetView* const*) noexcept;
 void observeForearmBuffer(ID3D11Device*,const D3D11_BUFFER_DESC*,const D3D11_SUBRESOURCE_DATA*,ID3D11Buffer*) noexcept;
@@ -22,6 +23,11 @@ public:
 private:
     ID3D11DeviceContext* context_{};
     Microsoft::WRL::ComPtr<ID3D11Buffer> original_;
+    struct VertexBinding {
+        Microsoft::WRL::ComPtr<ID3D11Buffer> original;
+        UINT slot{},stride{},offset{};
+    };
+    std::array<VertexBinding,2> vertices_;
     DXGI_FORMAT format_{};
     UINT offset_{};
 };

@@ -11,13 +11,16 @@
 namespace mgs5vr {
 struct ForearmIndexRange {size_t first,end;};
 
-// Close only boundaries introduced by the crop, using the same native vertices,
-// skin weights and material. Reuse removed triangles exclusive to this LOD:
+// Close only boundaries introduced by the crop. Optional fitted positions and
+// copy pairs reuse dead vertex slots for a flat rim and independently shaded cap.
+// Reuse removed triangles exclusive to this LOD:
 // Fox's LOD ranges overlap, so shared slots cannot hold a LOD-specific cap.
 inline size_t closeForearmCuffs(std::span<const Vec3> positions,
     std::span<const uint16_t> original,std::span<uint16_t> cropped,
-    std::span<const ForearmIndexRange> lods,bool right,float cut=.452f){
+    std::span<const ForearmIndexRange> lods,bool right,float cut=.452f,
+    std::vector<Vec3>* fitted=nullptr,std::vector<std::array<uint16_t,2>>* copies=nullptr){
     if(original.size()!=cropped.size()||positions.size()>65536)return 0;
+    if((fitted==nullptr)!=(copies==nullptr))return 0;
     std::map<std::array<int,3>,uint16_t> weld;
     std::vector<uint16_t> canonical;
     for(size_t i=0;i<positions.size();++i){
@@ -30,6 +33,19 @@ inline size_t closeForearmCuffs(std::span<const Vec3> positions,
     for(const auto range:lods){
         if(range.first>range.end||range.end>original.size()||(range.end-range.first)%3)return 0;
         for(size_t at=range.first;at<range.end;++at)if(original[at]>=positions.size())return 0;
+    }
+    std::vector<bool> used(positions.size());
+    for(const auto range:lods)for(size_t at=range.first;at<range.end;at+=3){
+        const bool keep=std::all_of(original.begin()+at,original.begin()+at+3,
+            [&](auto i){return (right?-positions[i].x:positions[i].x)>=cut;});
+        if(keep)for(size_t i=0;i<3;++i)used[canonical[original[at+i]]]=true;
+    }
+    std::vector<uint16_t> spare;
+    if(fitted){
+        fitted->assign(positions.begin(),positions.end());copies->clear();
+        // A welded representative may not itself be indexed by a retained
+        // triangle. Reserve its entire seam group, not just indexed copies.
+        for(size_t i=0;i<used.size();++i)if(!used[canonical[i]])spare.push_back(static_cast<uint16_t>(i));
     }
     size_t added{};
     for(size_t lod=0;lod<lods.size();++lod){
@@ -52,25 +68,33 @@ inline size_t closeForearmCuffs(std::span<const Vec3> positions,
                 if(keep){++edge.kept;edge.a=a;edge.b=b;}
             }
         }
-        std::map<uint16_t,uint16_t> next;
+        std::multimap<uint16_t,uint16_t> next;
         std::map<uint16_t,unsigned> incoming;
         bool manifold=true;
         for(const auto& [key,e]:edges)if(e.all==2&&e.kept==1){
             // Reverse the retained boundary winding to face out of the cuff.
-            if(!next.emplace(e.b,e.a).second)manifold=false;
+            next.emplace(e.b,e.a);
             ++incoming[e.a];
         }
-        for(const auto& [a,b]:next)if(incoming[a]!=1)manifold=false;
-        if(!manifold)continue; // Never guess across touching/disconnected sheets.
+        for(const auto& [a,b]:next)if(incoming[a]!=next.count(a))manifold=false;
+        if(!manifold)continue;
         std::vector<std::array<uint16_t,3>> caps;
+        std::vector<std::vector<uint16_t>> loops;
         while(!next.empty()&&manifold){
             const auto start=next.begin()->first;auto at=start;
             std::vector<uint16_t> polygon;
             do{
+                const auto repeat=std::find(polygon.begin(),polygon.end(),at);
+                if(repeat!=polygon.end()){
+                    loops.emplace_back(repeat,polygon.end());polygon.erase(repeat,polygon.end());
+                }
                 const auto it=next.find(at);
                 if(it==next.end()){manifold=false;break;}
                 polygon.push_back(at);at=it->second;next.erase(it);
             }while(at!=start);
+            if(!polygon.empty())loops.push_back(std::move(polygon));
+        }
+        for(auto polygon:loops){
             if(!manifold||polygon.size()<3){manifold=false;break;}
             const auto area=[&](uint16_t a,uint16_t b,uint16_t c){
                 const auto p=positions[a],q=positions[b],r=positions[c];
@@ -96,6 +120,23 @@ inline size_t closeForearmCuffs(std::span<const Vec3> positions,
             if(manifold)caps.push_back({polygon[0],polygon[1],polygon[2]});
         }
         if(!manifold||caps.size()>slots.size())continue;
+        if(fitted){
+            std::map<uint16_t,uint16_t> duplicates;
+            for(const auto& cap:caps)for(auto vertex:cap)duplicates.emplace(vertex,0);
+            if(duplicates.size()>spare.size())continue;
+            // A cut through whole triangles has a saw-tooth axial rim. Fit
+            // only that rim to the authored elbow plane; hands and distal
+            // forearms keep their native positions. All coincident seam
+            // copies move together so UV/normal seams cannot open a crack.
+            for(auto& [vertex,duplicate]:duplicates){
+                duplicate=spare.back();spare.pop_back();
+                for(size_t i=0;i<canonical.size();++i)if(canonical[i]==vertex)
+                    (*fitted)[i].x=right?-.472f:.472f;
+                (*fitted)[duplicate]=(*fitted)[vertex];
+                copies->push_back({duplicate,vertex});
+            }
+            for(auto& cap:caps)for(auto& vertex:cap)vertex=duplicates.at(vertex);
+        }
         for(size_t i=0;i<caps.size();++i)std::copy(caps[i].begin(),caps[i].end(),cropped.begin()+slots[i]);
         added+=caps.size();
     }

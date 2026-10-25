@@ -86,6 +86,7 @@ void bindCoverBuffers(SetVertexBuffers original,ID3D11DeviceContext* context,UIN
     std::array<ID3D11Buffer*,32> selected{};
     for(UINT i=0;i<count;++i)selected[i]=cabinCoverBuffer(buffers[i]);
     original(context,slot,count,selected.data(),strides,offsets);
+    bindForearmVertices(context,slot,count,selected.data(),strides,offsets);
 }
 void STDMETHODCALLTYPE vertexBuffers(ID3D11DeviceContext* c,UINT slot,UINT count,ID3D11Buffer* const* b,const UINT* s,const UINT* o){bindCoverBuffers(originalVertexBuffers,c,slot,count,b,s,o);}
 void STDMETHODCALLTYPE immediateVertexBuffers(ID3D11DeviceContext* c,UINT slot,UINT count,ID3D11Buffer* const* b,const UINT* s,const UINT* o){bindCoverBuffers(originalImmediateVertexBuffers,c,slot,count,b,s,o);}

@@ -18,6 +18,8 @@ std::atomic_uintptr_t playerOwner{},playerModel{};
 struct DrawState {
     ID3D11DeviceContext* context{};
     ComPtr<ID3D11Buffer> indices,object;
+    std::array<ComPtr<ID3D11Buffer>,32> vertices;
+    std::array<UINT,32> strides{},offsets{};
     DXGI_FORMAT format{};UINT offset{};bool color{};
 };
 thread_local std::array<DrawState,4> drawStates;
@@ -29,12 +31,13 @@ DrawState* drawState(ID3D11DeviceContext* context){
 thread_local bool building{};
 std::mutex geometryMutex;
 struct Geometry {
-    ComPtr<ID3D11Buffer> positions,indices,cropped;
-    std::vector<unsigned char> positionBytes,indexBytes;
-    D3D11_BUFFER_DESC indexDescription{};
+    ComPtr<ID3D11Buffer> positions,attributes,indices,cropped;
+    std::vector<unsigned char> positionBytes,attributeBytes,indexBytes;
+    D3D11_BUFFER_DESC positionDescription{},attributeDescription{},indexDescription{};
 };
 Geometry geometry;
 constexpr GUID croppedKey{0xd09211a8,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
+constexpr GUID vertexKey{0xd09211a9,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
 struct Constants {
     ComPtr<ID3D11Resource> resource;
     ID3D11DeviceContext* context{};
@@ -69,6 +72,12 @@ void setForearmPlayer(uintptr_t owner,uintptr_t model) noexcept {
 void bindForearmIndex(ID3D11DeviceContext* c,ID3D11Buffer* buffer,DXGI_FORMAT format,UINT offset) noexcept {
     if(auto* state=drawState(c)){state->indices=buffer;state->format=format;state->offset=offset;}
 }
+void bindForearmVertices(ID3D11DeviceContext* c,UINT start,UINT count,ID3D11Buffer* const* buffers,const UINT* strides,const UINT* offsets) noexcept {
+    if(start>32||count>32-start||!buffers||!strides||!offsets)return;
+    if(auto* state=drawState(c))for(UINT i=0;i<count;++i){
+        state->vertices[start+i]=buffers[i];state->strides[start+i]=strides[i];state->offsets[start+i]=offsets[i];
+    }
+}
 void bindForearmConstants(ID3D11DeviceContext* c,UINT start,UINT count,ID3D11Buffer* const* buffers) noexcept {
     if(start<=5&&count>5-start&&buffers)if(auto* state=drawState(c))state->object=buffers[5-start];
 }
@@ -78,21 +87,29 @@ void bindForearmTargets(ID3D11DeviceContext* c,UINT count,ID3D11RenderTargetView
 void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,const D3D11_SUBRESOURCE_DATA* data,ID3D11Buffer* buffer) noexcept {
     if(building||!device||!desc||!data||!data->pSysMem||!buffer)return;
     const bool positions=desc->ByteWidth==80640&&(desc->BindFlags&D3D11_BIND_VERTEX_BUFFER);
+    const bool attributes=desc->ByteWidth==214368&&(desc->BindFlags&D3D11_BIND_VERTEX_BUFFER);
     const bool indices=desc->ByteWidth==85824&&(desc->BindFlags&D3D11_BIND_INDEX_BUFFER);
-    if(!positions&&!indices)return;
+    if(!positions&&!attributes&&!indices)return;
     try{
         const auto hash=digest(data->pSysMem,desc->ByteWidth);
         if(hash!=(positions?"939ed828f424ab2271768682c4c9bf1640f1656cac6a2ae2012e7b6ab17975bb":
+            attributes?"951de936fba0c8b06d6f29996b138f33db442714776c4bc33fe5366a2adfcbd6":
             "7616a3f90d1f1eb01a5746707edd0bb56adf506b476f89376c88a652ac5adb49"))return;
         std::lock_guard lock(geometryMutex);
         auto& g=geometry;
         // A reload creates new native resources; attach the variant to that
         // exact index buffer so resource reuse cannot inherit concealment.
         const auto* bytes=static_cast<const unsigned char*>(data->pSysMem);
-        if(positions){g.positions=buffer;g.positionBytes.assign(bytes,bytes+desc->ByteWidth);}
-        else {g.indices=buffer;g.indexBytes.assign(bytes,bytes+desc->ByteWidth);g.indexDescription=*desc;g.cropped.Reset();}
-        if(!g.positions||!g.indices||g.cropped)return;
+        if(positions){g.positions=buffer;g.positionBytes.assign(bytes,bytes+desc->ByteWidth);g.positionDescription=*desc;}
+        else if(attributes){g.attributes=buffer;g.attributeBytes.assign(bytes,bytes+desc->ByteWidth);g.attributeDescription=*desc;}
+        else {g.indices=buffer;g.indexBytes.assign(bytes,bytes+desc->ByteWidth);g.indexDescription=*desc;}
+        g.cropped.Reset();
+        if(!g.positions||!g.attributes||!g.indices)return;
+        for(auto* resource:{g.positions.Get(),g.attributes.Get(),g.indices.Get()}){
+            ComPtr<ID3D11Device> owner;resource->GetDevice(&owner);if(owner.Get()!=device)return;
+        }
         auto cropped=g.indexBytes;
+        auto fittedPositions=g.positionBytes,capAttributes=g.attributeBytes;
         struct Mesh {size_t first,end,positions,count;bool right;};
         // Owned sna5 mesh partitions, including every native LOD. The same
         // right-hand partition contains shoulder cloth, forearm and fingers.
@@ -113,8 +130,8 @@ void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,con
             if(shoulder){face[1]=face[2]=face[0];std::memcpy(cropped.data()+at*2,face.data(),6);++removed;}
         }
         // Native LOD ranges share triangles. Caps use only removed slots that
-        // belong to one draw range, without modifying vertex streams or skin
-        // publication. Unsupported/nonmanifold boundaries retain the safe cut.
+        // belong to one draw range. Dead vertex slots give each cap its own
+        // normal/UV while retaining the original ring's skin weights.
         constexpr std::array<ForearmIndexRange,4> leftLods{{{261,1788},{1413,2367},{2142,2703},{2661,2922}}};
         constexpr std::array<ForearmIndexRange,4> rightLods{{{3219,7719},{7089,9384},{9015,10254},{10143,10743}}};
         std::vector<uint16_t> nativeIndices(g.indexBytes.size()/2),closedIndices(cropped.size()/2);
@@ -125,12 +142,34 @@ void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,con
             const auto& mesh=meshes[part];std::vector<Vec3> points(mesh.count);
             static_assert(sizeof(Vec3)==12);
             std::memcpy(points.data(),g.positionBytes.data()+mesh.positions,mesh.count*12);
-            caps+=closeForearmCuffs(points,nativeIndices,closedIndices,part?rightLods:leftLods,mesh.right);
+            std::vector<Vec3> fitted;std::vector<std::array<uint16_t,2>> copies;
+            caps+=closeForearmCuffs(points,nativeIndices,closedIndices,part?rightLods:leftLods,mesh.right,.452f,&fitted,&copies);
+            if(fitted.size()!=points.size())return;
+            std::memcpy(fittedPositions.data()+mesh.positions,fitted.data(),mesh.count*12);
+            const size_t attributeOffset=part?16640:2432;
+            // Native normal and tangent are half4; weights, indices and
+            // color occupy bytes 16..27, UV0 half2 occupies bytes 28..31.
+            const std::array<uint16_t,8> frame{static_cast<uint16_t>(mesh.right?0x3c00:0xbc00),0,0,0x3c00,0,0x3c00,0,0x3c00};
+            for(const auto copy:copies){
+                auto* destination=capAttributes.data()+attributeOffset+copy[0]*32;
+                std::memcpy(destination,g.attributeBytes.data()+attributeOffset+copy[1]*32,32);
+                std::memcpy(destination,frame.data(),16);
+                // One native fabric sample across the cap avoids drawing a
+                // stretched strip of the shoulder atlas over the cut end.
+                std::memcpy(destination+28,g.attributeBytes.data()+attributeOffset+copies.front()[1]*32+28,4);
+            }
         }
         std::memcpy(cropped.data(),closedIndices.data(),cropped.size());
         struct Guard {Guard(){building=true;}~Guard(){building=false;}} guard;
-        D3D11_SUBRESOURCE_DATA initial{};initial.pSysMem=cropped.data();
+        D3D11_SUBRESOURCE_DATA initial{};ComPtr<ID3D11Buffer> positionVariant,attributeVariant;
+        initial.pSysMem=fittedPositions.data();
+        if(FAILED(device->CreateBuffer(&g.positionDescription,&initial,&positionVariant)))return;
+        initial.pSysMem=capAttributes.data();
+        if(FAILED(device->CreateBuffer(&g.attributeDescription,&initial,&attributeVariant)))return;
+        initial.pSysMem=cropped.data();
         if(FAILED(device->CreateBuffer(&g.indexDescription,&initial,&g.cropped)))return;
+        if(FAILED(g.positions->SetPrivateDataInterface(vertexKey,positionVariant.Get()))
+            ||FAILED(g.attributes->SetPrivateDataInterface(vertexKey,attributeVariant.Get())))return;
         g.indices->SetPrivateDataInterface(croppedKey,g.cropped.Get());
         log("Native forearm-only indices ready; shoulder triangles removed="+std::to_string(removed)+" cuff triangles="+std::to_string(caps));
     }catch(...){}
@@ -205,10 +244,39 @@ ForearmDraw::ForearmDraw(ID3D11DeviceContext* c) noexcept {
             }
             return;
         }
-        original_=indices;context_=c;c->IASetIndexBuffer(variant.Get(),format_,offset_);
+        // Change all three streams together, only for the admitted player
+        // color draw. A missing attribute stream must not select cap indices
+        // whose reused vertices still contain the native shoulder data.
+        std::array<ComPtr<ID3D11Buffer>,32> bound;
+        std::array<UINT,32> strides{},offsets{};
+        if(deferred){bound=state->vertices;strides=state->strides;offsets=state->offsets;}
+        else {
+            std::array<ID3D11Buffer*,32> raw{};
+            c->IAGetVertexBuffers(0,32,raw.data(),strides.data(),offsets.data());
+            for(size_t i=0;i<raw.size();++i)bound[i].Attach(raw[i]);
+        }
+        std::array<ComPtr<ID3D11Buffer>,2> replacements;
+        for(UINT slot=0;slot<bound.size();++slot)if(bound[slot]){
+            ComPtr<ID3D11Buffer> replacement;size=sizeof(ID3D11Buffer*);
+            if(FAILED(bound[slot]->GetPrivateData(vertexKey,&size,replacement.GetAddressOf())))continue;
+            D3D11_BUFFER_DESC desc{};bound[slot]->GetDesc(&desc);
+            const size_t stream=desc.ByteWidth==80640?0:1;
+            if((stream==1&&desc.ByteWidth!=214368)||strides[slot]!=(stream?32u:12u)||replacements[stream])return;
+            replacements[stream]=replacement;
+            vertices_[stream]={bound[slot],slot,strides[slot],offsets[slot]};
+        }
+        if(!replacements[0]||!replacements[1])return;
+        original_=indices;context_=c;
+        for(size_t i=0;i<vertices_.size();++i){const auto& v=vertices_[i];auto* replacement=replacements[i].Get();
+            c->IASetVertexBuffers(v.slot,1,&replacement,&v.stride,&v.offset);
+        }
+        c->IASetIndexBuffer(variant.Get(),format_,offset_);
         static std::atomic_bool reported{};
         if(!reported.exchange(true))log("Native forearm-only draw selected for the owned player; native hands/materials retained");
     }catch(...){}
 }
-ForearmDraw::~ForearmDraw(){if(context_)context_->IASetIndexBuffer(original_.Get(),format_,offset_);}
+ForearmDraw::~ForearmDraw(){if(context_){
+    for(const auto& v:vertices_){auto* original=v.original.Get();context_->IASetVertexBuffers(v.slot,1,&original,&v.stride,&v.offset);}
+    context_->IASetIndexBuffer(original_.Get(),format_,offset_);
+}}
 }

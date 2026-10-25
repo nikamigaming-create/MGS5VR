@@ -1,8 +1,17 @@
 # Current MGS5VR work — 24 October 2026
 
-**The body/arm candidate is ready for the user's wired Quest Link test through
-`Play-Dev.cmd`.** Work remains on main. Do not rebuild or repeat the smoke just
-to refresh status; the next useful result is physical feedback on this candidate.
+**Release completion is active on main.** The user requested all remaining fixes,
+then combined testing, and an explicit release-readiness goal. The previously
+checked candidate below remains available while the next batch is prepared.
+Do not publish or advance the published pin during preparation.
+
+The next batch flattens the forearm-only cut rim and separates cap normals/UVs
+using dead native vertex slots. Resource sizes, skin weights and distal forearm
+positions remain native; all three streams change only around admitted player
+color draws. Build and final-eye review are pending. Additional mounted types
+and terrain reports still need a diagnosed native cause before changing controls
+or collision. The user clarified the location only as “terrain”; representative
+slope/obstacle/passage review is useful but cannot establish an exact reproduction.
 
 ## Candidate and delivered batch
 
