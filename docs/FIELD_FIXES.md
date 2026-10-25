@@ -20,7 +20,11 @@ generic action input, and invalidates mounted aiming across action changes.
 The moving-only intrusion is isolated to the stowed back weapon. Candidate
 `1933aa81fc8e` did not fix it; the hip-stock hypothesis is reverted. The source
 now conceals the owned stowed back assembly from main view and restores it on
-draw/manipulation or leaving field presentation. Build and moving review are next. The terrain report now has
+draw/manipulation or leaving field presentation. Candidate `da4ae29de73b` /
+`7273c25` also preserves concealment through camera-to-rig publication gaps.
+Moving source-eye review and both-eye back-rifle draw review pass their scoped
+visual checks; see CURRENT for retained runs and movement guard failures.
+The terrain report now has
 a regression clue (it began after the first-person rig change), not an exact
 location or confirmed cause. These edits do not close FP04/FP16 or whole-game
 and physical-headset acceptance.

@@ -2448,5 +2448,28 @@
     "transport_failure": "20261025T133444697660Z: blank right compositor frame during loading transition; native scene continued to flight; arrival continued without replaying menus.",
     "next_change": "Keep owned concealment during camera-to-rig publication gaps and update visibility at accepted rig publication.",
     "terrain": "First movement run stopped after two segments because native displacement exceeded the bounded envelope after release; no hang demonstrated."
+  },
+  "back_assembly_publication_correction": {
+    "candidate": "da4ae29de73ba5589a3c96a6ab8cb7e8a51f1cd9dfcb18193c442835b175e39f",
+    "source": "7273c255e50c59bb519e6dfdbf62972ede5c863c",
+    "status": "scoped_moving_intrusion_and_draw_visual_review_passed",
+    "build_log": "artifacts/release-back-publication-build.log",
+    "checks": "58 groups and installer checks passed",
+    "moving_run": "20261025T134726758222Z",
+    "moving_review": "Four crouched forward/back segments completed. All 430 native-source-eye frames inspected as affected-edge contact sheets; no stock flashes.",
+    "held_run": "20261025T134807665938Z",
+    "held_review": "Wrist picker selected native equipment 873; draw/release completed; both final eyes show back rifle stock, receiver and optic.",
+    "post_stow_run": "20261025T134844370944Z",
+    "post_stow_visual": "All 374 native-source-eye frames inspected at affected edge without stock flash; released final eyes inspected.",
+    "post_stow_traversal": "Stopped after three completed segments: native position did not settle promptly after neutral input. Not a traversal pass or diagnosed terrain hang.",
+    "recording_scope": "Native-source-eye recordings, not final-compositor stereo video. Review targets the reported edge intrusion.",
+    "transport": "20261025T134415368151Z input connection timed out on disembark; neutral controls and unchanged flight confirmed before 20261025T134703812123Z completed disembark. Failure retained.",
+    "cleanup": "Physical inputs neutral; owned game and simulator closed through stop-sim; Steam retained; published play pin unchanged.",
+    "open": [
+      "physical Quest review",
+      "other back-weapon/loadout breadth",
+      "exact rock/corridor defect localization",
+      "broader FIELD_FIXES release scope"
+    ]
   }
 }

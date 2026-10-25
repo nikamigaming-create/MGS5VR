@@ -10,9 +10,11 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current checked batch `1933aa81fc8e` failed moving stock review. The back slot
-is now isolated and a precise stowed-assembly visibility correction is in source;
-build/deploy then moving/back-weapon draw review are next.
+Current checked candidate `da4ae29de73b` / `7273c25` is deployed for Play-Dev.
+The stowed back assembly stays concealed through moving camera publication
+gaps; scoped moving-edge and both-eye back-rifle draw review are complete.
+Earlier `1933aa81fc8e` and `77a2fe7c9dc2` failed moving review and remain recorded.
+Exact terrain failures and the broader field/headset scope remain open.
 See [CURRENT.md](CURRENT.md) for retained failures and precise coverage.
 The identities below record the original audit baseline.
 

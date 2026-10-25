@@ -1,5 +1,39 @@
 # Current MGS5VR work — 25 October 2026
 
+## Installed candidate and immediate handoff
+
+**`da4ae29de73b` / source `7273c25` is built, checked and deployed for
+`Play-Dev.cmd`.** The moving back-stock intrusion has scoped visual acceptance.
+The visibility policy survives camera-to-rig publication gaps and updates at
+the accepted rig publication; drawing restores the native back assembly.
+
+- Retained `20261025T134726758222Z`: four forward/back crouched segments completed.
+  All 430 recorded native-source-eye frames were reviewed at the affected
+  upper-left edge; no stock flash was visible.
+- Retained `20261025T134807665938Z`: physical wrist selection chose native back
+  equipment 873, then draw/release completed. Both final eyes show the held
+  rifle, including its stock, receiver and optic.
+- Retained `20261025T134844370944Z`: all 374 recorded post-stow frames at that
+  edge are clear, and released final eyes show both arms without the back stock.
+  Three segments completed; the next stopped because native position did not
+  settle promptly after neutral input. This is not a traversal pass or a
+  reproduced terrain hang. All physical inputs were released.
+- Source-eye recordings are not final-compositor stereo video. Physical Quest,
+  other back weapons, extended handling and the broader FIELD_FIXES scope remain
+  open. Do not turn this scoped visual repair into whole-game acceptance.
+
+The build passed 58 groups and installer checks; log:
+`artifacts/release-back-publication-build.log`. The transport run
+`20261025T134415368151Z` passed loading but timed out at the simulator input
+connection on disembark. After confirming neutral controls and unchanged flight,
+`20261025T134703812123Z` completed disembark without replaying the route.
+That transport failure remains retained. Game/simulator were closed through
+`stop-sim`; Steam remained running. Published `play/` was not changed.
+
+Next: physical review through Play-Dev, localize the exact rock/corridor failure,
+and continue only diagnosed remaining gameplay repairs under FIELD_FIXES. Do not
+repeat the stock walk, ACC soak or ordinary iDroid route to accumulate passes.
+
 ## Active combined correction batch
 
 Candidate `971dfff38c29`, source `c8a7a29`, built, checked and deployed the following batch:
@@ -59,8 +93,9 @@ the initial 2 fps full-frame review missed. Do not claim this candidate fixes it
 The camera callback publishes a new native source before asking for the last
 rig; movement retires that rig until its matching skin arrives. The correction
 now preserves owned concealment across that gap and applies visibility again
-immediately after the accepted rig publication. Build/deploy and review this
-timing correction together with moving stow and back-weapon draw/stow.
+immediately after the accepted rig publication. Building and reviewing this
+timing correction together with moving stow and back-weapon draw/stow was the
+next step; its completed result is recorded at the top of this document.
 Transport run `20261025T133444697660Z` retained a blank right compositor frame
 during loading; native loading continued and arrival resumed from flight without
 replaying the menu route. This remains a recorded failure, not a transition pass.
@@ -79,8 +114,8 @@ recording completed with valid full-body fitting. The exact terrain hang remains
 unlocalized. The peripheral fixture `20261025T130109341945Z` dispatched no motion
 because its outcome was already satisfied; it remains a failed fixture.
 
-Next: finish the new moving/held-weapon review, repair any actual failures and
-update the ledger. Continue remaining diagnosed work without ACC soak repeats.
+The moving/held-weapon review is now recorded above. Continue remaining
+diagnosed work without ACC soak repeats.
 Do not publish or advance the play pin from a build alone.
 
 ## Previously checked candidate
