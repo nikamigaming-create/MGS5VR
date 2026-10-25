@@ -20,8 +20,9 @@ together on main; `f58ef4224995` is checked and deployed. Scoped gameplay
 checks pass D-Walker center/facing, helicopter exit, responsive MG grip aiming,
 actual Rocket socket steering/screen, arm rotations and world-preserving storm
 suppression. See CURRENT for retained runs, repaired failures and exact limits.
-The optional character-model eyepatch toggle is in this batch; its live appearance
-and physical Quest acceptance remain pending. Native prone-entry eligibility,
+The optional character-model eyepatch toggle is in this batch; retained native
+face captures confirm on/off/on appearance for the selected Snake face. Physical
+Quest acceptance and other face variants remain pending. Native prone-entry eligibility,
 all mount types and actual field-pickup boarding are not certified.
 
 

@@ -14,8 +14,8 @@ Current checked/deployed candidate is `f58ef4224995`. The reported arm,
 sandstorm, Rocket Arm, MG and mount-centering batch is implemented and has scoped
 combined gameplay results in CURRENT. Actual follow-up defects (MG root-yaw
 feedback and Rocket guidance neutral resets) are corrected. Original settings
-and Meta Link are restored and Play-Dev is ready. Eyepatch model appearance and
-physical headset review remain pending. Retain the older unresolved field scope;
+and Meta Link are restored and Play-Dev is ready. Retained native face captures
+confirm eyepatch on/off/on; physical headset review remains pending. Retain the older unresolved field scope;
 do not repeat completed narrow cases or certify untested combinations.
 
 Previous checked candidate `62f696613e2b` / `5bb471f`:

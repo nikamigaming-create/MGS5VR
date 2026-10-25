@@ -36,7 +36,7 @@ physical review. The owned test session is closed, test input released, original
   weather. Eyepatch visibility affects reviewed native face0/3/4 patch geometry,
   not either eye's VR image or character save data.
 
-### Retained gameplay results and limits
+### Gameplay results and limits
 
 | Area | Retained run | Result |
 | --- | --- | --- |
@@ -45,8 +45,8 @@ physical review. The owned test session is closed, test input released, original
 | Machine gun | `20261025T184154219366Z` | Four 12-degree hand requests produce 11.40–11.46 degrees native gun movement, zero induced viewer yaw; both-hand grip, stick override and release pass. Firing/impact was outside this case. |
 | Helicopter | `20261025T183116920712Z` | Off-center sortie disembark passes. This is not field-pickup boarding acceptance. |
 | Rocket Arm | `20261025T185436979277Z` | Screen visible above socket in both final eyes; actual projectile elevation changes +3.43 degrees and left yaw +12.42 degrees from arm movement; stick override and native return pass. |
-| Arm presentation | `20261025T174010920773Z`, `20261025T180234717411Z` | Reviewed rotations in forearm-only and full-body modes. Extreme cloth/all outfits remain open. |
-| Sandstorm | `20261025T175335820470Z` | Exact suppression hook exercised; world storm remains visible. Temporary weather request cancelled. |
+| Arm presentation (historical; raw run no longer retained) | `20261025T174010920773Z`, `20261025T180234717411Z` | Reviewed rotations in forearm-only and full-body modes. Extreme cloth/all outfits remain open. |
+| Sandstorm (historical; raw run no longer retained) | `20261025T175335820470Z` | Exact suppression hook exercised; world storm remains visible. Temporary weather request cancelled. |
 
 Final gameplay checks span the batch and targeted repairs: c219d25e7567 covered
 mounts/MG; 91ee741d93a1 covered the repaired Rocket steering continuity. The final
@@ -61,19 +61,31 @@ its procedural flight completion did not establish steering. The final run
 above checks actual projectile angle response. These failures remain retained.
 
 Eyepatch follow-up `20261025T190403353416Z` verifies on/off/on configuration
-round-trip and live settings application with neutral controls. Native model
-captures were too distant/dark or turned away to accept patch appearance. The
-close-up attempt timed out in operator input release before new camera input;
-the game remained responsive. `eyepatch-review.json` and `model-toggle*` retain
-the inconclusive attempts. This is not a passed visual check or a diagnosed
-patch-rendering failure. The owned session is closed; eyepatch=1, full_body=0
-and Meta Link are restored. Candidate code and installed DLL are unchanged.
+round-trip and live settings application. Reviewing the retained
+`model-toggle-turn/view-2` face pixels resolves the earlier whole-frame
+inconclusive assessment: the right eyepatch and strap disappear when disabled
+and return when enabled, while the face and bandanna remain. The labeled
+`eyepatch-face-review.png` magnifies those original pixels 5x and increases
+brightness 4x for inspection; unmodified source images remain alongside it.
+This covers the selected native Snake face in ordinary native-camera
+presentation, not every face variant or physical stereo acceptance. The later
+close-up operator timeout remains a failed attempt and does not invalidate the
+already captured toggle. Eyepatch=1, full_body=0 and Meta Link are restored;
+the owned session is closed. Candidate code and installed DLL are unchanged.
 
-Eyepatch model appearance, physical Quest comfort/arm behavior, actual iDroid-open
-field-pickup boarding, exact rock/corridor reproduction and broader progression/
-weapon coverage remain open in FIELD_FIXES. Do not claim every mount, outfit,
-mission or physical headset has passed. The next step is the user's Play-Dev
-review and targeted repair of actual findings, not repeating completed cases.
+Retention audit: the original arm/storm run directories 174010920773,
+180234717411 and 175335820470 are no longer present. Their run logs and this
+handoff preserve the observations made during the batch, but they must not be
+cited as currently retained image evidence. The mount, MG, final Rocket and
+eyepatch runs listed above are present and retained. Do not repeat completed
+working flows solely to reconstruct missing archives or inflate coverage.
+
+This named repair batch is implemented, built, deployed and smoke-tested;
+follow-up findings in MG aiming and Rocket guidance were fixed. Physical Quest
+comfort/arm behavior, actual iDroid-open field-pickup boarding, exact rock/corridor
+reproduction and broader progression/weapon coverage remain open in FIELD_FIXES.
+Do not claim every mount, outfit, mission or physical headset has passed. The
+next step is the user's Play-Dev review and targeted repair of actual findings.
 
 ## Previous playtest candidate — native terminal Help stow
 
