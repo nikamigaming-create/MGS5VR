@@ -1281,6 +1281,7 @@
       "source_paths": [
         "src/player_visibility.cpp",
         "src/forearm_visibility.cpp",
+        "src/forearm_profiles.inc",
         "include/mgs5vr/forearm_visibility.hpp",
         "src/render_camera.cpp",
         "src/head_camera.cpp",

@@ -966,10 +966,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const auto travelMode=nativeTravelMode();
         const bool mountedBody=travelMode==TravelMode::horse||frame.controllers.vehicleMounted||frame.controllers.cabinTransit
             ||stationaryWeaponAction(frame.controllers.nativeActionId);
+        const bool onFootBody=travelMode==TravelMode::onFoot
+            ||(travelMode==TravelMode::nativeAction&&!mountedBody);
         if(frame.locomotionHeadingTracked&&!frame.controllers.frontEnd
            &&!frame.controllers.authoredCamera&&!frame.controllers.cabinPlay
            &&!frame.controllers.cabinTransit&&!frame.controllers.vehicleMounted
-           &&travelMode==TravelMode::onFoot){
+           &&onFootBody){
             std::optional<Quat> handHeading;
             if(frame.controllers.weaponReady&&frame.controllers.supportGrip
                &&supportContact.attached()&&!frame.controllers.optic.held
@@ -999,7 +1001,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const auto fallbackUprightHead=uprightHead;
         bool fullBody=frame.controllers.fullBody&&nativeHead.has_value()&&frame.anatomicalEyeModel==model
             &&!frame.controllers.frontEnd&&!frame.controllers.authoredCamera
-            &&(frame.controllers.cabinPlay||travelMode==TravelMode::onFoot||mountedBody)&&parent[0]==-1&&parent[1]==0&&parent[2]==1&&parent[3]==2&&parent[4]==3
+            &&(frame.controllers.cabinPlay||onFootBody||mountedBody)&&parent[0]==-1&&parent[1]==0&&parent[2]==1&&parent[3]==2&&parent[4]==3
             &&parent[13]==0&&parent[14]==13&&parent[15]==14&&parent[16]==15
             &&parent[17]==0&&parent[18]==17&&parent[19]==18&&parent[20]==19;
         if(frame.controllers.fullBody&&nativeHead&&frame.anatomicalEyeModel!=model)frame.body.rejection=1;
@@ -1258,7 +1260,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         const bool canAlign=!fullBody&&count>20&&parent[1]==0&&parent[13]==0&&parent[14]==13
             &&parent[17]==0&&parent[18]==17&&!frame.menuOpen&&!frame.controllers.cabinPlay
             &&!frame.controllers.scriptedDemo&&!frame.controllers.authoredCamera
-            &&nativeTravelMode()==TravelMode::onFoot&&bone(originalQ,originalP,4).position.y>.6f;
+            &&onFootBody&&bone(originalQ,originalP,4).position.y>.6f;
         if(stationaryBody.update(canAlign,root->position,frame.sampleTime,continuity)){
             const StationaryBodyPose body{bone(originalQ,originalP,0).position,
                 bone(originalQ,originalP,13).position,bone(originalQ,originalP,17).position,
