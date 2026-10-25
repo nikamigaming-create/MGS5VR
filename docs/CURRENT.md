@@ -5,6 +5,26 @@
 Work on main only; do not redo implemented repairs or repeat the failed mounted
 approach. The full report map is [FIELD_FIXES.md](FIELD_FIXES.md).
 
+## Sustained follow-up: correction awaiting validation
+
+Retained run `20261025T042919220986Z` failed on cycle six after five complete
+ordinary iDroid cycles and the sixth opening passed. During a native render stall
+(max interval 432.981 ms), the camera published `rig_sequence=0` and
+`idroid_device_tracked=false` while raw tracking and iDroid remained active.
+The later failure images show recovery, not the transient itself.
+
+The anchored-menu stale-skin fallback retained palms but omitted the handset.
+The source correction holds the accepted image transaction for handheld iDroid
+until a fresh skin arrives; Pause/Help spatial panels retain their fallback.
+The regression checks both rejection and automatic recovery. Build and combined
+retest are pending; candidate identity below still names the preceding build.
+
+Current sustained timing is retained in
+`artifacts/release-sustained-performance.json`. Fresh stereo frames remain below
+runtime submissions even outside video capture. No no-drops claim. Both separate
+final-eye clips completed; their roughly 3 fps capture cadence is not game FPS.
+Owned session closed, Steam retained, published pin unchanged.
+
 ## Checked candidate
 
 - Development DLL: `351d84672f0e1b065212f3503e267940c862d5b18df00d5793d20dfcf3bc3930`.

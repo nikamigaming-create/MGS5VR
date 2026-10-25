@@ -209,3 +209,8 @@ both slots verify. Never remove settings, saves, source or retained evidence.
 - Next: process physical feedback on this candidate and diagnose a newly
   reproducible remaining failure before editing. No package/publication/pin or
   release-gate waiver. Outcome documentation may be newer than packaged prose.
+
+- Sustained follow-up found a reproducible handheld stale-skin camera publication
+  failure in cycle six. Source correction and stall/recovery regression are in
+  this batch. Next: build once, then repeat the combined sustained group and
+  adjacent Pause/Help and immediate-reopen checks. The prior run stays failed.

@@ -3545,6 +3545,33 @@ int main(){
             &&!menuEpoch.publishRigFrame(11,22,thirdPerson,afterExit),
             "immediate reopening also rejects a skin solved for the closed camera");
     }
+    {
+        HeadCamera handset;handset.configure(true,1,true);
+        auto tracked=hands;tracked.cabinPlay=true;tracked.handheldMenus=true;
+        tracked.presentationFocused=true;tracked.presentationEpoch=1;
+        handset.trackStereo({},rigEyes,true,100,tracked);
+        handset.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,100);
+        handset.toggle();handset.resolve(11,thirdPerson,100);
+        handset.setNativeMenuOpen(true,true);
+        auto skin=handset.resolve(11,thirdPerson,100);
+        skin.idroidDeviceTracked=true;skin.idroidDevice=Pose{{},{.1f,1.f,-.5f}};
+        expect(handset.publishRigFrame(11,22,thirdPerson,skin),"handheld terminal publishes its owned device skin");
+        const auto joined=handset.resolve(11,thirdPerson,100);
+        handset.trackStereo(menuLean,rigEyes,true,400,tracked);
+        const auto stalled=handset.resolve(11,thirdPerson,400);
+        const auto retained=handset.publishedView();
+        expect(!stalled.applied&&handset.status().reason==HeadCameraStop::staleRig
+            &&retained&&retained->rigSequence==joined.rigSequence&&retained->idroidDeviceTracked,
+            "a stalled handheld skin cannot publish new eyes without its device; retain the accepted image transaction");
+        auto resumed=handset.resolve(11,thirdPerson,400,NativeBodyHead{22,33,{}});
+        resumed.idroidDeviceTracked=true;resumed.idroidDevice=Pose{{},{.2f,1.f,-.5f}};
+        expect(resumed.applied&&handset.publishRigFrame(11,22,thirdPerson,resumed),
+            "fresh tracked skin can recover a stalled handheld terminal without reopening it");
+        const auto recovered=handset.resolve(11,thirdPerson,400);
+        expect(recovered.applied&&recovered.rigSequence>joined.rigSequence&&recovered.idroidDeviceTracked
+            &&same(recovered.idroidDevice.position,resumed.idroidDevice.position)&&!handset.status().suspended,
+            "recovered terminal camera and handset share the new skin transaction");
+    }
     handsCamera.trackStereo({},rigEyes,true,100,hands);handsCamera.toggle();
     const auto joinedHands=handsCamera.resolve(1,nativeCamera,100);
     expect(joinedHands.applied&&joinedHands.controllers.hands[1].gripTracked&&joinedHands.controllers.predictedXrTime==9000,

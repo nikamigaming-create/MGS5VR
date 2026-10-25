@@ -1705,7 +1705,7 @@
         "both_hand_stick_release": "native axes neutral"
       },
       "failures": [
-        "Right-hand acquisition chased native pitch, oscillating about 15\u00e2\u20ac\u201c18 degrees during a pure yaw movement.",
+        "Right-hand acquisition chased native pitch, oscillating about 15â€“18 degrees during a pure yaw movement.",
         "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
       ],
       "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
@@ -1760,7 +1760,7 @@
       "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
       "baseline_run": "20261022T044008503318Z",
       "retained_run": "20261022T045333990203Z",
-      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u00e2\u20ac\u201c90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20â€“90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
       "remaining": [
         "Wider marker grip orientations",
         "Broader FP09/FP10",
@@ -1783,7 +1783,7 @@
         {
           "sha256_prefix": "1bbaac705854",
           "run": "20261022T051925150310Z",
-          "failure": "Native eye identity joined, but fitted eye remained26\u00e2\u20ac\u201c31cm below cached passenger anchor; body rejected."
+          "failure": "Native eye identity joined, but fitted eye remained26â€“31cm below cached passenger anchor; body rejected."
         },
         {
           "sha256_prefix": "a563468ce054",
@@ -2220,10 +2220,92 @@
     "physical_headset_acceptance": false,
     "extreme_reach_followup": {
       "candidate_changed": false,
-      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44\u201359cm",
+      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44–59cm",
       "captured_solver_fixture": "native upper/lower28.4/25.5cm; requested shoulder-to-wrist106cm; reach-only unavoidable clamp52.1cm",
-      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9\u20131.2mm over production fallback with/without stereo padding",
+      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9–1.2mm over production fallback with/without stereo padding",
       "conclusion": "No additional IK rewrite justified by unreachable-pose clamp. Current mesh eye penetration unproven without joined palette; physical comfort/reachable reproduction still required."
     }
+  },
+  "sustained_idroid_followup": {
+    "candidate": "351d84672f0e1b065212f3503e267940c862d5b18df00d5793d20dfcf3bc3930",
+    "retained_run": "20261025T042919220986Z",
+    "status": "failed",
+    "completed_cases": [
+      {
+        "id": "sustained-1-idroid-left-front",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-1-idroid-left-turned",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-1-idroid-left-stow",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-2-idroid-left-front",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-2-idroid-left-turned",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-2-idroid-left-stow",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-3-idroid-left-front",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-3-idroid-left-turned",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-3-idroid-left-stow",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-4-idroid-left-front",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-4-idroid-left-turned",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-4-idroid-left-stow",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-5-idroid-left-front",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-5-idroid-left-turned",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-5-idroid-left-stow",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-6-idroid-left-front",
+        "status": "observed_pass"
+      },
+      {
+        "id": "sustained-6-idroid-left-turned",
+        "status": "failed"
+      }
+    ],
+    "observed_interval_seconds": 519.5480000000001,
+    "failure": "Cycle six, turned handheld: idroid_device_tracked=false and rig_sequence=0 with live raw tracking and iDroid still open. Native timing window max interval 432.981ms; recovery before endpoint capture. No visible dropout claimed from the later still.",
+    "cause": "Anchored handheld menu used the panel-only stale-skin fallback, publishing fresh eyes and retained palms without a device transform.",
+    "source_correction": "Hold the accepted image transaction until a fresh handheld skin arrives; retain panel-only Pause/Help fallback. Regression covers stall and fresh-skin recovery.",
+    "validation": "Correction pending build and combined retest. Prior sustained run remains failed.",
+    "performance": "Current candidate telemetry exists in artifacts/release-sustained-performance.json; exclude capture windows. Fresh frames below runtime submissions; no no-drops or physical acceptance.",
+    "visual_scope": "Separate 45-second left/right final-eye takes; right includes one controller-motion segment. About 3 capture frames/second, not game FPS; not simultaneous stereo video."
   }
 }

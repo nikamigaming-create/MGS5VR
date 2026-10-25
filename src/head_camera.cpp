@@ -899,7 +899,11 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         // drawing. A cached rig must not poison every subsequent menu frame
         // after 150 ms. Resolve fresh tracked eyes from this accepted menu
         // anchor without relabeling the old hand publication as current.
-        if((!spatialMenu&&!frozenCamera)||!sameOwner){
+        // A handheld terminal also needs its native handset from that skin
+        // transaction. The panel-only fallback has no device transform and
+        // must not publish new eyes with old palms during a producer stall.
+        const bool handheldTerminal=spatialMenu&&nativeIdroidOpen_&&controllers_.handheldMenus;
+        if((!spatialMenu&&!frozenCamera)||!sameOwner||handheldTerminal){
             // An aged rig from the same camera/owner is a producer delay,
             // not a broken pose join. Do not publish it as a new frame; let
             // the compositor retain only its previously accepted image.
