@@ -7,8 +7,8 @@
     "release": "experimental-2026-10-19.1",
     "source_reference": "docs/RELEASE_2026-10-19.1.md",
     "comparison": "Published local play is b627c7cacc9a. The code audit covers later development17b044cba72e; neither publication nor source inspection certifies physical or complete gameplay acceptance.",
-    "current_candidate": "Checked development17b044cba72e from main 5622052bd8799603ef8aae66235ec82d3c7bce6f; documentation cleanup is newer than its packaged docs. Existing 58-group report is not a new runtime pass.",
-    "current_candidate_id": "main-5622052-development-17b044cba72e"
+    "current_candidate": "Checked body/arm candidate1a64bb965bc6 from source4392536; 58 groups and installer checks pass, scoped native smoke retained with notice interruptions. Physical acceptance remains open; outcome docs may be newer than packaged docs.",
+    "current_candidate_id": "main-4392536-development-1a64bb965bc6"
   },
   "rules": [
     "Source presence is implementation evidence, not a feature-complete claim.",
@@ -5133,5 +5133,11 @@
     "plan": "docs/RELEASE_PLAN.md",
     "scope": "Production code and retained evidence reconciliation only. Later repairs exist; five conservative release blocks remain pending evidence reconciliation. No acceptance or sustained counters promoted. Historical observations retain their original candidates."
   },
-  "historical_excluded_claims_note": "The old list included an in-headset settings editor. It now exists in src/controls_editor.cpp, including registered gameplay settings; broad physical usability is not accepted."
+  "historical_excluded_claims_note": "The old list included an in-headset settings editor. It now exists in src/controls_editor.cpp, including registered gameplay settings; broad physical usability is not accepted.",
+  "body_arm_candidate_update": {
+    "date": "2026-10-24",
+    "source_commit": "439253632bd8aec2a5c78fe25359c8549a2608d6",
+    "report": "docs/CURRENT.md",
+    "scope": "Sleeve clearance and cuff closure checked; gates/counters unchanged. Scoped smoke and remaining visual limits recorded in FREE_PLAY_ACCEPTANCE."
+  }
 }

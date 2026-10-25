@@ -1,20 +1,13 @@
 # Status — 24 October 2026
 
-MGS5VR is an experimental native stereo VR mod for TPP 1.0.15.4. Main already
-contains the body/arm, support/reload, tracking, contextual-camera, cover,
-transit, left-hand iDroid, Rocket Arm and cabin repairs mapped in
-[FIELD_FIXES.md](FIELD_FIXES.md). An open acceptance item is not missing code.
+Body/arm candidate `1a64bb965bc6` is checked and ready through `Play-Dev.cmd`.
+It adds sleeve-aware head clearance and native-index cuff closure. All 58 groups
+and installer checks pass; one combined simulator session covers both body modes,
+arm reach/return and adjacent iDroid. Native notice interruptions remain recorded.
+Cuff rim/texture, extreme reach, other outfits and physical review remain open.
 
-Use [CURRENT.md](CURRENT.md) for build identities and
-[RELEASE_PLAN.md](RELEASE_PLAN.md) for next execution. Published play remains
-the October 19.1 baseline; development contains later fixes. Documentation
-cleanup does not publish them or replace the pin.
-
-Concrete limits include additional mounted adapters, outfit-specific forearm
-cropping, rough cuffs/extreme sleeve crowding and undiagnosed exact rock/corridor
-reports. Full-mission, all-weapon and physical Quest acceptance remain open.
-Ground Zeroes remains a separate stereo experiment without a completed tracked
-first-person rig.
-
-[STATUS_HISTORY.md](STATUS_HISTORY.md) preserves the September narrative.
-Its old controls/menu ownership and "current build" descriptions are historical.
+[CURRENT.md](CURRENT.md) has exact identity, results and next action;
+[FIELD_FIXES.md](FIELD_FIXES.md) separates implemented repairs from remaining work;
+[RELEASE_PLAN.md](RELEASE_PLAN.md) is the single durable plan.
+Published play is unchanged. Test sessions are closed; Meta Quest Link restored.
+Historical measurements remain in [STATUS_HISTORY.md](STATUS_HISTORY.md).

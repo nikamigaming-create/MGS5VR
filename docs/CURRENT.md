@@ -1,69 +1,55 @@
 # Current MGS5VR work — 24 October 2026
 
-**Body/arm batch is in progress on main; next is its combined build and smoke.**
-The retained reproduction was reused. Upper sleeves now use the shoulder-sized
-head-clearance envelope along the whole upper arm, while forearm/hand clearance
-stays unchanged. Forearm-only cuffs close supported cut boundaries with existing
-native vertices and LOD-exclusive removed triangles; no new vertex streams.
-Runtime smoke and physical Quest review are pending; no acceptance is promoted.
-See [RELEASE_PLAN.md](RELEASE_PLAN.md).
+**The body/arm candidate is ready for the user's wired Quest Link test through
+`Play-Dev.cmd`.** Work remains on main. Do not rebuild or repeat the smoke just
+to refresh status; the next useful result is physical feedback on this candidate.
 
-## Source and retained builds
+## Candidate and delivered batch
 
-| Item | Audited identity/status |
+- Development DLL: `1a64bb965bc61e06423519d5940f6c5b5c7f018bc233e107098533a5b4325b7e`.
+- Gameplay source: `439253632bd8aec2a5c78fe25359c8549a2608d6`; batch implementation
+  is `c2caa68`. Later outcome documentation does not change this runtime binary.
+- Published play remains `b627c7cacc9a` / October 19.1. No publication or pin change.
+- Upper sleeves now use the existing 18 cm shoulder envelope along the upper arm,
+  rather than the 12 cm forearm envelope. Forearm/hand clearance stays unchanged.
+  Native arm/leg lengths, wrist isolation, garment drivers and hand owners remain.
+- Forearm-only cuffs close supported native cut loops using existing vertices,
+  skin weights and material. Only removed triangles exclusive to that LOD are
+  reused; overlapping draw ranges and ambiguous boundaries are not rewritten.
+  The game reports 55 added cuff triangles without the prior startup failure.
+
+## Combined smoke and limits
+
+All 58 check groups and installer checks pass. The first build's only failure was
+an omitted source-inventory entry for the new helper; it was corrected before
+this candidate was staged. No gameplay code changed between those build attempts.
+
+One native simulator session produced three retained runs:
+
+| Run | Observed result |
 | --- | --- |
-| Checkout | One local branch/worktree, `main`; gameplay source `5622052bd8799603ef8aae66235ec82d3c7bce6f` |
-| Development | DLL `17b044cba72e`; existing October 23 report: 58 groups passed, zero failures |
-| Published play | DLL `b627c7cacc9a`, source `f8cf03f949ae`; October 19.1 baseline |
-| Integrity | Both slot manifests matched all listed files; full development source identity matched before this documentation pass |
-| After cleanup | Documentation-only working changes; packaged docs/source identity need refresh in the next planned build. No runtime binary changed. |
+| `20261025T024142216582Z` | Full-body right/left cross-head reach and neutral return pass. First iDroid open reaches the existing native help screen, interrupting the ordinary-menu expectation. Run remains failed. |
+| `20261025T024303487697Z` | Existing guarded help dismissal, stow, reopen and turned handset pass. Daily Bonus interrupts final stow expectation; cleanup returns to cabin. Run remains failed. |
+| `20261025T024405362489Z` | Forearm-only right/left reach/return and left iDroid front/turned/stow: all seven cases pass. Both-eye cuff and handset captures reviewed. |
 
-Two cached remote-tracking refs, `contributions/silent` and `contributions/vinion`,
-remain historical references, not extra local development branches. Their
-worker/filter differences were reviewed: [fork review](FORK_REVIEW_2026-09-20.md).
+Caps close the exposed end; **the outer rim remains uneven and the reused native
+texture stretches across the cap**. Extreme full-body reach still puts cloth
+close in view. Other outfits and nonmanifold lower-LOD cap boundaries remain
+unsupported. These are real visual limits, not a polished/full-body acceptance
+claim. Physical fit, comfort and handset readability still need the user's test.
+No release gate or sustained/headset acceptance counter was promoted.
 
-## Already implemented
+## Next and cleanup
 
-Fixed-length legs/shared pelvis fit; clavicle reach, wrist isolation and
-cross-head fallback; tracked garment corrections; acquired support/reload
-retention; tracking continuity; contextual yaw preservation; cover
-aim-out/exit/control classification; transit body/exit height; left iDroid
-contact/projection/lifecycle/scene handoff; Rocket Arm steering/display;
-paper/marker/printing/settling; native ACC rifle carry/return; sortie head.
-Physical binocular intel and village marking use the existing native-compatible
-VR route. [FIELD_FIXES.md](FIELD_FIXES.md) maps every FP report to source.
+Test this candidate with full body on/off, cross-body reach and return, then
+left-hand iDroid open/turn/stow on wired Meta Quest Link. Record feedback against
+`1a64bb965bc6`. Continue the remaining defect batch from [RELEASE_PLAN.md](RELEASE_PLAN.md)
+using [FIELD_FIXES.md](FIELD_FIXES.md); do not restart already implemented repairs.
 
-## Remaining release decisions
+Full-body preference restored to 1. Owned game/simulator and test runners are
+closed; Steam retained. The per-game runtime is restored to Meta Quest Link.
+Both Play paths remain ready. Evidence is retained in the structured ledger;
+initial Continue scratch expired and is not promoted as acceptance evidence.
 
-- Body first: rough forearm cuff and extreme cross-head sleeve crowding.
-  Forearm cropping admits identified sna5 geometry only. Never stretch legs or
-  restore the removed startup-failing cuff reconstruction.
-- Mounted aiming admits mortar `0x46` and machine gun `0x47`; additional types
-  need verified identities/contacts. Latest local Mother Base handoff reaches
-  the adjacent platform and fails entry at an intact AAG. Diagnose eligibility;
-  do not repeat approach loops, infer `0x45` or override native restrictions.
-  Destroyed hostile fixtures cannot prove a control defect.
-- Exact rock/corridor reports remain undiagnosed. Separate native movement from
-  presentation before changing either.
-- Acceptance gaps include forced iDroid lessons/readability in motion,
-  bolt-action support, mounted contact/impact, contextual headings, powered-arm
-  impact, outfits/loadouts and physical Quest. These are not all missing code.
-  FP13/FP14 remain scoped resolved.
-- Five catalog gates remain conservatively blocked pending reconciliation of
-  historical failures with later repairs/evidence. No gate was waived by docs.
-
-## Resume and cleanup
-
-Use one bounded investigation, one related correction batch and one combined
-review, as specified in RELEASE_PLAN. Reuse passing evidence where code/scope
-match. Do not repeat ordinary ACC toggles, both-rifle tracking recovery or village
-marking by default.
-
-Last recorded gameplay session was cleaned up. This audit/documentation pass
-launched no game/harness and performed no build, deployment, pin or release.
-Both Play commands retain Meta Quest Link. Published `play/` is unchanged.
-
-Exact history: [previous current log](CURRENT_HISTORY_2026-10-23.md),
-[field narrative](FIELD_FIXES_HISTORY_2026-10-23.md),
-[structured ledger](FREE_PLAY_ACCEPTANCE.json). Use these for evidence, not
-competing execution orders. [Documentation map](README.md).
+[Field implementation map](FIELD_FIXES.md) · [Durable plan](RELEASE_PLAN.md) ·
+[Evidence ledger](FREE_PLAY_ACCEPTANCE.json) · [Documentation map](README.md).

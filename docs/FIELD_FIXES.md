@@ -12,6 +12,16 @@ and no broad report was closed by source inspection.
 [CURRENT.md](CURRENT.md) is the handoff. [RELEASE_PLAN.md](RELEASE_PLAN.md) is the
 ordered execution plan. All supplied community reports remain in scope.
 
+## Body/arm candidate update — 24 October
+
+Candidate `1a64bb965bc6` / source `4392536` adds upper-sleeve clearance along the
+whole upper arm and closes supported forearm-only cut loops using existing
+native indexed geometry. Full-body reach/return and all seven forearm-only
+reach/iDroid smoke cases have scoped results; native help/Daily Bonus interrupted
+two earlier menu suites, whose failures remain recorded. See CURRENT.
+The cuff's outer rim and cap texture remain rough; other outfits/nonmanifold
+lower LODs and physical Quest review remain open. No blanket FP17/body closure.
+
 ## Code audit and remaining scope
 
 | Report | Implemented on main | Actual remaining work |
@@ -33,7 +43,7 @@ ordered execution plan. All supplied community reports remain in scope.
 | FP15 — mortar viewpoint | head_camera retains native mounted operator eye; controller_rig admits mounted body without forcing standing posture. | Wider headings, contact, translucent geometry, firing/impact and physical review. The 62.8 cm standing-eye mismatch is already repaired. |
 | FP16 — small rocks | Native floor/posture/body support exists, but no targeted repair for the exact reported rock interruption was established by the audit. | Locate/reproduce in both directions; join floor, velocity, action and eye height. A route guard is not a diagnosed production defect. |
 | FP17 — wrist coupling/reach | Acquired-supported-weapon-only torso correction, native clavicle reach, full arm/per-eye clearance and infeasible cross-head fallback in controller_rig/arm_ik. Garment driver translations follow solved arms. | Physical wrist isolation/reach and remaining sleeve crowding. These corrections exist; do not restart bare-wrist torso or cross-head-freeze implementation. |
-| Latest body fallback | [forearm_visibility](../src/forearm_visibility.cpp) is connected to production draw hooks and hides upper sleeves for exact admitted sna5 geometry when full body is off/unavailable. Native thigh/shin lengths stay fixed; garment branches follow solved joints. | Outfit-specific admission is a real implementation limit. Rough open cuff remains; removed cuff reconstruction caused startup failure and is not part of this candidate. |
+| Latest body fallback | [forearm_visibility](../src/forearm_visibility.cpp) is connected to production draw hooks and hides upper sleeves for exact admitted sna5 geometry when full body is off/unavailable. Native thigh/shin lengths stay fixed; garment branches follow solved joints. | Outfit-specific admission is a real implementation limit. Supported cuff loops now have native-index caps; outer rim/cap texture remain rough, and ambiguous lower LODs retain the safe cut. The earlier startup-failing reconstruction remains excluded. |
 | FP13 — free-roam route | Existing VR menu path: Missions -> Mission List -> Free Roam; [controls](CONTROLS.md) corrected. | Scoped resolved through on-foot arrival. No unlock/save modification or extra root menu required. Broader progression remains FP12. |
 | FP14 — sortie head | [player_visibility](../src/player_visibility.cpp) restores native preview visibility and first-person concealment afterward. | Scoped resolved in development; preserve during adjacent transit/body review. |
 | FP12 — remaining regressions | Physical binocular raised/marking events and native intel requests exist in [native_actions](../src/native_actions.cpp)/[optic_markers](../src/optic_markers.cpp); retained village marking advances the native lesson. Other systems remain inventoried in [GAMEPLAY_FEATURES](GAMEPLAY_FEATURES.md). | Full missions, other weapons/items/buddies/menus and historical reports need exact-build reconciliation. A lesson or source path is not a whole mission pass. |

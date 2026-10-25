@@ -6,6 +6,10 @@ this plan. [FIELD_FIXES.md](FIELD_FIXES.md) separates implemented repairs from
 remaining code work and acceptance. Do not restart the three-day investigation
 from unchecked historical boxes.
 
+Current execution has produced body/arm candidate `1a64bb965bc6`; see
+[CURRENT.md](CURRENT.md) for its smoke results and remaining visual limits.
+The identities below record the original audit baseline.
+
 ## Starting point and authority
 
 - Work in the existing checkout on `main`; no new branch or worktree.
@@ -177,17 +181,16 @@ both slots verify. Never remove settings, saves, source or retained evidence.
 
 ## Resume record
 
-- Completed: source audit and documentation reconciliation. Catalog validation
-  and all 33 catalog tests pass. Historical snapshots and structured evidence
-  preservation were checked; local documentation link targets resolve. No release
-  gate status or acceptance counter was promoted.
-- Active batch: retained cuff and cross-head sleeve reproductions reused. Added
-  upper-sleeve clearance and native-index cuff closure for admitted boundaries.
-  Next: combined development build/check and one body-on/body-off reach/iDroid
-  smoke session; then physical testing through Play-Dev.cmd. No broad replay.
-  Other outfits and nonmanifold lower-LOD cuff boundaries remain explicit limits.
-- Not performed by this documentation pass: code repair, build, game launch,
-  hardware review, release packaging/publication or pinning.
-- Update this record after each meaningful batch with what changed, exact
-  candidate, observed failures, next action and cleanup. Do not append another
-  competing "current plan" or treat missing acceptance as missing implementation.
+- Completed: source audit, documentation reconciliation and the first body/arm
+  correction batch on main (`c2caa68`, inventory follow-up `4392536`).
+- Checked candidate: `1a64bb965bc6`; all 58 groups and installer checks pass.
+  One native smoke session exercised both arms/body modes and adjacent iDroid.
+  Three runs are retained with failures and limits; see CURRENT/FREE_PLAY_ACCEPTANCE.
+- Next: user physical Quest Link feedback through Play-Dev.cmd. Do not rerun
+  the completed simulator subcases or rebuild merely for outcome documentation.
+- Remaining body limits: uneven cuff rim/cap texture, close cloth in extreme
+  reach, other outfits and ambiguous lower-LOD cap boundaries. Remaining mounted,
+  rock/corridor and progression questions keep their original order above.
+- Cleanup complete: full_body restored to1, owned game/simulator closed, Steam
+  retained and per-game Meta runtime restored. Published play unchanged.
+- No publication, build pin, universal acceptance or release-gate waiver.

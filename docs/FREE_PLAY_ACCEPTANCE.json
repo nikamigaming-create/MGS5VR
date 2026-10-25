@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "17b044cba72e33e6d6eefc89be5f00bcb313ba0fee4bb8751da9d43e52b50e4f",
-  "candidate_status": "Fixed-length body and simple forearm-only batch built and checked; final rebuild starts, renders and completes ordinary Continue to ACC. Retained body/reach/iDroid checks on8330791606ab cover the same implementation. Rough cuff edge, other outfits, physical headset and full release acceptance remain open.",
+  "candidate": "1a64bb965bc61e06423519d5940f6c5b5c7f018bc233e107098533a5b4325b7e",
+  "candidate_status": "Body/arm candidate checked: sleeve-aware head clearance and native-index cuff closure. Scoped combined smoke retained; rough rim/cap texture, outfit/LOD limits and physical acceptance remain.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -765,6 +765,16 @@
           "candidate_sha256": "428a0c0872fceff0010da50e1e417cb012bb2a8f6b68ffb08be0766696430dad",
           "result": "Challenge Tasks Exit Tutorial now retains active VR and readable spatial notice in both eyes; dismissal and immediate iDroid reopening/stow pass.",
           "limitations": "Other lessons and physical headset unverified."
+        },
+        {
+          "candidate": "1a64bb965bc61e06423519d5940f6c5b5c7f018bc233e107098533a5b4325b7e",
+          "runs": [
+            "20261025T024142216582Z",
+            "20261025T024303487697Z",
+            "20261025T024405362489Z"
+          ],
+          "scope": "Body/arm batch with adjacent iDroid; see body_arm_batch_2026_10_24 for each outcome and failures.",
+          "limitation": "Cuff remains visually rough; no headset/full-game or blanket issue acceptance."
         }
       ],
       "status_before_2026_10_24_audit": "verify",
@@ -1299,7 +1309,17 @@
           "baseline": "20261023T123830466301Z",
           "cleanup": "Owned game/simulator and bounded reader closed; Steam and published play retained"
         },
-        "Fixed-length body/forearm batch (17b044cba72e): removed leg calibration and dynamic length scaling; both legs keep native thigh/shin lengths, with shared pelvis placement satisfying head/spine and floor reach. Thigh clothing helpers now follow their solved joints. When full body is off/unavailable, the owned sna5 outfit hides shoulder/upper-sleeve triangles while retaining native hands, forearms, left bionic arm and attachments; full-body mode retains complete geometry. This simple cut still has a rough open sleeve edge in extreme close views and is not all-outfit acceptance. Extra cuff reconstruction was removed after startup failures; it is not in this candidate. The same retained gameplay implementation was checked on8330791606ab: cabin body run20261023T134930413251Z completes16 phases with both leg scales1 and eye error below0.001mm; explicit full_body=0 run20261023T135658962746Z passes both-arm reach/return and left iDroid front/turned/stow, with both final eyes reviewed and full_body restored to1. Adjacent production fixes evaluate acquired support on the current weapon transform, keep mounted aiming with the operating hand until release, adopt the correct horizontal posture/cover basis, and settle dropped markers using rotated extents. Those changes have focused checks; broad field acceptance remains open. No physical Quest or whole-game claim. Published play remains unchanged."
+        "Fixed-length body/forearm batch (17b044cba72e): removed leg calibration and dynamic length scaling; both legs keep native thigh/shin lengths, with shared pelvis placement satisfying head/spine and floor reach. Thigh clothing helpers now follow their solved joints. When full body is off/unavailable, the owned sna5 outfit hides shoulder/upper-sleeve triangles while retaining native hands, forearms, left bionic arm and attachments; full-body mode retains complete geometry. This simple cut still has a rough open sleeve edge in extreme close views and is not all-outfit acceptance. Extra cuff reconstruction was removed after startup failures; it is not in this candidate. The same retained gameplay implementation was checked on8330791606ab: cabin body run20261023T134930413251Z completes16 phases with both leg scales1 and eye error below0.001mm; explicit full_body=0 run20261023T135658962746Z passes both-arm reach/return and left iDroid front/turned/stow, with both final eyes reviewed and full_body restored to1. Adjacent production fixes evaluate acquired support on the current weapon transform, keep mounted aiming with the operating hand until release, adopt the correct horizontal posture/cover basis, and settle dropped markers using rotated extents. Those changes have focused checks; broad field acceptance remains open. No physical Quest or whole-game claim. Published play remains unchanged.",
+        {
+          "candidate": "1a64bb965bc61e06423519d5940f6c5b5c7f018bc233e107098533a5b4325b7e",
+          "runs": [
+            "20261025T024142216582Z",
+            "20261025T024303487697Z",
+            "20261025T024405362489Z"
+          ],
+          "scope": "Body/arm batch with adjacent iDroid; see body_arm_batch_2026_10_24 for each outcome and failures.",
+          "limitation": "Cuff remains visually rough; no headset/full-game or blanket issue acceptance."
+        }
       ],
       "status_before_2026_10_24_audit": "wrist_coupling_corrected_simulator_reach_and_headset_open",
       "implementation_audit": {
@@ -1311,22 +1331,21 @@
     }
   ],
   "active_work": {
-    "candidate": "17b044cba72e33e6d6eefc89be5f00bcb313ba0fee4bb8751da9d43e52b50e4f",
-    "source_commit": "5622052bd8799603ef8aae66235ec82d3c7bce6f",
-    "checkpoint": "Documentation and source audit complete; existing gameplay repairs retained. Follow the single execution plan, beginning with remaining body/arm presentation limits.",
+    "candidate": "1a64bb965bc61e06423519d5940f6c5b5c7f018bc233e107098533a5b4325b7e",
+    "source_commit": "439253632bd8aec2a5c78fe25359c8549a2608d6",
+    "checkpoint": "Body/arm batch checked and smoke complete; next user physical Quest Link test via Play-Dev.cmd.",
     "plan": "docs/RELEASE_PLAN.md",
     "next_actions": [
-      "Review known cuff/outfit limits without undoing fixed native leg lengths and tracked garment repairs.",
-      "Use retained mounted bridge route; intact east AAG entry remains unproven. Diagnose native entry/action/contact before adding types.",
-      "Reproduce exact rocks/corridor and any new progression failure; batch justified fixes and adjacent review.",
-      "Reconcile dated catalog failures with retained later evidence and exact candidate; physical Quest Link acceptance remains separate."
+      "Physical feedback on both body modes, cross-body reach/return and left iDroid on candidate1a64bb965bc6.",
+      "Continue remaining cuff/outfit limits and confirmed mounted/terrain/progression defects from RELEASE_PLAN; reuse completed repairs and passing scoped evidence."
     ],
     "runtime_requirement": "Wired Meta Quest Link / Meta OpenXR; both Play commands explicitly -MetaLink. Historical runtime observations in retained_work_history are not current setup instructions.",
     "build_slots": {
       "published_pin": "b627c7cacc9a",
-      "development": "17b044cba72e"
+      "development": "1a64bb965bc6"
     },
-    "scope": "Documentation pass only; no game session, new tests of gameplay, build, deployment, publication or pinning. Historical session and cleanup records keep their original scope in retained_work_history."
+    "scope": "Gameplay batch and one native smoke session complete. No publication, pin or physical acceptance.",
+    "cleanup": "Full_body restored to1; owned game/simulator stopped; Steam retained; no test menu open."
   },
   "implementation_audit": {
     "date": "2026-10-24",
@@ -2142,5 +2161,29 @@
       ],
       "notes": "Fixed-length body/forearm batch (17b044cba72e): removed leg calibration and dynamic length scaling; both legs keep native thigh/shin lengths, with shared pelvis placement satisfying head/spine and floor reach. Thigh clothing helpers now follow their solved joints. When full body is off/unavailable, the owned sna5 outfit hides shoulder/upper-sleeve triangles while retaining native hands, forearms, left bionic arm and attachments; full-body mode retains complete geometry. This simple cut still has a rough open sleeve edge in extreme close views and is not all-outfit acceptance. Extra cuff reconstruction was removed after startup failures; it is not in this candidate. The same retained gameplay implementation was checked on8330791606ab: cabin body run20261023T134930413251Z completes16 phases with both leg scales1 and eye error below0.001mm; explicit full_body=0 run20261023T135658962746Z passes both-arm reach/return and left iDroid front/turned/stow, with both final eyes reviewed and full_body restored to1. Adjacent production fixes evaluate acquired support on the current weapon transform, keep mounted aiming with the operating hand until release, adopt the correct horizontal posture/cover basis, and settle dropped markers using rotated extents. Those changes have focused checks; broad field acceptance remains open. No physical Quest or whole-game claim. Published play remains unchanged. Final rebuilt candidate17b044cba72e reaches the ACC through ordinary Continue in retained20261023T142213567316Z; owned game/simulator then closed, with no background runner."
     }
+  },
+  "body_arm_batch_2026_10_24": {
+    "candidate": "1a64bb965bc61e06423519d5940f6c5b5c7f018bc233e107098533a5b4325b7e",
+    "source_commit": "439253632bd8aec2a5c78fe25359c8549a2608d6",
+    "retained_runs": [
+      "20261025T024142216582Z",
+      "20261025T024303487697Z",
+      "20261025T024405362489Z"
+    ],
+    "scope": "One native session; full-body reach/return and forearm-only reach/return/iDroid. Both final eyes reviewed for cross-head reach and turned iDroid.",
+    "findings": [
+      "Full-body right/left cross-head and neutral return retain live camera and native leg scales1. Upper-sleeve clearance reduces the admitted bone approach; close cloth still occupies part of extreme views.",
+      "Runtime reports55 cuff triangles; forearm-only captures show closed caps and retained hands, but uneven rim and stretched native cap texture remain visible.",
+      "First iDroid open encounters existing completed help; retained guarded dismissal/stow passes. Reopen/front/turned pass; Daily Bonus interrupts final stow expectation, with cleanup returning to cabin.",
+      "After notices, all7 forearm-only reach/return/iDroid front/turned/stow cases pass."
+    ],
+    "limits": [
+      "No new physical-headset acceptance or full-game claim.",
+      "Other outfits and nonmanifold lower-LOD cap boundaries remain unsupported.",
+      "Cuff is closed, not fully polished.",
+      "The two interrupted menu suites remain failed as recorded.",
+      "Initial Continue scratch20261025T024035881259Z expired under the three-run retention policy; it is not promoted acceptance evidence. The retained subsequent runs establish actual ACC gameplay on this candidate."
+    ],
+    "cleanup": "Full_body restored to1; owned game/simulator stopped; Steam retained; no test menu open."
   }
 }

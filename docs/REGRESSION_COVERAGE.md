@@ -9,8 +9,9 @@ the code audit; [RELEASE_PLAN.md](RELEASE_PLAN.md) owns execution.
 
 The prior catalog called an October 2 investigation the current candidate.
 Main now contains the later rig, left iDroid contact/projection, stow,
-authored-scene handoff and tutorial-notice repairs. Development `17b044cba72e`
-comes from `5622052`; published play is `b627c7cacc9a` / October 19.1.
+authored-scene handoff and tutorial-notice repairs. The original audit used development `17b044cba72e` / `5622052`.
+The subsequent body/arm candidate is `1a64bb965bc6` / `4392536`, with scoped
+smoke results in CURRENT. Published play remains `b627c7cacc9a` / October 19.1.
 
 Five release gates remain conservatively blocked: hand-arm-rig, idroid-mount,
 idroid-lifecycle, idroid-native-guides and performance-pacing. Historical
