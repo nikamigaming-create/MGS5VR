@@ -1,5 +1,16 @@
 # Current MGS5VR work — 25 October 2026
 
+## Forced-Help stow follow-up — source batch
+
+The field UI-only Menu/held-Back request previously reached the one-shot native
+close mailbox while Help still blocked terminal closing. The source now uses
+the existing exact-owner Help acknowledgement before retaining and delivering
+terminal stow for a field handset, as it already does for the cabin. A handheld
+Menu press also remains consumed until physical release, so closing its terminal
+cannot turn the rest of that same press into native START. Unknown Help owners
+and unrelated native pauses remain excluded. This extension is source-audited;
+the new live Help-to-stow path still needs a scoped gameplay check.
+
 ## Current playtest candidate — lifecycle follow-up
 
 **`994c6d57762a` / source `3fc9cdc` is built, checked and deployed for Play-Dev.**

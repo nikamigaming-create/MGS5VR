@@ -208,7 +208,7 @@ struct Session {
     WeaponTrackingContinuity weaponTrackingContinuity;
     IdroidHandUseController idroidHandUse;
     IdroidHandUse priorIdroidHandUse{IdroidHandUse::device};
-    bool priorIdroidTap{};
+    bool priorIdroidTap{},handheldIdroidTapConsumed{};
     uint64_t cabinStowUntil{},cabinHelpConfirmUntil{};
     uintptr_t cabinHelpOwner{};
     bool priorHandheldFree{},priorHandheldGrip{},priorIdroidRouting{};
@@ -543,7 +543,7 @@ struct Session {
         controllerFrame=passiveControllerFrame(controllerFrame,time,referenceEpoch);
         controllerFrame.vehicleView=nativeVehicleView();
         controllerFrame.presentationEpoch=presentationEpoch;
-        idroidBackRecovery.suspend();requestNativeIdroidClose(false);requestHandheldIdroidOpen(0);priorIdroidTap=false;nativeControls.suspend();
+        idroidBackRecovery.suspend();requestNativeIdroidClose(false);requestHandheldIdroidOpen(0);priorIdroidTap=handheldIdroidTapConsumed=false;nativeControls.suspend();
         snapControls.reset();smoothControls.reset();cabinTurn.reset();cinematicTurn.reset();rigControls.suspend();controls.suspend();
         idroidTabInput.update({},false,steadyMilliseconds());
         cinematicMenuNavigation.update({},false,steadyMilliseconds());
@@ -1060,6 +1060,7 @@ struct Session {
             return controls.active(name);
         };
         const bool idroidTap=activeControl("system.idroid");
+        if(!idroidTap)handheldIdroidTapConsumed=false;
         const bool titleMenuToggle=titleCabin&&openingFocus.ready&&!editorInputOwned&&!nativeInput.exclusive;
         if(titleMenuToggle&&idroidTap&&!priorIdroidTap){
             titleNativeMenu=!titleNativeMenu;
@@ -1070,7 +1071,16 @@ struct Session {
             &&gameplayContext&&!cabinPlay&&!nativeStatus.nativeMenuOpen
             &&rigControls.equipmentPhase()==0&&!commandsControls.active()&&!nativeInput.exclusive
             &&!nativeGamepadActive()&&idroidPopup.active&&!*idroidPopup.active&&idroidTutorial&&*idroidTutorial==0;
+        const auto beginHelpStow=[&](){
+            cabinHelpOwner=nativeIdroidInformationalHelpOwner();
+            cabinStowUntil=cabinHelpOwner?now+3000:0;
+            cabinHelpConfirmUntil=cabinHelpOwner?now+180:0;
+        };
         if(idroidTap&&!priorIdroidTap){
+            // A UI-only open/stow consumes this whole physical press. Its
+            // terminal may close before the button is released; that must not
+            // expose the remaining held press to the native START mapping.
+            handheldIdroidTapConsumed=uiOnlyIdroid||borrowedIdroid||fieldIdroidOpen;
             std::ostringstream diagnostic;
             diagnostic<<"VR iDroid Menu tap activation="<<nativeStatus.activation
                 <<" field_open="<<fieldIdroidOpen<<" live="<<liveIdroid
@@ -1085,10 +1095,8 @@ struct Session {
                 cancelHandheldIdroidBorrow();borrowedReloadPending=false;borrowedReloadPulseUntil=0;
                 requestHandheldIdroidOpen(0);
                 if(liveIdroid)requestNativeIdroidClose(true);
-            }else if(cabinStowTap){
-                cabinHelpOwner=nativeIdroidInformationalHelpOwner();
-                cabinStowUntil=cabinHelpOwner?now+3000:0;
-                cabinHelpConfirmUntil=cabinHelpOwner?now+180:0;
+            }else if(cabinStowTap||(liveIdroid&&uiOnlyIdroid&&nativePauseMenuOpen())){
+                beginHelpStow();
                 // START below owns ordinary seated-player stow. Requesting
                 // terminal Close here first invalidates menu input readiness
                 // before that player can consume START, stranding SUBJECT.
@@ -1096,9 +1104,14 @@ struct Session {
             else if(fieldIdroidOpen)requestHandheldIdroidOpen(nativeStatus.activation);
         }
         priorIdroidTap=idroidTap;
-        if(idroidBackRecovery.update(liveIdroid,activeControl("menus.back"),!nativeInput.exclusive,now))
-            requestNativeIdroidClose(true);
-        if(!cabinControlsReady||nativeInput.exclusive||now>=cabinStowUntil||!nativeIdroidOpen()){
+        if(idroidBackRecovery.update(liveIdroid,activeControl("menus.back"),!nativeInput.exclusive,now)){
+            if(uiOnlyIdroid&&nativeIdroidInformationalHelpOwner())beginHelpStow();
+            else requestNativeIdroidClose(true);
+        }
+        // The same captured Help owner can belong to a field UI-only handset.
+        // Wait for its native acknowledgement before submitting terminal Close;
+        // a one-shot request sent while paused would be consumed and discarded.
+        if((!cabinControlsReady&&!uiOnlyIdroid)||nativeInput.exclusive||now>=cabinStowUntil||!nativeIdroidOpen()){
             cabinStowUntil=cabinHelpConfirmUntil=0;cabinHelpOwner=0;
         }
         const bool cabinHelpConfirm=cabinStowUntil&&now<cabinHelpConfirmUntil&&cabinHelpOwner
@@ -1163,7 +1176,7 @@ struct Session {
         // Ordinary ACC stow must reach the seated player's native Menu action
         // as well as the terminal close lifecycle. Suppress it only while the
         // verified Help overlay owns this tap; START there opens another menu.
-        const uint16_t menuBits=static_cast<uint16_t>((idroidTap&&!titleMenuToggle&&!fieldIdroidOpen&&!uiOnlyIdroid
+        const uint16_t menuBits=static_cast<uint16_t>((idroidTap&&!handheldIdroidTapConsumed&&!titleMenuToggle&&!fieldIdroidOpen&&!uiOnlyIdroid
             &&!(cabinStowTap&&nativePauseMenuOpen())?XINPUT_GAMEPAD_START:0)
             |(cabinHelpConfirm?XINPUT_GAMEPAD_A:0)
             |(activeControl("system.pause")?XINPUT_GAMEPAD_BACK:0));
