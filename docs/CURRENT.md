@@ -1,30 +1,45 @@
 # Current MGS5VR work — 25 October 2026
 
-## Arm publication and field-pickup batch — in source
+## Current development candidate — arm/pickup batch
 
-The new sleeve-pop report has a camera/skin publication-policy correction in
-`player_visibility.cpp`: a recently accepted body retains its visibility through
-the matching camera-to-skin gap, bounded by player/model, activation, reference,
-presentation, menu generation and 150 ms age. Failed solves still clear readiness.
-No limb lengths, native collision or authored geometry change. Visual acceptance
-of this latest report is pending.
+**`a33bfd559b9e` / source `f5dfb37` is built, checked and deployed for
+Play-Dev.** All 58 groups and installer checks passed in
+`artifacts/release-arm-pickup-build.log`. Published play is unchanged.
 
-The field-pickup iDroid report adds native passenger-identity stow and fresh
-on-board reopening in native_actions, native_idroid_interruption/open and
-xr_runtime. Boarding retires the old field terminal/borrow/open request; a new
-on-board handset uses its own lifecycle and UI-only stow. Unit cases cover
-passenger mismatch, stale vehicle identity, other vehicle types, pending native
-close and deliberate reopening. Live boarding is still unverified: retained
-20261025T141031947575Z never boarded; 20261025T141631950379Z shows the helicopter
-hovering overhead. The landing-zone movement in 20261025T142340540025Z completed
-seven bounded segments then reached the traversal deadline. These fixture runs
-are not acceptance or a reproduction of the reported boarding failure.
+The C++ visibility change retains an accepted full-body policy across the
+camera-to-skin publication gap, bounded by owner/model, activation, reference,
+presentation/menu generation and 150 ms age. Failed solves still clear it.
+Native leg lengths and collision are unchanged. Four full-body forward/back
+segments completed in retained `20261025T143642333671Z`; review of all 596
+encoded native-source-eye frames at the left arm found no visibility-mode pop.
+Four forearm-only segments completed in `20261025T143743590555Z`; both final
+compositor eyes and 5 fps source-eye review preserve hands/forearms without
+upper sleeves while disabled. Settings restored. This is one outfit/posture,
+not every reach or physical Quest acceptance. Extreme cloth crowding remains open.
 
-Build/check/deploy this batch once, then exercise moving body/forearm visibility,
-iDroid open/stow/reopen, weapon adjacency and actual field boarding where the
-native pickup permits it. Keep failed cases explicit. Published play stays pinned.
+C++/Lua now stows the field-owned iDroid on verified native helicopter passenger
+entry, releases its old borrow/open ownership, and permits a deliberate fresh
+on-board terminal with UI-only stow. The fresh flight open/turn/stow/reopen/restow
+and disembark cases passed in `20261025T143046727537Z`; both-eye checkpoints were
+reviewed. Ground open/turn/stow/reopen/restow and back-rifle draw/stow passed in
+`20261025T143543140256Z`, with both-eye checkpoints reviewed. Native Challenge
+Tasks Help and its Exit Tutorial notice interrupted earlier field cases; they
+were acknowledged through VR controls, without changing progress flags.
 
-## Installed candidate and immediate handoff
+**Actual field pickup entry remains unaccepted.** The native pickup call returned
+but the helicopter hovered above the LZ; no boarding was reached. Setup movement
+in `20261025T144059390254Z` stopped after a released segment exceeded its bounded
+envelope. This is neither boarding acceptance nor a reproduced terrain hang.
+The Lua ownership cases test the handoff contract; they do not replace that
+missing gameplay observation. Earlier pre-input fixture rejects and interrupted
+cases remain retained and enumerated in FREE_PLAY_ACCEPTANCE.
+
+Source-eye recordings precede compositor crop/composition. Final-eye images
+were inspected separately. Do not repeat the completed motion/handset cases
+just for pass counts. Continue diagnosed gameplay changes; remaining terrain,
+extreme cloth, pickup entry and broader FIELD_FIXES coverage stay explicit.
+
+## Previous stock candidate and retained results
 
 **`da4ae29de73b` / source `7273c25` is built, checked and deployed for
 `Play-Dev.cmd`.** The moving back-stock intrusion has scoped visual acceptance.

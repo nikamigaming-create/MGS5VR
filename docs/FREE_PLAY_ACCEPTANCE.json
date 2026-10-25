@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "1933aa81fc8ecf9798e0d14f4eb13999528b1d8b33ff738a384ee6e29b19e7bd",
-  "candidate_status": "1933aa81fc8e failed moving geometry review. Back slot isolated; source correction awaiting build and native review.",
+  "candidate": "a33bfd559b9eb61cd167c79b830a55af8dff48bfe9bfb0fb98c81e782074fff2",
+  "candidate_status": "Arm visibility and field-pickup iDroid batch built/deployed. Scoped body-motion and handset lifecycle review complete; actual field boarding and broader release scope remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2471,5 +2471,46 @@
       "exact rock/corridor defect localization",
       "broader FIELD_FIXES release scope"
     ]
+  },
+  "arm_pickup_batch_2026_10_25": {
+    "source": "f5dfb37e4c4f7998c393f54c35581a8c52e3a507",
+    "candidate": "a33bfd559b9eb61cd167c79b830a55af8dff48bfe9bfb0fb98c81e782074fff2",
+    "build_log": "artifacts/release-arm-pickup-build.log",
+    "automated": "58/58 and installer checks passed",
+    "body_motion": {
+      "run": "20261025T143642333671Z",
+      "result": "four forward/back segments completed; all 596 encoded source-eye frames reviewed at left arm; no visibility-mode pop observed",
+      "scope": "one outfit and field posture; source-eye video is not compositor stereo video"
+    },
+    "forearm_fallback": {
+      "run": "20261025T143743590555Z",
+      "result": "four forward/back segments completed; final compositor eyes and 5 fps source-eye review show hands/forearms without upper sleeves while disabled; settings restored"
+    },
+    "flight_handset": {
+      "run": "20261025T143046727537Z",
+      "result": "five flight open/turn/stow/reopen/restow cases and disembark passed; both-eye checkpoints reviewed; later field open was interrupted by native Challenge Tasks Help"
+    },
+    "field_handset_weapon": {
+      "run": "20261025T143543140256Z",
+      "result": "native exit notice acknowledged; five field handset cases and back-rifle draw/stow passed. Moving case rejected before input by generic outcome guard and moved to bounded traversal."
+    },
+    "retained_failures": [
+      "20261025T142851381439Z",
+      "20261025T142928025331Z",
+      "20261025T143046727537Z",
+      "20261025T143315499606Z",
+      "20261025T143421433785Z",
+      "20261025T143543140256Z",
+      "20261025T144059390254Z"
+    ],
+    "pickup_entry": "not accepted: native helicopter hovering; no field boarding reached. Native passenger handoff contract tests passed; fresh on-board reopen exercised separately.",
+    "remaining": [
+      "exact terrain/corridor failure",
+      "extreme full-body sleeve crowding",
+      "actual open-handset field pickup boarding",
+      "other outfit coverage",
+      "physical Meta Quest and full-game scope"
+    ],
+    "published_pin_unchanged": true
   }
 }

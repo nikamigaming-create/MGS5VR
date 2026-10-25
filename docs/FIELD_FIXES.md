@@ -15,10 +15,11 @@ ordered execution plan. All supplied community reports remain in scope.
 ## Latest incoming reports — 25 October
 
 - Sleeve pop during motion: a bounded same-owner camera/skin visibility continuity
-  repair is in source; visual acceptance pending. This does not close extreme
+  repair is deployed as a33bfd559b9e; scoped moving review passed. This does not close extreme
   cloth crowding or every outfit.
 - Open iDroid while boarding field pickup: native passenger stow and deliberate
-  on-board reopen are in source with lifecycle cases. Actual pickup boarding
+  on-board reopen are deployed with passing lifecycle cases and flight/field
+  open/stow/reopen observations. Actual pickup boarding
   remains unverified because the current helicopter fixture did not land.
 
 ## Current candidate — 25 October

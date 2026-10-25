@@ -10,17 +10,14 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Next combined candidate: camera/skin body-visibility continuity plus field-pickup
-iDroid stow/reopen ownership. Build and deploy together; test moving arms, both
-body modes, ordinary handset lifecycle and actual pickup as one review. An
-unlanded helicopter is a fixture gap, not boarding acceptance.
+Current checked candidate `a33bfd559b9e` / `f5dfb37` is deployed for Play-Dev.
+It includes camera/skin body-visibility continuity and field-pickup iDroid
+stow/reopen ownership. Scoped full-body/forearm-only movement and flight/field
+handset lifecycle reviews passed. Actual pickup entry remains unaccepted because
+the helicopter fixture did not land. Extreme cloth, exact terrain failures and
+broader field/headset scope remain open. The previous stock correction and its
+retained failures remain recorded in CURRENT and FREE_PLAY_ACCEPTANCE.
 
-Current checked candidate `da4ae29de73b` / `7273c25` is deployed for Play-Dev.
-The stowed back assembly stays concealed through moving camera publication
-gaps; scoped moving-edge and both-eye back-rifle draw review are complete.
-Earlier `1933aa81fc8e` and `77a2fe7c9dc2` failed moving review and remain recorded.
-Exact terrain failures and the broader field/headset scope remain open.
-See [CURRENT.md](CURRENT.md) for retained failures and precise coverage.
 The identities below record the original audit baseline.
 
 ## Starting point and authority
