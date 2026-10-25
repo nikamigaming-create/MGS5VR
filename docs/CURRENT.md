@@ -1,9 +1,9 @@
 # Current MGS5VR work — 25 October 2026
 
-**Current batch: duplicate bionic-shell correction, complete iDroid reopen
-handoff, and recovery of forearm-only cropping after native buffer replacement.
-Build and deploy this batch once for the user's play test. No simulator soak
-or repeated per-case test loop is authorized by the current request.**
+**Candidate `d4b526e24cf5` is built and deployed from source `32f2ab0`.
+All 58 groups and installer checks passed. Use `Play-Dev.cmd` for the user's
+physical test. No new simulator/game session was launched. Full-game and
+physical-headset acceptance remain open.**
 Work on main only. `build/dev/BUILD.json` identifies the checked candidate;
 `play/` remains the last published release. [FIELD_FIXES.md](FIELD_FIXES.md)
 separates implemented repairs from unresolved reports and acceptance gaps.
@@ -23,8 +23,11 @@ separates implemented repairs from unresolved reports and acceptance gaps.
   used completed entry and never evicts a mapped buffer. This is a source-level
   lifecycle correction; it does not expand the admitted outfit geometry.
 
-Build/check/deploy uses `tools/build.ps1 -SkipBootstrap -Deploy`. The final
-outcome is recorded in FREE_PLAY_ACCEPTANCE and the development manifest.
+Build/check/deploy completed with `tools/build.ps1 -SkipBootstrap -Deploy`.
+The exact outcome is in `artifacts/release-batched-candidate-outcome.json`,
+FREE_PLAY_ACCEPTANCE and the development manifest. The first contract run
+exposed fixtures missing the required new skin publication; their sequencing
+was corrected before the successful combined checks. No live loop was run.
 Physical testing belongs to the user through `Play-Dev.cmd`; no pin or release
 publication is part of this candidate deployment.
 
@@ -72,8 +75,8 @@ hand/device anchor. The original empty-rig correction also used a mismatch
 status that rejected retained stereo. This batch keeps the anchor and explicitly
 permits only the previously accepted stereo image during the expected wait.
 The focused regression covers retained pixels, rejection of the old stowed skin,
-fresh-skin recovery and the existing native Help/Pause fallback. It is included
-in the single combined build/check pass; no new native gameplay pass is claimed.
+fresh-skin recovery and the existing native Help/Pause fallback. These contracts
+passed in the completed build; no new native gameplay pass is claimed.
 
 ## Sustained iDroid correction and result
 

@@ -7,8 +7,8 @@
     "release": "experimental-2026-10-19.1",
     "source_reference": "docs/RELEASE_2026-10-19.1.md",
     "comparison": "Published local play is b627c7cacc9a. The code audit covers later development17b044cba72e; neither publication nor source inspection certifies physical or complete gameplay acceptance.",
-    "current_candidate": "Checked rigid prosthetic-shell correction, 58 groups and installer checks passed. Exact forced Help/Pause both-eye motion review is scoped; broader gates unchanged.",
-    "current_candidate_id": "main-f438de4-development-c6f7e1f7b7cb"
+    "current_candidate": "Combined shell/reopen/forearm-cache batch d4b526e24cf5 is checked and deployed. All 58 groups and installer checks passed. No new native or physical acceptance; broad gates unchanged.",
+    "current_candidate_id": "main-32f2ab0-development-d4b526e24cf5"
   },
   "rules": [
     "Source presence is implementation evidence, not a feature-complete claim.",
@@ -5162,10 +5162,10 @@
     "cleanup": "Owned game/simulator closed; Steam retained; no test menus/harnesses. Published play unchanged; Meta launch preference preserved."
   },
   "shared_fence_candidate_update": {
-    "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
+    "candidate": "d4b526e24cf5c3ef698db2e6c9659a76ccd3cb9573ce36d7c8924dd77e6dfa84",
     "source": {
-      "commit": "f438de418252f2ada8448d70280b5523fd126f3a",
-      "source_sha256": "6662ca4bec4c7c13100f532aae66a6d7a84421308e4a923e4798a3866c0d4310",
+      "commit": "32f2ab0591b33a975a1afec40524b07b3bbcc30f",
+      "source_sha256": "d3b6252a9c41980bf469b139304b773acfbbe53620afd7652f1b0c17adf74d2e",
       "changes": []
     },
     "automated": "58 groups and installer checks passed",
@@ -5185,7 +5185,7 @@
     },
     "publication": "none; published play unchanged",
     "blocker": null,
-    "next": "User stopped testing. Continue code batch; reopen correction is compile-only and not deployed.",
+    "next": "User tests deployed batch; no automatic soak loop.",
     "physical_headset_acceptance": false,
     "cleanup": "Owned game/simulator closed; no bot or test menu left open. Steam retained; published play unchanged.",
     "decision": "Retain shared fence: completed same-config ACC timing shows reduced repeats; wider performance gate remains open."
@@ -5202,7 +5202,15 @@
     "observed": "Second immediate reopening published menu_idroid=true with rig_sequence=0 and idroid_device_tracked=false; native input was not yet ready.",
     "existing_protection": "Stereo scene replay already rejects the unjoined frame; the trace alone does not establish a visible blank frame.",
     "code_change": "Keep last accepted tracked hand/device camera publication while ordinary handheld menu has no new rig. Skin preparation remains allowed and fresh publication resumes it.",
-    "validation": "Compilation succeeded. No tests, live rerun or candidate deployment requested after user stopped testing.",
-    "scope": "Does not alter native Help/Pause panel fallback or disabled/unestablished tracked rigs."
+    "validation": "Focused contract and full automated/installer checks passed in the deployed batch; no new native run.",
+    "scope": "Does not alter native Help/Pause panel fallback or disabled/unestablished tracked rigs.",
+    "candidate": "d4b526e24cf5c3ef698db2e6c9659a76ccd3cb9573ce36d7c8924dd77e6dfa84"
+  },
+  "release_batch_2026_10_25": {
+    "candidate": "d4b526e24cf5",
+    "source_commit": "32f2ab0591b33a975a1afec40524b07b3bbcc30f",
+    "report": "docs/CURRENT.md",
+    "automated": "58 groups and installer checks passed",
+    "scope": "Shell, handset reopen pose/stereo and forearm object-buffer cache. Native and physical gates/counts unchanged."
   }
 }

@@ -10,8 +10,8 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current execution batches the rigid-shell, reopen handoff and forearm-cache
-corrections before one build/check/deploy; see [CURRENT.md](CURRENT.md).
+Current batch `d4b526e24cf5` is built and deployed from source `32f2ab0`;
+see [CURRENT.md](CURRENT.md). All build/installer checks passed. No live loop ran.
 The identities below record the original audit baseline.
 
 ## Starting point and authority
@@ -218,7 +218,11 @@ both slots verify. Never remove settings, saves, source or retained evidence.
   is ready through Play-Dev. Next: physical Quest feedback and a newly
   reproducible field case; frame repeats remain measured and unresolved.
 
-## Current execution checkpoint — 25 October, latest direction
+## Current execution checkpoint — 25 October, completed batch
+
+Steps 1–3 below are complete: `d4b526e24cf5` is installed and ready through
+`Play-Dev.cmd`. Continue with the user's play feedback; do not rerun this batch
+or resume historical simulator loops. Remaining limits are in FIELD_FIXES.
 
 1. Finish the existing code batch on main: rigid prosthetic shell, retained
    iDroid reopen camera/stereo, and forearm crop cache replacement. Preserve

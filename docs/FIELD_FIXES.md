@@ -14,10 +14,10 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Current candidate — 25 October
 
-The current source batch includes the apparent third-arm correction, complete
-iDroid reopen pose/stereo handoff, and recovery of forearm cropping after native
-object-buffer replacement. Build and deploy together for the user's testing;
-see CURRENT and `build/dev/BUILD.json` for the candidate identity. The cache fix
+Candidate `d4b526e24cf5` / source `32f2ab0` is built and deployed. It includes
+the apparent third-arm correction, complete iDroid reopen pose/stereo handoff,
+and recovery of forearm cropping after native object-buffer replacement. All
+58 groups and installer checks passed; the user tests through `Play-Dev.cmd`. The cache fix
 preserves exact outfit admission and is not all-outfit acceptance. Earlier
 failed/interrupted runs remain failed; no repeated simulator soak is planned.
 

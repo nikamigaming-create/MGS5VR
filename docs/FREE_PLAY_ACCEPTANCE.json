@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
-  "candidate_status": "Combined shell/reopen/forearm-cache batch ready for one build/check/deploy; no new simulator pass claimed.",
+  "candidate": "d4b526e24cf5c3ef698db2e6c9659a76ccd3cb9573ce36d7c8924dd77e6dfa84",
+  "candidate_status": "Combined shell/reopen/forearm-cache candidate built, checked and deployed for user testing. No new simulator or physical acceptance claimed.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1331,21 +1331,21 @@
     }
   ],
   "active_work": {
-    "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
-    "source_commit": "f438de418252f2ada8448d70280b5523fd126f3a",
-    "checkpoint": "Combined shell/reopen/forearm-cache batch ready for one build/check/deploy; no new simulator pass claimed.",
+    "candidate": "d4b526e24cf5c3ef698db2e6c9659a76ccd3cb9573ce36d7c8924dd77e6dfa84",
+    "source_commit": "32f2ab0591b33a975a1afec40524b07b3bbcc30f",
+    "checkpoint": "Combined shell/reopen/forearm-cache candidate built, checked and deployed for user testing. No new simulator or physical acceptance claimed.",
     "plan": "docs/RELEASE_PLAN.md",
     "next_actions": [
-      "Build/check/deploy combined batch once.",
-      "Leave the candidate ready for user play; keep undiagnosed reports explicit."
+      "User play through Play-Dev.cmd.",
+      "Batch any newly diagnosed defects; preserve unresolved reports and completed scoped work."
     ],
     "runtime_requirement": "Wired Meta Quest Link / Meta OpenXR; both Play commands explicitly -MetaLink. Historical runtime observations in retained_work_history are not current setup instructions.",
     "build_slots": {
       "published_pin": "b627c7cacc9a",
-      "development": "c6f7e1f7b7cb"
+      "development": "d4b526e24cf5"
     },
-    "scope": "Scoped duplicate-shell correction; no publication or physical acceptance.",
-    "cleanup": "Owned game/simulator closed; no bot or test menu left open. Steam retained; published play unchanged."
+    "scope": "Checked and deployed candidate; not a publication or headset/full-game acceptance.",
+    "cleanup": "No owned gameplay or simulator test session left running. Steam was not stopped or restarted. Meta Link preference preserved."
   },
   "implementation_audit": {
     "date": "2026-10-24",
@@ -2330,10 +2330,10 @@
     "cleanup": "Owned game/simulator closed; Steam retained; no test menus/harnesses. Published play unchanged; Meta launch preference preserved."
   },
   "shared_fence_candidate": {
-    "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
+    "candidate": "d4b526e24cf5c3ef698db2e6c9659a76ccd3cb9573ce36d7c8924dd77e6dfa84",
     "source": {
-      "commit": "f438de418252f2ada8448d70280b5523fd126f3a",
-      "source_sha256": "6662ca4bec4c7c13100f532aae66a6d7a84421308e4a923e4798a3866c0d4310",
+      "commit": "32f2ab0591b33a975a1afec40524b07b3bbcc30f",
+      "source_sha256": "d3b6252a9c41980bf469b139304b773acfbbe53620afd7652f1b0c17adf74d2e",
       "changes": []
     },
     "automated": "58 groups and installer checks passed",
@@ -2353,7 +2353,7 @@
     },
     "publication": "none; published play unchanged",
     "blocker": null,
-    "next": "User stopped testing. Continue code batch; reopen correction is compile-only and not deployed.",
+    "next": "User tests deployed batch; no automatic soak loop.",
     "physical_headset_acceptance": false,
     "cleanup": "Owned game/simulator closed; no bot or test menu left open. Steam retained; published play unchanged.",
     "decision": "Retain shared fence: completed same-config ACC timing shows reduced repeats; wider performance gate remains open."
@@ -2377,17 +2377,37 @@
     "observed": "Second immediate reopening published menu_idroid=true with rig_sequence=0 and idroid_device_tracked=false; native input was not yet ready.",
     "existing_protection": "Stereo scene replay already rejects the unjoined frame; the trace alone does not establish a visible blank frame.",
     "code_change": "Keep last accepted tracked hand/device camera publication while ordinary handheld menu has no new rig. Skin preparation remains allowed and fresh publication resumes it.",
-    "validation": "Included in the current combined build/check/deploy batch; no new native run.",
-    "scope": "Does not alter native Help/Pause panel fallback or disabled/unestablished tracked rigs."
+    "validation": "Included in deployed d4b526e24cf5; focused contract and complete automated/installer checks passed. No native rerun.",
+    "scope": "Does not alter native Help/Pause panel fallback or disabled/unestablished tracked rigs.",
+    "candidate": "d4b526e24cf5c3ef698db2e6c9659a76ccd3cb9573ce36d7c8924dd77e6dfa84",
+    "compositor_correction": "Expected empty-rig handoff retains accepted stereo via awaitingRig; mismatched poses still reject."
   },
   "release_batch_2026_10_25": {
+    "candidate": "d4b526e24cf5c3ef698db2e6c9659a76ccd3cb9573ce36d7c8924dd77e6dfa84",
+    "source": {
+      "commit": "32f2ab0591b33a975a1afec40524b07b3bbcc30f",
+      "source_sha256": "d3b6252a9c41980bf469b139304b773acfbbe53620afd7652f1b0c17adf74d2e",
+      "changes": []
+    },
+    "build": "58 groups and installer checks passed",
+    "deployment": "Installed development into recorded local MGSV installation; personal settings preserved.",
     "changes": [
-      "Paused rigid bionic shell follows current forearm palette.",
-      "Reopen retains accepted hand/device anchor and stereo until fresh skin.",
-      "Forearm crop object-buffer cache recycles completed entries after resource replacement."
+      "Rigid left bionic shell follows the current paused arm palette.",
+      "iDroid reopen preserves accepted hand/device pose and stereo until fresh native skin; incomplete/new or retired skin cannot replace it.",
+      "Forearm-only crop recycles completed object-buffer snapshots after replacement instead of exhausting its fixed cache."
     ],
-    "validation": "Pending single combined build/check/deploy.",
-    "scope": "Native leg lengths and exact outfit admission unchanged. Physical and broad field acceptance remain open.",
-    "next": "Build/deploy once; user tests via Play-Dev. No repeated simulator loops."
+    "runtime_testing": "No new game or simulator session launched; user tests the combined candidate.",
+    "physical_headset": "unproven",
+    "full_game": "unproven",
+    "published_pin": "b627c7cacc9acd540e04193a811d3ca14bd59c9be542cc587345f1cd5ca2b47c",
+    "remaining": [
+      "Exact terrain/corridor report not reproduced.",
+      "Additional mounted entry/contact not established.",
+      "Other outfit crop admission and extreme cloth coverage remain limited.",
+      "Broader progression and physical Quest acceptance remain open."
+    ],
+    "cleanup": "No owned gameplay or simulator test session left running. Steam was not stopped or restarted. Meta Link preference preserved.",
+    "build_log": "artifacts/release-batched-candidate-build-final.log",
+    "first_build_failure": "Contract fixtures omitted required native skin publication; corrected fixture sequencing, retained their viewpoint assertions, then completed the build. No live test loop."
   }
 }
