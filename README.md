@@ -108,9 +108,11 @@ every native HUD effect.
 
 ## What is still experimental?
 
-TPP is the priority. Additional mounted types, broader outfit/forearm presentation,
-exact rock/corridor reports and complete mission/weapon/gadget coverage remain
-open. Historical HUD/rendering reports retain their tested-build scope.
+TPP is the priority. Forearm-only rendering supports 20 exact native outfit
+layouts; broader visual acceptance, additional mounted types, exact rock/corridor
+reports and complete mission/weapon/gadget coverage remain open.
+[Current candidate and known failures](docs/CURRENT.md) track development separately
+from published releases. Historical HUD/rendering reports retain their tested-build scope.
 [Tester feedback](docs/QUEST3_TESTER_FEEDBACK.md)
 · [Current status](docs/STATUS.md) · [Historical rendering notes](docs/RENDER_FIX_NOTES.md)
 · [Community report history](docs/COMMUNITY_RECOVERY_PLAN.md)

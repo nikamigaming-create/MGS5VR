@@ -1,13 +1,13 @@
-# Controller rig experiment
+# Controller rig
 
 Current code audit: [FIELD_FIXES.md](FIELD_FIXES.md). Native fixed-length legs,
 shared pelvis fit, clavicle reach, wrist isolation and garment drivers are already
-implemented. Forearm-only cropping is limited to identified sna5 geometry;
-rough cuffs and wider outfit/headset acceptance remain. Older observations below
+implemented. Forearm-only cropping admits 20 exact owned outfit layouts with
+closed cuffs; wider outfit, extreme-pose and headset acceptance remain. Older observations below
 retain their original scope; follow [RELEASE_PLAN.md](RELEASE_PLAN.md) for next work.
 
-Work in progress for the exact TPP 1.0.15.4 executable in the profile. This is
-disabled by default. AM MRS-4 and WU pistol interactions have simulator observations;
+Work in progress for the exact TPP 1.0.15.4 executable in the profile. The
+current full-body setting defaults to enabled. AM MRS-4 and WU pistol interactions have simulator observations;
 physical alignment and complete weapon acceptance remain unproven. See the
 [complete Touch controls](CONTROLS.md) before testing.
 
@@ -52,8 +52,11 @@ supply no contact. This is ground support, not hand/weapon wall collision.
 The primary body's verified bone 53 (`SKL_300_ASRROOT`, hash `ec70c442`,
 parent 0) is the hip holster. Its published render matrix has zero scale during
 an accepted VR rig update. Native animation channels and the held wrist socket
-are preserved. The stowed rifle stock disappeared in the observed pistol/prone
-views, while drawing the rifle remained functional. This is a guarded local
+are preserved. This hip rule remains limited to body fallback. The later
+moving-only intrusion was isolated to PRIMARY_BACK, so extending the hip rule
+was reverted. The back-assembly visibility correction and its current review
+status are recorded in CURRENT. Earlier pistol/prone observations showed the
+hip stock hidden while drawing the rifle remained functional. This is a guarded local
 mount rule, not a global model-visibility scan or an all-holster solution.
 
 An earlier experiment at RVA `0x1016e40` changed the separate 21-joint gameplay

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "d4b526e24cf5c3ef698db2e6c9659a76ccd3cb9573ce36d7c8924dd77e6dfa84",
-  "candidate_status": "Combined shell/reopen/forearm-cache candidate built, checked and deployed for user testing. No new simulator or physical acceptance claimed.",
+  "candidate": "1933aa81fc8ecf9798e0d14f4eb13999528b1d8b33ff738a384ee6e29b19e7bd",
+  "candidate_status": "1933aa81fc8e failed moving geometry review. Back slot isolated; source correction awaiting build and native review.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2409,5 +2409,28 @@
     "cleanup": "No owned gameplay or simulator test session left running. Steam was not stopped or restarted. Meta Link preference preserved.",
     "build_log": "artifacts/release-batched-candidate-build-final.log",
     "first_build_failure": "Contract fixtures omitted required native skin publication; corrected fixture sequencing, retained their viewpoint assertions, then completed the build. No live test loop."
+  },
+  "outfit_action_batch_2026_10_25": {
+    "candidate": "971dfff38c290f9133c0b63943d8c012f816cf3764fae9334b26661ed2e77ace",
+    "source": "c8a7a296ec1fcf3d9df2f81eb9f31065aa4ecba7",
+    "build_log": "artifacts/release-outfit-action-batch-build-final.log",
+    "combined_route_observation": "Ten cases reported observed_pass, with selected arm/iDroid eye review. Scratch run 20261025T125553142316Z expired before retention; not retained acceptance evidence. Do not repeat only to replenish evidence.",
+    "terrain_run": "20261025T125843318333Z",
+    "terrain_result": "Six segments completed; next exceeded native displacement bound after release. No reported hang reproduced.",
+    "moving_geometry_run": "20261025T130215121128Z",
+    "moving_geometry_result": "Four forward/backward segments completed; source-eye video reproduces stowed stock in upper-left view during movement.",
+    "failed_fixture": "20261025T130109341945Z: outcome already satisfied; no peripheral motion dispatched.",
+    "physical_headset": "unproven"
+  },
+  "moving_stock_correction": {
+    "candidate": "1933aa81fc8ecf9798e0d14f4eb13999528b1d8b33ff738a384ee6e29b19e7bd",
+    "source": "4538bc7c517b7591cd4066c64890585450fa592a",
+    "build_log": "artifacts/release-moving-stock-build.log",
+    "change": "Restore exact named hip-stock safeguard for valid full-body frames as well as fallback; held wrist socket untouched.",
+    "build": "58/58 groups and installer checks passed; development deployed; published play pin unchanged.",
+    "verification": "FAILED: 20261025T131456983791Z still shows intrusion. Hip hypothesis reverted.",
+    "adjacent_weapon": "20261025T131546151339Z observed_pass draw/release",
+    "isolation": "20261025T132017913994Z: native PRIMARY_BACK visibility off removes intrusion during four walking segments; restored true afterward. Diagnostic, not acceptance.",
+    "next_change": "Native main-view concealment for owned stowed custom back assemblies, restore selected weapon on draw/manipulation and release on leaving field presentation. Shadows preserved."
   }
 }

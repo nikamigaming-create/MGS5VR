@@ -17,12 +17,15 @@ ordered execution plan. All supplied community reports remain in scope.
 The active source batch expands exact forearm profiles to 20 owned outfits,
 repairs paused-part cache lifecycle, separates mounted body/eye admission from
 generic action input, and invalidates mounted aiming across action changes.
-See CURRENT for pending combined build/smoke status. The terrain report now has
-a regression clue (it predates the first-person rig change), not an exact
+The moving-only intrusion is isolated to the stowed back weapon. Candidate
+`1933aa81fc8e` did not fix it; the hip-stock hypothesis is reverted. The source
+now conceals the owned stowed back assembly from main view and restores it on
+draw/manipulation or leaving field presentation. Build and moving review are next. The terrain report now has
+a regression clue (it began after the first-person rig change), not an exact
 location or confirmed cause. These edits do not close FP04/FP16 or whole-game
 and physical-headset acceptance.
 
-Candidate `d4b526e24cf5` / source `32f2ab0` is built and deployed. It includes
+Earlier candidate `d4b526e24cf5` / source `32f2ab0` included
 the apparent third-arm correction, complete iDroid reopen pose/stereo handoff,
 and recovery of forearm cropping after native object-buffer replacement. All
 58 groups and installer checks passed; the user tests through `Play-Dev.cmd`. The cache fix
@@ -75,7 +78,7 @@ there is no blanket FP17/body closure.
 | FP15 — mortar viewpoint | head_camera retains native mounted operator eye; controller_rig admits mounted body without forcing standing posture. | Wider headings, contact, translucent geometry, firing/impact and physical review. The 62.8 cm standing-eye mismatch is already repaired. |
 | FP16 — small rocks | Native floor/posture/body support exists, but no targeted repair for the exact reported rock interruption was established by the audit. | Locate/reproduce in both directions; join floor, velocity, action and eye height. A route guard is not a diagnosed production defect. |
 | FP17 — wrist coupling/reach | Acquired-supported-weapon-only torso correction, native clavicle reach, full arm/per-eye clearance and infeasible cross-head fallback in controller_rig/arm_ik. Garment driver translations follow solved arms. | Physical wrist isolation/reach and remaining sleeve crowding. These corrections exist; do not restart bare-wrist torso or cross-head-freeze implementation. |
-| Latest body fallback | [forearm_visibility](../src/forearm_visibility.cpp) is connected to production draw hooks and hides upper sleeves for exact admitted sna5 geometry when full body is off/unavailable. Native thigh/shin lengths stay fixed; garment branches follow solved joints. | Outfit-specific admission is a real implementation limit. Supported cuff loops have flat independently shaded caps and native attribute-slot aliases are handled. Other outfits/ambiguous boundaries and physical review remain open. The earlier startup-failing reconstruction remains excluded. |
+| Latest body fallback | [forearm_visibility](../src/forearm_visibility.cpp) is connected to production draw hooks and hides upper sleeves for 20 exact admitted native outfit layouts when full body is off/unavailable. Native thigh/shin lengths stay fixed; garment branches follow solved joints. | Admission remains exact and outfit-specific; the 20 profiles expand implementation coverage, not live acceptance. Supported cuff loops have flat independently shaded caps and native attribute-slot aliases are handled. Other outfits/ambiguous boundaries and physical review remain open. The earlier startup-failing reconstruction remains excluded. |
 | FP13 — free-roam route | Existing VR menu path: Missions -> Mission List -> Free Roam; [controls](CONTROLS.md) corrected. | Scoped resolved through on-foot arrival. No unlock/save modification or extra root menu required. Broader progression remains FP12. |
 | FP14 — sortie head | [player_visibility](../src/player_visibility.cpp) restores native preview visibility and first-person concealment afterward. | Scoped resolved in development; preserve during adjacent transit/body review. |
 | FP12 — remaining regressions | Physical binocular raised/marking events and native intel requests exist in [native_actions](../src/native_actions.cpp)/[optic_markers](../src/optic_markers.cpp); retained village marking advances the native lesson. Other systems remain inventoried in [GAMEPLAY_FEATURES](GAMEPLAY_FEATURES.md). | Full missions, other weapons/items/buddies/menus and historical reports need exact-build reconciliation. A lesson or source path is not a whole mission pass. |

@@ -15,6 +15,15 @@ void publishFullBodyVisibility(uintptr_t owner,uintptr_t model,bool ready) noexc
 constexpr bool hidePlayerInFirstPerson(bool immersiveActive,bool scriptedDemo) noexcept {
     return immersiveActive&&!scriptedDemo;
 }
+// Native custom slots 873/874 are the two back-weapon variants (assemblies
+// 1/4). First-person stow concealment must release on draw and manipulation,
+// and must never claim hip/sidearm assemblies or the physical cabin weapons.
+constexpr bool concealStowedBackAssembly(uint32_t assembly,uint32_t equipment,
+                                         bool fieldFirstPerson,bool drawn) noexcept {
+    if(!fieldFirstPerson||(assembly!=1&&assembly!=4))return false;
+    const bool selected=(assembly==1&&equipment==873)||(assembly==4&&equipment==874);
+    return !(selected&&drawn);
+}
 // A short camera-publication gap is only permission to restore concealed
 // groups when current presentation policy also says concealment is no longer
 // wanted. An active stereo menu retains first-person concealment through Pause.

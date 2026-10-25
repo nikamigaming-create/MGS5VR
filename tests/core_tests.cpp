@@ -592,6 +592,19 @@ int main(){
         }
     }
     expect(!hidePlayerInFirstPerson(false,false),"inactive immersive presentation leaves the native body visible");
+    for(const auto [assembly,equipment]:{std::pair{1u,873u},std::pair{4u,874u}}){
+        expect(concealStowedBackAssembly(assembly,equipment,true,false),
+            "a selected but stowed back weapon cannot swing through the first-person eyes");
+        expect(!concealStowedBackAssembly(assembly,equipment,true,true),
+            "drawing or manipulating the selected back weapon restores its native model");
+        expect(concealStowedBackAssembly(assembly,875,true,true),
+            "drawing a sidearm does not expose the stowed back assembly");
+        expect(!concealStowedBackAssembly(assembly,equipment,false,false),
+            "cabin and authored presentation release field stow concealment");
+    }
+    for(const auto assembly:{0u,2u,3u,5u,6u})
+        expect(!concealStowedBackAssembly(assembly,873,true,false),
+            "back-weapon concealment cannot claim hip, sidearm or unknown assemblies");
     expect(hidePlayerInFirstPerson(true,false),"immersive first-person gameplay hides the native torso/head");
     const bool immersiveView=true;bool scriptedDemo=true;
     expect(!hidePlayerInFirstPerson(immersiveView,scriptedDemo),"scripted prologue scenes keep the complete native body visible");

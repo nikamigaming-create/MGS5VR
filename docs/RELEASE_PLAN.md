@@ -10,8 +10,10 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current batch `d4b526e24cf5` is built and deployed from source `32f2ab0`;
-see [CURRENT.md](CURRENT.md). All build/installer checks passed. No live loop ran.
+Current checked batch `1933aa81fc8e` failed moving stock review. The back slot
+is now isolated and a precise stowed-assembly visibility correction is in source;
+build/deploy then moving/back-weapon draw review are next.
+See [CURRENT.md](CURRENT.md) for retained failures and precise coverage.
 The identities below record the original audit baseline.
 
 ## Starting point and authority
@@ -42,8 +44,8 @@ Preserve them. FP13's free-roam route and FP14's sortie head are scoped resolved
 
 Concrete implementation limits: physical mounted aiming admits native actions
 `0x46` and `0x47` only. The active source batch expands forearm-only cropping
-from one sna5 layout to 20 exact owned outfit profiles; combined build and
-visual review are next. The previous sna5 cuff has scoped stereo review;
+from one sna5 layout to 20 exact owned outfit profiles; the combined build passed and the selected outfit was visually inspected.
+Other outfits remain unreviewed. The previous sna5 cuff has scoped stereo review;
 extreme full-body sleeve crowding remains a visible limitation.
 The exact rock/corridor reports remain undiagnosed. Missing coverage for another
 weapon, outfit or lesson does not establish a new defect.

@@ -16,6 +16,8 @@ namespace {
 uintptr_t base{};
 using GroupFn=void(*)(void*,uint32_t);
 GroupFn hideVisibleGroup{},showVisibleGroup{};
+using ResolveWeaponPart=uintptr_t(*)(void*,uint32_t,uint32_t,uint32_t*);
+ResolveWeaponPart resolveWeaponPart{};
 using VisualUpdate=void(*)(void*,uint32_t);
 VisualUpdate originalVisualUpdate{};
 struct alignas(16) FadePoint {float x{},y{},z{},w{};};
@@ -228,10 +230,15 @@ struct Binding {
     bool equipment{};
     uintptr_t service{},itemInterface{};
     uint32_t itemIndex{};
+    bool backWeapon{};
+    uintptr_t custom{};
+    uint64_t resourceCode{};
+    uint32_t assembly{},part{};
     std::array<GroupChange,128> groups{};
     uint16_t changed{};
 };
-std::array<Binding,32> hidden{};
+// Up to 32 modular player parts plus two twelve-part back assemblies and NVG.
+std::array<Binding,64> hidden{};
 std::mutex authoredHeadMutex;
 mgs5vr::AuthoredHeadVisibility authoredHead;
 bool names(uintptr_t model,std::array<uint32_t,128>& result,uint16_t& count){
@@ -243,18 +250,27 @@ bool names(uintptr_t model,std::array<uint32_t,128>& result,uint16_t& count){
 bool owned(const Binding& b){
     if(get<uintptr_t>(b.owner)!=base+0x23b8218||get<uintptr_t>(b.owner+0x370)!=b.character
         ||get<uintptr_t>(b.character)!=base+0x2295210)return false;
-    if(b.equipment){
+    if(b.equipment||b.backWeapon){
         const auto component=get<uintptr_t>(b.character+0x80);
         if(get<uintptr_t>(component)!=base+0x23b3e80||get<uintptr_t>(component+8)!=b.character
             ||get<uintptr_t>(component+0x60)!=b.service||get<uintptr_t>(b.service)!=base+0x234b840
-            ||get<uintptr_t>(b.service+0x190)!=b.itemInterface
             ||get<uintptr_t>(b.itemInterface)!=base+0x22e2970)return false;
+        if(b.backWeapon){
+            if(!resolveWeaponPart||get<uintptr_t>(b.service+0xf0)!=b.custom
+                ||get<uintptr_t>(b.custom)!=base+0x233ad90
+                ||get<uintptr_t>(base+0x233ad90+0x10)!=base+0xd45930
+                ||(b.assembly!=1&&b.assembly!=4)||b.part>11)return false;
+            uint32_t index{};
+            if(resolveWeaponPart(reinterpret_cast<void*>(b.custom),b.assembly,b.part,&index)!=b.itemInterface
+                ||index!=b.itemIndex)return false;
+        }else if(get<uintptr_t>(b.service+0x190)!=b.itemInterface)return false;
         const auto count=get<uint32_t>(b.itemInterface+0x50);
         const auto models=get<uintptr_t>(b.itemInterface+0x58);
         if(!models||!count||count>256||b.itemIndex>=count
             ||get<uintptr_t>(models+static_cast<uintptr_t>(b.itemIndex)*8)!=b.model
             ||get<uintptr_t>(b.model)!=base+0x20f4d90)return false;
         const auto code=get<uint64_t>(b.model+0x120);
+        if(b.backWeapon)return code==b.resourceCode;
         return std::find(nvgModels.begin(),nvgModels.end(),code)!=nvgModels.end();
     }
     if(b.body){
@@ -361,7 +377,7 @@ void conceal(Binding candidate){
         slot=std::find_if(hidden.begin(),hidden.end(),[](const auto& b){return !b.model;});
         if(slot==hidden.end())return;
         *slot=candidate;
-        mgs5vr::log(candidate.equipment?"First-person NVG goggles hidden before draw preparation; native vision filter and shadow retained":candidate.headOnly?"Integrated player head subtree hidden from main view; native body and shadow retained":candidate.hideArms?"Front-end player arms hidden before draw preparation; native shadow retained":candidate.body?"First-person player body hidden from main view; native shadow retained":"First-person player head hidden from main view; native shadow retained");
+        mgs5vr::log(candidate.backWeapon?"First-person stowed back weapon concealed; native draw/equip and shadow retained":candidate.equipment?"First-person NVG goggles hidden before draw preparation; native vision filter and shadow retained":candidate.headOnly?"Integrated player head subtree hidden from main view; native body and shadow retained":candidate.hideArms?"Front-end player arms hidden before draw preparation; native shadow retained":candidate.body?"First-person player body hidden from main view; native shadow retained":"First-person player head hidden from main view; native shadow retained");
     }
     std::array<uint32_t,128> groups{};uint16_t count{};
     if(!names(candidate.model,groups,count))return;
@@ -543,6 +559,12 @@ RocketHandPresentation::~RocketHandPresentation(){
 }
 void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
     base=moduleBase;hideVisibleGroup=showVisibleGroup=nullptr;
+    resolveWeaponPart=nullptr;
+    constexpr std::array<unsigned char,10> partSignature{0x41,0x83,0xf8,0x0b,0x0f,0x87,0xb9,0,0,0};
+    std::array<unsigned char,10> partBytes{};
+    if(read(base+0xd45930,partBytes)&&partBytes==partSignature
+        &&get<uintptr_t>(base+0x233ad90+0x10)==base+0xd45930)
+        resolveWeaponPart=reinterpret_cast<ResolveWeaponPart>(base+0xd45930);
     wchar_t trace[2]{};
     visibilityTraceEnabled.store(GetEnvironmentVariableW(L"MGS5VR_IDROID_UI_BOUNDARY_TRACE",trace,2)==1&&trace[0]==L'1');
     if(visibilityTraceEnabled.load())log("Player visibility source observation enabled max_boundaries=4 max_sources_per_boundary=12 max_ms=45000 writes=0");
@@ -614,11 +636,18 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool 
     // A recent solve from this model alone is insufficient after a tracking,
     // activation or presentation boundary. Use the current admitted rig and
     // never acquire the camera lock while holding hiddenMutex.
-    const auto frame=firstPerson&&!authoredBody&&fullBodyRequested.load()
+    const auto frame=firstPerson&&!authoredBody
         ?headCamera().publishedRigFrame(steadyMilliseconds()):std::nullopt;
     std::lock_guard lock(hiddenMutex);
     lastFirstPersonUpdateMs.store(firstPerson?GetTickCount64():0);
     const auto now=GetTickCount64();
+    const bool fieldGear=frame&&frame->applied&&frame->playerOwner==owner
+        &&frame->weaponRig.componentAccepted&&frame->weaponRig.instanceIndexMatched&&frame->weaponRig.resourceAccepted
+        &&!frame->controllers.cabinPlay&&!frame->controllers.cabinTransit
+        &&!frame->controllers.frontEnd&&!frame->controllers.authoredCamera&&!frame->body.mounted;
+    const uint32_t equipment=fieldGear?(frame->weaponRig.resourceHandle>>5)&0x7ffu:0;
+    const bool drawn=fieldGear&&(frame->controllers.weaponReady||(frame->weaponRig.mode&0x04000000u)!=0);
+    for(auto& b:hidden)if(b.backWeapon&&!concealStowedBackAssembly(b.assembly,equipment,fieldGear,drawn))restore(b);
     if(!firstPerson||!fullBodyRequested.load())fullBodyReady={};
     const bool ready=frame&&frame->applied&&frame->body.valid&&frame->controllers.fullBody
         &&fullBodyRequested.load()&&fullBodyReady.owner==owner&&frame->playerOwner==owner
@@ -660,6 +689,27 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool 
     if(get<uintptr_t>(weapon)==base+0x23b3e80&&get<uintptr_t>(weapon+8)==character){
         const auto service=get<uintptr_t>(weapon+0x60);
         if(get<uintptr_t>(service)==base+0x234b840){
+            const auto custom=get<uintptr_t>(service+0xf0);
+            if(fieldGear&&resolveWeaponPart&&get<uintptr_t>(custom)==base+0x233ad90){
+                for(const uint32_t assembly:{1u,4u}){
+                    if(!concealStowedBackAssembly(assembly,equipment,true,drawn))continue;
+                    for(uint32_t part=0;part<12;++part){
+                        uint32_t index{};
+                        const auto partInterface=resolveWeaponPart(reinterpret_cast<void*>(custom),assembly,part,&index);
+                        if(get<uintptr_t>(partInterface)!=base+0x22e2970)continue;
+                        const auto count=get<uint32_t>(partInterface+0x50);
+                        const auto models=get<uintptr_t>(partInterface+0x58);
+                        if(!models||!count||count>256||index>=count)continue;
+                        const auto model=get<uintptr_t>(models+static_cast<uintptr_t>(index)*8);
+                        if(get<uintptr_t>(model)!=base+0x20f4d90)continue;
+                        Binding stowed{owner,character,0,0,0,model};
+                        stowed.backWeapon=true;stowed.service=service;stowed.custom=custom;
+                        stowed.itemInterface=partInterface;stowed.itemIndex=index;
+                        stowed.resourceCode=get<uint64_t>(model+0x120);stowed.assembly=assembly;stowed.part=part;
+                        conceal(stowed);
+                    }
+                }
+            }
             const auto interface=get<uintptr_t>(service+0x190);
             if(get<uintptr_t>(interface)==base+0x22e2970){
                 const auto models=get<uintptr_t>(interface+0x58);

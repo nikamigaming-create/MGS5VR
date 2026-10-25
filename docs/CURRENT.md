@@ -2,7 +2,7 @@
 
 ## Active combined correction batch
 
-The next batch is on main, ahead of the checked candidate below:
+Candidate `971dfff38c29`, source `c8a7a29`, built, checked and deployed the following batch:
 
 - Paused modular-arm cache covers all 32 admitted owned parts, retires replaced
   models and invalidates frozen poses on resource changes.
@@ -32,10 +32,42 @@ They distinguish collision-constrained movement from grounding/presentation.
 Applying that separation here is an engineering decision, not evidence that
 MGSV has a particular collision defect. Keep native locomotion authoritative.
 
-Next: build/deploy this whole batch, then one combined native smoke covering
-arms/body fallback, iDroid reopening, traversal and an intact mounted fixture.
-Investigate failures from that combined pass, without repeating already passed
-single-case loops. Do not publish or advance the play pin from a build alone.
+Candidate `1933aa81fc8e` / `4538bc7` built and deployed, but its attempted
+hip-stock safeguard did **not** remove the reported intrusion. Retained moving
+run `20261025T131456983791Z` still shows it; adjacent weapon draw/release in
+`20261025T131546151339Z` passed. Do not claim that candidate fixes this report.
+
+Native slot isolation `20261025T132017913994Z` hides only PRIMARY_BACK during
+four forward/backward segments: the intrusion disappears. Native visibility was
+restored in cleanup. This diagnostic is not acceptance. The back assembly is
+already attached to the fitted body; its stowed stock crosses the first-person
+eye during crouched gait. The earlier hip-stock hypothesis is reverted.
+
+The correction now in source uses native main-view group concealment for the
+owned stowed custom back assemblies (1/4), preserving their shadows. Drawing or
+manipulating the selected back weapon restores its groups. Cabin inspection,
+scripted presentation, other actors and other weapon slots retain their existing
+ownership. Typed player/service/interface/resource joins and the verified native
+part resolver identify every assembly part; no arbitrary nearby mesh is hidden.
+Build/deploy this correction, then review moving stow and back-weapon draw/stow.
+Published `play/` remains unchanged.
+
+The earlier combined route `20261025T125553142316Z` reported ten completed
+cases: forearm fallback poses, left iDroid, Rival Help dismissal, free-roam
+selection, loading and disembark. Selected arm/iDroid eyes were inspected.
+That scratch run expired before retention, so it is a work observation rather
+than retained acceptance evidence; do not repeat it just to replenish a count.
+
+Retained traversal `20261025T125843318333Z` completed six segments before native
+displacement exceeded the bot bound after release. This was excess movement,
+not a terrain hang. Four forward/backward segments in the retained moving-stock
+recording completed with valid full-body fitting. The exact terrain hang remains
+unlocalized. The peripheral fixture `20261025T130109341945Z` dispatched no motion
+because its outcome was already satisfied; it remains a failed fixture.
+
+Next: finish the new moving/held-weapon review, repair any actual failures and
+update the ledger. Continue remaining diagnosed work without ACC soak repeats.
+Do not publish or advance the play pin from a build alone.
 
 ## Previously checked candidate
 
