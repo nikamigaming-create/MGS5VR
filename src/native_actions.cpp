@@ -1335,6 +1335,10 @@ void pump(void* state){
             if(!status)status=original(state,0,1,0);
             size_t length{};const auto* value=getString(state,-1,&length);
             const auto outcome=value?std::string_view(value,length):std::string_view{};
+            if(!status&&outcome=="returned-to-field"){
+                handheldOpenedInHelicopter=false;
+                log("Handheld iDroid: on-board terminal returned to field ownership");
+            }
             if(!status&&(outcome=="closed"||outcome=="boarding-closed")){
                 idroidSceneHandoff.reset();
                 requestHandheldIdroidOpen(0);

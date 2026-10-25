@@ -1663,11 +1663,11 @@ bool releaseNativeIdroidTutorialPause(bool requestedStow) noexcept {
 }
 uintptr_t captureNativeIdroidStowHelpOwner() noexcept {
     const auto mode=nativeIdroidTutorialMode();
-    // FOB, SECURITY and the Mother Base/FOB inventory lessons create a Help
+    // FOB, SECURITY, inventory and Challenge Tasks lessons create a Help
     // owner after requested terminal stow. Capture only these reproduced
     // lessons; nativeIdroidStowHelpState still requires that same owner,
     // a closed terminal, mode zero and its exact native Help pause handle.
-    if(!pauseReaderVerified||!mode||(*mode!=10&&*mode!=11&&*mode!=14)||!nativeIdroidOpen()||nativePauseMenuOpen())return 0;
+    if(!pauseReaderVerified||!nativeIdroidHasPostStowHelp(mode)||!nativeIdroidOpen()||nativePauseMenuOpen())return 0;
     uintptr_t manager{},pause{},type{};uint32_t kind{};
     return read(base+0x2bd3b80,&manager,sizeof(manager))&&manager
         &&read(manager,&type,sizeof(type))&&type==base+0x218fba0
@@ -1678,7 +1678,7 @@ uintptr_t captureNativeIdroidStowHelpOwner() noexcept {
 uintptr_t nativeIdroidInformationalHelpOwner() noexcept {
     const auto mode=nativeIdroidTutorialMode();
     const auto popup=nativePopupSnapshot();
-    if(!enabled.load()||!pauseReaderVerified||!mode||(*mode!=10&&*mode!=11&&*mode!=14)
+    if(!enabled.load()||!pauseReaderVerified||!nativeIdroidHasPostStowHelp(mode)
        ||!nativeIdroidOpen()||!nativePauseMenuOpen()||!popup.active||*popup.active)return 0;
     uintptr_t manager{},pause{},type{},handle{};uint32_t kind{},level{};
     if(!read(base+0x2bd3b80,&manager,sizeof(manager))||!manager

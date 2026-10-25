@@ -300,6 +300,11 @@ int main(){
             &&!nativeIdroidTutorialPauseReleaseAllowed(std::nullopt,false,true,true)
             &&!nativeIdroidTutorialPauseReleaseAllowed(17,false,true,true),
             "Help/Pause ownership and unknown tutorial values cannot release a pause");
+        expect(nativeIdroidHasPostStowHelp(16)&&nativeIdroidHasPostStowHelp(10)
+            &&nativeIdroidHasPostStowHelp(11)&&nativeIdroidHasPostStowHelp(14)
+            &&!nativeIdroidHasPostStowHelp(0)&&!nativeIdroidHasPostStowHelp(15)
+            &&!nativeIdroidHasPostStowHelp(std::nullopt),
+            "Reproduced Challenge Tasks stow captures Help without admitting unrelated lessons");
         expect(nativeIdroidStowHelpCloseAllowed(0,false,32,true),
             "the exact post-stow Help may close under its captured request");
         expect(!nativeIdroidStowHelpCloseAllowed(11,false,32,true)

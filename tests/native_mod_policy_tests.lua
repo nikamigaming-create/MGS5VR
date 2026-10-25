@@ -50,6 +50,22 @@ return function(godSource, interruptionSource, openSource)
     open = true; interruption.fieldHandset = false
     check(run(interruptionSource, interruption) == 'unchanged' and open and stops == 2,
         'A fresh handset opened aboard remains available')
+    interruption.PlayerStatus = {NORMAL_ACTION = 1}
+    local onFoot = false
+    interruption.PlayerInfo = {AndCheckStatus = function() return onFoot end}
+    ridden = 65535; interruption.vars.playerVehicleGameObjectId = 65535
+    check(run(interruptionSource, interruption) == 'unchanged' and open,
+        'An incomplete exit animation cannot retire the on-board handset lease')
+    onFoot = true
+    check(run(interruptionSource, interruption) == 'returned-to-field' and open and stops == 2,
+        'Completed on-foot exit returns ownership to the field without closing the handset')
+    interruption.vars.playerVehicleGameObjectId = vehicle
+    check(run(interruptionSource, interruption) == 'unchanged' and open,
+        'A stale vehicle identity cannot complete the field ownership handoff')
+    interruption.fieldHandset = true; ridden = vehicle
+    check(run(interruptionSource, interruption) == 'boarding-closed' and not open and stops == 3,
+        'A second pickup stows the handset after the field handoff')
+    open = true
     interruption.fieldHandset = true; isHelicopter = false
     check(run(interruptionSource, interruption) == 'unchanged' and open,
         'Vehicle and horse rides do not acquire the helicopter stow policy')

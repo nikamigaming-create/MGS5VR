@@ -52,6 +52,12 @@ inline bool nativeIdroidTutorialPauseReleaseAllowed(std::optional<unsigned> mode
     return *mode==0||(requestedStow&&closing);
 }
 
+inline bool nativeIdroidHasPostStowHelp(std::optional<unsigned> mode) noexcept {
+    // Reproduced FOB, Security, inventory and Challenge Tasks lessons.
+    // This admits owner capture only; closing still requires the exact Help
+    // owner, mode zero, closed terminal and native pause-handle identity.
+    return mode&&(*mode==10||*mode==11||*mode==14||*mode==16);
+}
 inline bool nativeIdroidStowHelpCloseAllowed(std::optional<unsigned> mode,bool idroidOpen,
     unsigned pauseKind,bool ownedRequest) noexcept {
     return ownedRequest&&mode&&*mode==0&&!idroidOpen&&pauseKind==32;

@@ -1,5 +1,24 @@
 # Current MGS5VR work — 25 October 2026
 
+## Lifecycle follow-up — preparing playtest candidate
+
+Two related corrections are batched before the next build. A handset deliberately
+opened on a helicopter returns to field ownership after a confirmed on-foot exit;
+the next pickup can therefore stow it instead of inheriting a permanent exemption.
+Challenge Tasks tutorial mode 16 now participates in the existing exact-owner
+post-stow Help cleanup. Retained 20261025T143421433785Z reproduced its Exit Tutorial
+notice remaining after terminal stow; 20261025T143543140256Z acknowledged it manually.
+The correction does not mark a lesson complete or modify save/progress flags.
+
+Current sleeve diagnosis: retained 20261025T145002391598Z joins read-only native
+palette samples with the owned sna5 mesh and stereo eye observations within 8 ms.
+The nearest sampled right-sleeve vertex is about 9.8 cm from the right eye in the
+extreme cross-head pose (about 22 cm neutral). It is entirely elbow-weighted.
+This does not establish eye penetration or justify increasing clearance blindly;
+full-body occlusion in extreme poses remains a presentation limitation. The native
+animation channels are restored after the skin hook; no movement-capsule write
+was found in the rig/camera audit. Exact terrain failures remain unlocalized.
+
 ## Current development candidate — arm/pickup batch
 
 **`a33bfd559b9e` / source `f5dfb37` is built, checked and deployed for
