@@ -122,7 +122,7 @@ inline size_t closeForearmCuffs(std::span<const Vec3> positions,
         if(!manifold||caps.size()>slots.size())continue;
         if(fitted){
             std::map<uint16_t,uint16_t> duplicates;
-            for(const auto& cap:caps)for(auto vertex:cap)duplicates.emplace(vertex,0);
+            for(const auto& cap:caps)for(auto vertex:cap)duplicates.emplace(vertex,uint16_t{});
             if(duplicates.size()>spare.size())continue;
             // A cut through whole triangles has a saw-tooth axial rim. Fit
             // only that rim to the authored elbow plane; hands and distal
