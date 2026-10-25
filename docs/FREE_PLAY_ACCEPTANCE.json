@@ -2560,5 +2560,17 @@
     "return_approach": "20261025T153124762503Z: stopped at parked jeep collision; no mapped starting floor reached",
     "scope": "Actual open-handset pickup boarding remains unverified. Neither the route guard nor this hover setup establishes the reported terrain defect.",
     "cleanup": "Owned game/simulator closed, inputs released, Steam retained, per-game Meta Link restored, published play unchanged."
+  },
+  "sleeve_reach_diagnosis_2026_10_25": {
+    "run": "20261025T145002391598Z",
+    "artifact": "sleeve-reach-constraint.json",
+    "native_arm_length_m": 0.5389997661442361,
+    "requested_wrist_reach_m": 1.0690466907618361,
+    "solved_wrist_request_error_m": 0.616089954060176,
+    "join_ms": -7.0846,
+    "source_compatibility": "controller_rig.cpp, arm_ik.cpp and stereo.cpp unchanged from f5dfb37 through bc813e5",
+    "classification": "Synthetic cross-head target is outside native reach; not a reachable-arm regression baseline",
+    "next_action": "Use physical feedback from current candidate to localize any ordinary-motion arm pop; do not expand clearance from the infeasible fixture",
+    "scope": "Does not close physical arm presentation or every outfit; no gameplay code or installed candidate changed"
   }
 }

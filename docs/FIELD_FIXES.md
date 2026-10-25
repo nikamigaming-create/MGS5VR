@@ -23,6 +23,9 @@ reset and Challenge Tasks mode16 post-stow Help cleanup.
 - Sleeve pop during motion: a bounded same-owner camera/skin visibility continuity
   repair is deployed as a33bfd559b9e; scoped moving review passed. This does not close extreme
   cloth crowding or every outfit.
+  The retained synthetic cross-head case asks for 1.069 m of shoulder-to-wrist
+  reach from 0.539 m of native arm length. It cannot serve as a reachable-arm
+  regression baseline; keep the current physical ordinary-motion report separate.
 - Open iDroid while boarding field pickup: native passenger stow and deliberate
   on-board reopen are deployed with passing lifecycle cases and flight/field
   open/stow/reopen observations. Actual pickup boarding

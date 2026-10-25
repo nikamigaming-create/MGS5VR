@@ -16,6 +16,16 @@ physical test; `Play.cmd` retains the published release. The release goal remain
 open for exact terrain/corridor reproduction, extreme cloth crowding, actual
 field-pickup boarding and the broader field/headset scope in FIELD_FIXES.
 
+The retained synthetic cross-head sleeve case is not a reachable-arm baseline.
+Reconstructing the requested wrist through the production tracking transform and
+the sampled palm-to-wrist frame gives 1.069 m from its fitted shoulder, versus
+0.284 m upper arm plus 0.255 m forearm. The solved wrist is 0.616 m from that
+request. `20261025T145002391598Z/sleeve-reach-constraint.json` retains the values
+and the roughly 7 ms palette/observation separation. The arm solver and tracking
+transform are unchanged between that run and the current candidate. Do not tune
+clearance from this impossible reach or treat it as an ordinary-motion failure.
+The physical arm-pop report still needs feedback on the current candidate.
+
 Pickup follow-up cleared the arrival point through native walking
 (`20261025T152529456360Z`), but the called helicopter stayed hovering
 (`20261025T152644554491Z`). It also hovered in the bounded native-camera comparison
@@ -72,7 +82,9 @@ palette samples with the owned sna5 mesh and stereo eye observations within 8 ms
 The nearest sampled right-sleeve vertex is about 9.8 cm from the right eye in the
 extreme cross-head pose (about 22 cm neutral). It is entirely elbow-weighted.
 This does not establish eye penetration or justify increasing clearance blindly;
-full-body occlusion in extreme poses remains a presentation limitation. The native
+full-body occlusion in extreme poses remains a presentation limitation. The
+reach reconstruction above identifies this particular fixture's infeasible
+target; it does not establish ordinary-use crowding. The native
 animation channels are restored after the skin hook; no movement-capsule write
 was found in the rig/camera audit. Exact terrain failures remain unlocalized.
 
