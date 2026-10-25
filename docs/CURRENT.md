@@ -2,6 +2,15 @@
 
 ## Forced-Help stow follow-up — source batch
 
+Candidate `4d5dbdf92e06` / `e842c7c` passed required build checks but retained
+`20261025T151404474920Z` reproduced a remaining Challenge Tasks Help stow failure.
+Its Menu diagnostic reports `live=0`, `ui_only=1`, tutorial 16 while native
+terminal state remains open. Help suspended the camera's iDroid presentation;
+using that flag skipped the stow branch entirely. The follow-up uses actual
+native terminal state for Menu, held-Back recovery and deferred close. It does
+not broaden the admitted Help owners. The failed run is retained; owned game
+and simulator were closed, Steam retained and Meta restored before rebuilding.
+
 The field UI-only Menu/held-Back request previously reached the one-shot native
 close mailbox while Help still blocked terminal closing. The source now uses
 the existing exact-owner Help acknowledgement before retaining and delivering

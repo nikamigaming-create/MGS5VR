@@ -1066,7 +1066,11 @@ struct Session {
             titleNativeMenu=!titleNativeMenu;
             controllerFrame.openingNativeMenu=titleNativeMenu;
         }
-        const bool cabinStowTap=cabinControlsReady&&nativeIdroidOpen()&&!uiOnlyIdroid&&!nativeInput.exclusive;
+        // Help can suspend the camera's iDroid presentation while the native
+        // terminal is still open. Stow ownership follows the terminal, not
+        // liveIdroid's camera/presentation flags.
+        const bool terminalOpenForStow=nativeIdroidOpen();
+        const bool cabinStowTap=cabinControlsReady&&terminalOpenForStow&&!uiOnlyIdroid&&!nativeInput.exclusive;
         const bool fieldIdroidOpen=controllerFrame.handheldMenus&&handheldMenuRoutingAvailable()
             &&gameplayContext&&!cabinPlay&&!nativeStatus.nativeMenuOpen
             &&rigControls.equipmentPhase()==0&&!commandsControls.active()&&!nativeInput.exclusive
@@ -1094,30 +1098,30 @@ struct Session {
             if(borrowedIdroid){
                 cancelHandheldIdroidBorrow();borrowedReloadPending=false;borrowedReloadPulseUntil=0;
                 requestHandheldIdroidOpen(0);
-                if(liveIdroid)requestNativeIdroidClose(true);
-            }else if(cabinStowTap||(liveIdroid&&uiOnlyIdroid&&nativePauseMenuOpen())){
+                if(terminalOpenForStow)requestNativeIdroidClose(true);
+            }else if(cabinStowTap||(terminalOpenForStow&&uiOnlyIdroid&&nativePauseMenuOpen())){
                 beginHelpStow();
                 // START below owns ordinary seated-player stow. Requesting
                 // terminal Close here first invalidates menu input readiness
                 // before that player can consume START, stranding SUBJECT.
-            }else if(liveIdroid&&uiOnlyIdroid)requestNativeIdroidClose(true);
+            }else if(terminalOpenForStow&&uiOnlyIdroid)requestNativeIdroidClose(true);
             else if(fieldIdroidOpen)requestHandheldIdroidOpen(nativeStatus.activation);
         }
         priorIdroidTap=idroidTap;
-        if(idroidBackRecovery.update(liveIdroid,activeControl("menus.back"),!nativeInput.exclusive,now)){
+        if(idroidBackRecovery.update(terminalOpenForStow,activeControl("menus.back"),!nativeInput.exclusive,now)){
             if(uiOnlyIdroid&&nativeIdroidInformationalHelpOwner())beginHelpStow();
             else requestNativeIdroidClose(true);
         }
         // The same captured Help owner can belong to a field UI-only handset.
         // Wait for its native acknowledgement before submitting terminal Close;
         // a one-shot request sent while paused would be consumed and discarded.
-        if((!cabinControlsReady&&!uiOnlyIdroid)||nativeInput.exclusive||now>=cabinStowUntil||!nativeIdroidOpen()){
+        if((!cabinControlsReady&&!uiOnlyIdroid)||nativeInput.exclusive||now>=cabinStowUntil||!terminalOpenForStow){
             cabinStowUntil=cabinHelpConfirmUntil=0;cabinHelpOwner=0;
         }
         const bool cabinHelpConfirm=cabinStowUntil&&now<cabinHelpConfirmUntil&&cabinHelpOwner
             &&nativeIdroidInformationalHelpOwner()==cabinHelpOwner;
-        if(cabinStowUntil&&liveIdroid&&!nativePauseMenuOpen())requestNativeIdroidClose(true);
-        else if(!liveIdroid||nativeInput.exclusive)requestNativeIdroidClose(false);
+        if(cabinStowUntil&&terminalOpenForStow&&!nativePauseMenuOpen())requestNativeIdroidClose(true);
+        else if(!terminalOpenForStow||nativeInput.exclusive)requestNativeIdroidClose(false);
         const bool manualToggle=headCamera().available()&&activeControl("system.toggle_vr");
         if(manualToggle||nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)automaticEntryDone=true;
         if(loading&&(nativeStatus.active||nativeStatus.pending||nativeStatus.awaitingPlayer)){
