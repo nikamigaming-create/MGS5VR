@@ -33,15 +33,21 @@ void reportSubmission(bool producer,bool fence,const std::array<double,3>& sampl
     log(line.str());s={};
 }catch(...){} }
 bool unsupportedFence(HRESULT result){return result==E_NOINTERFACE||result==E_NOTIMPL||result==DXGI_ERROR_UNSUPPORTED;}
-void initializeCompletion(TextureCompletion& completion,ID3D11Device* device,ID3D11DeviceContext* context,TextureCompletionPreference preference){
+void initializeCompletion(TextureCompletion& completion,ID3D11Device* device,ID3D11DeviceContext* context,TextureCompletionPreference preference,HANDLE* sharedHandle=nullptr){
     completion={};if(preference==TextureCompletionPreference::eventOnly)return;
     ComPtr<ID3D11Device5> device5;
     const auto deviceResult=device->QueryInterface(IID_PPV_ARGS(&device5));
     if(unsupportedFence(deviceResult))return;checkHr(deviceResult,"Query mailbox fence device");
     const auto contextResult=context->QueryInterface(IID_PPV_ARGS(&completion.context));
     if(unsupportedFence(contextResult)){completion={};return;}checkHr(contextResult,"Query mailbox fence context");
-    const auto fenceResult=device5->CreateFence(0,D3D11_FENCE_FLAG_NONE,IID_PPV_ARGS(&completion.fence));
+    bool shareable=sharedHandle!=nullptr;
+    auto fenceResult=device5->CreateFence(0,shareable?D3D11_FENCE_FLAG_SHARED:D3D11_FENCE_FLAG_NONE,IID_PPV_ARGS(&completion.fence));
+    if(shareable&&unsupportedFence(fenceResult)){
+        shareable=false;
+        fenceResult=device5->CreateFence(0,D3D11_FENCE_FLAG_NONE,IID_PPV_ARGS(&completion.fence));
+    }
     if(unsupportedFence(fenceResult)){completion={};return;}checkHr(fenceResult,"Create mailbox completion fence");
+    if(shareable)checkHr(completion.fence->CreateSharedHandle(nullptr,GENERIC_ALL,nullptr,sharedHandle),"Share producer completion fence");
 }
 void reportFlow(bool producer,const FlowSample& sample) noexcept {try{
     struct Stats {CaptureClock::time_point since=CaptureClock::now();FlowSample sum{};double maximum{};};
@@ -136,7 +142,12 @@ void TextureMailbox::pollLocked(const std::shared_ptr<TextureChannel>& channel,I
     FlowSample sample;
     try{for(auto& slot:channel->slots){
         if(slot.state.load(std::memory_order_acquire)==TextureSlotState::producerPending
-            &&complete(context,channel->producerCompletion,slot.producerComplete.Get(),slot.producerMarker,sample))slot.state.store(TextureSlotState::ready,std::memory_order_release);
+            &&complete(context,channel->producerCompletion,slot.producerComplete.Get(),slot.producerMarker,sample)){
+            // XR may have observed the shared fence and claimed this slot
+            // while the owner was polling. Never overwrite that ownership.
+            auto expected=TextureSlotState::producerPending;
+            if(!slot.state.compare_exchange_strong(expected,TextureSlotState::ready,std::memory_order_acq_rel))--sample.completed;
+        }
     }}catch(...){channel->retired.store(true,std::memory_order_release);throw;}
     reportFlow(true,sample);
 }
@@ -173,7 +184,7 @@ bool TextureMailbox::publishImages(const std::array<ID3D11Texture2D*,2>& sources
         if(channel)channel->retired.store(true,std::memory_order_release);
         channel=std::make_shared<TextureChannel>();
         channel->producerDevice=device;
-        initializeCompletion(channel->producerCompletion,device.Get(),context,preference_);
+        initializeCompletion(channel->producerCompletion,device.Get(),context,preference_,&channel->producerFenceHandle);
         channel->desc=desc;
         channel->desc.SampleDesc={1,0};
         channel->desc.ArraySize=count;
@@ -225,7 +236,7 @@ TextureConsumer::TextureConsumer(ID3D11Device* device,TextureCompletionPreferenc
 TextureConsumer::~TextureConsumer(){reset();}
 void TextureConsumer::reset() {
     if(channel_)channel_->retired.store(true,std::memory_order_release);
-    cached_.Reset();slots_={};completion_={};channel_.reset();frame_={};eyes_={};
+    cached_.Reset();slots_={};completion_={};producerFence_.Reset();channel_.reset();frame_={};eyes_={};
 }
 void TextureConsumer::poll() {
     if(!channel_)return;
@@ -248,6 +259,15 @@ bool TextureConsumer::consume(const std::shared_ptr<TextureChannel>& channel) {
         reset();
         channel_=channel;
         try{initializeCompletion(completion_,device_.Get(),context_.Get(),preference_);
+        if(channel->producerFenceHandle){
+            ComPtr<ID3D11Device5> device5;
+            const auto supported=device_.As(&device5);
+            if(!unsupportedFence(supported)){
+                checkHr(supported,"Query shared-fence consumer device");
+                const auto opened=device5->OpenSharedFence(channel->producerFenceHandle,IID_PPV_ARGS(&producerFence_));
+                if(!unsupportedFence(opened))checkHr(opened,"Open producer fence on XR device");
+            }
+        }
         for(size_t n=0;n<slots_.size();++n){
             auto& slot=slots_[n];
             checkHr(device_->OpenSharedResource(channel->slots[n].sharedHandle,IID_PPV_ARGS(&slot.shared)),"Open mailbox on XR device");
@@ -265,6 +285,23 @@ bool TextureConsumer::consume(const std::shared_ptr<TextureChannel>& channel) {
         // sees free only after this copy/release is GPU-complete.
         poll();
         if(!channel_)return false;
+        if(producerFence_){
+            // The producer signaled after its keyed release. Observe that
+            // immutable marker through this device's shared fence, without
+            // waiting for another native Present or using its immediate context.
+            const auto begin=CaptureClock::now();
+            const auto completed=producerFence_->GetCompletedValue();
+            if(completed==std::numeric_limits<uint64_t>::max())throw std::runtime_error("Shared producer fence device removed");
+            flow.pollMs+=elapsed(begin,CaptureClock::now());
+            for(auto& slot:channel->slots){
+                if(slot.state.load(std::memory_order_acquire)!=TextureSlotState::producerPending)continue;
+                ++flow.polls;
+                if(!slot.producerMarker)throw std::runtime_error("Missing shared producer fence marker");
+                if(completed<slot.producerMarker){++flow.pending;continue;}
+                auto expected=TextureSlotState::producerPending;
+                if(slot.state.compare_exchange_strong(expected,TextureSlotState::ready,std::memory_order_acq_rel))++flow.completed;
+            }
+        }
         size_t newest=slots_.size();uint64_t sequence=frame_.sequence;
         for(size_t n=0;n<slots_.size();++n){const auto& slot=channel->slots[n];
             if(slot.state.load(std::memory_order_acquire)==TextureSlotState::ready&&slot.published.sequence>sequence){newest=n;sequence=slot.published.sequence;}}

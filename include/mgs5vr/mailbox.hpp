@@ -33,8 +33,13 @@ struct TextureSlot {
     std::array<EyeFrame,2> eyes{};
 };
 struct TextureChannel {
+    TextureChannel()=default;
+    ~TextureChannel(){if(producerFenceHandle)CloseHandle(producerFenceHandle);}
+    TextureChannel(const TextureChannel&)=delete;
+    TextureChannel& operator=(const TextureChannel&)=delete;
     ComPtr<ID3D11Device> producerDevice;
     TextureCompletion producerCompletion;
+    HANDLE producerFenceHandle{}; // Owned NT handle; immutable after channel publication.
     std::array<TextureSlot,textureMailboxSlots> slots;
     D3D11_TEXTURE2D_DESC desc{};
     LUID adapterLuid{};
@@ -91,6 +96,7 @@ private:
     };
     std::array<Slot,textureMailboxSlots> slots_;
     TextureCompletion completion_;
+    ComPtr<ID3D11Fence> producerFence_; // Opened on the XR device, never its peer's context.
     TextureCompletionPreference preference_;
     ComPtr<ID3D11Texture2D> cached_;
     FrameId frame_{};

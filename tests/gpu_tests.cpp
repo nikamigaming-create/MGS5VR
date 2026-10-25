@@ -110,8 +110,15 @@ int main(){try{
     EyeFrame eye;eye.sourceSequence=77;eye.trackingSequence=91;eye.eye=1;eye.joined=true;
     require(mailbox.publish(source.Get(),producer.context.Get(),eye),"first frame must publish");
     require(static_cast<bool>(mailbox.latest()->producerCompletion.fence)==producerFences,"producer prefers its own supported completion fence");
-    require(slotsIn(mailbox.latest(),TextureSlotState::producerPending)==1,"submission remains unavailable until the producer polls its completion event");
-    require(!consumer.consume(mailbox.latest())&&!consumer.frame().sequence,"consumer cannot acquire a slot solely because its keyed mutex was released");
+    require(slotsIn(mailbox.latest(),TextureSlotState::producerPending)==1,"submission starts pending its GPU completion");
+    const auto pendingChannel=mailbox.latest();
+    auto& firstSlot=pendingChannel->slots[0];const auto submittedMarker=firstSlot.producerMarker;
+    // Hold the published readiness marker beyond the submitted GPU work. A
+    // released keyed mutex alone must not admit the image on either backend.
+    if(pendingChannel->producerFenceHandle)firstSlot.producerMarker=submittedMarker+1;
+    const bool early=consumer.consume(pendingChannel);
+    firstSlot.producerMarker=submittedMarker;
+    require(!early&&!consumer.frame().sequence,"consumer cannot acquire a slot solely because its keyed mutex was released");
     require(consumer.usingCompletionFence()==consumerFences,"consumer selects completion support on its own device");
     bool deferredRefused=false;try{mailbox.poll(deferred.Get());}catch(const std::invalid_argument&){deferredRefused=true;}
     require(deferredRefused,"mailbox completion cannot be polled from a deferred context");
@@ -119,7 +126,12 @@ int main(){try{
     require(wrongPollRefused,"XR device cannot poll the native producer completion queries");
     ComPtr<ID3D11RenderTargetView> after;producer.context->OMGetRenderTargets(1,&after,nullptr);
     require(after.Get()==target.Get(),"capture must preserve game render targets");
-    require(consumeEventually(consumer,mailbox,producer.context.Get()),"consumer must acquire first GPU-complete shared frame");
+    bool acquired=false;
+    if(pendingChannel->producerFenceHandle&&consumerFences){
+        for(int n=0;n<100&&!acquired;++n){acquired=consumer.consume(pendingChannel);if(!acquired)std::this_thread::sleep_for(std::chrono::milliseconds(1));}
+        require(acquired,"XR observes completed shared-fence work without another producer poll or Present");
+    }else acquired=consumeEventually(consumer,mailbox,producer.context.Get());
+    require(acquired,"consumer must acquire first GPU-complete shared frame");
     require(slotsIn(mailbox.latest(),TextureSlotState::consumerPending)==1,"shared slot stays unavailable until the consumer polls its own copy/release completion");
     require(pixel(reader,consumer.texture(),63,31)==std::array<unsigned char,4>{255,0,0,255},"actual GPU copied pixel must remain red");
     const auto first=consumer.frame();require(first.epoch&&first.sequence,"first capture must have a transaction");
@@ -231,6 +243,35 @@ int main(){try{
     require(pooled.publishStereo({left.Get(),right.Get()},producer.context.Get(),eyes),"producer replaces a retired consumer epoch");
     require(consumeEventually(poolConsumer,pooled,producer.context.Get())&&poolConsumer.frame().epoch!=resetFrame.epoch,
         "consumer reset cannot wedge the pool or reintroduce a prior epoch");
+    if(producerFences&&consumerFences){
+        TextureMailbox concurrent;unsigned received=0;std::exception_ptr failure;
+        std::jthread receiver([&](std::stop_token stop){try{
+            TextureConsumer copy(reader.device.Get());uint64_t previous=0;
+            while(!stop.stop_requested()){
+                if(copy.consume(concurrent.latest())){
+                    const auto pair=copy.eyes();
+                    if(pair[0].sourceSequence<=previous||pair[1].sourceSequence!=pair[0].sourceSequence
+                        ||pair[0].trackingSequence!=pair[0].sourceSequence+100
+                        ||pair[1].trackingSequence!=pair[0].trackingSequence)
+                        throw std::runtime_error("concurrent readiness promotion broke stereo lineage");
+                    previous=pair[0].sourceSequence;
+                    const auto expected=previous%2?std::array<unsigned char,4>{255,0,0,255}:std::array<unsigned char,4>{0,255,0,255};
+                    if(pixel(reader,copy.texture(),0,0,0)!=expected||pixel(reader,copy.texture(),0,0,1)!=expected)
+                        throw std::runtime_error("concurrent readiness promotion copied pixels from another transaction");
+                    ++received;
+                }
+                copy.poll();std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        }catch(...){failure=std::current_exception();}});
+        for(uint64_t n=1;n<=120;++n){
+            clear(producer,left.Get(),n%2?red:green);clear(producer,right.Get(),n%2?red:green);
+            for(uint32_t e=0;e<2;++e){eyes[e].sourceSequence=n;eyes[e].trackingSequence=n+100;eyes[e].eye=e;}
+            concurrent.publishStereo({left.Get(),right.Get()},producer.context.Get(),eyes);
+            concurrent.poll(producer.context.Get());std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+        receiver.request_stop();receiver.join();if(failure)std::rethrow_exception(failure);
+        require(received>=10,"concurrent owner and XR completion polling preserve real pixels and paired lineage under reuse");
+    }
     // Force compatibility independently on each owner. Fence/event selection is
     // internal capability policy, not a user setting or a weaker ownership gate.
     using Preference=TextureCompletionPreference;

@@ -29,6 +29,20 @@ statistics, not per-frame percentiles or physical display measurements.
 Details: `artifacts/release-handheld-stall-outcome.json` and
 `artifacts/release-handheld-stall-performance.json`.
 
+## Frame-handoff correction awaiting build and comparison
+
+Retained current-candidate logs show producer completion waiting for the next
+native Present before XR can see an already completed image. The source change
+exports the producer completion fence and opens it on the XR device. XR can
+admit completed copies without using the native immediate context. Atomic
+readiness promotion preserves a slot already claimed by the consumer; EVENT
+compatibility and the three-slot bound remain. GPU regressions cover a future
+completion marker, no-more-Present delivery and concurrent stereo pixel/lineage
+reuse. A combined candidate run must establish whether this reduces repeats.
+
+Microsoft API contracts: [shared fence creation](https://learn.microsoft.com/en-us/windows/win32/api/d3d11_3/nf-d3d11_3-id3d11fence-createsharedhandle)
+and [opening on the receiving device](https://learn.microsoft.com/en-us/windows/win32/api/d3d11_4/nf-d3d11_4-id3d11device5-opensharedfence).
+
 ## Checked candidate
 
 - Development DLL: `a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6`.
