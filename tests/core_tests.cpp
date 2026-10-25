@@ -3254,12 +3254,20 @@ int main(){
         expect(cabin.publishRigFrame(11,22,cabinSource,walked),"publish the walked ACC viewpoint before iDroid");
         walked=cabin.resolve(11,cabinSource,100);
         cabin.setNativeMenuOpen(true,true);cabin.trackStereo({},rigEyes,true,110,input);
+        if(handheld){
+            const auto skin=cabin.resolve(11,phoneSource,110,NativeBodyHead{22,33,{}});
+            expect(cabin.publishRigFrame(11,22,phoneSource,skin),"ACC handset entry publishes its current skin before rendering");
+        }
         const auto opened=cabin.resolve(11,phoneSource,110);
         expect(opened.applied&&same(opened.nativePose.position,walked.nativePose.position)
             &&same(rotate(opened.nativePose.orientation,{0,0,1}),rotate(walked.nativePose.orientation,{0,0,1})),
             "both ACC iDroid modes preserve the walked view when the native phone camera changes position and heading");
         const Pose lean{{0,.13052619f,0,.99144486f},{.12f,0,.03f}};
         cabin.trackStereo(lean,rigEyes,true,120,input);
+        if(handheld){
+            const auto skin=cabin.resolve(11,phoneSource,120,NativeBodyHead{22,33,{}});
+            expect(cabin.publishRigFrame(11,22,phoneSource,skin),"ACC handset lean joins current eyes and arm skin");
+        }
         const auto moved=cabin.resolve(11,phoneSource,120);
         const Pose basis{{0,1,0,0},{}};
         const auto expected=compose(walked.nativePose,compose(compose(basis,lean),inverse(basis)));
@@ -3572,6 +3580,7 @@ int main(){
             &&same(recovered.idroidDevice.position,resumed.idroidDevice.position)&&!handset.status().suspended,
             "recovered terminal camera and handset share the new skin transaction");
         handset.setNativeMenuOpen(false);
+        handset.publishPlayerHead(11,22,thirdPerson,playerRoot,headBone,400);
         auto stowed=handset.resolve(11,thirdPerson,400,NativeBodyHead{22,33,{}});
         stowed.idroidDeviceTracked=false;
         expect(stowed.applied&&handset.publishRigFrame(11,22,thirdPerson,stowed),
