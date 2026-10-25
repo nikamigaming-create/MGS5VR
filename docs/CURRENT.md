@@ -60,6 +60,15 @@ run `20261025T184458811736Z` showed the screen but intermittent hand guidance;
 its procedural flight completion did not establish steering. The final run
 above checks actual projectile angle response. These failures remain retained.
 
+Eyepatch follow-up `20261025T190403353416Z` verifies on/off/on configuration
+round-trip and live settings application with neutral controls. Native model
+captures were too distant/dark or turned away to accept patch appearance. The
+close-up attempt timed out in operator input release before new camera input;
+the game remained responsive. `eyepatch-review.json` and `model-toggle*` retain
+the inconclusive attempts. This is not a passed visual check or a diagnosed
+patch-rendering failure. The owned session is closed; eyepatch=1, full_body=0
+and Meta Link are restored. Candidate code and installed DLL are unchanged.
+
 Eyepatch model appearance, physical Quest comfort/arm behavior, actual iDroid-open
 field-pickup boarding, exact rock/corridor reproduction and broader progression/
 weapon coverage remain open in FIELD_FIXES. Do not claim every mount, outfit,
