@@ -2432,5 +2432,21 @@
     "adjacent_weapon": "20261025T131546151339Z observed_pass draw/release",
     "isolation": "20261025T132017913994Z: native PRIMARY_BACK visibility off removes intrusion during four walking segments; restored true afterward. Diagnostic, not acceptance.",
     "next_change": "Native main-view concealment for owned stowed custom back assemblies, restore selected weapon on draw/manipulation and release on leaving field presentation. Shadows preserved."
+  },
+  "back_assembly_visibility": {
+    "candidate": "77a2fe7c9dc27b6b9aa4af9ded484fcd8591048001e9c82096e3c33acb8a8162",
+    "source": "bc0984db1235f88af4d13db93059de415c0cd2be",
+    "status": "failed_moving_review",
+    "build_log": "artifacts/release-back-assembly-build.log",
+    "moving_runs": [
+      "20261025T133744460062Z",
+      "20261025T133919295859Z"
+    ],
+    "visual": "5 fps upper-left crops show stock flashes missed in 2 fps full-frame review. Not accepted.",
+    "held_run": "20261025T133824547414Z",
+    "held_result": "Native equipment 873 selected through wrist picker; back rifle visible in both final eyes while held. Release observed.",
+    "transport_failure": "20261025T133444697660Z: blank right compositor frame during loading transition; native scene continued to flight; arrival continued without replaying menus.",
+    "next_change": "Keep owned concealment during camera-to-rig publication gaps and update visibility at accepted rig publication.",
+    "terrain": "First movement run stopped after two segments because native displacement exceeded the bounded envelope after release; no hang demonstrated."
   }
 }

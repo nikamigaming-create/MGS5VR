@@ -1928,6 +1928,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(!headCamera().publishRigFrame(camera,owner,nativeCamera,frame))return false;
     probe.stage=14;
     publishFullBodyVisibility(owner,model,frame.body.valid);
+    // Visibility must consume this accepted rig before draw preparation.
+    // The earlier camera callback retires the preceding solve while moving.
+    updatePlayerVisibility(owner,true,false);
     if(idroidAttachmentDiagnosticsActive()||frame.controllers.cabinPlay||cabinGearMask.load()){
         // Capture this solve's assigned rig sequence before native skin work.
         // A later render/rig query cannot stand in for this transaction.

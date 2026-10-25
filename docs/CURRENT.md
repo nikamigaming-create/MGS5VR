@@ -49,7 +49,21 @@ manipulating the selected back weapon restores its groups. Cabin inspection,
 scripted presentation, other actors and other weapon slots retain their existing
 ownership. Typed player/service/interface/resource joins and the verified native
 part resolver identify every assembly part; no arbitrary nearby mesh is hidden.
-Build/deploy this correction, then review moving stow and back-weapon draw/stow.
+Candidate `77a2fe7c9dc2` / `bc0984d` built and deployed; all 58 groups and
+installer checks passed. Back-rifle selection/draw/release in retained run
+`20261025T133824547414Z` shows native equipment 873 and the held rifle in both
+final eyes. Moving review **failed**: 5 fps upper-left crops in retained runs
+`20261025T133744460062Z` and `20261025T133919295859Z` reveal stock flashes that
+the initial 2 fps full-frame review missed. Do not claim this candidate fixes it.
+
+The camera callback publishes a new native source before asking for the last
+rig; movement retires that rig until its matching skin arrives. The correction
+now preserves owned concealment across that gap and applies visibility again
+immediately after the accepted rig publication. Build/deploy and review this
+timing correction together with moving stow and back-weapon draw/stow.
+Transport run `20261025T133444697660Z` retained a blank right compositor frame
+during loading; native loading continued and arrival resumed from flight without
+replaying the menu route. This remains a recorded failure, not a transition pass.
 Published `play/` remains unchanged.
 
 The earlier combined route `20261025T125553142316Z` reported ten completed

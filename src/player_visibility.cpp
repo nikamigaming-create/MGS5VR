@@ -647,7 +647,12 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool 
         &&!frame->controllers.frontEnd&&!frame->controllers.authoredCamera&&!frame->body.mounted;
     const uint32_t equipment=fieldGear?(frame->weaponRig.resourceHandle>>5)&0x7ffu:0;
     const bool drawn=fieldGear&&(frame->controllers.weaponReady||(frame->weaponRig.mode&0x04000000u)!=0);
-    for(auto& b:hidden)if(b.backWeapon&&!concealStowedBackAssembly(b.assembly,equipment,fieldGear,drawn))restore(b);
+    // Moving publishes a new native camera before the matching skin solve.
+    // That temporarily retires publishedRigFrame; it is not a field exit.
+    // Retain owned concealment through that gap. The accepted skin below
+    // updates draw/stow policy; explicit presentation/owner exits still restore.
+    if(frame||!firstPerson||authoredBody)
+        for(auto& b:hidden)if(b.backWeapon&&!concealStowedBackAssembly(b.assembly,equipment,fieldGear,drawn))restore(b);
     if(!firstPerson||!fullBodyRequested.load())fullBodyReady={};
     const bool ready=frame&&frame->applied&&frame->body.valid&&frame->controllers.fullBody
         &&fullBodyRequested.load()&&fullBodyReady.owner==owner&&frame->playerOwner==owner
