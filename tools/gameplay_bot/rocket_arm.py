@@ -3,14 +3,14 @@ import math
 import time
 
 from .core import BotFault, atomic_json
-from .live import channel
+from .live import channel, rotate
 from .combat import mul
 from .session import preserved_tracking_poses, _controller_pose
 
 
 def inspect_flight(live):
     result = {'status': 'running', 'samples': [], 'captures': []}
-    deadline = time.monotonic() + 35.
+    deadline = time.monotonic() + 60.
     ready = next(a for a in live.bindings['actions'] if a['name'] == 'gameplay.ready_weapon')
     fire = next(a for a in live.bindings['actions'] if a['name'] == 'gameplay.fire_or_cqc')
     if (ready['bindings'][0]['inputs'] != ['right_grip']
@@ -66,15 +66,28 @@ def inspect_flight(live):
             raised = [math.sin(pitch), 0., 0., math.cos(pitch)]
             for kind, pose in left.items():
                 live.call('set_controller_pose', {'hand': 'left', 'pose_type': kind, 'base_space': 'local',
-                    **pose, 'orientation': mul(raised, pose['orientation'])})
+                    **pose, 'position': [pose['position'][0],pose['position'][1]+.12,pose['position'][2]+.02],
+                    'orientation': mul(raised, pose['orientation'])})
             if not hold('left-hand-pitch', .7, True):
                 raise BotFault('Flight ended during hand elevation')
             yaw = math.radians(30.) / 2
             for kind, pose in left.items():
                 live.call('set_controller_pose', {'hand': 'left', 'pose_type': kind, 'base_space': 'local',
-                    **pose, 'orientation': mul([0., math.sin(yaw), 0., math.cos(yaw)], mul(raised, pose['orientation']))})
+                    **pose, 'position': [pose['position'][0]-.14,pose['position'][1]+.12,pose['position'][2]+.04],
+                    'orientation': mul([0., math.sin(yaw), 0., math.cos(yaw)], mul(raised, pose['orientation']))})
             if not hold('left-hand-yaw', 1., True):
                 raise BotFault('Flight ended during hand steering')
+            def bearing(phase):
+                pose=next(s['camera'] for s in reversed(result['samples']) if s['phase']==phase)
+                forward=rotate(pose['orientation'],[0.,0.,1.])
+                return [math.degrees(math.atan2(forward[0],forward[2])),
+                        math.degrees(math.atan2(forward[1],math.hypot(forward[0],forward[2])))]
+            neutral,elevated,turned=[bearing(p) for p in ('neutral-flight','left-hand-pitch','left-hand-yaw')]
+            result['native_hand_response']={'elevation_degrees':elevated[1]-neutral[1],
+                'left_yaw_degrees':(turned[0]-elevated[0]+180.)%360.-180.}
+            if min(result['native_hand_response'].values())<2.:
+                raise BotFault('Socket movement did not steer the native projectile in both requested directions: '
+                               +str(result['native_hand_response']))
             for kind, pose in left.items():
                 live.call('set_controller_pose', {'hand': 'left', 'pose_type': kind, 'base_space': 'local', **pose})
             hold('hand-return', .3, True)

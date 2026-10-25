@@ -15,6 +15,9 @@ namespace mgs5vr {
 namespace {
 using Microsoft::WRL::ComPtr;
 std::atomic_uintptr_t playerOwner{},playerModel{};
+std::atomic_bool eyepatchVisible{true};
+#include "eyepatch_profiles.inc"
+constexpr GUID eyepatchKey{0xd09211ad,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
 struct DrawState {
     ID3D11DeviceContext* context{};
     ComPtr<ID3D11Buffer> indices,object;
@@ -94,6 +97,7 @@ Constants* trackConstants(ID3D11DeviceContext* context,ID3D11Buffer* buffer){
 void resetForearmBindings(ID3D11DeviceContext* c) noexcept {
     for(auto& state:drawStates)if(state.context==c){state={};break;}
 }
+void requestEyepatchVisibility(bool visible) noexcept {eyepatchVisible.store(visible);}
 void setForearmPlayer(uintptr_t owner,uintptr_t model) noexcept {
     playerOwner.store(owner);playerModel.store(model);
 }
@@ -114,6 +118,26 @@ void bindForearmTargets(ID3D11DeviceContext* c,UINT count,ID3D11RenderTargetView
 }
 void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,const D3D11_SUBRESOURCE_DATA* data,ID3D11Buffer* buffer) noexcept {
     if(building||!device||!desc||!data||!data->pSysMem||!buffer)return;
+    // Tag exact owned Snake index streams once at creation. The toggle then
+    // changes only patch triangles, including their shadow, without touching
+    // the eye, head, actor state or either headset view.
+    if(desc->BindFlags&D3D11_BIND_INDEX_BUFFER)try{
+        for(const auto& patch:eyepatchProfiles){
+            if(desc->ByteWidth!=patch.bytes||digest(data->pSysMem,desc->ByteWidth)!=patch.hash)continue;
+            std::vector<unsigned char> bytes(desc->ByteWidth);
+            std::memcpy(bytes.data(),data->pSysMem,bytes.size());
+            for(const auto& range:patch.ranges){
+                if(range[1]*2>bytes.size()||range[0]>range[1])return;
+                std::fill(bytes.begin()+range[0]*2,bytes.begin()+range[1]*2,static_cast<unsigned char>(0));
+            }
+            auto variantDesc=*desc;variantDesc.Usage=D3D11_USAGE_IMMUTABLE;
+            variantDesc.CPUAccessFlags=variantDesc.MiscFlags=0;
+            D3D11_SUBRESOURCE_DATA source{bytes.data(),0,0};ComPtr<ID3D11Buffer> variant;
+            building=true;const auto result=device->CreateBuffer(&variantDesc,&source,&variant);building=false;
+            if(SUCCEEDED(result))buffer->SetPrivateDataInterface(eyepatchKey,variant.Get());
+            return;
+        }
+    }catch(...){building=false;}
     const auto matchesSize=[&](const ForearmProfile& profile,size_t stream){
         return desc->ByteWidth==profile.bytes[stream]
             &&(desc->BindFlags&(stream==2?D3D11_BIND_INDEX_BUFFER:D3D11_BIND_VERTEX_BUFFER));
@@ -239,7 +263,7 @@ void updateForearmConstants(ID3D11DeviceContext* c,ID3D11Resource* r,UINT sub,co
 ForearmDraw::ForearmDraw(ID3D11DeviceContext* c) noexcept {
     if(!c)return;
     const auto owner=playerOwner.load(),model=playerModel.load();
-    if(!owner||!model)return;
+    if((!owner||!model)&&eyepatchVisible.load())return;
     try{
         const auto* state=drawState(c);
         const bool deferred=c->GetType()==D3D11_DEVICE_CONTEXT_DEFERRED;
@@ -248,6 +272,11 @@ ForearmDraw::ForearmDraw(ID3D11DeviceContext* c) noexcept {
         else c->IAGetIndexBuffer(&indices,&format_,&offset_);
         if(!indices||format_!=DXGI_FORMAT_R16_UINT)return;
         UINT size=sizeof(ID3D11Buffer*);
+        if(!eyepatchVisible.load()&&SUCCEEDED(indices->GetPrivateData(eyepatchKey,&size,variant.GetAddressOf()))){
+            context_=c;original_=indices;c->IASetIndexBuffer(variant.Get(),format_,offset_);return;
+        }
+        if(!owner||!model)return;
+        size=sizeof(ID3D11Buffer*);
         if(FAILED(indices->GetPrivateData(croppedKey,&size,variant.GetAddressOf())))return;
         static std::atomic_bool seen{};
         if(!seen.exchange(true))log("Native forearm-only owned index draw observed");

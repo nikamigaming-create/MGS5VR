@@ -1,6 +1,72 @@
 # Current MGS5VR work — 25 October 2026
 
-## Current playtest candidate — native terminal Help stow
+## Incoming headset batch — 25 October, candidate ready
+
+The latest batch fixes the reported sandstorm camera spray, forearm twist/reach,
+Rocket Arm socket display/guidance, mounted machine-gun response, and helicopter/
+D-Walker centering. It also adds the default-on character-model eyepatch option.
+All changes are on main. Published `play/` is unchanged.
+
+Final checked/deployed candidate: **`f58ef4224995`**. Build and installer
+results: `artifacts/release-playtest-final-build.log`. Use `Play-Dev.cmd` for
+physical review. The owned test session is closed, test input released, original
+`full_body=0` restored, Steam retained, and per-game Meta Link restored.
+
+### Delivered gameplay changes
+
+- D-Walker mounting now recognizes native ridden type 44 even when the engine
+  leaves ON_VEHICLE/ON_HORSE false and retains the entry crouch flag. Native seat
+  eyes/body and mount-forward tracking replace on-foot placement. Entry clears
+  positional origin, snap pivot and cached view; subsequent physical leaning
+  remains available. This does not add car pedals to D-Walker controls.
+- Helicopter deployment clears virtual cabin walking and positional tracking;
+  mounted placement no longer depends on full-body visibility or on-foot height.
+- Stationary machine-gun aiming no longer feeds rotating native player-root yaw
+  back into the VR viewer. Physical grip response is increased while preserving
+  native limits, joystick override, and separate mortar tuning.
+- Rocket Arm has no borrowed iDroid. A 20 cm guidance display sits 12 cm above
+  the solved left wrist endpoint in gravity-up and faces the viewer. That same
+  forearm socket axis steers the projectile; wrist roll does not redirect it.
+  Short camera/skin publication gaps emit zero input while retaining the neutral
+  reference up to 150 ms. Real hand tracking loss clears it immediately.
+- Arm solving uses authored bind segment lengths in both visibility modes and
+  bounds/unwraps corrective skin twist; tracked palm contacts and native leg
+  lengths remain intact.
+- Suppress only the exact native sandstorm camera emitter, preserving world
+  weather. Eyepatch visibility affects reviewed native face0/3/4 patch geometry,
+  not either eye's VR image or character save data.
+
+### Retained gameplay results and limits
+
+| Area | Retained run | Result |
+| --- | --- | --- |
+| D-Walker entry/exit | `20261025T184019469888Z` | Crouched, turned approach with -20 cm room-scale offset centers on native seat; view/root yaw both 2.96872 degrees. Native prone entry eligibility is not established. |
+| Mounted body/lean | `20261025T181031988326Z` | Down/left/right/lean phases pass; native seat and authored legs retained. |
+| Machine gun | `20261025T184154219366Z` | Four 12-degree hand requests produce 11.40–11.46 degrees native gun movement, zero induced viewer yaw; both-hand grip, stick override and release pass. Firing/impact was outside this case. |
+| Helicopter | `20261025T183116920712Z` | Off-center sortie disembark passes. This is not field-pickup boarding acceptance. |
+| Rocket Arm | `20261025T185436979277Z` | Screen visible above socket in both final eyes; actual projectile elevation changes +3.43 degrees and left yaw +12.42 degrees from arm movement; stick override and native return pass. |
+| Arm presentation | `20261025T174010920773Z`, `20261025T180234717411Z` | Reviewed rotations in forearm-only and full-body modes. Extreme cloth/all outfits remain open. |
+| Sandstorm | `20261025T175335820470Z` | Exact suppression hook exercised; world storm remains visible. Temporary weather request cancelled. |
+
+Final gameplay checks span the batch and targeted repairs: c219d25e7567 covered
+mounts/MG; 91ee741d93a1 covered the repaired Rocket steering continuity. The final
+build additionally rejects cached socket steering immediately on raw tracking
+loss, using the already tested immediate-reset branch. The whole suite was not
+replayed after that guard. Build checks do not substitute for physical review.
+
+The retained failed MG run `20261025T181213677630Z` exposed roughly 75-degree gun
+response and rotating viewer; the root-yaw feedback repair corrected it. Rocket
+run `20261025T184458811736Z` showed the screen but intermittent hand guidance;
+its procedural flight completion did not establish steering. The final run
+above checks actual projectile angle response. These failures remain retained.
+
+Eyepatch model appearance, physical Quest comfort/arm behavior, actual iDroid-open
+field-pickup boarding, exact rock/corridor reproduction and broader progression/
+weapon coverage remain open in FIELD_FIXES. Do not claim every mount, outfit,
+mission or physical headset has passed. The next step is the user's Play-Dev
+review and targeted repair of actual findings, not repeating completed cases.
+
+## Previous playtest candidate — native terminal Help stow
 
 **`62f696613e2b` / source `5bb471f` is built, checked and deployed for Play-Dev.**
 All 58 groups and installer checks passed in

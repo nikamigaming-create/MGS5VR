@@ -1135,6 +1135,7 @@ bool publishFastInput(const std::string& request,std::string& result){
             pose("right_grip",frame.controllers.hands[1].grip);
             pose("idroid_device",frame.idroidDevice);
             if(frame.rocketArmGuidance)pose("rocket_arm_camera",frame.rocketArmCamera);
+            if(frame.rocketArmSocketTracked)pose("rocket_arm_socket",frame.rocketArmSocket);
             pose("scope_ocular",frame.weaponScope.ocular);
             pose("scope_objective",frame.weaponScope.objective);
             pose("weapon_support_grip",frame.weaponSupportGrip);

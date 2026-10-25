@@ -15,6 +15,7 @@
 #include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/controller_rig.hpp"
 #include "mgs5vr/player_visibility.hpp"
+#include "mgs5vr/forearm_visibility.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/native_video.hpp"
 #include "mgs5vr/opening_selector.hpp"
@@ -624,6 +625,8 @@ struct Session {
         controllerFrame.vehicleMounted=detectedMode==TravelMode::vehicle;
         controllerFrame.nativeActionId=controllerRigEnabled()?nativePlayerAction():0;
         controllerFrame.vehicleView=nativeVehicleView();
+        controllerFrame.vehicleMounted=controllerFrame.vehicleMounted
+            ||(controllerFrame.vehicleView.valid&&walkerGearMounted(controllerFrame.vehicleView.object));
         if(loading!=priorLoadingTips){
             const bool wasLoading=priorLoadingTips;
             priorLoadingTips=loading;
@@ -902,6 +905,7 @@ struct Session {
         controllerFrame.seatedMode=controls.setting("settings.seated_mode")!=0;
         controllerFrame.cinematicFreeMove=controls.setting("settings.cinematic_free_move")!=0;
         requestFullBodyVisibility(controllerFrame.fullBody);
+        requestEyepatchVisibility(controls.setting("settings.eyepatch")!=0);
         controllerFrame.supportGripRadius=controls.setting("settings.support_grip_radius_cm")*.01f;
         controllerFrame.trackedWeaponObstruction=controls.setting("settings.tracked_weapon_obstruction")!=0;
         controllerFrame.blockFiringNearCover=controls.setting("settings.block_firing_near_cover")!=0;
@@ -1625,9 +1629,19 @@ struct Session {
         }
         const auto rocketStick=controls.axis("axes.move",routedPhysical);
         const bool rocketManual=std::hypot(rocketStick[0],rocketStick[1])>.15f;
-        const auto rocketAxes=rocketSteering.update(controllerFrame.hands[0].aim,
-            handUseRig?handUseRig->headPose:Pose{},rocketGuidanceInput&&controllerFrame.hands[0].aimTracked,
-            rocketManual,handUseRig?handUseRig->playerOwner:0,nativeStatus.activation,referenceEpoch);
+        // Guidance and the display share the solved socket, including reach
+        // limiting. Convert that published world pose back into tracking space;
+        // raw controller aim can turn independently of the visible forearm.
+        const bool rocketHandTracked=controllerFrame.hands[0].gripTracked&&controllerFrame.hands[0].aimTracked;
+        const bool rocketSocketTracked=rocketGuidanceInput&&rocketHandTracked&&handUseRig&&handUseRig->rocketArmSocketTracked;
+        const auto rocketSocket=rocketSocketTracked
+            ?compose(handUseRig->headPose,compose(Pose{{0,1,0,0},{}},
+                compose(inverse(handUseRig->nativePose),handUseRig->rocketArmSocket)))
+            :Pose{};
+        const auto rocketAxes=rocketSteering.update(rocketArmSocketAim(rocketSocket),
+            handUseRig?handUseRig->headPose:Pose{},rocketSocketTracked,
+            rocketManual,handUseRig?handUseRig->playerOwner:nativeStatus.sourcePlayerOwner,nativeStatus.activation,referenceEpoch,
+            rocketHandTracked?now:0); // Raw tracking loss resets immediately; only publication gaps retain neutral.
         if(rocketGuidanceInput){
             // The native projectile owns the movement stick, never a turn of
             // Snake's VR tracking space. Explicit stick input rebases the hand.

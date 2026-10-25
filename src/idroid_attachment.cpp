@@ -185,12 +185,9 @@ IdroidBodyStamp stamp(const HeadCameraSample& frame,const Owned& owned) noexcept
 void updateHandheldVisibility(const HeadCameraSample& frame,const Owned& owned) noexcept {
     if(!visibilityWriterVerified)return;
     std::lock_guard lock(visibilityMutex);
-    // The terminal keeps its closing bit after sortie selection. Guided
-    // flight owns its handset independently of that closed menu lifecycle.
-    const bool wanted=((handheldIdroidOwned(frame.playerOwner,frame.activation)
-        &&frame.menuOpen&&frame.menuIdroid)||(frame.rocketArmGuidance&&!frame.menuOpen))&&frame.controllers.handheldMenus
-        &&!frame.controllers.handheldIdroidStowed&&!frame.menuWorldQuad
-        &&((frame.rocketArmGuidance&&!frame.menuOpen)||!nativeIdroidClosing());
+    const bool wanted=handheldIdroidOwned(frame.playerOwner,frame.activation)
+        &&frame.menuOpen&&frame.menuIdroid&&frame.controllers.handheldMenus
+        &&!frame.controllers.handheldIdroidStowed&&!frame.menuWorldQuad&&!nativeIdroidClosing();
     const auto current=binding(owned);
     // Native dc4430 owns category-17 visibility: record+5 bit2 is inverted
     // draw enable; its typed B0 target publishes that decision to the renderer.
@@ -227,10 +224,10 @@ void printMatrix(std::ostringstream& stream,const char* label,const Matrix& matr
 }
 bool publishHandheldBody(const HeadCameraSample& frame,const Owned& owned,
                          const Completion& completion) noexcept {
-    if(!transformWriterVerified||(!(frame.menuOpen&&frame.menuIdroid)&&!frame.rocketArmGuidance)
+    if(!transformWriterVerified||!(frame.menuOpen&&frame.menuIdroid)
         ||!frame.controllers.handheldMenus||frame.controllers.handheldIdroidStowed||frame.menuWorldQuad
-        ||!frame.idroidDeviceTracked||(!(frame.rocketArmGuidance&&!frame.menuOpen)&&nativeIdroidClosing())
-        ||(!frame.rocketArmGuidance&&!handheldIdroidOwned(frame.playerOwner,frame.activation)&&(owned.state==3||!(owned.flags&0x20)))
+        ||!frame.idroidDeviceTracked||nativeIdroidClosing()
+        ||(!handheldIdroidOwned(frame.playerOwner,frame.activation)&&(owned.state==3||!(owned.flags&0x20)))
         ||!sameIdroidBodyPublication(completion.stamp,stamp(frame,owned)))return false;
     // UI-only ID499 has no player equipment task to move its scene root.
     // A reused native slot otherwise keeps its old world bounds, culling the
@@ -437,7 +434,7 @@ void pumpHandheldIdroidEquipment() noexcept {
         const auto frame=headCamera().publishedRigFrame(steadyMilliseconds());
         const auto borrow=handheldIdroidBorrow();
         const bool rocket=frame&&frame->rocketArmGuidance&&!frame->menuOpen;
-        const bool wanted=(rocket||(handheldIdroidOwned()&&((nativeIdroidOpen()&&!nativeIdroidClosing())||borrow.player)))
+        const bool wanted=!rocket&&handheldIdroidOwned()&&((nativeIdroidOpen()&&!nativeIdroidClosing())||borrow.player)
             &&handheldMenusSelected()&&!nativeGamepadActive()
             &&!nativeLoadingTipsOpen()&&!nativeTitleModeActive()&&!nativeScriptedDemoActive();
         uintptr_t character{},service{};

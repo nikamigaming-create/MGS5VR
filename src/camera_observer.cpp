@@ -4,6 +4,7 @@
 #include "mgs5vr/render_camera.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/player_visibility.hpp"
+#include "mgs5vr/weather_effects.hpp"
 #include "mgs5vr/ui_renderer.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
@@ -202,7 +203,7 @@ void installCameraObserver(const std::filesystem::path& evidenceDirectory,Render
         0x0f,0x29,0x89,0,1,0,0,0xc3};
     if(groundZeroes){expected[6]=0x98;expected[17]=0xa8;expected[18]=0;}
     imageBase=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
-    if(!groundZeroes)initializePlayerVisibility(imageBase);
+    if(!groundZeroes){initializePlayerVisibility(imageBase);initializeWeatherEffects(imageBase);}
     constexpr std::array<unsigned char,20> callsite{
         0x48,0x8b,0x8e,0x80,0x03,0,0,0x48,0x8d,0x95,0x10,0x03,0,0,
         0x48,0x8b,0x01,0xff,0x50,0x08};

@@ -1,7 +1,7 @@
 # Field fixes — implementation and acceptance
 
-Updated 24 October 2026 after tracing main's production paths and relevant test
-assertions at `5622052` (development DLL `17b044cba72e`).
+Updated 25 October 2026 with the incoming headset batch and scoped gameplay
+results. The original production-path audit baseline was `5622052` (DLL `17b044cba72e`).
 
 **Implemented is not accepted everywhere; acceptance pending is not missing code.**
 The previous checklist mixed these states. Its exact run narratives and checked
@@ -14,7 +14,18 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Latest incoming reports — 25 October
 
-Current playtest candidate: `62f696613e2b` / `5bb471f`. It adds native-terminal
+The new physical-play batch (sandstorm spray, arm twist/reach, Rocket Arm socket
+display, mounted machine-gun response, helicopter/D-Walker centering) is implemented
+together on main; `f58ef4224995` is checked and deployed. Scoped gameplay
+checks pass D-Walker center/facing, helicopter exit, responsive MG grip aiming,
+actual Rocket socket steering/screen, arm rotations and world-preserving storm
+suppression. See CURRENT for retained runs, repaired failures and exact limits.
+The optional character-model eyepatch toggle is in this batch; its live appearance
+and physical Quest acceptance remain pending. Native prone-entry eligibility,
+all mount types and actual field-pickup boarding are not certified.
+
+
+Previous playtest candidate: `62f696613e2b` / `5bb471f`. It adds native-terminal
 stow routing while Help suspends camera presentation, retained exact-owner Help
 acknowledgement, and consumption of the entire handheld Menu press. Forced-Help
 stow/reopen passes retained 20261025T152037198735Z. It includes the on-board-to-field ownership

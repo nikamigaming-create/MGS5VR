@@ -1782,6 +1782,22 @@ int main(){
         RocketArmCameraOwner owner{0x100,7,7,0x200,0x200,0x120,2,11,-1,true,true};
         expect(rocketArmCameraOwned(owner),"typed native guided-flight producer is eligible");
         const Pose distantFlight{{.616072953f,-.35409385f,.361318499f,.60375458f},{757.784241f,333.007141f,1663.47791f}};
+        for(const auto socket:std::array<Pose,3>{Pose{{},{.2f,-.3f,-.4f}},
+                Pose{{0,.70710678f,0,.70710678f},{-.2f,-.3f,-.4f}},
+                Pose{{.70710678f,0,0,.70710678f},{0,-.2f,-.4f}}}){
+            const auto panel=rocketArmDisplay(socket,{});
+            expect(panel.has_value(),"tracked socket has a guidance display");
+            const auto toward=Vec3{}-panel->position;
+            expect(same(panel->position,socket.position+Vec3{0,.12f,0}),
+                "socket screen remains above the endpoint rather than rolling behind the forearm");
+            expect(dot(rotate(panel->orientation,{0,0,1}),toward)>.999f*std::sqrt(dot(toward,toward)),
+                "rocket display faces the pilot across socket rotations instead of becoming edge-on");
+        }
+        const Pose socketForward{{0,.70710678f,0,.70710678f},{}};
+        const auto socketAim=rocketArmSocketAim(socketForward);
+        const auto rolledSocket=compose(socketForward,Pose{{.70710678f,0,0,.70710678f},{}});
+        expect(same(rotate(socketAim.orientation,{0,0,-1}),rotate(rocketArmSocketAim(rolledSocket).orientation,{0,0,-1})),
+            "forearm roll cannot steer the rocket when the socket axis has not moved");
         const auto rigidFlight=rocketArmRenderPose(distantFlight);
         expect(rigidFlight.has_value(),"observed native flight rotation is valid for rigid replay");
         const auto roundTrip=compose(*rigidFlight,inverse(*rigidFlight)).position;
@@ -1813,6 +1829,14 @@ int main(){
         const auto pitched=compose(Pose{{.258819f,0,0,.965926f},{}},turned);
         const auto elevated=steering.update(pitched,{},true,false,1,2,3);
         expect(near(elevated[0],0)&&elevated[1]>.6f,"left-hand pitch produces vertical rocket steering");
+        RocketArmSteering joinedSteering;
+        joinedSteering.update(neutral,{},true,false,1,2,3,100);
+        expect(joinedSteering.update(turned,{},false,false,1,2,3,110)==std::array<float,2>{}
+            &&joinedSteering.update(turned,{},true,false,1,2,3,120)[0]<-.6f,
+            "brief socket publication gaps suppress input without redefining the moved arm as neutral");
+        joinedSteering.update(turned,{},false,false,1,2,3,280);
+        expect(joinedSteering.update(turned,{},true,false,1,2,3,290)==std::array<float,2>{},
+            "expired socket publication requires fresh neutral guidance");
         HeadCamera flight;flight.configure(true,1,true);flight.track({},true,100);flight.toggle();
         auto head=identityMatrix;head[13]=1.6f;
         expect(flight.publishPlayerHead(7,8,{},identityMatrix,head,100),"ordinary head publication admitted");
@@ -3165,6 +3189,47 @@ int main(){
             "moving handheld vehicle eyes reject an unmatched native camera/player transaction");
     }
     {
+        HeadCamera gun;gun.configure(true,1,true);
+        ControllerFrame input;input.referenceEpoch=1;input.predictedXrTime=1;
+        input.nativeActionId=0x47;input.nativeActionControls=true;
+        auto root=identityMatrix,head=identityMatrix;head[13]=1.6f;
+        Pose gunCamera{{},{0,2,-3}};
+        gun.trackStereo({},rigEyes,true,100,input);gun.toggle();
+        gun.publishPlayerHead(31,42,gunCamera,root,head,100);
+        const auto before=gun.resolve(31,gunCamera,100);
+        gunCamera.orientation={0,std::sin(.3f),0,std::cos(.3f)};
+        root[0]=root[10]=std::cos(.6f);root[2]=-std::sin(.6f);root[8]=std::sin(.6f);
+        gun.trackStereo({},rigEyes,true,110,input);gun.publishPlayerHead(31,42,gunCamera,root,head,110);
+        const auto aimed=gun.resolve(31,gunCamera,110);
+        expect(before.applied&&aimed.applied&&same(rotate(before.nativePose.orientation,{0,0,1}),
+                rotate(aimed.nativePose.orientation,{0,0,1})),
+            "machine-gun barrel and animated player-root turn cannot rotate the physical aiming reference");
+    }
+    for(const auto posture:{PlayerPosture::standing,PlayerPosture::crouched,PlayerPosture::prone}){
+        HeadCamera mount;mount.configure(true,1,true);
+        ControllerFrame input;input.referenceEpoch=1;input.predictedXrTime=1;input.playerPosture=posture;
+        auto head=identityMatrix;head[13]=1.6f;
+        const Pose chase{{},{0,3,-5}};
+        mount.trackStereo({},rigEyes,true,100,input);mount.toggle();
+        mount.publishPlayerHead(31,42,chase,identityMatrix,head,100);mount.resolve(31,chase,100);
+        input.vehicleMounted=true;input.vehicleView={true,false,true,false,22528,0};
+        const NativeBodyHead skin{42,99,Pose{{},{0,1.2f,0}}};
+        const Pose approach{{0,std::sin(.4f),0,std::cos(.4f)},{.25f,-.5f,.1f}};
+        mount.trackStereo(approach,rigEyes,true,110,input);
+        mount.publishPlayerHead(31,42,chase,identityMatrix,head,110);
+        const auto seated=mount.resolve(31,chase,110,skin);
+        const auto seatEye=compose(skin.worldFromHead,Pose{{},nativeEyeFromHead}).position;
+        expect(seated.applied&&same(seated.nativePose.position,seatEye)
+            &&same(rotate(seated.nativePose.orientation,{0,0,1}),Vec3{0,0,1}),
+            "D-Walker entry centers position and facing independently of approach lean, yaw and stale stance");
+        auto leaned=approach;leaned.position.x+=.1f;
+        mount.trackStereo(leaned,rigEyes,true,120,input);
+        mount.publishPlayerHead(31,42,chase,identityMatrix,head,120);
+        const auto after=mount.resolve(31,chase,120,skin);
+        const auto delta=after.nativePose.position-seated.nativePose.position;
+        expect(after.applied&&near(dot(delta,delta),.01f),"mount centering preserves subsequent ten-centimetre physical leaning");
+    }
+    {
         HeadCamera handset;handset.configure(true,1,true);
         ControllerFrame input;input.handheldMenus=true;input.snapYaw=.5f;
         const Pose lookingUp{{.258819f,0,0,.965926f},{.1f,0,.2f}};
@@ -4112,6 +4177,29 @@ int main(){
         const float angle=degrees*.00872664626f,s=std::sin(angle);
         return Quat{axis==0?s:0,axis==1?s:0,axis==2?s:0,std::cos(angle)};
     };
+    {
+        ArmTwistState twist;
+        const RigContinuityKey key{1,2,3,4,5};
+        Quat previous{};
+        for(int degrees=0;degrees<=360;++degrees){
+            auto q=axisRotation(0,float(degrees));
+            if(degrees%2)q={-q.x,-q.y,-q.z,-q.w};
+            const auto fitted=twist.update(q,100+degrees,key);
+            const auto up=rotate(fitted,{0,1,0});
+            expect(up.y>=std::cos(1.745329252f)-.0001f,"forearm skin pronation remains anatomically bounded");
+            if(degrees>100)expect(same(up,rotate(previous,{0,1,0})),"wrist quaternion wrap cannot flip the forearm skin");
+            previous=fitted;
+        }
+        auto scaled=alignedArm;
+        scaled.elbow.position=scaled.shoulder.position+(scaled.elbow.position-scaled.shoulder.position)*1.2f;
+        scaled.wrist.position=scaled.elbow.position+Vec3{0,0,-.3f};
+        const auto fixed=solveArm(scaled,Pose{{},{.3f,-.1f,-.2f}},{0,-1,0},&alignedBasis);
+        expect(fixed&&near(std::sqrt(dot(fixed->pose.elbow.position-fixed->pose.shoulder.position,
+            fixed->pose.elbow.position-fixed->pose.shoulder.position)),.3f)
+            &&near(std::sqrt(dot(fixed->pose.wrist.position-fixed->pose.elbow.position,
+                fixed->pose.wrist.position-fixed->pose.elbow.position)),.25f),
+            "native animation scale cannot change tracked arm segment lengths");
+    }
     for(const bool right:{false,true}){
         const auto corrections=armCorrectiveRotations(axisRotation(2,20),axisRotation(0,80),
             axisRotation(1,-60),axisRotation(0,100),right);
@@ -4346,6 +4434,12 @@ int main(){
         expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,"inactive character parts cannot acquire stationary aim");
         set(145);set(4,false);
         expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,"non-standing action cannot acquire stationary aim");
+        for(const auto stance:{4u,5u,6u}){
+            auto walkerStatus=status;walkerStatus[0]|=1u<<stance;
+            expect(travelModeFromPlayerStatus(walkerStatus,22528)==TravelMode::nativeAction,
+                "occupied D-Walker owns mounted aim regardless of stale entry stance without car pedal remapping");
+        }
+        expect(!walkerGearMounted(65535)&&!walkerGearMounted(25600),"empty and car IDs cannot acquire D-Walker ownership");
         set(4);set(26);
         expect(travelModeFromPlayerStatus(status)==TravelMode::vehicle,"vehicle ownership remains authoritative");
         set(26,false);set(25);
@@ -5327,6 +5421,9 @@ int main(){
         const auto pitchAxes=mountedAimAxes({},Pose{{-std::sin(.1f),0,0,std::cos(.1f)},{}});
         expect(yawAxes[0]<0&&near(yawAxes[1],0)&&pitchAxes[1]>0&&near(pitchAxes[0],0),
             "mounted native aim axes keep yaw and elevation independent");
+        const auto machineGunAxes=mountedAimAxes({},Pose{{0,std::sin(.1f),0,std::cos(.1f)},{}},true);
+        expect(machineGunAxes[0]==-1.f&&near(machineGunAxes[1],0),
+            "machine gun responds at full native rate to a deliberate hand turn");
         MountedAimServo servo;
         const Pose yawRequest{{0,std::sin(.1f),0,std::cos(.1f)},{}};
         const Pose readyDrift{{-std::sin(.02f),0,0,std::cos(.02f)},{}};

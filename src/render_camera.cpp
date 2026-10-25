@@ -662,7 +662,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const std::optional<mgs5vr::EyeView> rocketView=rocketGuidance&&std::isfinite(rocketAspect)
         &&rocketAspect>.5f&&rocketAspect<3.f
         ?std::optional<mgs5vr::EyeView>{{source.pair.sample.headPose,{-rocketX,rocketX,rocketY,-rocketY}}}:std::nullopt;
-    const auto rocketHandset=rocketView?mgs5vr::resolveNativeIdroidDisplay(source.pair.sample):std::nullopt;
+    const bool rocketSocket=rocketView&&source.pair.sample.rocketArmSocketTracked;
     const auto opticView=rocketView?rocketView:studioView?studioView:!diagnosticLensRendering.load()?std::nullopt:binocularLensVisible?mgs5vr::binocularSceneView(optic.pose,
         source.pair.sample.controllers.magnification):collimator?std::nullopt:scopeView;
     mgs5vr::ComPtr<ID3D11Texture2D> opticScene;
@@ -701,7 +701,6 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         const auto hudView=mgs5vr::hudViewForPass(eye,optic.held&&optic.active
             &&optic.pose.tracked&&optic.pose.kind==mgs5vr::OpticKind::binocular);
         saved.restore();eyeViewport=source.viewport;clipProjection=gpuProjection=false;
-        mgs5vr::RocketHandPresentation rocketHand(source.pair.sample,!lensPass&&!restoreHead);
         drawingEye={lensPass?*opticView:source.pair.sample.views[eye],id,source.pair.sample.trackingSequence,status.activation,source.pair.sample.sampleTime,eye,false,false};
         // FOX sky/lighting expects a centered render projection. Keep the
         // runtime's asymmetric optics separately and crop the enclosing image
@@ -901,21 +900,17 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         }
         const auto& wrist=source.pair.sample;
         if(afterContext&&rocketView&&opticScene){
-            // The handset must have completed the same skin transaction as
-            // these eyes. A tracked pose alone is not a visible device.
-            if(const auto& handset=rocketHandset){
-                auto deviceFrame=wrist;deviceFrame.idroidDevice=handset->body;
-                if(const auto device=mgs5vr::trackedIdroidPose(deviceFrame)){
-                    auto screen=device->screen;
-                    // Keep the authored lower emitter edge fixed when the
-                    // native camera's aspect differs from the map's 16:9.
-                    screen=mgs5vr::compose(screen,mgs5vr::Pose{{},{0,wrist.controllers.idroidScreenWidth*(.5f/rocketAspect-9.f/32.f),0}});
-                    alignas(16) auto screenValues=values(screen);
-                    alignas(16) std::array<float,16> screenWorld{};
-                    originalWorld(screenValues.data(),screenWorld.data());
-                    mgs5vr::drawIdroidGuidance(afterContext,screenWorld,eyeView,eyeProjection,
-                        wrist.controllers.idroidScreenWidth,rocketAspect,opticScene.Get(),drawingEye);
-                }
+            if(const auto panel=rocketSocket?mgs5vr::rocketArmDisplay(wrist.rocketArmSocket,wrist.nativePose):std::nullopt){
+                // A small display above the stump follows the exact forearm
+                // transaction rendered in both eyes. Preserve flight pixels
+                // and their native aspect; do not borrow terminal equipment.
+                constexpr float width=.20f;
+                const auto screen=*panel;
+                alignas(16) auto screenValues=values(screen);
+                alignas(16) std::array<float,16> screenWorld{};
+                originalWorld(screenValues.data(),screenWorld.data());
+                mgs5vr::drawIdroidGuidance(afterContext,screenWorld,eyeView,eyeProjection,
+                    width,rocketAspect,opticScene.Get(),drawingEye);
             }
         }
         if(rocketGuidance&&eye==0){
@@ -924,7 +919,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 lastRocketReport=now;
                 mgs5vr::log("Rocket guidance source="+std::to_string(id)+" rig="+std::to_string(wrist.rigSequence)
                     +" aspect="+std::to_string(rocketAspect)+" view="+std::to_string(rocketView.has_value())
-                    +" pixels="+std::to_string(bool(opticScene))+" handset="+std::to_string(rocketHandset.has_value()));
+                    +" pixels="+std::to_string(bool(opticScene))+" socket="+std::to_string(rocketSocket));
             }
         }
         if(!titleSurface&&!wrist.menuOpen&&hudView==mgs5vr::HudView::world

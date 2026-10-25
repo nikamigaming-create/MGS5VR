@@ -17,7 +17,9 @@ def inspect_mounted_body(live, seconds, policy):
         n = s.get('native') or {}
         if (time.monotonic() > deadline or s['scene'] != 'gameplay'
                 or any(s.get(k) is not False for k in ('pause', 'idroid', 'loading', 'demo', 'gamepad'))
-                or not (n.get('status_ON_HORSE') is True or n.get('status_ON_VEHICLE') is True)
+                or not (n.get('status_ON_HORSE') is True or n.get('status_ON_VEHICLE') is True
+                        or (n.get('player_ridden_game_object_type') == 44
+                            and n.get('player_ridden_game_object_id') == policy.get('native',{}).get('player_ridden_game_object_id')))
                 or not matches(n, policy.get('native', {}))):
             raise BotFault('Mounted body inspection lost its native seat/ride owner')
         return s

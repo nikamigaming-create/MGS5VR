@@ -69,7 +69,8 @@ def inspect_physical_grips(live, policy, anchor, output, result):
     checks=result.setdefault('physical_grips',[])
     def sample(mask=None):
         state,_=fresh_rig(live,anchor)
-        if not stationary_mortar(state,policy) or state['rendered'].get('mounted_weapon_action')!=0x46:
+        action = {81: 0x46, 82: 0x47}.get(policy.get('type'))
+        if action is None or not stationary_mortar(state,policy) or state['rendered'].get('mounted_weapon_action')!=action:
             raise BotFault('Physical grip lost the observed native mortar action')
         if mask is not None and state['rendered'].get('mounted_weapon_hands')!=mask:
             raise BotFault('Native handle grip did not remain acquired')
@@ -182,7 +183,7 @@ def run(live, nav, policy, output, seconds):
         live.release()
         state, _ = fresh_rig(live)
         native = state['native']
-        if (policy.get('type') != 81 or policy.get('map_identity') != nav.identity
+        if (policy.get('type') not in (81,82) or policy.get('map_identity') != nav.identity
                 or native['mission'] != policy['mission'] or native['location'] != policy['location']):
             raise BotFault('Mortar test requires its reviewed native field fixture')
         operator = policy.get('operator_position')
@@ -303,6 +304,9 @@ def run(live, nav, policy, output, seconds):
         result['entered_eyes'] = live.capture('mortar-entered')
         if policy.get('physical_grips') is True:
             inspect_physical_grips(live,policy,anchor,output,result)
+            if policy.get('physical_grips_only') is True:
+                result['status'] = 'observed_physical_mount_aim'
+                return result
         result['aim_ready'] = live.execute({'op': 'action', 'name': 'gameplay.ready_weapon', 'seconds': 1.5,
             'native_before': {'mission': policy['mission'], 'location': policy['location'],
                               'popup': False, 'status_NORMAL_ACTION': False},

@@ -238,7 +238,7 @@ const std::vector<SettingDefinition>& settingDefinitions(){
         {"settings.binocular_roll_degrees",0,-180,180},{"settings.binocular_auto_mark",1,0,1},
         {"settings.binocular_max_eye_distance_cm",30,15,50},
         {"settings.binocular_actor_glow",1,0,1},{"settings.binocular_mark_dwell_ms",650,100,3000},
-        {"settings.player_height_offset_cm",0,-50,50},{"settings.full_body",1,0,1},{"settings.seated_mode",0,0,1},{"settings.cinematic_free_move",1,0,1},
+        {"settings.player_height_offset_cm",0,-50,50},{"settings.full_body",1,0,1},{"settings.eyepatch",1,0,1},{"settings.seated_mode",0,0,1},{"settings.cinematic_free_move",1,0,1},
         {"settings.left_hand_x_cm",0,-15,15},{"settings.left_hand_y_cm",0,-15,15},{"settings.left_hand_z_cm",0,-15,15},
         {"settings.left_hand_pitch_degrees",0,-90,90},{"settings.left_hand_yaw_degrees",0,-90,90},{"settings.left_hand_roll_degrees",0,-90,90},
         {"settings.right_hand_x_cm",0,-15,15},{"settings.right_hand_y_cm",0,-15,15},{"settings.right_hand_z_cm",0,-15,15},

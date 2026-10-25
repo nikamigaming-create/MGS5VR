@@ -1,4 +1,4 @@
-# Release execution plan — 24 October 2026
+# Release execution plan — 25 October 2026
 
 This is the durable plan for finishing the user-reported repairs and preparing
 the next TPP experimental release. Read [CURRENT.md](CURRENT.md), then execute
@@ -10,7 +10,15 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current checked candidate `62f696613e2b` / `5bb471f` is deployed for Play-Dev.
+Current checked/deployed candidate is `f58ef4224995`. The reported arm,
+sandstorm, Rocket Arm, MG and mount-centering batch is implemented and has scoped
+combined gameplay results in CURRENT. Actual follow-up defects (MG root-yaw
+feedback and Rocket guidance neutral resets) are corrected. Original settings
+and Meta Link are restored and Play-Dev is ready. Eyepatch model appearance and
+physical headset review remain pending. Retain the older unresolved field scope;
+do not repeat completed narrow cases or certify untested combinations.
+
+Previous checked candidate `62f696613e2b` / `5bb471f`:
 It fixes terminal stow routing under camera-suspending Help and retains the whole
 physical Menu press as handheld-owned. Forced-Help stow/reopen passes retained
 20261025T152037198735Z.

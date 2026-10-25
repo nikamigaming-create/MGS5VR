@@ -17,6 +17,25 @@ std::optional<std::array<size_t,14>> armHelperIndices(std::span<const uint32_t> 
     }
     return result;
 }
+Quat ArmTwistState::update(Quat wrist,uint64_t time,RigContinuityKey key){
+    if(!valid(Pose{wrist,{}})){*this={};return {};}
+    const float n=std::hypot(wrist.x,wrist.w);
+    float angle=n>.0001f?2.f*std::atan2(wrist.x,wrist.w):angle_;
+    angle=std::remainder(angle,6.283185307f);
+    if(sampled_&&key==key_&&time>=time_&&time-time_<=250)
+        angle=angle_+std::remainder(angle-angle_,6.283185307f);
+    angle_=angle;key_=key;time_=time;sampled_=true;
+    // Both arms share the authored local X axis. Never let controller roll
+    // turn the skin through a full revolution or jump at the quaternion seam.
+    const float bounded=std::clamp(angle,-1.745329252f,1.745329252f);
+    Quat twist{n>.0001f?wrist.x/n:0,0,0,n>.0001f?wrist.w/n:1};
+    auto swing=compose(Pose{wrist,{}},inverse(Pose{twist,{}})).orientation;
+    if(swing.w<0)swing={-swing.x,-swing.y,-swing.z,-swing.w};
+    const float sine=std::sqrt(swing.x*swing.x+swing.y*swing.y+swing.z*swing.z);
+    const float half=std::min(std::atan2(sine,swing.w),.698131701f);
+    if(sine>.0001f){const float gain=std::sin(half)/sine;swing={swing.x*gain,swing.y*gain,swing.z*gain,std::cos(half)};}
+    return compose(Pose{swing,{}},Pose{Quat{std::sin(bounded*.5f),0,0,std::cos(bounded*.5f)},{}}).orientation;
+}
 std::optional<HandPresentationPose> HandPresentationCache::update(HandPresentationPose pose,bool tracked,
     bool focused,uint64_t time,RigContinuityKey key){
     if(!focused||!key.owner||!key.model||!key.activation||!key.epoch||!key.presentationEpoch||!time
@@ -351,7 +370,8 @@ std::optional<ArmSolution> finishArm(const ArmPose& a,Pose target,Vec3 elbow,Vec
 std::optional<ArmSolution> solveArm(const ArmPose& a,Pose target,Vec3 hint,const ArmBasis* basis,const ArmSurface* surface){
     if(!valid(a.shoulder)||!valid(a.elbow)||!valid(a.wrist)||!valid(target)||!valid(Pose{{},hint}))return {};
     const auto upper=a.elbow.position-a.shoulder.position,lower=a.wrist.position-a.elbow.position;
-    const float u=length(upper),l=length(lower);
+    const float u=basis?length(basis->upperAxis):length(upper);
+    const float l=basis?length(basis->forearmAxis):length(lower);
     if(u<0.05f||l<0.05f||u>0.7f||l>0.7f)return {};
     auto ray=target.position-a.shoulder.position;float requested=length(ray);
     if(requested<0.0001f)ray=a.wrist.position-a.shoulder.position;
@@ -421,10 +441,10 @@ std::optional<ArmSolution> solveArmAroundHead(const ArmPose& a,Pose target,Vec3 
         }
         return center+direction*radius;
     };
-    const auto elbow=endpoint(a.shoulder.position,length(a.elbow.position-a.shoulder.position),
+    const auto elbow=endpoint(a.shoulder.position,basis?length(basis->upperAxis):length(a.elbow.position-a.shoulder.position),
         unconstrained->pose.elbow.position,sleeveRadius,sleeveRadius);
     if(!elbow)return {};
-    const auto wrist=endpoint(*elbow,length(a.wrist.position-a.elbow.position),target.position,wristRadius,elbowRadius);
+    const auto wrist=endpoint(*elbow,basis?length(basis->forearmAxis):length(a.wrist.position-a.elbow.position),target.position,wristRadius,elbowRadius);
     if(!wrist)return {};
     return finishArm(a,target,*elbow,*wrist,basis,true);
 }

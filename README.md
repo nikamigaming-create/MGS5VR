@@ -65,6 +65,8 @@ in older packages. The editor checks conflicts before saving and keeps a backup.
 Save, release all buttons/grips/triggers, and center both sticks for two seconds:
 valid edits apply **live**, without restarting. Buttons, taps, holds, chords,
 turning, HUD preferences, and physical fit have annotated settings.
+The **Character eyepatch** setting shows or hides Snake’s native eyepatch on
+his standard face models. It defaults on and does not mask either VR eye.
 
 [Complete illustrated control modes](docs/images/control-modes.svg)
 · [Accessible full guide](docs/CONTROLS.md)

@@ -203,7 +203,9 @@
         "include/mgs5vr/scene_capture.hpp",
         "include/mgs5vr/stereo.hpp",
         "include/mgs5vr/tracking_fault.hpp",
-        "include/mgs5vr/xr_runtime.hpp"
+        "include/mgs5vr/xr_runtime.hpp",
+        "include/mgs5vr/weather_effects.hpp",
+        "src/weather_effects.cpp"
       ],
       "automated_tests": [
         "contracts",
@@ -1287,7 +1289,8 @@
         "src/head_camera.cpp",
         "include/mgs5vr/head_camera.hpp",
         "include/mgs5vr/player_visibility.hpp",
-        "include/mgs5vr/render_camera.hpp"
+        "include/mgs5vr/render_camera.hpp",
+        "src/eyepatch_profiles.inc"
       ],
       "automated_tests": [
         "contracts",

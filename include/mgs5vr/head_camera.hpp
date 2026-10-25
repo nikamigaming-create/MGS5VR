@@ -266,6 +266,8 @@ struct HeadCameraSample {
     // world view remains anchored to Snake; this is never a retained image.
     Pose rocketArmCamera{};
     bool rocketArmGuidance{};
+    Pose rocketArmSocket{}; // Solved left forearm end, from this skin publication.
+    bool rocketArmSocketTracked{};
 };
 // Native listener adapters consume the center-head pose from the camera's
 // existing publication, never a newer tracking sample or an individual eye.

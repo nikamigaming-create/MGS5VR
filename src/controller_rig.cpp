@@ -154,6 +154,7 @@ uint16_t mountedActionId{};
 uint64_t mountedActionGeneration{};
 bool mountedActionAdmitted{};
 std::array<Vec3,2> bendHistory{};
+std::array<ArmTwistState,2> armSkinTwist;
 SupportContact supportContact;
 SupportPose supportPose;
 std::optional<Vec3> supportBarrelInGrip;
@@ -693,10 +694,10 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // snap back to the walking offset when its tracking returns.
     publishNativeCabinBounds(frame);
     const bool rocketIdroid=frame.rocketArmGuidance&&!frame.menuOpen;
-    const auto idroidMount=(frame.menuIdroid||rocketIdroid)?nativeIdroidMount(driver):std::nullopt;
-    const bool idroidHeld=((frame.menuOpen&&frame.menuIdroid)||rocketIdroid)&&frame.controllers.handheldMenus
+    const auto idroidMount=frame.menuIdroid?nativeIdroidMount(driver):std::nullopt;
+    const bool idroidHeld=(frame.menuOpen&&frame.menuIdroid)&&frame.controllers.handheldMenus
         &&!frame.controllers.handheldIdroidStowed
-        &&!frame.menuWorldQuad&&(idroidMount.has_value()||rocketIdroid)&&!frame.controllers.nativeGamepad;
+        &&!frame.menuWorldQuad&&idroidMount.has_value()&&!frame.controllers.nativeGamepad;
     const auto names=get<uintptr_t>(model+0xe8);
     std::array<uint32_t,512> boneNames{};
     const bool namesRead=names&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(names),
@@ -907,7 +908,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         if(static_cast<int>(side)!=aimHand){mountedAimServos[side].reset();continue;}
         mountedAxes[side]=mountedAimServos[side].update(nativeCamera,
             nativeTrackedPose(frame.nativePose,frame.headPose,mountedHeld[side].requestedAim),
-            mountedHeld[side].acquired||mountedAimHand!=aimHand||frame.controllers.mountedStickAiming);
+            mountedHeld[side].acquired||mountedAimHand!=aimHand||frame.controllers.mountedStickAiming,actionId==0x47);
     }
     mountedAimHand=aimHand;
     if(stationaryWeapon){
@@ -1011,7 +1012,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         // while the view/hands turned. Keep the anatomical camera anchor;
         // fullBodyPlacement rotates the complete skin about that fixed eye,
         // and the placed-foot queries resolve its new terrain contacts.
-        auto torsoDelta=fullBody?fullBodyPlacement(chest,bone(originalQ,originalP,4),uprightHead):upperBodyPlacement(chest,shoulderCenter,uprightHead);
+        auto torsoDelta=nativeHead?fullBodyPlacement(chest,bone(originalQ,originalP,4),uprightHead)
+            :upperBodyPlacement(chest,shoulderCenter,uprightHead);
         if(!torsoDelta)return false;
         if(fullBody&&!mountedBody){
             // A tracked turn belongs to the complete visible actor. Turning
@@ -1249,7 +1251,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             const auto rejection=frame.body.rejection;const auto eyeError=frame.body.eyeError;
             q=originalQ;p=originalP;frame.body={};frame.body.rejection=rejection;frame.body.eyeError=eyeError;fullBody=false;
             publishFullBodyVisibility(owner,model,false);
-            torsoDelta=upperBodyPlacement(chest,shoulderCenter,fallbackUprightHead);
+            torsoDelta=nativeHead?fullBodyPlacement(chest,bone(originalQ,originalP,4),fallbackUprightHead)
+                :upperBodyPlacement(chest,shoulderCenter,fallbackUprightHead);
             if(!torsoDelta)return false;
             if(lift>0)torsoDelta->position=torsoDelta->position+rotate(rootInverse.orientation,{0,lift,0});
         }
@@ -1284,7 +1287,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const auto fitClavicle=[&](size_t side,Pose target){
         // Grounded prone shoulders and authored mounted contacts retain their
         // existing constraints. The reproduced loss is in the full-body rig.
-        if(!frame.body.valid||frame.body.mounted||frame.controllers.playerPosture==PlayerPosture::prone)return;
+        if(frame.controllers.vehicleMounted||frame.controllers.cabinTransit||stationaryWeaponAction(frame.controllers.nativeActionId)
+           ||nativeTravelMode()==TravelMode::horse||frame.controllers.playerPosture==PlayerPosture::prone)return;
         const size_t clavicle=side?9:5,shoulder=clavicle+1;
         const auto before=bone(q,p,clavicle);
         const ArmPose arm{bone(q,p,shoulder),bone(q,p,shoulder+1),bone(q,p,shoulder+2)};
@@ -1652,8 +1656,9 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(helpersMatch)for(size_t side=0;side<2;++side){
         const size_t clavicle=side?9:5;
         const auto local=[&](size_t i){return compose(inverse(bone(q,p,parent[i])),bone(q,p,i)).orientation;};
-        const auto corrections=armCorrectiveRotations(local(clavicle),local(clavicle+1),local(clavicle+2),local(clavicle+3),side!=0);
-        const auto translations=armCorrectiveTranslations(local(clavicle+1),local(clavicle+3),side!=0);
+        const auto wristSkin=armSkinTwist[side].update(local(clavicle+3),frame.sampleTime,continuity);
+        const auto corrections=armCorrectiveRotations(local(clavicle),local(clavicle+1),local(clavicle+2),wristSkin,side!=0);
+        const auto translations=armCorrectiveTranslations(local(clavicle+1),wristSkin,side!=0);
         for(size_t j=0;j<7;++j){
             const auto i=(*helpers)[side*7+j],anchor=static_cast<size_t>(armHelperParents[side*7+j]);
             // Re-evaluate the driven channels from this same solved arm.
@@ -1821,11 +1826,22 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             tape.pose=compose(cabinFromNative,compose(correction,compose(frame.controllers.openingWorldOrigin,tape.pose)));
         }
     }
-    if(idroidMount||(rocketIdroid&&idroidHeld)){
+    if(idroidMount){
         const size_t side=idroidHeld?0:1;
         frame.idroidDevice=compose(*root,compose(bone(q,p,wrists[side]),
             idroidHeld?nativeIdroidLeftBodyInWrist:*idroidMount));
         frame.idroidDeviceTracked=presentationHands[side].has_value()&&valid(frame.idroidDevice);
+    }
+    if(rocketIdroid&&presentationHands[0]){
+        // The projectile leaves a socket, not an iDroid or a second hand.
+        // Use the solved forearm orientation and wrist endpoint together.
+        const auto wrist=compose(*root,bone(q,p,8));
+        const auto elbow=compose(*root,bone(q,p,7));
+        if(const auto socket=forearmPanel(elbow,wrist,rotate(renderedPalms[0].orientation,{-1,0,0}),0.f)){
+            frame.rocketArmSocket=*socket;
+            frame.rocketArmSocket.position=wrist.position;
+            frame.rocketArmSocketTracked=renderedPalmTracked[0];
+        }
     }
     frame.playerHead=renderedHead;
     if(presentationHands[0]&&renderedPalmTracked[0]){
@@ -2041,7 +2057,7 @@ void update(void* context,void* binding){
     if(solved)noteCompletedAttachmentBody(context,binding,restore,false);
     updateCabinGear(solved&&restore.attachmentDiagnosticFrame?&*restore.attachmentDiagnosticFrame:nullptr);
     const auto& attachmentFrame=restore.attachmentDiagnosticFrame;
-    const bool heldIdroid=solved&&attachmentFrame&&((attachmentFrame->menuOpen&&attachmentFrame->menuIdroid)||attachmentFrame->rocketArmGuidance)
+    const bool heldIdroid=solved&&attachmentFrame&&(attachmentFrame->menuOpen&&attachmentFrame->menuIdroid)
         &&attachmentFrame->controllers.handheldMenus&&!attachmentFrame->menuWorldQuad;
     if(menuBoundary||heldIdroid){
         // The native skin can already publish the new menu generation before
@@ -2514,6 +2530,9 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
             transitWalk.lastUpdateMs=steadyMilliseconds();
             return;
         }
+        // Native deployment/boarding interaction is authored from the seat.
+        // Discard accumulated virtual walking before handing it that action.
+        if(c.contextInteract)transitWalk={};
         frame.nativePose.position=advanceCabinWalk(transitWalk,frame.nativePose.position,
             frame.nativePose.orientation,c.cabinMove,steadyMilliseconds(),frame.activation,
             moveNativeCabin,.85f,frame.menuOpen&&!c.handheldMenuFree,true,frame.cabinBasePose);
@@ -2636,13 +2655,14 @@ TravelMode nativeTravelMode() noexcept{
             const auto phase=get<uint32_t>(base+0x2bd3fd0);
             if(phase>1)break;
             const auto state=base+0x2bd3ff0+(phase*16ull+index)*0xe0;
-            std::array<uint32_t,5> flags{};Vec3 stateRoot{},ownerRoot{};
+            std::array<uint32_t,5> flags{};Vec3 stateRoot{},ownerRoot{};uint16_t ridden{};
             if(get<uintptr_t>(state)!=base+0x2190b28||!read(state+0xc0,flags)
-                ||!read(state+0x40,stateRoot)||!read(owner+0x60,ownerRoot))break;
+                ||!read(state+0x40,stateRoot)||!read(owner+0x60,ownerRoot)||!read(state+0xb6,ridden))break;
             if(phase!=get<uint32_t>(base+0x2bd3fd0))continue;
             const auto difference=stateRoot-ownerRoot;
             if(!valid(Pose{{},difference})||dot(difference,difference)>4)break;
-            const auto mode=travelModeFromPlayerStatus(flags);
+            if(owner!=playerOwner.load()||ridden!=get<uint16_t>(state+0xb6))continue;
+            const auto mode=travelModeFromPlayerStatus(flags,ridden);
             if(mode!=cached){std::ostringstream s;s<<"Native travel mode="<<static_cast<int>(mode)
                 <<" player="<<index<<" flags="<<std::hex<<flags[0]<<','<<flags[1];log(s.str());}
             cached=mode;sampledAt=now;return mode;
@@ -2665,7 +2685,8 @@ NativeVehicleView nativeVehicleView() noexcept{
            ||!read(state+0x40,stateRoot)||!read(owner+0x60,ownerRoot)||!read(state+0xb6,ridden))return {};
         const auto difference=stateRoot-ownerRoot;
         if(!valid(Pose{{},difference})||dot(difference,difference)>4)return {};
-        NativeVehicleView result{true,(flags[0]&(1u<<7))!=0,(flags[0]&(1u<<26))!=0,false,ridden,0};
+        NativeVehicleView result{true,(flags[0]&(1u<<7))!=0,
+            (flags[0]&(1u<<26))!=0||walkerGearMounted(ridden),false,ridden,0};
         // SendCommand's registry resolves type and instance separately. Read
         // only the occupied TppVehicle2 record, never a nearby guessed vehicle.
         if((ridden>>9)==50){

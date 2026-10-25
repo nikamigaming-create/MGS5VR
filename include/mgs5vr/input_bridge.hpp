@@ -82,9 +82,11 @@ private:
 };
 enum class TravelMode { unknown,onFoot,horse,vehicle,nativeAction };
 constexpr bool stationaryWeaponAction(uint16_t action) noexcept {return action==0x46||action==0x47;}
+// Retail GetGameObjectIdIsRiddenToLocal: TppWalkerGear2 occupies type 44.
+constexpr bool walkerGearMounted(uint16_t ridden) noexcept {return (ridden>>9)==44;}
 // A standing non-ordinary action (including stationary weapons) owns native
 // aiming. These are the retail PlayerStatus bits, not an emplacement ID.
-TravelMode travelModeFromPlayerStatus(const std::array<uint32_t,5>& flags) noexcept;
+TravelMode travelModeFromPlayerStatus(const std::array<uint32_t,5>& flags,uint16_t ridden=65535) noexcept;
 // A mounted view/turret consumes both native right-stick axes. The on-foot
 // controller rig may suppress those axes because the tracked head owns view
 // motion; menus and native-input mode remain exclusive as usual.

@@ -54,11 +54,15 @@ bool mountedViewOwnsRightStick(TravelMode mode,bool rigInput,bool nativeExclusiv
     return rigInput&&!nativeExclusive&&!stickNavigation
         &&(mode==TravelMode::horse||mode==TravelMode::vehicle||mode==TravelMode::nativeAction);
 }
-TravelMode travelModeFromPlayerStatus(const std::array<uint32_t,5>& flags) noexcept{
+TravelMode travelModeFromPlayerStatus(const std::array<uint32_t,5>& flags,uint16_t ridden) noexcept{
     const auto status=[&](unsigned bit){return (flags[bit/32]&(1u<<(bit%32)))!=0;};
     if(status(37))return TravelMode::unknown;
     if(status(26))return TravelMode::vehicle;
     if(status(25))return TravelMode::horse;
+    // D-Walker sets neither ON_VEHICLE nor ON_HORSE and retains its entry
+    // stance. Keep walking/weapon button meanings, with native mounted aim;
+    // car pedals and steering-wheel remapping do not apply to this mount.
+    if(walkerGearMounted(ridden))return TravelMode::nativeAction;
     // BEHIND clears NORMAL_ACTION too, but wall cover still uses the player's
     // handheld gun and physical aim. Treating it as a stationary weapon drops
     // that rig and routes the right stick into native action aiming.

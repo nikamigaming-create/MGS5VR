@@ -8,6 +8,17 @@ struct RigContinuityKey {
     uint64_t activation{},epoch{},presentationEpoch{};
     bool operator==(const RigContinuityKey&) const=default;
 };
+// Anatomical skin roll is continuous across quaternion +/-pi and bounded.
+// The tracked palm stays authoritative for device/weapon contact.
+class ArmTwistState {
+public:
+    Quat update(Quat wrist,uint64_t time,RigContinuityKey key);
+private:
+    RigContinuityKey key_{};
+    float angle_{};
+    uint64_t time_{};
+    bool sampled_{};
+};
 struct HandPresentationPose {Pose grip{},aim{};};
 // Retain one complete controller sample while fresh focused publications
 // continue. Raw tracking still owns every action. Grip and aim recover together.

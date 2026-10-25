@@ -57,17 +57,19 @@ private:
 };
 // Native axes retain the game's mechanical limits. A physical grip requests
 // an aim direction, never a world transform for the emplacement itself.
-inline std::array<float,2> mountedAimAxes(Pose current,Pose requested) noexcept {
+inline std::array<float,2> mountedAimAxes(Pose current,Pose requested,bool machineGun=false) noexcept {
     if(!valid(current)||!valid(requested))return {};
     const auto a=rotate(current.orientation,{0,0,1}),b=rotate(requested.orientation,{0,0,1});
     const auto horizontalA=std::hypot(a.x,a.z),horizontalB=std::hypot(b.x,b.z);
     if(horizontalA<.01f||horizontalB<.01f)return {};
     const float yaw=std::remainder(std::atan2(b.x,b.z)-std::atan2(a.x,a.z),6.283185307f);
     const float pitch=std::atan2(b.y,horizontalB)-std::atan2(a.y,horizontalA);
-    const auto axis=[](float error){
+    const auto axis=[machineGun](float error){
         if(!std::isfinite(error)||std::abs(error)<.012f)return 0.f;
-        // Retail mortar input has a dead zone even after the VR resolver.
-        return std::copysign(std::clamp(std::abs(error)*2.f,.45f,.65f),error);
+        // The MG must catch the hand rapidly; retain the mortar's slower
+        // response. Both use native limits and brake on reaching the target.
+        return std::copysign(machineGun?std::clamp(std::abs(error)*8.f,.45f,1.f)
+            :std::clamp(std::abs(error)*2.f,.45f,.65f),error);
     };
     return {-axis(yaw),axis(pitch)};
 }
@@ -77,7 +79,7 @@ inline std::array<float,2> mountedAimAxes(Pose current,Pose requested) noexcept 
 // an opposite-direction correction with an unchanged hand.
 class MountedAimServo {
 public:
-    std::array<float,2> update(Pose current,Pose requested,bool rebase=false) noexcept {
+    std::array<float,2> update(Pose current,Pose requested,bool rebase=false,bool machineGun=false) noexcept {
         const auto angles=[](Pose pose){
             const auto f=rotate(pose.orientation,{0,0,1});
             return std::array<float,2>{std::atan2(f.x,f.z),std::atan2(f.y,std::hypot(f.x,f.z))};
@@ -85,7 +87,7 @@ public:
         if(!valid(current)||!valid(requested)){reset();return {};}
         const auto target=angles(requested),actual=angles(current);
         if(!sampled_||rebase){target_=target;active_={};sampled_=true;return {};}
-        auto axes=mountedAimAxes(current,requested);
+        auto axes=mountedAimAxes(current,requested,machineGun);
         for(size_t i=0;i<2;++i){
             const float change=std::remainder(target[i]-target_[i],6.283185307f);
             const float error=std::remainder(target[i]-actual[i],6.283185307f);

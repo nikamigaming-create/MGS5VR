@@ -283,6 +283,27 @@ void HeadCamera::trackStereo(Pose head,const std::array<EyeView,2>& views,bool t
         }else if(!freezeAnchor&&cameraFreezeAnchored_){
             cameraFreezeAnchored_=false;rig_={};resetStabilization(this);
         }
+        const auto mounted=[](const ControllerFrame& c){
+            return c.cabinTransit||c.vehicleMounted||stationaryWeaponAction(c.nativeActionId);
+        };
+        const bool mountChanged=mounted(controllers_)!=mounted(controllers)
+            ||(mounted(controllers)&&(controllers_.cabinTransit!=controllers.cabinTransit
+                ||controllers_.vehicleView.object!=controllers.vehicleView.object
+                ||((stationaryWeaponAction(controllers_.nativeActionId)||stationaryWeaponAction(controllers.nativeActionId))
+                    &&controllers_.nativeActionId!=controllers.nativeActionId)));
+        const bool passengerExit=controllers.cabinTransit&&controllers.contextInteract&&!controllers_.contextInteract;
+        if(mountChanged||passengerExit){
+            // Seat entry starts at the native contact, independent of the
+            // previous roomscale lean, prone height and snap-turn pivot.
+            // A new mount also establishes its forward reference. Otherwise
+            // looking toward it during approach leaves the seated view turned
+            // across the mount. Exit only clears position; fresh leaning and
+            // head turning remain available after either transition.
+            origin_.position=head.position;seatedHeadY_=head.position.y;
+            if(mountChanged&&mounted(controllers))origin_=uprightOrigin(head);
+            snapTranslation_={};snapYaw_=controllers.snapYaw;driverView_={};rig_={};
+            resetStabilization(this);
+        }
         if(controllers_.cabinTransit&&!controllers.cabinTransit)
             fieldPostureUntil_=time+900;
         head_=head;views_=views;controllers_=controllers;trackingEpoch_=controllers.referenceEpoch;time_=time;++sequence_;
@@ -790,7 +811,8 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         // This adapter resolves the actual TppVehicle2 carrier only.
         const bool otherCarrier=controllers_.vehicleView.valid&&controllers_.vehicleView.object!=65535
             &&(controllers_.vehicleView.object>>9)!=50;
-        if((controllers_.cabinTransit||(controllers_.vehicleMounted&&otherCarrier))&&!controllers_.nativeGamepad){
+        const bool stationaryMount=stationaryWeaponAction(controllers_.nativeActionId);
+        if((controllers_.cabinTransit||(controllers_.vehicleMounted&&otherCarrier)||stationaryWeaponAction(controllers_.nativeActionId))&&!controllers_.nativeGamepad){
             PlayerRootSample root;
             if(!getPlayerRootSample(camera,result.playerOwner,result.playerSequence,time,root)){
                 rig_={};suspendLocked(HeadCameraStop::playerHeadUnavailable);return result;
@@ -806,6 +828,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 view={nativeYaw,rootYaw,0,camera,result.playerOwner,time,activation_,
                     controllers_.referenceEpoch,0,true};
                 view.passenger=controllers_.cabinTransit;
+                if(stationaryMount)view.lookYaw=nativeYaw;
                 if(view.passenger){
                     view.lookYaw=std::remainder(nativeYaw-rootYaw,6.283185307f);
                     view.headLocalOffset=rotate(inverseQuat(root.orientation),result.playerHead-root.position);
@@ -815,7 +838,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 // The cached HEAD marker can still describe the standing
                 // boarding pose. Follow its larger transition into the seat,
                 // but keep ordinary seated idle head motion out of VR.
-                if(controllers_.fullBody&&nativeEyeJoined&&root.eyeModel){
+                if(nativeEyeJoined&&root.eyeModel){
                     const auto target=rotate(inverseQuat(root.orientation),root.eyePosition-root.position);
                     if(view.eyeModel!=root.eyeModel){
                         view.headLocalOffset=target;view.eyeModel=root.eyeModel;view.eyeSettling=false;
@@ -830,7 +853,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                         }
                     }
                     view.eyeTime=time;
-                }else if(!controllers_.fullBody&&view.eyeModel){
+                }else if(!nativeEyeJoined&&view.eyeModel){
                     view.headLocalOffset=rotate(inverseQuat(root.orientation),result.playerHead-root.position);
                     view.eyeModel=0;
                 }
@@ -843,17 +866,20 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 // brief settling motion. Body/vehicle turns supply the base
                 // heading; unrelated chase-camera auto-orbit does not.
                 const float delta=std::remainder(nativeYaw-view.nativeYaw,6.283185307f)
-                    -std::remainder(rootYaw-view.rootYaw,6.283185307f);
+                    -(stationaryMount?0.f:std::remainder(rootYaw-view.rootYaw,6.283185307f));
                 if(std::abs(delta)<.9f)view.lookYaw=std::remainder(view.lookYaw+delta,6.283185307f);
             }
             view.nativeYaw=nativeYaw;view.rootYaw=rootYaw;view.time=time;
-            nativePose.orientation=yawRotation(rootYaw+view.lookYaw);
+            // MG aiming rotates Snake's ROOT with the barrel. Feeding that
+            // rotation into VR turns a 12-degree hand request into a continuous
+            // turn. A stationary emplacement has no rotating carrier to follow.
+            nativePose.orientation=yawRotation(stationaryMount?view.lookYaw:rootYaw+view.lookYaw);
             // A passenger's authored seated fit rides the native player root.
             // Native camera orbit and idle head animation do not move the VR
             // seat; HMD turning/leaning and cabin walking are applied below.
             if(view.passenger)nativePose.position=root.position+rotate(root.orientation,view.headLocalOffset);
         }else driverView_={};
-        if(!otherCarrier&&!controllers_.cabinTransit&&!controllers_.cabinPlay&&!controllers_.frontEnd
+        if(!otherCarrier&&!stationaryWeaponAction(controllers_.nativeActionId)&&!controllers_.cabinTransit&&!controllers_.cabinPlay&&!controllers_.frontEnd
            &&!controllers_.scriptedDemo&&!controllers_.nativeGamepad){
             if(vehicleHeadingCamera_!=camera||vehicleHeadingOwner_!=result.playerOwner
                ||vehicleHeadingEpoch_!=controllers_.referenceEpoch){
@@ -1057,7 +1083,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
                 // authored head publication. A mortar keeps STAND set while
                 // its operator bends, so the on-foot stance latch is stale.
                 // physical HMD motion remains relative to it below.
-                nativePose.position=controllers_.fullBody&&nativeEyeJoined
+                nativePose.position=nativeEyeJoined
                     ?rootSample.eyePosition:result.playerHead;
             }else{
                 // Retain the eye's horizontal frame when Snake turns to run
@@ -1082,7 +1108,9 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     }
     // FOX's camera-local forward/right candidates are +Z/-X. The explicit
     // 180-degree basis rotation keeps handedness intact; validate in live motion.
-    if(!frozenCamera&&(!spatialMenu||liveHandheldMenu)&&!controllers_.authoredCamera)nativePose.position.y+=controllers_.playerHeightOffset;
+    if(!frozenCamera&&(!spatialMenu||liveHandheldMenu)&&!controllers_.authoredCamera
+       &&!controllers_.cabinTransit&&!controllers_.vehicleMounted&&!stationaryWeaponAction(controllers_.nativeActionId))
+        nativePose.position.y+=controllers_.playerHeightOffset;
     if(controllers_.cabinTransit&&driverView_.valid&&driverView_.passenger
        &&(!spatialMenu||liveHandheldMenu)){
         result.cabinBasePose=nativePose;result.cabinBaseTracked=true;
@@ -1109,7 +1137,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
     if(!anchoredMenu&&!frozenCamera&&!controllers_.seatedMode&&controllers_.physicalFloorTracked&&controllers_.fullBody
        &&!controllers_.frontEnd&&!controllers_.authoredCamera&&!controllers_.scriptedDemo
        &&!controllers_.cabinPlay&&!controllers_.cabinTransit&&!controllers_.vehicleMounted
-       &&controllers_.playerPosture!=PlayerPosture::prone){
+       &&!stationaryWeaponAction(controllers_.nativeActionId)&&controllers_.playerPosture!=PlayerPosture::prone){
         const auto& body=stabilizationState(this);
         if(body.valid)if(const auto offset=physicalFloorHeightOffset(head_.position.y,
             controllers_.physicalFloorY,units_,body.standingEyeHeight))relative.position.y=*offset;
