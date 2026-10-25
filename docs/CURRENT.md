@@ -1,8 +1,20 @@
 # Current MGS5VR work — 25 October 2026
 
-## Lifecycle follow-up — preparing playtest candidate
+## Current playtest candidate — lifecycle follow-up
 
-Two related corrections are batched before the next build. A handset deliberately
+**`994c6d57762a` / source `3fc9cdc` is built, checked and deployed for Play-Dev.**
+All 58 check groups and installer checks passed in
+`artifacts/release-lifecycle-followup-build.log`. Retained
+`20261025T150300810232Z` passed fresh flight opening, disembark with the handset
+still open, and field stow without a leftover menu. Runtime logs confirm the
+on-board-to-field ownership reset. The sequential eye captures straddle the
+exit animation and differ in scale; this is not continuous stereo acceptance.
+The first route attempt was rejected by a contradictory private scene predicate
+before disembark input; its failure is retained. Challenge Tasks mode 16 cleanup
+has contract checks and the retained pre-fix reproduction; its new live tutorial
+path is not yet accepted. Game/simulator are closed, Steam retained, Meta Link
+restored and published play unchanged. Play-Dev is ready for physical testing.
+Two related corrections are included. A handset deliberately
 opened on a helicopter returns to field ownership after a confirmed on-foot exit;
 the next pickup can therefore stow it instead of inheriting a permanent exemption.
 Challenge Tasks tutorial mode 16 now participates in the existing exact-owner
@@ -19,7 +31,7 @@ full-body occlusion in extreme poses remains a presentation limitation. The nati
 animation channels are restored after the skin hook; no movement-capsule write
 was found in the rig/camera audit. Exact terrain failures remain unlocalized.
 
-## Current development candidate — arm/pickup batch
+## Previous development candidate — arm/pickup batch
 
 **`a33bfd559b9e` / source `f5dfb37` is built, checked and deployed for
 Play-Dev.** All 58 groups and installer checks passed in

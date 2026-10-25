@@ -14,6 +14,10 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Latest incoming reports — 25 October
 
+Current playtest candidate: `994c6d57762a` / `3fc9cdc`. It adds on-board-to-field
+handset ownership reset (functional live smoke passed) and Challenge Tasks mode16
+post-stow Help cleanup (contract checked; corrected live guide path pending).
+
 - Sleeve pop during motion: a bounded same-owner camera/skin visibility continuity
   repair is deployed as a33bfd559b9e; scoped moving review passed. This does not close extreme
   cloth crowding or every outfit.

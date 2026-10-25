@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "a33bfd559b9eb61cd167c79b830a55af8dff48bfe9bfb0fb98c81e782074fff2",
-  "candidate_status": "Arm visibility and field-pickup iDroid batch built/deployed. Scoped body-motion and handset lifecycle review complete; actual field boarding and broader release scope remain open.",
+  "candidate": "994c6d57762a44c17eec691e99221f1456c5dc51b07ef114ab677679d46d57f8",
+  "candidate_status": "Built and deployed playtest candidate. Helicopter open-handset exit/stow functional smoke passed; release and physical acceptance remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2512,5 +2512,21 @@
       "physical Meta Quest and full-game scope"
     ],
     "published_pin_unchanged": true
+  },
+  "lifecycle_followup_2026_10_25": {
+    "source": "3fc9cdcb8d10bbbfcfd9374a7f9a5b84a5fec1a3",
+    "candidate": "994c6d57762a44c17eec691e99221f1456c5dc51b07ef114ab677679d46d57f8",
+    "changes": [
+      "On-board handset ownership returns to field after verified on-foot exit; next pickup can stow it",
+      "Exact-owner post-stow Help cleanup includes reproduced Challenge Tasks mode16"
+    ],
+    "automated": "58/58 and installer checks passed",
+    "build_log": "artifacts/release-lifecycle-followup-build.log",
+    "smoke_run": "20261025T150300810232Z",
+    "smoke_result": "Fresh flight handset, open-handset disembark and field stow pass state transitions; runtime logs confirm field ownership reset",
+    "visual_limit": "Sequential eye samples straddle exit animation and differ in scale. No continuous stereo or physical acceptance claimed.",
+    "retained_fixture_rejection": "20261025T150004189444Z: contradictory scene=gameplay/idroid=true predicate; no disembark input sent. Resumed remaining sequence only.",
+    "challenge_help": "Pre-fix actual Exit Tutorial reproduction 20261025T143421433785Z; new mode16 admission contract passes; live corrected guide path pending",
+    "cleanup": "Owned game/simulator closed, Steam retained, Meta Link restored, published pin unchanged"
   }
 }
