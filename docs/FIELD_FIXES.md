@@ -14,6 +14,14 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Current candidate — 25 October
 
+The active source batch expands exact forearm profiles to 20 owned outfits,
+repairs paused-part cache lifecycle, separates mounted body/eye admission from
+generic action input, and invalidates mounted aiming across action changes.
+See CURRENT for pending combined build/smoke status. The terrain report now has
+a regression clue (it predates the first-person rig change), not an exact
+location or confirmed cause. These edits do not close FP04/FP16 or whole-game
+and physical-headset acceptance.
+
 Candidate `d4b526e24cf5` / source `32f2ab0` is built and deployed. It includes
 the apparent third-arm correction, complete iDroid reopen pose/stereo handoff,
 and recovery of forearm cropping after native object-buffer replacement. All

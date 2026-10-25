@@ -81,6 +81,7 @@ private:
     unsigned category_{};
 };
 enum class TravelMode { unknown,onFoot,horse,vehicle,nativeAction };
+constexpr bool stationaryWeaponAction(uint16_t action) noexcept {return action==0x46||action==0x47;}
 // A standing non-ordinary action (including stationary weapons) owns native
 // aiming. These are the retail PlayerStatus bits, not an emplacement ID.
 TravelMode travelModeFromPlayerStatus(const std::array<uint32_t,5>& flags) noexcept;
@@ -122,6 +123,7 @@ struct MountedAimSample {
     uint64_t activation{},referenceEpoch{},time{};
     std::array<float,2> axes{};
     uint8_t hands{};
+    uint16_t action{};
 };
 class MountedAimMailbox {
 public:

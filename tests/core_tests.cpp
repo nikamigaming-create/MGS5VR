@@ -3982,6 +3982,25 @@ int main(){
         auto invalid=indices;invalid[0]=65535;
         expect(closeForearmCuffs(points,invalid,cropped,lod,false)==0&&cropped==cut,
             "invalid native topology leaves the existing safe crop intact");
+        // Native variants can place both arms in a single material partition.
+        // Capping one must never recycle the other's live vertices or cap.
+        auto both=points;for(auto p:points){p.x=-p.x;both.push_back(p);}
+        auto bothIndices=indices;for(auto i:indices)bothIndices.push_back(static_cast<uint16_t>(i+points.size()));
+        auto bothCut=bothIndices;
+        for(size_t at=0;at<bothCut.size();at+=3)
+            if(std::abs(both[bothCut[at]].x)<.452f||std::abs(both[bothCut[at+1]].x)<.452f||std::abs(both[bothCut[at+2]].x)<.452f)
+                bothCut[at+1]=bothCut[at+2]=bothCut[at];
+        const std::array<ForearmIndexRange,1> bothLod{{{0,bothCut.size()}}};
+        const auto leftCaps=closeForearmCuffs(both,bothIndices,bothCut,bothLod,false,.412f,&fitted,&copies,.432f);
+        auto leftFitted=fitted;const auto leftCopies=copies;
+        const auto rightCaps=closeForearmCuffs(leftFitted,bothIndices,bothCut,bothLod,true,.412f,&fitted,&copies,.432f);
+        bool intact=leftCaps==2&&rightCaps==2&&fitted.size()==both.size();
+        if(intact){
+            for(size_t i=8;i<12;++i)intact&=same(fitted[i],both[i])&&same(fitted[i+12],both[i+12]);
+            for(const auto copy:leftCopies)intact&=same(fitted[copy[0]],leftFitted[copy[0]])&&near(fitted[copy[0]].x,.432f);
+            for(const auto copy:copies)intact&=near(fitted[copy[0]].x,-.432f);
+        }
+        expect(intact,"bilateral partition preserves both distal arms and independently caps the native female elbow planes");
     }
     // Captured ACC cross-body reach: its fully extended elbow circle lies
     // inside the head, so changing bend alone cannot produce a fresh rig.
@@ -4289,6 +4308,9 @@ int main(){
         set(4);set(145);set(7);
         expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,"ordinary standing action keeps tracked foot aiming");
         set(7,false);
+        expect(!stationaryWeaponAction(1)&&!stationaryWeaponAction(0x45)
+            &&stationaryWeaponAction(0x46)&&stationaryWeaponAction(0x47),
+            "generic context actions cannot borrow mounted body placement from the NORMAL_ACTION flag");
         expect(travelModeFromPlayerStatus(status)==TravelMode::nativeAction,"observed mortar standing action keeps both native aiming axes");
         set(90);
         expect(travelModeFromPlayerStatus(status)==TravelMode::onFoot,

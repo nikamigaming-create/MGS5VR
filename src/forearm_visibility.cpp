@@ -35,9 +35,13 @@ struct Geometry {
     std::vector<unsigned char> positionBytes,attributeBytes,indexBytes;
     D3D11_BUFFER_DESC positionDescription{},attributeDescription{},indexDescription{};
 };
-Geometry geometry;
+#include "forearm_profiles.inc"
+std::array<Geometry,std::size(forearmProfiles)> geometries;
 constexpr GUID croppedKey{0xd09211a8,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
-constexpr GUID vertexKey{0xd09211a9,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
+constexpr GUID positionKey{0xd09211a9,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
+constexpr GUID attributeKey{0xd09211aa,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
+constexpr GUID nativePositionKey{0xd09211ab,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
+constexpr GUID nativeAttributeKey{0xd09211ac,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
 struct Constants {
     ComPtr<ID3D11Resource> resource;
     ID3D11DeviceContext* context{};
@@ -110,17 +114,22 @@ void bindForearmTargets(ID3D11DeviceContext* c,UINT count,ID3D11RenderTargetView
 }
 void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,const D3D11_SUBRESOURCE_DATA* data,ID3D11Buffer* buffer) noexcept {
     if(building||!device||!desc||!data||!data->pSysMem||!buffer)return;
-    const bool positions=desc->ByteWidth==80640&&(desc->BindFlags&D3D11_BIND_VERTEX_BUFFER);
-    const bool attributes=desc->ByteWidth==214368&&(desc->BindFlags&D3D11_BIND_VERTEX_BUFFER);
-    const bool indices=desc->ByteWidth==85824&&(desc->BindFlags&D3D11_BIND_INDEX_BUFFER);
-    if(!positions&&!attributes&&!indices)return;
+    const auto matchesSize=[&](const ForearmProfile& profile,size_t stream){
+        return desc->ByteWidth==profile.bytes[stream]
+            &&(desc->BindFlags&(stream==2?D3D11_BIND_INDEX_BUFFER:D3D11_BIND_VERTEX_BUFFER));
+    };
+    if(std::none_of(std::begin(forearmProfiles),std::end(forearmProfiles),[&](const auto& p){
+        return matchesSize(p,0)||matchesSize(p,1)||matchesSize(p,2);}))return;
     try{
         const auto hash=digest(data->pSysMem,desc->ByteWidth);
-        if(hash!=(positions?"939ed828f424ab2271768682c4c9bf1640f1656cac6a2ae2012e7b6ab17975bb":
-            attributes?"951de936fba0c8b06d6f29996b138f33db442714776c4bc33fe5366a2adfcbd6":
-            "7616a3f90d1f1eb01a5746707edd0bb56adf506b476f89376c88a652ac5adb49"))return;
         std::lock_guard lock(geometryMutex);
-        auto& g=geometry;
+        for(size_t profileIndex=0;profileIndex<std::size(forearmProfiles);++profileIndex){
+        const auto& profile=forearmProfiles[profileIndex];
+        size_t stream=0;
+        for(;stream<3;++stream)if(matchesSize(profile,stream)&&hash==profile.hashes[stream])break;
+        if(stream==3)continue;
+        const bool positions=stream==0,attributes=stream==1;
+        auto& g=geometries[profileIndex];
         // A reload creates new native resources; attach the variant to that
         // exact index buffer so resource reuse cannot inherit concealment.
         const auto* bytes=static_cast<const unsigned char*>(data->pSysMem);
@@ -128,59 +137,66 @@ void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,con
         else if(attributes){g.attributes=buffer;g.attributeBytes.assign(bytes,bytes+desc->ByteWidth);g.attributeDescription=*desc;}
         else {g.indices=buffer;g.indexBytes.assign(bytes,bytes+desc->ByteWidth);g.indexDescription=*desc;}
         g.cropped.Reset();
-        if(!g.positions||!g.attributes||!g.indices)return;
+        if(!g.positions||!g.attributes||!g.indices)continue;
+        bool sameDevice=true;
         for(auto* resource:{g.positions.Get(),g.attributes.Get(),g.indices.Get()}){
-            ComPtr<ID3D11Device> owner;resource->GetDevice(&owner);if(owner.Get()!=device)return;
+            ComPtr<ID3D11Device> owner;resource->GetDevice(&owner);sameDevice&=owner.Get()==device;
         }
+        if(!sameDevice)continue;
         auto cropped=g.indexBytes;
         auto fittedPositions=g.positionBytes,capAttributes=g.attributeBytes;
-        struct Mesh {size_t first,end,positions,count;bool right;};
-        // Owned sna5 mesh partitions, including every native LOD. The same
-        // right-hand partition contains shoulder cloth, forearm and fingers.
-        constexpr std::array<Mesh,6> meshes{{{261,2922,912,372,false},{2922,3138,5376,50,false},
-            {3138,3195,5984,14,false},{3195,3219,6160,7,true},{3219,10743,6256,1057,true},{10743,11112,18944,92,true}}};
+        const auto meshes=profile.meshes;
+        const float cut=profile.elbow-.02f;
         size_t removed{};
-        for(const auto& mesh:meshes)for(size_t at=mesh.first;at<mesh.end;at+=3){
+        for(const auto& mesh:meshes){
+        if(mesh.first>mesh.end||mesh.end>cropped.size()/2||(mesh.end-mesh.first)%3
+            ||mesh.positions+mesh.count*12>g.positionBytes.size()
+            ||mesh.attributes+mesh.count*mesh.stride>g.attributeBytes.size())return;
+        for(size_t at=mesh.first;at<mesh.end;at+=3){
             std::array<uint16_t,3> face{};std::memcpy(face.data(),cropped.data()+at*2,6);
             bool shoulder=false;
+            int side=0;
             for(auto index:face){
                 if(index>=mesh.count)return;
                 float x{};std::memcpy(&x,g.positionBytes.data()+mesh.positions+index*12,4);
-                // The native elbow is +/-0.472 m in the authored T pose.
-                // Keep the elbow seam and all distal vertices. Classification
-                // precedes skinning, so bending cannot expose the shoulder.
-                shoulder|=(mesh.right?-x:x)<.452f;
+                // Some native partitions contain both hands. Keep both distal
+                // halfspaces at THIS skeleton's elbow, before skinning.
+                shoulder|=std::abs(x)<cut;
+                const int vertexSide=x<0?-1:1;
+                if(side&&side!=vertexSide)shoulder=true;
+                side=vertexSide;
             }
             if(shoulder){face[1]=face[2]=face[0];std::memcpy(cropped.data()+at*2,face.data(),6);++removed;}
-        }
+        }}
         // Native LOD ranges share triangles. Caps use only removed slots that
         // belong to one draw range. Dead vertex slots give each cap its own
         // normal/UV while retaining the original ring's skin weights.
-        constexpr std::array<ForearmIndexRange,4> leftLods{{{261,1788},{1413,2367},{2142,2703},{2661,2922}}};
-        constexpr std::array<ForearmIndexRange,4> rightLods{{{3219,7719},{7089,9384},{9015,10254},{10143,10743}}};
         std::vector<uint16_t> nativeIndices(g.indexBytes.size()/2),closedIndices(cropped.size()/2);
         std::memcpy(nativeIndices.data(),g.indexBytes.data(),g.indexBytes.size());
         std::memcpy(closedIndices.data(),cropped.data(),cropped.size());
         size_t caps{};
-        for(const size_t part:{size_t{0},size_t{4}}){
-            const auto& mesh=meshes[part];std::vector<Vec3> points(mesh.count);
+        for(const auto& mesh:meshes){
+            std::vector<Vec3> points(mesh.count);
             static_assert(sizeof(Vec3)==12);
             std::memcpy(points.data(),g.positionBytes.data()+mesh.positions,mesh.count*12);
+            for(bool right:{false,true}){
             std::vector<Vec3> fitted;std::vector<std::array<uint16_t,2>> copies;
-            caps+=closeForearmCuffs(points,nativeIndices,closedIndices,part?rightLods:leftLods,mesh.right,.452f,&fitted,&copies);
+            caps+=closeForearmCuffs(points,nativeIndices,closedIndices,mesh.lods,right,cut,&fitted,&copies,profile.elbow);
             if(fitted.size()!=points.size())return;
             std::memcpy(fittedPositions.data()+mesh.positions,fitted.data(),mesh.count*12);
-            const size_t attributeOffset=part?16640:2432;
-            // Native normal and tangent are half4; weights, indices and
-            // color occupy bytes 16..27, UV0 half2 occupies bytes 28..31.
-            const std::array<uint16_t,8> frame{static_cast<uint16_t>(mesh.right?0x3c00:0xbc00),0,0,0x3c00,0,0x3c00,0,0x3c00};
+            // Normal/tangent are native half4. Preserve each layout's skin
+            // bytes and UV locations (attribute strides are 28, 32 or 36).
+            const std::array<uint16_t,8> frame{static_cast<uint16_t>(right?0x3c00:0xbc00),0,0,0x3c00,0,0x3c00,0,0x3c00};
             for(const auto copy:copies){
-                auto* destination=capAttributes.data()+attributeOffset+copy[0]*32;
-                std::memcpy(destination,g.attributeBytes.data()+attributeOffset+copy[1]*32,32);
+                auto* destination=capAttributes.data()+mesh.attributes+copy[0]*mesh.stride;
+                std::memcpy(destination,g.attributeBytes.data()+mesh.attributes+copy[1]*mesh.stride,mesh.stride);
                 std::memcpy(destination,frame.data(),16);
                 // One native fabric sample across the cap avoids drawing a
                 // stretched strip of the shoulder atlas over the cut end.
-                std::memcpy(destination+28,g.attributeBytes.data()+attributeOffset+copies.front()[1]*32+28,4);
+                // All native UV sets on a cap use a single authored sample.
+                std::memcpy(destination+mesh.uv,g.attributeBytes.data()+mesh.attributes+copies.front()[1]*mesh.stride+mesh.uv,mesh.stride-mesh.uv);
+            }
+            points=std::move(fitted);
             }
         }
         std::memcpy(cropped.data(),closedIndices.data(),cropped.size());
@@ -192,10 +208,15 @@ void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,con
         if(FAILED(device->CreateBuffer(&g.attributeDescription,&initial,&attributeVariant)))return;
         initial.pSysMem=cropped.data();
         if(FAILED(device->CreateBuffer(&g.indexDescription,&initial,&g.cropped)))return;
-        if(FAILED(g.positions->SetPrivateDataInterface(vertexKey,positionVariant.Get()))
-            ||FAILED(g.attributes->SetPrivateDataInterface(vertexKey,attributeVariant.Get())))return;
+        // Variants belong to an index/position/attribute transaction. Shared
+        // native streams must not inherit another outfit's fitted cap vertices.
+        if(FAILED(g.indices->SetPrivateDataInterface(positionKey,positionVariant.Get()))
+            ||FAILED(g.indices->SetPrivateDataInterface(attributeKey,attributeVariant.Get()))
+            ||FAILED(g.indices->SetPrivateDataInterface(nativePositionKey,g.positions.Get()))
+            ||FAILED(g.indices->SetPrivateDataInterface(nativeAttributeKey,g.attributes.Get())))return;
         g.indices->SetPrivateDataInterface(croppedKey,g.cropped.Get());
-        log("Native forearm-only indices ready; shoulder triangles removed="+std::to_string(removed)+" cuff triangles="+std::to_string(caps));
+        log("Native forearm-only indices ready outfit="+std::string(profile.name)+" shoulder triangles removed="+std::to_string(removed)+" cuff triangles="+std::to_string(caps));
+        }
     }catch(...){}
 }
 void mapForearmConstants(ID3D11DeviceContext* c,ID3D11Resource* r,UINT sub,D3D11_MAP type,const D3D11_MAPPED_SUBRESOURCE* mapped) noexcept {
@@ -237,7 +258,7 @@ ForearmDraw::ForearmDraw(ID3D11DeviceContext* c) noexcept {
         const auto character=get<uintptr_t>(owner+0x370);
         if(get<uintptr_t>(owner)!=base+0x23b8218||get<uintptr_t>(character)!=base+0x2295210
             ||get<uintptr_t>(get<uintptr_t>(get<uintptr_t>(character+0x10)+0x10)+0x68)!=model
-            ||get<uintptr_t>(model)!=base+0x20f4d90||get<uint64_t>(model+0x120)!=0x84a033c711e29aedull)return;
+            ||get<uintptr_t>(model)!=base+0x20f4d90)return;
         std::array<float,16> playerWorld{};if(!read(model+0x40,playerWorld)||!nativeAffinePose(playerWorld))return;
         ComPtr<ID3D11Buffer> object;UINT first=0,count=0;
         ComPtr<ID3D11DeviceContext1> context1;
@@ -279,19 +300,23 @@ ForearmDraw::ForearmDraw(ID3D11DeviceContext* c) noexcept {
         }
         std::array<ComPtr<ID3D11Buffer>,32> replacements;
         std::array<bool,2> streams{};
+        std::array<ComPtr<ID3D11Buffer>,2> nativeStreams,variantStreams;
+        const std::array<GUID,2> nativeKeys{nativePositionKey,nativeAttributeKey},variantKeys{positionKey,attributeKey};
+        for(size_t stream=0;stream<2;++stream){
+            size=sizeof(ID3D11Buffer*);
+            if(FAILED(indices->GetPrivateData(nativeKeys[stream],&size,nativeStreams[stream].GetAddressOf())))return;
+            size=sizeof(ID3D11Buffer*);
+            if(FAILED(indices->GetPrivateData(variantKeys[stream],&size,variantStreams[stream].GetAddressOf())))return;
+        }
         for(UINT slot=0;slot<bound.size();++slot)if(bound[slot]){
-            ComPtr<ID3D11Buffer> replacement;size=sizeof(ID3D11Buffer*);
-            if(FAILED(bound[slot]->GetPrivateData(vertexKey,&size,replacement.GetAddressOf())))continue;
-            D3D11_BUFFER_DESC desc{};bound[slot]->GetDesc(&desc);
-            const size_t stream=desc.ByteWidth==80640?0:1;
-            if((stream==1&&desc.ByteWidth!=214368)
-                ||(stream==0?strides[slot]!=12u:
-                    strides[slot]!=28u&&strides[slot]!=32u&&strides[slot]!=36u))return;
+            const size_t stream=bound[slot]==nativeStreams[0]?0:bound[slot]==nativeStreams[1]?1:2;
+            if(stream==2)continue;
+            if(stream==0?strides[slot]!=12u:strides[slot]!=28u&&strides[slot]!=32u&&strides[slot]!=36u)return;
             // The owned FMDL binds normal/tangent, skinning and UV groups
             // separately from the same attribute buffer. Replace every
             // alias, retaining each native offset and mesh-specific stride.
             streams[stream]=true;
-            replacements[vertexCount_]=replacement;
+            replacements[vertexCount_]=variantStreams[stream];
             vertices_[vertexCount_++]={bound[slot],slot,strides[slot],offsets[slot]};
         }
         if(!streams[0]||!streams[1])return;

@@ -1,5 +1,44 @@
 # Current MGS5VR work — 25 October 2026
 
+## Active combined correction batch
+
+The next batch is on main, ahead of the checked candidate below:
+
+- Paused modular-arm cache covers all 32 admitted owned parts, retires replaced
+  models and invalidates frozen poses on resource changes.
+- Forearm-only rendering has 20 exact owned outfit buffer profiles instead of
+  one sna5 profile. Each profile supplies native partitions, LODs, attribute
+  layout and elbow plane; female elbows remain at 0.432 m, male at 0.472 m.
+  Bilateral partitions reserve both arms' retained vertices when closing cuffs.
+  Index and vertex variants are joined as one resource transaction. No native
+  geometry is distributed. Other outfits and visual acceptance remain open.
+- Body/camera mounted admission uses the actual native action ID, independently
+  of input focus. Generic NORMAL_ACTION transitions cannot select a mounted eye
+  or skip the on-foot floor fit merely because they use native action controls.
+- Mounted grip leases include action identity; the input consumer rejects aim
+  left over from another weapon action. Mortar/MG admission remains 0x46/0x47;
+  no guessed gatling action has been added.
+
+User clarification: terrain worked before the first-person rig transition.
+The exact small-rock/corridor failure remains unlocalized; the action-admission
+correction is not yet established as its cause. Native movement still owns
+actor collision, stairs and slopes; IK changes render channels and restores
+animation inputs after publication. Do not replace that controller speculatively.
+
+Controller design references reviewed: [Godot CharacterBody3D](https://docs.godotengine.org/en/stable/classes/class_characterbody3d.html),
+[Jolt CharacterVirtual](https://jrouwe.github.io/JoltPhysicsDocs/5.3.0/class_character_virtual.html),
+and [Unity XR Body Transformer](https://docs.unity3d.com/Packages/com.unity.xr.interaction.toolkit@3.1/manual/xr-body-transformer.html).
+They distinguish collision-constrained movement from grounding/presentation.
+Applying that separation here is an engineering decision, not evidence that
+MGSV has a particular collision defect. Keep native locomotion authoritative.
+
+Next: build/deploy this whole batch, then one combined native smoke covering
+arms/body fallback, iDroid reopening, traversal and an intact mounted fixture.
+Investigate failures from that combined pass, without repeating already passed
+single-case loops. Do not publish or advance the play pin from a build alone.
+
+## Previously checked candidate
+
 **Candidate `d4b526e24cf5` is built and deployed from source `32f2ab0`.
 All 58 groups and installer checks passed. Use `Play-Dev.cmd` for the user's
 physical test. No new simulator/game session was launched. Full-game and

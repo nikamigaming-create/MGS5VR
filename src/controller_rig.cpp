@@ -129,12 +129,14 @@ struct PausedSkin {
 } pausedSkin;
 struct PausedPart {
     uintptr_t model{},matrices{},namesAddress{},parentsAddress{};
+    uint64_t resource{};
     uint16_t count{};
     std::array<uint32_t,512> names{};
     std::array<int32_t,512> parents{};
     std::array<Pose,512> frozen{};
 };
-std::array<PausedPart,4> pausedParts;
+// Match the bounded native part-list admission, including replacement parts.
+std::array<PausedPart,32> pausedParts;
 uint64_t pausedSkinRefreshes{};
 uintptr_t boundOwner{};
 uintptr_t boundModel{};
@@ -148,6 +150,7 @@ std::array<MountedGrip,2> mountedGrips;
 std::array<MountedAimServo,2> mountedAimServos;
 int mountedAimHand=-1;
 uintptr_t mountedActionOwner{};
+uint16_t mountedActionId{};
 uint64_t mountedActionGeneration{};
 bool mountedActionAdmitted{};
 std::array<Vec3,2> bendHistory{};
@@ -391,11 +394,18 @@ uint32_t refreshPausedArmParts(const PausedSkin& body,uintptr_t character){
     if(!hasSource(leftForearm)||!hasSource(leftWrist))return 0;
     const auto bodyRoot=nativeAffinePose(get<std::array<float,16>>(body.model+0x40));
     if(!bodyRoot)return 0;
-    uint32_t refreshed{};
+    std::array<uintptr_t,32> ownedModels{};
     for(uint32_t entry=0;entry<count;++entry){
         const auto record=get<uintptr_t>(records+entry*8),renderer=get<uintptr_t>(record);
-        if(get<uintptr_t>(renderer)!=base+0x20f9460)continue;
-        const auto model=get<uintptr_t>(renderer+0x40);
+        if(get<uintptr_t>(renderer)==base+0x20f9460)ownedModels[entry]=get<uintptr_t>(renderer+0x40);
+    }
+    // A replaced native part must not consume a cache slot for the rest of
+    // the pause, or supply frozen mechanical joints to a different resource.
+    for(auto& cached:pausedParts)if(cached.model
+        &&std::find(ownedModels.begin(),ownedModels.begin()+count,cached.model)==ownedModels.begin()+count)cached={};
+    uint32_t refreshed{};
+    for(uint32_t entry=0;entry<count;++entry){
+        const auto model=ownedModels[entry];
         if(model==body.model||get<uintptr_t>(model)!=base+0x20f4d90)continue;
         const auto groupCount=get<uint16_t>(model+0x1e8);
         const auto groups=get<uintptr_t>(model+0x180);
@@ -410,11 +420,12 @@ uint32_t refreshPausedArmParts(const PausedSkin& body,uintptr_t character){
         const auto a=partRoot->orientation,b=bodyRoot->orientation;
         if(dot(delta,delta)>.001f*.001f||std::abs(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w)<.99999f)continue;
         const auto matrices=get<uintptr_t>(model+0xe0),names=get<uintptr_t>(model+0xe8),parents=get<uintptr_t>(model+0xf0);
+        const auto resource=get<uint64_t>(model+0x120);
         if(!matrices||!names||!parents)continue;
         auto cached=std::find_if(pausedParts.begin(),pausedParts.end(),[&](const auto& p){return p.model==model;});
         if(cached==pausedParts.end())cached=std::find_if(pausedParts.begin(),pausedParts.end(),[](const auto& p){return !p.model;});
         if(cached==pausedParts.end())continue;
-        if(cached->model&&(cached->matrices!=matrices||cached->namesAddress!=names||cached->parentsAddress!=parents||cached->count!=boneCount))*cached={};
+        if(cached->model&&(cached->resource!=resource||cached->matrices!=matrices||cached->namesAddress!=names||cached->parentsAddress!=parents||cached->count!=boneCount))*cached={};
         bool consistent=true;
         for(size_t i=0;i<boneCount;++i){
             const auto name=get<uint32_t>(names+i*4);const auto parent=get<int32_t>(parents+i*0x20);
@@ -426,9 +437,9 @@ uint32_t refreshPausedArmParts(const PausedSkin& body,uintptr_t character){
             }
         }
         if(!consistent){*cached={};continue;}
-        if(!pausedArmPartMatches(get<uint64_t>(model+0x120),
+        if(!pausedArmPartMatches(resource,
             {cached->names.data(),boneCount},{cached->parents.data(),boneCount})){*cached={};continue;}
-        cached->model=model;cached->matrices=matrices;cached->namesAddress=names;cached->parentsAddress=parents;cached->count=boneCount;
+        cached->model=model;cached->resource=resource;cached->matrices=matrices;cached->namesAddress=names;cached->parentsAddress=parents;cached->count=boneCount;
         std::array<Pose,512> solved{};
         if(!retargetPausedPart({sourceNames.data(),sourceCount},{source.data(),sourceCount},
             {cached->names.data(),boneCount},{cached->frozen.data(),boneCount},
@@ -843,7 +854,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         for(auto& hand:mountedGrips)hand.reset();
         for(auto& servo:mountedAimServos)servo.reset();
         mountedAimHand=-1;
-        mountedActionAdmitted=false;mountedActionOwner=0;++mountedActionGeneration;
+        mountedActionAdmitted=false;mountedActionOwner=0;mountedActionId=0;++mountedActionGeneration;
         mountedAimMailbox().publish({});
         log("Controller rig uses native anatomical palm frames; no activation-pose wrist calibration");
     }
@@ -860,11 +871,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     const bool actionOwnerMatches=actionContext&&actionTable&&actionIndex<16
         &&get<uint32_t>(actionContext+0x218)==actionIndex;
     const auto actionId=actionOwnerMatches?get<uint16_t>(actionTable+actionIndex*2ull):uint16_t{};
-    const bool stationaryWeapon=(actionId==0x46||actionId==0x47)&&frame.controllers.nativeActionControls
+    const bool stationaryWeapon=stationaryWeaponAction(actionId)&&actionId==frame.controllers.nativeActionId&&frame.controllers.nativeActionControls
         &&frame.controllers.presentationFocused&&!frame.controllers.nativeGamepad&&!frame.menuOpen;
     const auto actionOwner=stationaryWeapon?actionTable+actionIndex*2ull:uintptr_t{};
-    if(stationaryWeapon!=mountedActionAdmitted||actionOwner!=mountedActionOwner){
-        ++mountedActionGeneration;mountedActionAdmitted=stationaryWeapon;mountedActionOwner=actionOwner;
+    const auto admittedAction=stationaryWeapon?actionId:uint16_t{};
+    if(stationaryWeapon!=mountedActionAdmitted||actionOwner!=mountedActionOwner||admittedAction!=mountedActionId){
+        ++mountedActionGeneration;mountedActionAdmitted=stationaryWeapon;mountedActionOwner=actionOwner;mountedActionId=admittedAction;
     }
     const MountedGripOwner mountedOwner{owner,actionOwner,frame.activation,
         frame.controllers.referenceEpoch,mountedActionGeneration};
@@ -901,6 +913,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     if(stationaryWeapon){
         mountedAim.player=owner;mountedAim.activation=frame.activation;
         mountedAim.referenceEpoch=frame.controllers.referenceEpoch;mountedAim.time=frame.sampleTime;
+        mountedAim.action=actionId;
         // A second hand supports its own native contact without fighting the
         // primary hand's requested bearing. Either hand can operate alone.
         if(aimHand>=0)mountedAim.axes=mountedAxes[aimHand];
@@ -952,7 +965,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         Quat torso{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)};
         const auto travelMode=nativeTravelMode();
         const bool mountedBody=travelMode==TravelMode::horse||frame.controllers.vehicleMounted||frame.controllers.cabinTransit
-            ||frame.controllers.nativeActionControls;
+            ||stationaryWeaponAction(frame.controllers.nativeActionId);
         if(frame.locomotionHeadingTracked&&!frame.controllers.frontEnd
            &&!frame.controllers.authoredCamera&&!frame.controllers.cabinPlay
            &&!frame.controllers.cabinTransit&&!frame.controllers.vehicleMounted
@@ -2582,6 +2595,24 @@ void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
     }
     nextAttempt=now+1000;
     applyRoomMovement();
+}
+uint16_t nativePlayerAction() noexcept{
+    if(!enabled.load())return 0;
+    const auto owner=playerOwner.load();
+    if(get<uintptr_t>(owner)!=base+0x23b8218)return 0;
+    const auto character=get<uintptr_t>(owner+0x370);
+    if(get<uintptr_t>(character)!=base+0x2295210)return 0;
+    const auto context=get<uintptr_t>(character+0x138);
+    const auto index=get<uint32_t>(owner+0x3a0);
+    const auto table=get<uintptr_t>(get<uintptr_t>(context+0x60)+0x18);
+    if(!context||!table||index>=16||get<uint32_t>(context+0x218)!=index)return 0;
+    const auto action=get<uint16_t>(table+index*2ull);
+    // Reject a concurrent owner/action-table replacement instead of carrying
+    // a mount identity across loading, respawn or a new native action owner.
+    return owner==playerOwner.load()&&character==get<uintptr_t>(owner+0x370)
+        &&context==get<uintptr_t>(character+0x138)
+        &&table==get<uintptr_t>(get<uintptr_t>(context+0x60)+0x18)
+        &&index==get<uint32_t>(context+0x218)?action:0;
 }
 TravelMode nativeTravelMode() noexcept{
     // PlayerStatus's own Lua readers select this double-buffered local player

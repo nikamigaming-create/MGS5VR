@@ -948,7 +948,7 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             // anchored Pause/photo frames retain their admitted tag above.
             result.anatomicalEyeModel=nativeEyeJoined?rootSample.eyeModel:0;
             auto& state=stabilizationState(this);
-            const bool mountedOperator=controllers_.vehicleMounted||controllers_.nativeActionControls;
+            const bool mountedOperator=controllers_.vehicleMounted||stationaryWeaponAction(controllers_.nativeActionId);
             const bool anatomical=controllers_.fullBody&&!mountedOperator;
             if(state.valid&&(state.anatomical!=anatomical
                 ||(anatomical&&rootSample.eyeModel&&state.anatomicalModel!=rootSample.eyeModel)))state={};

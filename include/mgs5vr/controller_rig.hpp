@@ -14,6 +14,7 @@ uint8_t cabinWeaponHands(uint64_t now) noexcept;
 // owned magnifier hinge to the zoom mode from that completed body frame.
 void refreshNativeWeaponMagnifier(uintptr_t modelInterface,uint32_t index) noexcept;
 TravelMode nativeTravelMode() noexcept;
+uint16_t nativePlayerAction() noexcept;
 NativeVehicleView nativeVehicleView() noexcept;
 // Called only at the native camera-publication boundary, before either eye.
 // Republishes the owned paused skin and its attachments without a game tick.

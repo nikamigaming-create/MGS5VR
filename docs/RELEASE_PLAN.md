@@ -41,8 +41,10 @@ steering, cabin paper/printing and ACC rifle grabbing are implemented on main.
 Preserve them. FP13's free-roam route and FP14's sortie head are scoped resolved.
 
 Concrete implementation limits: physical mounted aiming admits native actions
-`0x46` and `0x47` only; forearm-only cropping admits the identified sna5 geometry
-only. The corrected cuff has scoped stereo review; extreme full-body sleeve crowding remains a visible limitation.
+`0x46` and `0x47` only. The active source batch expands forearm-only cropping
+from one sna5 layout to 20 exact owned outfit profiles; combined build and
+visual review are next. The previous sna5 cuff has scoped stereo review;
+extreme full-body sleeve crowding remains a visible limitation.
 The exact rock/corridor reports remain undiagnosed. Missing coverage for another
 weapon, outfit or lesson does not establish a new defect.
 

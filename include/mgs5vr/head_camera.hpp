@@ -71,6 +71,9 @@ struct ControllerFrame {
     // orbit does not set the driver's initial seated facing.
     std::array<float,2> vehicleViewInput{};
     bool nativeActionControls{}; // Native stationary/action aim; no handheld firearm replacement.
+    // Occupancy is independent of input focus and of NORMAL_ACTION. Ordinary
+    // traversal/context actions must not select a seated body or mounted eye.
+    uint16_t nativeActionId{};
     bool mountedStickAiming{};
     std::array<bool,2> mountedHandGrip{};
     bool nativeGamepad{}; // Physical XInput owns actions and native animated hands.

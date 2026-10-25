@@ -18,8 +18,9 @@ struct ForearmIndexRange {size_t first,end;};
 inline size_t closeForearmCuffs(std::span<const Vec3> positions,
     std::span<const uint16_t> original,std::span<uint16_t> cropped,
     std::span<const ForearmIndexRange> lods,bool right,float cut=.452f,
-    std::vector<Vec3>* fitted=nullptr,std::vector<std::array<uint16_t,2>>* copies=nullptr){
+    std::vector<Vec3>* fitted=nullptr,std::vector<std::array<uint16_t,2>>* copies=nullptr,float elbow=.472f){
     if(original.size()!=cropped.size()||positions.size()>65536)return 0;
+    if(!std::isfinite(cut)||!std::isfinite(elbow)||cut<=0||elbow<cut||elbow>1.f)return 0;
     if((fitted==nullptr)!=(copies==nullptr))return 0;
     std::map<std::array<int,3>,uint16_t> weld;
     std::vector<uint16_t> canonical;
@@ -36,9 +37,10 @@ inline size_t closeForearmCuffs(std::span<const Vec3> positions,
     }
     std::vector<bool> used(positions.size());
     for(const auto range:lods)for(size_t at=range.first;at<range.end;at+=3){
-        const bool keep=std::all_of(original.begin()+at,original.begin()+at+3,
-            [&](auto i){return (right?-positions[i].x:positions[i].x)>=cut;});
-        if(keep)for(size_t i=0;i<3;++i)used[canonical[original[at+i]]]=true;
+        // A native partition can contain BOTH arms. Reserve every retained
+        // triangle, including the other arm and caps already emitted for it.
+        if(cropped[at]!=cropped[at+1]&&cropped[at]!=cropped[at+2]&&cropped[at+1]!=cropped[at+2])
+            for(size_t i=0;i<3;++i){if(cropped[at+i]>=positions.size())return 0;used[canonical[cropped[at+i]]]=true;}
     }
     std::vector<uint16_t> spare;
     if(fitted){
@@ -131,7 +133,7 @@ inline size_t closeForearmCuffs(std::span<const Vec3> positions,
             for(auto& [vertex,duplicate]:duplicates){
                 duplicate=spare.back();spare.pop_back();
                 for(size_t i=0;i<canonical.size();++i)if(canonical[i]==vertex)
-                    (*fitted)[i].x=right?-.472f:.472f;
+                    (*fitted)[i].x=right?-elbow:elbow;
                 (*fitted)[duplicate]=(*fitted)[vertex];
                 copies->push_back({duplicate,vertex});
             }

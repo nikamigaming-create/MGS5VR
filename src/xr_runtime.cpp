@@ -622,6 +622,7 @@ struct Session {
         openingBackend=title;
         const auto mode=(cabinPlay||cabinTransit)&&!title&&detectedMode==TravelMode::unknown?TravelMode::onFoot:detectedMode;
         controllerFrame.vehicleMounted=detectedMode==TravelMode::vehicle;
+        controllerFrame.nativeActionId=controllerRigEnabled()?nativePlayerAction():0;
         controllerFrame.vehicleView=nativeVehicleView();
         if(loading!=priorLoadingTips){
             const bool wasLoading=priorLoadingTips;
@@ -1582,7 +1583,7 @@ struct Session {
             pad={};controllerFrame.cabinMove={};controllerFrame.weaponReady=controllerFrame.supportGrip=false;
             controllerFrame.allowMotionMelee=controllerFrame.allowAnimalTouch=false;
         }
-        const bool mountedGripInput=rigInput&&mode==TravelMode::nativeAction&&!nativeInput.exclusive
+        const bool mountedGripInput=rigInput&&mode==TravelMode::nativeAction&&stationaryWeaponAction(controllerFrame.nativeActionId)&&!nativeInput.exclusive
             &&!nativeStatus.nativeMenuOpen&&!liveIdroid&&!stickNavigation&&!editorInputOwned
             &&!controllerFrame.cameraWorldFrozen&&!controllerFrame.studio->freezeRequested
             &&!center&&!headToggle&&!utilityCenter;
@@ -1593,6 +1594,7 @@ struct Session {
         const auto heldMountedHands=static_cast<uint8_t>((controllerFrame.mountedHandGrip[0]?1:0)
             |(controllerFrame.mountedHandGrip[1]?2:0));
         if(mountedGripInput&&handUseRig&&mountedGrip.player==handUseRig->playerOwner
+           &&mountedGrip.action==controllerFrame.nativeActionId&&mountedGrip.action==handUseRig->mountedWeaponAction
            &&mountedGrip.activation==nativeStatus.activation&&mountedGrip.referenceEpoch==referenceEpoch
            &&mountedGrip.hands&&(mountedGrip.hands&heldMountedHands)==mountedGrip.hands){
             pad.leftTrigger=255;
