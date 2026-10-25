@@ -5,30 +5,34 @@
 Work on main only; do not redo implemented repairs or repeat the failed mounted
 approach. The full report map is [FIELD_FIXES.md](FIELD_FIXES.md).
 
-## Sustained follow-up: correction awaiting validation
+## Sustained iDroid correction and result
 
-Retained run `20261025T042919220986Z` failed on cycle six after five complete
-ordinary iDroid cycles and the sixth opening passed. During a native render stall
-(max interval 432.981 ms), the camera published `rig_sequence=0` and
-`idroid_device_tracked=false` while raw tracking and iDroid remained active.
-The later failure images show recovery, not the transient itself.
+The first extended run (`20261025T042919220986Z`, candidate `351d84672f0e`)
+failed in cycle six: a 432.981 ms native frame interval let the anchored-menu
+fallback publish new eyes with retained palms but no tracked handset transform.
+The later failure images show recovery, not the transient itself. Keep that run
+failed. The correction holds the accepted image transaction until a matching
+fresh handheld skin arrives; ordinary Pause/Help panels keep their fallback.
+A deterministic regression checks rejection and automatic recovery.
 
-The anchored-menu stale-skin fallback retained palms but omitted the handset.
-The source correction holds the accepted image transaction for handheld iDroid
-until a fresh skin arrives; Pause/Help spatial panels retain their fallback.
-The regression checks both rejection and automatic recovery. Build and combined
-retest are pending; candidate identity below still names the preceding build.
+Corrected candidate `a6dc5fb91151` passes retained run `20261025T044511277442Z`:
+27 of 27 cases, seven sustained left-iDroid cycles, Pause open/close and two
+immediate open/stow round trips. Bounded observation totals 667.83 seconds.
+Both final eyes reviewed for Pause, turned iDroid and final reopening. Valid body
+samples retain leg scales 1, 1. This is ACC state/endpoint acceptance, not every
+forced guide, continuous stereo, whole mission or physical-headset acceptance.
 
-Current sustained timing is retained in
-`artifacts/release-sustained-performance.json`. Fresh stereo frames remain below
-runtime submissions even outside video capture. No no-drops claim. Both separate
-final-eye clips completed; their roughly 3 fps capture cadence is not game FPS.
-Owned session closed, Steam retained, published pin unchanged.
+Current timing now exists: settled window medians are about 90 submissions/sec,
+with 75.83 fresh stereo pairs/sec open/front, 76.12 turned and 62.42 stowed.
+Frame repeats remain an explicit performance limit. These are logged window
+statistics, not per-frame percentiles or physical display measurements.
+Details: `artifacts/release-handheld-stall-outcome.json` and
+`artifacts/release-handheld-stall-performance.json`.
 
 ## Checked candidate
 
-- Development DLL: `351d84672f0e1b065212f3503e267940c862d5b18df00d5793d20dfcf3bc3930`.
-- Gameplay source: `5ba674fea4d2b1243bf06e5848dd288801bd73f7`; cuff implementation `3cccc52`.
+- Development DLL: `a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6`.
+- Gameplay source: `f11d0d0878268a59e4c06d5c334078610a5f21ef`; body/cuff batch `5ba674f`.
 - All 58 groups and installer checks passed. Both retained build slots verify.
 - Published play remains `b627c7cacc9a` / October 19.1. No package, publication
   or pin change. Outcome documentation is newer than the checked gameplay build;
@@ -51,7 +55,7 @@ strides. The owned player draw now selects the crop. Full-body and shadow draws
 retain original buffers. Existing fixed native thigh/shin lengths, pelvis fit,
 sleeve clearance and tracked garment repairs remain intact.
 
-## Combined result
+## Prior body/arm review (body code unchanged)
 
 - Forearm-only: retained `20261025T040914930453Z`, all nine cases passed.
 - Full body: retained `20261025T040959528958Z`, all nine cases passed.
@@ -81,7 +85,7 @@ sleeve clearance and tracked garment repairs remain intact.
    was observed; the adapter still admits mortar46 and machine-gun47. A new
    attempt needs a changed fixture/prerequisite, not another identical route.
 5. Broader forced lessons, other weapons, mission completion and sustained
-   performance remain unaccepted. The five conservative catalog gates remain;
+   performance remain unaccepted; current repeats are measured above. The five conservative catalog gates remain;
    no release-gate waiver or universal playability claim.
 
 ## Extreme-reach follow-up — retained evidence only
@@ -98,7 +102,7 @@ That older captured fixture establishes reach infeasibility, not the current
 cloth's exact eye distance. Current endpoint records lack a joined full bone
 palette, so mesh penetration is unproven. Keep the extreme-view comfort limit
 explicit; require a reachable-pose reproduction or physical feedback before
-another clearance change. Candidate351d84672f0e remains unchanged. Analysis is
+another clearance change. The reach solver remains unchanged in the current candidate. Analysis is
 retained in `artifacts/release-reach-position-audit.json` and
 `artifacts/release-reach-feasibility-audit.json`.
 

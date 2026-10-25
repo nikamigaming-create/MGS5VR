@@ -10,7 +10,7 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Previous execution produced body/arm candidate `1a64bb965bc6`; see
+Current execution produced checked candidate `a6dc5fb91151`; see
 [CURRENT.md](CURRENT.md) for its smoke results and remaining visual limits.
 The identities below record the original audit baseline.
 
@@ -212,5 +212,8 @@ both slots verify. Never remove settings, saves, source or retained evidence.
 
 - Sustained follow-up found a reproducible handheld stale-skin camera publication
   failure in cycle six. Source correction and stall/recovery regression are in
-  this batch. Next: build once, then repeat the combined sustained group and
-  adjacent Pause/Help and immediate-reopen checks. The prior run stays failed.
+  this batch. Build completed: all 58 groups and installer checks pass. Retained
+  combined run `20261025T044511277442Z` passes all 27 cases, including Pause and
+  immediate reopening. The prior run stays failed. Candidate `a6dc5fb91151`
+  is ready through Play-Dev. Next: physical Quest feedback and a newly
+  reproducible field case; frame repeats remain measured and unresolved.

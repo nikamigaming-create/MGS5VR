@@ -12,9 +12,17 @@ and no broad report was closed by source inspection.
 [CURRENT.md](CURRENT.md) is the handoff. [RELEASE_PLAN.md](RELEASE_PLAN.md) is the
 ordered execution plan. All supplied community reports remain in scope.
 
+## Current candidate — 24 October
+
+Candidate `a6dc5fb91151` / source `f11d0d0` adds the reproduced handheld
+stale-skin correction. It passes 27 combined sustained/menu/reopen cases and
+58 test groups plus installer checks. The earlier extended run failed and is
+retained. Current frame repeats, physical Quest and wider field coverage remain
+open; see CURRENT for measurements and exact scope.
+
 ## Body/arm candidate update — 24 October
 
-Current checked candidate `351d84672f0e` / source `5ba674f` flattens cuff rims,
+The body/cuff batch `351d84672f0e` / source `5ba674f` flattens cuff rims,
 separates cap shading and handles repeated native attribute-slot bindings.
 Both body modes pass nine combined reach/return/left-iDroid/stow/reopen cases.
 Both final eyes show the forearm-only crop with flat closed caps; the previous
@@ -27,8 +35,9 @@ whole upper arm and closes supported forearm-only cut loops using existing
 native indexed geometry. Full-body reach/return and all seven forearm-only
 reach/iDroid smoke cases have scoped results; native help/Daily Bonus interrupted
 two earlier menu suites, whose failures remain recorded. See CURRENT.
-The cuff's outer rim and cap texture remain rough; other outfits/nonmanifold
-lower LODs and physical Quest review remain open. No blanket FP17/body closure.
+That intermediate build's rough cuff rim and shading were corrected by the
+later body/cuff batch above. Other outfits and physical Quest remain open;
+there is no blanket FP17/body closure.
 
 ## Code audit and remaining scope
 

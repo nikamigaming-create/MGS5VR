@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "351d84672f0e1b065212f3503e267940c862d5b18df00d5793d20dfcf3bc3930",
-  "candidate_status": "Checked cuff/attribute-slot batch: 18 combined cases pass across both body modes, with scoped both-eye review. Physical Quest, extreme cloth, other outfits and wider field coverage remain open.",
+  "candidate": "a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6",
+  "candidate_status": "Checked body/arm and handheld-stall candidate: 58 groups and installer checks pass; 27-case sustained/menu/reopen group passes. Physical Quest, extreme cloth/outfits, field diagnosis and frame repeats remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2304,8 +2304,29 @@
     "failure": "Cycle six, turned handheld: idroid_device_tracked=false and rig_sequence=0 with live raw tracking and iDroid still open. Native timing window max interval 432.981ms; recovery before endpoint capture. No visible dropout claimed from the later still.",
     "cause": "Anchored handheld menu used the panel-only stale-skin fallback, publishing fresh eyes and retained palms without a device transform.",
     "source_correction": "Hold the accepted image transaction until a fresh handheld skin arrives; retain panel-only Pause/Help fallback. Regression covers stall and fresh-skin recovery.",
-    "validation": "Correction pending build and combined retest. Prior sustained run remains failed.",
+    "validation": "Corrected in f11d0d0; new candidate passes retained 27-case combined run. This earlier run remains failed.",
     "performance": "Current candidate telemetry exists in artifacts/release-sustained-performance.json; exclude capture windows. Fresh frames below runtime submissions; no no-drops or physical acceptance.",
     "visual_scope": "Separate 45-second left/right final-eye takes; right includes one controller-motion segment. About 3 capture frames/second, not game FPS; not simultaneous stereo video."
+  },
+  "sustained_idroid_correction": {
+    "candidate": "a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6",
+    "source_commit": "f11d0d0878268a59e4c06d5c334078610a5f21ef",
+    "retained_run": "20261025T044511277442Z",
+    "state_cases": "27 of 27 observed_pass",
+    "observed_interval_seconds": 667.8299999999997,
+    "scope": "Pause open/close, seven sustained ACC left iDroid open/turn/stow cycles, two immediate open/stow round trips",
+    "valid_body_samples": 5930,
+    "leg_scale_values": [
+      [
+        1,
+        1
+      ]
+    ],
+    "visual_review": "Both final eyes: Pause panel, cycle-four turned handset, final immediate reopening. Endpoint review; no continuous stereo or physical acceptance.",
+    "fix": "Handheld terminal rejects stale skin camera fallback; accepted image retained until matching fresh hand/device skin returns. Pause/Help panel fallback preserved.",
+    "tests": "58 groups plus installer checks passed",
+    "performance": "Settled window medians: submissions about90Hz; fresh pairs75.83 front,76.12 turned,62.42 stowed. Repeats remain; no no-drops claim. Window percentiles are not per-frame percentiles.",
+    "physical_headset_acceptance": false,
+    "cleanup": "Owned game/simulator closed; Steam retained; no test menus/harnesses. Published play unchanged; Meta launch preference preserved."
   }
 }

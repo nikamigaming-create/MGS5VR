@@ -2537,7 +2537,7 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Left cinematic contact, native connector/projector frame and effect-cone retargeting exist. Continuous stereo motion/readability and physical fit remain unaccepted."
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Left cinematic contact, native connector/projector frame and effect-cone retargeting exist. Continuous stereo motion/readability and physical fit remain unaccepted. Candidate a6dc5fb91151 fixes the sustained handheld stale-skin failure; retained 27-case ACC/menu/reopen group passes. Broader/physical acceptance remains required."
       },
       "missing_checks": [
         "Continuous native device/hand animation and screen publication during opening, movement and stow.",
@@ -2684,7 +2684,7 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Native stow ordering, close-input ownership, terminal scene handoff and retired-player/exit-notice repairs exist; later scoped ordinary reopen evidence is retained in FREE_PLAY_ACCEPTANCE. Continuous/full lifecycle acceptance remains."
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Native stow ordering, close-input ownership, terminal scene handoff and retired-player/exit-notice repairs exist; later scoped ordinary reopen evidence is retained in FREE_PLAY_ACCEPTANCE. Continuous/full lifecycle acceptance remains. Candidate a6dc5fb91151 fixes the sustained handheld stale-skin failure; retained 27-case ACC/menu/reopen group passes. Broader/physical acceptance remains required."
       },
       "missing_checks": [
         "Reconcile historical failure with existing repairs and inspect the whole open/stow/reopen sequence; repair only a remaining reproduced failure.",
@@ -4506,7 +4506,7 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Adaptive native pacing and timing instrumentation exist. The retained 4df measurements describe their own workload, not a measurement of current development. No sustained no-drops or physical acceptance."
+        "reason": "Current a6dc5fb91151 sustained ACC measurements are retained: settled window median fresh pairs75.83 front,76.12 turned,62.42 stowed against about90 runtime submissions/sec. Frame repeats persist. No full-field or physical no-drops acceptance."
       },
       "missing_checks": [
         "Matched closed/open/stowed windows with owned process identity and actual display period.",
@@ -5139,5 +5139,26 @@
     "source_commit": "439253632bd8aec2a5c78fe25359c8549a2608d6",
     "report": "docs/CURRENT.md",
     "scope": "Sleeve clearance and cuff closure checked; gates/counters unchanged. Scoped smoke and remaining visual limits recorded in FREE_PLAY_ACCEPTANCE."
+  },
+  "handheld_stall_candidate_update": {
+    "candidate": "a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6",
+    "source_commit": "f11d0d0878268a59e4c06d5c334078610a5f21ef",
+    "retained_run": "20261025T044511277442Z",
+    "state_cases": "27 of 27 observed_pass",
+    "observed_interval_seconds": 667.8299999999997,
+    "scope": "Pause open/close, seven sustained ACC left iDroid open/turn/stow cycles, two immediate open/stow round trips",
+    "valid_body_samples": 5930,
+    "leg_scale_values": [
+      [
+        1,
+        1
+      ]
+    ],
+    "visual_review": "Both final eyes: Pause panel, cycle-four turned handset, final immediate reopening. Endpoint review; no continuous stereo or physical acceptance.",
+    "fix": "Handheld terminal rejects stale skin camera fallback; accepted image retained until matching fresh hand/device skin returns. Pause/Help panel fallback preserved.",
+    "tests": "58 groups plus installer checks passed",
+    "performance": "Settled window medians: submissions about90Hz; fresh pairs75.83 front,76.12 turned,62.42 stowed. Repeats remain; no no-drops claim. Window percentiles are not per-frame percentiles.",
+    "physical_headset_acceptance": false,
+    "cleanup": "Owned game/simulator closed; Steam retained; no test menus/harnesses. Published play unchanged; Meta launch preference preserved."
   }
 }
