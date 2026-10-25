@@ -467,7 +467,10 @@ for menu control; **right-stick left/right** selects previous/next tabs,
 **left-stick click** remains an alternative for Previous, and **right grip**
 keeps the next-tab loop. Release focus for left-stick movement. Ordinary spatial menus retain
 **left/right grip** as **LB/RB**. Triggers retain **LT/RT**. On the map, triggers zoom, right-stick click changes
-zoom step and **Y** switches MAP/NAV. **B** closes iDroid; hold **Menu** again to
+zoom step and **Y** switches MAP/NAV. **B** backs out of the current native
+dialog or page and closes iDroid at its root. A Daily Bonus notice consumes
+that Back action before the handset can close. Tap **Menu** to stow the ordinary
+handset; hold **Menu** again to
 unpause. Holding Menu *inside iDroid* opens its native Help, so close iDroid before
 opening Pause. If a native tutorial traps B, hold **B for 0.75 seconds** to
 request its exit, then answer the game's confirmation. If the handset remains

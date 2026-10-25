@@ -880,6 +880,16 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
             snapTranslation_={};snapYaw_=controllers_.snapYaw;recenterPending_=false;rig_={};++activation_;activationCause_=10;
         }
     }
+    if(useRig&&!authoredScene&&spatialMenu&&nativeIdroidOpen_&&!nativeIdroidPaused_
+       &&controllers_.handheldMenus&&!rig_.camera&&lastView_.rigSequence){
+        // Opening or reopening the handset clears rig_ before its next native
+        // skin publication. Stereo already rejects that unjoined frame, but
+        // accepting it here also overwrites the last valid hand/device anchor.
+        // Preserve the accepted view until the new skin joins. Rig preparation
+        // uses useRig=false, so it can still produce the frame that resumes us.
+        suspendLocked(HeadCameraStop::rigFrameMismatch);
+        return result;
+    }
     if(useRig&&!authoredScene&&rig_.camera){
         const auto& s=rig_.sample;const auto& p=rig_.sourceCamera;
         const bool same=p.position.x==sourceCamera.position.x&&p.position.y==sourceCamera.position.y&&p.position.z==sourceCamera.position.z

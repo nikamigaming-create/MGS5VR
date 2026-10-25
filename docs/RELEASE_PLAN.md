@@ -10,7 +10,7 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current execution built candidate `5d44f0706d11`, awaiting live comparison; see
+Current execution built candidate `c6f7e1f7b7cb`, with the shell fix reviewed; see
 [CURRENT.md](CURRENT.md) for its smoke results and remaining visual limits.
 The identities below record the original audit baseline.
 
@@ -218,38 +218,22 @@ both slots verify. Never remove settings, saves, source or retained evidence.
   is ready through Play-Dev. Next: physical Quest feedback and a newly
   reproducible field case; frame repeats remain measured and unresolved.
 
-## Immediate resume point: shared-fence comparison
+## Current execution checkpoint — 25 October
 
-Source `78110e0`, development `5d44f0706d11`: all 58 groups and installer
-checks pass. Steam is absent; a request for the user to open it is pending.
-No owned game, simulator or bot is running. Published play is unchanged.
-
-1. Confirm Steam is running and no physical game session is in use. Do not
-   start/restart Steam. Launch `workspace.py launch-sim` alone, without chaining
-   commands behind its inherited Steam handles.
-2. Use `private/release-startup-notices.json` for the exact known notices, then
-   `workspace.py bot --command continue --seconds 90`. A blank capture during
-   the completed notice transition does not authorize replaying its confirm.
-3. Run `workspace.py bot --command run --suite
-   private/release-handheld-stall-combined.json --seconds 900` once. It combines
-   Pause, seven sustained left-iDroid cycles and immediate reopening.
-4. Retain the run and compare its settled front/turned/stowed timing with
-   `artifacts/release-handheld-stall-performance.json` (a6dc baseline). The
-   private summarizer accepts the new run directory and output JSON path.
-   Inspect both final eyes; source/tracking identity and no empty image are
-   required alongside any fresh-frame improvement.
-5. Keep the handoff change only with demonstrated benefit and no regression.
-   If rejected, undo that change on main and rebuild development normally; do
-   not create another retained binary slot. Close the owned test session.
-6. Physical Quest acceptance and exact remaining field cases still apply;
-   neither GPU checks nor this ACC comparison certify them.
-
-## User-reported duplicate arm: current priority
-
-Steam is running again. The resumed candidate reproduced a third-arm appearance
-in forced Choose a Rival Help; see CURRENT. Fix the rigid prosthetic shell's
-paused palette admission, then build the combined shell/shared-fence candidate.
-Review both final eyes while moving the left arm under Pause and native Help,
-including the forearm-to-hand connection, close and reopen. Complete the
-sustained lifecycle/performance comparison in that same session. Do not treat
-state success as visual acceptance or claim the earlier Help failure is passed.
+- Checked development `c6f7e1f7b7cb`, source `f438de4`, contains the corrected
+  rigid bionic shell and shared-fence handoff. The shell follows the hand in
+  the reproduced Help/Pause scene. It is available through `Play-Dev.cmd`.
+- The later reopen trace exposed an empty-rig camera publication overwriting
+  the accepted hand/device anchor. Its production correction is now on main,
+  compiled successfully without tests; it is not yet in the checked development slot.
+- The user explicitly stopped further testing and requested code work. Do not
+  restart repeated smoke/soak loops. Preserve the existing failed runs and
+  scoped passes; do not claim a clean integrated seven-cycle soak.
+- Continue justified code fixes from FIELD_FIXES in a batch. Current remaining
+  scope: other outfits/extreme cloth, exact terrain/corridor, actual mounted
+  contact and wider progression. Undiagnosed coverage is not missing code.
+- Before a later release candidate is installed/published, reconcile its source,
+  compiled payload and validation honestly. Keep the published pin unchanged
+  until the authorized publication/upload-verification sequence is complete.
+- Owned game/simulator/bots are closed. Steam and Meta headset preference are
+  preserved. No release, new branch, worktree, package or pin was created.

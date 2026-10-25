@@ -1,7 +1,8 @@
-# Current MGS5VR work — 24 October 2026
+# Current MGS5VR work — 25 October 2026
 
-**The user-reported duplicate left forearm is reproduced and blocks release.
-Its source correction is awaiting a combined build and visual retest.**
+**Third-arm fix: ready in checked development `c6f7e1f7b7cb` through
+`Play-Dev.cmd`. The additional reopen handoff correction is on main, compiling
+only. Runtime tests have stopped at the user's direction. Not release accepted.**
 Work on main only; do not redo implemented repairs or repeat the failed mounted
 approach. The full report map is [FIELD_FIXES.md](FIELD_FIXES.md).
 
@@ -18,15 +19,41 @@ The correction admits that exact owned shell/rig and joins it to the same
 native body palette. It does not hide or delete the shell. The original model
 ownership, matching root, arm group and native bone-length checks remain.
 Regression coverage includes admission, rejection of foreign single-bone parts,
-and rigid/idempotent pose transfer. Live verification is pending; earlier
-endpoint review did not cover this forced-Help failure and cannot close it.
+and rigid/idempotent pose transfer. All 58 groups and installer checks pass.
+Current both-eye endpoints cover hand raise/return and head pitch in the exact
+forced Help state and ordinary Pause. All 135 frames of the 45-second, 3 fps
+left-eye motion capture were inspected chronologically. No stationary duplicate
+shell remains in those samples. Sparse single-eye video and stereo endpoints
+do not establish full-rate stereo or physical-headset acceptance.
 
 Evidence: `artifacts/duplicate-left-arm-report/` contains the user image,
 current both-eye captures and read-only native model/pose inventory. Retained
 run `20261025T112301566248Z` failed when the first opening entered forced Help.
 The reviewed native Close and stow then passed in `20261025T113207144511Z`.
-The owned session is closed; Steam 30812 was retained. The frame-handoff
-performance comparison remains pending and will join this correction's test.
+Current run `20261025T114234180520Z` passed 13 cases before an optional legacy
+Help fixture rejected its entry context; it dispatched no input for that case.
+Keep the overall run failed. The exact forced-Help motion cases already passed.
+Run `20261025T114651540109Z` passed eight sustained cases before a native
+Daily Bonus notice consumed Back during cycle three; cleanup closed iDroid.
+Run `20261025T115331588265Z` also passed eight cases before Daily Bonus
+consumed Back in cycle six. Final run `20261025T115918951584Z` passed the
+seventh cycle and first immediate reopen/stow, then caught an unjoined camera
+publication at the second reopening. All three overall runs remain failed.
+Visual record: `artifacts/release-rigid-shell-visual-review.json`.
+
+## Reopen handoff correction — source work after the checked candidate
+
+The second immediate reopening reports `menu_idroid=true`, `rig_sequence=0`
+and no device transform while native input is still opening. Stereo already
+rejects that unjoined frame, but camera resolution overwrote the last accepted
+hand/device anchor before the new native skin arrived. The new production
+change preserves that accepted publication across the empty-rig boundary.
+Skin preparation still runs and the next fresh publication resumes normally.
+Ordinary native Help/Pause fallback remains unchanged.
+
+This additional change is compiled successfully without tests. It is not in checked `build/dev/`
+and has no new test or live result. The user explicitly stopped further testing;
+do not restart the soak loop or advertise a clean seven-cycle integrated pass.
 
 ## Sustained iDroid correction and result
 
@@ -52,29 +79,27 @@ statistics, not per-frame percentiles or physical display measurements.
 Details: `artifacts/release-handheld-stall-outcome.json` and
 `artifacts/release-handheld-stall-performance.json`.
 
-## Frame-handoff candidate; comparison interrupted by the arm defect
+## Frame-handoff comparison on the corrected candidate
 
-Retained current-candidate logs show producer completion waiting for the next
-native Present before XR can see an already completed image. The source change
-exports the producer completion fence and opens it on the XR device. XR can
-admit completed copies without using the native immediate context. Atomic
-readiness promotion preserves a slot already claimed by the consumer; EVENT
-compatibility and the three-slot bound remain. GPU regressions cover a future
-completion marker, no-more-Present delivery and concurrent stereo pixel/lineage
-reuse. All 58 groups and installer checks passed. Development DLL:
-`5d44f0706d1117c5a7c8e2bac46bb74a475704aceee0c2b3a4ab67b407aebf70`, source `78110e0`.
+The shared producer fence lets XR admit a completed copy without waiting for
+another native Present. Ownership transitions remain atomic; EVENT fallback,
+GPU completion checks and the three-slot bound remain. GPU regressions cover
+future markers, no-more-Present delivery and concurrent pixel/lineage reuse.
 
-Steam was reopened by the user. The resumed live run encountered forced Help
-and the duplicate shell above before a sustained comparison completed. Do not
-restart Steam. Both retained build payloads verify; headset preference is Meta.
-A combined candidate run must establish whether this reduces repeats; no
-performance improvement or current-candidate gameplay pass is claimed.
-Details: `artifacts/release-shared-fence-status.json`.
+Current partial settled-window medians are 88.49 fresh pairs/sec front, 88.68
+turned and 87.30 stowed at about 90 submissions/sec, versus 75.83/76.12/62.42
+on the a6dc baseline. Config, effective bindings, game executable, eye FOVs and
+body mode match. The current online page/notice state differs from the earlier
+session, so the stowed comparison is the stronger scene match. These window
+statistics support reduced repeats in this ACC sample, not universal frame
+pacing or physical display acceptance. The later completed windows retain the improvement (about 89 fresh pairs/sec);
+the interrupted runs do not certify a clean integrated soak.
+Details: `artifacts/release-rigid-shell-performance.json`.
 
 Microsoft API contracts: [shared fence creation](https://learn.microsoft.com/en-us/windows/win32/api/d3d11_3/nf-d3d11_3-id3d11fence-createsharedhandle)
 and [opening on the receiving device](https://learn.microsoft.com/en-us/windows/win32/api/d3d11_4/nf-d3d11_4-id3d11device5-opensharedfence).
 
-## Last completed gameplay review (preceding candidate)
+## Earlier sustained gameplay review (preceding candidate)
 
 - Reviewed DLL: `a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6`.
 - Gameplay source: `f11d0d0878268a59e4c06d5c334078610a5f21ef`; body/cuff batch `5ba674f`.
@@ -153,8 +178,8 @@ retained in `artifacts/release-reach-position-audit.json` and
 
 ## Cleanup and launch readiness
 
-Full_body is restored to1. Owned game, simulator and bounded readers are closed;
-no test menu or gameplay harness remains. Steam24696 was retained. Both Play
+Full_body is1. The owned game/simulator and bounded bots are closed; no test
+menu remains. Steam30812 is retained. Both Play
 commands explicitly use Meta Link, the saved HeadsetRuntime is Meta, and the
 shared headset launcher's Meta CheckOnly succeeds.
 

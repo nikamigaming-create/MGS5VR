@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "5d44f0706d1117c5a7c8e2bac46bb74a475704aceee0c2b3a4ab67b407aebf70",
-  "candidate_status": "Release blocked by visually reproduced duplicate left forearm during forced iDroid Help. Exact owned shell correction pending build/retest; shared-fence comparison also pending.",
+  "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
+  "candidate_status": "Third-arm fix is in checked development c6f7e1f7b7cb. A further reopen handoff correction is on main and compiled successfully without tests; no further tests or deployment at the user's direction. Not release accepted.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1331,21 +1331,21 @@
     }
   ],
   "active_work": {
-    "candidate": "1a64bb965bc61e06423519d5940f6c5b5c7f018bc233e107098533a5b4325b7e",
-    "source_commit": "439253632bd8aec2a5c78fe25359c8549a2608d6",
-    "checkpoint": "Body/arm batch checked and smoke complete; next user physical Quest Link test via Play-Dev.cmd.",
+    "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
+    "source_commit": "f438de418252f2ada8448d70280b5523fd126f3a",
+    "checkpoint": "Third-arm fix is in checked development c6f7e1f7b7cb. A further reopen handoff correction is on main and compiled successfully without tests; no further tests or deployment at the user's direction. Not release accepted.",
     "plan": "docs/RELEASE_PLAN.md",
     "next_actions": [
-      "Physical feedback on both body modes, cross-body reach/return and left iDroid on candidate1a64bb965bc6.",
-      "Continue remaining cuff/outfit limits and confirmed mounted/terrain/progression defects from RELEASE_PLAN; reuse completed repairs and passing scoped evidence."
+      "Continue justified gameplay code fixes in a batch; no repeated runtime tests.",
+      "Keep third-arm candidate available through Play-Dev; new reopen source change is not yet in that checked payload."
     ],
     "runtime_requirement": "Wired Meta Quest Link / Meta OpenXR; both Play commands explicitly -MetaLink. Historical runtime observations in retained_work_history are not current setup instructions.",
     "build_slots": {
       "published_pin": "b627c7cacc9a",
-      "development": "1a64bb965bc6"
+      "development": "c6f7e1f7b7cb"
     },
-    "scope": "Gameplay batch and one native smoke session complete. No publication, pin or physical acceptance.",
-    "cleanup": "Full_body restored to1; owned game/simulator stopped; Steam retained; no test menu open."
+    "scope": "Scoped duplicate-shell correction; no publication or physical acceptance.",
+    "cleanup": "Owned game/simulator closed; no bot or test menu left open. Steam retained; published play unchanged."
   },
   "implementation_audit": {
     "date": "2026-10-24",
@@ -1705,7 +1705,7 @@
         "both_hand_stick_release": "native axes neutral"
       },
       "failures": [
-        "Right-hand acquisition chased native pitch, oscillating about 15â€“18 degrees during a pure yaw movement.",
+        "Right-hand acquisition chased native pitch, oscillating about 15\u00e2\u20ac\u201c18 degrees during a pure yaw movement.",
         "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
       ],
       "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
@@ -1760,7 +1760,7 @@
       "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
       "baseline_run": "20261022T044008503318Z",
       "retained_run": "20261022T045333990203Z",
-      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20â€“90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u00e2\u20ac\u201c90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
       "remaining": [
         "Wider marker grip orientations",
         "Broader FP09/FP10",
@@ -1783,7 +1783,7 @@
         {
           "sha256_prefix": "1bbaac705854",
           "run": "20261022T051925150310Z",
-          "failure": "Native eye identity joined, but fitted eye remained26â€“31cm below cached passenger anchor; body rejected."
+          "failure": "Native eye identity joined, but fitted eye remained26\u00e2\u20ac\u201c31cm below cached passenger anchor; body rejected."
         },
         {
           "sha256_prefix": "a563468ce054",
@@ -2220,9 +2220,9 @@
     "physical_headset_acceptance": false,
     "extreme_reach_followup": {
       "candidate_changed": false,
-      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44–59cm",
+      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44\u201359cm",
       "captured_solver_fixture": "native upper/lower28.4/25.5cm; requested shoulder-to-wrist106cm; reach-only unavoidable clamp52.1cm",
-      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9–1.2mm over production fallback with/without stereo padding",
+      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9\u20131.2mm over production fallback with/without stereo padding",
       "conclusion": "No additional IK rewrite justified by unreachable-pose clamp. Current mesh eye penetration unproven without joined palette; physical comfort/reachable reproduction still required."
     }
   },
@@ -2330,20 +2330,33 @@
     "cleanup": "Owned game/simulator closed; Steam retained; no test menus/harnesses. Published play unchanged; Meta launch preference preserved."
   },
   "shared_fence_candidate": {
-    "candidate": "5d44f0706d1117c5a7c8e2bac46bb74a475704aceee0c2b3a4ab67b407aebf70",
+    "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
     "source": {
-      "commit": "78110e0e4e633463021131a23ef0736a503670c3",
-      "source_sha256": "2d1134d8cdbd8e87a2f72bd664c93100297b9dfb31058b3ea3e3bc398e638df0",
+      "commit": "f438de418252f2ada8448d70280b5523fd126f3a",
+      "source_sha256": "6662ca4bec4c7c13100f532aae66a6d7a84421308e4a923e4798a3866c0d4310",
       "changes": []
     },
-    "automated": "58 groups and installer checks passed; real two-device GPU tests include no-more-Present delivery and concurrent pixel/lineage reuse",
-    "native_validation": "pending; launch refused because Steam is absent",
-    "previous_reviewed_candidate": "a6dc5fb91151ed40c58a4ea4a67543112bf62ebc14cd5f45ea29bfef708128f6",
-    "previous_reviewed_run": "20261025T044511277442Z",
+    "automated": "58 groups and installer checks passed",
+    "native_validation": "Completed ACC windows support reduced repeats; overall native runs remain failed/interrupted. No clean integrated soak.",
+    "comparison": "Same config, effective bindings, game executable, eye FOVs and full-body mode as a6dc. Online page/notice differs; stowed scene is the stronger comparison.",
+    "fresh_pairs_fps_window_medians": {
+      "baseline": {
+        "front": 75.83,
+        "turned": 76.12,
+        "stow": 62.42
+      },
+      "current_partial": {
+        "front": 88.49,
+        "turned": 88.68,
+        "stow": 87.3
+      }
+    },
     "publication": "none; published play unchanged",
-    "blocker": "One signed-in Steam client must already be running. User rules prohibit restarting Steam; user has been asked to open it.",
-    "cleanup": "No game, simulator or bot running; launch failed before creating a runtime lease. Saved headset runtime remains Meta.",
-    "next": "Run the existing 27-case combined suite once on this candidate, compare current settled performance against a6dc, inspect both eyes, then retain or revert this handoff change based on evidence. No performance improvement claimed yet."
+    "blocker": null,
+    "next": "User stopped testing. Continue code batch; reopen correction is compile-only and not deployed.",
+    "physical_headset_acceptance": false,
+    "cleanup": "Owned game/simulator closed; no bot or test menu left open. Steam retained; published play unchanged.",
+    "decision": "Retain shared fence: completed same-config ACC timing shows reduced repeats; wider performance gate remains open."
   },
   "duplicate_left_forearm_report": {
     "date": "2026-10-25",
@@ -2353,6 +2366,18 @@
     "shell_rig": "one LFOREARM joint, parent -1, player-owned arm group with matching body root",
     "cause": "Paused part admission required a wrist and skipped the rigid shell; articulated hand updated while shell stayed about20cm behind.",
     "correction": "Admit exact owned rigid shell and retarget to the same body forearm; no mesh hiding.",
-    "validation": "Pending combined build and both-eye paused hand-motion review; prior static review is insufficient."
+    "validation": "Scoped exact Help/Pause duplicate-shell correction passed both-eye review; broader hand-arm gate remains open.",
+    "candidate": "c6f7e1f7b7cb4b0eea503d35ad342f1e43962967fd2a311c85855b175c43fe73",
+    "review": "artifacts/release-rigid-shell-visual-review.json",
+    "retained_motion_run": "20261025T114234180520Z",
+    "run_status": "failed at optional legacy Help entry guard after 13 observed_pass cases; no input dispatched for that failed case"
+  },
+  "reopen_handoff_correction": {
+    "report_run": "20261025T115918951584Z",
+    "observed": "Second immediate reopening published menu_idroid=true with rig_sequence=0 and idroid_device_tracked=false; native input was not yet ready.",
+    "existing_protection": "Stereo scene replay already rejects the unjoined frame; the trace alone does not establish a visible blank frame.",
+    "code_change": "Keep last accepted tracked hand/device camera publication while ordinary handheld menu has no new rig. Skin preparation remains allowed and fresh publication resumes it.",
+    "validation": "Compilation succeeded. No tests, live rerun or candidate deployment requested after user stopped testing.",
+    "scope": "Does not alter native Help/Pause panel fallback or disabled/unestablished tracked rigs."
   }
 }

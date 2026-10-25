@@ -12,13 +12,16 @@ and no broad report was closed by source inspection.
 [CURRENT.md](CURRENT.md) is the handoff. [RELEASE_PLAN.md](RELEASE_PLAN.md) is the
 ordered execution plan. All supplied community reports remain in scope.
 
-## Current candidate — 24 October
+## Current candidate — 25 October
 
-Development `5d44f0706d11` / source `78110e0` adds a shared producer-fence
-read on the XR device to remove a completed-image admission delay. Its 58
-groups and installer checks pass; live comparison is blocked by Steam being
-closed. The prior candidate result below remains scoped to that candidate.
-No improvement in current gameplay or pacing is claimed before comparison.
+Development `c6f7e1f7b7cb` / source `f438de4` fixes the reported third-arm
+appearance: the rigid bionic shell now follows the same paused arm palette as
+the hand. The exact forced Help scene and ordinary Pause pass scoped both-eye
+motion review. All 58 groups and installer checks pass. The shared-fence change
+also shows fewer repeated frames in the completed ACC timing samples. The
+sustained runs remain interrupted by native notices and a reopen publication
+boundary. The latter now has a source correction, compiled successfully without tests; further
+testing has stopped at the user's direction. See CURRENT for exact status.
 
 Candidate `a6dc5fb91151` / source `f11d0d0` adds the reproduced handheld
 stale-skin correction. It passes 27 combined sustained/menu/reopen cases and
