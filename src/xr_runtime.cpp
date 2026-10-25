@@ -1025,9 +1025,15 @@ struct Session {
             rigControls.equipmentPhase()!=0?ControlContext::equipment:
             binocularSelected?ControlContext::binoculars:mode==TravelMode::vehicle?ControlContext::vehicle:
             mode==TravelMode::horse?ControlContext::horse:ControlContext::gameplay;
+        // The passenger and the on-foot player share locomotion ownership.
+        // Cabin transit masks native walking below while the player is aboard;
+        // adding transit to this identity latches a held stick off on exit until
+        // it is centered. Preserve that stick across disembark so walking resumes
+        // when the native exit action finishes. ACC/menu/loading owners still
+        // require release through their distinct context and state bits.
         const uint32_t axisOwner=static_cast<uint32_t>(controlContext)
             |(uint32_t(idroidFocus)<<4)|(uint32_t(idroidRouting)<<5)
-            |(uint32_t(cabinPlay||cabinTransit)<<6)|(uint32_t(scriptedDemo)<<7)|(uint32_t(loading)<<8)
+            |(uint32_t(cabinPlay)<<6)|(uint32_t(scriptedDemo)<<7)|(uint32_t(loading)<<8)
             |(uint32_t(rocketFlightOwned)<<9);
         const auto routedPhysical=axisOwnership.update(physical,axisOwner);
         if(priorIdroidRouting&&!idroidRouting){

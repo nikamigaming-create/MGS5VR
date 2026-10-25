@@ -10,7 +10,11 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current checked/deployed candidate is `1e50576a0e7d`, darkening the native
+Current checked/deployed candidate is `27e9108f2a58`, preserving held walking
+input across helicopter disembark. The targeted held-stick smoke passes, with
+0.4035 units horizontal travel after exit and neutral input restored afterward.
+Retain the user's broader physical movement report until its behavior is confirmed.
+Previous `1e50576a0e7d` darkens the native
 first-person eyepatch to matte black and removing reflection-like atlas detail.
 The prior `422594fb5ef8` supplies retained stereo on/off/motion pictures.
 The preceding `f58ef4224995` batch remains included. The reported arm,

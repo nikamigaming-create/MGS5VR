@@ -1,5 +1,29 @@
 # Current MGS5VR work — 25 October 2026
 
+## New blocker: movement unavailable after deployment
+
+User reports "we couldn't move once deployed" after the eyepatch review.
+User confirmed this happens after getting out of the helicopter. Prior disembark
+acceptance did not include a subsequent walking segment. The centered-stick
+route on `1e50576a0e7d` clears passenger mode and moves both the native player
+and camera: retained route `20261025T225131890400Z`, movement
+`20261025T225445132506Z`, follow-up `20261025T225603602110Z`. The movement probe
+failed its 0.75-unit envelope at 0.7635 units, not a no-progress check; do not
+label that run a pass or the user's lock resolved from it.
+
+Source diagnosis: the cabin-transit bit changed stick ownership on disembark,
+latching any held stick off until centered. Candidate `27e9108f2a58` removes
+transit from that identity; the existing passenger mask still prevents native
+walking aboard, and ACC/menu/loading/focus protections retain their owners.
+Build and installer checks passed; deployed development only. Retained run
+`20261025T225945448637Z/held-stick-exit` passes the targeted held-stick disembark:
+effective movement stick held at 0.45 before exit, native forward axes remain
+nonzero after passenger mode clears, and horizontal displacement reaches 0.4035
+units without a centering cycle. Inputs are zero after release. Both final-eye
+captures retained; owned simulator closed, Steam retained and Meta Link restored.
+This verifies the held-stick latch repair; the user's physical session has not
+been replayed. No collision or rig geometry was changed.
+
 ## First-person eyepatch — current picture request
 
 The user clarified that the eyepatch must be visible from inside VR, gray and

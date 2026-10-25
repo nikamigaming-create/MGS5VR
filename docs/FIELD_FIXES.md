@@ -14,6 +14,16 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Latest incoming reports — 25 October
 
+**Deployment movement:** user confirmed movement stopped after helicopter exit.
+Centered-stick departure moved native player and camera on `1e50576a0e7d`; that
+does not reproduce the user's complete lock. The source did latch a stick held
+through exit because cabin transit changed axis ownership. Checked/deployed
+`27e9108f2a58` preserves locomotion ownership across that transition, retaining
+the passenger's native-walk mask and menu/focus protections. Held-stick smoke
+passes: forward axes survive exit and Snake moves 0.4035 units horizontally
+without centering. Retained `20261025T225945448637Z/held-stick-exit`; broader
+physical confirmation remains open. See CURRENT for exact runs.
+
 First-person eyepatch follow-up: `422594fb5ef8` renders Snake's
 owned native patch and front strap close to the right pupil with gray transparency.
 Actual both-eye on/off/on and head-motion pictures are retained under
