@@ -939,6 +939,12 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             originalWorld(hintPose.data(),hintWorld.data());
             mgs5vr::drawAccWristHint(afterContext,hintWorld,eyeView,eyeProjection,hintBinding);
         }
+        if(afterContext&&!titleSurface&&wrist.playerOwner&&wrist.controllers.eyepatch
+           &&!wrist.controllers.frontEnd&&!wrist.controllers.scriptedDemo){
+            // Use this source transaction for the patch and both eyes, including
+            // the runtime's actual IPD and asymmetric FOV. Never unhide the head.
+            mgs5vr::drawFirstPersonEyepatch(afterContext,wrist.headPose,wrist.views[1].pose,drawingEye.view);
+        }
         // The equipment category screen is native UI orders 133..136. The
         // worker-side UI hook remaps those real pixels to the wrist picker;
         // there is deliberately no generated instruction-card draw here.

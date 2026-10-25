@@ -1,5 +1,6 @@
 #include "mgs5vr/optic_renderer.hpp"
 #include "mgs5vr/core.hpp"
+#include "mgs5vr/eyepatch.hpp"
 #include "mgs5vr/optic_rig.hpp"
 #include "mgs5vr/optic_markers.hpp"
 #include "mgs5vr/optic_native_lighting_probe.hpp"
@@ -235,7 +236,7 @@ std::filesystem::path openingAssetPath(const wchar_t* key,const wchar_t* fallbac
     return path;
 }
 
-std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std::string& failure){
+std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std::string& failure,int selectedMesh=-1){
     if(path.empty()){failure="game module path unavailable";return {};}
     std::ifstream input(path,std::ios::binary|std::ios::ate);
     if(!input){failure="file not found: "+path.string();return {};}
@@ -313,6 +314,7 @@ std::optional<RetailModel> readRetailFmdl(const std::filesystem::path& path,std:
     const auto bufferBase=static_cast<size_t>(section1Offset)+bufferSection->offset;
     RetailModel model;model.path=path;model.sha256=ownedAssetDigest(bytes);
     for(uint16_t meshIndex=0;meshIndex<meshInfo->count;++meshIndex){
+        if(selectedMesh>=0&&meshIndex!=selectedMesh)continue;
         const auto meshAt=static_cast<size_t>(section0Offset)+meshInfo->offset+meshIndex*0x30u;
         uint16_t vertexCount{};uint32_t firstFaceVertexIndex{},faceVertexCount{};
         if(!readAt(bytes,meshAt+0x0a,vertexCount)||!readAt(bytes,meshAt+0x10,firstFaceVertexIndex)
@@ -795,6 +797,13 @@ struct Resources {
     ComPtr<ID3D11InputLayout> markerInputLayout;
     ComPtr<ID3D11RasterizerState> markerRasterizer;
     ComPtr<ID3D11DepthStencilState> markerDepth;
+    ComPtr<ID3D11BlendState> eyepatchBlend;
+    RetailGpuAsset eyepatch;
+    ComPtr<ID3D11VertexShader> eyepatchVs;
+    ComPtr<ID3D11PixelShader> eyepatchPs;
+    ComPtr<ID3D11InputLayout> eyepatchLayout;
+    ComPtr<ID3D11SamplerState> eyepatchSampler;
+    bool eyepatchAttempted{};
     ComPtr<ID3D11DepthStencilState> markerMaskWrite,markerMaskRead;
     ComPtr<ID3D11Texture2D> markerMaskTexture;
     ComPtr<ID3D11DepthStencilView> markerMask;
@@ -2384,6 +2393,93 @@ bool drawOpeningProps(ID3D11DeviceContext* context,const std::array<std::array<f
             resources.openingReported=true;mgs5vr::log("Physical labelled cassettes use the existing native cabin player; native depth join reported separately");
         }
         return cassettes;
+    }catch(...){return false;}
+}
+
+bool drawFirstPersonEyepatch(ID3D11DeviceContext* context,Pose head,Pose rightEye,const EyeView& eye) noexcept {
+    if(!context)return false;
+    try {
+        std::lock_guard lock(rendererMutex);
+        ComPtr<ID3D11Device> device;context->GetDevice(&device);if(!device)return false;
+        if(resources.device.Get()!=device.Get()){resources=Resources{};resources.device=device;}
+        if(!createMarkerResources(device.Get()))return false;
+        if(!resources.eyepatchBlend){
+            D3D11_BLEND_DESC blend{};auto& target=blend.RenderTarget[0];
+            target.BlendEnable=TRUE;target.SrcBlend=D3D11_BLEND_SRC_ALPHA;
+            target.DestBlend=D3D11_BLEND_INV_SRC_ALPHA;target.BlendOp=D3D11_BLEND_OP_ADD;
+            target.SrcBlendAlpha=D3D11_BLEND_ONE;target.DestBlendAlpha=D3D11_BLEND_INV_SRC_ALPHA;
+            target.BlendOpAlpha=D3D11_BLEND_OP_ADD;target.RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
+            if(FAILED(device->CreateBlendState(&blend,&resources.eyepatchBlend)))return false;
+        }
+        struct PatchVertex {float clip[4];float uv[3];};
+        if(!resources.eyepatch.ready){
+            if(resources.eyepatchAttempted)return false;
+            resources.eyepatchAttempted=true;
+            const auto root=gameRoot()/L"retail-assets/Assets/tpp/chara/sna";
+            std::string failure;
+            const auto model=readRetailFmdl(root/L"Scenes/sna0_face0_cov.fmdl",failure,20);
+            const auto texture=readRetailDds(root/L"Pictures/sna0_face1_def_bsm.dds",failure);
+            if(!model||!texture||model->sha256!="7fd7f6e5c981a957ede9f8113d334c67f5ef706766be7f84a79a41e6fb9bfdd5"
+               ||texture->sha256!="adf9bcee7dd55b3d5ebe524f0aa6e0d060cfca8dec540223014f9df5c4299ade"
+               ||model->vertices.size()!=142||model->indices.size()!=411){
+                log("Native first-person eyepatch unavailable: "+failure);return false;
+            }
+            constexpr auto vs=R"(
+struct V {float4 clip:POSITION;float3 uv:TEXCOORD;};
+struct O {float4 position:SV_POSITION;float3 uv:TEXCOORD;};
+O main(V v){O o;o.position=v.clip;o.uv=v.uv;return o;})";
+            constexpr auto ps=R"(
+Texture2D nativeFace:register(t0);SamplerState nativeSampler:register(s0);
+float4 main(float4 position:SV_POSITION,float3 uv:TEXCOORD):SV_TARGET{
+ // The hidden head still occludes the rear wrapping straps. Keep the actual
+ // native front surface; do not expose inside-head straps through the face.
+ clip(uv.z-.105);
+ float3 native=nativeFace.Sample(nativeSampler,uv.xy).rgb;
+ float gray=.18+dot(native,float3(.2126,.7152,.0722))*.45;
+ return float4(lerp(native,gray.xxx,.85),.48);})";
+            ComPtr<ID3DBlob> vertex,pixel;
+            if(!compile(device.Get(),vs,"vs_5_0",&vertex)||!compile(device.Get(),ps,"ps_5_0",&pixel))return false;
+            if(FAILED(device->CreateVertexShader(vertex->GetBufferPointer(),vertex->GetBufferSize(),nullptr,&resources.eyepatchVs))
+               ||FAILED(device->CreatePixelShader(pixel->GetBufferPointer(),pixel->GetBufferSize(),nullptr,&resources.eyepatchPs)))return false;
+            const D3D11_INPUT_ELEMENT_DESC elements[]{
+                {"POSITION",0,DXGI_FORMAT_R32G32B32A32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},
+                {"TEXCOORD",0,DXGI_FORMAT_R32G32B32_FLOAT,0,16,D3D11_INPUT_PER_VERTEX_DATA,0}};
+            if(FAILED(device->CreateInputLayout(elements,2,vertex->GetBufferPointer(),vertex->GetBufferSize(),&resources.eyepatchLayout)))return false;
+            D3D11_BUFFER_DESC vb{};vb.ByteWidth=static_cast<UINT>(model->vertices.size()*sizeof(PatchVertex));
+            vb.Usage=D3D11_USAGE_DYNAMIC;vb.BindFlags=D3D11_BIND_VERTEX_BUFFER;vb.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
+            D3D11_BUFFER_DESC ib{};ib.ByteWidth=static_cast<UINT>(model->indices.size()*sizeof(uint16_t));
+            ib.Usage=D3D11_USAGE_IMMUTABLE;ib.BindFlags=D3D11_BIND_INDEX_BUFFER;
+            D3D11_SUBRESOURCE_DATA indices{model->indices.data(),0,0};
+            D3D11_SAMPLER_DESC sampler{};sampler.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+            sampler.AddressU=sampler.AddressV=sampler.AddressW=D3D11_TEXTURE_ADDRESS_CLAMP;sampler.MaxLOD=D3D11_FLOAT32_MAX;
+            if(FAILED(device->CreateBuffer(&vb,nullptr,&resources.eyepatch.vertices))
+               ||FAILED(device->CreateBuffer(&ib,&indices,&resources.eyepatch.indices))
+               ||FAILED(device->CreateSamplerState(&sampler,&resources.eyepatchSampler))
+               ||!createRetailDiffuseView(device.Get(),*texture,resources.eyepatch.diffuse))return false;
+            resources.eyepatch.bindVertices=model->vertices;resources.eyepatch.indexCount=411;resources.eyepatch.ready=true;
+            log("Native first-person eyepatch loaded: owned face0 mesh20, 142 vertices, 137 triangles, native diffuse/UVs");
+        }
+        std::vector<PatchVertex> vertices;vertices.reserve(resources.eyepatch.bindVertices.size());
+        for(const auto& native:resources.eyepatch.bindVertices){
+            const auto clip=projectEyepatch(head,rightEye,eye,eyepatchHeadPoint({native.position[0],native.position[1],native.position[2]}));
+            if(!clip)return false;
+            vertices.push_back({{(*clip)[0],(*clip)[1],(*clip)[2],(*clip)[3]},{native.uv[0],native.uv[1],native.position[2]}});
+        }
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        if(FAILED(context->Map(resources.eyepatch.vertices.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&mapped)))return false;
+        std::memcpy(mapped.pData,vertices.data(),vertices.size()*sizeof(PatchVertex));context->Unmap(resources.eyepatch.vertices.Get(),0);
+        SavedState saved;save(context,saved);if(!saved.renderTarget){restore(context,saved);return false;}
+        ID3D11RenderTargetView* target=saved.renderTarget.Get();context->OMSetRenderTargets(1,&target,nullptr);
+        context->RSSetState(resources.markerRasterizer.Get());context->OMSetDepthStencilState(resources.markerDepth.Get(),0);
+        context->OMSetBlendState(resources.eyepatchBlend.Get(),nullptr,0xffffffffu);
+        const UINT stride=sizeof(PatchVertex),offset=0;ID3D11Buffer* buffer=resources.eyepatch.vertices.Get();
+        context->IASetVertexBuffers(0,1,&buffer,&stride,&offset);context->IASetInputLayout(resources.eyepatchLayout.Get());
+        context->IASetIndexBuffer(resources.eyepatch.indices.Get(),DXGI_FORMAT_R16_UINT,0);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context->VSSetShader(resources.eyepatchVs.Get(),nullptr,0);context->PSSetShader(resources.eyepatchPs.Get(),nullptr,0);
+        ID3D11ShaderResourceView* texture=resources.eyepatch.diffuse.Get();context->PSSetShaderResources(0,1,&texture);
+        ID3D11SamplerState* sampler=resources.eyepatchSampler.Get();context->PSSetSamplers(0,1,&sampler);
+        context->DrawIndexed(resources.eyepatch.indexCount,0,0);restore(context,saved);return true;
     }catch(...){return false;}
 }
 

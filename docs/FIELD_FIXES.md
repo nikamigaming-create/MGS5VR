@@ -14,9 +14,15 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Latest incoming reports — 25 October
 
+First-person eyepatch follow-up: checked/deployed `422594fb5ef8` renders Snake's
+owned native patch and front strap close to the right pupil with gray transparency.
+Actual both-eye on/off/on and head-motion pictures are retained under
+`20261025T211153118499Z/on-off-motion`; see CURRENT for placement corrections and
+the arrival fixture's no-op assertion. Physical headset fit remains user review.
+
 The new physical-play batch (sandstorm spray, arm twist/reach, Rocket Arm socket
 display, mounted machine-gun response, helicopter/D-Walker centering) is implemented
-together on main; `f58ef4224995` is checked and deployed. Scoped gameplay
+together on main; `f58ef4224995` was the preceding checked candidate. Scoped gameplay
 checks pass D-Walker center/facing, helicopter exit, responsive MG grip aiming,
 actual Rocket socket steering/screen, arm rotations and world-preserving storm
 suppression. See CURRENT for retained runs, repaired failures and exact limits.

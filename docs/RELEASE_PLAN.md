@@ -10,7 +10,9 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current checked/deployed candidate is `f58ef4224995`. The reported arm,
+Current checked/deployed candidate is `422594fb5ef8`, adding the native
+translucent first-person eyepatch and retained stereo on/off/motion pictures.
+The preceding `f58ef4224995` batch remains included. The reported arm,
 sandstorm, Rocket Arm, MG and mount-centering batch is implemented and has scoped
 combined gameplay results in CURRENT. Actual follow-up defects (MG root-yaw
 feedback and Rocket guidance neutral resets) are corrected. Original settings

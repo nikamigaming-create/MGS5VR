@@ -7,6 +7,7 @@
 #include "mgs5vr/motion_melee.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/rocket_arm.hpp"
+#include "mgs5vr/eyepatch.hpp"
 #include "mgs5vr/paused_rig.hpp"
 #include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/idroid_rig.hpp"
@@ -39,6 +40,20 @@ static void expect(bool ok,const char* name){++checks;if(!ok){++failures;std::ce
 static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
+    {
+        const Pose head{},right{{},{.032f,0,0}},left{{},{-.032f,0,0}};
+        const EyeFov fov{-.785398163f,.785398163f,.785398163f,-.785398163f};
+        const auto center=eyepatchHeadPoint({.032f,.470f,.125f});
+        const auto r=projectEyepatch(head,right,{right,fov},center);
+        const auto l=projectEyepatch(head,right,{left,fov},center);
+        expect(r&&l&&(*r)[0]/(*r)[3]>.2f&&(*r)[0]/(*r)[3]<.4f&&(*l)[0]/(*l)[3]>1,
+            "eyepatch intrudes in right view while its center is outside the left view");
+        const Pose moved{{0,.38268343f,0,.92387953f},{2,1,-3}};
+        const auto following=projectEyepatch(moved,compose(moved,right),{compose(moved,right),fov},center);
+        expect(r&&following&&near((*r)[0],(*following)[0])&&near((*r)[1],(*following)[1]),
+            "same-transaction head movement leaves eyepatch attached to the pupil");
+        expect(!projectEyepatch(head,right,{right,{}},center),"invalid eye FOV cannot draw an eyepatch");
+    }
     expect(menuSurface(true,false,false)==MenuSurface::fallback,"open menu with absent device gets spatial fallback");
     expect(menuSurface(true,false,true)==MenuSurface::device,"ready device keeps native menu on device");
     expect(menuSurface(true,true,true)==MenuSurface::spatial,"explicit spatial menu keeps one spatial owner");

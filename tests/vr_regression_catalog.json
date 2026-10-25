@@ -1290,7 +1290,8 @@
         "include/mgs5vr/head_camera.hpp",
         "include/mgs5vr/player_visibility.hpp",
         "include/mgs5vr/render_camera.hpp",
-        "src/eyepatch_profiles.inc"
+        "src/eyepatch_profiles.inc",
+        "include/mgs5vr/eyepatch.hpp"
       ],
       "automated_tests": [
         "contracts",

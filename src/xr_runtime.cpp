@@ -905,7 +905,8 @@ struct Session {
         controllerFrame.seatedMode=controls.setting("settings.seated_mode")!=0;
         controllerFrame.cinematicFreeMove=controls.setting("settings.cinematic_free_move")!=0;
         requestFullBodyVisibility(controllerFrame.fullBody);
-        requestEyepatchVisibility(controls.setting("settings.eyepatch")!=0);
+        controllerFrame.eyepatch=controls.setting("settings.eyepatch")!=0;
+        requestEyepatchVisibility(controllerFrame.eyepatch);
         controllerFrame.supportGripRadius=controls.setting("settings.support_grip_radius_cm")*.01f;
         controllerFrame.trackedWeaponObstruction=controls.setting("settings.tracked_weapon_obstruction")!=0;
         controllerFrame.blockFiringNearCover=controls.setting("settings.block_firing_near_cover")!=0;

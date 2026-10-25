@@ -57,6 +57,8 @@ try {
             # Existing, unchanged local imports are reused, never claimed by
             # this installer. Only these authored fixtures get synthetic hashes.
             $mgsAssets = @{
+                'retail-assets\Assets\tpp\chara\sna\Scenes\sna0_face0_cov.fmdl'='7FD7F6E5C981A957EDE9F8113D334C67F5EF706766BE7F84A79A41E6FB9BFDD5'
+                'retail-assets\Assets\tpp\chara\sna\Pictures\sna0_face1_def_bsm.dds'='ADF9BCEE7DD55B3D5EBE524F0AA6E0D060CFCA8DEC540223014F9DF5C4299ADE'
                 'retail-assets\Assets\tpp\item\tel\Scenes\tel0_main0_def.fmdl'='935739377E6E0B14EB7186E778E265E65C8E2F66D97B8909D74725800EB21011'
                 'retail-assets\Assets\tpp\item\tel\Pictures\tel0_main0_def_c00_bsm.dds'='7CB40D536F37FAA66D8153EF04AFE6A23331D5BCE45908DC7AA3F63558F566B3'
                 'retail-assets\Assets\tpp\item\tel\Pictures\tel0_main0_def_nrm.dds'='285C9A61B02B5798E79A5013B49CE3344B1F196AE2A56814AB7DB6BFB9028EB4'

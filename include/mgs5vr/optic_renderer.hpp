@@ -15,6 +15,8 @@ struct OpticWaypoints;
 struct OpticNativeLightingSource;
 struct EyeFrame;
 struct CabinStudioFrame;
+struct EyeView;
+bool drawFirstPersonEyepatch(ID3D11DeviceContext*,Pose head,Pose rightEye,const EyeView&) noexcept;
 
 // Native material insertion is legal only at the exact verified 4MT shader's
 // three-MRT/writable-depth head draw. The caller must independently prove its

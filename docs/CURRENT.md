@@ -1,13 +1,42 @@
 # Current MGS5VR work — 25 October 2026
 
-## Incoming headset batch — 25 October, candidate ready
+## First-person eyepatch — current picture request
+
+The user clarified that the eyepatch must be visible from inside VR, gray and
+translucent so both eyes remain usable. External model visibility did not satisfy
+that request. Current development `422594fb5ef8` adds the exact owned face0 mesh20
+(142 vertices / 137 triangles, patch and strap) with its original UVs and native
+face diffuse texture. A gray transparency treatment is applied only to this
+first-person draw. No generated substitute shape is used. The existing eyepatch
+setting controls both presentations.
+
+The same captured head/right-pupil pose and the enclosing render FOV project the
+surface before the runtime's per-eye crop, including clipping straps that extend
+behind the eyes. Native scale is retained; the patch is close to the right pupil,
+with its edge and front strap visible from the left eye. The rest of the
+native head remains hidden. The importer obtains the exact model/texture from
+the user's game archives; those assets are not included in the mod package.
+All 58 build groups and installer checks passed; published play is unchanged.
+Actual simulator pictures are retained in `20261025T211153118499Z`, including
+`eyepatch-vr-on.png` and `on-off-motion/`. On/off/on removes and restores the
+patch; the head-translation/yaw capture retains its eye-relative placement.
+World remains visible through the gray patch. Physical headset distance and
+comfort remain for user review. The earlier `20261025T210608859981Z` capture
+exposed mirrored placement and wrapping straps; the current candidate corrects
+the imported X basis, render-FOV projection and rear-strap clipping. The latest
+arrival bot's no-op outcome assertion failed after arrival; its screenshots are
+retained as pictures, not a passed arrival test. The separate toggle/motion
+capture completed. Owned simulator closed, eyepatch=1/full_body=0 retained,
+Steam retained and Meta Link restored. Use Play-Dev for this candidate.
+
+## Earlier incoming headset batch — 25 October
 
 The latest batch fixes the reported sandstorm camera spray, forearm twist/reach,
 Rocket Arm socket display/guidance, mounted machine-gun response, and helicopter/
 D-Walker centering. It also adds the default-on character-model eyepatch option.
 All changes are on main. Published `play/` is unchanged.
 
-Final checked/deployed candidate: **`f58ef4224995`**. Build and installer
+Previous checked/deployed candidate: **`f58ef4224995`**. Build and installer
 results: `artifacts/release-playtest-final-build.log`. Use `Play-Dev.cmd` for
 physical review. The owned test session is closed, test input released, original
 `full_body=0` restored, Steam retained, and per-game Meta Link restored.

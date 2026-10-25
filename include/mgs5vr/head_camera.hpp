@@ -152,6 +152,7 @@ struct ControllerFrame {
     bool openingWorldAnchored{};
     PlayerPosture playerPosture{PlayerPosture::unknown};
     bool fullBody{},seatedMode{},cinematicFreeMove{true};
+    bool eyepatch{true};
     bool coverAssistance{true};
     std::array<float,2> cinematicMove{};
 };

@@ -43,8 +43,12 @@ internal static class OwnedAssets
         new ModelSpec("Assets/tpp/item/rdi/Scenes/rdi0_main0_def.fmdl", "3681e86a1b611cc33bc67d756b815d4899147532a3417d78e510cd20eda54028"),
         new ModelSpec("Assets/tpp/item/idr/Scenes/idr0_main0_def.fmdl", "6e450f67a423f83f9d42717fb6ed7a464aa7b914c4524fe7dd762fe9dffc3f50")
     };
+    static readonly ModelSpec EyepatchModel = new ModelSpec("Assets/tpp/chara/sna/Scenes/sna0_face0_cov.fmdl",
+        "7fd7f6e5c981a957ede9f8113d334c67f5ef706766be7f84a79a41e6fb9bfdd5");
     static readonly TextureSpec[] Textures =
     {
+        new TextureSpec("Assets/tpp/chara/sna/Pictures/sna0_face1_def_bsm.dds", "adf9bcee7dd55b3d5ebe524f0aa6e0d060cfca8dec540223014f9df5c4299ade",
+            0x15690f74ae4ad3adUL, 0xb2c10f74ae4ad3adUL, 0xb5710f74ae4ad3adUL, 0x57190f74ae4ad3adUL),
         new TextureSpec("Assets/tpp/item/tel/Pictures/tel0_main0_def_c00_bsm.dds", "7cb40d536f37faa66d8153ef04afe6a23331d5bce45908dc7aa3f63558f566b3",
             0x1568643e638c1c21UL, 0xb2c0643e638c1c21UL, 0xb570643e638c1c21UL, 0x5718643e638c1c21UL),
         new TextureSpec("Assets/tpp/item/tel/Pictures/tel0_main0_def_nrm.dds", "285c9a61b02b5798e79a5013b49ce3344b1f196ae2a56814ab7db6bfb9028eb4",
@@ -374,6 +378,9 @@ internal static class OwnedAssets
         var textureArchive = ReadArchive(Path.Combine(game, "master", "texture0.dat"), wanted.ToArray());
         var outputs = new Dictionary<string, byte[]>();
         foreach (var model in Models) outputs.Add(SafeTarget(destination, model.Path), ReadModel(package, model));
+        const ulong facePackageId = 0x52282a5f83a94178UL;
+        var facePackage = ReadArchive(Path.Combine(game, "master", "chunk0.dat"), facePackageId)[facePackageId];
+        outputs.Add(SafeTarget(destination, EyepatchModel.Path), ReadModel(facePackage, EyepatchModel));
         foreach (var texture in Textures) outputs.Add(SafeTarget(destination, texture.Path), DecodeTexture(textureArchive, texture));
         outputs.Add(SafeTarget(destination, MaterialShaderPath), ReadMaterialShader(game));
         foreach (var file in outputs) if (File.Exists(file.Key))
