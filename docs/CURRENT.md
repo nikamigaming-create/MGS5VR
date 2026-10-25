@@ -4,11 +4,25 @@
 
 The user clarified that the eyepatch must be visible from inside VR, gray and
 translucent so both eyes remain usable. External model visibility did not satisfy
-that request. Current development `422594fb5ef8` adds the exact owned face0 mesh20
+that request. Development `422594fb5ef8` added the exact owned face0 mesh20
 (142 vertices / 137 triangles, patch and strap) with its original UVs and native
 face diffuse texture. A gray transparency treatment is applied only to this
 first-person draw. No generated substitute shape is used. The existing eyepatch
 setting controls both presentations.
+
+Current candidate `1e50576a0e7d` addresses the user's reflection/darkness feedback:
+the first-person shader no longer samples the face atlas's baked detail. It uses
+constant matte near-black at 72% opacity (previously gray at 48%). Native geometry,
+stereo placement and the character-model appearance remain unchanged. Build and
+installer checks passed in `artifacts/eyepatch-matte-build.log`; development is
+deployed and the published pin is unchanged. Fresh simulator pictures and an
+explicitly illustrative binocular composite accompany this material revision:
+retained run `20261025T212952693176Z` arrived in the cabin and captures both eyes.
+`eyepatch-matte-stereo.png` preserves the eye images; the separate
+`eyepatch-binocular-approximation.png` blends them 50/50 after registering the
+cabin background. That edited illustration is not a prediction of human fusion
+or stereo evidence. The actual eye images show dark translucent native geometry
+without the earlier baked atlas detail. Owned simulator closed and Steam retained.
 
 The same captured head/right-pupil pose and the enclosing render FOV project the
 surface before the runtime's per-eye crop, including clipping straps that extend

@@ -14,11 +14,13 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Latest incoming reports — 25 October
 
-First-person eyepatch follow-up: checked/deployed `422594fb5ef8` renders Snake's
+First-person eyepatch follow-up: `422594fb5ef8` renders Snake's
 owned native patch and front strap close to the right pupil with gray transparency.
 Actual both-eye on/off/on and head-motion pictures are retained under
 `20261025T211153118499Z/on-off-motion`; see CURRENT for placement corrections and
 the arrival fixture's no-op assertion. Physical headset fit remains user review.
+Current checked/deployed `1e50576a0e7d` removes the reflection-like face-atlas
+detail from that near-eye draw and changes gray 48% opacity to matte black 72%.
 
 The new physical-play batch (sandstorm spray, arm twist/reach, Rocket Arm socket
 display, mounted machine-gun response, helicopter/D-Walker centering) is implemented

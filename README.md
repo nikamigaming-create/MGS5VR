@@ -66,7 +66,7 @@ Save, release all buttons/grips/triggers, and center both sticks for two seconds
 valid edits apply **live**, without restarting. Buttons, taps, holds, chords,
 turning, HUD preferences, and physical fit have annotated settings.
 The **Eyepatch** setting shows or hides Snake’s native character eyepatch and a
-curved, translucent gray patch near the right eye in first-person VR. It defaults
+curved, translucent matte-black patch near the right eye in first-person VR. It defaults
 on; the rim partially obstructs the view while the world remains visible through it.
 
 [Complete illustrated control modes](docs/images/control-modes.svg)

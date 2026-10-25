@@ -2434,9 +2434,9 @@ float4 main(float4 position:SV_POSITION,float3 uv:TEXCOORD):SV_TARGET{
  // The hidden head still occludes the rear wrapping straps. Keep the actual
  // native front surface; do not expose inside-head straps through the face.
  clip(uv.z-.105);
- float3 native=nativeFace.Sample(nativeSampler,uv.xy).rgb;
- float gray=.18+dot(native,float3(.2126,.7152,.0722))*.45;
- return float4(lerp(native,gray.xxx,.85),.48);})";
+ // Matte black cloth: the face atlas contains baked highlights that look like
+ // reflections at this near-eye distance. Preserve geometry, not that lighting.
+ return float4(.012,.014,.018,.72);})";
             ComPtr<ID3DBlob> vertex,pixel;
             if(!compile(device.Get(),vs,"vs_5_0",&vertex)||!compile(device.Get(),ps,"ps_5_0",&pixel))return false;
             if(FAILED(device->CreateVertexShader(vertex->GetBufferPointer(),vertex->GetBufferSize(),nullptr,&resources.eyepatchVs))
