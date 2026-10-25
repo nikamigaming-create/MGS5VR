@@ -2572,5 +2572,24 @@
     "classification": "Synthetic cross-head target is outside native reach; not a reachable-arm regression baseline",
     "next_action": "Use physical feedback from current candidate to localize any ordinary-motion arm pop; do not expand clearance from the infeasible fixture",
     "scope": "Does not close physical arm presentation or every outfit; no gameplay code or installed candidate changed"
+  },
+  "mounted_adapter_investigation_2026_10_25": {
+    "native_event": "OnPlayerGatling",
+    "owned_lua_consumer": "TppTutorial maps this event to ANTI_AIRCRAFT",
+    "event_emitter_rva": "0x126d50b",
+    "handler_rva": "0x126c570",
+    "anti_aircraft_action_id": "unresolved",
+    "excluded_inference": "0x45 writer at 0x126ea20 is in a separate handler; no demonstrated anti-aircraft link",
+    "searchlight": "0x44 write and OnPlayerSearchLight emitter share handler 0x1277210; not a stationary weapon admission",
+    "new_artifacts": [
+      "private/release-mounted-static-0.json",
+      "private/release-mounted-static-1.json",
+      "private/release-mounted-static-2.json",
+      "private/release-mounted-dispatch.json",
+      "private/release-mounted-dispatch-caller.json"
+    ],
+    "next_cpp_change": "Extend verified native action admission after real anti-aircraft mount/contact observation; preserve existing native aim limits and grip ownership",
+    "candidate_changed": false,
+    "physical_feedback": "User has not yet tested 62f696613e2b"
   }
 }

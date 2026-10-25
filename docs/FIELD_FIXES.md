@@ -108,6 +108,19 @@ there is no blanket FP17/body closure.
 
 ## Next batch
 
+Mounted adapter investigation, 25 October: owned `TppTutorial.lua` maps native
+`OnPlayerGatling` to the `ANTI_AIRCRAFT` guide. The retained native emitter is
+RVA `0x126d50b` inside the handler beginning at `0x126c570`. This is the event to
+correlate with the next real anti-aircraft mount. It does not establish its
+player action ID. The separate `0x45` writer belongs to another handler and has
+not been connected to that event. Action `0x44` is associated with the verified
+`OnPlayerSearchLight` handler; do not admit it as a stationary weapon.
+The current adapter remains limited to the verified mortar/MG IDs. Next C++
+work is to admit the anti-aircraft action only after correlating actual mounting,
+its current native palm contacts and aim pose, then exercise both operating
+hands, release, native aim limits and impact together. No candidate change or
+new mounted acceptance is claimed by this offline investigation.
+
 1. Prioritize the remaining body/arm presentation limits without undoing the
    fixed-length and tracked-garment repairs.
 2. Diagnose intact mounted entry/native eligibility, then extend only confirmed
