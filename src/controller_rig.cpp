@@ -426,8 +426,8 @@ uint32_t refreshPausedArmParts(const PausedSkin& body,uintptr_t character){
             }
         }
         if(!consistent){*cached={};continue;}
-        const auto hasPart=[&](uint32_t name){return std::find(cached->names.begin(),cached->names.begin()+boneCount,name)!=cached->names.begin()+boneCount;};
-        if(!hasPart(leftForearm)||!hasPart(leftWrist)){*cached={};continue;}
+        if(!pausedArmPartMatches(get<uint64_t>(model+0x120),
+            {cached->names.data(),boneCount},{cached->parents.data(),boneCount})){*cached={};continue;}
         cached->model=model;cached->matrices=matrices;cached->namesAddress=names;cached->parentsAddress=parents;cached->count=boneCount;
         std::array<Pose,512> solved{};
         if(!retargetPausedPart({sourceNames.data(),sourceCount},{source.data(),sourceCount},

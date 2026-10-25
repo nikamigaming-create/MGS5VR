@@ -1,9 +1,32 @@
 # Current MGS5VR work — 24 October 2026
 
-**Development `5d44f0706d11` has passed automated checks. Its final live
-comparison is waiting for Steam to be opened. Release readiness remains active.**
+**The user-reported duplicate left forearm is reproduced and blocks release.
+Its source correction is awaiting a combined build and visual retest.**
 Work on main only; do not redo implemented repairs or repeat the failed mounted
 approach. The full report map is [FIELD_FIXES.md](FIELD_FIXES.md).
+
+## Duplicate left forearm — 25 October
+
+The user's screenshot is reproduced in both final eyes during the native
+"Choose a Rival" iDroid Help state. The owned prosthetic contains an articulated
+34-bone hand and a separate rigid shell (`84a051ef13b1e379`, one LFOREARM bone,
+root parent -1). The refresh required both LFOREARM and LHAND, so it updated the
+hand but rejected the shell. The sampled shell was about 20 cm behind the
+body's forearm matrix, creating the apparent third arm.
+
+The correction admits that exact owned shell/rig and joins it to the same
+native body palette. It does not hide or delete the shell. The original model
+ownership, matching root, arm group and native bone-length checks remain.
+Regression coverage includes admission, rejection of foreign single-bone parts,
+and rigid/idempotent pose transfer. Live verification is pending; earlier
+endpoint review did not cover this forced-Help failure and cannot close it.
+
+Evidence: `artifacts/duplicate-left-arm-report/` contains the user image,
+current both-eye captures and read-only native model/pose inventory. Retained
+run `20261025T112301566248Z` failed when the first opening entered forced Help.
+The reviewed native Close and stow then passed in `20261025T113207144511Z`.
+The owned session is closed; Steam 30812 was retained. The frame-handoff
+performance comparison remains pending and will join this correction's test.
 
 ## Sustained iDroid correction and result
 
@@ -29,7 +52,7 @@ statistics, not per-frame percentiles or physical display measurements.
 Details: `artifacts/release-handheld-stall-outcome.json` and
 `artifacts/release-handheld-stall-performance.json`.
 
-## Built frame-handoff candidate; live comparison blocked
+## Frame-handoff candidate; comparison interrupted by the arm defect
 
 Retained current-candidate logs show producer completion waiting for the next
 native Present before XR can see an already completed image. The source change
@@ -41,10 +64,9 @@ completion marker, no-more-Present delivery and concurrent stereo pixel/lineage
 reuse. All 58 groups and installer checks passed. Development DLL:
 `5d44f0706d1117c5a7c8e2bac46bb74a475704aceee0c2b3a4ab67b407aebf70`, source `78110e0`.
 
-The launch refused because Steam is no longer running. The user has been asked
-to open it; do not start/restart Steam or bypass its game launch. No game,
-simulator or bot is left running, and the failed launch created no runtime
-lease. Both retained build payloads verify. The saved headset runtime is Meta.
+Steam was reopened by the user. The resumed live run encountered forced Help
+and the duplicate shell above before a sustained comparison completed. Do not
+restart Steam. Both retained build payloads verify; headset preference is Meta.
 A combined candidate run must establish whether this reduces repeats; no
 performance improvement or current-candidate gameplay pass is claimed.
 Details: `artifacts/release-shared-fence-status.json`.

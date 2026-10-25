@@ -36,4 +36,19 @@ int main(){
     require(retargetPausedPart(withHiddenMount,withUnusedCollapse,part,frozen,parents,output));
     const std::array<Pose,3> withSharedCollapse{source[0],collapsed,source[1]};
     require(!retargetPausedPart(withHiddenMount,withSharedCollapse,part,frozen,parents,output));
+    const std::array<uint32_t,2> armNames{0x31e2de16,0x3e2d77e5};
+    const std::array<int32_t,2> armParents{-1,0};
+    const std::array<uint32_t,1> shellNames{armNames[0]};
+    const std::array<int32_t,1> shellParents{-1};
+    require(pausedArmPartMatches(0x84a2fb2fc94ab4d1ull,armNames,armParents));
+    require(pausedArmPartMatches(0x84a051ef13b1e379ull,shellNames,shellParents));
+    require(!pausedArmPartMatches(0x84a051ef13b1e378ull,shellNames,shellParents));
+    require(!pausedArmPartMatches(0x84a051ef13b1e379ull,std::array<uint32_t,1>{armNames[1]},shellParents));
+    require(!pausedArmPartMatches(0x84a051ef13b1e379ull,shellNames,std::array<int32_t,1>{0}));
+    const std::array<Pose,1> frozenShell{frozen[0]};std::array<Pose,1> shell{};
+    require(retargetPausedPart(armNames,source,shellNames,frozenShell,shellParents,shell));
+    require(shell[0].position.x==source[0].position.x&&shell[0].position.y==source[0].position.y
+        &&shell[0].orientation.w==source[0].orientation.w);
+    for(int i=0;i<1000;++i)require(retargetPausedPart(armNames,source,shellNames,frozenShell,shellParents,shell));
+    require(shell[0].position.x==source[0].position.x);
 }

@@ -4,6 +4,17 @@
 #include <algorithm>
 
 namespace mgs5vr {
+inline bool pausedArmPartMatches(uint64_t resource,std::span<const uint32_t> names,
+                                std::span<const int32_t> parents) noexcept {
+    if(names.empty()||names.size()!=parents.size())return false;
+    constexpr uint32_t forearm=0x31e2de16,wrist=0x3e2d77e5;
+    const auto has=[&](uint32_t name){return std::find(names.begin(),names.end(),name)!=names.end();};
+    if(has(forearm)&&has(wrist))return true;
+    // The owned prosthetic also has a separate rigid shell. It has only
+    // LFOREARM, so requiring LHAND leaves it at its pre-Help pose while the
+    // articulated hand moves. Admit this observed resource/rig exactly.
+    return resource==0x84a051ef13b1e379ull&&names.size()==1&&names[0]==forearm&&parents[0]==-1;
+}
 // Native modular arm models share named joints with the body and add their
 // own mechanical joints. Re-publish shared joints and retain the frozen local
 // transforms of those extra joints. All poses are in the same model space.

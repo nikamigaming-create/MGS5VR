@@ -243,3 +243,13 @@ No owned game, simulator or bot is running. Published play is unchanged.
    not create another retained binary slot. Close the owned test session.
 6. Physical Quest acceptance and exact remaining field cases still apply;
    neither GPU checks nor this ACC comparison certify them.
+
+## User-reported duplicate arm: current priority
+
+Steam is running again. The resumed candidate reproduced a third-arm appearance
+in forced Choose a Rival Help; see CURRENT. Fix the rigid prosthetic shell's
+paused palette admission, then build the combined shell/shared-fence candidate.
+Review both final eyes while moving the left arm under Pause and native Help,
+including the forearm-to-hand connection, close and reopen. Complete the
+sustained lifecycle/performance comparison in that same session. Do not treat
+state success as visual acceptance or claim the earlier Help failure is passed.
