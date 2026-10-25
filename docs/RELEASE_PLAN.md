@@ -202,6 +202,10 @@ both slots verify. Never remove settings, saves, source or retained evidence.
   retained. Both Play commands/saved headset preference select Meta. Windows'
   global OpenXR registration is Virtual Desktop; an attempted Meta restoration
   was denied by registry permissions. See CURRENT for this precise limitation.
+- Extreme-reach follow-up: the captured fixture requests106cm from a53.9cm
+  native arm chain; dense comparison does not justify replacing its fallback.
+  Current mesh penetration remains unproven. Do not repeat that impossible-pose
+  test as evidence of a new tracking defect; see CURRENT.
 - Next: process physical feedback on this candidate and diagnose a newly
   reproducible remaining failure before editing. No package/publication/pin or
   release-gate waiver. Outcome documentation may be newer than packaged prose.

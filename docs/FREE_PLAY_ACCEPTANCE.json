@@ -2217,6 +2217,13 @@
       "physical Quest and full missions unaccepted"
     ],
     "cleanup": "full_body1; owned game/simulator/readers closed; Steam retained; saved headset runtime and both Play commands Meta; global Windows registration remains Virtual Desktop after access-denied attempt to restore Meta",
-    "physical_headset_acceptance": false
+    "physical_headset_acceptance": false,
+    "extreme_reach_followup": {
+      "candidate_changed": false,
+      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44\u201359cm",
+      "captured_solver_fixture": "native upper/lower28.4/25.5cm; requested shoulder-to-wrist106cm; reach-only unavoidable clamp52.1cm",
+      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9\u20131.2mm over production fallback with/without stereo padding",
+      "conclusion": "No additional IK rewrite justified by unreachable-pose clamp. Current mesh eye penetration unproven without joined palette; physical comfort/reachable reproduction still required."
+    }
   }
 }

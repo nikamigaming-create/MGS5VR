@@ -64,6 +64,24 @@ sleeve clearance and tracked garment repairs remain intact.
    performance remain unaccepted. The five conservative catalog gates remain;
    no release-gate waiver or universal playability claim.
 
+## Extreme-reach follow-up — retained evidence only
+
+The two final runs retain requested controller grips and rendered palms. Neutral
+return error is below1mm; extreme cross-head error is44–59cm. This is not, by
+itself, a new tracking or mesh-penetration defect: the captured native regression
+fixture has28.4cm/25.5cm arm segments and asks for a wrist106cm from its shoulder.
+Its reach-only lower bound is52.1cm of clamping. An independent200,000-direction
+comparison of the existing head-clearance fallback improved target distance by
+only0.9–1.2mm, depending on stereo padding. No solver rewrite was justified.
+
+That older captured fixture establishes reach infeasibility, not the current
+cloth's exact eye distance. Current endpoint records lack a joined full bone
+palette, so mesh penetration is unproven. Keep the extreme-view comfort limit
+explicit; require a reachable-pose reproduction or physical feedback before
+another clearance change. Candidate351d84672f0e remains unchanged. Analysis is
+retained in `artifacts/release-reach-position-audit.json` and
+`artifacts/release-reach-feasibility-audit.json`.
+
 ## Cleanup and launch readiness
 
 Full_body is restored to1. Owned game, simulator and bounded readers are closed;
