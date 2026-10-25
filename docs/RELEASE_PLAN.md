@@ -10,10 +10,14 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
-Current checked candidate `994c6d57762a` / `3fc9cdc` is deployed for Play-Dev.
+Current checked candidate `62f696613e2b` / `5bb471f` is deployed for Play-Dev.
+It fixes terminal stow routing under camera-suspending Help and retains the whole
+physical Menu press as handheld-owned. Forced-Help stow/reopen passes retained
+20261025T152037198735Z.
 It additionally retires the on-board exemption after disembarking and admits
 Challenge Tasks to exact-owner stow-Help cleanup. Open-handset exit/stow smoke
-passes; the corrected live Challenge Tasks path and physical review remain open.
+passes; the corrected live Challenge Tasks stow/reopen now passes too. Physical
+review remains open.
 It includes camera/skin body-visibility continuity and field-pickup iDroid
 stow/reopen ownership. Scoped full-body/forearm-only movement and flight/field
 handset lifecycle reviews passed. Actual pickup entry remains unaccepted because

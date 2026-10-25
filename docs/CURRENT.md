@@ -1,6 +1,31 @@
 # Current MGS5VR work — 25 October 2026
 
-## Forced-Help stow follow-up — source batch
+## Current playtest candidate — native terminal Help stow
+
+**`62f696613e2b` / source `5bb471f` is built, checked and deployed for Play-Dev.**
+All 58 groups and installer checks passed in
+`artifacts/release-help-terminal-build.log`. Retained
+`20261025T152037198735Z` passes Challenge Tasks Help Menu stow, immediate
+reopen and restow, following normal ACC sortie/disembark. Both final stow eyes
+show the menu cleared. Reopen captures straddle screen allocation; they do not
+establish continuous stereo readiness. Published play is unchanged.
+
+The owned game/simulator are closed, inputs released, Steam retained and the
+per-game Meta Link preference restored. `Play-Dev.cmd` is ready for the user's
+physical test; `Play.cmd` retains the published release. The release goal remains
+open for exact terrain/corridor reproduction, extreme cloth crowding, actual
+field-pickup boarding and the broader field/headset scope in FIELD_FIXES.
+
+Pickup follow-up cleared the arrival point through native walking
+(`20261025T152529456360Z`), but the called helicopter stayed hovering
+(`20261025T152644554491Z`). It also hovered in the bounded native-camera comparison
+(`20261025T153018416570Z`); immersive presentation was restored. The return route
+(`20261025T153124762503Z`) stopped against the parked jeep, visible in the final
+eye capture. This is not a terrain-hang diagnosis or boarding acceptance.
+The first comparison fixture was rejected before toggle input because it omitted
+the required target presentation; that failed record is retained too.
+
+### Reproduction and correction
 
 Candidate `4d5dbdf92e06` / `e842c7c` passed required build checks but retained
 `20261025T151404474920Z` reproduced a remaining Challenge Tasks Help stow failure.
@@ -17,10 +42,10 @@ the existing exact-owner Help acknowledgement before retaining and delivering
 terminal stow for a field handset, as it already does for the cabin. A handheld
 Menu press also remains consumed until physical release, so closing its terminal
 cannot turn the rest of that same press into native START. Unknown Help owners
-and unrelated native pauses remain excluded. This extension is source-audited;
-the new live Help-to-stow path still needs a scoped gameplay check.
+and unrelated native pauses remain excluded. This extension now has the scoped
+live Help-to-stow/reopen result above.
 
-## Current playtest candidate — lifecycle follow-up
+## Previous development candidate — lifecycle follow-up
 
 **`994c6d57762a` / source `3fc9cdc` is built, checked and deployed for Play-Dev.**
 All 58 check groups and installer checks passed in

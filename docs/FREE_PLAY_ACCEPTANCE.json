@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "994c6d57762a44c17eec691e99221f1456c5dc51b07ef114ab677679d46d57f8",
-  "candidate_status": "Built and deployed playtest candidate. Helicopter open-handset exit/stow functional smoke passed; release and physical acceptance remain open.",
+  "candidate": "62f696613e2b89678303842a140ad712bbcf09cb712e591ea743721d36c0ee70",
+  "candidate_status": "Built, checked and deployed candidate. Live Challenge Tasks Help stow/reopen/restow passed; release and physical acceptance remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1331,21 +1331,22 @@
     }
   ],
   "active_work": {
-    "candidate": "d4b526e24cf5c3ef698db2e6c9659a76ccd3cb9573ce36d7c8924dd77e6dfa84",
-    "source_commit": "32f2ab0591b33a975a1afec40524b07b3bbcc30f",
-    "checkpoint": "Combined shell/reopen/forearm-cache candidate built, checked and deployed for user testing. No new simulator or physical acceptance claimed.",
+    "candidate": "62f696613e2b89678303842a140ad712bbcf09cb712e591ea743721d36c0ee70",
+    "source_commit": "5bb471f789563ae8ccd13f5c12bdd39c08c3ccb9",
+    "checkpoint": "Built, checked and deployed candidate. Live Challenge Tasks Help stow/reopen/restow passed; release and physical acceptance remain open.",
     "plan": "docs/RELEASE_PLAN.md",
     "next_actions": [
-      "User play through Play-Dev.cmd.",
-      "Batch any newly diagnosed defects; preserve unresolved reports and completed scoped work."
+      "Physical playtest through Play-Dev.cmd on wired Meta Quest Link.",
+      "Diagnose actual pickup boarding at a usable native LZ, exact rock/corridor failure and extreme cloth crowding before changing those flows.",
+      "Batch newly diagnosed gameplay repairs on main; retain completed scoped results and all failures."
     ],
     "runtime_requirement": "Wired Meta Quest Link / Meta OpenXR; both Play commands explicitly -MetaLink. Historical runtime observations in retained_work_history are not current setup instructions.",
     "build_slots": {
       "published_pin": "b627c7cacc9a",
-      "development": "d4b526e24cf5"
+      "development": "62f696613e2b"
     },
     "scope": "Checked and deployed candidate; not a publication or headset/full-game acceptance.",
-    "cleanup": "No owned gameplay or simulator test session left running. Steam was not stopped or restarted. Meta Link preference preserved."
+    "cleanup": "Owned game/simulator closed, inputs released, Steam retained, per-game Meta Link restored, published play unchanged."
   },
   "implementation_audit": {
     "date": "2026-10-24",
@@ -2528,5 +2529,36 @@
     "retained_fixture_rejection": "20261025T150004189444Z: contradictory scene=gameplay/idroid=true predicate; no disembark input sent. Resumed remaining sequence only.",
     "challenge_help": "Pre-fix actual Exit Tutorial reproduction 20261025T143421433785Z; new mode16 admission contract passes; live corrected guide path pending",
     "cleanup": "Owned game/simulator closed, Steam retained, Meta Link restored, published pin unchanged"
+  },
+  "help_terminal_stow_2026_10_25": {
+    "source": "5bb471f789563ae8ccd13f5c12bdd39c08c3ccb9",
+    "candidate": "62f696613e2b89678303842a140ad712bbcf09cb712e591ea743721d36c0ee70",
+    "changes": [
+      "Use actual native terminal state for Menu, held-Back and deferred stow when Help suspends camera presentation",
+      "Retain exact-owner Help acknowledgement and stow request",
+      "Consume the entire handheld Menu press until physical release"
+    ],
+    "automated": "58/58 and installer checks passed",
+    "build_log": "artifacts/release-help-terminal-build.log",
+    "failed_intermediate": {
+      "candidate": "4d5dbdf92e06",
+      "run": "20261025T151404474920Z",
+      "failure": "Challenge Tasks Help remained; camera liveIdroid=false skipped stow despite native terminal open"
+    },
+    "smoke_run": "20261025T152037198735Z",
+    "smoke_status": "observed_pass",
+    "scope": "Forced-Help stow and adjacent reopen only; no physical or full-game claim",
+    "visual_review": "Both final stow eye captures show the Help and terminal cleared. Reopen captures straddle screen allocation; no continuous stereo claim.",
+    "cleanup": "Owned game/simulator closed, inputs released, Steam retained, per-game Meta Link restored, published play unchanged."
+  },
+  "pickup_fixture_followup_2026_10_25": {
+    "candidate": "62f696613e2b89678303842a140ad712bbcf09cb712e591ea743721d36c0ee70",
+    "clear_route": "20261025T152529456360Z: ordinary native route completed to clear the arrival point",
+    "arrival": "20261025T152644554491Z: native pickup arrived but stayed hovering",
+    "native_comparison": "20261025T153018416570Z: helicopter still hovering in native third-person/quad presentation, then immersive restored",
+    "fixture_reject": "20261025T152933092768Z: toggle comparison required explicit target_presentation; rejected before toggle dispatch",
+    "return_approach": "20261025T153124762503Z: stopped at parked jeep collision; no mapped starting floor reached",
+    "scope": "Actual open-handset pickup boarding remains unverified. Neither the route guard nor this hover setup establishes the reported terrain defect.",
+    "cleanup": "Owned game/simulator closed, inputs released, Steam retained, per-game Meta Link restored, published play unchanged."
   }
 }

@@ -14,9 +14,11 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Latest incoming reports — 25 October
 
-Current playtest candidate: `994c6d57762a` / `3fc9cdc`. It adds on-board-to-field
-handset ownership reset (functional live smoke passed) and Challenge Tasks mode16
-post-stow Help cleanup (contract checked; corrected live guide path pending).
+Current playtest candidate: `62f696613e2b` / `5bb471f`. It adds native-terminal
+stow routing while Help suspends camera presentation, retained exact-owner Help
+acknowledgement, and consumption of the entire handheld Menu press. Forced-Help
+stow/reopen passes retained 20261025T152037198735Z. It includes the on-board-to-field ownership
+reset and Challenge Tasks mode16 post-stow Help cleanup.
 
 - Sleeve pop during motion: a bounded same-owner camera/skin visibility continuity
   repair is deployed as a33bfd559b9e; scoped moving review passed. This does not close extreme
