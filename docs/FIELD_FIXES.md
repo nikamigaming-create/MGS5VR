@@ -14,6 +14,12 @@ ordered execution plan. All supplied community reports remain in scope.
 
 ## Body/arm candidate update — 24 October
 
+Next checked candidate `250884f4c156` / source `21799fd` flattens the cuff rim
+and separates cap shading using dead native vertex slots, including additional
+lower-LOD loops (107 cap triangles observed at startup). Final visual smoke is
+deferred until the remaining justified fixes are batched. The limits below
+describe the preceding candidate; CURRENT tracks the active release goal.
+
 Candidate `1a64bb965bc6` / source `4392536` adds upper-sleeve clearance along the
 whole upper arm and closes supported forearm-only cut loops using existing
 native indexed geometry. Full-body reach/return and all seven forearm-only

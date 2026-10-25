@@ -255,19 +255,26 @@ ForearmDraw::ForearmDraw(ID3D11DeviceContext* c) noexcept {
             c->IAGetVertexBuffers(0,32,raw.data(),strides.data(),offsets.data());
             for(size_t i=0;i<raw.size();++i)bound[i].Attach(raw[i]);
         }
-        std::array<ComPtr<ID3D11Buffer>,2> replacements;
+        std::array<ComPtr<ID3D11Buffer>,32> replacements;
+        std::array<bool,2> streams{};
         for(UINT slot=0;slot<bound.size();++slot)if(bound[slot]){
             ComPtr<ID3D11Buffer> replacement;size=sizeof(ID3D11Buffer*);
             if(FAILED(bound[slot]->GetPrivateData(vertexKey,&size,replacement.GetAddressOf())))continue;
             D3D11_BUFFER_DESC desc{};bound[slot]->GetDesc(&desc);
             const size_t stream=desc.ByteWidth==80640?0:1;
-            if((stream==1&&desc.ByteWidth!=214368)||strides[slot]!=(stream?32u:12u)||replacements[stream])return;
-            replacements[stream]=replacement;
-            vertices_[stream]={bound[slot],slot,strides[slot],offsets[slot]};
+            if((stream==1&&desc.ByteWidth!=214368)
+                ||(stream==0?strides[slot]!=12u:
+                    strides[slot]!=28u&&strides[slot]!=32u&&strides[slot]!=36u))return;
+            // The owned FMDL binds normal/tangent, skinning and UV groups
+            // separately from the same attribute buffer. Replace every
+            // alias, retaining each native offset and mesh-specific stride.
+            streams[stream]=true;
+            replacements[vertexCount_]=replacement;
+            vertices_[vertexCount_++]={bound[slot],slot,strides[slot],offsets[slot]};
         }
-        if(!replacements[0]||!replacements[1])return;
+        if(!streams[0]||!streams[1])return;
         original_=indices;context_=c;
-        for(size_t i=0;i<vertices_.size();++i){const auto& v=vertices_[i];auto* replacement=replacements[i].Get();
+        for(size_t i=0;i<vertexCount_;++i){const auto& v=vertices_[i];auto* replacement=replacements[i].Get();
             c->IASetVertexBuffers(v.slot,1,&replacement,&v.stride,&v.offset);
         }
         c->IASetIndexBuffer(variant.Get(),format_,offset_);
@@ -276,7 +283,7 @@ ForearmDraw::ForearmDraw(ID3D11DeviceContext* c) noexcept {
     }catch(...){}
 }
 ForearmDraw::~ForearmDraw(){if(context_){
-    for(const auto& v:vertices_){auto* original=v.original.Get();context_->IASetVertexBuffers(v.slot,1,&original,&v.stride,&v.offset);}
+    for(size_t i=0;i<vertexCount_;++i){const auto& v=vertices_[i];auto* original=v.original.Get();context_->IASetVertexBuffers(v.slot,1,&original,&v.stride,&v.offset);}
     context_->IASetIndexBuffer(original_.Get(),format_,offset_);
 }}
 }

@@ -185,16 +185,22 @@ both slots verify. Never remove settings, saves, source or retained evidence.
 
 ## Resume record
 
-- Completed: source audit, documentation reconciliation and the first body/arm
-  correction batch on main (`c2caa68`, inventory follow-up `4392536`).
-- Checked candidate: `1a64bb965bc6`; all 58 groups and installer checks pass.
-  One native smoke session exercised both arms/body modes and adjacent iDroid.
-  Three runs are retained with failures and limits; see CURRENT/FREE_PLAY_ACCEPTANCE.
-- Next: user physical Quest Link feedback through Play-Dev.cmd. Do not rerun
-  the completed simulator subcases or rebuild merely for outcome documentation.
-- Remaining body limits: uneven cuff rim/cap texture, close cloth in extreme
-  reach, other outfits and ambiguous lower-LOD cap boundaries. Remaining mounted,
-  rock/corridor and progression questions keep their original order above.
-- Cleanup complete: full_body restored to1, owned game/simulator closed, Steam
-  retained and per-game Meta runtime restored. Published play unchanged.
-- No publication, build pin, universal acceptance or release-gate waiver.
+- Completed on main: source audit and documentation reconciliation; fixed-length
+  body/head fit, tracked garment drivers, sleeve clearance and forearm-only
+  presentation; the latest correction flattens cuff rims and separates cap
+  shading without resizing native buffers. Gameplay source `21799fd`.
+- Checked development DLL: `250884f4c156`; all 58 groups and installer checks pass.
+  The published October 19.1 pin remains unchanged.
+- The Afghanistan investigation exercised descending terrain and physical VR
+  discharge. It did not reproduce the reported small-rock stop or establish a
+  tight-corridor defect. Combat and bounded movement prevented actual intact
+  anti-air mounting; no live action45/contact was observed. Stop repeating that
+  approach. A new attempt needs a genuinely changed fixture or prerequisite.
+- Final combined reach/body-mode/left-iDroid smoke is running on the completed
+  batch. CURRENT and FREE_PLAY_ACCEPTANCE carry its reviewed outcome, exact run
+  identities and cleanup state; do not reuse preceding-candidate observations.
+- Remaining scope: actual physical Quest Link feedback; unsupported outfits;
+  broader mounted/terrain/progression cases without a diagnosed missing repair.
+  None authorizes speculative collision changes or a blanket release-gate waiver.
+- Next release decision follows the combined review, with actual failures kept
+  distinct from missing coverage. No publication or pin change has been authorized.

@@ -27,7 +27,8 @@ private:
         Microsoft::WRL::ComPtr<ID3D11Buffer> original;
         UINT slot{},stride{},offset{};
     };
-    std::array<VertexBinding,2> vertices_;
+    std::array<VertexBinding,32> vertices_;
+    size_t vertexCount_{};
     DXGI_FORMAT format_{};
     UINT offset_{};
 };
