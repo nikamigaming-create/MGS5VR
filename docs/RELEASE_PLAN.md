@@ -42,7 +42,7 @@ Preserve them. FP13's free-roam route and FP14's sortie head are scoped resolved
 
 Concrete implementation limits: physical mounted aiming admits native actions
 `0x46` and `0x47` only; forearm-only cropping admits the identified sna5 geometry
-only. The rough cuff and extreme sleeve crowding remain visible limitations.
+only. The corrected cuff has scoped stereo review; extreme full-body sleeve crowding remains a visible limitation.
 The exact rock/corridor reports remain undiagnosed. Missing coverage for another
 weapon, outfit or lesson does not establish a new defect.
 
@@ -185,22 +185,23 @@ both slots verify. Never remove settings, saves, source or retained evidence.
 
 ## Resume record
 
-- Completed on main: source audit and documentation reconciliation; fixed-length
-  body/head fit, tracked garment drivers, sleeve clearance and forearm-only
-  presentation; the latest correction flattens cuff rims and separates cap
-  shading without resizing native buffers. Gameplay source `21799fd`.
-- Checked development DLL: `250884f4c156`; all 58 groups and installer checks pass.
-  The published October 19.1 pin remains unchanged.
-- The Afghanistan investigation exercised descending terrain and physical VR
-  discharge. It did not reproduce the reported small-rock stop or establish a
-  tight-corridor defect. Combat and bounded movement prevented actual intact
-  anti-air mounting; no live action45/contact was observed. Stop repeating that
-  approach. A new attempt needs a genuinely changed fixture or prerequisite.
-- Final combined reach/body-mode/left-iDroid smoke is running on the completed
-  batch. CURRENT and FREE_PLAY_ACCEPTANCE carry its reviewed outcome, exact run
-  identities and cleanup state; do not reuse preceding-candidate observations.
-- Remaining scope: actual physical Quest Link feedback; unsupported outfits;
-  broader mounted/terrain/progression cases without a diagnosed missing repair.
-  None authorizes speculative collision changes or a blanket release-gate waiver.
-- Next release decision follows the combined review, with actual failures kept
-  distinct from missing coverage. No publication or pin change has been authorized.
+- Completed on main: documentation/source audit; previous body/head, garment,
+  reach and interaction repairs; flat native cuffs with independent shading and
+  correct repeated attribute-slot binding. Gameplay source `5ba674f`.
+- Checked candidate `351d84672f0e`: 58 groups and installer checks pass. Both
+  slots verify; published play remains October 19.1 (`b627c7cacc9a`).
+- Combined affected review completed: nine cases in each body mode, including
+  left iDroid stow/immediate reopen. Both final eyes reviewed. The rejected
+  intermediate selector regression remains recorded; see CURRENT and the ledger.
+- Native Afghanistan travel/fire diagnosis did not establish a terrain repair
+  or actual intact anti-air mounting. Do not repeat combat-blocked approaches.
+- Remaining: physical Quest feedback, extreme cloth crowding/other outfits,
+  exact terrain and mounted/progression cases, sustained performance. Keep
+  implemented fixes distinct from missing coverage; five conservative gates remain.
+- Cleanup complete: full_body1, owned game/simulator/readers closed, Steam
+  retained. Both Play commands/saved headset preference select Meta. Windows'
+  global OpenXR registration is Virtual Desktop; an attempted Meta restoration
+  was denied by registry permissions. See CURRENT for this precise limitation.
+- Next: process physical feedback on this candidate and diagnose a newly
+  reproducible remaining failure before editing. No package/publication/pin or
+  release-gate waiver. Outcome documentation may be newer than packaged prose.

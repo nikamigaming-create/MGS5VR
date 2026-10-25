@@ -1,66 +1,82 @@
 # Current MGS5VR work — 24 October 2026
 
-**Release readiness is the active goal on main.** The user requested the whole
-remaining fix batch before the final combined smoke. Do not stop after another
-narrow body case or redo repairs already implemented in [FIELD_FIXES.md](FIELD_FIXES.md).
+**The completed body/arm candidate is ready for physical testing through
+[Play-Dev.cmd](../Play-Dev.cmd). Release readiness remains the active goal.**
+Work on main only; do not redo implemented repairs or repeat the failed mounted
+approach. The full report map is [FIELD_FIXES.md](FIELD_FIXES.md).
 
-## Checked development and published play
+## Checked candidate
 
-- Development DLL: `250884f4c15699c2c7307e8bf9db87dd949e16bf24aa60641b36a2c8440e0b5b`.
-- Gameplay source: `21799fd3462463d7f29be136cfa7ba1c4914712c`; implementation `3cccc52`.
-- All 58 check groups and installer checks pass. One integer-width compiler
-  warning in the new helper was corrected before this checked candidate.
-- Published play remains `b627c7cacc9a` / October 19.1. No publication or pin change.
-- Current documentation may be newer than the checked gameplay source. Do not
-  rebuild for prose alone; include it with the next justified code batch.
+- Development DLL: `351d84672f0e1b065212f3503e267940c862d5b18df00d5793d20dfcf3bc3930`.
+- Gameplay source: `5ba674fea4d2b1243bf06e5848dd288801bd73f7`; cuff implementation `3cccc52`.
+- All 58 groups and installer checks passed. Both retained build slots verify.
+- Published play remains `b627c7cacc9a` / October 19.1. No package, publication
+  or pin change. Outcome documentation is newer than the checked gameplay build;
+  do not rebuild solely for prose. Reconcile package source before publication.
 
-## Current correction batch
+## Delivered in this correction batch
 
-Forearm-only cut rims fit the native elbow plane. Caps get separate normals and
-one native UV sample, reusing vertex slots absent from retained triangles in
-all LODs. Original skin weights, buffer sizes and distal forearms remain native.
-Overlapping LOD ranges retain exclusive cap triangle slots; touching closed
-boundaries are split into simple loops. Position, attribute and index variants
-are selected together only around the admitted player's color draw and restored
-afterward. Native shadows and full-body geometry keep their original buffers.
+Forearm-only cut rims fit the native elbow plane. Caps use separate normals and
+one native fabric sample instead of stretching the shoulder atlas across them.
+Dead native vertex slots and exclusive removed triangle slots preserve buffer
+sizes, skin weights, distal geometry and overlapping LOD draws. The game creates
+107 cap triangles for the admitted owned sna5 geometry.
 
-The live game creates 107 cuff triangles without a startup failure. **Final-eye
-acceptance of this new cuff is still pending.** The earlier 18 cm upper-sleeve
-clearance and fixed native arm/leg lengths remain unchanged. Other outfits are
-still outside the exact geometry admission; do not claim a universal outfit fix.
+Combined visual review rejected intermediate `250884f4c156`: full-body-off was
+active, but upper sleeves remained visible. The owned model binds normal/tangent,
+skinning and UV groups through repeated slots of its attribute buffer; the new
+selector incorrectly rejected aliases. The final correction replaces/restores
+**every** matching slot, preserving native offsets and 28/32/36-byte attribute
+strides. The owned player draw now selects the crop. Full-body and shadow draws
+retain original buffers. Existing fixed native thigh/shin lengths, pelvis fit,
+sleeve clearance and tracked garment repairs remain intact.
 
-## Remaining diagnosis before final smoke
+## Combined result
 
-- Terrain: the user clarified the location only as “terrain.” The current native
-  Afghanistan approach traversed descending terrain without reproducing the
-  reported small-rock stop. A route deadline and combat interruption are not
-  evidence of a collision defect. The exact rock/corridor reports remain open.
-- Mounted: the field anti-air gun is loaded and intact. Existing code admits
-  mortar `0x46` and machine gun `0x47`; Gatling `0x45` remains unconfirmed live.
-  Address nearby threats and observe actual native entry/contact before changing
-  admission. Do not repeat the old broken-gun attempt or guess an action ID.
-- Existing firing works in the current field session: two patrol soldiers were
-  incapacitated after physical VR discharge. Rifle discharge also occurred;
-  blocked terrain rays and moving-target aiming deadlines are not new gun defects.
-- Native online sign-out interrupted one route; its reviewed notice was closed.
-  This was not a movement/control repair.
+- Forearm-only: retained `20261025T040914930453Z`, all nine cases passed.
+- Full body: retained `20261025T040959528958Z`, all nine cases passed.
+- Each group covers both-arm reach/return, left iDroid front/turned/stow,
+  immediate reopening and restow. Body mode is asserted in the cases.
+- Both final eyes reviewed: upper sleeves are absent with full body off; cuffs
+  are flat and closed; left bionic forearm/hand and the handheld iDroid remain.
+  Full-body geometry returns with the setting on. Both leg scales remain1.
+- These are scoped state and endpoint-visual results. They do not establish
+  continuous-motion, every-outfit, whole-mission or physical-headset acceptance.
+- Earlier failed/interrupted runs remain recorded. Startup autosave/offline
+  notices and a loading-transition capture were setup interruptions, not newly
+  repaired gameplay defects. The game was offline during the final session.
 
-All runs remain scoped diagnosis until reviewed and retained. The final combined
-smoke is deferred until the remaining justified fixes have been batched. Preserve
-native restrictions, physical optics, left forearm HUD and left-hand iDroid.
+## Remaining release limits
 
-## Active session and handoff
+1. Physical Quest Link: scale/reach, wrist isolation, headset movement, sight and
+   handset comfort/readability still need actual feedback on this candidate.
+2. Full-body extreme cross-head cloth still crowds part of the view. Other
+   outfits remain outside exact forearm geometry admission. Do not call all
+   body/arm reports closed.
+3. Terrain: descending Afghanistan traversal did not reproduce the reported
+   small-rock stop. Exact rock/corridor cases remain undiagnosed. No collision
+   change was justified by a route deadline or combat interruption.
+4. Mounted: field anti-air gun remained intact, but native entry was not reached.
+   Combat and a short-movement bound stopped approach. No live action45/contact
+   was observed; the adapter still admits mortar46 and machine-gun47. A new
+   attempt needs a changed fixture/prerequisite, not another identical route.
+5. Broader forced lessons, other weapons, mission completion and sustained
+   performance remain unaccepted. The five conservative catalog gates remain;
+   no release-gate waiver or universal playability claim.
 
-The owned simulator/game session is currently active for bounded field diagnosis.
-Do not describe it as cleaned up yet. Every run releases its inputs; finish by
-restoring temporary preferences, closing test-opened menus and owned processes
-with `workspace.py stop-sim`, and restoring Meta Quest Link. Keep Steam running.
-The published pin must remain unchanged. Physical Quest acceptance is pending.
+## Cleanup and launch readiness
 
-Current working summary: `artifacts/release-completion-progress.json`.
-Previous candidate `1a64bb965bc6` and its retained reach/iDroid outcomes remain in
-`artifacts/body-arm-batch-review.json` and the evidence ledger; those observations
-must not be relabeled as acceptance of the new cuff.
+Full_body is restored to1. Owned game, simulator and bounded readers are closed;
+no test menu or gameplay harness remains. Steam24696 was retained. Both Play
+commands explicitly use Meta Link, the saved HeadsetRuntime is Meta, and the
+shared headset launcher's Meta CheckOnly succeeds.
 
-[Durable plan](RELEASE_PLAN.md) · [Field implementation map](FIELD_FIXES.md) ·
-[Evidence ledger](FREE_PLAY_ACCEPTANCE.json) · [Documentation map](README.md).
+Windows' global 64-bit OpenXR registration currently names Virtual Desktop.
+Restoring Meta there was denied by registry permissions. This is distinct from
+the verified explicit Meta selection in both MGS5VR Play commands; do not claim
+that the global registration was restored or switch either launcher away from Meta.
+
+Review details: `artifacts/release-completion-progress.json`; retained evidence:
+[FREE_PLAY_ACCEPTANCE.json](FREE_PLAY_ACCEPTANCE.json). Continue from
+[RELEASE_PLAN.md](RELEASE_PLAN.md), with the current physical-feedback request
+pending. Source and published pin are preserved.

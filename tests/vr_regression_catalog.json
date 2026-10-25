@@ -7,8 +7,8 @@
     "release": "experimental-2026-10-19.1",
     "source_reference": "docs/RELEASE_2026-10-19.1.md",
     "comparison": "Published local play is b627c7cacc9a. The code audit covers later development17b044cba72e; neither publication nor source inspection certifies physical or complete gameplay acceptance.",
-    "current_candidate": "Checked body/arm candidate1a64bb965bc6 from source4392536; 58 groups and installer checks pass, scoped native smoke retained with notice interruptions. Physical acceptance remains open; outcome docs may be newer than packaged docs.",
-    "current_candidate_id": "main-4392536-development-1a64bb965bc6"
+    "current_candidate": "Checked cuff/attribute-slot candidate351d84672f0e from source5ba674f; 58 groups and installer checks pass; 18 combined body-mode/reach/left-iDroid cases and scoped both-eye review retained. Physical and full acceptance remain open; outcome docs are newer than packaged docs.",
+    "current_candidate_id": "main-5ba674f-development-351d84672f0e"
   },
   "rules": [
     "Source presence is implementation evidence, not a feature-complete claim.",
@@ -1200,7 +1200,7 @@
       },
       "release_gate": {
         "status": "blocked",
-        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Fixed-length legs/shared pelvis, clavicle reach/wrist isolation, garment drivers and native hand publication exist. Rough cuff, cross-head sleeve crowding and outfit admission remain real limits."
+        "reason": "Conservative block retained for extreme full-body cross-head cloth crowding, other outfit admission and physical acceptance. Fixed-length legs/pelvis, garment drivers, reach and wrist isolation exist; flat cuff caps and repeated native attribute-slot selection now have scoped both-eye review on351d84672f0e."
       },
       "missing_checks": [
         "Review the implemented hand/stow repairs and later retained evidence, then continuously replay; repair only any remaining reproduced failure.",

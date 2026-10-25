@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "1a64bb965bc61e06423519d5940f6c5b5c7f018bc233e107098533a5b4325b7e",
-  "candidate_status": "Body/arm candidate checked: sleeve-aware head clearance and native-index cuff closure. Scoped combined smoke retained; rough rim/cap texture, outfit/LOD limits and physical acceptance remain.",
+  "candidate": "351d84672f0e1b065212f3503e267940c862d5b18df00d5793d20dfcf3bc3930",
+  "candidate_status": "Checked cuff/attribute-slot batch: 18 combined cases pass across both body modes, with scoped both-eye review. Physical Quest, extreme cloth, other outfits and wider field coverage remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1705,7 +1705,7 @@
         "both_hand_stick_release": "native axes neutral"
       },
       "failures": [
-        "Right-hand acquisition chased native pitch, oscillating about 15â€“18 degrees during a pure yaw movement.",
+        "Right-hand acquisition chased native pitch, oscillating about 15\u00e2\u20ac\u201c18 degrees during a pure yaw movement.",
         "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
       ],
       "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
@@ -1760,7 +1760,7 @@
       "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
       "baseline_run": "20261022T044008503318Z",
       "retained_run": "20261022T045333990203Z",
-      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20â€“90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u00e2\u20ac\u201c90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
       "remaining": [
         "Wider marker grip orientations",
         "Broader FP09/FP10",
@@ -1783,7 +1783,7 @@
         {
           "sha256_prefix": "1bbaac705854",
           "run": "20261022T051925150310Z",
-          "failure": "Native eye identity joined, but fitted eye remained26â€“31cm below cached passenger anchor; body rejected."
+          "failure": "Native eye identity joined, but fitted eye remained26\u00e2\u20ac\u201c31cm below cached passenger anchor; body rejected."
         },
         {
           "sha256_prefix": "a563468ce054",
@@ -2185,5 +2185,38 @@
       "Initial Continue scratch20261025T024035881259Z expired under the three-run retention policy; it is not promoted acceptance evidence. The retained subsequent runs establish actual ACC gameplay on this candidate."
     ],
     "cleanup": "Full_body restored to1; owned game/simulator stopped; Steam retained; no test menu open."
+  },
+  "cuff_stream_batch_2026_10_24": {
+    "candidate": "351d84672f0e1b065212f3503e267940c862d5b18df00d5793d20dfcf3bc3930",
+    "source_commit": "5ba674fea4d2b1243bf06e5848dd288801bd73f7",
+    "rejected_intermediate": {
+      "candidate": "250884f4c15699c2c7307e8bf9db87dd949e16bf24aa60641b36a2c8440e0b5b",
+      "runs": [
+        "20261025T035801467874Z",
+        "20261025T035843564720Z"
+      ],
+      "state_cases": "7 of 7 passed in each body mode",
+      "visual_result": "rejected: full-body-off still displayed upper sleeves",
+      "cause": "Repeated native attribute-buffer slots were incorrectly rejected"
+    },
+    "retained_runs": [
+      "20261025T040914930453Z",
+      "20261025T040959528958Z"
+    ],
+    "state_cases": "9 of 9 passed in each body mode; body mode explicitly asserted; both native leg scales1",
+    "visual_review": "Both final eyes for both forearm-only cross-head reaches and left iDroid turned/immediate reopen; full-body right cross-head and immediate reopen. Flat closed caps, native hands/bionic forearm, upper sleeves absent when off and restored when on. No continuous or physical acceptance implied.",
+    "delivered": [
+      "flat native cuff rims",
+      "separate cap normals and uniform native UV sample",
+      "all native attribute-buffer aliases replaced/restored with original offsets/strides"
+    ],
+    "limits": [
+      "exact sna5 geometry only",
+      "extreme full-body cloth crowding persists",
+      "terrain/anti-air reports not diagnosed",
+      "physical Quest and full missions unaccepted"
+    ],
+    "cleanup": "full_body1; owned game/simulator/readers closed; Steam retained; saved headset runtime and both Play commands Meta; global Windows registration remains Virtual Desktop after access-denied attempt to restore Meta",
+    "physical_headset_acceptance": false
   }
 }
