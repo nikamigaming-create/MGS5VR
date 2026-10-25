@@ -10,6 +10,11 @@ The user has now explicitly set release readiness as an active goal: complete
 all justified fixes on main, then test the batch and continue through remaining
 field/progression checks. Do not stop merely because one cuff case passes.
 
+Next combined candidate: camera/skin body-visibility continuity plus field-pickup
+iDroid stow/reopen ownership. Build and deploy together; test moving arms, both
+body modes, ordinary handset lifecycle and actual pickup as one review. An
+unlanded helicopter is a fixture gap, not boarding acceptance.
+
 Current checked candidate `da4ae29de73b` / `7273c25` is deployed for Play-Dev.
 The stowed back assembly stays concealed through moving camera publication
 gaps; scoped moving-edge and both-eye back-rifle draw review are complete.

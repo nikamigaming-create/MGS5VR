@@ -1,5 +1,29 @@
 # Current MGS5VR work — 25 October 2026
 
+## Arm publication and field-pickup batch — in source
+
+The new sleeve-pop report has a camera/skin publication-policy correction in
+`player_visibility.cpp`: a recently accepted body retains its visibility through
+the matching camera-to-skin gap, bounded by player/model, activation, reference,
+presentation, menu generation and 150 ms age. Failed solves still clear readiness.
+No limb lengths, native collision or authored geometry change. Visual acceptance
+of this latest report is pending.
+
+The field-pickup iDroid report adds native passenger-identity stow and fresh
+on-board reopening in native_actions, native_idroid_interruption/open and
+xr_runtime. Boarding retires the old field terminal/borrow/open request; a new
+on-board handset uses its own lifecycle and UI-only stow. Unit cases cover
+passenger mismatch, stale vehicle identity, other vehicle types, pending native
+close and deliberate reopening. Live boarding is still unverified: retained
+20261025T141031947575Z never boarded; 20261025T141631950379Z shows the helicopter
+hovering overhead. The landing-zone movement in 20261025T142340540025Z completed
+seven bounded segments then reached the traversal deadline. These fixture runs
+are not acceptance or a reproduction of the reported boarding failure.
+
+Build/check/deploy this batch once, then exercise moving body/forearm visibility,
+iDroid open/stow/reopen, weapon adjacency and actual field boarding where the
+native pickup permits it. Keep failed cases explicit. Published play stays pinned.
+
 ## Installed candidate and immediate handoff
 
 **`da4ae29de73b` / source `7273c25` is built, checked and deployed for

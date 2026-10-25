@@ -12,6 +12,15 @@ and no broad report was closed by source inspection.
 [CURRENT.md](CURRENT.md) is the handoff. [RELEASE_PLAN.md](RELEASE_PLAN.md) is the
 ordered execution plan. All supplied community reports remain in scope.
 
+## Latest incoming reports — 25 October
+
+- Sleeve pop during motion: a bounded same-owner camera/skin visibility continuity
+  repair is in source; visual acceptance pending. This does not close extreme
+  cloth crowding or every outfit.
+- Open iDroid while boarding field pickup: native passenger stow and deliberate
+  on-board reopen are in source with lifecycle cases. Actual pickup boarding
+  remains unverified because the current helicopter fixture did not land.
+
 ## Current candidate — 25 October
 
 The active source batch expands exact forearm profiles to 20 owned outfits,

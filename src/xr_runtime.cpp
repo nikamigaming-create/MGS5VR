@@ -1065,9 +1065,9 @@ struct Session {
             titleNativeMenu=!titleNativeMenu;
             controllerFrame.openingNativeMenu=titleNativeMenu;
         }
-        const bool cabinStowTap=cabinControlsReady&&nativeIdroidOpen()&&!nativeInput.exclusive;
+        const bool cabinStowTap=cabinControlsReady&&nativeIdroidOpen()&&!uiOnlyIdroid&&!nativeInput.exclusive;
         const bool fieldIdroidOpen=controllerFrame.handheldMenus&&handheldMenuRoutingAvailable()
-            &&gameplayContext&&!cabinPlay&&!cabinTransit&&!nativeStatus.nativeMenuOpen
+            &&gameplayContext&&!cabinPlay&&!nativeStatus.nativeMenuOpen
             &&rigControls.equipmentPhase()==0&&!commandsControls.active()&&!nativeInput.exclusive
             &&!nativeGamepadActive()&&idroidPopup.active&&!*idroidPopup.active&&idroidTutorial&&*idroidTutorial==0;
         if(idroidTap&&!priorIdroidTap){

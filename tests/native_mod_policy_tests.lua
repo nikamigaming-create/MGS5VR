@@ -39,6 +39,30 @@ return function(godSource, interruptionSource, openSource)
     check(run(interruptionSource, interruption) == 'closed' and stops == 1, 'Repeated failure pump does not reopen or repeat Stop')
     interruption.TppMission.IsGameOver = nil
     check(run(interruptionSource, interruption) == 'unchanged' and stops == 1, 'Missing state cannot invent a mission failure')
+    local ridden, vehicle, isHelicopter = 7168, 7168, true
+    interruption.fieldHandset = true
+    interruption.vars = {playerVehicleGameObjectId = vehicle}
+    interruption.Player = {GetGameObjectIdIsRiddenToLocal = function() return ridden end}
+    interruption.Tpp = {IsHelicopter = function(id) return id == vehicle and isHelicopter end}
+    open = true
+    check(run(interruptionSource, interruption) == 'boarding-closed' and not open and stops == 2,
+        'Boarding the exact native helicopter stows a field-owned handset')
+    open = true; interruption.fieldHandset = false
+    check(run(interruptionSource, interruption) == 'unchanged' and open and stops == 2,
+        'A fresh handset opened aboard remains available')
+    interruption.fieldHandset = true; isHelicopter = false
+    check(run(interruptionSource, interruption) == 'unchanged' and open,
+        'Vehicle and horse rides do not acquire the helicopter stow policy')
+    isHelicopter = true; ridden = 65535
+    check(run(interruptionSource, interruption) == 'unchanged' and open,
+        'A stale vehicle variable without a local passenger cannot stow the handset')
+    ridden = vehicle + 1
+    check(run(interruptionSource, interruption) == 'unchanged' and open,
+        'Mismatched local passenger and vehicle identities cannot stow the handset')
+    ridden = vehicle
+    interruption.TppUiCommand.StopMbDvcTerminal = function() stops = stops + 1 end
+    check(run(interruptionSource, interruption) == 'pending' and open,
+        'Unacknowledged native Stop retains ownership for the next pump')
     local function opening(changes)
         local state = {posture = 'horse', sequence = 'Seq_Game_IDroidTutorial', mission = 10020,
             open = false, popup = false, saving = false, title = false, demo = false,
@@ -58,6 +82,12 @@ return function(godSource, interruptionSource, openSource)
                 IsShowPopup = function() return state.popup end,
                 StartMbDvcTerminal = function() state.starts = state.starts + 1; state.open = true end}}
         if state.unregisteredHorse then openingEnv.PlayerStatus.ON_HORSE = nil end
+        if state.riddenHelicopter then
+            openingEnv.vars.playerVehicleGameObjectId = 7168
+            openingEnv.Player = {GetGameObjectIdIsRiddenToLocal = function()
+                return state.mismatchedPassenger and 7169 or 7168 end}
+            openingEnv.Tpp = {IsHelicopter = function(id) return id == 7168 end}
+        end
         if state.missingStart then openingEnv.TppUiCommand.StartMbDvcTerminal = nil end
         local expectedSequence = state.sequence
         local result = run(openSource, openingEnv)
@@ -70,10 +100,16 @@ return function(godSource, interruptionSource, openSource)
         check(result == 'opened' and state.open and state.starts == 1,
             'Normal, vehicle and native horse states admit the owned handset request')
     end
+    local flightResult, flightState = opening{posture = 'other', riddenHelicopter = true}
+    check(flightResult == 'opened-flight' and flightState.open and flightState.starts == 1,
+        'A fresh request aboard the exact field helicopter opens a new handset lease')
     for _, changes in ipairs{{posture = 'other'}, {popup = true}, {saving = true}, {title = true},
             {demo = true}, {prepared = false}, {helicopter = true}, {mission = 10010},
             {sequence = 'Seq_Demo_ArrivalInAfghanistan'}, {unregisteredHorse = true},
-            {missingStart = true}, {open = true}} do
+            {missingStart = true}, {open = true},
+            {posture = 'other', riddenHelicopter = true, mismatchedPassenger = true},
+            {posture = 'other', riddenHelicopter = true, demo = true},
+            {posture = 'other', riddenHelicopter = true, helicopter = true}} do
         local result, state = opening(changes)
         check(result == 'owner changed' and state.starts == 0,
             'Unavailable or changed native owner never starts the handset')

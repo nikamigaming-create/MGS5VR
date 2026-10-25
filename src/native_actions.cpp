@@ -1325,16 +1325,23 @@ void pump(void* state){
            ||!idroidSceneHandoff.observe(terminal->system,terminal->terminal,terminal->open))
             idroidSceneHandoff.reset();
     }
+    static bool handheldOpenedInHelicopter{};
     if(handheldIdroidOwned()||idroidSceneHandoff.suspended()){
         if(luaReady(state)){
             const int top=getTop(state);
-            int status=load(state,nativeIdroidInterruptionScript.data(),nativeIdroidInterruptionScript.size(),"@mgs5vr-idroid-interruption");
+            const std::string interruptionScript=std::string("local fieldHandset=")
+                +(handheldOpenedInHelicopter?"false\n":"true\n")+std::string(nativeIdroidInterruptionScript);
+            int status=load(state,interruptionScript.data(),interruptionScript.size(),"@mgs5vr-idroid-interruption");
             if(!status)status=original(state,0,1,0);
             size_t length{};const auto* value=getString(state,-1,&length);
-            if(!status&&value&&std::string_view(value,length)=="closed"){
+            const auto outcome=value?std::string_view(value,length):std::string_view{};
+            if(!status&&(outcome=="closed"||outcome=="boarding-closed")){
                 idroidSceneHandoff.reset();
+                requestHandheldIdroidOpen(0);
                 cancelHandheldIdroidBorrow();publishHandheldIdroidOwner(0,0);nativeMenuOpen();
-                log("Handheld iDroid: owned terminal closed for native mission failure");
+                handheldOpenedInHelicopter=false;
+                log(outcome=="boarding-closed"?"Handheld iDroid: field terminal stowed for helicopter boarding; fresh reopen available"
+                    :"Handheld iDroid: owned terminal closed for native mission failure");
             }
             setTop(state,top);
         }
@@ -1445,9 +1452,11 @@ void pump(void* state){
             int status=load(state,nativeIdroidOpenScript.data(),nativeIdroidOpenScript.size(),"@mgs5vr-handheld-idroid-open");
             if(!status)status=original(state,0,1,0);
             size_t length{};const auto* result=getString(state,-1,&length);
-            if(!status&&result&&std::string_view(result,length)=="opened"){
+            const auto opened=result?std::string_view(result,length):std::string_view{};
+            if(!status&&(opened=="opened"||opened=="opened-flight")){
                 nativeMenuOpen();
                 if(nativeIdroidOpen()){
+                    handheldOpenedInHelicopter=opened=="opened-flight";
                     publishHandheldIdroidOwner(currentRig->playerOwner,cameraStatus.activation);
                     if(borrow.player)cancelHandheldIdroidBorrow();
                 }

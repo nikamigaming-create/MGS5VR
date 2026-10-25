@@ -638,6 +638,8 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool 
     // never acquire the camera lock while holding hiddenMutex.
     const auto frame=firstPerson&&!authoredBody
         ?headCamera().publishedRigFrame(steadyMilliseconds()):std::nullopt;
+    const auto cameraStatus=headCamera().status();
+    const auto view=!frame?headCamera().publishedView():std::nullopt;
     std::lock_guard lock(hiddenMutex);
     lastFirstPersonUpdateMs.store(firstPerson?GetTickCount64():0);
     const auto now=GetTickCount64();
@@ -654,7 +656,21 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool 
     if(frame||!firstPerson||authoredBody)
         for(auto& b:hidden)if(b.backWeapon&&!concealStowedBackAssembly(b.assembly,equipment,fieldGear,drawn))restore(b);
     if(!firstPerson||!fullBodyRequested.load())fullBodyReady={};
-    const bool ready=frame&&frame->applied&&frame->body.valid&&frame->controllers.fullBody
+    // The camera callback runs before the matching skin publication. A
+    // retired preceding frame must not toggle a still-owned full body into
+    // the cropped forearm draw path between those two publications. Failed
+    // solves clear fullBodyReady at publishFullBodyVisibility; owner changes,
+    // activation changes and stale publications cannot retain this policy.
+    const bool retainedBody=!frame&&firstPerson&&!hideArms&&!authoredBody
+        &&fullBodyRequested.load()&&fullBodyReady.owner==owner
+        &&cameraStatus.active&&!cameraStatus.suspended
+        &&cameraStatus.activation==fullBodyReady.activation
+        &&view&&view->playerOwner==owner&&view->controllers.fullBody
+        &&view->controllers.referenceEpoch==fullBodyReady.referenceEpoch
+        &&view->controllers.presentationEpoch==fullBodyReady.presentationEpoch
+        &&view->menuGeneration==fullBodyReady.menuGeneration
+        &&now>=fullBodyReady.time&&now-fullBodyReady.time<=150;
+    const bool ready=retainedBody||(frame&&frame->applied&&frame->body.valid&&frame->controllers.fullBody
         &&fullBodyRequested.load()&&fullBodyReady.owner==owner&&frame->playerOwner==owner
         &&now>=fullBodyReady.time&&now-fullBodyReady.time<=250
         &&frame->activation==fullBodyReady.activation
@@ -664,7 +680,7 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool 
         &&frame->playerSequence==fullBodyReady.playerSequence
         &&frame->rigSequence==fullBodyReady.rigSequence
         &&frame->sampleTime==fullBodyReady.sampleTime
-        &&frame->menuGeneration==fullBodyReady.menuGeneration;
+        &&frame->menuGeneration==fullBodyReady.menuGeneration);
     for(auto& b:hidden)if(b.model&&(!firstPerson||b.owner!=owner||!owned(b)||(b.body&&(
         b.headOnly?!(authoredBody||(ready&&!hideArms&&b.model==fullBodyReady.model)):
         (authoredBody||b.hideArms!=hideArms||(ready&&!hideArms&&b.model==fullBodyReady.model))))))restore(b);
