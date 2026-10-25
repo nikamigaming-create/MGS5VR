@@ -1143,7 +1143,8 @@
         "include/mgs5vr/paused_rig.hpp",
         "include/mgs5vr/paused_parts.hpp",
         "include/mgs5vr/arm_ik.hpp",
-        "include/mgs5vr/controller_rig.hpp"
+        "include/mgs5vr/controller_rig.hpp",
+        "include/mgs5vr/forearm_crop.hpp"
       ],
       "automated_tests": [
         "contracts",
