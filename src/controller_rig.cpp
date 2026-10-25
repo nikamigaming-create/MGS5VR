@@ -1958,10 +1958,12 @@ bool apply(void* context,void* binding,PoseRestore& restore){
     // animation cache and compound garment transforms on subsequent updates.
     restore.rotations=rotations;restore.positions=positions;restore.q=originalQ;restore.p=originalP;restore.count=count;
     restore.owner={camera,owner,frame.activation,frame.controllers.referenceEpoch,now,frame.menuGeneration};
-    // SKL_300_ASRROOT follows the solved pelvis through the descendant pass.
-    // Keep the native loadout visible when that full body was admitted. The
-    // arms-only fallback still suppresses its unplaced hip stock near the eye.
-    if(!frame.body.valid&&count>53&&parent[53]==0&&get<uint32_t>(names+53*4)==0xec70c442)
+    // The native hip rifle swings into the first-person eye during crouched
+    // walking even when the fitted body is valid. Body admission proves the
+    // skeleton/eye join, not clearance for the separate stowed weapon mesh.
+    // Preserve the established first-person safeguard for this exact socket;
+    // the held wrist socket and native animation input remain untouched.
+    if(count>53&&parent[53]==0&&get<uint32_t>(names+53*4)==0xec70c442)
         restore.stowedMount=get<uintptr_t>(reinterpret_cast<uintptr_t>(binding)+0x40)+53*64;
     std::memcpy(reinterpret_cast<void*>(rotations),q.data(),count*16u);
     std::memcpy(reinterpret_cast<void*>(positions),p.data(),count*16u);
