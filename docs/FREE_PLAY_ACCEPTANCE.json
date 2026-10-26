@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "0451221ea76df7a0bebcad113b9fce85ebc0c88d74f3ea00eab7e501bfa7eb2e",
-  "candidate_status": "Flipped-up oval checked/deployed; centered take4 shows wrist gyro/stick/return. New user-confirmed independent spatial socket channel implemented, build/video pending.",
+  "candidate": "9d5e15c0a101d1295017e02cd2e060694bc90c0c833299432f3894c62ca018bf",
+  "candidate_status": "Checked/deployed spatial socket + wrist gyro + joystick; take6 shows scoped launch/steering/return. Physical headset and tutorial persistence remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2654,10 +2654,36 @@
     "build_check_failure": "Launcher backup test saved unchanged default and relied on newline conversion. Now saves actual changed value. Retained rocket-oval-build-failed.log."
   },
   "rocket_spatial_combo_2026_10_26": {
-    "status": "source_implemented_build_video_pending",
+    "status": "checked_deployed_scoped_video_reviewed",
     "contract": "Spatial socket yaw/pitch at gain 1 + independent wrist gyro default gain 2 + additive joystick correction",
     "prior_take": "artifacts/rocket-proof-20261026/take4",
     "prior_limits": "Take4 does not prove independent spatial socket steering; user accepts right-eye patch overlap as intentional; physical headset unproven",
-    "preservation": "artifacts/rocket-flip-up-preservation.json"
+    "preservation": "artifacts/rocket-spatial-preservation.json",
+    "candidate": "9d5e15c0a101d1295017e02cd2e060694bc90c0c833299432f3894c62ca018bf",
+    "source": "e162ef6",
+    "build_checks": "58 groups and installer pass: artifacts/rocket-spatial-build.log",
+    "take": "artifacts/rocket-proof-20261026/take6",
+    "incomplete_take": "artifacts/rocket-proof-20261026/take5",
+    "visual_review": "artifacts/rocket-proof-20261026/take6/visual-review.json",
+    "delivery": "artifacts/rocket-proof-20261026/take6/field-kit-rocket-arm-no-voice.mp4",
+    "audio": "Synthetic narration removed at user request; no audio stream",
+    "capture_fps": {
+      "left": 3.2962328767122466,
+      "right": 0.999
+    },
+    "limits": [
+      "Physical headset feel and smoothness remain unaccepted",
+      "No tower demolition or enemy impact shown",
+      "Recurring Choose a Rival Help remains unresolved"
+    ]
+  },
+  "tower_attempt_2026_10_26": {
+    "status": "incomplete_no_shot_or_demolition",
+    "wrong_height_goal_refusal": "20261026T172703692067Z",
+    "ridge_foot_route_pass": "20261026T173208372900Z",
+    "ascent_failure": "20261026T173417070766Z",
+    "error": "Requested physical input was never observed held by the native XR control sampler",
+    "diagnosis": "Undiagnosed input observation failure; no collision defect claimed",
+    "cleanup": "Inputs released, owned game/simulator closed, Steam retained, Meta Link checked"
   }
 }

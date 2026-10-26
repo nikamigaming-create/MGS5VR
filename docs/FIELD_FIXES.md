@@ -1,5 +1,41 @@
 # Field fixes — implementation and acceptance
 
+## Checked spatial controls and silent video — 26 October
+
+Candidate `9d5e15c0a101` / source `e162ef6` passed all 58 test groups and installer
+checks and is deployed to development. The new spatial socket channel, stronger
+wrist gyro and joystick are additive. Live screen/socket/gyro/twist and fitting
+settings remain available; the oval stays flipped up above the wrist.
+
+Retained `artifacts/rocket-proof-20261026/take6` shows centered arm approach,
+palm-down wrist, launch, spatial raise/wave with wrist rotation fixed, wrist
+pitch/yaw/twist, all three controls together, downward guidance and native return.
+All 77 left and 24 right captured frames reviewed. Capture cadence is 3.30/1.00
+fps, so smoothness and physical headset acceptance remain open. Native horse
+crosses the foreground. User accepts intentional right-eye patch overlap.
+Take5 ended before completing all three inputs; it remains incomplete.
+
+Delivery is `take6/field-kit-rocket-arm-no-voice.mp4`: continuous real left-eye
+footage with Field Kit labels outside the image. Robotic narration was rejected
+and removed; ffprobe confirms video only. No game audio was captured. Do not
+add synthesized narration back to this delivery.
+
+Recurring Choose a Rival Help remains unresolved despite saved FINISH state;
+normal Back dismisses it. Latest retained arrival/arm selection route is
+`20261026T171614902974Z`. No tower demolition or enemy impact is yet demonstrated.
+Tower approach `20261026T173208372900Z` reached the ridge foot. Ascent
+`20261026T173417070766Z` failed when requested physical input was not observed
+by the native XR sampler; no shot or demolition occurred. Earlier wrong-height
+goal refusal `20261026T172703692067Z` is retained separately. Cause of ascent
+input failure is undiagnosed; no collision or gameplay repair is claimed.
+
+Owned simulator/game session is closed, inputs released, Steam retained, Meta
+64-bit Link runtime restored/checked. Both build slots and installed DLL verify;
+personal settings and published pin are unchanged. Receipt:
+`artifacts/rocket-spatial-preservation.json`. Next: user Play-Dev headset review;
+retain tutorial persistence and tower-ascent input failure as unresolved. Older
+sections below retain the historical stage and build they originally describe.
+
 ## Socket + gyro + joystick clarification — 26 October
 
 User explicitly requests three concurrent controls: spatial forearm/socket aim,
