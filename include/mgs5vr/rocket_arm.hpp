@@ -21,14 +21,16 @@ constexpr bool rocketArmCameraOwned(const RocketArmCameraOwner& s) noexcept {
         &&s.producer&&s.producer==s.selectedProducer&&s.producerOwner==s.owner+0x20
         &&s.family==2&&s.mode==11&&s.overrideMode==-1;
 }
-// forearmPanel: +X elbow->wrist, +Z dorsal. The display lies on TOP of
-// the wrist: screen +Y runs forward along the arm, +Z is the dorsal normal.
-// Its near edge mounts 25 mm above the solved wrist centerline, matching
-// the ordinary forearm surface clearance. Forearm roll turns the whole face.
+// forearmPanel: +X elbow->wrist, +Z dorsal. The oval flips up 60 degrees
+// from the dorsal plane, facing back toward the pilot above the socket.
+// Its near-edge hinge stays 25 mm above the wrist centerline. The complete
+// mount follows forearm translation/roll; it never faces the head separately.
 inline std::optional<Pose> rocketArmDisplay(Pose socket,float width,float aspect) noexcept {
     if(!valid(socket)||!std::isfinite(width)||width<.1f||width>.35f
        ||!std::isfinite(aspect)||aspect<.5f||aspect>3.f)return {};
-    return compose(socket,Pose{Quat{0,0,-.70710678f,.70710678f},{width/(2*aspect),0,.025f}});
+    const float halfHeight=width/(2*aspect);
+    return compose(socket,Pose{Quat{.35355339f,-.35355339f,-.61237244f,.61237244f},
+        {halfHeight*.5f,0,.025f+halfHeight*.8660254f}});
 }
 inline Pose rocketArmGuidancePose(Pose socket,Pose phantomHand) noexcept {
     // The absent hand still articulates at the wrist. Keep its full rotation,

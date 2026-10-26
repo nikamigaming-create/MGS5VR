@@ -1805,8 +1805,8 @@ int main(){
             expect(panel.has_value(),"tracked socket has a guidance display");
             const auto bottom=compose(*panel,Pose{{},{0,-screenWidth/(2*screenAspect),0}});
             expect(same(bottom.position,compose(socket,Pose{{},{0,0,.025f}}).position),"oval near edge stays on top of the wrist through rotation");
-            expect(same(rotate(panel->orientation,{0,0,1}),rotate(socket.orientation,{0,0,1})),
-                "screen lies in the dorsal wrist plane and rolls with the arm");
+            expect(same(rotate(panel->orientation,{0,0,1}),rotate(socket.orientation,{-.8660254f,0,.5f})),
+                "screen flips up above the socket toward the pilot and rolls with the arm");
             const auto horizontal=rotate(panel->orientation,{screenWidth,0,0});
             const auto vertical=rotate(panel->orientation,{0,screenWidth/screenAspect,0});
             expect(near(dot(horizontal,vertical),0)&&near(dot(horizontal,horizontal),screenWidth*screenWidth)
