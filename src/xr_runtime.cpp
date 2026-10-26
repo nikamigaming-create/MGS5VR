@@ -23,6 +23,7 @@
 #include "mgs5vr/vehicle_weapon.hpp"
 #include "mgs5vr/vehicle_pedals.hpp"
 #include "mgs5vr/rocket_arm.hpp"
+#include "mgs5vr/mounted_grip.hpp"
 #include "mgs5vr/eye_resampler.hpp"
 #include <Xinput.h>
 #include <openxr/openxr.h>
