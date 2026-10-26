@@ -1,5 +1,30 @@
 # Current MGS5VR work — 26 October 2026
 
+## Gameplay toggle demonstrations — 26 October
+
+Source `52585ca` adds a 25–150% marked-enemy size control (60% default),
+front-loads God Mode and common switches, and groups related settings in the
+headset and launcher. A reproduced live-edit bug stowed binoculars when marker
+settings changed; display/recon-only changes now preserve the active optic
+after neutral release. Binding and other control changes retain the reset.
+
+Checked/deployed dev DLL `4187a681cd4f` passed 58 test groups and installer
+checks. `artifacts/toggle-showcase-20261026/field-kit-gameplay-showcase.mp4`
+is an edited native right-eye gameplay recording with game audio; paired
+final-eye checkpoints and exact scopes are in `coverage.json`. It demonstrates
+body/eyepatch (previous candidate), binocular/world marker visibility and size,
+close-muzzle firing allowed/blocked, and cover attachment/release/re-attachment.
+The sandbag entry needed a lateral approach; lean/aim retained native cover at
+night, with visual and physical acceptance still open. A second binocular glow
+setup lost the bot's fresh tracked owner; glow remains unverified. God Mode
+damage immunity, other switch effects, dual sights, physical Quest behavior,
+daytime shifting shadows, and wider mounted interactions remain open. This is
+not a complete all-toggle showcase or a whole-game acceptance claim.
+
+Next: finish effect-based demonstrations for the remaining switches and
+investigate the tracked-owner interruption; diagnose daytime shadow movement.
+
+
 ## Mounted spatial aim and daytime shadow report — 26 October
 
 The user clarified that the daytime report is **larger light/shadow patches

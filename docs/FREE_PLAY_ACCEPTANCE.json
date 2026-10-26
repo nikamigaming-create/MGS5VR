@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "87186cb55ebe45167216657c0ec45c1b9ce370385e5293ef8b0df7edba26f74f",
-  "candidate_status": "Checked/deployed mortar/MG spatial hand aim and additive stick trim. Daytime shifting-shadow report unresolved; expanded mounted types and physical acceptance remain open.",
+  "candidate": "4187a681cd4f810169abb651cf84d58a89e323addbcb29c14501ae164cbaece4",
+  "candidate_status": "Checked/deployed grouped live controls and marker scale; gameplay showcase partial; physical acceptance, glow and daytime shadows remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1723,7 +1723,7 @@
         "both_hand_stick_release": "native axes neutral"
       },
       "failures": [
-        "Right-hand acquisition chased native pitch, oscillating about 15\u00e2\u20ac\u201c18 degrees during a pure yaw movement.",
+        "Right-hand acquisition chased native pitch, oscillating about 15â€“18 degrees during a pure yaw movement.",
         "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
       ],
       "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
@@ -1778,7 +1778,7 @@
       "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
       "baseline_run": "20261022T044008503318Z",
       "retained_run": "20261022T045333990203Z",
-      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u00e2\u20ac\u201c90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20â€“90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
       "remaining": [
         "Wider marker grip orientations",
         "Broader FP09/FP10",
@@ -1801,7 +1801,7 @@
         {
           "sha256_prefix": "1bbaac705854",
           "run": "20261022T051925150310Z",
-          "failure": "Native eye identity joined, but fitted eye remained26\u00e2\u20ac\u201c31cm below cached passenger anchor; body rejected."
+          "failure": "Native eye identity joined, but fitted eye remained26â€“31cm below cached passenger anchor; body rejected."
         },
         {
           "sha256_prefix": "a563468ce054",
@@ -2238,9 +2238,9 @@
     "physical_headset_acceptance": false,
     "extreme_reach_followup": {
       "candidate_changed": false,
-      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44\u201359cm",
+      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44–59cm",
       "captured_solver_fixture": "native upper/lower28.4/25.5cm; requested shoulder-to-wrist106cm; reach-only unavoidable clamp52.1cm",
-      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9\u20131.2mm over production fallback with/without stereo padding",
+      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9–1.2mm over production fallback with/without stereo padding",
       "conclusion": "No additional IK rewrite justified by unreachable-pose clamp. Current mesh eye penetration unproven without joined palette; physical comfort/reachable reproduction still required."
     }
   },
@@ -2793,5 +2793,31 @@
     "noon_fixture_clock_restored": true,
     "rendering_change": false,
     "headset_acceptance": false
+  },
+  "toggle_showcase_20261026": {
+    "video": "artifacts/toggle-showcase-20261026/field-kit-gameplay-showcase.mp4",
+    "coverage": "artifacts\\toggle-showcase-20261026\\coverage.json",
+    "status": "partial_effect_demonstrations",
+    "physical_headset_acceptance": false,
+    "evidence": {
+      "body_and_eyepatch": "Captured on previous dev candidate; both-eye comparisons; full-body off still exposes a pale holstered object, not visually certified perfect.",
+      "binocular_markers": "Native already-marked actors, binocular lens with world markers off, live size edit while equipped, world markers off/on and 25/150 percent; both eyes recorded.",
+      "close_muzzle": "Off three shots, on zero shots with native obstruction 1, then clear two shots; both eyes recorded.",
+      "cover": "Sandbag state attached, released with assistance off, reattached with assistance on; physical lean/aim observations at night, not headset accepted.",
+      "glow": "Second re-equip attempt lost a fresh tracked owner in the bot; no conclusion on actual headset behavior.",
+      "not_demonstrated": [
+        "God Mode damage immunity on/off",
+        "binocular auto-mark on/off",
+        "actor glow on/off",
+        "handheld menus on/off",
+        "seated mode",
+        "motion melee",
+        "animal touch",
+        "cinematic movement",
+        "all rocket steering toggles",
+        "dual sights",
+        "other weapons and surfaces"
+      ]
+    }
   }
 }
