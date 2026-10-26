@@ -25,7 +25,11 @@ gyro, wrist twist, and gyro sensitivity (0.25–4, default 2). The three switche
 default on. There are now 69 gameplay settings, including 18 switches.
 Focused core/editor checks pass, including rigid rectangle attachment, resizing,
 phantom-wrist motion, stick blending, reference/loss resets, all-switch save/live
-round trips and fractional sensitivity adjustment. Combined build/deploy pending.
+round trips and fractional sensitivity adjustment. The first combined run passed
+57/58 groups; the launcher bridge test retained a hardcoded 64-setting count and
+rejected the new 69-row schema. Deployment did not run. That expectation is
+updated with explicit Rocket option/default/range checks; failure log retained
+as `artifacts/rocket-socket-build-failed.log`. Combined build/deploy pending.
 No new in-game/final-eye or physical headset acceptance is claimed. Follow the
 latest delivery direction: one checked deployment for the user's headset review,
 without restarting per-case simulator loops. Existing field limitations remain.

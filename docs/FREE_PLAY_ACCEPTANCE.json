@@ -2615,6 +2615,7 @@
     "coordinate_contract": "Native metres: socket +X elbow-to-wrist, +Z dorsal. Screen +Y=dorsal, +Z=-socket X, lower-edge midpoint at solved wrist. Phantom palm rotation and socket share one rig publication; guidance converts that world pose into tracking space.",
     "validation": "Focused core/editor checks pass; combined build/check/deploy pending.",
     "limits": "No new in-game/final-eye or physical acceptance. Previous Rocket Arm flight evidence retains its original build and behavior scope. Native roll channel is unavailable; wrist twist maps to horizontal steering.",
-    "next_action": "One checked deployment, then user physical Quest Link review. No per-case simulator loops."
+    "next_action": "One checked deployment, then user physical Quest Link review. No per-case simulator loops.",
+    "initial_build_failure": "57/58 passed; launcher bridge test expected 64 rows instead of the new 69. No deployment. Assertion corrected with explicit new setting/default/range checks. Log: artifacts/rocket-socket-build-failed.log."
   }
 }
