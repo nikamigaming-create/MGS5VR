@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "9d5e15c0a101d1295017e02cd2e060694bc90c0c833299432f3894c62ca018bf",
-  "candidate_status": "Checked/deployed spatial controls; native-eye Blast Arm tower destruction with game audio reviewed. Initial launch heading requires native-camera alignment; tutorial persistence and physical headset remain open.",
+  "candidate": "87186cb55ebe45167216657c0ec45c1b9ce370385e5293ef8b0df7edba26f74f",
+  "candidate_status": "Checked/deployed mortar/MG spatial hand aim and additive stick trim. Daytime shifting-shadow report unresolved; expanded mounted types and physical acceptance remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1347,19 +1347,20 @@
     }
   ],
   "active_work": {
-    "candidate": "62f696613e2b89678303842a140ad712bbcf09cb712e591ea743721d36c0ee70",
-    "source_commit": "5bb471f789563ae8ccd13f5c12bdd39c08c3ccb9",
-    "checkpoint": "Built, checked and deployed candidate. Live Challenge Tasks Help stow/reopen/restow passed; release and physical acceptance remain open.",
+    "candidate": "87186cb55ebe45167216657c0ec45c1b9ce370385e5293ef8b0df7edba26f74f",
+    "source_commit": "939d41a74c0f3e6ae1b2e29c13281810264c4e3a",
+    "checkpoint": "Checked/deployed mortar/MG spatial hand aim and additive stick trim. Daytime shifting-shadow report unresolved; expanded mounted types and physical acceptance remain open.",
     "plan": "docs/RELEASE_PLAN.md",
     "next_actions": [
-      "Physical playtest through Play-Dev.cmd on wired Meta Quest Link.",
-      "Diagnose actual pickup boarding at a usable native LZ, exact rock/corridor failure and extreme cloth crowding before changing those flows.",
-      "Batch newly diagnosed gameplay repairs on main; retain completed scoped results and all failures."
+      "Physical mortar/MG spatial-plus-wrist-plus-stick review through Play-Dev.cmd on wired Meta Quest Link.",
+      "Diagnose daytime large light/shadow patches shifting with head nods; no disappearance/culling claim.",
+      "Confirm actual native helicopter/anti-aircraft action and contacts before extending mounted hand admission.",
+      "Retain unresolved Blast Arm initial heading, tutorial persistence, terrain/cloth and broader physical limits."
     ],
     "runtime_requirement": "Wired Meta Quest Link / Meta OpenXR; both Play commands explicitly -MetaLink. Historical runtime observations in retained_work_history are not current setup instructions.",
     "build_slots": {
       "published_pin": "b627c7cacc9a",
-      "development": "62f696613e2b"
+      "development": "87186cb55ebe"
     },
     "scope": "Checked and deployed candidate; not a publication or headset/full-game acceptance.",
     "cleanup": "Owned game/simulator closed, inputs released, Steam retained, per-game Meta Link restored, published play unchanged."
@@ -2758,7 +2759,7 @@
     "cleanup": "Inputs released, tracking poses restored, owned simulator/game closed, Steam retained, Meta 64-bit Link checked"
   },
   "mounted_spatial_trim_2026_10_26": {
-    "status": "implemented_build_pending_physical_acceptance_open",
+    "status": "checked_deployed_physical_acceptance_pending",
     "native_actions": [
       "0x46 mortar",
       "0x47 machine gun"
@@ -2772,7 +2773,14 @@
     "baseline_fixture_run": "20261026T192853043999Z",
     "baseline_fixture_result": "refused_destroyed_native_mortar_before_mount",
     "new_live_acceptance": false,
-    "helicopter_anti_aircraft_admission": "unverified"
+    "helicopter_anti_aircraft_admission": "unverified",
+    "candidate": "87186cb55ebe45167216657c0ec45c1b9ce370385e5293ef8b0df7edba26f74f",
+    "source_commit": "939d41a74c0f3e6ae1b2e29c13281810264c4e3a",
+    "automated_test_groups_passed": 58,
+    "installer_checks": "passed",
+    "handoff_camera_fallback": "corrected",
+    "build_log": "artifacts/mounted-spatial-final-build.log",
+    "preservation": "artifacts/mounted-spatial-preservation.json"
   },
   "daytime_shadow_shimmer_2026_10_26": {
     "status": "reported_undiagnosed",

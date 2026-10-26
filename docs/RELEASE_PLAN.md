@@ -29,10 +29,20 @@ in-game hand contact, discharge/impact and physical responsiveness remain open.
 Helicopter/anti-aircraft handle admission is still unverified. Initial Blast Arm
 launch heading, recurring tutorial notices and previous physical limits remain.
 
-Next: build/check/deploy this control batch once, then user Play-Dev review.
-Continue diagnosis of the daytime shadow report; do not substitute a speculative
-shader patch or disable shadows and mark the report fixed. Published play stays
-pinned. Owned simulator/input session is closed and the clock/poses restored.
+Checked/deployed candidate `87186cb55ebe` / source `939d41a` passes all
+58 test groups and installer checks. Final review also repaired the one-frame
+hand-transfer fallback to camera turning. The initial handoff build failed for a
+missing include; the corrected final build passes. New in-game/physical mounted
+acceptance remains open. Use `Play-Dev.cmd` for the user's review.
+
+Next: diagnose the reported daytime shadow patches and confirm actual native
+helicopter/anti-aircraft contacts before extending admission. Do not substitute
+a speculative shader patch or disable shadows and mark the report fixed.
+Published play remains pinned; all 424 published and 434 development files,
+installed DLL and personal settings verify. Owned simulator/input session is
+closed, clock/poses restored, Steam retained and Meta 64-bit Link checked.
+Receipt: `artifacts/mounted-spatial-preservation.json`; final build log:
+`artifacts/mounted-spatial-final-build.log`. No whole-game/headset sign-off.
 
 ## Blast Arm tower destruction with game audio — 26 October
 
