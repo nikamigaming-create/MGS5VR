@@ -73,6 +73,35 @@ int main(){try{
     p.buttons[5]=1;check(routed.bindingChordHeld("system.controls",p),"Editor opening chord was not recognized");
     routed.requireRelease(routed.heldInputMask("system.controls",p));
     routed.update({},ControlContext::gameplay,150);check(!routed.active("system.idroid"),"Opening editor manufactured a Menu tap");
+    // Exercise the same edit -> durable save -> neutral-gated live apply used
+    // in the headset for every gameplay switch, including both eyepatch states.
+    editor.close();
+    {std::ifstream saved(temp);check(bindings.load(saved).empty(),"Saved personal layout failed to load");}
+    const auto personalBinding=bindings.bindingText("gameplay.equip_binoculars");
+    const auto personalCurl=bindings.setting("settings.hand_rest_curl_percent");
+    editor.open({},ControlsMode::driving,bindings,temp,3);editor.command(117,bindings);
+    const auto& gear=editor.frame().rows;
+    for(const auto name:{"settings.full_body","settings.eyepatch"})
+        check(std::any_of(gear.begin(),gear.begin()+11,[&](const auto& row){return row.action==name;}),"Visibility toggle is not on the first Gear page");
+    uint64_t tick=1000;
+    for(const auto& definition:settingDefinitions()){
+        check(std::count_if(gear.begin(),gear.end(),[&](const auto& row){return row.action==definition.name;})==1,"Gear duplicated or omitted a setting");
+        if(definition.minimum!=0||definition.maximum!=1)continue;
+        const auto before=bindings.setting(definition.name);
+        for(int cycle=0;cycle<2;++cycle){
+            chooseSetting(definition.name);editor.command(120,bindings);editor.command(113,bindings);
+            check(editor.frame().phase==ControlsEditPhase::applying,"Gameplay toggle did not save");
+            LiveControls reload;std::ifstream saved(temp);check(reload.stage(saved).empty(),"Saved toggle failed live validation");
+            PhysicalControls held;held.buttons[10]=1;
+            check(!reload.apply(bindings,held),"Toggle applied while trigger was held");
+            check(reload.apply(bindings,{}),"Toggle failed to apply after release");
+            check(bindings.setting(definition.name)==(cycle==0?1-before:before),"Live toggle value differs from saved choice");
+            check(bindings.bindingText("gameplay.equip_binoculars")==personalBinding
+                &&bindings.setting("settings.hand_rest_curl_percent")==personalCurl,"Toggle changed unrelated personal controls");
+            editor.update({},aims,tracked,ControlsMode::driving,bindings,++tick,3);
+            check(editor.frame().phase==ControlsEditPhase::browse,"Editor did not acknowledge live toggle");
+        }
+    }
     std::filesystem::remove(temp);std::filesystem::remove(temp.wstring()+L".vr-backup");
     std::cout<<"Capture release, two-hand chords, context filtering, confirmed save, external-edit protection and close handoff passed\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

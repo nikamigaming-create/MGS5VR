@@ -1,4 +1,31 @@
-# Current MGS5VR work — 25 October 2026
+# Current MGS5VR work — 26 October 2026
+
+## Live settings and headset handoff — 26 October
+
+The settings audit found all 64 gameplay settings exposed in the headset Gear
+editor and launcher, including 15 on/off options with production consumers.
+Eyepatch already controls native model visibility and the first-person patch
+live; the retained on/off/motion evidence below remains its visual scope.
+Gear now puts Seated mode, Full body and Eyepatch immediately after Immersive VR,
+then the other toggles before numeric fitting. Launcher copy describes the
+current matte dark patch and explains body/cinematic options. No new gameplay
+or rendering repair is inferred from this usability change.
+
+Personal binding audit: hold BOTH stick clicks for 650 ms opens the editor;
+select Gear, toggle, check to save, then release buttons/grips/triggers and center
+sticks. Allow about two seconds for the file poll. Runtime/graphics setup still
+requires a restart. Saved eyepatch=1, full_body=0 and seated_mode=1 are preserved.
+The expanded editor check exercises every gameplay switch through save and live
+reload in both directions, held-trigger deferral, and personal-binding retention.
+Build/check/deploy outcome will be recorded after the combined candidate finishes.
+
+The previous deployed DLL is `27e9108f2a58`. It includes the held-stick exit repair;
+the user's broader physical movement report remains open. Remaining concrete
+scope: undiagnosed exact rock/corridor snags, physical arm fit/extreme cloth and
+other outfits, additional mounted adapters beyond verified mortar/MG, actual
+field-pickup boarding, wider progression/weapon and headset/performance coverage.
+Do not describe these as universally fixed. Next is the user's Play-Dev headset
+review, without restarting simulator/soak loops. Published play stays pinned.
 
 ## New blocker: movement unavailable after deployment
 

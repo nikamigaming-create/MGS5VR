@@ -2591,5 +2591,15 @@
     "next_cpp_change": "Extend verified native action admission after real anti-aircraft mount/contact observation; preserve existing native aim limits and grip ownership",
     "candidate_changed": false,
     "physical_feedback": "User has not yet tested 62f696613e2b"
+  },
+  "live_settings_audit_2026_10_26": {
+    "baseline_candidate": "27e9108f2a58a79be62f7448b06e4723af6ab41623ca98ee66ed3d4d2f733811",
+    "gameplay_settings": 64,
+    "gameplay_switches": 15,
+    "change": "First-page body/eyepatch; remaining switches before numeric fitting; launcher descriptions corrected. Existing live application mechanism preserved.",
+    "personal_editor_binding": "hold(left_stick_click + right_stick_click,650)",
+    "validation": "Combined build/check/deploy pending; editor regression exercises every switch save/live reload in both directions and held-trigger deferral.",
+    "acceptance": "No new gameplay, final-eye or headset acceptance. Existing movement and eyepatch retained evidence keeps its original candidate scope.",
+    "next_action": "Finish checked development deployment, then user physical Quest Link review; no simulator/soak loop."
   }
 }

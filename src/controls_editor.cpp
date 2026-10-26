@@ -147,10 +147,15 @@ void ControlsEditor::rows(const ControlBindings& bindings){
     frame_.rows.clear();const uint32_t context=1u<<static_cast<unsigned>(controlsModeContext(frame_.mode));
     if(frame_.settings){
         frame_.rows.push_back({"system.toggle_vr","Immersive VR",frame_.vrEnabled?"On":"Off",false});
-        frame_.rows.push_back({"settings.seated_mode","Seated mode",bindings.setting("settings.seated_mode")>0?"On":"Off",false});
-        for(const auto& d:settingDefinitions()){
-            if(d.name=="settings.seated_mode")continue;
-            const auto label=d.minimum==0&&d.maximum==1?(bindings.setting(d.name)>0?"On":"Off"):bindings.settingText(d.name);
+        // Keep the common headset visibility choices on the first page, then
+        // all remaining switches before the numeric fitting controls.
+        constexpr std::array<std::string_view,3> first{"settings.seated_mode","settings.full_body","settings.eyepatch"};
+        for(const auto name:first)
+            frame_.rows.push_back({std::string(name),title(name),bindings.setting(name)>0?"On":"Off",false});
+        for(const bool toggles:{true,false})for(const auto& d:settingDefinitions()){
+            const bool toggle=d.minimum==0&&d.maximum==1;
+            if(toggle!=toggles||std::find(first.begin(),first.end(),d.name)!=first.end())continue;
+            const auto label=toggle?(bindings.setting(d.name)>0?"On":"Off"):bindings.settingText(d.name);
             frame_.rows.push_back({std::string(d.name),title(d.name),label,false});}
         frame_.page=std::min(frame_.page,(frame_.rows.size()-1)/11);return;
     }

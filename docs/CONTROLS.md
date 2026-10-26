@@ -19,6 +19,13 @@ checks conflicts while you type, refuses invalid saves, and backs up the previou
 file when saving. No game launch is needed to check a layout. The headset editor is also available with Menu + left-stick click held
 650 ms; its gear tab exposes gameplay tuning. These are default bindings.
 
+Gear starts with Immersive VR, Seated mode, Full body and Eyepatch, followed by
+the remaining on/off options before numeric fitting controls. Select an option,
+toggle it, select the check mark to save, then release the controls to apply it
+live. Eyepatch controls both the character's patch and the dark translucent
+first-person patch. Full body off retains hands and forearms on supported outfits.
+The launcher exposes the same gameplay settings; search for a setting by name.
+
 Open **mgs5vr-controls.ini in your MGSV game folder** (beside `dinput8.dll`).
 Save, release all buttons/grips/triggers and center both sticks for about two
 seconds. Changes apply live; no restart is needed. Invalid edits keep the last

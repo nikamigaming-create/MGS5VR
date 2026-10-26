@@ -1,5 +1,12 @@
 # Field fixes — implementation and acceptance
 
+26 October live-settings audit: all 64 gameplay settings are exposed, including
+15 on/off options. Gear now places body/eyepatch visibility on its first page
+and all switches ahead of numeric tuning; launcher descriptions match the dark
+translucent patch. This is a usability change, not closure of any field report.
+The edit/save/live-apply regression covers every switch in both directions.
+See CURRENT for the build outcome and preserved personal headset shortcut.
+
 Updated 25 October 2026 with the incoming headset batch and scoped gameplay
 results. The original production-path audit baseline was `5622052` (DLL `17b044cba72e`).
 
