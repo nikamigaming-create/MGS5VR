@@ -2,7 +2,7 @@
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
   "candidate": "9d5e15c0a101d1295017e02cd2e060694bc90c0c833299432f3894c62ca018bf",
-  "candidate_status": "Checked/deployed spatial socket + wrist gyro + joystick; take6 shows scoped launch/steering/return. Physical headset and tutorial persistence remain open.",
+  "candidate_status": "Checked/deployed spatial controls; native-eye Blast Arm tower destruction with game audio reviewed. Initial launch heading requires native-camera alignment; tutorial persistence and physical headset remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2685,5 +2685,60 @@
     "error": "Requested physical input was never observed held by the native XR control sampler",
     "diagnosis": "Undiagnosed input observation failure; no collision defect claimed",
     "cleanup": "Inputs released, owned game/simulator closed, Steam retained, Meta Link checked"
+  },
+  "rocket_native_audio_2026_10_26": {
+    "take": "artifacts/rocket-proof-20261026/take7-native-av",
+    "source": "native right eye plus process loopback audio; not final compositor",
+    "unique_images": 680,
+    "unique_fps": 29.694,
+    "source_gap_max_seconds": 0.2658137,
+    "dropped_samples": 8,
+    "audio_mean_db": -26.9,
+    "audio_max_db": -1.4,
+    "scope": "launch, spatial socket, wrist gyro, joystick, native return; no demolition",
+    "physical_headset": "not tested",
+    "narration": "none",
+    "tower_shot_status": "Completed: blast-shot2 launch, guidance and wooden watchtower destruction with game audio"
+  },
+  "blast_arm_tower_2026_10_26": {
+    "status": "reviewed_native_blast_arm_tower_destruction",
+    "build": "9d5e15c0a101d1295017e02cd2e060694bc90c0c833299432f3894c62ca018bf",
+    "hand_id": 518,
+    "god_mode": 1,
+    "delivery": "D:\\code\\MGS5VR\\artifacts\\rocket-tower-20261026\\blast-shot2\\field-kit-blast-arm-tower-game-audio.mp4",
+    "source": "continuous in-engine right eye, not final compositor",
+    "duration_seconds": 32.4,
+    "unique_image_transactions": 970,
+    "unique_fps": 29.938271604938272,
+    "cfr_frames": 972,
+    "repeated_frames": 2,
+    "interpolation": false,
+    "maximum_source_gap_seconds": 0.0992733,
+    "audio": {
+      "game_pid": 34376,
+      "first_qpc_100ns": 651654842585,
+      "last_qpc_100ns": 651977042585,
+      "frames": 1547040,
+      "sample_rate": 48000,
+      "gaps": 0,
+      "flags": 0,
+      "mean_db": -18.7,
+      "max_db": -0.5,
+      "narration": false
+    },
+    "review": [
+      "Whole-take 2-second contact sheet",
+      "Impact/aftermath 0.5-second contact sheet",
+      "Rendered delivery impact frame",
+      "Both final eyes immediately after impact and after smoke cleared"
+    ],
+    "observed": "Blast Arm launch and controller-guided approach; explosion at about 24.5 seconds collapses wooden watchtower. Clear paired aftermath shows tower absent. No enemy casualty claimed.",
+    "limitations": [
+      "Right eyepatch intentionally retained, overlaps right-eye image",
+      "Physical headset not tested",
+      "Launch heading followed native camera, requiring right-stick alignment before second shot; no source repair claimed"
+    ],
+    "failed_take": "blast-shot1 missed the tower after native-camera launch heading differed from HMD gaze",
+    "cleanup": "Inputs released, tracking poses restored, owned simulator/game closed, Steam retained, Meta 64-bit Link checked"
   }
 }

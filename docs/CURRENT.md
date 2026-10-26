@@ -1,5 +1,50 @@
 # Current MGS5VR work — 26 October 2026
 
+## Blast Arm tower destruction with game audio � 26 October
+
+The user rejected take6's 3.3 fps capture and missing game audio. Replacement
+`artifacts/rocket-proof-20261026/take7-native-av/field-kit-rocket-arm-game-audio.mp4`
+retains a continuous 22.9-second native right-eye source and synchronized MGSV
+process audio: 680 unique image transactions, 29.69 unique fps, eight dropped
+samples, longest source gap 0.266 seconds. The 30 fps container includes repeated
+frames; no interpolation. Full render FOV aspect is corrected, without cropping.
+This is in-engine eye footage, not final-compositor video. Separate paired final
+eye checkpoints are retained. No synthesized narration. Actual launch, socket
+motion, gyro, stick and native return are shown; no demolition in this take.
+
+Crouched A-star approach `20261026T181347204901Z` reached the outpost. The earlier
+stance-input failure remains scoped to its own run. Simulator Thumbstick X/Y
+writes were observed to replace one another, preventing diagonal radial choices;
+this does not establish a physical-controller defect.
+
+User authorized stopping the separate OpenNV test to free Meta XR. Its verified
+process and child crash handler were stopped; Steam retained. Fresh MGSV process
+34376 loaded the ACC, where Blast Arm was selected through the native sortie
+loadout (retained `artifacts/rocket-tower-20261026/blast-equipped`). Supply-drop
+waiting was abandoned. Deployment `20261026T184813917645Z`, approach
+`20261026T185023101192Z` and flank `20261026T185239276285Z` are retained.
+
+**Delivered:** `artifacts/rocket-tower-20261026/blast-shot2/field-kit-blast-arm-tower-game-audio.mp4`.
+32.4 seconds, 970 unique native images (29.94 fps), two repeated CFR frames,
+maximum source gap 0.0993 seconds. Synchronized 48 kHz stereo MGSV audio has no
+reported capture gaps; mean -18.7 dB, peak -0.5 dB. No narration or interpolation.
+Native hand ID 518 and God mode 1 are recorded. Launch, additive socket/gyro/stick
+guidance and explosion collapse the wooden watchtower at about 24.5 seconds.
+Both final eyes after smoke clears show the tower gone. No enemy casualty claimed.
+Review/limits: `blast-shot2/visual-review.json` in the same retained directory.
+
+First take `blast-shot1` missed: launch follows the native camera heading, not
+HMD gaze. Existing native-smooth right-stick turning aligned the second shot.
+This is an unresolved launch-aim contract gap, not a source repair or a perfect
+rocket-arm pass. Next fix: investigate tracked LEFT socket aim at initial launch;
+retain recurring tutorial notices and physical-headset acceptance as open.
+
+Owned session closed, input/poses restored, Steam retained, Meta 64-bit Link
+checked. All 424 published and 434 development manifest files, installed DLL and
+personal settings match the earlier receipt. Published pin unchanged. Receipt:
+`artifacts/rocket-tower-20261026/preservation.json`.
+
+
 ## Checked spatial controls and silent video — 26 October
 
 Candidate `9d5e15c0a101` / source `e162ef6` passed all 58 test groups and installer
