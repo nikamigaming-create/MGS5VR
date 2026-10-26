@@ -1,5 +1,39 @@
 # Field fixes — implementation and acceptance
 
+## Mounted spatial aim and daytime shadow report — 26 October
+
+The user clarified that the daytime report is **larger light/shadow patches
+shifting during head nods**. Trees never disappear. Do not diagnose this as
+missing foliage/culling or tiny specular sparkles. The cause remains undiagnosed;
+no rendering or graphics-setting change is claimed.
+
+Retained `artifacts/foliage-20261026/baseline-lz` records the initial daylight
+head-pitch sweep and paired final eyes. `daylight-lighting` in the same directory
+records a noon fixture, exposure observations and both eyes; the original clock
+was restored. `camp-lighting` occurred after sunset and is excluded from daytime
+acceptance. These captures do not establish a shimmer fix or headset acceptance.
+
+Source now extends the existing mortar `0x46` / machine-gun `0x47` handle adapter:
+spatial hand displacement uses the actor's authored forearm length as an input
+lever; wrist rotation remains additive; either hand operates and the other
+supports/transfers at the live bearing. Right-stick trim adds to the target,
+stops at the attained bearing on release, limits pending travel at native stops,
+and does not rotate the viewer. Native mechanical limits, action ownership,
+tracking-loss release and fresh-grip reacquisition remain in force. This is not
+a newly verified physical emplacement pivot or universal mounted-gun adapter.
+
+The retained mortar attempt `20261026T192853043999Z` refused the already destroyed
+native fixture before mounting. It is a fixture refusal, not a new input failure
+or an acceptance pass. The new spatial/trim behavior has contract coverage;
+in-game hand contact, discharge/impact and physical responsiveness remain open.
+Helicopter/anti-aircraft handle admission is still unverified. Initial Blast Arm
+launch heading, recurring tutorial notices and previous physical limits remain.
+
+Next: build/check/deploy this control batch once, then user Play-Dev review.
+Continue diagnosis of the daytime shadow report; do not substitute a speculative
+shader patch or disable shadows and mark the report fixed. Published play stays
+pinned. Owned simulator/input session is closed and the clock/poses restored.
+
 ## Blast Arm tower destruction with game audio � 26 October
 
 The user rejected take6's 3.3 fps capture and missing game audio. Replacement

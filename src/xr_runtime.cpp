@@ -1619,7 +1619,7 @@ struct Session {
             &&!center&&!headToggle&&!utilityCenter;
         controllerFrame.mountedHandGrip={mountedGripInput&&controllerFrame.hands[0].gripTracked&&controllerFrame.supportGrip,
             mountedGripInput&&right&&activeControl("gameplay.ready_weapon")};
-        controllerFrame.mountedStickAiming=mountedGripInput&&(pad.rightX||pad.rightY);
+        if(mountedGripInput)controllerFrame.mountedStickAxes={float(pad.rightX)/32767.f,float(pad.rightY)/32767.f};
         const auto mountedGrip=mountedAimMailbox().read(packetTime);
         const auto heldMountedHands=static_cast<uint8_t>((controllerFrame.mountedHandGrip[0]?1:0)
             |(controllerFrame.mountedHandGrip[1]?2:0));
@@ -1628,13 +1628,12 @@ struct Session {
            &&mountedGrip.activation==nativeStatus.activation&&mountedGrip.referenceEpoch==referenceEpoch
            &&mountedGrip.hands&&(mountedGrip.hands&heldMountedHands)==mountedGrip.hands){
             pad.leftTrigger=255;
-            if(!controllerFrame.mountedStickAiming){
-                pad.rightX=static_cast<int16_t>(mountedGrip.axes[0]*32767.f);
-                pad.rightY=static_cast<int16_t>(mountedGrip.axes[1]*32767.f);
-            }
-            // vehicleViewInput above contains only deliberate stick input.
-            // Native hand aiming must not rotate the tracking origin along
-            // with the barrel, feeding its own movement back into the grip.
+            pad.rightX=static_cast<int16_t>(mountedGrip.axes[0]*32767.f);
+            pad.rightY=static_cast<int16_t>(mountedGrip.axes[1]*32767.f);
+            // While holding a handle the stick trims the gun's requested aim.
+            // Neither physical aiming nor its stick trim turns the viewer's
+            // reference space and feeds barrel movement back into the hand.
+            controllerFrame.vehicleViewInput={};
         }
         const auto rocketStick=controls.axis("axes.move",routedPhysical);
         const bool rocketGyro=controls.setting("settings.rocket_arm_gyro")!=0;

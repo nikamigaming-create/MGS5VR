@@ -74,7 +74,7 @@ struct ControllerFrame {
     // Occupancy is independent of input focus and of NORMAL_ACTION. Ordinary
     // traversal/context actions must not select a seated body or mounted eye.
     uint16_t nativeActionId{};
-    bool mountedStickAiming{};
+    std::array<float,2> mountedStickAxes{};
     std::array<bool,2> mountedHandGrip{};
     bool nativeGamepad{}; // Physical XInput owns actions and native animated hands.
     bool wheelGrip{};
@@ -165,7 +165,7 @@ inline ControllerFrame passiveControllerFrame(ControllerFrame frame,int64_t time
     frame.presentationFocused=false;
     frame.weaponReady=frame.supportGrip=frame.vehicleControls=frame.nativeActionControls=frame.wheelGrip=false;
     frame.rightWheelGrip=frame.vehicleWeaponIntent=false;
-    frame.mountedHandGrip={};frame.mountedStickAiming=false;
+    frame.mountedHandGrip={};frame.mountedStickAxes={};
     frame.cabinDeployHint=false;
     frame.vehicleViewInput={};
     frame.contextInteract=false;

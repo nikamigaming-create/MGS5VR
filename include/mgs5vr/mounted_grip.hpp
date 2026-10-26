@@ -19,7 +19,8 @@ struct MountedGripSample {
 class MountedGrip {
 public:
     MountedGripSample update(MountedGripOwner owner,Pose hand,Pose contact,Pose aim,
-            bool available,bool squeeze,uint64_t now,float acquireRadius,float releaseRadius,bool rebase=false) noexcept {
+            bool available,bool squeeze,uint64_t now,float acquireRadius,float releaseRadius,bool rebase=false,
+            float forearmLength=0.f) noexcept {
         const bool identity=owner.player&&owner.mount&&owner.activation&&owner.referenceEpoch;
         const bool dimensions=std::isfinite(acquireRadius)&&std::isfinite(releaseRadius)
             &&acquireRadius>0&&releaseRadius>=acquireRadius;
@@ -37,13 +38,26 @@ public:
             held_=acquired=true;armed_=false;
             // Capture orientation at contact: acquisition itself cannot turn
             // the native gun, even if the physical controller is misaligned.
-            startHand_=hand.orientation;startAim_=aim.orientation;
+            startHand_=hand.orientation;startAim_=aim.orientation;startPosition_=hand.position;
+            // Use this actor's authored forearm length for the spatial control
+            // lever. It is an input gesture, not an invented emplacement pivot.
+            lever_=std::isfinite(forearmLength)&&forearmLength>=.1f&&forearmLength<=1.f?forearmLength:0.f;
         }
         if(held_&&dot(distance,distance)>releaseRadius*releaseRadius){held_=false;armed_=false;}
         if(!held_)return {};
-        if(rebase){startHand_=hand.orientation;startAim_=aim.orientation;}
+        if(rebase){startHand_=hand.orientation;startAim_=aim.orientation;startPosition_=hand.position;}
         const auto delta=compose(Pose{hand.orientation,{}},inverse(Pose{startHand_,{}}));
-        const auto requested=compose(delta,Pose{startAim_,{}}).orientation;
+        Pose spatial{};
+        if(lever_>0){
+            const auto displacement=rotate(inverse(Pose{startAim_,{}}).orientation,hand.position-startPosition_);
+            // Native aim is +Z. Lateral/vertical handle movement contributes
+            // yaw/elevation; pushing along the barrel must not introduce yaw.
+            const float yaw=std::atan2(displacement.x,lever_);
+            const float pitch=-std::atan2(displacement.y,std::hypot(lever_,displacement.x));
+            spatial=compose(Pose{{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)},{}},
+                Pose{{std::sin(pitch*.5f),0,0,std::cos(pitch*.5f)},{}});
+        }
+        const auto requested=compose(delta,compose(Pose{startAim_,{}},spatial)).orientation;
         // The rendered hand follows the current native grip, not its old world
         // position. The adapter applies the request through native aim limits.
         return {true,acquired,contact,Pose{requested,aim.position}};
@@ -52,8 +66,54 @@ public:
 private:
     MountedGripOwner owner_{};
     Quat startHand_{},startAim_{};
+    Vec3 startPosition_{};
+    float lever_{};
     uint64_t time_{};
     bool sampled_{},held_{},pressed_{},armed_{};
+};
+// Stick trim changes the requested bearing while either hand owns a native
+// handle. It never turns the VR reference space or recenters the physical hand.
+// Keep at most eight degrees of pending stick travel at native mechanical stops.
+class MountedAimTrim {
+public:
+    Pose update(Pose current,Pose handRequest,std::array<float,2> stick,uint64_t now,bool rebase=false) noexcept {
+        if(!valid(current)||!valid(handRequest)){reset();return handRequest;}
+        const auto angles=[](Pose p){const auto f=rotate(p.orientation,{0,0,1});
+            return std::array<float,2>{std::atan2(f.x,f.z),std::atan2(f.y,std::hypot(f.x,f.z))};};
+        const auto actual=angles(current),physical=angles(handRequest);
+        if(!sampled_||rebase||now<time_||now-time_>250){
+            reset();sampled_=true;time_=now;previous_=physical;return handRequest;
+        }
+        const float seconds=float(now-time_)*.001f;time_=now;
+        for(size_t i=0;i<2;++i){
+            const float input=std::isfinite(stick[i])?std::clamp(stick[i],-1.f,1.f):0.f;
+            const bool active=std::abs(input)>.15f;
+            if(active){
+                constexpr float trimRadiansPerSecond=.35f; // About 20 degrees/s at full stick.
+                const float step=(i==0?-input:input)*trimRadiansPerSecond*seconds;
+                const float error=std::remainder(physical[i]+offset_[i]-actual[i],6.283185307f);
+                // Do not accumulate trim beyond a stop, or unwind a deliberate
+                // physical request merely because it is farther from the gun.
+                if(step*error<=0||std::abs(error)<.14f)
+                    offset_[i]=std::remainder(offset_[i]+step,6.283185307f);
+            }else if(sticking_[i]){
+                // Stop on release at the attained bearing; preserve physical
+                // movement on this very frame instead of pulling back later.
+                offset_[i]=std::remainder(actual[i]-previous_[i],6.283185307f);
+            }
+            sticking_[i]=active;previous_[i]=physical[i];
+        }
+        const float yaw=physical[0]+offset_[0];
+        const float pitch=std::clamp(physical[1]+offset_[1],-1.55334f,1.55334f);
+        return compose(Pose{{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)},handRequest.position},
+            Pose{{-std::sin(pitch*.5f),0,0,std::cos(pitch*.5f)},{}});
+    }
+    void reset() noexcept {*this=MountedAimTrim{};}
+private:
+    std::array<float,2> offset_{},previous_{};
+    std::array<bool,2> sticking_{};
+    uint64_t time_{};
+    bool sampled_{};
 };
 // Native axes retain the game's mechanical limits. A physical grip requests
 // an aim direction, never a world transform for the emplacement itself.

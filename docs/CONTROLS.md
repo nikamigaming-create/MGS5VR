@@ -545,6 +545,18 @@ Support. The call menu uses the native buddy and stance restrictions.
 
 ## Vehicle mapping under simulator development
 
+For the admitted stationary mortar and machine gun, reach either hand to its
+native handle and squeeze that hand's grip. The first operating hand controls
+aim; the other hand supports its own handle and takes over when the operator
+releases. Moving the operating hand sideways/up/down adds aim alongside wrist
+rotation. The spatial sensitivity uses the character's authored forearm length;
+it does not move the emplacement's world pivot. Native yaw/elevation limits stay
+in force. Right-stick trim adds to this hand target at up to about 20 degrees per
+second and stops at the attained bearing on release. While gripping a handle,
+the stick aims the gun without turning the viewer's reference space. Releasing
+both handles restores ordinary native stick control. These additions require
+physical review; they do not establish helicopter-gun or anti-aircraft support.
+
 Native vehicle state changes the controls to **right trigger: accelerator**,
 **left trigger: brake/reverse**, **left stick: steering**, and **Y: enter/exit**.
 In the development candidate, bring the **left hand to the wheel and squeeze

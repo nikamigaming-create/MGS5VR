@@ -148,6 +148,7 @@ std::array<WheelSteering,2> wheelSteering;
 float wheelSteeringAxis{};
 std::array<MountedGrip,2> mountedGrips;
 std::array<MountedAimServo,2> mountedAimServos;
+std::array<MountedAimTrim,2> mountedAimTrims;
 int mountedAimHand=-1;
 uintptr_t mountedActionOwner{};
 uint16_t mountedActionId{};
@@ -854,6 +855,7 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         wheelSteeringAxis=0;wheelMailbox().publish({});
         for(auto& hand:mountedGrips)hand.reset();
         for(auto& servo:mountedAimServos)servo.reset();
+        for(auto& trim:mountedAimTrims)trim.reset();
         mountedAimHand=-1;
         mountedActionAdmitted=false;mountedActionOwner=0;mountedActionId=0;++mountedActionGeneration;
         mountedAimMailbox().publish({});
@@ -891,24 +893,28 @@ bool apply(void* context,void* binding,PoseRestore& restore){
             inverse(gripFromWrist[side]))));
         const auto& hand=frame.controllers.hands[side];
         const bool available=stationaryWeapon&&hand.gripTracked&&valid(contact);
+        const auto forearm=bone(q,p,wrists[side]).position-bone(q,p,wrists[side]-1).position;
+        const float forearmLength=std::sqrt(dot(forearm,forearm));
         if(stationaryWeapon)frame.mountedWeaponGrips[side]=contact;
         const auto held=mountedGrips[side].update(mountedOwner,hand.grip,contact,nativeAimLocal,
             available,frame.controllers.mountedHandGrip[side],frame.sampleTime,.16f,.40f,
-            frame.controllers.mountedStickAiming||mountedAimHand!=static_cast<int>(side));
+            mountedAimHand!=static_cast<int>(side),forearmLength);
         mountedHeld[side]=held;
         if(held.held){
             mountedAim.hands|=static_cast<uint8_t>(1u<<side);
-        }else mountedAimServos[side].reset();
+        }else {mountedAimServos[side].reset();mountedAimTrims[side].reset();}
     }
     // Keep the operating hand until it releases. The other hand follows its
     // live handle without accumulating an aim request behind the operator.
     const int aimHand=mountedAimHand>=0&&(mountedAim.hands&(1u<<mountedAimHand))
         ?mountedAimHand:(mountedAim.hands&2)?1:(mountedAim.hands&1)?0:-1;
     for(size_t side=0;side<2;++side){
-        if(static_cast<int>(side)!=aimHand){mountedAimServos[side].reset();continue;}
-        mountedAxes[side]=mountedAimServos[side].update(nativeCamera,
+        if(static_cast<int>(side)!=aimHand){mountedAimServos[side].reset();mountedAimTrims[side].reset();continue;}
+        const bool rebase=mountedHeld[side].acquired||mountedAimHand!=aimHand;
+        const auto requested=mountedAimTrims[side].update(nativeCamera,
             nativeTrackedPose(frame.nativePose,frame.headPose,mountedHeld[side].requestedAim),
-            mountedHeld[side].acquired||mountedAimHand!=aimHand||frame.controllers.mountedStickAiming,actionId==0x47);
+            frame.controllers.mountedStickAxes,frame.sampleTime,rebase);
+        mountedAxes[side]=mountedAimServos[side].update(nativeCamera,requested,rebase,actionId==0x47);
     }
     mountedAimHand=aimHand;
     if(stationaryWeapon){

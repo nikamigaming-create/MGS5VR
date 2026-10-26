@@ -1328,6 +1328,22 @@
         "source_map": "docs/FIELD_FIXES.md",
         "acceptance_promoted": false
       }
+    },
+    {
+      "id": "FP18",
+      "title": "Daytime light/shadow patches shift during head nods",
+      "status": "reported_undiagnosed",
+      "acceptance": [
+        "Paired-eye daylight shadow stability through head pitch and translation",
+        "Preserve native lighting, shadows and world geometry",
+        "Physical Meta Quest Link validation"
+      ],
+      "evidence": [
+        {
+          "path": "artifacts/foliage-20261026/daylight-lighting",
+          "status": "diagnostic_only_no_fix_claimed"
+        }
+      ]
     }
   ],
   "active_work": {
@@ -2740,5 +2756,34 @@
     ],
     "failed_take": "blast-shot1 missed the tower after native-camera launch heading differed from HMD gaze",
     "cleanup": "Inputs released, tracking poses restored, owned simulator/game closed, Steam retained, Meta 64-bit Link checked"
+  },
+  "mounted_spatial_trim_2026_10_26": {
+    "status": "implemented_build_pending_physical_acceptance_open",
+    "native_actions": [
+      "0x46 mortar",
+      "0x47 machine gun"
+    ],
+    "changes": [
+      "Spatial operating-hand displacement scaled by native forearm length",
+      "Additive wrist rotation and bounded joystick target trim",
+      "Either-hand ownership and support hand transfer",
+      "Stick trim cannot rotate the viewer or spring back after release"
+    ],
+    "baseline_fixture_run": "20261026T192853043999Z",
+    "baseline_fixture_result": "refused_destroyed_native_mortar_before_mount",
+    "new_live_acceptance": false,
+    "helicopter_anti_aircraft_admission": "unverified"
+  },
+  "daytime_shadow_shimmer_2026_10_26": {
+    "status": "reported_undiagnosed",
+    "user_clarification": "Trees never disappear. Larger light/shadow patches shift across trees and ground during daytime head nods.",
+    "evidence": [
+      "artifacts/foliage-20261026/baseline-lz",
+      "artifacts/foliage-20261026/daylight-lighting"
+    ],
+    "excluded_daytime_evidence": "artifacts/foliage-20261026/camp-lighting (after sunset)",
+    "noon_fixture_clock_restored": true,
+    "rendering_change": false,
+    "headset_acceptance": false
   }
 }

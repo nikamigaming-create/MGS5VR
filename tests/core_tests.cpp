@@ -5473,7 +5473,7 @@ int main(){
         const auto rebased=grip.update(owner,hand,contact,aim,true,true,5,.1f,.5f,true);
         const auto settledAxes=mountedAimAxes(aim,rebased.requestedAim);
         expect(rebased.held&&near(settledAxes[0],0)&&near(settledAxes[1],0),
-            "manual stick aiming rebases a held physical grip instead of steering back to its old bearing");
+            "explicit hand transfer rebases at the current native bearing");
         aim.orientation={0,std::sin(.3f),0,std::cos(.3f)};
         const auto follower=grip.update(owner,hand,contact,aim,true,true,5,.1f,.5f,true);
         const auto transferred=grip.update(owner,hand,contact,aim,true,true,5,.1f,.5f);
@@ -5509,6 +5509,58 @@ int main(){
         expect(near(command[0],0)&&near(command[1],0),"settled physical aim does not oscillate when delayed native motion returns");
         servo.update({}, {},true);
         expect(servo.update({},yawRequest)[0]<0,"manual rebase permits a subsequent physical turn");
+        {
+            MountedGrip spatial;
+            const Pose neutral{};
+            spatial.update(owner,neutral,neutral,neutral,true,false,1000,.1f,.5f,false,.3f);
+            spatial.update(owner,neutral,neutral,neutral,true,true,1001,.1f,.5f,false,.3f);
+            Pose translated{{},{.08f,0,0}};
+            const auto spatialMoved=spatial.update(owner,translated,neutral,neutral,true,true,1010,.1f,.5f,false,.3f);
+            auto forward=rotate(spatialMoved.requestedAim.orientation,{0,0,1});
+            expect(spatialMoved.held&&forward.x>.2f&&near(forward.y,0),
+                "moving a grabbed handle spatially steers with unchanged wrist rotation");
+            Pose contactMotion{{},{.05f,.03f,0}};
+            const auto contactMoved=spatial.update(owner,translated,contactMotion,neutral,true,true,1020,.1f,.5f,false,.3f);
+            expect(same(rotate(contactMoved.requestedAim.orientation,{0,0,1}),forward),
+                "native handle animation cannot feed movement back into spatial steering");
+            translated.orientation={0,std::sin(.1f),0,std::cos(.1f)};
+            const auto combined=spatial.update(owner,translated,neutral,neutral,true,true,1030,.1f,.5f,false,.3f);
+            expect(rotate(combined.requestedAim.orientation,{0,0,1}).x>forward.x,
+                "wrist rotation adds to spatial handle movement");
+            translated={{},{0,0,.1f}};
+            const auto axial=spatial.update(owner,translated,neutral,neutral,true,true,1040,.1f,.5f,false,.3f);
+            expect(near(mountedAimAxes(neutral,axial.requestedAim)[0],0)&&near(mountedAimAxes(neutral,axial.requestedAim)[1],0),
+                "pushing straight along the barrel does not add lateral or vertical aim");
+        }
+        {
+            MountedAimTrim trim;
+            trim.update({}, {},{},1000);
+            const Pose trimHand{{0,std::sin(.04f),0,std::cos(.04f)},{}};
+            const auto combined=trim.update({},trimHand,{-1,1},1100);
+            const auto forward=rotate(combined.orientation,{0,0,1});
+            expect(std::atan2(forward.x,forward.z)>.11f&&forward.y>.03f,
+                "stick yaw and pitch trim add to the physical hand target concurrently");
+            const Pose attained{{0,std::sin(.06f),0,std::cos(.06f)},{}};
+            const auto released=trim.update(attained,trimHand,{},1110);
+            const auto releaseAxes=mountedAimAxes(attained,released);
+            expect(near(releaseAxes[0],0)&&near(releaseAxes[1],0),
+                "releasing stick trim stops at the attained native bearing without springback");
+            const Pose moreHand{{0,std::sin(.15f),0,std::cos(.15f)},{}};
+            const auto continued=trim.update(attained,moreHand,{},1120);
+            expect(mountedAimAxes(attained,continued)[0]<0,
+                "physical aiming still works after joystick trim without a new grip");
+            trim.reset();trim.update({}, {},{},2000);
+            Pose atStop{};
+            for(uint64_t time=2010;time<=5000;time+=10)atStop=trim.update({}, {},{-1,0},time);
+            const auto stopped=rotate(atStop.orientation,{0,0,1});
+            expect(std::atan2(stopped.x,stopped.z)<.145f,
+                "holding trim against a native stop cannot accumulate an unlimited turn");
+            expect(near(mountedAimAxes({},trim.update({}, {},{},5010))[0],0),
+                "releasing trim at a mechanical stop cancels unexecuted stick travel");
+            const auto stale=trim.update({},yawRequest,{-1,0},6000);
+            expect(near(mountedAimAxes(yawRequest,stale)[0],0),
+                "stale trim publication drops accumulated input instead of integrating the gap");
+        }
         MountedAimMailbox mailbox;
         mailbox.publish({1,2,3,100,{.5f,0},2});
         expect(mailbox.read(199).hands==2&&!mailbox.read(201).hands&&!mailbox.read(99).hands,
