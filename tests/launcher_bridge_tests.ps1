@@ -82,10 +82,12 @@ try {
     $measured=Invoke-Bridge 'load' '' $null
     Assert ($measured.ok -and $measured.state.display.requestedWidth -eq 2960 -and $measured.state.display.actualWidth -eq 1920 -and !$measured.state.display.live) 'requested high resolution cannot be reported as the measured game buffer or as a live session'
 
+    # Exercise an actual value change; saving the default again is a no-op
+    # and must not rely on newline conversion to manufacture a backup.
     $originalControls=[IO.File]::ReadAllText($controls)
-    $saved=Invoke-Bridge 'saveControls' $loaded.state.controlsRevision @{ 'settings.handheld_menus'='1' }
+    $saved=Invoke-Bridge 'saveControls' $loaded.state.controlsRevision @{ 'settings.handheld_menus'='0' }
     Assert $saved.ok 'valid control setting saves through the validator'
-    Assert ([IO.File]::ReadAllText($controls) -match '(?m)^handheld_menus\s*=\s*1\s*$') 'valid setting is written to the fixture INI'
+    Assert ([IO.File]::ReadAllText($controls) -match '(?m)^handheld_menus\s*=\s*0\s*$') 'valid setting is written to the fixture INI'
     Assert ($saved.state.backup -and (Test-Path -LiteralPath $saved.state.backup -PathType Leaf)) 'successful write returns a backup path that exists'
     Assert ([IO.File]::ReadAllText($saved.state.backup) -ceq $originalControls) 'backup preserves the exact original controls bytes/text'
 
