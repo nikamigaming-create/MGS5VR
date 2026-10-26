@@ -29,7 +29,16 @@ round trips and fractional sensitivity adjustment. The first combined run passed
 57/58 groups; the launcher bridge test retained a hardcoded 64-setting count and
 rejected the new 69-row schema. Deployment did not run. That expectation is
 updated with explicit Rocket option/default/range checks; failure log retained
-as `artifacts/rocket-socket-build-failed.log`. Combined build/deploy pending.
+as `artifacts/rocket-socket-build-failed.log`.
+
+Checked/deployed **`fbc50f53c4d3` / source `3421214`** passes all 58 groups and
+installer checks in `artifacts/rocket-socket-build.log`. Installed DLL and both
+slot manifests verify. Personal controls/runtime files are byte-identical and
+the published manifest is unchanged (`artifacts/rocket-socket-preservation.json`).
+64-bit Meta Link CheckOnly passes, Steam is retained, and no game/simulator or
+test input was started. No obsolete build targets remain. Outcome prose is newer
+than the packaged docs; no runtime source changed after this checked build.
+
 No new in-game/final-eye or physical headset acceptance is claimed. Follow the
 latest delivery direction: one checked deployment for the user's headset review,
 without restarting per-case simulator loops. Existing field limitations remain.

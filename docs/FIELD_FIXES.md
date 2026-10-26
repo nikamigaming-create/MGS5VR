@@ -4,7 +4,8 @@
 socket-fixed rectangular camera and additive joystick correction differ from
 the previously accepted forearm-axis/head-facing presentation. The new batch
 implements those controls and live screen/gyro/twist/width/sensitivity settings;
-focused contract/editor checks pass. Combined build outcome is in CURRENT.
+focused contract/editor checks pass. Checked/deployed `fbc50f53c4d3` / `3421214`
+passes all 58 groups and installer checks; preservation outcome is in CURRENT.
 Physical feel, final-eye motion/readability, impact and return on this revision
 remain unaccepted; the earlier flight evidence is not relabeled as this revision.
 

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "c5900adb1a22a2be7b273c908b600635f87c9b553b44778178f8a0d89b5e34fe",
-  "candidate_status": "Live-settings usability candidate built, checked and deployed; 58 groups and installer checks passed. Physical review and unresolved field scope remain open.",
+  "candidate": "fbc50f53c4d320097ed946787d7cc41032e01f0a5b7ed79bfa02a043214adb5a",
+  "candidate_status": "Rocket Arm phantom-left-hand/socket-rectangle candidate built, checked and deployed. All 58 groups and installer checks pass; new in-game/final-eye and physical headset acceptance remain pending.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2613,9 +2613,15 @@
     "requested_hand": "left controller, confirmed by user",
     "change": "Socket-fixed rectangular camera; phantom left-hand yaw/pitch/twist gyro; additive joystick without rebase; live screen/gyro/twist toggles, width and sensitivity.",
     "coordinate_contract": "Native metres: socket +X elbow-to-wrist, +Z dorsal. Screen +Y=dorsal, +Z=-socket X, lower-edge midpoint at solved wrist. Phantom palm rotation and socket share one rig publication; guidance converts that world pose into tracking space.",
-    "validation": "Focused core/editor checks pass; combined build/check/deploy pending.",
+    "validation": "All 58 groups and installer checks pass, including screen attachment/rectangularity through motion and resize, wrist yaw/pitch/twist, stick blending, owner/epoch/tracking resets, all 18 switch save/live-apply round trips and launcher schema ranges.",
     "limits": "No new in-game/final-eye or physical acceptance. Previous Rocket Arm flight evidence retains its original build and behavior scope. Native roll channel is unavailable; wrist twist maps to horizontal steering.",
-    "next_action": "One checked deployment, then user physical Quest Link review. No per-case simulator loops.",
-    "initial_build_failure": "57/58 passed; launcher bridge test expected 64 rows instead of the new 69. No deployment. Assertion corrected with explicit new setting/default/range checks. Log: artifacts/rocket-socket-build-failed.log."
+    "next_action": "User physical Quest Link review via Play-Dev: socket-screen visibility in both eyes through movement, left-hand gyro/joystick feel, native impact/return. No per-case simulator loops.",
+    "initial_build_failure": "57/58 passed; launcher bridge test expected 64 rows instead of the new 69. No deployment. Assertion corrected with explicit new setting/default/range checks. Log: artifacts/rocket-socket-build-failed.log.",
+    "candidate": "fbc50f53c4d320097ed946787d7cc41032e01f0a5b7ed79bfa02a043214adb5a",
+    "source_commit": "3421214b61b2d5f9e622f932e6b754459a67b800",
+    "build_log": "artifacts/rocket-socket-build.log",
+    "preservation_receipt": "artifacts/rocket-socket-preservation.json",
+    "preservation": "Installed DLL and both slot manifests verify; personal controls/runtime byte-identical; published play manifest unchanged.",
+    "cleanup": "No game/simulator launched or test input/settings changed. Steam retained. Meta Link 64-bit CheckOnly passes. Zero obsolete builds."
   }
 }
