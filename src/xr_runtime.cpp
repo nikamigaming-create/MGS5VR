@@ -217,7 +217,7 @@ struct Session {
     bool borrowedReloadSent{};
     uint64_t borrowedReloadPulseUntil{};
     std::optional<HeadCameraSample> handUseRigHistory;
-    RocketArmSteering rocketSteering;
+    RocketArmSteering rocketSteering,rocketSocketSteering;
     RigInput rigControls;
     RigOptics opticsControls;
     bool binocularSelected{};
@@ -1638,17 +1638,23 @@ struct Session {
         }
         const auto rocketStick=controls.axis("axes.move",routedPhysical);
         const bool rocketGyro=controls.setting("settings.rocket_arm_gyro")!=0;
+        const bool rocketSocketControl=controls.setting("settings.rocket_arm_socket")!=0;
         // The socket and phantom palm come from one solved skin publication.
-        // The screen follows the forearm; the missing left hand still rotates
-        // independently at its wrist and controls guidance.
+        // Forearm direction and phantom wrist rotation steer independently.
+        // Both physical channels add to fine joystick correction.
         const bool rocketHandTracked=controllerFrame.hands[0].gripTracked&&controllerFrame.hands[0].aimTracked;
         const bool rocketSocketTracked=rocketGuidanceInput&&rocketHandTracked&&handUseRig
             &&handUseRig->rocketArmSocketTracked&&handUseRig->renderedPalmTracked[0];
-        const auto rocketHand=rocketSocketTracked
+        const auto rocketTrackingPose=[&](Pose pose){return rocketSocketTracked
             ?compose(handUseRig->headPose,compose(Pose{{0,1,0,0},{}},
-                compose(inverse(handUseRig->nativePose),rocketArmGuidancePose(
-                    handUseRig->rocketArmSocket,handUseRig->renderedPalms[0]))))
-            :Pose{};
+                compose(inverse(handUseRig->nativePose),pose))):Pose{};};
+        const auto rocketHand=rocketTrackingPose(rocketSocketTracked
+            ?rocketArmGuidancePose(handUseRig->rocketArmSocket,handUseRig->renderedPalms[0]):Pose{});
+        const auto rocketSocket=rocketTrackingPose(rocketSocketTracked?handUseRig->rocketArmSocket:Pose{});
+        const auto socketAxes=rocketSocketSteering.update(rocketArmSocketAim(rocketSocket),
+            handUseRig?handUseRig->headPose:Pose{},rocketSocketTracked&&rocketSocketControl,
+            handUseRig?handUseRig->playerOwner:nativeStatus.sourcePlayerOwner,nativeStatus.activation,referenceEpoch,
+            rocketHandTracked&&rocketSocketControl&&rocketGuidanceInput?now:0,1.f,false);
         const auto rocketAxes=rocketSteering.update(rocketHand,
             handUseRig?handUseRig->headPose:Pose{},rocketSocketTracked&&rocketGyro,
             handUseRig?handUseRig->playerOwner:nativeStatus.sourcePlayerOwner,nativeStatus.activation,referenceEpoch,
@@ -1658,7 +1664,7 @@ struct Session {
             // The native projectile owns the movement stick, never a turn of
             // Snake's VR tracking space. Stick correction adds to the gyro;
             // using or releasing the stick must not silently recenter the hand.
-            const auto combined=rocketArmInput(rocketAxes,rocketStick);
+            const auto combined=rocketArmInput(rocketAxes,rocketStick,socketAxes);
             pad.leftX=static_cast<int16_t>(combined[0]*32767.f);
             pad.leftY=static_cast<int16_t>(combined[1]*32767.f);
         }

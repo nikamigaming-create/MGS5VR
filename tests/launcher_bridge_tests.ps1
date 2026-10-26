@@ -54,9 +54,9 @@ try {
     Assert ($loaded.state.runtime.'ui.map_control_prompts' -eq '1') 'reviewed Map control labels default on in the launcher runtime snapshot'
     Assert ($loaded.state.runtime.'optics.binocular_native_material' -eq '0') 'unproven binocular scene lighting defaults off in the launcher runtime snapshot'
     $settingRows=@($loaded.state.settings)
-    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 69) 'serialized settings field is a flat array containing all 69 setting rows'
+    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 70) 'serialized settings field is a flat array containing all 70 setting rows'
     $rowsValid=$true
-    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 69) { $rowsValid=$false }
+    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 70) { $rowsValid=$false }
     else {
         foreach ($row in $settingRows) {
             $numbers=@($row.value,$row.min,$row.max)
@@ -66,7 +66,7 @@ try {
         }
     }
     Assert $rowsValid 'each setting row has a named setting and numeric value/min/max bounds'
-    foreach ($rocketSwitch in @('rocket_arm_screen','rocket_arm_gyro','rocket_arm_wrist_twist')) {
+    foreach ($rocketSwitch in @('rocket_arm_screen','rocket_arm_socket','rocket_arm_gyro','rocket_arm_wrist_twist')) {
         Assert (@($settingRows | Where-Object { $_.name -eq "settings.$rocketSwitch" -and $_.value -eq 1 -and $_.min -eq 0 -and $_.max -eq 1 }).Count -eq 1) "$rocketSwitch is an independent live toggle defaulting on"
     }
     Assert (@($settingRows | Where-Object { $_.name -eq 'settings.rocket_arm_screen_width_cm' -and $_.value -eq 20 -and $_.min -eq 10 -and $_.max -eq 35 }).Count -eq 1) 'Rocket screen width exposes the supported live range'

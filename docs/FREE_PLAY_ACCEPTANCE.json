@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "fbc50f53c4d320097ed946787d7cc41032e01f0a5b7ed79bfa02a043214adb5a",
-  "candidate_status": "Rocket Arm phantom-left-hand/socket-rectangle candidate built, checked and deployed. All 58 groups and installer checks pass; new in-game/final-eye and physical headset acceptance remain pending.",
+  "candidate": "0451221ea76df7a0bebcad113b9fce85ebc0c88d74f3ea00eab7e501bfa7eb2e",
+  "candidate_status": "Flipped-up oval checked/deployed; centered take4 shows wrist gyro/stick/return. New user-confirmed independent spatial socket channel implemented, build/video pending.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2652,5 +2652,12 @@
     "latest_native_back_dismissal": "20261026T164122346815Z",
     "latest_land_select": "20261026T164229698528Z",
     "build_check_failure": "Launcher backup test saved unchanged default and relied on newline conversion. Now saves actual changed value. Retained rocket-oval-build-failed.log."
+  },
+  "rocket_spatial_combo_2026_10_26": {
+    "status": "source_implemented_build_video_pending",
+    "contract": "Spatial socket yaw/pitch at gain 1 + independent wrist gyro default gain 2 + additive joystick correction",
+    "prior_take": "artifacts/rocket-proof-20261026/take4",
+    "prior_limits": "Take4 does not prove independent spatial socket steering; user accepts right-eye patch overlap as intentional; physical headset unproven",
+    "preservation": "artifacts/rocket-flip-up-preservation.json"
   }
 }

@@ -1892,6 +1892,23 @@ int main(){
         wristSteering.update(phantom,{},false,2,3,4,0);
         expect(wristSteering.update({}, {},true,2,3,4,180)==std::array<float,2>{},
             "raw tracking loss or disabled gyro clears guidance immediately");
+        RocketArmSteering spatialSteering;
+        // +X in the socket frame points along the forearm, initially forward.
+        const Pose forwardSocket{{0,.70710678f,0,.70710678f},{0,-.2f,-.5f}};
+        spatialSteering.update(rocketArmSocketAim(forwardSocket),{},true,1,2,3,100,1,false);
+        const auto waved=compose(Pose{{0,.258819f,0,.965926f},{}},forwardSocket);
+        const auto spatial=spatialSteering.update(rocketArmSocketAim(waved),{},true,1,2,3,110,1,false);
+        expect(spatial[0]<-.5f&&near(spatial[1],0),
+            "socket direction steers while the phantom palm orientation remains fixed");
+        const auto rolledSocket=compose(forwardSocket,Pose{{.258819f,0,0,.965926f},{}});
+        const auto rolledAim=rocketArmSocketAim(rolledSocket),straightAim=rocketArmSocketAim(forwardSocket);
+        expect(same(rotate(rolledAim.orientation,{0,0,-1}),rotate(straightAim.orientation,{0,0,-1})),
+            "socket pronation cannot double-count the independent wrist-twist gyro");
+        expect(near(rocketArmInput({.2f,.1f},{.25f,-.2f},{.3f,.4f})[0],.75f)
+            &&near(rocketArmInput({.2f,.1f},{.25f,-.2f},{.3f,.4f})[1],.3f),
+            "spatial socket, wrist gyro and joystick act together without override");
+        expect(rocketArmInput({}, {},spatial)==spatial&&rocketArmInput({}, {.3f,0})[0]==.3f,
+            "socket-only and joystick-only steering remain available independently");
         HeadCamera flight;flight.configure(true,1,true);flight.track({},true,100);flight.toggle();
         auto head=identityMatrix;head[13]=1.6f;
         expect(flight.publishPlayerHead(7,8,{},identityMatrix,head,100),"ordinary head publication admitted");

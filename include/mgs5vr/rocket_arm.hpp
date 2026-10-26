@@ -37,10 +37,22 @@ inline Pose rocketArmGuidancePose(Pose socket,Pose phantomHand) noexcept {
     // including pronation, instead of reducing it to the elbow->wrist axis.
     return {phantomHand.orientation,socket.position};
 }
-inline std::array<float,2> rocketArmInput(std::array<float,2> gyro,std::array<float,2> stick) noexcept {
+// Convert elbow->wrist direction to yaw/pitch only. Moving the tracked socket
+// can steer independently of palm orientation; pronation belongs to wrist gyro.
+inline Pose rocketArmSocketAim(Pose socket) noexcept {
+    if(!valid(socket))return socket;
+    const auto forward=rotate(socket.orientation,{1,0,0});
+    const float yaw=std::atan2(-forward.x,-forward.z);
+    const float pitch=std::atan2(forward.y,std::hypot(forward.x,forward.z));
+    return compose(Pose{{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)},socket.position},
+        Pose{{std::sin(pitch*.5f),0,0,std::cos(pitch*.5f)},{}});
+}
+inline std::array<float,2> rocketArmInput(std::array<float,2> gyro,std::array<float,2> stick,
+                                         std::array<float,2> socket={}) noexcept {
     if(!std::isfinite(stick[0])||!std::isfinite(stick[1])||std::hypot(stick[0],stick[1])<=.15f)stick={};
     for(size_t i=0;i<gyro.size();++i)
-        gyro[i]=std::clamp((std::isfinite(gyro[i])?gyro[i]:0.f)+stick[i],-1.f,1.f);
+        gyro[i]=std::clamp((std::isfinite(gyro[i])?gyro[i]:0.f)+stick[i]
+            +(std::isfinite(socket[i])?socket[i]:0.f),-1.f,1.f);
     return gyro;
 }
 inline std::optional<Pose> rocketArmRenderPose(Pose native) noexcept {

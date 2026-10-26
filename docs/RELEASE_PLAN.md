@@ -1,5 +1,26 @@
 # Release execution plan — 26 October 2026
 
+## Socket + gyro + joystick clarification — 26 October
+
+User explicitly requests three concurrent controls: spatial forearm/socket aim,
+stronger independent phantom-wrist gyro, and fine joystick correction. Prior
+`0451221ea76d` demonstrates wrist gyro and joystick, but moving a socket with
+unchanged palm orientation did not itself steer. Its centered take4 is retained
+at `artifacts/rocket-proof-20261026/take4`: arm approach/palm-down pose, launch,
+wrist rotation, translation, joystick, downward burst and native return; 22 s,
+65 left/63 right frames at 2.95/2.86 capture fps. Both complete frame sequences
+reviewed; left feed clear. User confirms the noticeable right-eye patch overlap
+is intentional and acceptable, not a defect by itself. No physical acceptance.
+Take3 timed out waiting for automatic return and is retained as incomplete.
+
+New source adds the solved elbow-to-socket direction as a separate yaw/pitch
+channel at gain 1, alongside the existing wrist gyro (default gain 2) and stick.
+Socket roll is excluded from this channel to avoid duplicating wrist twist.
+All three add before native bounds; none overrides/recenters another. A new
+live Rocket Arm socket steering switch defaults on. There are 70 settings and
+19 switches. Build/check/deploy and spatial-steering video are pending. Retain
+the flipped-up oval, original personal settings and published play pin.
+
 Latest user clarification: flip the oval UP above the socket, facing the pilot.
 Source now lifts it 60 degrees from the dorsal wrist plane about its attached
 near edge; the complete mount still follows the wrist. This supersedes the flat
