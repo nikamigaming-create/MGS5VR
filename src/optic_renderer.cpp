@@ -836,7 +836,7 @@ struct Resources {
     ComPtr<ID3D11DepthStencilView> housingDepthView;
     std::array<RetailGpuAsset,11> studioCamera;
     RetailGpuAsset studioMarker,studioMarkerTip,studioNotes,studioStickyBack,studioPhotoBack,studioViewfinder,studioFocus;
-    RetailGpuAsset idroidGuidance;
+    RetailGpuAsset idroidGuidance,rocketGuidanceRim;
     float idroidGuidanceWidth{},idroidGuidanceAspect{};
     std::array<RetailGpuAsset,44> studioKeys;
     std::array<RetailGpuAsset,6> studioButtons,studioButtonFaces;
@@ -1194,6 +1194,39 @@ bool studioQuad(ID3D11Device* device,RetailGpuAsset& asset,mgs5vr::Vec3 half,
         Vertex v{};v.position[0]=p[0];v.position[1]=p[1];v.position[2]=z;v.normal[2]=1;
         v.uv[0]=p[2];v.uv[1]=p[3];vertices.push_back(v);}
     return createCabinSurface(device,asset,vertices,indices,pixels,width,height);
+}
+bool rocketOval(ID3D11Device* device,RetailGpuAsset& face,RetailGpuAsset& rim,float width,float aspect){
+    constexpr uint16_t segments=64;
+    const float a=width*.5f,b=a/aspect;
+    std::vector<Vertex> vertices;std::vector<uint16_t> indices;
+    Vertex center{};center.position[2]=.001f;center.normal[2]=1;center.uv[0]=center.uv[1]=.5f;
+    vertices.push_back(center);
+    for(uint16_t i=0;i<segments;++i){
+        const float angle=6.28318530718f*i/segments,c=std::cos(angle),s=std::sin(angle);
+        Vertex v{};v.position[0]=a*.94f*c;v.position[1]=b*.94f*s;v.position[2]=.001f;v.normal[2]=1;
+        v.uv[0]=.5f+.5f*c;v.uv[1]=.5f-.5f*s;vertices.push_back(v);
+        indices.insert(indices.end(),{0,static_cast<uint16_t>(i+1),static_cast<uint16_t>((i+1)%segments+1)});
+    }
+    if(!createCabinSurface(device,face,vertices,indices,{0xffffffffu},1,1))return false;
+    vertices.clear();indices.clear();
+    const auto triangle=[&](mgs5vr::Vec3 p,mgs5vr::Vec3 q,mgs5vr::Vec3 r){
+        const auto u=q-p,v=r-p;
+        auto n=mgs5vr::Vec3{u.y*v.z-u.z*v.y,u.z*v.x-u.x*v.z,u.x*v.y-u.y*v.x};
+        n=n*(1.f/std::max(.000001f,std::sqrt(mgs5vr::dot(n,n))));
+        for(const auto point:{p,q,r}){Vertex vertex{};
+            vertex.position[0]=point.x;vertex.position[1]=point.y;vertex.position[2]=point.z;
+            vertex.normal[0]=n.x;vertex.normal[1]=n.y;vertex.normal[2]=n.z;
+            indices.push_back(static_cast<uint16_t>(vertices.size()));vertices.push_back(vertex);}
+    };
+    // Shallow graphite housing, raised shoulder and sloped inner bevel.
+    constexpr std::array<std::array<float,2>,4> rings{{{1.f,-.003f},{1.f,.001f},{.97f,.004f},{.94f,.001f}}};
+    for(size_t ring=0;ring+1<rings.size();++ring)for(uint16_t i=0;i<segments;++i){
+        const auto point=[&](size_t k,unsigned j){const float angle=6.28318530718f*j/segments;
+            return mgs5vr::Vec3{a*rings[k][0]*std::cos(angle),b*rings[k][0]*std::sin(angle),rings[k][1]};};
+        const auto p=point(ring,i),q=point(ring,i+1),r=point(ring+1,i),s=point(ring+1,i+1);
+        triangle(p,q,r);triangle(r,q,s);
+    }
+    return createCabinSurface(device,rim,vertices,indices,{0xff56616au},1,1);
 }
 bool studioCylinder(ID3D11Device* device,RetailGpuAsset& asset,float radius,float from,float to,
     uint32_t color,mgs5vr::Vec3 center={}){
@@ -2625,9 +2658,10 @@ bool drawIdroidGuidance(ID3D11DeviceContext* context,const std::array<float,16>&
         if(!resources.attempted&&!createResources(device.Get()))return false;
         if(!resources.ready)return false;
         if(!resources.idroidGuidance.ready||resources.idroidGuidanceWidth!=width||resources.idroidGuidanceAspect!=aspect){
-            RetailGpuAsset surface;
-            if(!studioQuad(device.Get(),surface,{width*.5f,width/(2*aspect),0},{0xffffffffu},1,1,0))return false;
+            RetailGpuAsset surface,rim;
+            if(!rocketOval(device.Get(),surface,rim,width,aspect))return false;
             resources.idroidGuidance=std::move(surface);
+            resources.rocketGuidanceRim=std::move(rim);
             resources.idroidGuidanceWidth=width;resources.idroidGuidanceAspect=aspect;
         }
         // Never keep a preceding flight/frame's SRV after a missing capture.
@@ -2636,7 +2670,8 @@ bool drawIdroidGuidance(ID3D11DeviceContext* context,const std::array<float,16>&
         SavedState saved;save(context,saved);
         ComPtr<ID3D11DepthStencilView> depth;
         const bool ready=saved.renderTarget&&bindHousingDepth(context,device.Get(),saved,projection[14]>0,depth,&eye);
-        const bool drawn=ready&&drawOpeningAsset(context,resources.idroidGuidance,saved.renderTarget.Get(),depth.Get(),world,view,projection,true);
+        const bool drawn=ready&&drawOpeningAsset(context,resources.rocketGuidanceRim,saved.renderTarget.Get(),depth.Get(),world,view,projection)
+            &&drawOpeningAsset(context,resources.idroidGuidance,saved.renderTarget.Get(),depth.Get(),world,view,projection,true);
         restore(context,saved);return drawn;
     }catch(...){return false;}
 }

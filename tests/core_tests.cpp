@@ -1804,24 +1804,24 @@ int main(){
             const auto panel=rocketArmDisplay(socket,screenWidth,screenAspect);
             expect(panel.has_value(),"tracked socket has a guidance display");
             const auto bottom=compose(*panel,Pose{{},{0,-screenWidth/(2*screenAspect),0}});
-            expect(same(bottom.position,socket.position),"rectangle lower edge remains attached to the socket through rotation");
-            expect(same(rotate(panel->orientation,{0,0,1}),rotate(socket.orientation,{-1,0,0})),
-                "screen faces along the forearm toward the pilot, without head-facing billboarding");
+            expect(same(bottom.position,compose(socket,Pose{{},{0,0,.025f}}).position),"oval near edge stays on top of the wrist through rotation");
+            expect(same(rotate(panel->orientation,{0,0,1}),rotate(socket.orientation,{0,0,1})),
+                "screen lies in the dorsal wrist plane and rolls with the arm");
             const auto horizontal=rotate(panel->orientation,{screenWidth,0,0});
             const auto vertical=rotate(panel->orientation,{0,screenWidth/screenAspect,0});
             expect(near(dot(horizontal,vertical),0)&&near(dot(horizontal,horizontal),screenWidth*screenWidth)
                 &&near(dot(vertical,vertical),(screenWidth/screenAspect)*(screenWidth/screenAspect)),
-                "socket rotation retains a true rectangle and native camera aspect");
+                "wrist display bounds preserve the native camera aspect");
             const Pose motion{{0,0,.38268343f,.92387953f},{3,1,-2}};
             const auto moved=rocketArmDisplay(compose(motion,socket),screenWidth,screenAspect);
             const auto expected=compose(motion,*panel);
             expect(moved&&same(moved->position,expected.position)
                 &&same(rotate(moved->orientation,{0,1,0}),rotate(expected.orientation,{0,1,0})),
-                "socket translation and twist move the complete rectangle rigidly");
+                "socket translation and twist move the complete oval display rigidly");
         }
         for(const float width:{.1f,.35f}){
             const auto panel=rocketArmDisplay({},width,screenAspect);
-            expect(panel&&same(compose(*panel,Pose{{},{0,-width/(2*screenAspect),0}}).position,{}),
+            expect(panel&&same(compose(*panel,Pose{{},{0,-width/(2*screenAspect),0}}).position,{0,0,.025f}),
                 "live screen resizing preserves the socket attachment");
         }
         expect(!rocketArmDisplay({},.09f,screenAspect)&&!rocketArmDisplay({},.36f,screenAspect)

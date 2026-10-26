@@ -1,5 +1,14 @@
 # Field fixes — implementation and acceptance
 
+26 October video follow-up: `fbc50f53c4d3` launched and accepted phantom-hand
+steering, but the upright rectangle failed the user's requested wrist plane.
+Retained take1 is a visual failure, not presentation acceptance. Revised source
+mounts an oval, shallow-beveled display flat on the dorsal wrist and retains
+real camera pixels and both-eye source ownership. Build and corrected video
+pending; physical feel/impact remain open. Recurring Choose a Rival Help was
+closed with native Back; its saved tutorial state was already FINISH. No broad
+tutorial persistence repair is claimed. See CURRENT for retained runs.
+
 26 October Rocket Arm clarification: the requested phantom LEFT hand gyro,
 socket-fixed rectangular camera and additive joystick correction differ from
 the previously accepted forearm-axis/head-facing presentation. The new batch

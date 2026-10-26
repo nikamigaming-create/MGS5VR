@@ -2623,5 +2623,25 @@
     "preservation_receipt": "artifacts/rocket-socket-preservation.json",
     "preservation": "Installed DLL and both slot manifests verify; personal controls/runtime byte-identical; published play manifest unchanged.",
     "cleanup": "No game/simulator launched or test input/settings changed. Steam retained. Meta Link 64-bit CheckOnly passes. Zero obsolete builds."
+  },
+  "rocket_oval_wrist_2026_10_26": {
+    "status": "source_corrected_build_video_pending",
+    "prior_take": "artifacts/rocket-proof-20261026/take1",
+    "prior_candidate": "fbc50f53c4d320097ed946787d7cc41032e01f0a5b7ed79bfa02a043214adb5a",
+    "prior_result": "native launch/gyro/twist/translation/stick/return observed; upright rectangle rejected by user",
+    "capture_fps": {
+      "left": 3.379,
+      "right": 3.325
+    },
+    "contract": "Oval live aperture with shallow graphite bevel, dorsal wrist plane, rigid socket attachment, left phantom hand gyro and additive joystick",
+    "limits": [
+      "Physical headset unproven",
+      "Impact unproven",
+      "Capture cadence is not game frame rate",
+      "Recurring Help persistence unresolved; existing FINISH state preserved"
+    ],
+    "tutorial_failure": "20261026T161740178213Z",
+    "native_back_dismissal": "20261026T161941318842Z",
+    "land_select": "20261026T162112602837Z"
   }
 }

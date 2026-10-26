@@ -902,7 +902,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         if(afterContext&&rocketView&&opticScene){
             const float width=wrist.controllers.rocketArmScreenWidth;
             if(const auto panel=rocketSocket?mgs5vr::rocketArmDisplay(wrist.rocketArmSocket,width,rocketAspect):std::nullopt){
-                // A rectangle fixed at the stump follows the exact forearm
+                // An oval on top of the wrist follows the exact forearm
                 // transaction rendered in both eyes. Preserve flight pixels
                 // and their native aspect; do not borrow terminal equipment.
                 const auto screen=*panel;

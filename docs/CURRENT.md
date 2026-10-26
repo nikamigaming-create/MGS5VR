@@ -1,5 +1,29 @@
 # Current MGS5VR work — 26 October 2026
 
+## Oval wrist display follow-up � 26 October
+
+The requested final-eye video reproduced the mounting mistake on `fbc50f53c4d3`:
+the rectangle stood at the socket end instead of lying on top of the wrist.
+Retained continuous take `artifacts/rocket-proof-20261026/take1` shows real launch,
+phantom-hand pitch/yaw/twist, translation, joystick input and native return, but
+is rejected for the requested presentation. Left/right capture cadence is only
+3.38/3.33 fps; it does not establish smooth headset motion or impact.
+
+The user clarified a dorsal wrist plane and then requested an OVAL with a shallow
+beveled rim. The revised display follows the socket rigidly, lies 25 mm above its
+centerline and extends forward from its near edge. A 64-segment oval aperture
+crops camera corners without stretching the feed; a graphite three-slope rim
+adds depth. This replaces the previous rectangle contract, not its history.
+Build/deploy and a corrected bounded video are pending. Preserve left-hand gyro,
+additive joystick and live settings. Physical headset acceptance remains open.
+
+The route also reproduced recurring Choose a Rival Help. Native FOB tutorial
+state is already FINISH (127); ordinary B/Back dismisses it and deployment then
+completes. Retained failed confirm route `20261026T161740178213Z` and successful
+Back dismissal `20261026T161941318842Z` distinguish Help from lost tutorial save
+progress. Persistence of all tutorial notices remains unresolved; no save flags
+were changed. Landing/selection route `20261026T162112602837Z` is retained.
+
 ## Rocket Arm requested interaction — 26 October
 
 The user clarified that the LEFT controller remains the missing hand: wrist

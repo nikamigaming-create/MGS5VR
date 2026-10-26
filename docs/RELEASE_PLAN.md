@@ -1,5 +1,12 @@
 # Release execution plan — 26 October 2026
 
+Next action: build/check/deploy the corrected dorsal OVAL wrist display, then
+record the user-requested bounded final-eye demonstration. The earlier upright
+rectangle failed visual review. Show actual launch, wrist twist, translation,
+additive joystick and native return; inspect both eyes. Preserve the published
+pin and saves, restore poses/input/runtime and close the owned simulator after
+recording. No universal or physical-headset acceptance from this take.
+
 Current action completed: checked/deployed `fbc50f53c4d3` / source `3421214` of the clarified Rocket Arm batch:
 rectangle attached to the left socket, phantom left-hand gyro including optional
 wrist twist, additive joystick correction and live tuning. All 58 groups and
