@@ -221,7 +221,7 @@ const settingCopy={
  full_body:['Full body','Show the native body with tracked arms. Off keeps hands and forearms on supported outfits. Native leg lengths stay unchanged.'],
  eyepatch:['Eyepatch','Show Snake’s eyepatch and its matte dark translucent first-person patch near the right eye. Off hides both presentations. Applies live after saving and releasing controls.'],
  cinematic_free_move:['Cinematic free movement','Allow spectator movement during noninteractive cinematics. Authored actors stay in place.'],
- rocket_arm_screen:['Rocket Arm screen','Show the live rocket camera on a beveled oval lying flat on top of the left wrist. The world remains visible around it.'],
+ rocket_arm_screen:['Rocket Arm screen','Show the live rocket camera on a beveled oval flipped up above the left wrist socket. The world remains visible around it.'],
  rocket_arm_screen_width_cm:['Rocket Arm screen width','Resize the wrist-mounted oval. The camera image keeps its proportions; the oval aperture crops its corners.'],
  rocket_arm_gyro:['Rocket Arm left-hand gyro','Steer with the missing left hand’s controller rotation. Joystick input adds correction. Off keeps joystick steering.'],
  rocket_arm_wrist_twist:['Rocket Arm wrist twist','Add left/right steering by twisting the left wrist. Off keeps gyro yaw and pitch. Requires left-hand gyro.'],
