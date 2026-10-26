@@ -5562,6 +5562,13 @@ int main(){
                 "stale trim publication drops accumulated input instead of integrating the gap");
         }
         MountedAimMailbox mailbox;
+        const auto transferring=mountedAimForHeldHands({.6f,.3f},3,1);
+        expect(transferring&&(*transferring)[0]==0&&(*transferring)[1]==0,
+            "releasing one mounted handle reserves neutral gun input until ownership transfers instead of turning the viewer");
+        expect(!mountedAimForHeldHands({.6f,.3f},3,0),
+            "releasing both handles returns the stick to ordinary native control");
+        expect(mountedAimForHeldHands({.6f,.3f},1,1)==std::optional<std::array<float,2>>{{.6f,.3f}},
+            "the new operating hand resumes native gun aim after transfer");
         mailbox.publish({1,2,3,100,{.5f,0},2});
         expect(mailbox.read(199).hands==2&&!mailbox.read(201).hands&&!mailbox.read(99).hands,
             "expired or backward-clock mounted requests cannot keep steering the native weapon");

@@ -1625,11 +1625,11 @@ struct Session {
             |(controllerFrame.mountedHandGrip[1]?2:0));
         if(mountedGripInput&&handUseRig&&mountedGrip.player==handUseRig->playerOwner
            &&mountedGrip.action==controllerFrame.nativeActionId&&mountedGrip.action==handUseRig->mountedWeaponAction
-           &&mountedGrip.activation==nativeStatus.activation&&mountedGrip.referenceEpoch==referenceEpoch
-           &&mountedGrip.hands&&(mountedGrip.hands&heldMountedHands)==mountedGrip.hands){
+           &&mountedGrip.activation==nativeStatus.activation&&mountedGrip.referenceEpoch==referenceEpoch)
+          if(const auto axes=mountedAimForHeldHands(mountedGrip.axes,mountedGrip.hands,heldMountedHands)){
             pad.leftTrigger=255;
-            pad.rightX=static_cast<int16_t>(mountedGrip.axes[0]*32767.f);
-            pad.rightY=static_cast<int16_t>(mountedGrip.axes[1]*32767.f);
+            pad.rightX=static_cast<int16_t>((*axes)[0]*32767.f);
+            pad.rightY=static_cast<int16_t>((*axes)[1]*32767.f);
             // While holding a handle the stick trims the gun's requested aim.
             // Neither physical aiming nor its stick trim turns the viewer's
             // reference space and feeds barrel movement back into the hand.

@@ -16,6 +16,16 @@ struct MountedGripSample {
     bool held{},acquired{};
     Pose snappedHand{},requestedAim{};
 };
+// During a hand transfer, the previous publication can still name both hands.
+// Reserve gun input with neutral axes until the rig publishes the new operator;
+// falling through to ordinary stick input would briefly turn the viewer.
+inline std::optional<std::array<float,2>> mountedAimForHeldHands(
+        std::array<float,2> axes,uint8_t sampledHands,uint8_t heldHands) noexcept {
+    if(!(sampledHands&heldHands))return {};
+    if((sampledHands&heldHands)!=sampledHands)return std::array<float,2>{};
+    for(auto& axis:axes)axis=std::isfinite(axis)?std::clamp(axis,-1.f,1.f):0.f;
+    return axes;
+}
 class MountedGrip {
 public:
     MountedGripSample update(MountedGripOwner owner,Pose hand,Pose contact,Pose aim,
