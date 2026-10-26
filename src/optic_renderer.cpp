@@ -1917,7 +1917,7 @@ std::array<uint8_t,7> markerGlyph(char c){
 void drawWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
     const std::array<float,16>& view,const std::array<float,16>& projection,mgs5vr::Vec3 camera,
     const mgs5vr::OpticWaypoints& points,ID3D11RenderTargetView* target,const D3D11_VIEWPORT& viewport,bool lens,
-    ID3D11DepthStencilView* housingMask=nullptr){
+    ID3D11DepthStencilView* housingMask=nullptr,float enemyMarkerScale=.6f){
     const auto status=mgs5vr::headCamera().status();
     const auto now=mgs5vr::steadyMilliseconds();
     if(!target||!status.active||points.activation!=status.activation
@@ -1953,21 +1953,23 @@ void drawWaypoints(ID3D11DeviceContext* context,ID3D11Device* device,
         if(!std::isfinite(distance)||distance>99999.f)continue;
         ++visible;
         const bool compact=!lens&&!point.letter;
-        const float radius=compact?.009f:.032f;
+        // Scale acquired-person glyphs, never their world anchor, waypoints or marking ray.
+        const float scale=point.letter?1.f:std::clamp(std::isfinite(enemyMarkerScale)?enemyMarkerScale:.6f,.25f,1.5f);
+        const float radius=(compact?.009f:.032f)*scale;
         const auto markerColor=point.letter?amber:red;
         for(const auto color:{black,markerColor}){
-            const float width=color==black?(compact?.0018f:.005f):(compact?.0008f:.002f);
+            const float width=(color==black?(compact?.0018f:.005f):(compact?.0008f:.002f))*scale;
             line(x,y+radius,x+radius,y,width,color);line(x+radius,y,x,y-radius,width,color);
             line(x,y-radius,x-radius,y,width,color);line(x-radius,y,x,y+radius,width,color);
         }
         char label[24]{};
         if(point.letter)std::snprintf(label,sizeof(label),"%c %uM",'A'+point.letter-1,static_cast<unsigned>(std::lround(distance)));
         else std::snprintf(label,sizeof(label),"%uM",static_cast<unsigned>(std::lround(distance)));
-        const float pixel=lens?.0075f:compact?.0025f:.0035f;const float length=static_cast<float>(std::strlen(label));
+        const float pixel=(lens?.0075f:compact?.0025f:.0035f)*scale;const float length=static_cast<float>(std::strlen(label));
         // Keep nearby waypoint and person labels on opposite sides of the
         // marker, leaving the person and the exact aiming point visible.
-        const float left=x-(length*6-1)*pixel*.5f,top=y+(point.letter?-.052f:compact?.036f:.112f);
-        const float padding=compact?.003f:.008f;
+        const float left=x-(length*6-1)*pixel*.5f,top=y+(point.letter?-.052f:compact?.036f:.112f)*scale;
+        const float padding=(compact?.003f:.008f)*scale;
         quad(left-padding,top+padding,left+(length*6-1)*pixel+padding,top-7*pixel-padding,black);
         for(size_t n=0;label[n];++n){const auto glyph=markerGlyph(label[n]);
             for(size_t row=0;row<7;++row)for(size_t col=0;col<5;++col)if(glyph[row]&(1u<<(4-col))){
@@ -2095,7 +2097,7 @@ bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& wor
 namespace mgs5vr {
 bool capturePhysicalOpticScene(ID3D11DeviceContext* context,const std::array<float,16>& view,
     const std::array<float,16>& projection,Vec3 cameraPosition,ID3D11Texture2D** output,bool waypoints,
-    const OpticWaypoints* markers) noexcept{
+    const OpticWaypoints* markers,float enemyMarkerScale) noexcept{
     if(output)*output=nullptr;
     if(!context||!output)return false;
     try{
@@ -2109,7 +2111,7 @@ bool capturePhysicalOpticScene(ID3D11DeviceContext* context,const std::array<flo
         if(copied&&waypoints){
             const auto points=markers?*markers:opticWaypoints();
             const D3D11_VIEWPORT viewport{0,0,static_cast<float>(resources.sceneDescription.Width),static_cast<float>(resources.sceneDescription.Height),0,1};
-            drawWaypoints(context,device.Get(),view,projection,cameraPosition,points,resources.sceneOverlayTarget.Get(),viewport,true);
+            drawWaypoints(context,device.Get(),view,projection,cameraPosition,points,resources.sceneOverlayTarget.Get(),viewport,true,nullptr,enemyMarkerScale);
         }
         restore(context,state);
         if(!copied)return false;
@@ -2119,7 +2121,7 @@ bool capturePhysicalOpticScene(ID3D11DeviceContext* context,const std::array<flo
 }
 void drawWorldWaypoints(ID3D11DeviceContext* context,const std::array<float,16>& view,
     const std::array<float,16>& projection,Vec3 cameraPosition,const OpticWaypoints& markers,
-    HudMode mode,bool enemyMarkers,const std::array<float,16>* binocularWorld) noexcept{
+    HudMode mode,bool enemyMarkers,const std::array<float,16>* binocularWorld,float enemyMarkerScale) noexcept{
     if(!context||!markers.count)return;
     try{
         std::lock_guard lock(rendererMutex);
@@ -2132,7 +2134,7 @@ void drawWorldWaypoints(ID3D11DeviceContext* context,const std::array<float,16>&
                 visible.points[visible.count++]=markers.points[i];
         if(state.renderTarget&&state.viewportCount){
             auto* mask=binocularWorld?binocularMarkerMask(context,device.Get(),state,*binocularWorld,view,projection):nullptr;
-            drawWaypoints(context,device.Get(),view,projection,cameraPosition,visible,state.renderTarget.Get(),state.viewport,false,mask);
+            drawWaypoints(context,device.Get(),view,projection,cameraPosition,visible,state.renderTarget.Get(),state.viewport,false,mask,enemyMarkerScale);
         }
         restore(context,state);
     }catch(...){}

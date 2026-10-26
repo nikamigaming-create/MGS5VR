@@ -828,6 +828,17 @@ int main(int argc,char** argv){
     }
     {
         ControlBindings controls;LiveControls live;PhysicalControls physical;
+        bool preserve{};
+        std::istringstream sizeEdit("[settings]\nenemy_marker_scale_percent=25\n");
+        expect(live.stage(sizeEdit).empty(),"marker-size edit validates");
+        physical.buttons[7]=1;
+        expect(!live.apply(controls,physical,&preserve)&&!preserve,"visual edits still wait for grip release");
+        physical={};
+        expect(live.apply(controls,physical,&preserve)&&preserve,"marker resize preserves the equipped optic and presentation owner");
+        std::istringstream mixedEdit("[settings]\nenemy_marker_scale_percent=60\nturn_mode=snap\n");
+        expect(live.stage(mixedEdit).empty()&&live.apply(controls,physical,&preserve)&&!preserve,"mixed routing and visual edits retain the normal reset");
+        std::istringstream resetEdit("[settings]\nturn_mode=native_smooth\n");
+        expect(live.stage(resetEdit).empty()&&live.apply(controls,physical),"restore routing defaults for neutral-input checks");
         std::istringstream file("[settings]\nturn_mode=snap\n");
         expect(live.stage(file).empty()&&live.pending(),"valid complete edit waits away from active bindings");
         physical.buttons[10]=1;

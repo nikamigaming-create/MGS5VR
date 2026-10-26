@@ -107,6 +107,7 @@ public:
     // test bot and generated instructions; never reconstruct this from labels.
     std::string bindingsJson() const;
 private:
+    friend class LiveControls;
     enum class Gesture { level,press,release,tap,hold };
     struct Binding {uint32_t mask{};Gesture gesture{};uint64_t milliseconds{300};};
     struct State {uint64_t since{},until{};bool held{},blocked{},enabled{};};
@@ -127,7 +128,7 @@ private:
 class LiveControls {
 public:
     std::vector<std::string> stage(std::istream& input);
-    bool apply(ControlBindings& destination,const PhysicalControls& physical);
+    bool apply(ControlBindings& destination,const PhysicalControls& physical,bool* preservePresentation=nullptr);
     bool pending() const {return pending_.has_value();}
     void cancel(){pending_.reset();}
 private:

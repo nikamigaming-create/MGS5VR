@@ -6,6 +6,7 @@
 
 namespace mgs5vr {
 enum class ControlsMode { field,acc,title,driving,horse,binoculars,equipment,commands,idroid,menus,nativeButtons,cinematic,count };
+std::string_view controlsSettingsGroupName(size_t group) noexcept;
 std::string_view controlsModeName(ControlsMode mode) noexcept;
 ControlContext controlsModeContext(ControlsMode mode) noexcept;
 struct ControlsRow {std::string action,title,label;bool axis{};};
@@ -17,7 +18,7 @@ struct ControlsEditorFrame {
     Pose panel{};
     PhysicalControls physical{};
     std::vector<ControlsRow> rows;
-    size_t selected{},page{};
+    size_t selected{},page{},settingsGroup{};
     int hover{-1};
     std::array<float,2> cursor{};
     bool cursorValid{};

@@ -110,6 +110,7 @@ struct ControllerFrame {
     float handRestCurl{.08f},handTouchCurl{.20f};
     HudMode hudMode{HudMode::binocularsOnly};
     bool enemyWorldMarkers{};
+    float enemyMarkerScale{.6f};
     float magnification{1};
     uint64_t weaponZoomSequence{};
     float weaponAimPitch{-30.f}; // Firearms only, in the runtime pointing frame.

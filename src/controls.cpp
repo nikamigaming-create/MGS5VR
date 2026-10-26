@@ -230,7 +230,8 @@ const std::vector<SettingDefinition>& settingDefinitions(){
         {"settings.menu_quad_distance_cm",130,75,300},{"settings.menu_quad_tilt_degrees",-10,-30,30},
         {"settings.scope_eye_relief_cm",10,3,20},{"settings.turn_mode",1,0,2},{"settings.hud_mode",1,0,2},
         {"settings.scope_pose_stabilization",1,0,1},
-        {"settings.enemy_world_markers",0,0,1},{"settings.god_mode",0,0,1},
+        {"settings.enemy_world_markers",0,0,1},{"settings.enemy_marker_scale_percent",60,25,150},
+        {"settings.god_mode",0,0,1},
         {"settings.block_firing_near_cover",0,0,1},
         {"settings.cover_assistance",1,0,1},
         {"settings.tracked_weapon_obstruction",1,0,1},
@@ -402,7 +403,8 @@ std::vector<std::string> LiveControls::stage(std::istream& input){
     if(errors.empty())pending_=std::move(candidate);
     return errors;
 }
-bool LiveControls::apply(ControlBindings& destination,const PhysicalControls& physical){
+bool LiveControls::apply(ControlBindings& destination,const PhysicalControls& physical,bool* preservePresentation){
+    if(preservePresentation)*preservePresentation=false;
     if(!pending_)return false;
     for(size_t n=0;n<11;++n)
         if(!std::isfinite(physical.buttons[n])||std::abs(physical.buttons[n])>.09f)return false;
@@ -413,6 +415,23 @@ bool LiveControls::apply(ControlBindings& destination,const PhysicalControls& ph
     }
     for(const auto& stick:{physical.leftStick,physical.rightStick})
         for(const auto axis:stick)if(!std::isfinite(axis)||std::abs(axis)>=.18f)return false;
+    if(preservePresentation){
+        // Display/recon preferences do not change who owns the controls. In
+        // particular, resizing a marked person must not unequip the binoculars.
+        bool preserve=true;
+        for(const auto& entry:destination.entries_)
+            preserve&=destination.bindingText(entry.name)==pending_->bindingText(entry.name);
+        for(const auto& axis:destination.axes_)
+            preserve&=destination.bindingText(axis.name)==pending_->bindingText(axis.name);
+        constexpr std::array<std::string_view,6> display{
+            "settings.enemy_marker_scale_percent","settings.enemy_world_markers",
+            "settings.binocular_actor_glow","settings.binocular_auto_mark",
+            "settings.binocular_mark_dwell_ms","settings.hud_mode"};
+        for(const auto& setting:destination.settings_)
+            if(std::find(display.begin(),display.end(),setting.name)==display.end())
+                preserve&=setting.value==pending_->setting(setting.name);
+        *preservePresentation=preserve;
+    }
     destination=std::move(*pending_);pending_.reset();destination.suspend();
     return true;
 }

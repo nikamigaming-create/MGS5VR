@@ -30,14 +30,14 @@ bool drawNativeBinocularMaterialGBuffer(ID3D11DeviceContext*,
 bool capturePhysicalOpticScene(ID3D11DeviceContext* context,
     const std::array<float,16>& view,const std::array<float,16>& projection,
     Vec3 cameraPosition,ID3D11Texture2D** output,bool waypoints=true,
-    const OpticWaypoints* markers=nullptr) noexcept;
+    const OpticWaypoints* markers=nullptr,float enemyMarkerScale=.6f) noexcept;
 
 // Reproject acquired native people/waypoints from their world positions using
 // this exact eye. Both eyes receive one immutable marker snapshot.
 void drawWorldWaypoints(ID3D11DeviceContext* context,
     const std::array<float,16>& view,const std::array<float,16>& projection,
     Vec3 cameraPosition,const OpticWaypoints& markers,HudMode mode,bool enemyMarkers,
-    const std::array<float,16>* binocularWorld=nullptr) noexcept;
+    const std::array<float,16>* binocularWorld=nullptr,float enemyMarkerScale=.6f) noexcept;
 
 // Only the aperture is drawn: the equipped game's scope already supplies its
 // housing and lighting. No binocular asset is required by this path.

@@ -71,7 +71,7 @@ std::vector<uint32_t> panelPixels(const ControlsEditorFrame& f){
     fill({0,0,2048,105},RGB(23,36,44));text(f.settings?"VR SETTINGS":"CONTROLS",{42,18,790,94},56);
     text("LIVE MODE: "+std::string(controlsModeName(f.liveMode)),{980,26,1840,82},32,RGB(98,211,179));
     text(f.settings?"APPLIES LIVE":std::string(controlsModeName(f.mode)),{1120,123,1980,201},38);
-    text(f.settings?"ALL VR TUNING":f.automatic?"FOLLOWING GAME":"INSPECTING MODE",{32,215,880,241},24,RGB(145,165,169));
+    text(f.settings?(f.settingsGroup?"RELATED SWITCHES AND TUNING":"SWITCHES FIRST / ARROWS CHOOSE GROUP"):f.automatic?"FOLLOWING GAME":"INSPECTING MODE",{32,215,880,241},24,RGB(145,165,169));
     if(!f.settings){
         text("LEFT",{995,212,1455,269},34,RGB(229,236,232),DT_CENTER|DT_VCENTER|DT_SINGLELINE);
         text("RIGHT",{1500,212,1980,269},34,RGB(229,236,232),DT_CENTER|DT_VCENTER|DT_SINGLELINE);

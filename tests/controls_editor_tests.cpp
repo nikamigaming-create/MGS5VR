@@ -38,6 +38,17 @@ int main(){try{
     check(controlsModeContext(ControlsMode::idroid)==ControlContext::menus&&controlsModeContext(ControlsMode::binoculars)==ControlContext::binoculars,"Mode/context routing disagreed");
     editor.command(117,bindings);
     check(editor.frame().settings&&editor.frame().rows.size()==settingDefinitions().size()+1,"Headset omitted a live VR setting");
+    check(editor.frame().rows[1].action=="settings.god_mode","God Mode is not immediately accessible");
+    std::vector<std::string> grouped;
+    for(size_t group=1;group<8;++group){
+        editor.command(123,bindings);
+        check(editor.frame().settingsGroup==group&&!editor.frame().rows.empty(),"Settings group navigation failed");
+        for(const auto& row:editor.frame().rows)grouped.push_back(row.action);
+    }
+    editor.command(123,bindings);
+    check(editor.frame().settingsGroup==0,"Settings groups did not return to all");
+    for(const auto& row:editor.frame().rows)
+        check(std::count(grouped.begin(),grouped.end(),row.action)==1,"Grouped controls omit or duplicate a setting");
     const auto chooseSetting=[&](std::string_view name){
         const auto& rows=editor.frame().rows;const auto row=std::find_if(rows.begin(),rows.end(),[&](const auto& r){return r.action==name;});
         check(row!=rows.end(),"Setting missing");const auto index=static_cast<size_t>(row-rows.begin());
@@ -52,6 +63,12 @@ int main(){try{
     check(editor.frame().proposed=="snap"&&editor.frame().validProposal,"Enumerated turn setting lost parser syntax");
     editor.command(112,bindings);chooseSetting("settings.rocket_arm_sensitivity");editor.command(118,bindings);
     check(editor.frame().proposed=="1.75"&&editor.frame().validProposal,"Rocket gyro cannot be fine-tuned in the headset");
+    editor.command(112,bindings);chooseSetting("settings.enemy_marker_scale_percent");editor.command(118,bindings);
+    check(editor.frame().proposed=="55"&&editor.frame().validProposal,"Marker size cannot be fine-tuned live");
+    for(int n=0;n<30;++n)editor.command(118,bindings);
+    check(editor.frame().proposed=="25"&&editor.frame().validProposal,"Marker size lower bound failed");
+    for(int n=0;n<40;++n)editor.command(119,bindings);
+    check(editor.frame().proposed=="150"&&editor.frame().validProposal,"Marker size upper bound failed");
     editor.command(112,bindings);chooseSetting("settings.hand_touch_curl_percent");
     for(int n=0;n<13;++n)editor.command(118,bindings);
     check(!editor.frame().validProposal,"Coupled hand curl constraint accepted an invalid value");

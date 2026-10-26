@@ -54,9 +54,9 @@ try {
     Assert ($loaded.state.runtime.'ui.map_control_prompts' -eq '1') 'reviewed Map control labels default on in the launcher runtime snapshot'
     Assert ($loaded.state.runtime.'optics.binocular_native_material' -eq '0') 'unproven binocular scene lighting defaults off in the launcher runtime snapshot'
     $settingRows=@($loaded.state.settings)
-    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 70) 'serialized settings field is a flat array containing all 70 setting rows'
+    Assert ($loaded.json -match '"settings"\s*:\s*\[' -and $loaded.state.settings -is [Array] -and $settingRows.Count -eq 71) 'serialized settings field is a flat array containing all 71 setting rows'
     $rowsValid=$true
-    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 70) { $rowsValid=$false }
+    if ($loaded.state.settings -isnot [Array] -or $settingRows.Count -ne 71) { $rowsValid=$false }
     else {
         foreach ($row in $settingRows) {
             $numbers=@($row.value,$row.min,$row.max)
@@ -76,6 +76,7 @@ try {
     Assert (@($settingRows | Where-Object { $_.name -eq 'settings.tracked_weapon_obstruction' -and $_.value -eq 1 -and $_.min -eq 0 -and $_.max -eq 1 }).Count -eq 1) 'tracked-gun cover clearance is present and defaults on'
     Assert (@($settingRows | Where-Object { $_.name -eq 'settings.block_firing_near_cover' -and $_.value -eq 0 -and $_.min -eq 0 -and $_.max -eq 1 }).Count -eq 1) 'the independent cover firing block is present and defaults off'
     Assert (@($settingRows | Where-Object { $_.name -eq 'settings.enemy_world_markers' -and $_.value -eq 0 -and $_.min -eq 0 -and $_.max -eq 1 }).Count -eq 1) 'world enemy markers are independently toggleable'
+    Assert (@($settingRows | Where-Object { $_.name -eq 'settings.enemy_marker_scale_percent' -and $_.value -eq 60 -and $_.min -eq 25 -and $_.max -eq 150 }).Count -eq 1) 'marked enemy size has a compact default and bounded live range'
     Assert (@($settingRows | Where-Object { $_.name -eq 'settings.god_mode' -and $_.value -eq 0 -and $_.min -eq 0 -and $_.max -eq 1 }).Count -eq 1) 'god mode is available as a validated launcher toggle'
     [IO.File]::WriteAllText((Join-Path $fixture 'mgs5vr-display.ini'),"[display]`nenabled=1`nrender_width=2960`nrender_height=3220`n")
     [IO.File]::WriteAllText((Join-Path $fixture 'mgs5vr-render-size.txt'),"0 100 1920 1080 960 540 1`n")

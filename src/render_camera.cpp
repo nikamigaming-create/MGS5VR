@@ -812,7 +812,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
             std::array<float,16> opticProjection{};
             std::memcpy(opticProjection.data(),reinterpret_cast<void*>(source.viewport+layout.gpuProjection),sizeof(opticProjection));
             if(!mgs5vr::capturePhysicalOpticScene(afterContext,eyeView,opticProjection,native.position,opticScene.GetAddressOf(),
-                !rocketGuidance&&!studioCamera&&mgs5vr::worldHudVisible(source.pair.sample.controllers.hudMode,hudView),&markerSnapshot))
+                !rocketGuidance&&!studioCamera&&mgs5vr::worldHudVisible(source.pair.sample.controllers.hudMode,hudView),&markerSnapshot,source.pair.sample.controllers.enemyMarkerScale))
                 mgs5vr::log("Physical optic scene copy unavailable; retaining normal head views");
             if(studioCamera&&opticScene&&studio->shutter>mgs5vr::acceptedStudioShutter())
                 mgs5vr::captureStudioPhoto(afterContext,opticScene.Get(),studio->shutter);
@@ -931,7 +931,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
                 originalWorld(bodyValues.data(),markerHousing->data());
             }
             mgs5vr::drawWorldWaypoints(afterContext,eyeView,eyeProjection,native.position,markerSnapshot,
-                wrist.controllers.hudMode,wrist.controllers.enemyWorldMarkers,markerHousing?&*markerHousing:nullptr);
+                wrist.controllers.hudMode,wrist.controllers.enemyWorldMarkers,markerHousing?&*markerHousing:nullptr,wrist.controllers.enemyMarkerScale);
         }
         if(afterContext&&drawAccHint){
             alignas(16) auto hintPose=values(wrist.wristPanel);

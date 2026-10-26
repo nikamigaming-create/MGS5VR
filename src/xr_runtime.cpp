@@ -321,11 +321,15 @@ struct Session {
                 }
             }
         }
-        if(liveControls.apply(controls,physical)){
-            presentationEpoch=nextRigPresentationEpoch();
-            nativeControls.suspend();rigControls.suspend();commandsControls.suspend();
-            opticsControls.reset();opticGate.reset();snapControls.reset();smoothControls.reset();
-            weaponZoomInput.update(false,false);refreshControlLabels();
+        bool preservePresentation{};
+        if(liveControls.apply(controls,physical,&preservePresentation)){
+            if(!preservePresentation){
+                presentationEpoch=nextRigPresentationEpoch();
+                nativeControls.suspend();rigControls.suspend();commandsControls.suspend();
+                opticsControls.reset();opticGate.reset();snapControls.reset();smoothControls.reset();
+                weaponZoomInput.update(false,false);
+            }
+            refreshControlLabels();
             log("Controls applied LIVE: "+controlsPath.string()+"; no restart required");
         }
     }
@@ -918,6 +922,7 @@ struct Session {
         controllerFrame.handTouchCurl=controls.setting("settings.hand_touch_curl_percent")*.01f;
         controllerFrame.hudMode=static_cast<HudMode>(static_cast<unsigned>(controls.setting("settings.hud_mode")));
         controllerFrame.enemyWorldMarkers=controls.setting("settings.enemy_world_markers")!=0;
+        controllerFrame.enemyMarkerScale=controls.setting("settings.enemy_marker_scale_percent")*.01f;
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
         controllerFrame.scopePoseStabilization=controls.setting("settings.scope_pose_stabilization")!=0;
         controllerFrame.weaponAimPitch=controls.setting("settings.weapon_aim_pitch_degrees");

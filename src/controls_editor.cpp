@@ -22,6 +22,15 @@ bool neutral(const PhysicalControls& physical,bool touches=false){
     for(size_t n=7;n<11;++n)if(!std::isfinite(physical.buttons[n])||physical.buttons[n]>.09f)return false;
     return true;
 }
+size_t settingsGroup(std::string_view name){
+    if(name=="system.toggle_vr"||name=="settings.full_body"||name=="settings.eyepatch"||name=="settings.seated_mode"||name.find("height")!=name.npos)return 1;
+    if(name.find("rocket_arm")!=name.npos)return 4;
+    if(name.find("enemy_")!=name.npos||name.find("binocular")!=name.npos||name.find("scope")!=name.npos)return 2;
+    if(name.find("idroid")!=name.npos||name.find("handheld")!=name.npos||name.find("menu_quad")!=name.npos)return 6;
+    if(name.find("wrist")!=name.npos||name.find("hud")!=name.npos)return 5;
+    if(name.find("hand_")!=name.npos||name.find("support_")!=name.npos||name.find("weapon")!=name.npos||name.find("cover")!=name.npos||name.find("god_mode")!=name.npos)return 3;
+    return 7;
+}
 std::string title(std::string_view action){
     const auto dot=action.find('.');std::string text(action.substr(dot==std::string_view::npos?0:dot+1));
     std::replace(text.begin(),text.end(),'_',' ');if(!text.empty())text[0]=static_cast<char>(std::toupper(text[0]));return text;
@@ -64,6 +73,10 @@ void reportControlsEditor(std::ostream& out){
     out<<"],\"layout\":[";first=true;for(const auto& hit:controlsEditorLayout(f)){
         if(!first)out<<',';first=false;out<<"{\"id\":"<<hit.id<<",\"x\":"<<hit.x<<",\"y\":"<<hit.y<<",\"width\":"<<hit.width<<",\"height\":"<<hit.height<<'}';}
     out<<"]}";
+}
+std::string_view controlsSettingsGroupName(size_t group) noexcept{
+    constexpr std::array<std::string_view,8> names{"ALL", "BODY", "OPTICS", "COMBAT", "ROCKET", "WRIST HUD", "MENUS", "MOVEMENT"};
+    return group<names.size()?names[group]:names[0];
 }
 std::string_view controlsModeName(ControlsMode mode) noexcept{
     constexpr std::array<std::string_view,12> names{"ON FOOT","ACC","LAUNCH CABIN","DRIVING","HORSEBACK","BINOCULARS",
@@ -126,6 +139,7 @@ std::vector<ControlsHit> controlsEditorLayout(const ControlsEditorFrame& f){
     std::vector<ControlsHit> hits{{100,.92f,.015f,.055f,.060f,"X"},
         {116,.35f,.105f,.075f,.050f,"CONTROLLER"},{117,.43f,.105f,.075f,.050f,"GEAR"},
         {104,.02f,.895f,.065f,.060f,"<"},{105,.37f,.895f,.065f,.060f,">"}};
+    if(f.settings){hits.push_back({121,.02f,.105f,.05f,.050f,"<"});hits.push_back({122,.075f,.105f,.20f,.050f,controlsSettingsGroupName(f.settingsGroup)});hits.push_back({123,.28f,.105f,.05f,.050f,">"});}
     if(!f.settings){hits.push_back({101,.02f,.105f,.07f,.050f,"<"});hits.push_back({102,.095f,.105f,.16f,.050f,"AUTO"});hits.push_back({103,.26f,.105f,.07f,.050f,">"});}
     for(size_t n=0;n<11&&f.page*11+n<f.rows.size();++n)hits.push_back({static_cast<int>(n),.02f,.19f+static_cast<float>(n)*.061f,.42f,.056f,{}});
     if(!f.action.empty()){
@@ -149,7 +163,9 @@ void ControlsEditor::rows(const ControlBindings& bindings){
         frame_.rows.push_back({"system.toggle_vr","Immersive VR",frame_.vrEnabled?"On":"Off",false});
         // Keep the common headset visibility choices on the first page, then
         // all remaining switches before the numeric fitting controls.
-        constexpr std::array<std::string_view,3> first{"settings.seated_mode","settings.full_body","settings.eyepatch"};
+        constexpr std::array<std::string_view,10> first{"settings.god_mode","settings.full_body","settings.eyepatch",
+            "settings.cover_assistance","settings.block_firing_near_cover","settings.tracked_weapon_obstruction",
+            "settings.enemy_world_markers","settings.binocular_auto_mark","settings.binocular_actor_glow","settings.seated_mode"};
         for(const auto name:first)
             frame_.rows.push_back({std::string(name),title(name),bindings.setting(name)>0?"On":"Off",false});
         for(const bool toggles:{true,false})for(const auto& d:settingDefinitions()){
@@ -157,6 +173,7 @@ void ControlsEditor::rows(const ControlBindings& bindings){
             if(toggle!=toggles||std::find(first.begin(),first.end(),d.name)!=first.end())continue;
             const auto label=toggle?(bindings.setting(d.name)>0?"On":"Off"):bindings.settingText(d.name);
             frame_.rows.push_back({std::string(d.name),title(d.name),label,false});}
+        if(frame_.settingsGroup)std::erase_if(frame_.rows,[&](const auto& row){return settingsGroup(row.action)!=frame_.settingsGroup;});
         frame_.page=std::min(frame_.page,(frame_.rows.size()-1)/11);return;
     }
     for(const auto& d:controlDefinitions())if(d.contexts&context){
@@ -182,7 +199,7 @@ void ControlsEditor::select(size_t index,const ControlBindings& bindings){
         if(frame_.action!="system.toggle_vr")for(const auto& d:settingDefinitions())if(d.name==frame_.action){
             frame_.minimum=d.minimum;frame_.maximum=d.maximum;frame_.settingValue=bindings.setting(d.name);
             frame_.step=d.name.ends_with("_degrees")?5.f:d.name.ends_with("_ms")?50.f:d.name=="settings.wrist_text_scale"?.05f:
-                d.name=="settings.rocket_arm_sensitivity"?.25f:1.f;break;}
+                d.name=="settings.rocket_arm_sensitivity"?.25f:d.name=="settings.enemy_marker_scale_percent"?5.f:1.f;break;}
         frame_.status="Adjust, then check to apply live. X cancels.";frame_.gesture.clear();return;
     }
     const auto open=frame_.binding.find('(');frame_.gesture=open==std::string::npos?"level":frame_.binding.substr(0,open);
@@ -215,6 +232,9 @@ void ControlsEditor::command(int control,const ControlBindings& bindings){
     if(control>=0&&control<11){select(frame_.page*11+static_cast<size_t>(control),bindings);++frame_.revision;return;}
     switch(control){
     case 100:close();return;
+    case 121:case 122:case 123:
+        if(frame_.settings){frame_.settingsGroup=(frame_.settingsGroup+(control==121?7:1))%8;
+            frame_.page=0;rows(bindings);select(0,bindings);}break;
     case 101:case 103:{frame_.automatic=false;const auto count=static_cast<int>(ControlsMode::count);
         frame_.mode=static_cast<ControlsMode>((static_cast<int>(frame_.mode)+(control==101?count-1:1))%count);
         frame_.page=0;rows(bindings);select(0,bindings);break;}
