@@ -1,5 +1,13 @@
 # Field fixes — implementation and acceptance
 
+26 October Rocket Arm clarification: the requested phantom LEFT hand gyro,
+socket-fixed rectangular camera and additive joystick correction differ from
+the previously accepted forearm-axis/head-facing presentation. The new batch
+implements those controls and live screen/gyro/twist/width/sensitivity settings;
+focused contract/editor checks pass. Combined build outcome is in CURRENT.
+Physical feel, final-eye motion/readability, impact and return on this revision
+remain unaccepted; the earlier flight evidence is not relabeled as this revision.
+
 26 October live-settings audit: all 64 gameplay settings are exposed, including
 15 on/off options. Gear now places body/eyepatch visibility on its first page
 and all switches ahead of numeric tuning; launcher descriptions match the dark

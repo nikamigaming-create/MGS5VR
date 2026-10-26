@@ -153,6 +153,8 @@ struct ControllerFrame {
     PlayerPosture playerPosture{PlayerPosture::unknown};
     bool fullBody{},seatedMode{},cinematicFreeMove{true};
     bool eyepatch{true};
+    bool rocketArmScreen{true};
+    float rocketArmScreenWidth{.20f};
     bool coverAssistance{true};
     std::array<float,2> cinematicMove{};
 };

@@ -2607,5 +2607,14 @@
     "preservation_receipt": "artifacts/live-settings-preservation.json",
     "preservation": "Both slot manifests verify, installed DLL matches development, personal controls/runtime byte-identical, published manifest unchanged.",
     "cleanup": "No game/simulator launched; no test inputs/settings changed; Steam retained; 64-bit Meta Link CheckOnly passed; zero obsolete build targets."
+  },
+  "rocket_phantom_hand_2026_10_26": {
+    "baseline_candidate": "c5900adb1a22a2be7b273c908b600635f87c9b553b44778178f8a0d89b5e34fe",
+    "requested_hand": "left controller, confirmed by user",
+    "change": "Socket-fixed rectangular camera; phantom left-hand yaw/pitch/twist gyro; additive joystick without rebase; live screen/gyro/twist toggles, width and sensitivity.",
+    "coordinate_contract": "Native metres: socket +X elbow-to-wrist, +Z dorsal. Screen +Y=dorsal, +Z=-socket X, lower-edge midpoint at solved wrist. Phantom palm rotation and socket share one rig publication; guidance converts that world pose into tracking space.",
+    "validation": "Focused core/editor checks pass; combined build/check/deploy pending.",
+    "limits": "No new in-game/final-eye or physical acceptance. Previous Rocket Arm flight evidence retains its original build and behavior scope. Native roll channel is unavailable; wrist twist maps to horizontal steering.",
+    "next_action": "One checked deployment, then user physical Quest Link review. No per-case simulator loops."
   }
 }

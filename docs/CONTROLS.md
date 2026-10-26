@@ -596,6 +596,26 @@ posture-derived sweep while retaining cover blocking. Missing or stale tracking
 and unverified weapon ownership retain native behavior.
 The latest build's verification state is recorded in `docs/CURRENT.md`.
 
+### Rocket Arm guidance
+
+During native guided flight, a rectangular live rocket-camera screen attaches
+by its lower edge to the LEFT forearm socket. Its position and orientation follow
+that socket; the normal world view remains around it. The default width is 20 cm
+and the native camera aspect is preserved. The left controller acts as the
+missing left hand: yaw and pitch steer, and wrist twist adds horizontal steering.
+Hold a comfortable orientation as flight starts to establish the neutral.
+Return toward that orientation to stop the gyro's turn request. The native
+rocket retains its flight dynamics, speed, impact and return behavior.
+
+The movement joystick adds correction to the gyro; releasing it leaves the hand
+reference intact. The screen, gyro and twist each have independent live switches
+in Gear or the launcher's Rocket Arm group. Screen width is 10–35 cm and gyro
+sensitivity is 0.25–4 (default 2). Gyro off retains joystick guidance; twist off
+retains yaw/pitch. Save and release controls to apply. The screen uses the exact
+socket publication rendered with both eyes. Tracking loss suppresses gyro and
+requires a fresh neutral after reacquisition. These controls still require
+physical headset review; see CURRENT for the exact candidate and scope.
+
 **Enemy markers in the world** (`settings.enemy_world_markers`, default **Off**)
 shows already acquired native enemy tags at their world positions in each eye.
 It does not reveal unmarked enemies. Physical binocular acquisition and marking

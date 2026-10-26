@@ -659,7 +659,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
     const float rocketAspect=std::abs(authoredProjection[5]/authoredProjection[0]);
     const float rocketX=std::atan(1.f/std::abs(authoredProjection[0]));
     const float rocketY=std::atan(1.f/std::abs(authoredProjection[5]));
-    const std::optional<mgs5vr::EyeView> rocketView=rocketGuidance&&std::isfinite(rocketAspect)
+    const std::optional<mgs5vr::EyeView> rocketView=rocketGuidance&&source.pair.sample.controllers.rocketArmScreen&&std::isfinite(rocketAspect)
         &&rocketAspect>.5f&&rocketAspect<3.f
         ?std::optional<mgs5vr::EyeView>{{source.pair.sample.headPose,{-rocketX,rocketX,rocketY,-rocketY}}}:std::nullopt;
     const bool rocketSocket=rocketView&&source.pair.sample.rocketArmSocketTracked;
@@ -900,11 +900,11 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         }
         const auto& wrist=source.pair.sample;
         if(afterContext&&rocketView&&opticScene){
-            if(const auto panel=rocketSocket?mgs5vr::rocketArmDisplay(wrist.rocketArmSocket,wrist.nativePose):std::nullopt){
-                // A small display above the stump follows the exact forearm
+            const float width=wrist.controllers.rocketArmScreenWidth;
+            if(const auto panel=rocketSocket?mgs5vr::rocketArmDisplay(wrist.rocketArmSocket,width,rocketAspect):std::nullopt){
+                // A rectangle fixed at the stump follows the exact forearm
                 // transaction rendered in both eyes. Preserve flight pixels
                 // and their native aspect; do not borrow terminal equipment.
-                constexpr float width=.20f;
                 const auto screen=*panel;
                 alignas(16) auto screenValues=values(screen);
                 alignas(16) std::array<float,16> screenWorld{};

@@ -1797,22 +1797,36 @@ int main(){
         RocketArmCameraOwner owner{0x100,7,7,0x200,0x200,0x120,2,11,-1,true,true};
         expect(rocketArmCameraOwned(owner),"typed native guided-flight producer is eligible");
         const Pose distantFlight{{.616072953f,-.35409385f,.361318499f,.60375458f},{757.784241f,333.007141f,1663.47791f}};
+        constexpr float screenWidth=.20f,screenAspect=16.f/9.f;
         for(const auto socket:std::array<Pose,3>{Pose{{},{.2f,-.3f,-.4f}},
                 Pose{{0,.70710678f,0,.70710678f},{-.2f,-.3f,-.4f}},
                 Pose{{.70710678f,0,0,.70710678f},{0,-.2f,-.4f}}}){
-            const auto panel=rocketArmDisplay(socket,{});
+            const auto panel=rocketArmDisplay(socket,screenWidth,screenAspect);
             expect(panel.has_value(),"tracked socket has a guidance display");
-            const auto toward=Vec3{}-panel->position;
-            expect(same(panel->position,socket.position+Vec3{0,.12f,0}),
-                "socket screen remains above the endpoint rather than rolling behind the forearm");
-            expect(dot(rotate(panel->orientation,{0,0,1}),toward)>.999f*std::sqrt(dot(toward,toward)),
-                "rocket display faces the pilot across socket rotations instead of becoming edge-on");
+            const auto bottom=compose(*panel,Pose{{},{0,-screenWidth/(2*screenAspect),0}});
+            expect(same(bottom.position,socket.position),"rectangle lower edge remains attached to the socket through rotation");
+            expect(same(rotate(panel->orientation,{0,0,1}),rotate(socket.orientation,{-1,0,0})),
+                "screen faces along the forearm toward the pilot, without head-facing billboarding");
+            const auto horizontal=rotate(panel->orientation,{screenWidth,0,0});
+            const auto vertical=rotate(panel->orientation,{0,screenWidth/screenAspect,0});
+            expect(near(dot(horizontal,vertical),0)&&near(dot(horizontal,horizontal),screenWidth*screenWidth)
+                &&near(dot(vertical,vertical),(screenWidth/screenAspect)*(screenWidth/screenAspect)),
+                "socket rotation retains a true rectangle and native camera aspect");
+            const Pose motion{{0,0,.38268343f,.92387953f},{3,1,-2}};
+            const auto moved=rocketArmDisplay(compose(motion,socket),screenWidth,screenAspect);
+            const auto expected=compose(motion,*panel);
+            expect(moved&&same(moved->position,expected.position)
+                &&same(rotate(moved->orientation,{0,1,0}),rotate(expected.orientation,{0,1,0})),
+                "socket translation and twist move the complete rectangle rigidly");
         }
-        const Pose socketForward{{0,.70710678f,0,.70710678f},{}};
-        const auto socketAim=rocketArmSocketAim(socketForward);
-        const auto rolledSocket=compose(socketForward,Pose{{.70710678f,0,0,.70710678f},{}});
-        expect(same(rotate(socketAim.orientation,{0,0,-1}),rotate(rocketArmSocketAim(rolledSocket).orientation,{0,0,-1})),
-            "forearm roll cannot steer the rocket when the socket axis has not moved");
+        for(const float width:{.1f,.35f}){
+            const auto panel=rocketArmDisplay({},width,screenAspect);
+            expect(panel&&same(compose(*panel,Pose{{},{0,-width/(2*screenAspect),0}}).position,{}),
+                "live screen resizing preserves the socket attachment");
+        }
+        expect(!rocketArmDisplay({},.09f,screenAspect)&&!rocketArmDisplay({},.36f,screenAspect)
+            &&!rocketArmDisplay({},screenWidth,0)&&!rocketArmDisplay(Pose{{0,0,0,0},{}},screenWidth,screenAspect),
+            "invalid socket and screen dimensions cannot produce a guidance surface");
         const auto rigidFlight=rocketArmRenderPose(distantFlight);
         expect(rigidFlight.has_value(),"observed native flight rotation is valid for rigid replay");
         const auto roundTrip=compose(*rigidFlight,inverse(*rigidFlight)).position;
@@ -1830,28 +1844,54 @@ int main(){
         expect(!rocketArmCameraOwned(other),"unknown native reader cannot enable remote camera acceptance");
         RocketArmSteering steering;
         const Pose neutral{{.5f,0,0,.8660254f},{-.2f,-.2f,-.5f}};
-        expect(steering.update(neutral,{},true,false,1,2,3)==std::array<float,2>{},
+        expect(steering.update(neutral,{},true,1,2,3)==std::array<float,2>{},
             "rocket flight begins with neutral hand steering");
         const auto turned=compose(Pose{{0,.258819f,0,.965926f},{}},neutral);
-        const auto axes=steering.update(turned,{},true,false,1,2,3);
+        const auto axes=steering.update(turned,{},true,1,2,3);
         expect(axes[0]<-.6f&&near(axes[1],0),"left-hand yaw produces only horizontal rocket steering");
-        expect(steering.update(turned,{},true,true,1,2,3)==std::array<float,2>{}
-            &&steering.update(turned,{},true,false,1,2,3)==std::array<float,2>{},
-            "manual rocket steering rebases the physical hand without a release jump");
-        expect(steering.update(neutral,{},false,false,1,2,3)==std::array<float,2>{}
-            &&steering.update(turned,{},true,false,1,2,3)==std::array<float,2>{},
+        const auto corrected=rocketArmInput(axes,{.2f,-.25f});
+        expect(near(corrected[0],axes[0]+.2f)&&near(corrected[1],-.25f),
+            "joystick correction adds to hand steering instead of overriding it");
+        expect(steering.update(turned,{},true,1,2,3)==axes
+            &&rocketArmInput(axes,{})==axes,
+            "joystick release preserves the phantom hand neutral and steering");
+        expect(rocketArmInput({.65f,-.65f},{1,-1})==std::array<float,2>{1,-1}
+            &&rocketArmInput({}, {.1f,0})==std::array<float,2>{},
+            "combined guidance respects native axis bounds and centered stick deadzone");
+        expect(steering.update(neutral,{},false,1,2,3)==std::array<float,2>{}
+            &&steering.update(turned,{},true,1,2,3)==std::array<float,2>{},
             "flight end or tracking loss clears steering before reacquisition");
         const auto pitched=compose(Pose{{.258819f,0,0,.965926f},{}},turned);
-        const auto elevated=steering.update(pitched,{},true,false,1,2,3);
+        const auto elevated=steering.update(pitched,{},true,1,2,3);
         expect(near(elevated[0],0)&&elevated[1]>.6f,"left-hand pitch produces vertical rocket steering");
         RocketArmSteering joinedSteering;
-        joinedSteering.update(neutral,{},true,false,1,2,3,100);
-        expect(joinedSteering.update(turned,{},false,false,1,2,3,110)==std::array<float,2>{}
-            &&joinedSteering.update(turned,{},true,false,1,2,3,120)[0]<-.6f,
+        joinedSteering.update(neutral,{},true,1,2,3,100);
+        expect(joinedSteering.update(turned,{},false,1,2,3,110)==std::array<float,2>{}
+            &&joinedSteering.update(turned,{},true,1,2,3,120)[0]<-.6f,
             "brief socket publication gaps suppress input without redefining the moved arm as neutral");
-        joinedSteering.update(turned,{},false,false,1,2,3,280);
-        expect(joinedSteering.update(turned,{},true,false,1,2,3,290)==std::array<float,2>{},
+        joinedSteering.update(turned,{},false,1,2,3,280);
+        expect(joinedSteering.update(turned,{},true,1,2,3,290)==std::array<float,2>{},
             "expired socket publication requires fresh neutral guidance");
+        RocketArmSteering wristSteering;
+        const Pose socket{{},{-.2f,-.2f,-.5f}};
+        wristSteering.update(rocketArmGuidancePose(socket,{}),{},true,1,2,3,100);
+        const Pose twist{{0,0,.258819f,.965926f},{}};
+        const auto phantom=rocketArmGuidancePose(socket,twist);
+        expect(same(phantom.position,socket.position)&&wristSteering.update(phantom,{},true,1,2,3,110)[0]<-.6f,
+            "wrist twist steers the rocket even with a stationary socket axis");
+        expect(wristSteering.update(phantom,{},true,1,2,3,120,2,false)==std::array<float,2>{},
+            "wrist-twist toggle removes roll guidance without altering the neutral");
+        const auto lowGain=wristSteering.update(phantom,{},true,1,2,3,130,.25f);
+        expect(lowGain[0]<-.12f&&lowGain[0]>-.14f,"gyro sensitivity changes live without changing stick input");
+        expect(wristSteering.update(rocketArmGuidancePose(Pose{{},{1,2,3}},{}),{},true,1,2,3,140)==std::array<float,2>{},
+            "pure socket translation carries the display without manufacturing angular gyro input");
+        expect(wristSteering.update(phantom,{},true,2,2,3,150)==std::array<float,2>{}
+            &&wristSteering.update({}, {},true,2,3,3,160)==std::array<float,2>{}
+            &&wristSteering.update(phantom,{},true,2,3,4,170)==std::array<float,2>{},
+            "new owner, activation and reference space each acquire a fresh neutral");
+        wristSteering.update(phantom,{},false,2,3,4,0);
+        expect(wristSteering.update({}, {},true,2,3,4,180)==std::array<float,2>{},
+            "raw tracking loss or disabled gyro clears guidance immediately");
         HeadCamera flight;flight.configure(true,1,true);flight.track({},true,100);flight.toggle();
         auto head=identityMatrix;head[13]=1.6f;
         expect(flight.publishPlayerHead(7,8,{},identityMatrix,head,100),"ordinary head publication admitted");

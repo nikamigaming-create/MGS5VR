@@ -21,29 +21,24 @@ constexpr bool rocketArmCameraOwned(const RocketArmCameraOwner& s) noexcept {
         &&s.producer&&s.producer==s.selectedProducer&&s.producerOwner==s.owner+0x20
         &&s.family==2&&s.mode==11&&s.overrideMode==-1;
 }
-// The socket owns position; the guidance surface faces the pilot instead of
-// inheriting the forearm HUD's edge-on plane. One center-eye pose feeds both eyes.
-inline std::optional<Pose> rocketArmDisplay(Pose socket,Pose viewer) noexcept {
-    if(!valid(socket)||!valid(viewer))return {};
-    // Above the endpoint in the game world's gravity frame. Wrist roll must
-    // not swing the screen behind the arm or into the pilot's body.
-    const auto position=socket.position+Vec3{0,.12f,0};
-    const auto toward=viewer.position-position;
-    if(dot(toward,toward)<.0025f)return {};
-    const float yaw=std::atan2(toward.x,toward.z);
-    const float pitch=-std::atan2(toward.y,std::hypot(toward.x,toward.z));
-    const auto orientation=compose(Pose{Quat{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)},{}},
-        Pose{Quat{std::sin(pitch*.5f),0,0,std::cos(pitch*.5f)},{}}).orientation;
-    return Pose{orientation,position};
+// forearmPanel: +X elbow->wrist, +Z dorsal. The screen's +Y points
+// dorsally and +Z faces back along the arm. Its lower-edge midpoint is the
+// solved wrist endpoint. Neither eye nor head movement changes this mount.
+inline std::optional<Pose> rocketArmDisplay(Pose socket,float width,float aspect) noexcept {
+    if(!valid(socket)||!std::isfinite(width)||width<.1f||width>.35f
+       ||!std::isfinite(aspect)||aspect<.5f||aspect>3.f)return {};
+    return compose(socket,Pose{Quat{.5f,-.5f,-.5f,.5f},{0,0,width/(2*aspect)}});
 }
-inline Pose rocketArmSocketAim(Pose socket) noexcept {
-    // forearmPanel publishes +X from elbow to wrist. Guidance follows that
-    // axis, not dorsal roll or the palm's independent wrist articulation.
-    const auto forward=rotate(socket.orientation,{1,0,0});
-    const float yaw=std::atan2(-forward.x,-forward.z);
-    const float pitch=std::atan2(forward.y,std::hypot(forward.x,forward.z));
-    return compose(Pose{Quat{0,std::sin(yaw*.5f),0,std::cos(yaw*.5f)},socket.position},
-        Pose{Quat{std::sin(pitch*.5f),0,0,std::cos(pitch*.5f)},{}});
+inline Pose rocketArmGuidancePose(Pose socket,Pose phantomHand) noexcept {
+    // The absent hand still articulates at the wrist. Keep its full rotation,
+    // including pronation, instead of reducing it to the elbow->wrist axis.
+    return {phantomHand.orientation,socket.position};
+}
+inline std::array<float,2> rocketArmInput(std::array<float,2> gyro,std::array<float,2> stick) noexcept {
+    if(!std::isfinite(stick[0])||!std::isfinite(stick[1])||std::hypot(stick[0],stick[1])<=.15f)stick={};
+    for(size_t i=0;i<gyro.size();++i)
+        gyro[i]=std::clamp((std::isfinite(gyro[i])?gyro[i]:0.f)+stick[i],-1.f,1.f);
+    return gyro;
 }
 inline std::optional<Pose> rocketArmRenderPose(Pose native) noexcept {
     if(!valid(native))return {};
@@ -57,8 +52,9 @@ inline std::optional<Pose> rocketArmRenderPose(Pose native) noexcept {
 }
 class RocketArmSteering {
 public:
-    std::array<float,2> update(Pose hand,Pose head,bool active,bool manual,
-                              uintptr_t owner,uint64_t activation,uint64_t referenceEpoch,uint64_t time=0) noexcept {
+    std::array<float,2> update(Pose hand,Pose head,bool active,
+                              uintptr_t owner,uint64_t activation,uint64_t referenceEpoch,uint64_t time=0,
+                              float sensitivity=2.f,bool wristTwist=true) noexcept {
         if(!active||!owner||!valid(hand)||!valid(head)){
             // Camera/skin publication can cross an XR input poll. Suppress
             // input on that poll, but don't recenter guidance at the moved
@@ -70,7 +66,7 @@ public:
         }
         if(time&&lastActive_&&(time<lastActive_||time-lastActive_>150))*this={};
         lastActive_=time;
-        if(!owner_||owner_!=owner||activation_!=activation||epoch_!=referenceEpoch||manual){
+        if(!owner_||owner_!=owner||activation_!=activation||epoch_!=referenceEpoch){
             owner_=owner;activation_=activation;epoch_=referenceEpoch;neutral_=hand;
             const auto forward=rotate(head.orientation,{0,0,-1});
             const float yaw=std::atan2(-forward.x,-forward.z);
@@ -78,11 +74,16 @@ public:
             return {};
         }
         const auto delta=compose(compose(inverse(basis_),compose(hand,inverse(neutral_))),basis_);
-        const auto direction=rotate(delta.orientation,{0,0,-1});
-        const float yaw=std::atan2(-direction.x,-direction.z);
-        const float pitch=std::atan2(direction.y,std::hypot(direction.x,direction.z));
-        const auto axis=[](float angle){return std::abs(angle)<.04f?0.f:std::clamp(angle*2.f,-.65f,.65f);};
-        return {axis(-yaw),axis(pitch)};
+        // Shortest-arc rotation vector in the launch head's level frame:
+        // pitch raises the rocket; yaw and wrist twist turn it horizontally.
+        // Native flight has two steering axes, not a separate roll channel.
+        auto q=delta.orientation;
+        if(q.w<0)q={-q.x,-q.y,-q.z,-q.w};
+        const float length=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z);
+        const float scale=length>1e-6f?2.f*std::atan2(length,q.w)/length:2.f;
+        const float gain=std::isfinite(sensitivity)?std::clamp(sensitivity,.25f,4.f):2.f;
+        const auto axis=[gain](float angle){return std::abs(angle)<.04f?0.f:std::clamp(angle*gain,-.65f,.65f);};
+        return {axis(-(q.y+(wristTwist?q.z:0.f))*scale),axis(q.x*scale)};
     }
 private:
     Pose neutral_{},basis_{};

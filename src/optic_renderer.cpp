@@ -2616,7 +2616,7 @@ bool drawCabinStudio(ID3D11DeviceContext* context,const CabinStudioFrame& frame,
 bool drawIdroidGuidance(ID3D11DeviceContext* context,const std::array<float,16>& world,
     const std::array<float,16>& view,const std::array<float,16>& projection,
     float width,float aspect,ID3D11Texture2D* source,const EyeFrame& eye) noexcept {
-    if(!context||!source||!std::isfinite(width)||width<.2f||width>.6f
+    if(!context||!source||!std::isfinite(width)||width<.1f||width>.6f
        ||!std::isfinite(aspect)||aspect<.5f||aspect>3.f)return false;
     try{
         std::lock_guard lock(rendererMutex);ComPtr<ID3D11Device> device;context->GetDevice(&device);

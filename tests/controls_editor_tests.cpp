@@ -50,6 +50,8 @@ int main(){try{
     editor.command(112,bindings);check(editor.frame().binding=="1"&&editor.frame().proposed.empty(),"Cancel changed live setting");
     chooseSetting("settings.turn_mode");editor.command(118,bindings);
     check(editor.frame().proposed=="snap"&&editor.frame().validProposal,"Enumerated turn setting lost parser syntax");
+    editor.command(112,bindings);chooseSetting("settings.rocket_arm_sensitivity");editor.command(118,bindings);
+    check(editor.frame().proposed=="1.75"&&editor.frame().validProposal,"Rocket gyro cannot be fine-tuned in the headset");
     editor.command(112,bindings);chooseSetting("settings.hand_touch_curl_percent");
     for(int n=0;n<13;++n)editor.command(118,bindings);
     check(!editor.frame().validProposal,"Coupled hand curl constraint accepted an invalid value");

@@ -181,7 +181,8 @@ void ControlsEditor::select(size_t index,const ControlBindings& bindings){
         frame_.minimum=0;frame_.maximum=1;frame_.step=1;frame_.settingValue=frame_.vrEnabled?1.f:0.f;
         if(frame_.action!="system.toggle_vr")for(const auto& d:settingDefinitions())if(d.name==frame_.action){
             frame_.minimum=d.minimum;frame_.maximum=d.maximum;frame_.settingValue=bindings.setting(d.name);
-            frame_.step=d.name.ends_with("_degrees")?5.f:d.name.ends_with("_ms")?50.f:d.name=="settings.wrist_text_scale"?.05f:1.f;break;}
+            frame_.step=d.name.ends_with("_degrees")?5.f:d.name.ends_with("_ms")?50.f:d.name=="settings.wrist_text_scale"?.05f:
+                d.name=="settings.rocket_arm_sensitivity"?.25f:1.f;break;}
         frame_.status="Adjust, then check to apply live. X cancels.";frame_.gesture.clear();return;
     }
     const auto open=frame_.binding.find('(');frame_.gesture=open==std::string::npos?"level":frame_.binding.substr(0,open);

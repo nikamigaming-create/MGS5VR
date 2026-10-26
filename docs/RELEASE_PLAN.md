@@ -1,5 +1,12 @@
 # Release execution plan — 26 October 2026
 
+Current action: finish one checked deployment of the clarified Rocket Arm batch:
+rectangle attached to the left socket, phantom left-hand gyro including optional
+wrist twist, additive joystick correction and live tuning. Focused checks pass;
+build/check/deploy together, preserve personal settings and published play, then
+use the user's physical headset feedback. Do not claim the new interaction is
+perfect from contracts or reuse old Rocket Arm images as acceptance of it.
+
 Latest action completed: checked/deployed `c5900adb1a22` / source `72b3636` for the live-settings
 usability batch (first-page body/eyepatch, switches before fitting controls,
 accurate launcher descriptions). All 58 groups and installer checks pass; both

@@ -1,5 +1,35 @@
 # Current MGS5VR work — 26 October 2026
 
+## Rocket Arm requested interaction — 26 October
+
+The user clarified that the LEFT controller remains the missing hand: wrist
+rotation controls guidance, the screen attaches to the socket, and joystick
+correction works alongside physical steering. Baseline `c5900adb1a22` did not
+implement that exact contract: it discarded independent wrist rotation, used
+stick override/rebasing, and floated a head-facing screen 12 cm above the wrist.
+The earlier `f58ef4224995` steering/display evidence retains its original scope;
+it cannot accept this new behavior.
+
+The new batch fixes the rectangle's lower edge to the solved left wrist endpoint,
+with screen up along forearm dorsal and its normal back along the forearm. It
+keeps native camera aspect and both-eye source-transaction ownership. Guidance
+uses that publication's solved phantom LEFT palm rotation at the socket; yaw,
+pitch and optional wrist twist drive native two-axis steering. Joystick correction
+adds within native bounds without recentering the hand. Pure socket translation
+moves the screen without injecting angular steering. Real tracking loss, flight
+exit/menu ownership and gyro-off clear steering; short publication gaps still
+suppress input while preserving the neutral for at most 150 ms.
+
+New live options: Rocket Arm screen, screen width (10–35 cm, default 20), left-hand
+gyro, wrist twist, and gyro sensitivity (0.25–4, default 2). The three switches
+default on. There are now 69 gameplay settings, including 18 switches.
+Focused core/editor checks pass, including rigid rectangle attachment, resizing,
+phantom-wrist motion, stick blending, reference/loss resets, all-switch save/live
+round trips and fractional sensitivity adjustment. Combined build/deploy pending.
+No new in-game/final-eye or physical headset acceptance is claimed. Follow the
+latest delivery direction: one checked deployment for the user's headset review,
+without restarting per-case simulator loops. Existing field limitations remain.
+
 ## Live settings and headset handoff — 26 October
 
 The settings audit found all 64 gameplay settings exposed in the headset Gear

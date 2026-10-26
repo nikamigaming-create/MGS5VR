@@ -906,6 +906,8 @@ struct Session {
         controllerFrame.cinematicFreeMove=controls.setting("settings.cinematic_free_move")!=0;
         requestFullBodyVisibility(controllerFrame.fullBody);
         controllerFrame.eyepatch=controls.setting("settings.eyepatch")!=0;
+        controllerFrame.rocketArmScreen=controls.setting("settings.rocket_arm_screen")!=0;
+        controllerFrame.rocketArmScreenWidth=controls.setting("settings.rocket_arm_screen_width_cm")/100.f;
         requestEyepatchVisibility(controllerFrame.eyepatch);
         controllerFrame.supportGripRadius=controls.setting("settings.support_grip_radius_cm")*.01f;
         controllerFrame.trackedWeaponObstruction=controls.setting("settings.tracked_weapon_obstruction")!=0;
@@ -1635,25 +1637,30 @@ struct Session {
             // with the barrel, feeding its own movement back into the grip.
         }
         const auto rocketStick=controls.axis("axes.move",routedPhysical);
-        const bool rocketManual=std::hypot(rocketStick[0],rocketStick[1])>.15f;
-        // Guidance and the display share the solved socket, including reach
-        // limiting. Convert that published world pose back into tracking space;
-        // raw controller aim can turn independently of the visible forearm.
+        const bool rocketGyro=controls.setting("settings.rocket_arm_gyro")!=0;
+        // The socket and phantom palm come from one solved skin publication.
+        // The screen follows the forearm; the missing left hand still rotates
+        // independently at its wrist and controls guidance.
         const bool rocketHandTracked=controllerFrame.hands[0].gripTracked&&controllerFrame.hands[0].aimTracked;
-        const bool rocketSocketTracked=rocketGuidanceInput&&rocketHandTracked&&handUseRig&&handUseRig->rocketArmSocketTracked;
-        const auto rocketSocket=rocketSocketTracked
+        const bool rocketSocketTracked=rocketGuidanceInput&&rocketHandTracked&&handUseRig
+            &&handUseRig->rocketArmSocketTracked&&handUseRig->renderedPalmTracked[0];
+        const auto rocketHand=rocketSocketTracked
             ?compose(handUseRig->headPose,compose(Pose{{0,1,0,0},{}},
-                compose(inverse(handUseRig->nativePose),handUseRig->rocketArmSocket)))
+                compose(inverse(handUseRig->nativePose),rocketArmGuidancePose(
+                    handUseRig->rocketArmSocket,handUseRig->renderedPalms[0]))))
             :Pose{};
-        const auto rocketAxes=rocketSteering.update(rocketArmSocketAim(rocketSocket),
-            handUseRig?handUseRig->headPose:Pose{},rocketSocketTracked,
-            rocketManual,handUseRig?handUseRig->playerOwner:nativeStatus.sourcePlayerOwner,nativeStatus.activation,referenceEpoch,
-            rocketHandTracked?now:0); // Raw tracking loss resets immediately; only publication gaps retain neutral.
+        const auto rocketAxes=rocketSteering.update(rocketHand,
+            handUseRig?handUseRig->headPose:Pose{},rocketSocketTracked&&rocketGyro,
+            handUseRig?handUseRig->playerOwner:nativeStatus.sourcePlayerOwner,nativeStatus.activation,referenceEpoch,
+            rocketHandTracked&&rocketGyro&&rocketGuidanceInput?now:0,controls.setting("settings.rocket_arm_sensitivity"),
+            controls.setting("settings.rocket_arm_wrist_twist")!=0);
         if(rocketGuidanceInput){
             // The native projectile owns the movement stick, never a turn of
-            // Snake's VR tracking space. Explicit stick input rebases the hand.
-            pad.leftX=static_cast<int16_t>((rocketManual?rocketStick[0]:rocketAxes[0])*32767.f);
-            pad.leftY=static_cast<int16_t>((rocketManual?rocketStick[1]:rocketAxes[1])*32767.f);
+            // Snake's VR tracking space. Stick correction adds to the gyro;
+            // using or releasing the stick must not silently recenter the hand.
+            const auto combined=rocketArmInput(rocketAxes,rocketStick);
+            pad.leftX=static_cast<int16_t>(combined[0]*32767.f);
+            pad.leftY=static_cast<int16_t>(combined[1]*32767.f);
         }
         lastMappedWeaponReady=controllerFrame.weaponReady&&pad.leftTrigger>127;
         controllerFrame.contextInteract=rigInput&&!nativeInput.exclusive&&(pad.buttons&XINPUT_GAMEPAD_Y)

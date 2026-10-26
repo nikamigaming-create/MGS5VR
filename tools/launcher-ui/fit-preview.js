@@ -14,6 +14,7 @@ export const fitContexts={
  movement:['Movement','Eye height · turning · physical reach']
 };
 export function fitContext(name){
+ if(/rocket_arm/.test(name))return null; // No rocket-camera reference model in this preview.
  if(/idroid|handheld/.test(name))return 'idroid';
  if(/wrist|weapon_hud|hud_mode/.test(name))return 'wrist';
  if(/binocular|scope/.test(name))return 'optics';
