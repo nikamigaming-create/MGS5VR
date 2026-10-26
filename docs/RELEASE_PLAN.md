@@ -1,5 +1,16 @@
 # Release execution plan — 26 October 2026
 
+Latest user clarification: flip the oval UP above the socket, facing the pilot.
+Source now lifts it 60 degrees from the dorsal wrist plane about its attached
+near edge; the complete mount still follows the wrist. This supersedes the flat
+plane requested earlier. Flat candidate `eca68f998fb9` passed 58 groups and
+installer checks, but take2 ended during yaw before all controls were shown.
+The flight/feed returned early; impact cause is unproven. Retain
+`artifacts/rocket-proof-20261026/take2` as incomplete. Flipped-up `e56cff6352e9`
+also passed 58 groups/installer and deployed. The following build synchronizes
+launcher wording and this evidence record; flipped-up visual review is pending.
+
+
 Next action: build/check/deploy the corrected dorsal OVAL wrist display, then
 record the user-requested bounded final-eye demonstration. The earlier upright
 rectangle failed visual review. Show actual launch, wrist twist, translation,

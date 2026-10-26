@@ -2625,7 +2625,7 @@
     "cleanup": "No game/simulator launched or test input/settings changed. Steam retained. Meta Link 64-bit CheckOnly passes. Zero obsolete builds."
   },
   "rocket_oval_wrist_2026_10_26": {
-    "status": "source_corrected_build_video_pending",
+    "status": "flip_up_checked_visual_pending",
     "prior_take": "artifacts/rocket-proof-20261026/take1",
     "prior_candidate": "fbc50f53c4d320097ed946787d7cc41032e01f0a5b7ed79bfa02a043214adb5a",
     "prior_result": "native launch/gyro/twist/translation/stick/return observed; upright rectangle rejected by user",
@@ -2633,7 +2633,7 @@
       "left": 3.379,
       "right": 3.325
     },
-    "contract": "Oval live aperture with shallow graphite bevel, dorsal wrist plane, rigid socket attachment, left phantom hand gyro and additive joystick",
+    "contract": "Oval live aperture with shallow graphite bevel, flipped up 60 degrees above the socket from dorsal hinge; rigid wrist attachment, phantom left hand gyro and additive joystick",
     "limits": [
       "Physical headset unproven",
       "Impact unproven",
@@ -2642,6 +2642,15 @@
     ],
     "tutorial_failure": "20261026T161740178213Z",
     "native_back_dismissal": "20261026T161941318842Z",
-    "land_select": "20261026T162112602837Z"
+    "land_select": "20261026T162112602837Z",
+    "flat_candidate": "eca68f998fb9e35819b061396e8937a6c10f9c534db12862c0c0d2609c1f24a0",
+    "flat_build_checks": "58 groups and installer passed; artifacts/rocket-oval-build.log",
+    "flat_take": "artifacts/rocket-proof-20261026/take2",
+    "flat_take_result": "Incomplete: native flight ended during neutral-after-yaw; impact cause unproven",
+    "flip_up_candidate": "e56cff6352e98ab5ad6a704d0965fd34086059d6357684f549c03da728c95adf",
+    "latest_tutorial_failure": "20261026T164030609165Z",
+    "latest_native_back_dismissal": "20261026T164122346815Z",
+    "latest_land_select": "20261026T164229698528Z",
+    "build_check_failure": "Launcher backup test saved unchanged default and relied on newline conversion. Now saves actual changed value. Retained rocket-oval-build-failed.log."
   }
 }

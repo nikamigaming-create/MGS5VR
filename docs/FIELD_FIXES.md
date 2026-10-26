@@ -1,5 +1,16 @@
 # Field fixes — implementation and acceptance
 
+Latest user clarification: flip the oval UP above the socket, facing the pilot.
+Source now lifts it 60 degrees from the dorsal wrist plane about its attached
+near edge; the complete mount still follows the wrist. This supersedes the flat
+plane requested earlier. Flat candidate `eca68f998fb9` passed 58 groups and
+installer checks, but take2 ended during yaw before all controls were shown.
+The flight/feed returned early; impact cause is unproven. Retain
+`artifacts/rocket-proof-20261026/take2` as incomplete. Flipped-up `e56cff6352e9`
+also passed 58 groups/installer and deployed. The following build synchronizes
+launcher wording and this evidence record; flipped-up visual review is pending.
+
+
 26 October video follow-up: `fbc50f53c4d3` launched and accepted phantom-hand
 steering, but the upright rectangle failed the user's requested wrist plane.
 Retained take1 is a visual failure, not presentation acceptance. Revised source
