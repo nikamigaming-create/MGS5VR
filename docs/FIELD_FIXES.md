@@ -4,8 +4,10 @@
 15 on/off options. Gear now places body/eyepatch visibility on its first page
 and all switches ahead of numeric tuning; launcher descriptions match the dark
 translucent patch. This is a usability change, not closure of any field report.
-The edit/save/live-apply regression covers every switch in both directions.
-See CURRENT for the build outcome and preserved personal headset shortcut.
+Checked/deployed `c5900adb1a22` / `72b3636` passes all 58 groups and installer
+checks, including edit/save/live-apply for every switch in both directions.
+See CURRENT for preservation checks and the personal headset shortcut. Actual
+headset review, existing frame repeats and unresolved field reports remain open.
 
 Updated 25 October 2026 with the incoming headset batch and scoped gameplay
 results. The original production-path audit baseline was `5622052` (DLL `17b044cba72e`).

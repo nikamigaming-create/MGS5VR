@@ -15,15 +15,24 @@ Personal binding audit: hold BOTH stick clicks for 650 ms opens the editor;
 select Gear, toggle, check to save, then release buttons/grips/triggers and center
 sticks. Allow about two seconds for the file poll. Runtime/graphics setup still
 requires a restart. Saved eyepatch=1, full_body=0 and seated_mode=1 are preserved.
-The expanded editor check exercises every gameplay switch through save and live
-reload in both directions, held-trigger deferral, and personal-binding retention.
-Build/check/deploy outcome will be recorded after the combined candidate finishes.
+Checked/deployed development: **`c5900adb1a22` / source `72b3636`**. All 58 groups
+and installer checks passed in `artifacts/live-settings-build.log`. The editor
+check passed every gameplay switch through save and live reload in both
+directions, held-trigger deferral, and personal-binding retention. Both slots
+verify; installed DLL matches development. Personal controls/runtime files are
+byte-identical and published play's manifest is unchanged (receipt:
+`artifacts/live-settings-preservation.json`). Meta Link CheckOnly selects the
+64-bit Oculus runtime. Steam is running; no owned game/simulator was launched.
+No obsolete build targets remain. Use Play-Dev for the user's physical review.
+This outcome prose is newer than the packaged docs; runtime source is unchanged.
 
 The previous deployed DLL is `27e9108f2a58`. It includes the held-stick exit repair;
 the user's broader physical movement report remains open. Remaining concrete
 scope: undiagnosed exact rock/corridor snags, physical arm fit/extreme cloth and
 other outfits, additional mounted adapters beyond verified mortar/MG, actual
 field-pickup boarding, wider progression/weapon and headset/performance coverage.
+Previously measured frame repeats remain a performance limitation; no fresh
+performance or final-eye claim is made for this settings-only change.
 Do not describe these as universally fixed. Next is the user's Play-Dev headset
 review, without restarting simulator/soak loops. Published play stays pinned.
 

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "62f696613e2b89678303842a140ad712bbcf09cb712e591ea743721d36c0ee70",
-  "candidate_status": "Built, checked and deployed candidate. Live Challenge Tasks Help stow/reopen/restow passed; release and physical acceptance remain open.",
+  "candidate": "c5900adb1a22a2be7b273c908b600635f87c9b553b44778178f8a0d89b5e34fe",
+  "candidate_status": "Live-settings usability candidate built, checked and deployed; 58 groups and installer checks passed. Physical review and unresolved field scope remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2598,8 +2598,14 @@
     "gameplay_switches": 15,
     "change": "First-page body/eyepatch; remaining switches before numeric fitting; launcher descriptions corrected. Existing live application mechanism preserved.",
     "personal_editor_binding": "hold(left_stick_click + right_stick_click,650)",
-    "validation": "Combined build/check/deploy pending; editor regression exercises every switch save/live reload in both directions and held-trigger deferral.",
+    "validation": "All 58 groups and installer checks passed. All 15 switches saved and live-applied in both directions, with held-trigger deferral and unrelated controls preserved.",
     "acceptance": "No new gameplay, final-eye or headset acceptance. Existing movement and eyepatch retained evidence keeps its original candidate scope.",
-    "next_action": "Finish checked development deployment, then user physical Quest Link review; no simulator/soak loop."
+    "next_action": "User physical Quest Link review through Play-Dev; no simulator/soak loop. Existing frame repeats, exact terrain/corridor, arm/outfit, additional mounted, pickup and broader progression scope remain open.",
+    "candidate": "c5900adb1a22a2be7b273c908b600635f87c9b553b44778178f8a0d89b5e34fe",
+    "source_commit": "72b36360bfe29c374693d0a55c8d2335a62b940c",
+    "build_log": "artifacts/live-settings-build.log",
+    "preservation_receipt": "artifacts/live-settings-preservation.json",
+    "preservation": "Both slot manifests verify, installed DLL matches development, personal controls/runtime byte-identical, published manifest unchanged.",
+    "cleanup": "No game/simulator launched; no test inputs/settings changed; Steam retained; 64-bit Meta Link CheckOnly passed; zero obsolete build targets."
   }
 }

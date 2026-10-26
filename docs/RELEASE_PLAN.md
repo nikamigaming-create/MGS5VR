@@ -1,9 +1,10 @@
 # Release execution plan — 26 October 2026
 
-Latest action: finish one checked/deployed candidate for the live-settings
+Latest action completed: checked/deployed `c5900adb1a22` / source `72b3636` for the live-settings
 usability batch (first-page body/eyepatch, switches before fitting controls,
-accurate launcher descriptions). Verify saved preferences and published pin
-remain intact. Then use the user's Play-Dev physical feedback; no repeated
+accurate launcher descriptions). All 58 groups and installer checks pass; both
+slots verify, saved preferences and published pin remain intact. Next, use
+the user's Play-Dev physical feedback; no repeated
 simulator/soak runs. Existing unresolved field scope remains in FIELD_FIXES.
 This change does not establish new gameplay or headset acceptance.
 
