@@ -1,5 +1,21 @@
 # Release execution plan — 26 October 2026
 
+### Nightly distribution setup - 27 October
+
+The user authorized isolated release-automation work and public nightlies from
+committed main, leaving concurrent uncommitted gameplay/tooling work untouched.
+The daily/manual GitHub workflow reuses the Windows build and installer checks,
+verifies the asset-free package and uploaded hashes, and publishes a technical
+nightly prerelease without promoting the local Play pin. The exact existing
+blocker snapshots are disclosed under `config/nightly-policy.json`; new or changed
+blockers stop publication. Hardware-only tests and physical/full-game acceptance
+remain outside hosted CI. See [Nightly builds](NIGHTLIES.md).
+
+This entry records setup, not a completed publication or a new gameplay pass.
+Next release action: pass the PR checks, enable the workflow on remote main,
+publish the first nightly and verify its public downloads. Development gameplay
+and the existing acceptance evidence retain their original candidate scope.
+
 ### Diagonal cabin take failed at framing guard — 27 October
 
 Retained `20261027T174300006026Z` on installed development DLL `9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a` observed cassette pickup, release and recovery, then stopped before insertion: the temporary diagonal viewpoint reached distances of 0.509 and 0.454 m but the measured slot-face dot products were -0.310 and -0.256, below the 0.5 guard. This is a staging failure, not a diagnosed cassette gameplay defect. The observed carrier normal was approximately [0.848, 0.259, 0.463], mostly horizontal; the temporary offset followed the prior head direction instead of the carrier normal, putting the observer behind its face. A normal-relative offset is an unverified staging lead. Camera and photo actions were not reached. The partial source-eye take recorded 557 accepted frames, 34 dropped/repeated samples (10 missed cadence, 24 queue drops); the audio capture reports no gaps, but sound was not auditioned. It is not the requested movie. Temporary staging was saved privately and removed; inputs were released and owned simulator/game closed with Steam retained. No build, pin, or physical-headset acceptance changed. Do not rerun this unchanged viewpoint.

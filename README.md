@@ -14,14 +14,22 @@ Remaining code limits and verification gaps are separated in
 Local work keeps two builds: published `play/` and checked `build/dev/`.
 `tools/build.ps1` refreshes development only; `Play.cmd` restores the published
 pin and `Play-Dev.cmd` selects development. Both use Meta Quest Link locally.
-Only successful verified publication advances the pin. Full-game and physical
+Only explicit promotion after verified reviewed-release publication advances the pin;
+automated nightlies never advance it. Full-game and physical
 headset acceptance remain open.
 [Current handoff](docs/CURRENT.md) · [Exact release plan](docs/RELEASE_PLAN.md)
 · [Documentation map](docs/README.md).
 
-**[Download the public build](https://github.com/nikamigaming-create/MGS5VR/releases)**
+**[Download the reviewed build](https://github.com/nikamigaming-create/MGS5VR/releases/tag/experimental-2026-10-19.1)**
+· **[Download nightlies](https://github.com/nikamigaming-create/MGS5VR/releases?q=nightly-&expanded=true)**
+· [About nightly builds](docs/NIGHTLIES.md)
 · [Controls](docs/CONTROLS.md) · [Setup help](docs/ADVANCED_SETUP.md) · [Published baseline notes](docs/RELEASE_2026-10-19.1.md)
 · [Live native actions](docs/NATIVE_ACTIONS.md)
+
+Nightlies offer recent committed fixes and features between reviewed releases.
+They are experimental, may regress, and have not received complete headset or
+full-game acceptance. A daily job publishes only changed commits that pass its
+build, test and packaging checks; each download lists its known limitations.
 
 Experimental Windows mod. Requires your own **TPP 1.0.15.4** and a PC-connected
 OpenXR headset. Physical feedback currently comes from **Quest 3 + Touch**;
