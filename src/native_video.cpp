@@ -1,5 +1,6 @@
 #include "mgs5vr/native_video.hpp"
 #include "mgs5vr/native_video_timing.hpp"
+#include "mgs5vr/native_video_buffers.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include <mfapi.h>
@@ -53,6 +54,7 @@ struct NativeVideoRecorder::State {
     uint64_t missedCadence{},queueDropped{},stagingBusy{},stagingDiscarded{};
     struct Slot {ComPtr<ID3D11Texture2D> texture;int64_t clock{};uint64_t captureSlot{};FrameId image{};EyeFrame eye{};};
     std::array<Slot,3> slots;
+    NativeVideoBuffers buffers;
     std::mutex mutex;std::condition_variable wake;std::deque<VideoFrame> queue;std::thread encoder;
     explicit State(const wchar_t* requestName){
         std::array<wchar_t,32768> exe{};
@@ -117,6 +119,9 @@ struct NativeVideoRecorder::State {
                 checkHr(MFCreateMemoryBuffer(length,&buffer),"Video buffer");
                 BYTE* bytes{};checkHr(buffer->Lock(&bytes,nullptr,nullptr),"Video buffer lock");
                 std::memcpy(bytes,frame.bytes.get(),length);
+                // The sink writer sees its own IMF buffer, so this CPU copy
+                // can be reused without modifying pixels held by the encoder.
+                buffers.recycle(std::move(frame.bytes),frame.length);
                 // Channel conversion belongs to encoding, not the OpenXR
                 // frame loop. Every source row was copied in full; source
                 // timestamps and accepted/encoded slot accounting stay intact.
@@ -193,6 +198,7 @@ struct NativeVideoRecorder::State {
         if(next==requested)return;
         if(!finished.load()){stop();return;}
         if(encoder.joinable())encoder.join();
+        buffers.clear();
         requested=next;path.clear();slots={};cadence={};started=budgetChecked=0;budgetStopped=false;
         if(next.empty())return;
         auto candidate=std::filesystem::path(std::u8string(next.begin(),next.end()));
@@ -256,14 +262,21 @@ struct NativeVideoRecorder::State {
             copy.length=static_cast<size_t>(width)*height*4;
             // Copy all pixels before handoff. Avoid initializing a second
             // full-eye buffer that the row copy immediately overwrites.
-            copy.bytes=std::make_unique_for_overwrite<unsigned char[]>(copy.length);
-            for(UINT y=0;y<height;++y){
-                auto* dst=copy.bytes.get()+static_cast<size_t>(y)*width*4;
-                const auto* src=static_cast<const unsigned char*>(mapped.pData)+static_cast<size_t>(y)*mapped.RowPitch;
-                std::memcpy(dst,src,static_cast<size_t>(width)*4);
+            try{
+                copy.bytes=buffers.acquire(copy.length);
+                for(UINT y=0;y<height;++y){
+                    auto* dst=copy.bytes.get()+static_cast<size_t>(y)*width*4;
+                    const auto* src=static_cast<const unsigned char*>(mapped.pData)+static_cast<size_t>(y)*mapped.RowPitch;
+                    std::memcpy(dst,src,static_cast<size_t>(width)*4);
+                }
+            }catch(...){
+                context->Unmap(slot.texture.Get(),0);
+                {std::lock_guard lock(mutex);++stagingDiscarded;slot.clock=0;}
+                throw;
             }
             context->Unmap(slot.texture.Get(),0);slot.clock=0;
             {std::lock_guard lock(mutex);if(queue.size()<4&&!stopping)queue.push_back(std::move(copy));else ++queueDropped;}
+            if(copy.bytes)buffers.recycle(std::move(copy.bytes),copy.length);
             wake.notify_one();
         }
         const auto clock=captureClock();std::optional<NativeVideoDue> due;

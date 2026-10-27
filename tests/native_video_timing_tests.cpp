@@ -1,8 +1,11 @@
 #include "mgs5vr/native_video_timing.hpp"
+#include "mgs5vr/native_video_buffers.hpp"
 #include <array>
+#include <atomic>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 
 namespace {
@@ -29,6 +32,32 @@ void sourcePixelConversion(){
     require(!normalizeNativeVideoPixels(partial,true)&&partial==before,
         "an incomplete pixel cannot be partially normalized");
     require(normalizeNativeVideoPixels({},true),"empty source bytes are safe for pure conversion");
+}
+void captureBufferOwnership(){
+    using namespace mgs5vr;
+    NativeVideoBuffers pool;
+    auto first=pool.acquire(64);auto* original=first.get();first[0]=71;
+    pool.recycle(std::move(first),64);
+    auto reused=pool.acquire(64);
+    require(reused.get()==original&&reused[0]==71,"only a returned buffer of the requested size is reused");
+    auto simultaneous=pool.acquire(64);
+    require(simultaneous.get()!=reused.get(),"a buffer still in use cannot be handed out twice");
+    pool.recycle(std::move(reused),64);pool.recycle(std::move(simultaneous),64);
+    auto different=pool.acquire(128);
+    require(different.get()!=original,"a differently sized frame cannot reuse a smaller buffer");
+    pool.recycle(std::move(different),128);
+    std::atomic_bool valid{true};
+    const auto worker=[&](unsigned char value){
+        for(int i=0;i<500;++i){
+            auto bytes=pool.acquire(64);
+            for(size_t n=0;n<64;++n)bytes[n]=value;
+            for(size_t n=0;n<64;++n)if(bytes[n]!=value)valid=false;
+            pool.recycle(std::move(bytes),64);
+        }
+    };
+    std::thread a(worker,static_cast<unsigned char>(11)),b(worker,static_cast<unsigned char>(37));a.join();b.join();
+    require(valid.load(),"concurrent capture and encoder owners do not share a buffer");
+    pool.clear();
 }
 void rationalTimestamps(){
     using namespace mgs5vr;
@@ -171,7 +200,7 @@ void cadenceAndEncodingAccounting(){
 }
 }
 int main(){try{
-    sourcePixelConversion();rationalTimestamps();cadenceDeadlines();cadenceRenderGap();oldestStagingOrder();
+    sourcePixelConversion();captureBufferOwnership();rationalTimestamps();cadenceDeadlines();cadenceRenderGap();oldestStagingOrder();
     timelinePlacement();rejectedSourcesDoNotChangeLedger();boundedTimeline();cadenceAndEncodingAccounting();
     std::cout<<checks<<" native video timing/order contracts passed; no native capture or runtime FPS claim.\n";
     return 0;

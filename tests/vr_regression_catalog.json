@@ -4605,6 +4605,7 @@
         "tools/gameplay_bot/motion.py",
         "src/native_video.cpp",
         "include/mgs5vr/native_video.hpp",
+        "include/mgs5vr/native_video_buffers.hpp",
         "include/mgs5vr/native_video_timing.hpp",
         "include/mgs5vr/cover_probe.hpp",
         "tools/gameplay_bot/cover.py",

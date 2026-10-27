@@ -1,5 +1,12 @@
 # Release execution plan — 26 October 2026
 
+### Recorder buffer reuse candidate — 27 October
+
+The latest cabin take had 15 encoder-queue drops and copied 2368 x 2576 RGBA frames. A standalone same-size UCRT/RAM microbenchmark found median allocation-plus-copy 4.024 ms versus 0.821 ms with a reused buffer; it does not measure GPU readback, encoder contention or in-game performance. The native recorder now retains at most four idle CPU frame buffers, reusing only a matching size after the encoder has copied the pixels into its own Media Foundation buffer. Dropped CPU copies return to the pool, and an allocation failure unmaps and accounts for the staging sample. Eye dimensions, source ordering, timestamps and encoded repeat accounting are unchanged. New tests check buffer size, exclusive ownership and concurrent reuse.
+
+The first build failed on a test argument conversion warning; after correcting it, a full check found the new header absent from the source catalog, which was then mapped. The final development build passed all 58 test groups and installer checks. Development DLL `9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a` is installed; published play remains pinned to `b627c7cacc9a`. No simulator or physical-headset run has exercised this candidate, so no improvement in actual cadence or video quality is claimed. The earlier cabin interaction evidence applies only to its recorded candidate. Clear hand contact, true lid motion, full showcase and headset acceptance remain open.
+
+
 ### Latest take gap timing — 27 October
 
 In the retained combined take, the 0.523-second accepted-sample gap occurred before the first filmed chapter; a separate 0.274-second gap occurred between the tape-on-seat and tape-seated markers. Trimming the startup alone therefore would not remove all visible cadence problems. `artifacts/bot/runs/20261027T164745284337Z/capture-gap-phase-analysis.json` records the timing; markers do not establish exact hand-motion boundaries or the cause. No final-eye cadence, gameplay repair or finished movie is inferred.

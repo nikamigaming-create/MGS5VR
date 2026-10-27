@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f",
-  "candidate_status": "Scripted title-cabin tape, camera and photo states observed with paired endpoint stills; overlapping board layering, held-grip deletion, physical Quest and finished showcase remain unverified on this candidate.",
+  "candidate": "9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a",
+  "candidate_status": "Checked recorder buffer-reuse development candidate installed; in-game capture, cabin interactions on this candidate and physical Quest remain unverified.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -3275,5 +3275,16 @@
       "finding": "0.523-second gap before first chapter; 0.274-second gap between tape-on-seat and tape-seated markers.",
       "limitation": "Markers do not establish exact hand motion or cause; source eye is not final stereo."
     }
+  },
+  "native_video_buffer_reuse_2026_10_27": {
+    "candidate": "9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a",
+    "benchmark": "artifacts/bot/runs/20261027T164745284337Z/frame-copy-microbenchmark.json",
+    "change": "Bounded matching-size CPU buffer reuse after encoder copy; ordering and metadata retained.",
+    "checks": "All 58 test groups and installer checks passed after fixing the test conversion and catalog mapping.",
+    "limitations": [
+      "Standalone benchmark is not a GPU or in-game measurement.",
+      "No live capture cadence, cabin interaction, audio quality or headset acceptance on this candidate.",
+      "Prior video and interaction evidence retains its original build scope."
+    ]
   }
 }
