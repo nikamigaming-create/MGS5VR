@@ -2,7 +2,7 @@
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
   "candidate": "aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f",
-  "candidate_status": "Checked and deployed overlapping board-paper layering and earlier deletion re-grab fix; simulator, physical Quest and showcase unverified on this candidate.",
+  "candidate_status": "Scripted title-cabin tape, camera and photo states observed with paired endpoint stills; overlapping board layering, held-grip deletion, physical Quest and finished showcase remain unverified on this candidate.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -3169,5 +3169,15 @@
     "validation": "Both hands, mixed photo/note, overlapping and separated cases; all 58 test groups and installer checks passed.",
     "candidate": "aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f",
     "limits": "No retroactive movement of existing pinned sheets; not simulator or Quest tested on this candidate. The older gray print cause is unproven. Large stacks and the requested movie remain open."
+  },
+  "cabin_source_film_2026_10_27": {
+    "candidate": "aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f",
+    "run": "artifacts/bot/runs/20261027T160026917677Z",
+    "cleanup_run": "artifacts/bot/runs/20261027T160532234306Z",
+    "observed": "Scripted tape pickup, seating and ejection, camera shots and photo placement; paired final-eye endpoint captures reviewed.",
+    "visual": "New print visible on board in both eyes; hand and cassette/camera contact obscured. Rejected as finished movie.",
+    "recording": "Pre-compositor source-eye with non-silent AAC; 59 dropped and 58 repeated samples, maximum accepted sample gap 0.654 seconds. Audio not auditioned.",
+    "cleanup": "Two earlier test prints and digital entries removed by exact in-game confirmation. Final observed collection has two newly printed photos and no notes; backups retained privately. Game and simulator closed; Steam retained.",
+    "limits": "No continuous final-eye video, body/eyepatch toggle demonstration, held-grip deletion, overlap stress, or physical headset acceptance. Experimental staging removed; local patch retained privately."
   }
 }
