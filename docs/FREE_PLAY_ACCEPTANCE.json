@@ -3179,5 +3179,23 @@
     "recording": "Pre-compositor source-eye with non-silent AAC; 59 dropped and 58 repeated samples, maximum accepted sample gap 0.654 seconds. Audio not auditioned.",
     "cleanup": "Two earlier test prints and digital entries removed by exact in-game confirmation. Final observed collection has two newly printed photos and no notes; backups retained privately. Game and simulator closed; Steam retained.",
     "limits": "No continuous final-eye video, body/eyepatch toggle demonstration, held-grip deletion, overlap stress, or physical headset acceptance. Experimental staging removed; local patch retained privately."
+  },
+  "cabin_source_cadence_review_2026_10_27": {
+    "run": "artifacts/bot/runs/20261027T160026917677Z",
+    "largest_gaps_seconds": [
+      0.654,
+      0.563
+    ],
+    "nearest_final_eye_capture_midpoint_seconds": [
+      2.84,
+      2.83
+    ],
+    "loss_counts": {
+      "missed_cadence": 34,
+      "queue_drop": 16,
+      "staging_busy": 8,
+      "staging_discard": 1
+    },
+    "limits": "The underlying stutter cause and indirect effects are unproven; take remains rejected."
   }
 }

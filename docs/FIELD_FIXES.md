@@ -1,5 +1,10 @@
 # Field fixes — implementation and acceptance
 
+### Source-eye cadence check - 27 October
+
+In `artifacts/bot/runs/20261027T160026917677Z`, the two largest accepted-sample gaps were 0.654 and 0.563 seconds. The closest recorded final-eye capture events were about 2.84 and 2.83 seconds from their midpoints, respectively. One gap preceded the first chapter; the other fell in the tape sequence. The recording ledger reports 34 missed cadence slots, 16 queue drops, eight staging-busy samples and one staging discard. This does not identify the underlying cause or prove capture calls had no indirect effect; simply moving stereo snapshots is not a justified complete fix. The take remains rejected and physical-headset acceptance remains open.
+
+
 ### Source-eye cabin take and cleanup - 27 October
 
 Retained `artifacts/bot/runs/20261027T160026917677Z` on development DLL `aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f` completed scripted tape, camera and photo-placement states. Separate final-eye endpoint captures were reviewed: the placed photo is visible in both eyes, but cassette/camera hand contact is obscured. The source-eye recording has AAC audio with nonzero signal, 59 dropped and 58 repeated samples, and a longest accepted-sample gap of 0.654 seconds; audio was not auditioned. The take is rejected as the requested finished movie, is not continuous final-eye proof, and does not show body or eyepatch toggles. Temporary source-film staging was removed after recording and its local patch preserved privately. In the same live session, retained cleanup `artifacts/bot/runs/20261027T160532234306Z` removed only the two earlier test prints and their digital entries; the final observed collection had the two newly printed photos and no notes. Test images were privately backed up and hash-verified. One-time cleanup code was removed; the game and simulator closed and Steam retained. Held-grip deletion, board layering under overlap and physical Quest remain unverified on this candidate.
