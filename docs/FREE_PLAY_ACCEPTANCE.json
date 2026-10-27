@@ -3269,6 +3269,11 @@
       "limitations": [
         "No natural grip, captured subject, headset, audio or finished movie acceptance inferred."
       ]
+    },
+    "gap_phase_review": {
+      "evidence": "artifacts/bot/runs/20261027T164745284337Z/capture-gap-phase-analysis.json",
+      "finding": "0.523-second gap before first chapter; 0.274-second gap between tape-on-seat and tape-seated markers.",
+      "limitation": "Markers do not establish exact hand motion or cause; source eye is not final stereo."
     }
   }
 }

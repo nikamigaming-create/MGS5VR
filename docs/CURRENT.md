@@ -1,5 +1,10 @@
 # Current MGS5VR work — 26 October 2026
 
+### Latest take gap timing — 27 October
+
+In the retained combined take, the 0.523-second accepted-sample gap occurred before the first filmed chapter; a separate 0.274-second gap occurred between the tape-on-seat and tape-seated markers. Trimming the startup alone therefore would not remove all visible cadence problems. `artifacts/bot/runs/20261027T164745284337Z/capture-gap-phase-analysis.json` records the timing; markers do not establish exact hand-motion boundaries or the cause. No final-eye cadence, gameplay repair or finished movie is inferred.
+
+
 ### Showcase camera framing correction — 27 October
 
 The completed combined take captured dark cabin-seat subjects because its scripted camera target used the controller/head orientation rather than the actual held-camera lens orientation. For film runs, the workbench now waits through the existing pickup easing, derives the current camera-to-controller attachment and aims the camera at the native cabin board for both hands. A previous retained staged take using the same attachment/lens-aware approach produced cabin-wall images, but this integration has not been rerun. Python compilation and the existing bot contract suite passed; these do not prove camera pixels, natural grasp, continuous stereo, audio, cadence or physical Quest behavior. This is showcase staging, not a gameplay repair or completed movie.
