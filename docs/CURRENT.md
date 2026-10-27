@@ -1,5 +1,402 @@
 # Current MGS5VR work — 26 October 2026
 
+### Cabin take and maintenance notice — 27 October
+
+Candidate `789a8e11c795` completed cassette pickup, insertion and ejection,
+both camera shutters and photo placement in `artifacts/bot/runs/20261027T133035987440Z`.
+Body and eyepatch changes were requested and checked in both eye snapshots;
+body-off snapshots show large black sleeve caps. The steep cassette shot remains
+obstructed and is rejected as a finished movie. Source-eye recordings have 15
+and 5 dropped samples in two segments; audio was not independently auditioned.
+The marker change was not exercised. A server-maintenance popup blocked the
+first attempt; a guarded startup confirmation for its witnessed popup advanced
+the same live session. The existing bot contract suite passed. Personal settings
+and studio files were restored, owned simulator closed and Steam retained.
+See `visual-review.json` in the run; headset and continuous final-eye motion
+remain unverified. Next audit the user-requested broader cabin interactions.
+
+
+### Marker pickup continuity candidate — 27 October
+
+A retained earlier actual-game trace showed the marker stationary in 15 samples
+over 3.062 seconds; the last left controller pose coincided with its last
+observed position, and the first held sample was 70.66 mm away. There was no
+marker observation immediately before grip, so the exact pickup discontinuity
+was not isolated. The code immediately replaced the acquired contact with a
+fixed writing grip. Marker pickup now starts at the acquired pose and eases
+to that writing grip over 300 ms while tracking hand movement; the correction
+does not add throw velocity. Both-hand pickup, final grip and release checks
+passed as part of all 58 test groups and installer checks. A subsequent core
+check also passed for stationary early release during the transition with both
+hands; it does not establish rendered or physical behavior. Development candidate
+`789a8e11c795` is installed; the published pin is unchanged. The new candidate
+has not been run in-game or in a headset. Writing during transition, actual
+contact, release/throw and both-eye presentation need user validation. The
+showcase movie remains unfinished. Evidence: `artifacts/opening-marker-continuity-20261027.json`.
+
+
+### Diagonal cabin showcase attempt — 27 October
+
+The retained bounded bot run `artifacts/bot/runs/20261027T131055498302Z`
+observed tape pickup, insertion, eject/recovery, both camera shutters and photo
+placement on candidate `1ed68066ab7c`. A diagonal slot viewpoint reduced the
+scripted downward pitch to about 48 degrees. Sampled source-eye frames still
+show sleeves obscuring the cassette and camera grip; paired final-eye stills
+show the open player but do not prove moving contact. Time-neighbor pose
+analysis found the cassette face approaching an 82-degree angle to the
+view direction near seating, nearly edge-on; see `cassette-face-view-analysis.json`
+in the run. A future view must account for the tracking-space slot normal
+and be checked for reach and collision; no replacement has been tested. The recording is 30 fps
+pre-compositor video with an AAC audio stream, 24 dropped source samples and 23
+encoded repeats. Audio content was not independently auditioned. This take did
+not demonstrate body or eyepatch toggles and is rejected as the finished movie.
+No note interactions were run. Personal settings and the three-file studio tree
+were restored; transient bot changes were removed, simulator closed, Steam kept.
+See `visual-review.json` in the run for scope and limits. The finished showcase,
+continuous final-eye motion and physical Quest remain open.
+
+
+### Cassette showcase viewpoint diagnosis — 27 October
+
+The recorded source-eye cassette transfer was reviewed against simulator pose
+commands. The staged approach points nearly straight down at the player: the
+initial target is 90 degrees down and the subsequent re-aim is 87.3 degrees
+down, where heading becomes ill-conditioned. Playback shows a steep, poorly
+readable interaction. This is a recording-route problem, not proof of a game
+mechanism failure. Evidence: `artifacts/opening-hand-palette-20261026/cassette-viewpoint-analysis.json`.
+For the next full showcase, use a reachable diagonal offset with horizontal
+separation and a stable gravity-up heading; inspect motion in both final eyes.
+The diagonal proposal was later exercised in the retained run described above;
+its framing still obscures actions. The movie and physical Quest remain open.
+
+
+### Final-eye camera framing review — 27 October
+
+A private diagnostic projects a time-neighbor candidate hand mesh over retained
+final-eye stills. The right-eye wireframe overlaps the hand and sleeve region;
+the left-eye action is clipped at the frame edge. This is not proof of the
+rendered hand mesh or grip: the samples are seconds apart, palette reads are
+non-atomic, and the overlay has no scene depth. Evidence and timing are recorded
+in `artifacts/opening-hand-palette-20261026/eye-overlay-review.json`. The
+candidate camera pickup improvement is deployed, but clear hand contact,
+continuous two-eye presentation, a finished movie and physical Quest acceptance
+remain open. Do not install a speculative grip based on this overlay.
+
+
+### Opposed-handle search and draw-identity check — 27 October
+
+A multi-start opposed-side grip search using distal skin and full-finger
+penalties produced an extreme modeled wrist rotation and over 60 mm translation;
+full recombination still places 22 selected index vertices inside approximate
+camera planes. It is rejected as a production pose; the search is not exhaustive
+and its contact landmarks are hypotheses. Evidence:
+`artifacts/opening-hand-palette-20261026/camera-opposed-elite-recombined.json`.
+During the earlier palette session the log showed one uniquely admitted
+`sna3_main1_def` forearm profile and a player-owned color draw, but the closest
+observation puts that draw in the title scene before the ACC transition. It
+therefore does not establish draw ownership for the later held-camera image.
+A loaded buffer or shared skeleton is not a substitute for the required
+current-eye draw and skin join. No candidate grip was installed. Next establish
+current gameplay draw ownership and derive a supported hand/handle relationship;
+review continuous eye motion and physical controller alignment. The movie and
+physical Quest remain open.
+
+### Camera grip visual geometry review — 27 October
+
+A private static diagnostic rendered the candidate hand skin and the camera's
+beveled body, base and handle from multiple angles. It is synthetic geometry
+for analysis, not gameplay footage. The opposed-side grip candidates still
+show modeled palm/handle overlap and large palm rotations; full recombination
+reports up to 13.88 mm approximate palm-plane penetration for the selected pose.
+Evidence and limits: `artifacts/opening-hand-palette-20261026/camera-opposed-visual-review.json`
+and `camera-opposed-full-recombined.json` in the same folder. The candidate
+mesh was observed loaded, not proven drawn, and the palette/camera samples are
+non-atomic time-neighbors. The visualizations do not establish actual rendered
+contact, so no production grip was changed. Next validate a draw-matched hand
+and derive a supported pose that works for both hands, preserving controller
+alignment, camera shutter and print behavior; then review both final eyes
+through motion. The finished movie and physical Quest remain open.
+
+### Finger palette composition validation — 26 October, later
+
+Retained actual-game right-hand samples validate the offline palette-composition
+convention for the thumb, middle, ring and little when grip changes from 0.08
+to 1.0: after accounting for each actual parent transform, maximum difference
+across 12 bones is 0.108 degrees and 0.001 mm. An independent older cabin
+sample validates the index transition 0.08 to 0.42 to the displayed precision.
+Both sets are non-atomic time-neighbor reads on earlier builds, not proof of
+current draw ownership or a correct camera grasp. Evidence:
+`artifacts/opening-hand-palette-20261026/finger-delta-validation.json`.
+A constrained full-skin candidate search using that convention reduced modeled
+intersections but also removed nearly all nearby finger contact; it is rejected
+(`artifacts/opening-hand-palette-20261026/camera-articulated-union-recombined.json`).
+The model still uses an unproven drawn mesh, approximate surface planes and no
+physical wrist or motion validation. Next establish actual draw ownership and
+reasonable finger/handle contact targets rather than optimizing only distance.
+The grip, finished movie and physical Quest acceptance remain open.
+
+### Articulated camera-grip exploration — 26 October, later
+
+A private diagnostic reposed five weighted finger groups from the retained
+nearby native skin palette while exploring palm rotation and translation. The
+baseline reconstructed sample vertices match the previous projection exactly,
+but the inferred bone-palette delta convention has not been validated against a
+live re-pose. Recombining all candidate skin weights exposed intersections
+missed by the sample-only search. An adaptive candidate removed estimated finger
+intersections but retained 16 palm vertices inside the approximate handle/body
+planes, up to 10.04 mm, and required a large wrist rotation. A search that
+penalized every selected palm vertex reduced that overlap but introduced a
+7.34 mm modeled little-finger intersection and left the index without nearby
+contact. Evidence: `artifacts/opening-hand-palette-20261026/camera-articulated-adaptive-recombined.json`
+and `artifacts/opening-hand-palette-20261026/camera-articulated-palm-recombined.json`.
+Neither pose is a production fix: the mesh is loaded but not draw-proven,
+the palette/camera join is not same-frame, planes approximate surface contact,
+and ergonomics, skin triangles, control reach and motion are unverified. Next
+validate the palette-delta convention in a bounded real pose and constrain
+the actual drawn hand, camera surfaces and controller motion together. Both-eye
+motion, physical Quest and the finished movie remain open.
+
+### Projected full-hand grip search — 26 October, later
+
+A static candidate-hand projection was grouped by thumb, four fingers and palm
+using the retained loaded `sna3_main1` asset and nearby non-atomic skin sample.
+An approximate beveled-camera surface search found a rigid socket adjustment
+that reduced selected palm overlap, but the full selected-vertex review showed
+new finger intersections. A stricter candidate reduced those intersections but
+left the thumb without nearby contact and retained palm overlap. Evidence:
+`artifacts/opening-hand-palette-20261026/camera-projected-hand-search.json` and
+`artifacts/opening-hand-palette-20261026/camera-projected-hand-strict-search.json`.
+Both are rejected for production: loaded asset is not proven drawn, the sample
+is not same-frame, surface planes and weighted vertex subsets do not certify
+skin collision, and a fixed rigid rotation does not establish physical wrist
+comfort or a natural five-finger grasp. Next combine valid surface landmarks
+with finger articulation and a draw-matched skin join, then test both eyes and
+motion. Do not promote either pose from aggregate distance alone. The film and
+physical headset remain unaccepted.
+
+### Candidate current hand geometry — 26 October, later
+
+The game log for the palette session reports `sna3_main1_def` forearm resources
+loaded after the exact game process started. All three input-buffer hashes match
+the retained owned `sna3_main1_def` asset; its mesh 18 has 42 vertices at least
+half weighted to right index bone 42, 30 fully weighted. A non-atomic,
+double-read-stable palette and a held-camera observation 4.52 ms apart project
+the index bone origin within 0.058 mm of the published position. Applying that
+palette to this candidate mesh yields all 42 selected vertex positions outside
+the approximate camera body/base/handle bevels; the smallest signed-plane
+distance is 50.75 mm (55.03 mm for fully bone-42-weighted vertices). Evidence:
+`artifacts/opening-hand-palette-20261026/skin-projection-lead.json`.
+This is a strong contact lead, not exact visual proof: resource load is not
+draw ownership, the palette and observation are not the same render transaction,
+and only a vertex subset was modeled. Positive plane distance is a lower bound,
+not exact surface distance. Identify the drawn mesh and evaluate the full skin
+and grasp through motion in both eyes before a repair or acceptance claim. The
+raw asset and palette remain private; physical Quest and the movie remain open.
+
+### Live camera-hand palette — 26 October, later
+
+A combined actual-game take on `1ed68066ab7c` completed tape and camera/photo
+actions while a bounded read-only skin-palette reader sampled a stationary
+right-hand camera grip. There were 72 double-read-stable samples; 12 had
+same-owner held-camera observations within 20 ms, with the closest 4.52 ms.
+The live model code differs from the older `sna5` sleeve-analysis model, even
+though their first 53 bone names and parents match. Shared skeleton does not
+establish mesh identity. The reads are non-atomic and a time-neighbor is not
+the same render transaction. See `artifacts/opening-hand-palette-20261026/skin-palette-identity.json`;
+raw owned palette stays private. No mesh-contact or physical-headset pass is
+claimed. The user's two photos and board were restored from
+`private/opening-clean-film-baseline/thirteenth-trial`, the test prints archived
+in `fourteenth-trial`, settings restored, the owned simulator closed, and Steam
+retained. Next identify the exact current model/mesh and obtain a same-frame
+skin-to-camera join; then review contact through motion in both final eyes.
+The movie remains unfinished.
+
+### Owned hand-mesh inventory — 26 October, later
+
+A previously retained owned `sna5` mesh contains a right-hand mesh whose
+23 vertices have at least 50 percent weight on bone 42; 17 are fully weighted.
+Their bind-pose distance from that bone origin ranges from 5.38 to 25.11 mm
+(`artifacts/opening-centered-camera-20261026/owned-index-mesh-inventory.json`).
+This makes clear why a distal-bone-to-camera distance is not fingertip clearance.
+The asset was used by an older sleeve analysis, but its identity and skinning
+palette were not joined to the centered-camera render; no actual camera contact
+or visible fingertip position follows from this inventory alone. The owned asset
+remains private. Next capture matched model identity, skin palette and camera
+pose from the same current render transaction and evaluate the deformed surface
+in both eyes. Physical headset and the finished movie remain open.
+
+### Correction: camera contact point — 26 October, later
+
+The telemetry field `index_tip_local` is published from the position of the
+third articulated index bone (`controller_rig.cpp`), not from a measured
+skinned fingertip vertex. The 35.6 mm right and 23.5 mm left camera-box
+distances below are therefore **distal bone-origin distances**, not direct
+measurements of the visible fingertip. The earlier statements calling them
+fingertip gaps are too strong. The modeled other fingers and earlier curl
+searches also end at joint origins; they cannot establish visible skin contact.
+Both-eye images still show an unclear grip, but exact finger-surface separation
+or penetration remains unproven. Do not change the contact socket solely
+from these distances. Next identify the actual owned hand mesh and its skin
+weights for the matched render transaction, then compare visible finger
+geometry to the camera surface through motion. The same naming limitation
+also applies to historical paper distance reports; their original results are
+retained with this qualification. Physical headset and finished movie remain open.
+
+### Full-hand camera contact model — 26 October, later
+
+The retained native-left 16-joint hand offsets, mirrored for the right, now
+include thumb, index, middle, ring and little chains and their shared parent.
+The camera surface analysis reconstructs body, base and side-handle bevel
+triangle planes from the mod-authored geometry. The actual captured index tip
+was within 1.9 mm (left) and 5.7 mm (right) of the nominal model at the
+sampled print poses (`artifacts/opening-centered-camera-20261026/camera-full-hand-live-estimate.json`).
+Other finger joints are modeled, not published measurements; negative plane
+distance is only a centerline warning, not proof of skinned-mesh penetration.
+An exploratory 150,000-candidate-per-hand search with hypothesized surface
+landmarks still yielded large fingertip errors and some internal joints
+(`artifacts/opening-centered-camera-20261026/camera-full-hand-search.json`).
+The search is neither exhaustive nor evidence that a supported grip is
+impossible, and its landmark targets are assumptions. No pose is promoted.
+Next: obtain full actual hand contacts and establish valid camera-side contact
+landmarks, then derive and test the hand/handle transform; verify motion and
+both eyes before changing acceptance. Physical headset and the movie remain open.
+
+### Camera grip geometry search — 26 October, later
+
+An offline nominal-hand search compared index and thumb positions with boxes
+approximating the mod-authored camera body, base and side handle. The first
+low-tip-distance candidates put intermediate finger joints inside those boxes.
+A second search penalized those intersections but converged to both tips on
+the underside of the base with about 60 degrees of palm roll. These are not
+accepted grips or gameplay fixes: they use nominal chains and boxes, omit other
+fingers, skin and ergonomics, and were not exercised in the game. Evidence:
+`artifacts/opening-centered-camera-20261026/camera-grip-exploration.json` and
+`artifacts/opening-centered-camera-20261026/camera-grip-joint-search.json`.
+Do not promote a pose merely because fingertip-to-box distance is small. Next
+use exact camera-side surfaces and complete finger chains to derive a supported
+grasp, then verify actual hand/controller motion and both eyes. Physical
+headset comfort and the finished cabin movie remain open.
+
+### Camera hand contact investigation — 26 October, later
+
+The centered-camera run exposed a specific unresolved grip problem. Published
+rendered index fingertips in the shutter poses were 35.6 mm (right) and 23.5 mm
+(left) outside the conservative camera bounding box; the front/side final-eye
+images show the right fingers below the camera. See
+`artifacts/opening-centered-camera-20261026/camera-contact-analysis.json`.
+The camera palm anchors are inside the modeled side-handle volume. An offline
+nominal finger-chain calculation predicts that index curl alone would leave
+about 29 mm right and 18 mm left outside even that conservative box. This is a
+prediction for the sampled pose, not runtime proof, and bounding-box contact is
+not exact mesh contact. Do not fix the gap by an arbitrary camera offset: that
+may bury the palm. Next derive and test compatible palm orientation, handle
+contact and articulation together, then inspect full hands through motion in
+both eyes. Other grip poses, thumb contact and physical Quest remain unverified.
+
+### Centered-camera take — 26 October, later
+
+`artifacts/opening-centered-camera-20261026` exercised the current checked
+candidate with a centered camera position and a deliberate cassette-face reveal.
+Tape seat/eject, both camera shutters and photo placement were observed; the
+source-eye recording had 11 dropped samples and 10 repeats. Both final-eye
+print checkpoints were reviewed. The camera body is more central, but the
+right sleeve hides the gripping hand and the cassette face remains largely
+obscured during insertion. The take is rejected as a finished showcase; this
+does not establish whether hand geometry is inside the camera or merely hidden
+from the chosen viewpoint. Preserve that distinction when investigating contact.
+The user's photo pair and board were restored from `private/opening-clean-film-baseline/eleventh-trial`,
+new test prints archived in `twelfth-trial`, settings restored, and owned
+simulator closed. Continuous final-eye motion and physical headset remain open.
+Next: verify the camera-side grip geometry and a reachable viewpoint that exposes
+the hand, and validate the cassette interaction without the covering arm.
+
+### Camera pickup continuity repair — 26 October, later
+
+A controlled stationary right-hand grip reproduced the camera moving 33.28 mm
+in 116 ms (`artifacts/opening-stationary-camera-20261026`). Camera pickup now
+starts at the acquired pose and eases camera attachment and rendered palm toward
+the authored handle over 300 ms; contact easing is excluded from throw velocity.
+Candidate `1ed68066ab7c` passed all 58 test groups and installer checks and was
+installed in `build/dev`. In `artifacts/opening-camera-fix-verified-20261026`,
+the equivalent 115 ms sample moved 9.94 mm, while the head stayed stationary.
+This is a partial transition sample, not a claim of zero final adjustment. Tape
+seat/eject, both camera shutters and photo placement completed in the same run.
+Both final-eye pickup stills were reviewed but crop the hand; continuous final-eye
+contact, different grip orientations, physical Quest and cinematic quality remain
+unaccepted. The film still obscures tape insertion. The user's two fresh photos
+and board were restored from `private/opening-clean-film-baseline/ninth-trial`;
+test photos were archived in `tenth-trial`, settings were restored, the owned
+simulator closed, and the published `play/` pin remains unchanged. Next: verify
+full-view hand contact during motion and produce a readable cassette sequence.
+
+### Camera displaced by interrupted test — 26 October, later
+
+`artifacts/opening-cinematic-offset-20261026/camera-fall-cause.json` narrows
+the camera-on-floor observation: after the simulated tape grip expired, the
+script reissued right grip; the following sample showed the tape unheld and
+the camera held. Cleanup released the camera, and the same-session retry then
+found it on the floor. This is test-route contamination, not evidence of an
+idle camera falling by itself. The interval does not identify exactly when tape
+ownership was lost. The next film route must confirm tape ownership while
+renewing a bounded grip and stop without re-grabbing if ownership is lost;
+verify the camera is at its native resting location before recording. The
+previously documented camera pickup movement remains a separate, unisolated
+lead. No gameplay change or headset acceptance is inferred.
+
+### Offset-view retry — 26 October, later
+
+The first offset-view take (`artifacts/opening-cinematic-offset-20261026`)
+stopped when its five-second scripted grip lease expired during slow observer
+motion. It was a test-control failure, not a diagnosed headset interaction bug.
+The same-session retry (`artifacts/opening-cinematic-offset-retry-20261026`)
+renewed the bounded grip and observed tape pickup, seating and ejection, camera
+shutters with both hands, photo placement and body/eyepatch requests. The native
+source-eye recording reports four dropped samples and three repeated frames.
+Visual review rejects the new angle: it hides the tape during insertion and
+the camera is on the floor during approach, so it is not a cinematic showcase.
+The prior two fresh photographs and matching board were restored from
+`private/opening-clean-film-baseline/fifth-trial`; retry files were archived in
+`sixth-trial`. Personal settings match their original hashes, Steam was retained
+and the owned simulator closed. The original lid motion, both-eye motion quality
+and physical Quest acceptance remain open. Do not repeat this route unchanged;
+frame the grip and carrier from a reach-valid pose and reset the prop before filming.
+
+### Revised cabin staging — 26 October, later
+
+`artifacts/opening-cinematic-staged-20261026` records an actual ACC take on
+the unchanged checked candidate. The test route now carries the cassette to
+the player without its prior deliberate drop, eases observer motion, and derives
+the two photo aims from the camera's acquired attachment and lens direction.
+Both resulting PNGs show the cabin wall; the prior take photographed the floor.
+Cassette seat/eject, both camera shutters, photo placement, body and eyepatch
+requests were observed. Both eyes were inspected at seated tape and camera
+print checkpoints. This is an improvement to demonstration staging, not a
+production gameplay fix or a physical-headset pass. Review still finds the arm
+crosses the cassette interaction, camera movement lacks cinematic composition,
+and the 30 fps pre-compositor source-eye recording dropped 59 samples and
+repeated 59 frames. Continuous final-eye quality and original lid motion remain
+unproven. The live studio contains two fresh photos and two paper records;
+the previous fresh pair is backed up in `private/opening-clean-film-baseline/fourth-trial`.
+Personal INIs match their original hashes and the owned simulator is closed.
+Next: solve the framing and movement from actual playback, then capture and
+review both final eyes through motion; do not call this finished footage.
+
+### Clean-set cabin take — 26 October, later
+
+At the user's request, the prior custom photo and note collection was cleared;
+its 47 PNGs and board were backed up under `private/user-cleared-cabin-studio-20261026`.
+The live studio now contains two newly captured photo PNGs and two paper records.
+`artifacts/opening-clean-final-attempt-20261026` records the actual ACC interaction
+loop, cassette seating/ejection, camera use with both hands, photo placement and
+requested body/eyepatch switches. The 30 fps recording is a native source-eye
+capture with game-process audio, before compositor; eight samples were dropped
+and seven encoded frames repeated. Review rejected it as the requested cinematic
+showcase: abrupt viewpoint/hand changes obscure the action, and the photographs
+are poorly framed. Final-eye stills do not establish continuous stereo or physical
+Quest acceptance. Settings were restored and the owned simulator closed. Next:
+resolve camera and hand staging and verify a continuous, readable final-eye take;
+do not present this take as finished or treat the scripted loop as headset proof.
+
 ### Cabin showcase attempts — 26 October
 
 Multiple actual-game takes were attempted after the user requested a clear, human

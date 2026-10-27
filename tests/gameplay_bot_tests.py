@@ -3540,6 +3540,27 @@ class MenuCleanupTests(unittest.TestCase):
 
 
 class StartupTests(unittest.TestCase):
+    def test_observed_maintenance_notice_uses_guarded_confirmation(self):
+        notice={'scene':'menu','title_menu':False,
+                'native':{'mission':1,'sequence':'Seq_Demo_LogInKonamiServer',
+                          'title':False,'popup':True},
+                'popup_observer':{'reader_verified':True,'owner_verified':True,
+                                  'active':True,'numeric_id':3,
+                                  'string_id':'0xd7658701ee40'}}
+        menu=self.stage('Seq_Demo_StartHasTitleMission',menu=True)
+        live=mock.Mock();live.observe.side_effect=[notice,menu];clock=Clock()
+        self.assertIs(advance_startup(live,clock=clock,sleep=clock.sleep),menu)
+        step=live.execute.call_args.args[0]
+        self.assertEqual(step['name'],'menus.confirm')
+        self.assertEqual(step['state_before']['popup_observer.string_id'],'0xd7658701ee40')
+        self.assertEqual(step['state_before']['popup_observer.numeric_id'],3)
+
+        unknown={**notice,'popup_observer':{**notice['popup_observer'],'string_id':'0x0'}}
+        live=mock.Mock();live.observe.return_value=unknown;clock=Clock()
+        with self.assertRaisesRegex(BotFault,'Native startup deadline'):
+            advance_startup(live,timeout=.3,clock=clock,sleep=clock.sleep)
+        live.execute.assert_not_called()
+
     @staticmethod
     def information_close():
         return {'now_ms':1000,'scene':'cinematic','camera_active':False,

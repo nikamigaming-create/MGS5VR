@@ -53,6 +53,7 @@ struct CabinStudioFrame {
     Pose shutterPose{};
     uint8_t inputMask{},hapticMask{};
     uint8_t cameraCandidateMask{};
+    float cameraGripBlend{};
     bool cabin{},available{},capacityReached{},keyboardOnly{};
     bool review{},freezeRequested{},freezeSupported{};
     StudioFreeze freezeState{StudioFreeze::live};
@@ -79,6 +80,7 @@ inline constexpr float studioMarkerThumbCurl=.10f,studioMarkerIndexCurl=.70f;
 Pose studioPaperContact(size_t side) noexcept;
 Pose studioMarkerGrip(size_t side) noexcept;
 Pose studioCameraPalm(Pose camera,size_t side) noexcept;
+Pose studioCameraPalmTransition(Pose grip,Pose camera,size_t side,float blend) noexcept;
 // Native anatomical frames in one shared space: +X left, +Y up, +Z forward.
 // The mod-authored camera has a -Z lens and rests outside the right hip.
 std::optional<Pose> studioFieldCameraHolster(Pose pelvis,Pose rightHip) noexcept;
@@ -106,6 +108,10 @@ private:
     void control(StudioControl control,uint64_t now);
     CabinStudioFrame frame_{};
     std::array<Pose,2> attachment_{};
+    std::array<Pose,2> cameraPickupAttachment_{},cameraPreviousGrip_{};
+    std::array<uint64_t,2> cameraPickupTime_{};
+    std::array<Pose,2> markerPickupAttachment_{},markerPreviousGrip_{};
+    std::array<uint64_t,2> markerPickupTime_{};
     // Each paper starts at its real pickup pose, then settles into the
     // authored finger contact in hand space without losing tracked movement.
     std::array<Pose,2> paperPickupAttachment_{};

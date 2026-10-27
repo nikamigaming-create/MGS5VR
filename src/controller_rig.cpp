@@ -753,7 +753,8 @@ bool apply(void* context,void* binding,PoseRestore& restore){
         for(size_t side=0;side<2;++side){
             propHands[side]=studio->cameraHand==static_cast<int>(side)||studio->markerHand==static_cast<int>(side)
                 ||std::any_of(studio->papers.begin(),studio->papers.end(),[&](const auto& paper){return paper.hand==static_cast<int>(side);});
-            if(studio->cameraHand==static_cast<int>(side))propInputPalms[side]=studioCameraPalm(studio->camera,side);
+            if(studio->cameraHand==static_cast<int>(side))propInputPalms[side]=studioCameraPalmTransition(
+                frame.controllers.hands[side].grip,studio->camera,side,studio->cameraGripBlend);
         }
     }
     std::array<Pose,2> grips{};

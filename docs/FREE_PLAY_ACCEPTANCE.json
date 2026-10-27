@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "217df3f4b9befaaecf1880de40ad2a60b007eb69ec9ea7f2f8f118c7ddb5a28c",
-  "candidate_status": "Checked/deployed opening lid end-face and paper pickup repair; close visual and physical headset acceptance and original lid motion remain unverified.",
+  "candidate": "789a8e11c795bc3150fddf273ce489f3a48f19ff162f4c65f3374b493bd556f9",
+  "candidate_status": "Checked/deployed marker and camera pickup continuity; no simulator or physical-headset acceptance on this candidate; finished movie remains open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1405,11 +1405,12 @@
     }
   ],
   "active_work": {
-    "candidate": "87186cb55ebe45167216657c0ec45c1b9ce370385e5293ef8b0df7edba26f74f",
+    "candidate": "789a8e11c795bc3150fddf273ce489f3a48f19ff162f4c65f3374b493bd556f9",
     "source_commit": "939d41a74c0f3e6ae1b2e29c13281810264c4e3a",
-    "checkpoint": "Checked/deployed mortar/MG spatial hand aim and additive stick trim. Daytime shifting-shadow report unresolved; expanded mounted types and physical acceptance remain open.",
+    "checkpoint": "Checked/deployed cabin marker and camera pickup continuity; no simulator or physical-headset acceptance on this candidate.",
     "plan": "docs/RELEASE_PLAN.md",
     "next_actions": [
+      "Review cabin marker pickup, writing and release with both hands and both eyes in the deployed development candidate; retain unresolved movie and headset gaps.",
       "Physical mortar/MG spatial-plus-wrist-plus-stick review through Play-Dev.cmd on wired Meta Quest Link.",
       "Diagnose daytime large light/shadow patches shifting with head nods; no disappearance/culling claim.",
       "Confirm actual native helicopter/anti-aircraft action and contacts before extending mounted hand admission.",
@@ -1418,7 +1419,7 @@
     "runtime_requirement": "Wired Meta Quest Link / Meta OpenXR; both Play commands explicitly -MetaLink. Historical runtime observations in retained_work_history are not current setup instructions.",
     "build_slots": {
       "published_pin": "b627c7cacc9a",
-      "development": "87186cb55ebe"
+      "development": "789a8e11c795"
     },
     "scope": "Checked and deployed candidate; not a publication or headset/full-game acceptance.",
     "cleanup": "Owned game/simulator closed, inputs released, Steam retained, per-game Meta Link restored, published play unchanged."
@@ -2894,6 +2895,151 @@
       "Fast motion and paper contact not fully visually accepted",
       "Physical Quest untested",
       "No perfect-scene claim"
-    ]
+    ],
+    "clean_set_take": {
+      "candidate": "217df3f4b9befaaecf1880de40ad2a60b007eb69ec9ea7f2f8f118c7ddb5a28c",
+      "result": "artifacts/opening-clean-final-attempt-20261026/result.json",
+      "recording": "artifacts/opening-clean-final-attempt-20261026/recording/segment-0000-av.mp4",
+      "status": "rejected_showcase",
+      "scope": "Native pre-compositor source eye, game audio; 30 fps, eight samples dropped and seven encoded frames repeated. Cassette and camera actions observed, but viewpoint and hand motion are abrupt and photos poorly framed. Does not prove cinematic or physical headset acceptance.",
+      "studio": "User requested old photos and notes cleared; two fresh photo files and two paper records remain. Prior collection backed up privately."
+    },
+    "revised_cabin_staging": {
+      "candidate": "217df3f4b9befaaecf1880de40ad2a60b007eb69ec9ea7f2f8f118c7ddb5a28c",
+      "result": "artifacts/opening-cinematic-staged-20261026/result.json",
+      "status": "showcase_incomplete",
+      "scope": "Direct cassette carry and camera lens-aware staging improved the two real photos; both eyes reviewed at seated cassette and camera print. Arm occlusion and motion remain unpolished, source-eye video has 59 dropped samples and 59 repeats, and continuous final-eye and physical headset acceptance are unproven."
+    },
+    "offset_retry": {
+      "candidate": "217df3f4b9befaaecf1880de40ad2a60b007eb69ec9ea7f2f8f118c7ddb5a28c",
+      "failed_first": "artifacts/opening-cinematic-offset-20261026/result.json",
+      "retry": "artifacts/opening-cinematic-offset-retry-20261026/result.json",
+      "status": "showcase_rejected",
+      "scope": "First test lost bounded simulated grip after a long head move; retry retained it and observed cassette/camera actions. The offset hid insertion and camera appeared on floor, so the visual showcase and physical headset remain unaccepted.",
+      "camera_floor_cause": "artifacts/opening-cinematic-offset-20261026/camera-fall-cause.json"
+    },
+    "camera_pickup_repair": {
+      "candidate": "1ed68066ab7ccdcfcbac416e11fb297259f804eb7b9c58fee4d3a1853b19886e",
+      "comparison": "artifacts/opening-camera-fix-verified-20261026/camera-pickup-comparison.json",
+      "result": "artifacts/opening-camera-fix-verified-20261026/result.json",
+      "status": "implemented_simulator_scope_only",
+      "limitations": "Eased 300 ms handle adjustment remains; hand cropped in final-eye stills, continuous contact and physical headset unverified."
+    },
+    "centered_camera_take": {
+      "candidate": "1ed68066ab7ccdcfcbac416e11fb297259f804eb7b9c58fee4d3a1853b19886e",
+      "result": "artifacts/opening-centered-camera-20261026/result.json",
+      "status": "showcase_rejected",
+      "scope": "Centered camera appears in both final-eye stills but the sleeve masks the gripping hand. Cassette face remains obscured during insertion. This does not prove hand penetration; motion and physical headset acceptance remain open."
+    },
+    "camera_grip_contact": {
+      "candidate": "1ed68066ab7ccdcfcbac416e11fb297259f804eb7b9c58fee4d3a1853b19886e",
+      "evidence": "artifacts/opening-centered-camera-20261026/camera-contact-analysis.json",
+      "status": "visual_contact_unclear_bone_origin_measured",
+      "scope": "Right and left distal index bone origins lie 35.6 and 23.5 mm outside the conservative camera box in sampled print poses. The published field is not a measured skinned fingertip; visible skin contact, exact mesh, other fingers, dynamic contact and headset remain unverified.",
+      "offline_search": "artifacts/opening-centered-camera-20261026/camera-grip-joint-search.json",
+      "offline_search_result": "Rejected as a production pose: approximate search found underside pinches and approximately 60 degree palm roll; intermediate-joint intersections affect the first candidate set. Exact surface, all fingers and physical ergonomics remain unverified.",
+      "full_hand_model": "artifacts/opening-centered-camera-20261026/camera-full-hand-live-estimate.json",
+      "bevel_search": "artifacts/opening-centered-camera-20261026/camera-full-hand-search.json",
+      "model_limits": "Nominal five-finger model matches the observed distal index bone origin within 1.9 mm left and 5.7 mm right; this is not visible fingertip evidence. Other finger positions are estimates and the nonexhaustive search uses hypothesized landmarks.",
+      "owned_mesh_inventory": "artifacts/opening-centered-camera-20261026/owned-index-mesh-inventory.json",
+      "mesh_inventory_limit": "Previously retained owned sna5 right index-weighted vertices extend up to 25.11 mm from bone 42 in bind pose; the inventory is not joined to the current rendered model/palette and does not measure camera contact.",
+      "live_palette_identity": "artifacts/opening-hand-palette-20261026/skin-palette-identity.json",
+      "identity_limit": "Current live model code differs from the older retained sna5 analysis despite a matching first-53-bone skeleton. Non-atomic palette reads joined only by time cannot certify exact mesh or same-frame contact.",
+      "candidate_skin_projection": "artifacts/opening-hand-palette-20261026/skin-projection-lead.json",
+      "projection_limit": "Loaded sna3_main1 buffer hashes match a candidate asset; non-atomic palette and held-camera observation 4.52 ms apart align bone 42 to 0.058 mm. Selected projected index vertices lie outside approximate camera bevels, but loaded resources are not proof of draw ownership or a same-frame full-skin result.",
+      "rigid_skin_search": "artifacts/opening-hand-palette-20261026/camera-projected-hand-strict-search.json",
+      "rigid_skin_search_result": "Rejected: full selected-vertex review still shows modeled palm overlap and no nearby thumb contact. It uses an unproven drawn mesh, time-neighbor palette and approximate planes; no visual or headset acceptance.",
+      "articulated_search": "artifacts/opening-hand-palette-20261026/camera-articulated-adaptive-recombined.json",
+      "articulated_search_limit": "Candidate search reposes weighted skin with inferred palette deltas and approximate surface planes; recombined full groups still show estimated palm or finger overlap. No pose promoted; actual drawn mesh, live delta convention and headset ergonomics unverified.",
+      "finger_delta_validation": "artifacts/opening-hand-palette-20261026/finger-delta-validation.json",
+      "validated_scope": "Thumb, middle, ring, little and separately index palette composition compared with prior real-game, non-atomic time-neighbor samples. This does not validate camera contact, mesh ownership, motion or physical headset.",
+      "constrained_recombined_search": "artifacts/opening-hand-palette-20261026/camera-articulated-union-recombined.json",
+      "visual_geometry_review": "artifacts/opening-hand-palette-20261026/camera-opposed-visual-review.json",
+      "visual_geometry_limit": "Synthetic static views for internal diagnosis only, not gameplay or final-eye evidence. Opposed candidate rejected; candidate mesh is not draw-proven and full motion and headset ergonomics are unverified.",
+      "opposed_full_hand_search": "artifacts/opening-hand-palette-20261026/camera-opposed-elite-recombined.json",
+      "draw_identity_limit": "The unique admitted forearm profile and player-owned draw were observed in title before ACC arrival; they do not prove which mesh is drawn during the later held-camera state."
+    }
+  },
+  "cabin_final_eye_camera_overlay_2026_10_27": {
+    "candidate": "1ed68066ab7ccdcfcbac416e11fb297259f804eb7b9c58fee4d3a1853b19886e",
+    "evidence": "artifacts/opening-hand-palette-20261026/eye-overlay-review.json",
+    "status": "diagnostic only; not acceptance",
+    "finding": "Right-eye projected hand overlaps hand/sleeve region; left-eye action is clipped. Mesh draw ownership, actual contact, continuous two-eye presentation, finished movie and physical headset remain unverified.",
+    "limitations": "Non-atomic palette and non-matching capture times; synthetic overlay lacks depth and does not establish rendered geometry."
+  },
+  "cabin_cassette_showcase_viewpoint_2026_10_27": {
+    "evidence": "artifacts/opening-hand-palette-20261026/cassette-viewpoint-analysis.json",
+    "status": "diagnosed recording route; diagonal replacement not tested",
+    "scope": "Source-eye playback and simulator input commands; no claim of game mechanism failure or final-eye or physical-headset acceptance."
+  },
+  "cabin_diagonal_showcase_2026_10_27": {
+    "evidence": "artifacts\\bot\\runs\\20261027T131055498302Z\\visual-review.json",
+    "status": "observed interactions; visual showcase rejected",
+    "limitations": "Sleeve obscures actions; paired stills only; no body/eyepatch toggle segment; audio stream present but not independently auditioned; physical headset untested."
+  },
+  "cabin_marker_pickup_continuity_2026_10_27": {
+    "candidate": "789a8e11c795bc3150fddf273ce489f3a48f19ff162f4c65f3374b493bd556f9",
+    "source_observation": "artifacts/opening-paper-lid-validation-20261026/events.jsonl",
+    "details": "artifacts/opening-marker-pickup-leads-20261026.json",
+    "reproduction_scope": "Earlier build: marker unchanged in 15 room-space samples over 3.062 seconds. Last left grip command was approximately 0.0001 mm from its last observed pose; the first held sample was 70.66 mm away. Grip was pressed 62 ms after last controller pose. Marker was not sampled immediately before grip, so the exact pickup step is not isolated. Source assigned the authored grip immediately.",
+    "change": "Keep acquired room-relative marker pose at grip and ease toward the established writing grip over 300 ms; use hand-only movement to compute throw velocity.",
+    "validation": "build/current-tests.xml: 58 test groups, zero failures; installer checks passed. New unit coverage checks both hands, initial continuity, tracked movement to final writing grip, and release. Candidate deployed to development slot and installed game.",
+    "limits": [
+      "No in-game or both-eye run of this candidate.",
+      "The original observation was from a prior build; it is evidence of a lead, not a tightly bracketed measurement on this candidate.",
+      "Physical hand contact, writing during pickup, throw behavior and headset performance are not accepted.",
+      "Cinematic showcase remains unfinished."
+    ],
+    "cleanup": "Steam retained; no simulator started; published play pin unchanged.",
+    "followup_unit_check": {
+      "scope": "Both hands: acquire stationary marker, release before 300 ms transition completes, and observe lateral position for one second.",
+      "command": "ctest --test-dir build -C Release -R ^contracts$ --output-on-failure",
+      "result": "passed",
+      "limits": "Core model only; not rendered movement, real writing or physical headset. Test source added after candidate build; no runtime source changed."
+    }
+  },
+  "cabin_face_take_2026_10_27": {
+    "candidate": "789a8e11c795bc3150fddf273ce489f3a48f19ff162f4c65f3374b493bd556f9",
+    "run": "artifacts\\bot\\runs\\20261027T133035987440Z",
+    "status": "observed_workbench_loop",
+    "outcomes": [
+      "initial-tape-ejected",
+      "initial-tape-picked-up",
+      "initial-tape-set-down",
+      "tape-picked-up",
+      "tape-seated-without-native-import",
+      "tape-ejected",
+      "ejected-tape-supported-in-carrier",
+      "ejected-tape-recovered",
+      "physical-camera-grabbed",
+      "camera-native-scene-printed",
+      "left-camera-grip-before-contact",
+      "left-camera-native-scene-printed",
+      "polaroid-picked-up",
+      "polaroid-attached-to-native-board"
+    ],
+    "toggles": [
+      [
+        "full_body",
+        0
+      ],
+      [
+        "full_body",
+        1
+      ],
+      [
+        "eyepatch",
+        1
+      ],
+      [
+        "eyepatch",
+        0
+      ]
+    ],
+    "recording": "Two separate 30 fps pre-compositor source-eye segments with AAC audio; dropped samples 15 and 5; repeated frames 14 and 4. Audio not independently auditioned.",
+    "review": "Sampled source-eye frames show an overly steep shot and an obstructed cassette; this take is rejected as a finished movie. Paired eye snapshots show body off/on and right-eye patch on/off, but body-off snapshots have large black sleeve caps. No marker actions were performed, so the new marker behavior remains unverified in-game.",
+    "startup": "Initial attempt stalled at server maintenance notice. Same live session continued after a guarded confirmation keyed to witnessed native popup numeric 3 and StringId 0xd7658701ee40; it reached title and completed the workbench. See artifacts/opening-maintenance-startup-failure-20261027.",
+    "cleanup": "Inputs released; owned simulator closed; Steam retained. Personal INIs restored. Studio tree restored byte-identically; a late shutdown write was preserved separately under private/opening-face-late-output.",
+    "limits": "Not continuous final-eye acceptance or physical Quest; newly requested broader cabin interactions not yet audited."
   }
 }

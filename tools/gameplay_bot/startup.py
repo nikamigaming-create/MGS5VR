@@ -117,6 +117,16 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
               and logged_in_notice(state)):
             action = ("logged-in-notice", {"mission": 1, "sequence": "Seq_Demo_LogInKonamiServer",
                                           "title": False, "popup": True})
+        elif (native.get("sequence") == "Seq_Demo_LogInKonamiServer"
+              and native.get("mission") == 1 and native.get("title") is False
+              and native.get("popup") is True
+              and state.get("popup_observer", {}).get("reader_verified") is True
+              and state.get("popup_observer", {}).get("owner_verified") is True
+              and state.get("popup_observer", {}).get("active") is True
+              and state.get("popup_observer", {}).get("numeric_id") == 3
+              and state.get("popup_observer", {}).get("string_id") == "0xd7658701ee40"):
+            action = ("server-maintenance-notice", {"mission": 1,
+                "sequence": "Seq_Demo_LogInKonamiServer", "title": False, "popup": True})
         elif online_information_close(state):
             action = ("online-information-close", {"mission": native["mission"],
                 "sequence": "Seq_Demo_LogInKonamiServer", "title": False,
@@ -187,6 +197,10 @@ def advance_startup(live, timeout=90., clock=time.monotonic, sleep=time.sleep):
                 step["seconds"] = .30
                 if label == "logged-in-notice":
                     step["state_before"] = LOGGED_IN_NOTICE
+                elif label == "server-maintenance-notice":
+                    step["state_before"] = {"popup_observer.reader_verified": True,
+                        "popup_observer.owner_verified": True, "popup_observer.active": True,
+                        "popup_observer.numeric_id": 3, "popup_observer.string_id": "0xd7658701ee40"}
                 elif label == "online-information-close":
                     step["state_before"] = ONLINE_INFORMATION_CLOSE
             try:

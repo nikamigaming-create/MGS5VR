@@ -118,6 +118,9 @@ Pose studioCameraPalm(Pose camera,size_t side) noexcept{
     // Turn the socket so both palms cup the body from its respective side.
     return compose(camera,Pose{{0,1,0,0},side?studioCameraRightGrip:studioCameraLeftGrip});
 }
+Pose studioCameraPalmTransition(Pose grip,Pose camera,size_t side,float blend) noexcept{
+    return blendPaperPickup(grip,studioCameraPalm(camera,side),blend);
+}
 std::optional<Pose> studioFieldCameraHolster(Pose pelvis,Pose rightHip) noexcept{
     if(!valid(pelvis)||!valid(rightHip))return {};
     const auto hip=compose(inverse(pelvis),rightHip).position;
@@ -326,8 +329,14 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
         }
         if(frame_.cameraHand==static_cast<int>(side)){
             frame_.inputMask|=uint8_t(1u<<side);
-            if(tracking){const auto next=compose(hand.grip,attachment_[side]);
-                if(dt>0)cameraVelocity_=(next.position-frame_.camera.position)*(1/dt);frame_.camera=next;}
+            if(tracking){const float blend=now>=cameraPickupTime_[side]
+                    ?std::min(1.f,static_cast<float>(now-cameraPickupTime_[side])/300.f):0.f;
+                const auto contact=blendPaperPickup(cameraPickupAttachment_[side],attachment_[side],blend);
+                const auto next=compose(hand.grip,contact);
+                // Handle alignment is not a throw: measure hand movement at
+                // the same blend fraction, just as for picked-up paper.
+                if(dt>0)cameraVelocity_=(next.position-compose(cameraPreviousGrip_[side],contact).position)*(1/dt);
+                cameraPreviousGrip_[side]=hand.grip;frame_.camera=next;frame_.cameraGripBlend=blend;}
             if(edge&&now-lastShot_>1000&&frame_.photos.size()<studioPhotoLimit&&!frame_.review&&!frame_.confirmPhoto){
                 lastShot_=now;frame_.shutter=now;frame_.shutterPose=compose(frame_.camera,studioCameraLens);
                 frame_.hapticMask|=uint8_t(1u<<side);}
@@ -337,8 +346,13 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 for(auto& p:frame_.papers)if(p.field&&p.hand<0)p.field=false;}
         }else if(frame_.markerHand==static_cast<int>(side)){
             frame_.inputMask|=uint8_t(1u<<side);
-            if(tracking){const auto next=compose(local,attachment_[side]);
-                if(dt>0)markerVelocity_=(next.position-frame_.marker.position)*(1/dt);frame_.marker=next;}
+            if(tracking){const float blend=now>=markerPickupTime_[side]
+                    ?std::min(1.f,static_cast<float>(now-markerPickupTime_[side])/300.f):0.f;
+                const auto contact=blendPaperPickup(markerPickupAttachment_[side],attachment_[side],blend);
+                const auto next=compose(local,contact);
+                // Contact correction is not a throw; measure only actual hand motion.
+                if(dt>0)markerVelocity_=(next.position-compose(markerPreviousGrip_[side],contact).position)*(1/dt);
+                markerPreviousGrip_[side]=local;frame_.marker=next;}
             if(trigger&&tracking){
                 const auto tip=compose(frame_.marker,Pose{{},{0,0,-.08f}}).position;
                 bool wrote=false;
@@ -412,16 +426,19 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
             if(cameraPickup){
                 frame_.cameraHand=static_cast<int>(side);cameraDropped_=false;
                 attachment_[side]=rigid(compose(inverse(hand.grip),frame_.camera));
+                cameraPickupAttachment_[side]=attachment_[side];cameraPreviousGrip_[side]=hand.grip;
+                cameraPickupTime_[side]=now;frame_.cameraGripBlend=0;cameraVelocity_={};
                 // Retain the picked-up orientation and place the authored side
                 // handle in the palm, leaving the lens and rear finder visible.
                 attachment_[side].position=rotate(attachment_[side].orientation,
                     (side?studioCameraRightGrip:studioCameraLeftGrip)*-1.f);
-                frame_.camera=compose(hand.grip,attachment_[side]);
                 frame_.inputMask|=uint8_t(1u<<side);}
             else if(markerDistance<.035f*.035f&&markerDistance<paperDistance){
                 frame_.markerHand=static_cast<int>(side);markerDropped_=false;
+                markerPickupAttachment_[side]=rigid(compose(inverse(local),frame_.marker));
+                markerPreviousGrip_[side]=local;markerPickupTime_[side]=now;markerVelocity_={};
                 attachment_[side]=studioMarkerGrip(side);
-                frame_.marker=compose(local,attachment_[side]);}
+            }
             else if(selected||cabin){
                 if(cabin&&!selected&&(near(local.position,studioNotesHome,.055f)
                     ||near(compose(local,studioPaperContact(side)).position,studioNotesHome,.055f))&&frame_.papers.size()<studioPaperLimit){

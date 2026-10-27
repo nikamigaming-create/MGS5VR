@@ -2744,6 +2744,36 @@ int main(){
             }
         }
         {
+            for(size_t side=0;side<2;++side){
+                CabinStudio marker;std::array<StudioHand,2> holding{};
+                holding[side].tracked=true;holding[side].grip.position=studioMarkerHome;
+                const auto before=marker.update(true,true,{}, {},holding,100)->marker;
+                holding[side].squeeze=1;
+                auto frame=marker.update(true,true,{}, {},holding,120);
+                expect(frame->markerHand==static_cast<int>(side)&&same(frame->marker.position,before.position),
+                    "A stationary marker pickup preserves the acquired position for either hand");
+                holding[side].grip.position.x+=.02f;
+                frame=marker.update(true,true,{}, {},holding,420);
+                expect(same(frame->marker.position,compose(holding[side].grip,studioMarkerGrip(side)).position),
+                    "The marker follows the hand and reaches its writing grip after pickup");
+                holding[side].squeeze=0;
+                frame=marker.update(true,true,{}, {},holding,440);
+                expect(frame->markerHand<0,"The marker remains releasable after pickup");
+
+                CabinStudio earlyRelease;holding={};holding[side].tracked=true;
+                holding[side].grip.position=studioMarkerHome;
+                earlyRelease.update(true,true,{}, {},holding,100);
+                holding[side].squeeze=1;earlyRelease.update(true,true,{}, {},holding,120);
+                earlyRelease.update(true,true,{}, {},holding,220);
+                holding[side].squeeze=0;auto released=earlyRelease.update(true,true,{}, {},holding,240);
+                const auto releasedPosition=released->marker.position;
+                for(uint64_t t=260;t<=1240;t+=20)released=earlyRelease.update(true,true,{}, {},holding,t);
+                expect(std::abs(released->marker.position.x-releasedPosition.x)<.0001f
+                    &&std::abs(released->marker.position.z-releasedPosition.z)<.0001f,
+                    "Releasing a stationary marker during contact easing does not throw it sideways");
+            }
+        }
+        {
             CabinStudio marker;std::array<StudioHand,2> holding{};
             holding[1].tracked=true;holding[1].grip.position=studioMarkerHome;
             marker.update(true,true,{}, {},holding,100);
@@ -2806,6 +2836,31 @@ int main(){
             expect(dot(correction,correction)<.015f*.015f
                 &&same(rotate(settled.orientation,{0,0,1}),rotate(paper.pose.orientation,{0,0,1})),
                 "Paper keeps its chosen orientation and any aligned pinch adjustment stays below 15 mm");
+        }
+    }
+    {
+        for(size_t side=0;side<2;++side){
+            CabinStudio pickup;std::array<StudioHand,2> hands{};
+            auto before=pickup.update(true,true,Pose{},Pose{},hands,100);
+            const auto original=before->camera;
+            hands[side].tracked=true;hands[side].grip=studioCameraPalm(original,side);
+            hands[side].grip.position.x+=side?-.03f:.03f;
+            pickup.update(true,true,Pose{},Pose{},hands,120);
+            hands[side].squeeze=1;auto held=pickup.update(true,true,Pose{},Pose{},hands,140);
+            expect(held->cameraHand==static_cast<int>(side)&&same(held->camera.position,original.position)
+                &&held->cameraGripBlend==0,
+                "Camera acquisition preserves the actual object position for either hand");
+            const auto startingPalm=studioCameraPalmTransition(hands[side].grip,held->camera,side,held->cameraGripBlend);
+            expect(same(startingPalm.position,hands[side].grip.position),
+                "Camera pickup starts the rendered palm at the tracked grip");
+            hands[side].grip.position.y+=.02f;held=pickup.update(true,true,Pose{},Pose{},hands,160);
+            expect(held->camera.position.y>original.position.y+.019f,
+                "Camera follows hand movement immediately while contact settles");
+            held=pickup.update(true,true,Pose{},Pose{},hands,440);
+            expect(held->cameraGripBlend==1&&same(studioCameraPalm(held->camera,side).position,hands[side].grip.position),
+                "Camera contact settles on the authored handle for either hand");
+            hands[side].squeeze=0;held=pickup.update(true,true,Pose{},Pose{},hands,460);
+            expect(held->cameraHand<0,"Settled camera can be released normally");
         }
     }
     {
