@@ -3065,5 +3065,13 @@
     "status": "static lead, not a diagnosed visible defect",
     "finding": "The idealized closed cassette box intersects stationary native player triangles; an arbitrary offset can instead intersect the lid. Actual cassette mesh/material and final-eye visibility are not joined.",
     "next": "Inspect closely framed moving two-eye gameplay and native material before altering insertion."
+  },
+  "cabin_title_interaction_check_2026_10_27_later": {
+    "candidate": "a1174b19694f7df8004b27db8a2759ecc3631f3531063746d3f45cfb29e628b6",
+    "run": "artifacts/bot/runs/20261027T144043760382Z",
+    "status": "failed_notepad_contact_not_observed",
+    "observed": "Tape pickup, release, recovery, seating, ejection and recovery; camera pickup and photo from both hands.",
+    "limits": "Title cabin; notepad contact not observed. Marker and photo placement not reached. Both-eye endpoint stills reviewed: steep view, obscured grips and prominent forearm ends. No motion video or physical headset acceptance.",
+    "cleanup": "Inputs released; simulator and game closed; Steam retained. Studio baseline restored byte-identically, test outputs preserved privately."
   }
 }

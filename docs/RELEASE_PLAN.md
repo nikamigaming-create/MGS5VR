@@ -1,5 +1,10 @@
 # Release execution plan — 26 October 2026
 
+### Title-cabin interaction check - 27 October, later
+
+On development DLL `a1174b19694f`, retained run `artifacts/bot/runs/20261027T144043760382Z` observed tape pickup, release, recovery, seating, ejection and recovery, plus camera pickup and a photo from each hand. It stopped because the scripted hand did not acquire a notepad sheet; the marker and photo-placement portions were not reached. This is a reproduced route failure, not yet a diagnosed interaction defect: hand-to-notepad contact and ownership need investigation. Both eyes were reviewed at the seated-tape and camera checkpoints; the view is steep, grips are obscured, and forearm ends dominate the foreground. These stills do not verify contact during motion. No video was recorded in this run. User studio files were restored byte-identically after preserving test outputs; the owned simulator and game were closed and Steam retained. Physical Quest and the requested movie remain open.
+
+
 ### Cassette compartment geometry lead — 27 October
 
 A static check clips the reconstructed cassette interaction box against the
