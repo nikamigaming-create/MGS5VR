@@ -1,5 +1,30 @@
 # Release execution plan — 26 October 2026
 
+## Opening cabin follow-up — 26 October
+
+Checked/deployed development DLL `217df3f4b9be` includes a repair for a
+reproduced stationary pickup jump: the pinned note and Polaroid previously
+moved 8–9 cm and rotated about 106 degrees when gripped. Pickup now preserves
+the selected hand-relative pose, with only a small aligned pinch adjustment;
+contact adjustment does not manufacture throw velocity. In the combined native
+run `artifacts/opening-paper-lid-validation-20261026`, stationary samples
+moved about 1 mm and 0.09 degrees. The run completed cassette pickup, off-axis
+rejection, seating, eject/recovery, camera printing with both hands, note
+editing, marker writing, and note/photo board placement. All 58 build test
+groups and installer checks passed. The user's board was restored byte-for-byte
+and existing photos verified (`artifacts/opening-studio-validation-restore.json`).
+
+Eight coincident lid end-face vertices previously stayed behind; the exact
+native interior mesh now moves 76 lid-body vertices plus four window vertices
+(`artifacts/opening-lid-end-seams-20261026.json`). The second native player bone
+influences a small control, not the identified lid vertices; this does not
+exclude other native animation mechanisms. Original lid travel remains unverified.
+The paired-eye stills are too distant or obstructed by sleeves to establish
+clean fingertip contact or the quality of the moving lid. Dynamic lid motion,
+wider grab orientations, physical Quest testing and whole-scene acceptance
+remain open. The test-owned session is closed and Steam retained.
+
+
 ## Opening cabin cassette and lid — 26 October
 
 The user reports unnatural cassette insertion and questions the tape-player
@@ -16,8 +41,8 @@ guide boundary (`artifacts/opening-guide-repro2-20261026/guide-snap.json`).
 Source `4945ca9` preserves the hand-driven rotation, rejects a sideways entry,
 introduces guide correction continuously and interpolates seating after release,
 including reversed aligned tapes. The exact hashed interior mesh had ten lid
-triangles mixing animated and stationary vertices; the isolated connected lid
-now moves together (68 body vertices plus four window vertices). Geometry audit:
+triangles mixing animated and stationary vertices; the previously identified lid components
+then moved together (68 body vertices plus four window vertices; see follow-up above). Geometry audit:
 `artifacts/opening-lid-topology-20261026.json`.
 
 Checked/deployed candidate `d2341d57320d` passed all 58 test groups and

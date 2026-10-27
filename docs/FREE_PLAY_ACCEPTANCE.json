@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "d2341d57320d0ba61706434d485589224d1371c0547a775ab0292167d11f729c",
-  "candidate_status": "Checked/deployed opening cassette guide and connected lid geometry; physical headset and original lid motion remain unverified.",
+  "candidate": "217df3f4b9befaaecf1880de40ad2a60b007eb69ec9ea7f2f8f118c7ddb5a28c",
+  "candidate_status": "Checked/deployed opening lid end-face and paper pickup repair; close visual and physical headset acceptance and original lid motion remain unverified.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -828,6 +828,14 @@
         "finding": "Paper-edge pinch, marker contact, writing/typing/board pinning exist with retained scoped evidence; wider orientations remain.",
         "source_map": "docs/FIELD_FIXES.md",
         "acceptance_promoted": false
+      },
+      "opening_followup_2026_10_26": {
+        "run": "artifacts/opening-paper-lid-validation-20261026",
+        "result": "combined native interaction loop completed; stationary sampled note and photo pickup approximately 1 mm and 0.09 degrees",
+        "limitations": [
+          "stills do not clearly show fingertip contact or moving lid",
+          "physical Quest and original lid animation unverified"
+        ]
       }
     },
     {
@@ -845,6 +853,14 @@
         "finding": "Print front slots, field-paper pose/rays, flat sheet and rotated marker settlement exist; wider stacking/cassettes/physical review remain.",
         "source_map": "docs/FIELD_FIXES.md",
         "acceptance_promoted": false
+      },
+      "opening_followup_2026_10_26": {
+        "run": "artifacts/opening-paper-lid-validation-20261026",
+        "result": "combined native interaction loop completed; stationary sampled note and photo pickup approximately 1 mm and 0.09 degrees",
+        "limitations": [
+          "stills do not clearly show fingertip contact or moving lid",
+          "physical Quest and original lid animation unverified"
+        ]
       }
     },
     {
