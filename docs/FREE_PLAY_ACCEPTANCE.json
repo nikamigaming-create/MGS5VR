@@ -3054,5 +3054,10 @@
     "change": "Tactile pulse at existing verified weapon contact; one-shot cue after return near saved mount with close orientation. Existing automatic release return and native restrictions retained.",
     "checks": "58 groups and installer checks passed; body_gear_contact covers cue arming, alignment, invalid inputs and repeat suppression.",
     "limits": "No simulator or physical headset test on this candidate; free placement and physically validated re-holstering not implemented; complete cabin showcase remains open."
+  },
+  "cabin_player_model_identification_2026_10_27": {
+    "finding": "Owned pcp0 cutscene-player texture says STEREO CASSETTE-CORDER WM-R55; prior 478-position geometry match strongly supports that physical model as a reference for the interior player.",
+    "evidence": "artifacts/opening-player-model-comparison-20261026.json; private/cabin-player-physical-reference-20261027.json",
+    "limitations": "No proof of interior texture binding, original lid motion, hinge angle, tape seating or headset acceptance."
   }
 }

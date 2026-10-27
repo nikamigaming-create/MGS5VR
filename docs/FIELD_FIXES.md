@@ -1,5 +1,19 @@
 # Field fixes — implementation and acceptance
 
+### Cassette-player model identification — 27 October
+
+The owned `pcp0_main0_def_c00_bsm` cutscene-player texture bears the
+inscription `STEREO CASSETTE-CORDER WM-R55`. Its corresponding cutscene
+model has 478 vertex positions matching the cabin interior player to a
+maximum 0.000193 mm after placement (see `artifacts/opening-player-model-comparison-20261026.json`).
+This strongly supports a Sony WM-R55 physical reference for the cabin
+model. It does not prove the interior texture binding, original hinge
+travel, animation, or correct tape insertion. The owned texture and crop
+remain private. [Sony product support](https://support.sony.jp/electronics/support/portable-music-players-other-portable-music-players/wm-r55)
+confirms that model exists. Next inspect direct opening/loading footage and
+the native animation before changing lid behavior; the movie remains open.
+
+
 ### Cabin weapon contact and rack cues — 27 October
 
 The native cabin weapon path now forwards a tactile cue when the hand reaches
