@@ -1,5 +1,10 @@
 # Field fixes — implementation and acceptance
 
+### WM-R55 lid reference — 27 October
+
+A [photo of an open WM-R55](https://www.ebay.com/p/21011535430) shows the actual empty compartment and open door; a local reference copy is retained privately. It is one perspective and does not measure hinge travel or establish the loading path. A [WM-R55 video](https://www.youtube.com/watch?v=hh8WE7Wl9bM) was identified but could not be retrieved for review (HTTP 403), so it is not evidence of the motion. Compare a clear in-game insertion against an accessible moving reference before changing the existing guide or lid. The sleeve cap visible in the body-off cabin still also remains a visual issue; its cause has not been isolated.
+
+
 ### Source-eye cadence check - 27 October
 
 In `artifacts/bot/runs/20261027T160026917677Z`, the two largest accepted-sample gaps were 0.654 and 0.563 seconds. The closest recorded final-eye capture events were about 2.84 and 2.83 seconds from their midpoints, respectively. One gap preceded the first chapter; the other fell in the tape sequence. The recording ledger reports 34 missed cadence slots, 16 queue drops, eight staging-busy samples and one staging discard. This does not identify the underlying cause or prove capture calls had no indirect effect; simply moving stereo snapshots is not a justified complete fix. The take remains rejected and physical-headset acceptance remains open.
