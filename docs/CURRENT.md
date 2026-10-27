@@ -5,7 +5,12 @@
 Multiple actual-game takes were attempted after the user requested a clear, human
 showcase. A later side-angle take (`artifacts/opening-showcase-side-retry-20261026`)
 completed at 30 fps with game audio but still obscured insertion behind the arm;
-it was rejected as a finished demonstration. The source-eye recorder captured 30 fps with game-process audio;
+it was rejected as a finished demonstration. An opposite-hand retry
+(`artifacts/opening-showcase-left-20261026`) completed the interaction loop,
+but its recorded arm caps obscured insertion even more; it was also rejected.
+Its test photos were archived and the studio baseline restored exactly
+(`artifacts/opening-lefttake-restore-20261026.json`). The source-eye recorder
+captured 30 fps with game-process audio;
 this is pre-compositor footage, not final-headset video. The last complete
 workbench take `artifacts/opening-showcase-close-20261026` observed cassette
 seat/eject, camera printing with each hand, note editing and marker writing,

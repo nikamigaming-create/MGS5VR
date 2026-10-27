@@ -860,7 +860,9 @@
           "physical headset not tested"
         ],
         "side_retry": "artifacts/opening-showcase-side-retry-20261026",
-        "side_retry_result": "rejected: insertion remains obscured by the arm"
+        "side_retry_result": "rejected: insertion remains obscured by the arm",
+        "opposite_hand_retry": "artifacts/opening-showcase-left-20261026",
+        "opposite_hand_result": "rejected: insertion more obscured by both forearm ends"
       }
     },
     {
@@ -898,7 +900,9 @@
           "physical headset not tested"
         ],
         "side_retry": "artifacts/opening-showcase-side-retry-20261026",
-        "side_retry_result": "rejected: insertion remains obscured by the arm"
+        "side_retry_result": "rejected: insertion remains obscured by the arm",
+        "opposite_hand_retry": "artifacts/opening-showcase-left-20261026",
+        "opposite_hand_result": "rejected: insertion more obscured by both forearm ends"
       }
     },
     {
