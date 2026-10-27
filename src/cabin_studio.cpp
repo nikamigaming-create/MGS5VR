@@ -34,6 +34,14 @@ Pose rigid(Pose pose){
         static_cast<float>(q.z/length),static_cast<float>(q.w/length)};
     return pose;
 }
+Pose blendPaperPickup(Pose start,Pose target,float t){
+    t=std::clamp(t,0.f,1.f);
+    auto a=start.orientation,b=target.orientation;
+    if(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w<0)b={-b.x,-b.y,-b.z,-b.w};
+    return rigid(Pose{{a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,
+                       a.z+(b.z-a.z)*t,a.w+(b.w-a.w)*t},
+                      start.position+(target.position-start.position)*t});
+}
 void settle(Pose& pose,Vec3& velocity,float dt,Vec3 half,
     float support=-std::numeric_limits<float>::infinity()){
     velocity.y-=9.81f*dt;pose.position=pose.position+velocity*dt;
@@ -353,8 +361,19 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
         }else if(hasPaper){
             frame_.inputMask|=uint8_t(1u<<side);
             auto& paperPose=paperIt->field?paperIt->fieldPose:paperIt->pose;
-            if(tracking){const auto next=compose(paperIt->field?hand.grip:local,attachment_[side]);
-                if(dt>0)paperIt->velocity=(next.position-paperPose.position)*(1/dt);paperPose=next;}
+            if(tracking){
+                // The pickup pose is already expressed in the owning hand's
+                // space, so deliberate hand movement is never smoothed away.
+                // Only the contact correction eases in over 300 ms.
+                const float blend=now>=paperPickupTime_[side]
+                    ?std::min(1.f,static_cast<float>(now-paperPickupTime_[side])/300.f):0.f;
+                const auto grip=paperIt->field?hand.grip:local;
+                const auto contact=blendPaperPickup(paperPickupAttachment_[side],attachment_[side],blend);
+                const auto next=compose(grip,contact);
+                // The contact easing is not a physical throw. Measure only
+                // hand translation/rotation at the same contact fraction.
+                if(dt>0)paperIt->velocity=(next.position-compose(paperPreviousGrip_[side],contact).position)*(1/dt);
+                paperPreviousGrip_[side]=grip;paperPose=next;}
             if(!squeeze){
                 paperIt->hand=-1;const auto half=studioPaperHalf(paperIt->photo!=0);
                 const auto boardLocal=compose(inverse(cabinNativeBoard),paperIt->pose);
@@ -410,15 +429,19 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                     frame_.papers.push_back(std::move(paper));selected=&frame_.papers.back();++frame_.revision;
                 }
                 if(selected){selected->hand=static_cast<int>(side);selected->pinned=false;
+                    selected->velocity={};
                     if(selected->id==frame_.outputPaper)frame_.outputPaper=0;
                     const auto grip=selected->field?hand.grip:local;
                     auto& paperPose=selected->field?selected->fieldPose:selected->pose;
+                    paperPickupAttachment_[side]=rigid(compose(inverse(grip),paperPose));
+                    paperPreviousGrip_[side]=grip;
+                    paperPickupTime_[side]=now;
                     attachment_[side]=studioPaperContact(side);
                     const auto half=studioPaperHalf(selected->photo!=0);
                     const Vec3 paperEdge{side?-half.x+.004f:half.x-.004f,0,0};
                     attachment_[side].position=attachment_[side].position
                         +rotate(attachment_[side].orientation,paperEdge*-1.f);
-                    paperPose=compose(grip,attachment_[side]);}
+                }
             }
             if(frame_.cameraHand==static_cast<int>(side)||frame_.markerHand==static_cast<int>(side)
                 ||std::any_of(frame_.papers.begin(),frame_.papers.end(),[&](const auto& p){return p.hand==static_cast<int>(side);})){

@@ -2782,6 +2782,35 @@ int main(){
             "The field camera stays on the native right hip through independent HMD motion and picks up at that same authored handle");
     }
     {
+        for(size_t side=0;side<2;++side)for(const bool photo:{false,true}){
+            CabinStudio pickup;StudioPaper paper{};paper.id=91;paper.photo=photo?1234:0;
+            paper.pose=cabinNativeBoard;paper.pinned=true;paper.ink=std::make_shared<const StudioInk>();
+            pickup.restore({paper});std::array<StudioHand,2> hands{};hands[side].tracked=true;
+            hands[side].grip={{},paper.pose.position};pickup.update(true,true,Pose{},Pose{},hands,100);
+            hands[side].squeeze=1;auto frame=pickup.update(true,true,Pose{},Pose{},hands,150);
+            expect(frame->papers.front().hand==static_cast<int>(side)
+                &&same(frame->papers.front().pose.position,paper.pose.position)
+                &&same(rotate(frame->papers.front().pose.orientation,{0,0,1}),rotate(paper.pose.orientation,{0,0,1})),
+                "Picking a pinned note or photo preserves its position and orientation on the grip edge");
+            hands[side].grip.position.x+=.02f;frame=pickup.update(true,true,Pose{},Pose{},hands,160);
+            const auto expected=paper.pose.position+Vec3{.02f,0,0};
+            const auto movement=frame->papers.front().pose.position-expected;
+            expect(dot(movement,movement)<.0001f,
+                "Paper follows deliberate hand movement immediately while the contact offset eases in");
+            frame=pickup.update(true,true,Pose{},Pose{},hands,200);
+            expect(dot(frame->papers.front().velocity,frame->papers.front().velocity)<.000001f,
+                "Contact adjustment on a stationary hand cannot manufacture a paper throw");
+            frame=pickup.update(true,true,Pose{},Pose{},hands,450);
+            auto contact=studioPaperContact(side);const auto half=studioPaperHalf(photo);
+            const Vec3 edge{side?-half.x+.004f:half.x-.004f,0,0};
+            contact.position=contact.position+rotate(contact.orientation,edge*-1.f);
+            const auto target=compose(hands[side].grip,contact);
+            expect(same(frame->papers.front().pose.position,target.position)
+                &&same(rotate(frame->papers.front().pose.orientation,{0,0,1}),rotate(target.orientation,{0,0,1})),
+                "After pickup, both paper types settle at the existing authored finger contact");
+        }
+    }
+    {
         for(size_t side=0;side<2;++side){
             CabinStudio bilateral;std::array<StudioHand,2> contact{};
             contact[side].tracked=true;contact[side].squeeze=1;
@@ -2861,11 +2890,12 @@ int main(){
         hands[0].grip={{-.70710678f,0,0,.70710678f},studioNotesHome};
         hands[0].squeeze=1;frame=studio.update(true,true,Pose{},Pose{},hands,1400);
         expect(frame->papers.size()==2&&frame->papers.back().hand==0,"A fresh note is peeled from the physical stack");
+        frame=studio.update(true,true,Pose{},Pose{},hands,1700);
         const auto paperAttachment=compose(inverse(hands[0].grip),frame->papers.back().pose);
-        hands[0].grip=compose(cabinNativeBoard,inverse(paperAttachment));studio.update(true,true,Pose{},Pose{},hands,1450);
-        hands[0].squeeze=0;frame=studio.update(true,true,Pose{},Pose{},hands,1500);
+        hands[0].grip=compose(cabinNativeBoard,inverse(paperAttachment));studio.update(true,true,Pose{},Pose{},hands,1750);
+        hands[0].squeeze=0;frame=studio.update(true,true,Pose{},Pose{},hands,1800);
         expect(frame->papers.back().pinned&&frame->papers.back().hand<0,"Releasing an aligned note on the native board attaches it");
-        hands[0].squeeze=1;frame=studio.update(true,true,Pose{},Pose{},hands,1550);
+        hands[0].squeeze=1;frame=studio.update(true,true,Pose{},Pose{},hands,1850);
         expect(!frame->papers.back().pinned&&frame->papers.back().hand==0,"A placed note can be pulled back off the board");
         hands[0].squeeze=0;
         CabinStudio restored;restored.restore(frame->papers);frame=restored.update(true,true,Pose{},Pose{},hands,1600);

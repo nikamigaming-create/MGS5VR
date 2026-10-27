@@ -106,6 +106,11 @@ private:
     void control(StudioControl control,uint64_t now);
     CabinStudioFrame frame_{};
     std::array<Pose,2> attachment_{};
+    // Each paper starts at its real pickup pose, then settles into the
+    // authored finger contact in hand space without losing tracked movement.
+    std::array<Pose,2> paperPickupAttachment_{};
+    std::array<Pose,2> paperPreviousGrip_{};
+    std::array<uint64_t,2> paperPickupTime_{};
     std::array<bool,2> squeezed_{},triggered_{};
     std::array<GearContact,2> cameraContact_{};
     uint64_t last_{},lastShot_{},processedPhoto_{};
