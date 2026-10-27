@@ -2839,6 +2839,31 @@ int main(){
         }
     }
     {
+        for(size_t side=0;side<2;++side)for(bool firstPhoto:{false,true})for(bool secondPhoto:{false,true})
+            for(bool overlap:{false,true}){
+            CabinStudio studio;std::array<StudioHand,2> hands{};
+            StudioPaper first{},second{};first.id=81;second.id=82;
+            first.photo=firstPhoto?111:0;second.photo=secondPhoto?222:0;
+            first.pose=compose(cabinNativeBoard,Pose{{},{0,0,.003f}});first.pinned=true;
+            const float x=overlap?0.f:.14f;
+            second.pose=compose(cabinNativeBoard,Pose{{},{x,0,.12f}});second.pinned=true;
+            first.ink=second.ink=std::make_shared<const StudioInk>();studio.restore({first,second});
+            hands[side].tracked=true;hands[side].grip=second.pose;
+            studio.update(true,true,{}, {},hands,100);hands[side].squeeze=1;
+            auto frame=studio.update(true,true,{}, {},hands,120);
+            expect(frame->papers[1].hand==static_cast<int>(side),"Board placement starts with the selected sheet held");
+            hands[side].grip.position=compose(cabinNativeBoard,Pose{{},{x,0,.01f}}).position;
+            frame=studio.update(true,true,{}, {},hands,440);
+            const auto before=compose(inverse(cabinNativeBoard),frame->papers[1].pose).position;
+            hands[side].squeeze=0;frame=studio.update(true,true,{}, {},hands,460);
+            const auto placed=compose(inverse(cabinNativeBoard),frame->papers[1].pose).position;
+            const float expected=overlap?.003f+studioPaperHalf(firstPhoto).z+studioPaperHalf(secondPhoto).z+.0004f:.003f;
+            expect(frame->papers[1].pinned&&near(placed.x,before.x)&&near(placed.y,before.y)&&near(placed.z,expected),
+                "Pinned sheets preserve placement and separate overlapping surfaces without raising distant sheets");
+            expect(same(frame->papers[0].pose.position,first.pose.position),"Pinning a new sheet leaves the earlier sheet in place");
+        }
+    }
+    {
         for(size_t side=0;side<2;++side){
             CabinStudio pickup;std::array<StudioHand,2> hands{};
             auto before=pickup.update(true,true,Pose{},Pose{},hands,100);

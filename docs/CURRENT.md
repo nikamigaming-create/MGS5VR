@@ -1,5 +1,10 @@
 # Current MGS5VR work — 26 October 2026
 
+### Cabin board paper layering - 27 October
+
+Retained run `artifacts/bot/runs/20261027T145943690455Z` placed two prints at nearly the same board pose, within about 0.215 mm, although each print has nonzero thickness. Pinning a sheet now preserves its chosen board coordinates and positions it just in front of overlapping pinned sheets; non-overlapping sheets keep the original depth. Both-hand mixed photo/note and separated-placement checks passed, as did all 58 test groups and installer checks. Development DLL `aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f` is installed; published play remains pinned. This does not retroactively move existing pinned sheets and has not been tested in the simulator or Quest. It does not establish the cause of the older gray print. Large stacks, grip presentation, the completed movie and physical-headset acceptance remain open.
+
+
 ### Test-photo cleanup completed - 27 October
 
 Retained `artifacts/bot/runs/20261027T154906297397Z` used the in-game confirmation flow to remove the remaining five identified older test prints and eight older test-photo library entries. Together with the earlier three-print cleanup, the final observed game state contains only the two newest test prints and their two digital entries, with no notes. All ten test PNGs were backed up and hash-verified privately before cleanup. Each removal checked exact identities; the holding grip was released before final confirmation. This is cleanup evidence, not a live test of the new held-grip re-grab fix. One-time cleanup code was removed, the game and simulator were closed, and Steam retained. Persistence after restart, actual storage mapping, headset acceptance and the requested movie remain open.

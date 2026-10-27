@@ -394,7 +394,19 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 const auto boardLocal=compose(inverse(cabinNativeBoard),paperIt->pose);
                 const auto p=boardLocal.position,normal=rotate(boardLocal.orientation,{0,0,1});
                 if(cabin&&std::abs(p.z)<.045f&&std::abs(p.x)<cabinBoardHalf.x-half.x&&std::abs(p.y)<cabinBoardHalf.y-half.y&&normal.z>.75f){
-                    paperIt->pose=compose(cabinNativeBoard,Pose{{},{p.x,p.y,.003f}});
+                    // Preserve where the user placed the sheet, but put it
+                    // in front of overlapping pinned sheets. Coplanar prints
+                    // fight for the same pixels and can obscure one another.
+                    float depth=.003f;
+                    for(const auto& other:frame_.papers){
+                        if(&other==&*paperIt||!other.pinned||other.field)continue;
+                        const auto otherLocal=compose(inverse(cabinNativeBoard),other.pose).position;
+                        const auto otherHalf=studioPaperHalf(other.photo!=0);
+                        if(std::abs(p.x-otherLocal.x)<half.x+otherHalf.x
+                            &&std::abs(p.y-otherLocal.y)<half.y+otherHalf.y)
+                            depth=std::max(depth,otherLocal.z+otherHalf.z+half.z+.0004f);
+                    }
+                    paperIt->pose=compose(cabinNativeBoard,Pose{{},{p.x,p.y,depth}});
                     paperIt->pinned=true;paperIt->velocity={};frame_.hapticMask|=uint8_t(1u<<side);}
                 if(paperIt->field){paperIt->field=false;
                     if(frame_.editor==static_cast<int>(paperIt->id)){frame_.editor=-1;frame_.confirmPaper=0;}}

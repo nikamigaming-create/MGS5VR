@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "91869f7f27103cf8133b12415160d15d625e60f4fed57d0f1208107d7c223dc8",
-  "candidate_status": "Checked and deployed paper deletion re-grab fix; simulator, physical Quest, remaining cabin interactions and showcase unverified on this candidate.",
+  "candidate": "aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f",
+  "candidate_status": "Checked and deployed overlapping board-paper layering and earlier deletion re-grab fix; simulator, physical Quest and showcase unverified on this candidate.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -3161,5 +3161,13 @@
     "result": "Removed five remaining old physical test prints and eight old digital test-photo entries using exact in-game confirmations. Final observed state has two newest test prints and two digital entries, with no notes.",
     "backup": "All ten identified test PNGs privately backed up and hash-verified before cleanup.",
     "limits": "Holding grip was released before final confirmation, so this is not a live test of held-grip re-grab repair. Restart persistence, storage mapping, final movie and physical headset remain open. One-time cleanup code removed; game and simulator closed, Steam retained."
+  },
+  "cabin_board_paper_layering_2026_10_27": {
+    "evidence": "artifacts/bot/runs/20261027T145943690455Z",
+    "failure": "Two printed sheets were pinned within about 0.215 mm despite nonzero paper thickness.",
+    "fix": "A newly pinned sheet preserves board coordinates and is placed in front of overlapping pinned sheets; non-overlapping sheets retain the original depth.",
+    "validation": "Both hands, mixed photo/note, overlapping and separated cases; all 58 test groups and installer checks passed.",
+    "candidate": "aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f",
+    "limits": "No retroactive movement of existing pinned sheets; not simulator or Quest tested on this candidate. The older gray print cause is unproven. Large stacks and the requested movie remain open."
   }
 }
