@@ -34,6 +34,14 @@ int main(){
     tracking.update(1,true,true,true,false,100);
     tracking.update(1,false,false,true,true,110);
     require(!tracking.update(1,true,true,true,true,120).grab,"tracking recovery needs release");
+    CabinRackCue rack;
+    require(!rack.update(0.f,1.f),"initial mount contact must not repeat a return cue");
+    require(!rack.update(.14f,1.f),"leaving the mount only arms a return cue");
+    require(!rack.update(.07f,.95f),"a misaligned weapon must not signal a dock");
+    require(rack.update(.07f,.99f),"returning close and aligned to the mount must cue once");
+    require(!rack.update(.04f,1.f),"remaining at the mount must not repeat the cue");
+    require(!rack.update(.2f,1.f)&&rack.update(.04f,1.f),"a later removal and return rearms the cue");
+    require(!rack.update(-1.f,1.f)&&!rack.update(0.f,1.f),"invalid distance resets the cue");
     CabinStudio studio;
     std::array<StudioHand,2> hands{};
     const Pose holster{{},{1,1,-.5f}};

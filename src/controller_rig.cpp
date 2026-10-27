@@ -202,6 +202,7 @@ struct CabinGearHold {
     uint64_t code{},activation{},reference{};
     uint32_t assembly{};
     Pose parked{},inPalm{},last{};
+    CabinRackCue rackCue{};
 };
 using CabinGearSetter=void(*)(void*,uint32_t,const float*);
 CabinGearSetter originalCabinGearSetter{};
@@ -210,6 +211,7 @@ std::atomic<std::shared_ptr<const CabinGearPublication>> cabinGearPublication;
 std::array<CabinGearHold,2> cabinGear;
 std::array<GearContact,2> cabinGearContact;
 std::atomic<uint8_t> cabinGearMask{};
+std::atomic<uint8_t> cabinGearHaptics{};
 std::atomic<uint64_t> cabinGearTime{};
 bool cabinGearIdentity(const CabinGearHold& held){
     if(!held.model||playerOwner.load()!=held.owner||get<uintptr_t>(held.owner+0x370)!=held.character
@@ -308,10 +310,17 @@ void updateCabinGear(const HeadCameraSample* frame){
             }
             const auto contact=cabinGearContact[side].update(candidate.model, candidate.model!=0,
                 candidate.model!=0,candidate.model!=0,squeeze,now);
+            if(contact.pulse)cabinGearHaptics.fetch_or(uint8_t(1u<<side));
             if(contact.grab&&candidate.model){held=candidate;held.inPalm=compose(inverse(palm),held.parked);
                 log("Cabin native weapon acquired assembly="+std::to_string(held.assembly)+" hand="+std::to_string(side));}
         }
-        if(held.model){held.last=compose(palm,held.inPalm);placeCabinGear(held,held.last);mask|=uint8_t(1u<<side);}
+        if(held.model){held.last=compose(palm,held.inPalm);
+            const auto delta=held.last.position-held.parked.position;
+            const auto a=held.last.orientation,b=held.parked.orientation;
+            const float agreement=std::abs(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w);
+            if(held.rackCue.update(std::sqrt(dot(delta,delta)),agreement))
+                cabinGearHaptics.fetch_or(uint8_t(1u<<side));
+            placeCabinGear(held,held.last);mask|=uint8_t(1u<<side);}
     }
     cabinGearTime.store(now);cabinGearMask.store(mask);
     if(mask)cabinGearPublication.store(std::make_shared<const CabinGearPublication>(CabinGearPublication{cabinGear,now}));
@@ -2503,13 +2512,13 @@ void observeControllerRigOwner(uintptr_t owner) noexcept{
     if(playerOwner.load()==owner)return;
     std::lock_guard publicationLock(skinPublicationMutex);
     for(auto& held:cabinGear)returnCabinGear(held);
-    cabinGearContact={};cabinGearMask.store(0);cabinGearPublication.store({});
+    cabinGearContact={};cabinGearMask.store(0);cabinGearHaptics.store(0);cabinGearPublication.store({});
     playerOwner.store(owner);pausedSkin={};pausedParts={};
 }
 void stopControllerRig() noexcept{
     {
         std::lock_guard publicationLock(skinPublicationMutex);
-        enabled.store(false);playerOwner.store(0);pausedSkin={};pausedParts={};
+        enabled.store(false);playerOwner.store(0);cabinGearHaptics.store(0);pausedSkin={};pausedParts={};
     }
     stopIdroidAttachmentDiagnostics();stopIdroidEffectProbe();stopSmallAnimalInteraction();stopMotionMelee();
     {std::lock_guard lock(rigMutex);for(auto& cache:handPresentation)cache.reset();stationaryBody.reset();}
@@ -2517,6 +2526,7 @@ void stopControllerRig() noexcept{
 uint8_t cabinWeaponHands(uint64_t now) noexcept {
     const auto sampled=cabinGearTime.load();return now>=sampled&&now-sampled<=150?cabinGearMask.load():0;
 }
+uint8_t takeCabinWeaponHaptics() noexcept{return cabinGearHaptics.exchange(0);}
 bool controllerRigEnabled() noexcept{return enabled.load();}
 void publishNativeCabinBounds(HeadCameraSample& frame) noexcept{
     static bool cacheActive{};

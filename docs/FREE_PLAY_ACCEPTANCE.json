@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "789a8e11c795bc3150fddf273ce489f3a48f19ff162f4c65f3374b493bd556f9",
-  "candidate_status": "Checked/deployed marker and camera pickup continuity; no simulator or physical-headset acceptance on this candidate; finished movie remains open.",
+  "candidate": "a1174b19694f7df8004b27db8a2759ecc3631f3531063746d3f45cfb29e628b6",
+  "candidate_status": "Checked/deployed cabin weapon contact and rack tactile cues; simulator, physical Quest, broader cabin interactions and showcase remain unverified on this candidate.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -1405,11 +1405,12 @@
     }
   ],
   "active_work": {
-    "candidate": "789a8e11c795bc3150fddf273ce489f3a48f19ff162f4c65f3374b493bd556f9",
+    "candidate": "a1174b19694f7df8004b27db8a2759ecc3631f3531063746d3f45cfb29e628b6",
     "source_commit": "939d41a74c0f3e6ae1b2e29c13281810264c4e3a",
-    "checkpoint": "Checked/deployed cabin marker and camera pickup continuity; no simulator or physical-headset acceptance on this candidate.",
+    "checkpoint": "Checked/deployed cabin weapon contact and rack tactile cues; simulator, physical Quest, broader cabin interactions and showcase remain unverified on this candidate.",
     "plan": "docs/RELEASE_PLAN.md",
     "next_actions": [
+      "Review native cabin weapon contact and return cues, both-hand grip, interruption and physical headset ergonomics; develop remaining direct interactions without replacing native ownership.",
       "Review cabin marker pickup, writing and release with both hands and both eyes in the deployed development candidate; retain unresolved movie and headset gaps.",
       "Physical mortar/MG spatial-plus-wrist-plus-stick review through Play-Dev.cmd on wired Meta Quest Link.",
       "Diagnose daytime large light/shadow patches shifting with head nods; no disappearance/culling claim.",
@@ -1419,7 +1420,7 @@
     "runtime_requirement": "Wired Meta Quest Link / Meta OpenXR; both Play commands explicitly -MetaLink. Historical runtime observations in retained_work_history are not current setup instructions.",
     "build_slots": {
       "published_pin": "b627c7cacc9a",
-      "development": "789a8e11c795"
+      "development": "a1174b19694f"
     },
     "scope": "Checked and deployed candidate; not a publication or headset/full-game acceptance.",
     "cleanup": "Owned game/simulator closed, inputs released, Steam retained, per-game Meta Link restored, published play unchanged."
@@ -3047,5 +3048,11 @@
     "existing": "Native owned cabin gear assemblies follow either hand and restore their parked transform on release; historical scoped rifle evidence exists on a prior candidate.",
     "limitations": "Automatic return is not validated physical placement. Every prop, loadout, current candidate and physical headset remain unverified. Static interior geometry needs source ownership mapping before moving it.",
     "next": "Map visible props and their native ownership; preserve native firing and loadout restrictions while developing and validating physical interactions."
+  },
+  "cabin_weapon_rack_haptics_2026_10_27": {
+    "candidate": "a1174b19694f7df8004b27db8a2759ecc3631f3531063746d3f45cfb29e628b6",
+    "change": "Tactile pulse at existing verified weapon contact; one-shot cue after return near saved mount with close orientation. Existing automatic release return and native restrictions retained.",
+    "checks": "58 groups and installer checks passed; body_gear_contact covers cue arming, alignment, invalid inputs and repeat suppression.",
+    "limits": "No simulator or physical headset test on this candidate; free placement and physically validated re-holstering not implemented; complete cabin showcase remains open."
   }
 }

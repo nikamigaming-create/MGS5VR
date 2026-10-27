@@ -1685,13 +1685,15 @@ struct Session {
             ?static_cast<uint8_t>(wheel.hands&((controllerFrame.wheelGrip?1:0)|(controllerFrame.rightWheelGrip?2:0))):0;
         const uint8_t tookWheel=holding&~wheelHeld;wheelHeld=holding;
         const auto tapeContact=openingFrame.bench.hapticMask|(controllerFrame.studio?controllerFrame.studio->hapticMask:0);
-        if(tookWheel||binocularEquipped||nativeInput.changed||tapeContact||hapticNow-hapticAt>=50){
+        const auto cabinWeaponContact=takeCabinWeaponHaptics();
+        const auto cabinHaptic=rigInput&&controllerFrame.cabinPlay?cabinWeaponContact:0;
+        if(tookWheel||binocularEquipped||nativeInput.changed||tapeContact||cabinHaptic||hapticNow-hapticAt>=50){
             hapticAt=hapticNow;
             const auto rumble=rumbleMailbox().read(hapticNow);
             for(size_t side=0;side<2;++side){
                 const float native=side?rumble.high:rumble.low;
                 const float contact=nativeInput.changed?.4f:side&&binocularEquipped?.3f:(tookWheel&(1u<<side))?.25f:0.f;
-                const float amplitude=std::clamp(std::max({native,contact,(tapeContact&(1u<<side))?.3f:0.f}),0.f,.75f);
+                const float amplitude=std::clamp(std::max({native,contact,((tapeContact|cabinHaptic)&(1u<<side))?.3f:0.f}),0.f,.75f);
                 XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};info.action=vibration;info.subactionPath=hands[side];
                 if(amplitude>0&&controllerFrame.hands[side].gripTracked){
                     XrHapticVibration pulse{XR_TYPE_HAPTIC_VIBRATION};pulse.amplitude=amplitude;

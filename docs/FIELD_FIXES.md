@@ -1,5 +1,22 @@
 # Field fixes — implementation and acceptance
 
+### Cabin weapon contact and rack cues — 27 October
+
+The native cabin weapon path now forwards a tactile cue when the hand reaches
+an eligible owned assembly. After moving that assembly away, returning it
+within 8 cm of the saved mount with orientation agreement above 0.98 emits
+a one-shot return cue; leaving the mount region rearms it. The cues use the
+existing XR haptic output and do not change acquisition, loadout ownership,
+cabin firing restrictions, or the existing automatic return on release. This
+is not free placement or a completed physical re-holstering feature. Core
+checks cover the cue state including initial contact, misalignment, rearming
+and invalid data. All 58 groups and installer checks passed; candidate
+`a1174b19694f` is installed in development and the published pin is unchanged.
+Neither the cue nor the existing rifle path was tested on this candidate in
+the simulator or physical Quest. The broader cabin interactions and movie
+remain open; do not treat tactile design thresholds as headset acceptance.
+
+
 ### Expanded cabin interaction request — 27 October
 
 The user wants a deeply interactive first-person cabin, including removing

@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include <cstdint>
 
 namespace mgs5vr {
@@ -39,5 +40,20 @@ public:
 private:
     uint64_t candidate_{},lastTouch_{},last_{};
     bool sampled_{},contact_{},pressed_{},armed_{};
+};
+
+// Signal a deliberate return near the native parked pose. Acquisition at the
+// mount itself is silent: the weapon must first leave its mount region.
+class CabinRackCue {
+public:
+    bool update(float distance,float orientationAgreement) noexcept {
+        if(!std::isfinite(distance)||distance<0.f||!std::isfinite(orientationAgreement)
+                ||orientationAgreement<0.f||orientationAgreement>1.001f){*this={};return false;}
+        if(distance>.13f||orientationAgreement<.90f)armed_=true;
+        if(armed_&&distance<.08f&&orientationAgreement>.98f){armed_=false;return true;}
+        return false;
+    }
+private:
+    bool armed_{};
 };
 }
