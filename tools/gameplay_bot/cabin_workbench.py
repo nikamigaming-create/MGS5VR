@@ -268,6 +268,13 @@ def workbench(live, timeout=90., film=False):
                     normal=rotate(note_home['orientation'],[0.,0.,1.])
                     note_offset=[n*.55+(.10 if i==1 else 0.) for i,n in enumerate(normal)]
                 head=approach(note_home,note_offset)
+                # Moving the observer can republish the cabin in a new pose.
+                # Rejoin the same sheet or notepad to the fresh room.
+                current=studio();room=current['room']
+                if reusable:
+                    reusable=next((p for p in current['papers'] if p['id']==reusable['id']),None)
+                    if reusable is None:raise BotFault('Reusable note disappeared during observer movement')
+                note_home=compose(room,reusable['pose'] if reusable else current['notes_home'])
                 hold(('right','Grip'))
                 move('right',note_home)
                 # Persistent loose prints can cover the notepad after earlier

@@ -3072,6 +3072,15 @@
     "status": "failed_notepad_contact_not_observed",
     "observed": "Tape pickup, release, recovery, seating, ejection and recovery; camera pickup and photo from both hands.",
     "limits": "Title cabin; notepad contact not observed. Marker and photo placement not reached. Both-eye endpoint stills reviewed: steep view, obscured grips and prominent forearm ends. No motion video or physical headset acceptance.",
-    "cleanup": "Inputs released; simulator and game closed; Steam retained. Studio baseline restored byte-identically, test outputs preserved privately."
+    "cleanup": "Inputs released; simulator and game closed; Steam retained. Restoring process reported matching baseline; subsequent game-loaded IDs conflict, so actual storage mapping is under investigation."
+  },
+  "cabin_title_interaction_retry_2026_10_27": {
+    "candidate": "a1174b19694f7df8004b27db8a2759ecc3631f3531063746d3f45cfb29e628b6",
+    "run": "artifacts/bot/runs/20261027T144612968660Z",
+    "status": "observed_workbench_loop_visual_review_failed",
+    "finding": "Earlier test used stale notepad position about 275 mm from later published target. Rejoining the room and note pose allowed acquisition; this is a test-route fix.",
+    "observed": "Scripted tape, camera, note, typing, marker both hands and photo placement states completed.",
+    "visual": "Both-eye board snapshots show gray rectangle at attached photo; marker grip obscured. Selected photo ID came from previous run and differs from restored filenames; storage mapping and selection require investigation.",
+    "limitations": "No moving-eye video or physical Quest acceptance. Restoring process reported matching files; game-loaded IDs do not match that view, so actual game storage mapping is unverified."
   }
 }
