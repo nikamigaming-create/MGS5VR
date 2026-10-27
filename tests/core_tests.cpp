@@ -2801,13 +2801,11 @@ int main(){
             expect(dot(frame->papers.front().velocity,frame->papers.front().velocity)<.000001f,
                 "Contact adjustment on a stationary hand cannot manufacture a paper throw");
             frame=pickup.update(true,true,Pose{},Pose{},hands,450);
-            auto contact=studioPaperContact(side);const auto half=studioPaperHalf(photo);
-            const Vec3 edge{side?-half.x+.004f:half.x-.004f,0,0};
-            contact.position=contact.position+rotate(contact.orientation,edge*-1.f);
-            const auto target=compose(hands[side].grip,contact);
-            expect(same(frame->papers.front().pose.position,target.position)
-                &&same(rotate(frame->papers.front().pose.orientation,{0,0,1}),rotate(target.orientation,{0,0,1})),
-                "After pickup, both paper types settle at the existing authored finger contact");
+            const auto settled=frame->papers.front().pose;
+            const auto correction=settled.position-expected;
+            expect(dot(correction,correction)<.015f*.015f
+                &&same(rotate(settled.orientation,{0,0,1}),rotate(paper.pose.orientation,{0,0,1})),
+                "Paper keeps its chosen orientation and any aligned pinch adjustment stays below 15 mm");
         }
     }
     {

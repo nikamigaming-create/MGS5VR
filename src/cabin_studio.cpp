@@ -436,11 +436,22 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                     paperPickupAttachment_[side]=rigid(compose(inverse(grip),paperPose));
                     paperPreviousGrip_[side]=grip;
                     paperPickupTime_[side]=now;
-                    attachment_[side]=studioPaperContact(side);
+                    // Preserve the orientation and grab point the player
+                    // actually chose. Only a genuinely nearby, aligned pinch
+                    // gets a small correction onto the paper surface.
+                    attachment_[side]=paperPickupAttachment_[side];
                     const auto half=studioPaperHalf(selected->photo!=0);
-                    const Vec3 paperEdge{side?-half.x+.004f:half.x-.004f,0,0};
-                    attachment_[side].position=attachment_[side].position
-                        +rotate(attachment_[side].orientation,paperEdge*-1.f);
+                    const auto pinch=studioPaperContact(side);
+                    const auto normal=rotate(attachment_[side].orientation,{0,0,1});
+                    const auto pinchNormal=rotate(pinch.orientation,{0,0,1});
+                    if(std::abs(dot(normal,pinchNormal))>.85f){
+                        const auto localPinch=compose(inverse(attachment_[side]),Pose{{},pinch.position}).position;
+                        const Vec3 surface{std::clamp(localPinch.x,-half.x,half.x),
+                            std::clamp(localPinch.y,-half.y,half.y),0};
+                        const auto correction=pinch.position-compose(attachment_[side],Pose{{},surface}).position;
+                        if(dot(correction,correction)<.015f*.015f)
+                            attachment_[side].position=attachment_[side].position+correction;
+                    }
                 }
             }
             if(frame_.cameraHand==static_cast<int>(side)||frame_.markerHand==static_cast<int>(side)
