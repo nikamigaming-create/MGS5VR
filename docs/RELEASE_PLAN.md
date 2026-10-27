@@ -1,5 +1,10 @@
 # Release execution plan — 26 October 2026
 
+### Latest cabin recording drop breakdown — 27 October
+
+Retained `20261027T172437888879Z` reports 61 missed samples: 48 missed cadence slots, three encoder-queue drops and ten staging-busy samples, with no staging discards. Cadence is evaluated on recorder frame calls after ready GPU frames are copied; these counters do not distinguish delayed render calls from time spent within the recorder, nor prove a root cause. Enlarging the encoder queue alone cannot address the 48 unscheduled cadence slots in this take. Investigate the frame-call/copy timeline before changing scheduling; retain the earlier acceptance limits and do not infer a gameplay or headset pass.
+
+
 ### Integrated cabin recording on checked candidate — 27 October
 
 Retained run `artifacts/bot/runs/20261027T172437888879Z` on installed development DLL `9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a` observed cassette pickup, seating, ejection and recovery, right- and left-hand camera shutter actions, and photo placement. Both final-eye board stills show the new cabin-wall photo. Both final-eye cassette-ejection stills were subsequently reviewed: the player and tape are visible, but a large dark forearm end obscures the hand. This does not establish the crop cause, natural grip or clear insertion. Sampled source-eye frames leave hand contact and cassette action poorly framed; this is not continuous stereo acceptance. The 76-second source-eye recording has an AAC game-audio track with nonzero signal (mean -23.1 dB, peak -11.5 dB), not auditioned; it has 61 dropped and 61 repeated frames, with a 0.215-second maximum accepted-sample gap. Body and eyepatch toggles are absent. Reject this take as the requested finished movie. The change in gap and drops versus prior takes does not establish recorder performance because conditions were not controlled.

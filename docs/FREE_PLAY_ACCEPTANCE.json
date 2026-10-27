@@ -3304,6 +3304,13 @@
       "No physical Quest acceptance",
       "No causal recorder performance conclusion"
     ],
-    "cassette_endpoint_review": "Both final-eye ejection stills were reviewed. The tape/player are visible, but the hand is obscured by a large dark forearm end; they cannot establish natural grip or clear insertion. Cause and outfit admission are not established."
+    "cassette_endpoint_review": "Both final-eye ejection stills were reviewed. The tape/player are visible, but the hand is obscured by a large dark forearm end; they cannot establish natural grip or clear insertion. Cause and outfit admission are not established.",
+    "drop_breakdown": {
+      "missed_cadence_slots": 48,
+      "encoder_queue_drops": 3,
+      "staging_busy": 10,
+      "staging_discards": 0,
+      "interpretation": "Cadence is evaluated after ready GPU copies on frame calls; this does not distinguish delayed caller scheduling from recorder work. A larger encoder queue alone cannot address the 48 unscheduled slots."
+    }
   }
 }
