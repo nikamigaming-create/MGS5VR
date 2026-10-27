@@ -3219,6 +3219,14 @@
       "limitations": [
         "No gameplay repair or headset acceptance inferred."
       ]
+    },
+    "approach_correction": {
+      "source": "tools/gameplay_bot/cabin_workbench.py",
+      "scope": "Open grip during left-hand camera approach; stop if paper or marker acquired at contact.",
+      "checks": "Python compilation and existing bot contract suite pass; actual game route not rerun.",
+      "limitations": [
+        "Does not fix or verify gameplay, cinematic quality, audio, or physical Quest."
+      ]
     }
   }
 }

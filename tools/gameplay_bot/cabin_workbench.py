@@ -249,8 +249,14 @@ def workbench(live, timeout=90., film=False, on_ready=None):
             live.release();time.sleep(.30)
             rest('right')
             camera=studio()['camera'];head=approach(camera)
-            hold(('left','Grip'))
+            # Keep the hand open while it travels across the table: a loose
+            # print can otherwise be picked up before the hand reaches the camera.
+            live.release()
             move('left',studio()['camera'])
+            hold(('left','Grip'))
+            picked=studio()
+            if any(p['hand']==0 for p in picked['papers']) or picked['marker_hand']==0:
+                raise BotFault('Left hand acquired another object at camera contact')
             wait(lambda s:s['rendered']['studio']['camera_hand']==0,'left-camera-grip-before-contact')
             previous_photo=studio()['photo']
             move('left',shifted(head,[-.16,-.10,-.42]))

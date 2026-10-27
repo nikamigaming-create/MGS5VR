@@ -1,5 +1,10 @@
 # Release execution plan — 26 October 2026
 
+### Left-hand camera approach correction — 27 October
+
+The failed oriented take observed the scripted left hand acquiring loose photo 12 while grip was held during travel to the camera. The existing workbench route now releases input before that approach, moves the left hand to the camera with grip open, and grips at contact. It stops if a paper or marker is acquired there rather than moving it as though it were the camera. Python compilation and the existing gameplay bot contract suite passed; those checks do not exercise this route in the game. This is a demonstration-route correction, not a gameplay repair or a finished movie. The next integrated take must verify actual pickup, user-print preservation, clear contact, audio and cadence in the game; physical Quest remains unverified.
+
+
 ### Test-image cleanup — 27 October
 
 Retained same-session retry `artifacts/bot/runs/20261027T163331720348Z` removed the exact backed-up digital test image 13437591790496 through the camera confirmation flow. The observed library retains the two previous image IDs, and the observed paper IDs 12 and 13 remain; loose print 12 remains at its previously documented displaced position. The earlier retry `20261027T163143242615Z` stopped before touching the gallery because the title native menu was still open; the corrected route opened prop mode in the same session. The prior cleanup's camera moved during pickup easing after the aim was sampled, a plausible reason its button hover missed but not proof of the consumed ray. Waiting for the camera to settle let this cleanup reach and confirm the exact control. Temporary cleanup code was removed, inputs released, game and simulator closed, and Steam retained. No gameplay fix, movie acceptance or physical Quest pass is claimed.
