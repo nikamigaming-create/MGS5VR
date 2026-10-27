@@ -1,5 +1,10 @@
 # Release execution plan — 26 October 2026
 
+### Cabin paper deletion re-grab fix - 27 October
+
+In retained cleanup run `artifacts/bot/runs/20261027T153735536542Z`, deleting a held test print while grip remained down immediately acquired neighboring prints. Cabin paper deletion now requires the hand that held the deleted paper to release before it can pick up another object. The requirement survives tracking loss and clears only on a tracked release; normal fresh-grip pickup remains available. Checks cover both hands, held grip, tracking loss and recovery, and release/re-grip. All 58 groups and installer checks passed. Development DLL `91869f7f27103cf8133b12415160d15d625e60f4fed57d0f1208107d7c223dc8` is installed; published play remains pinned. This candidate has not been tested in the simulator or physical Quest. The editor-open failure, partial photo cleanup, old gray print, hand presentation and requested movie remain open.
+
+
 ### Partial test-photo cleanup - 27 October
 
 All ten identified test-created PNGs were copied to a private local backup and verified before cleanup. The first attempt `artifacts/bot/runs/20261027T153614496312Z` stopped before touching a print because title prop mode was not ready. In the same live session, retained `artifacts/bot/runs/20261027T153735536542Z` removed three older physical test prints through in-game confirmation. It stopped when the fourth print was held but its editor did not open. At the last observation, seven physical prints remained, including the two newest; all ten digital library entries remained. The fourth print was subsequently released and may have moved. No digital deletion was attempted. One-time cleanup code was removed; the game and simulator closed and Steam retained. Cleanup remains partial, and photo storage mapping, the gray old print, the requested movie and headset acceptance remain open.

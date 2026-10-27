@@ -118,6 +118,9 @@ private:
     std::array<Pose,2> paperPreviousGrip_{};
     std::array<uint64_t,2> paperPickupTime_{};
     std::array<bool,2> squeezed_{},triggered_{};
+    // A deleted held paper must not immediately acquire a nearby object
+    // until that hand has physically released its grip.
+    std::array<bool,2> releaseAfterPaperDelete_{};
     std::array<GearContact,2> cameraContact_{};
     uint64_t last_{},lastShot_{},processedPhoto_{};
     uint32_t nextId_{1};

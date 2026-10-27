@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "a1174b19694f7df8004b27db8a2759ecc3631f3531063746d3f45cfb29e628b6",
-  "candidate_status": "Checked/deployed cabin weapon contact and rack tactile cues; simulator, physical Quest, broader cabin interactions and showcase remain unverified on this candidate.",
+  "candidate": "91869f7f27103cf8133b12415160d15d625e60f4fed57d0f1208107d7c223dc8",
+  "candidate_status": "Checked and deployed paper deletion re-grab fix; simulator, physical Quest, remaining cabin interactions and showcase unverified on this candidate.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -3146,5 +3146,13 @@
     "backup": "All ten identified test-created photos copied and hash-verified in private local backup before cleanup.",
     "result": "Three older physical test prints removed by in-game confirmation. Fourth was held but editor did not open; seven physical prints and ten digital library entries observed before release.",
     "limits": "Partial cleanup; fourth may have moved. One-time cleanup code removed; game and simulator closed, Steam retained. Not photo, movie or headset acceptance."
+  },
+  "cabin_paper_delete_regrab_2026_10_27": {
+    "evidence": "artifacts/bot/runs/20261027T153735536542Z",
+    "failure": "After deletion while the grip remained down, neighboring prints were acquired without a new squeeze.",
+    "fix": "The deleting paper holder must release a tracked grip before another pickup; suppression survives tracking loss.",
+    "validation": "Both-hand behavior, continued squeeze, tracking loss/recovery and release/re-grip checks; all 58 groups and installer checks passed.",
+    "candidate": "91869f7f27103cf8133b12415160d15d625e60f4fed57d0f1208107d7c223dc8",
+    "limits": "Not tested in simulator or physical Quest on this candidate. Editor-open failure, partial photo cleanup, old gray print, hand presentation and final movie remain open."
   }
 }

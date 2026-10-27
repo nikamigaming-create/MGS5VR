@@ -303,6 +303,7 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
         const auto& hand=hands[side];const bool tracking=hand.tracked&&valid(hand.grip);
         const bool squeeze=tracking&&hand.squeeze>(squeezed_[side]?.25f:.55f);
         const bool trigger=tracking&&hand.trigger>.65f,edge=trigger&&!triggered_[side];
+        if(tracking&&!squeeze)releaseAfterPaperDelete_[side]=false;
         const auto local=compose(inverse(room),hand.grip);
         auto paperIt=std::find_if(frame_.papers.begin(),frame_.papers.end(),[&](const auto& p){return p.hand==static_cast<int>(side);});
         const bool hasPaper=paperIt!=frame_.papers.end();
@@ -399,7 +400,7 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                     if(frame_.editor==static_cast<int>(paperIt->id)){frame_.editor=-1;frame_.confirmPaper=0;}}
                 ++frame_.revision;
             }
-        }else if(squeeze&&(cabin||!squeezed_[side])){
+        }else if(squeeze&&!releaseAfterPaperDelete_[side]&&(cabin||!squeezed_[side])){
             StudioPaper* selected{};float paperDistance=.035f*.035f;
             for(auto& paper:frame_.papers){if(paper.hand>=0||(!cabin&&!paper.field))continue;
                 const auto grip=paper.field?hand.grip:local;
@@ -488,6 +489,8 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                         if(found==frame_.papers.end()){frame_.editor=-1;break;}
                         if(frame_.confirmPaper){
                             if(key==43&&found->id==frame_.confirmPaper){
+                                if(found->hand>=0&&found->hand<static_cast<int>(releaseAfterPaperDelete_.size()))
+                                    releaseAfterPaperDelete_[static_cast<size_t>(found->hand)]=true;
                                 frame_.papers.erase(found);frame_.editor=-1;frame_.confirmPaper=0;++frame_.revision;
                             }else if(key==33||key==36)frame_.confirmPaper=0;
                             frame_.hapticMask|=uint8_t(1u<<side);break;

@@ -3023,6 +3023,38 @@ int main(){
         expect(frame->papers.size()==3&&frame->editor<0&&frame->photos==std::vector<uint64_t>{222},
             "Confirmed note disposal permanently removes only that paper, without digital history");
     }
+    for(size_t holder=0;holder<2;++holder){
+        CabinStudio studio;std::array<StudioHand,2> hands{};uint64_t tick=3000;
+        for(auto& hand:hands)hand.tracked=hand.aimTracked=true;
+        const auto editor=1-holder;
+        StudioPaper first{},neighbor{};first.id=91;neighbor.id=92;
+        first.pose=neighbor.pose={Quat{-.70710678f,0,0,.70710678f},studioNotesHome+Vec3{-.12f,.15f,0}};
+        first.pinned=neighbor.pinned=true;
+        first.ink=neighbor.ink=std::make_shared<const StudioInk>();
+        studio.restore({first,neighbor});hands[holder].grip=first.pose;
+        auto frame=studio.update(true,true,{}, {},hands,tick);
+        hands[holder].squeeze=1;frame=studio.update(true,true,{}, {},hands,tick+=20);
+        expect(frame->papers.front().hand==static_cast<int>(holder),"Cabin paper can be held before disposal");
+        hands[editor].aim=compose(frame->papers.front().pose,Pose{{},{0,0,.2f}});
+        hands[editor].trigger=1;frame=studio.update(true,true,{}, {},hands,tick+=20);
+        expect(frame->editor==91,"Held paper editor opens before disposal");
+        const auto trash=[&]{
+            hands[editor].trigger=0;frame=studio.update(true,true,{}, {},hands,tick+=20);
+            hands[editor].aim=compose(studioKeyPose(frame->keyboard,43),Pose{{},{0,0,.25f}});
+            hands[editor].trigger=1;frame=studio.update(true,true,{}, {},hands,tick+=20);
+        };
+        trash();trash();
+        expect(frame->papers.size()==1&&frame->papers.front().id==92&&frame->papers.front().hand<0,
+            "Deleting held paper does not immediately grab its neighbor");
+        frame=studio.update(true,true,{}, {},hands,tick+=20);
+        expect(frame->papers.front().hand<0,"Continued squeeze does not grab another paper after disposal");
+        hands[holder].tracked=false;frame=studio.update(true,true,{}, {},hands,tick+=20);
+        hands[holder].tracked=true;frame=studio.update(true,true,{}, {},hands,tick+=20);
+        expect(frame->papers.front().hand<0,"Tracking recovery does not clear the release requirement");
+        hands[holder].squeeze=0;frame=studio.update(true,true,{}, {},hands,tick+=20);
+        hands[holder].squeeze=1;frame=studio.update(true,true,{}, {},hands,tick+=20);
+        expect(frame->papers.front().hand==static_cast<int>(holder),"A fresh grip can acquire the neighboring paper");
+    }
     {
         OpeningSelector opening;std::array<TrackedHand,2> hands{};
         for(auto& hand:hands)hand.gripTracked=true;
