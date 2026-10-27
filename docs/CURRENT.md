@@ -1,5 +1,10 @@
 # Current MGS5VR work — 26 October 2026
 
+### Showcase camera framing correction — 27 October
+
+The completed combined take captured dark cabin-seat subjects because its scripted camera target used the controller/head orientation rather than the actual held-camera lens orientation. For film runs, the workbench now waits through the existing pickup easing, derives the current camera-to-controller attachment and aims the camera at the native cabin board for both hands. A previous retained staged take using the same attachment/lens-aware approach produced cabin-wall images, but this integration has not been rerun. Python compilation and the existing bot contract suite passed; these do not prove camera pixels, natural grasp, continuous stereo, audio, cadence or physical Quest behavior. This is showcase staging, not a gameplay repair or completed movie.
+
+
 ### Combined cabin take and test cleanup — 27 October
 
 On development DLL `aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f`, retained run `artifacts/bot/runs/20261027T164745284337Z` observed cassette pickup, insertion, eject and recovery, both-hand camera shutters and newly printed photo placement. The corrected open-hand left-camera approach succeeded; the two existing print IDs and room-local positions were unchanged in the observed start and end states. The open player and placed photo were reviewed in both final-eye snapshots. The sample contact-sheet review still shows obstructed hand contact and dark, poorly composed camera subjects; these results are not continuous two-eye contact proof. The pre-compositor recording carries AAC audio with mean -23.1 dB, but it was not auditioned. It reports 23 dropped source samples, 22 encoded repeats and a 0.523-second maximum accepted-sample gap. Body/eyepatch toggles are not demonstrated, and this is rejected as the finished movie.

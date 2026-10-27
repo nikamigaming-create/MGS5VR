@@ -3260,6 +3260,15 @@
       "Source-eye recording dropped 23 samples, repeated 22 frames, and has a 0.523-second gap; audio signal present but not auditioned.",
       "Contact obscured and camera subjects dark; no body/eyepatch toggle demo.",
       "Not continuous final-eye motion or physical-headset acceptance."
-    ]
+    ],
+    "framing_followup": {
+      "source": "tools/gameplay_bot/cabin_workbench.py",
+      "scope": "Film-only two-hand camera aim uses current held attachment and native board target after pickup easing.",
+      "prior_reference": "artifacts/opening-cinematic-staged-20261026",
+      "validation": "Python compilation and existing bot contracts pass; current integration not run in the game.",
+      "limitations": [
+        "No natural grip, captured subject, headset, audio or finished movie acceptance inferred."
+      ]
+    }
   }
 }

@@ -130,6 +130,17 @@ def workbench(live, timeout=90., film=False, on_ready=None):
     def hold(*channels):
         live.input([{'hand':hand,'component':component,'value':1.} for hand,component in channels],.1,lease_seconds=5.)
         time.sleep(.10)
+    def camera_view(hand,head):
+        # Rejoin the held camera to its actual tracked grip after the pickup
+        # easing finishes; aim the lens at the cabin board rather than using
+        # the controller's current orientation as a camera orientation.
+        current=studio()
+        grip=_controller_pose(live,hand,'grip','local')
+        attachment=compose(inverse_pose(grip),current['camera'])
+        target=compose(current['room'],current['board'])['position']
+        camera=shifted(head,[.13 if hand=='right' else -.13,-.10,-.38])
+        camera['orientation']=pointing([b-a for a,b in zip(camera['position'],target)])
+        return compose(camera,inverse_pose(attachment))
     def marker_grip(body):
         rendered=observe()['rendered'];current=rendered['studio']
         side='right' if current['marker_hand']==1 else 'left'
@@ -233,7 +244,8 @@ def workbench(live, timeout=90., film=False, on_ready=None):
             camera=studio()['camera']
             move('right',shifted(camera,[.05,-.025,0.]));hold(('right','Grip'))
             wait(lambda s:s['rendered']['studio']['camera_hand']==1,'physical-camera-grabbed')
-            camera_target=shifted(head,[.16,-.10,-.42])
+            if movie:time.sleep(.4);hold(('right','Grip'))
+            camera_target=camera_view('right',head) if movie else shifted(head,[.16,-.10,-.42])
             if movie:movie.mark('camera-shutter')
             move('right',camera_target);hold(('right','Grip'),('right','Trigger'))
             wait(lambda s:s['rendered']['studio']['photo']>0,'camera-native-scene-printed',seconds=8.)
@@ -259,7 +271,8 @@ def workbench(live, timeout=90., film=False, on_ready=None):
                 raise BotFault('Left hand acquired another object at camera contact')
             wait(lambda s:s['rendered']['studio']['camera_hand']==0,'left-camera-grip-before-contact')
             previous_photo=studio()['photo']
-            move('left',shifted(head,[-.16,-.10,-.42]))
+            if movie:time.sleep(.4);hold(('left','Grip'))
+            move('left',camera_view('left',head) if movie else shifted(head,[-.16,-.10,-.42]))
             hold(('left','Grip'),('left','Trigger'))
             printed=wait(lambda s:s['rendered']['studio']['photo']>previous_photo,'left-camera-native-scene-printed',seconds=8.)
             printed_photo=printed['rendered']['studio']['photo']
