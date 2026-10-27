@@ -1,5 +1,44 @@
 # Current MGS5VR work — 26 October 2026
 
+## Opening cabin cassette and lid — 26 October
+
+The user reports unnatural cassette insertion and questions the tape-player
+model and lid motion; Polaroid and Post-it handling are also in scope. The
+existing player body is owned native helicopter-interior geometry. A point-set
+comparison of all 478 vertices against the separate owned `pcp0` cutscene player
+matched within 0.0002 mm after the measured placement; this proves geometry
+correspondence, not native animation or material parity. The white instant
+camera is a separate mod-authored object. The lid uses reconstructed motion;
+the original cutscene animation and exact travel remain unverified.
+
+A live off-axis attempt reproduced an 89.36-degree cassette rotation at the
+guide boundary (`artifacts/opening-guide-repro2-20261026/guide-snap.json`).
+Source `4945ca9` preserves the hand-driven rotation, rejects a sideways entry,
+introduces guide correction continuously and interpolates seating after release,
+including reversed aligned tapes. The exact hashed interior mesh had ten lid
+triangles mixing animated and stationary vertices; the isolated connected lid
+now moves together (68 body vertices plus four window vertices). Geometry audit:
+`artifacts/opening-lid-topology-20261026.json`.
+
+Checked/deployed candidate `d2341d57320d` passed all 58 test groups and
+installer checks. Fresh native run `artifacts/opening-guide-verified-20261026`
+measured zero rotation at the formerly snapping sideways guide boundary and
+completed pickup, seat, eject and supported recovery. Both final-eye seated and
+open-player images were reviewed; dynamic motion and physical headset comfort
+remain unaccepted. Earlier paired workbench `20261027T011954036566Z` completed
+Polaroid and Post-it pickup, writing and board placement on the prior candidate;
+this is not proof of smooth contact at every orientation. In-game tests added
+four photos and four strokes to an existing note; the pre-test library and
+note stroke count were restored, test images retained privately, and other
+paper records preserved byte-for-byte (`artifacts/opening-studio-cleanup.json`).
+
+Next: review the reconstructed lid travel against a verified original native
+animation or physical reference, and reproduce any remaining paper contact or
+placement instability before editing those working paths. Physical Quest and
+whole-scene acceptance remain open. Steam retained; owned session closed;
+published play pin and personal control settings unchanged.
+
+
 ## Gameplay toggle demonstrations — 26 October
 
 Source `52585ca` adds a 25–150% marked-enemy size control (60% default),

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
-  "candidate": "4187a681cd4f810169abb651cf84d58a89e323addbcb29c14501ae164cbaece4",
-  "candidate_status": "Checked/deployed grouped live controls and marker scale; gameplay showcase partial; physical acceptance, glow and daytime shadows remain open.",
+  "candidate": "d2341d57320d0ba61706434d485589224d1371c0547a775ab0292167d11f729c",
+  "candidate_status": "Checked/deployed opening cassette guide and connected lid geometry; physical headset and original lid motion remain unverified.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -2819,5 +2819,23 @@
         "other weapons and surfaces"
       ]
     }
+  },
+  "opening_cabin_20261026": {
+    "candidate": "d2341d57320d0ba61706434d485589224d1371c0547a775ab0292167d11f729c",
+    "source": "4945ca9",
+    "player_geometry_comparison": "artifacts/opening-player-model-comparison-20261026.json",
+    "lid_topology": "artifacts/opening-lid-topology-20261026.json",
+    "before_off_axis": "artifacts/opening-guide-repro2-20261026/guide-snap.json",
+    "after_off_axis": "artifacts/opening-guide-verified-20261026/guide-snap.json",
+    "after_insert_eject": "artifacts/opening-guide-verified-20261026/result.json",
+    "earlier_paper_run": "artifacts/bot/runs/20261027T011954036566Z",
+    "studio_cleanup": "artifacts/opening-studio-cleanup.json",
+    "physical_headset_acceptance": false,
+    "limits": [
+      "Original native lid animation and travel not established",
+      "Fast motion and paper contact not fully visually accepted",
+      "Physical Quest untested",
+      "No perfect-scene claim"
+    ]
   }
 }
