@@ -1,8 +1,13 @@
 # Current MGS5VR work — 26 October 2026
 
+### Test-photo cleanup completed - 27 October
+
+Retained `artifacts/bot/runs/20261027T154906297397Z` used the in-game confirmation flow to remove the remaining five identified older test prints and eight older test-photo library entries. Together with the earlier three-print cleanup, the final observed game state contains only the two newest test prints and their two digital entries, with no notes. All ten test PNGs were backed up and hash-verified privately before cleanup. Each removal checked exact identities; the holding grip was released before final confirmation. This is cleanup evidence, not a live test of the new held-grip re-grab fix. One-time cleanup code was removed, the game and simulator were closed, and Steam retained. Persistence after restart, actual storage mapping, headset acceptance and the requested movie remain open.
+
+
 ### Cabin paper deletion re-grab fix - 27 October
 
-In retained cleanup run `artifacts/bot/runs/20261027T153735536542Z`, deleting a held test print while grip remained down immediately acquired neighboring prints. Cabin paper deletion now requires the hand that held the deleted paper to release before it can pick up another object. The requirement survives tracking loss and clears only on a tracked release; normal fresh-grip pickup remains available. Checks cover both hands, held grip, tracking loss and recovery, and release/re-grip. All 58 groups and installer checks passed. Development DLL `91869f7f27103cf8133b12415160d15d625e60f4fed57d0f1208107d7c223dc8` is installed; published play remains pinned. This candidate has not been tested in the simulator or physical Quest. The editor-open failure, partial photo cleanup, old gray print, hand presentation and requested movie remain open.
+In retained cleanup run `artifacts/bot/runs/20261027T153735536542Z`, deleting a held test print while grip remained down immediately acquired neighboring prints. Cabin paper deletion now requires the hand that held the deleted paper to release before it can pick up another object. The requirement survives tracking loss and clears only on a tracked release; normal fresh-grip pickup remains available. Checks cover both hands, held grip, tracking loss and recovery, and release/re-grip. All 58 groups and installer checks passed. Development DLL `91869f7f27103cf8133b12415160d15d625e60f4fed57d0f1208107d7c223dc8` is installed; published play remains pinned. The held-grip fix has not been tested in the simulator or physical Quest. The editor-open failure, partial photo cleanup, old gray print, hand presentation and requested movie remain open.
 
 
 ### Partial test-photo cleanup - 27 October

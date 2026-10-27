@@ -3154,5 +3154,12 @@
     "validation": "Both-hand behavior, continued squeeze, tracking loss/recovery and release/re-grip checks; all 58 groups and installer checks passed.",
     "candidate": "91869f7f27103cf8133b12415160d15d625e60f4fed57d0f1208107d7c223dc8",
     "limits": "Not tested in simulator or physical Quest on this candidate. Editor-open failure, partial photo cleanup, old gray print, hand presentation and final movie remain open."
+  },
+  "cabin_test_photo_cleanup_completion_2026_10_27": {
+    "candidate": "91869f7f27103cf8133b12415160d15d625e60f4fed57d0f1208107d7c223dc8",
+    "run": "artifacts/bot/runs/20261027T154906297397Z",
+    "result": "Removed five remaining old physical test prints and eight old digital test-photo entries using exact in-game confirmations. Final observed state has two newest test prints and two digital entries, with no notes.",
+    "backup": "All ten identified test PNGs privately backed up and hash-verified before cleanup.",
+    "limits": "Holding grip was released before final confirmation, so this is not a live test of held-grip re-grab repair. Restart persistence, storage mapping, final movie and physical headset remain open. One-time cleanup code removed; game and simulator closed, Steam retained."
   }
 }
