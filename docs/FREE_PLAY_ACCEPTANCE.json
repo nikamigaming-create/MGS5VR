@@ -3139,5 +3139,12 @@
     "prior_failed_attempt": "artifacts/bot/runs/20261027T152836609861Z",
     "result": "Exact test-created note removed using in-game confirmation. Other observed paper identities and digital library unchanged across the cleanup.",
     "limits": "Not verification of remaining photos, grip presentation, finished movie, or physical headset. One-time cleanup code removed; game and simulator closed and Steam retained."
+  },
+  "cabin_test_photo_cleanup_2026_10_27": {
+    "run": "artifacts/bot/runs/20261027T153735536542Z",
+    "prior_failed_attempt": "artifacts/bot/runs/20261027T153614496312Z",
+    "backup": "All ten identified test-created photos copied and hash-verified in private local backup before cleanup.",
+    "result": "Three older physical test prints removed by in-game confirmation. Fourth was held but editor did not open; seven physical prints and ten digital library entries observed before release.",
+    "limits": "Partial cleanup; fourth may have moved. One-time cleanup code removed; game and simulator closed, Steam retained. Not photo, movie or headset acceptance."
   }
 }

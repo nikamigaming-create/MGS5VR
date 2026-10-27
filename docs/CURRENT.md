@@ -1,5 +1,10 @@
 # Current MGS5VR work — 26 October 2026
 
+### Partial test-photo cleanup - 27 October
+
+All ten identified test-created PNGs were copied to a private local backup and verified before cleanup. The first attempt `artifacts/bot/runs/20261027T153614496312Z` stopped before touching a print because title prop mode was not ready. In the same live session, retained `artifacts/bot/runs/20261027T153735536542Z` removed three older physical test prints through in-game confirmation. It stopped when the fourth print was held but its editor did not open. At the last observation, seven physical prints remained, including the two newest; all ten digital library entries remained. The fourth print was subsequently released and may have moved. No digital deletion was attempted. One-time cleanup code was removed; the game and simulator closed and Steam retained. Cleanup remains partial, and photo storage mapping, the gray old print, the requested movie and headset acceptance remain open.
+
+
 ### Test-created note cleanup - 27 October
 
 The specific note created by retained run `20261027T151753032724Z` was removed through the in-game confirmation path in retained `artifacts/bot/runs/20261027T153047221916Z`. The note ID and text were checked before interaction; the observed other paper identities and digital library were unchanged across the cleanup. A first attempt `artifacts/bot/runs/20261027T152836609861Z` stopped before touching the note because title prop mode was not ready; the same live session was used for the successful attempt. One-time cleanup code was removed. The game and simulator were closed, Steam retained. This is cleanup evidence only, not photo, grip, movie or headset acceptance.
