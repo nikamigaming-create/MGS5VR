@@ -1,5 +1,20 @@
 # Field fixes — implementation and acceptance
 
+### Cassette compartment geometry lead — 27 October
+
+A static check clips the reconstructed cassette interaction box against the
+owned player mesh. At the default closed carrier pose, eight stationary
+triangles intersect the box; two form a broad plane about 0.47 mm from the
+cassette center. At sampled open fractions 0.5, 0.75 and 1.0, no mesh-10
+triangles intersect the idealized box. This is not a visible-clipping finding:
+the box approximates the cassette, and material, actual mesh and dynamic eye
+occlusion were not checked. A 5 mm hypothetical outward shift clears the
+broad plane but still intersects side faces; 7 mm intersects the lid, so no
+offset is justified. See `artifacts/opening-cassette-volume-lead-20261027.json`.
+Review an actual close two-eye insertion and native material before changing
+the working guide. The original hinge motion and finished movie remain open.
+
+
 ### Cassette-player model identification — 27 October
 
 The owned `pcp0_main0_def_c00_bsm` cutscene-player texture bears the

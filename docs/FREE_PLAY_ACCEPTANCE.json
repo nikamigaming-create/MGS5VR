@@ -3059,5 +3059,11 @@
     "finding": "Owned pcp0 cutscene-player texture says STEREO CASSETTE-CORDER WM-R55; prior 478-position geometry match strongly supports that physical model as a reference for the interior player.",
     "evidence": "artifacts/opening-player-model-comparison-20261026.json; private/cabin-player-physical-reference-20261027.json",
     "limitations": "No proof of interior texture binding, original lid motion, hinge angle, tape seating or headset acceptance."
+  },
+  "cabin_cassette_volume_lead_2026_10_27": {
+    "evidence": "artifacts/opening-cassette-volume-lead-20261027.json",
+    "status": "static lead, not a diagnosed visible defect",
+    "finding": "The idealized closed cassette box intersects stationary native player triangles; an arbitrary offset can instead intersect the lid. Actual cassette mesh/material and final-eye visibility are not joined.",
+    "next": "Inspect closely framed moving two-eye gameplay and native material before altering insertion."
   }
 }
