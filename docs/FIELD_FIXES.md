@@ -1,5 +1,10 @@
 # Field fixes — implementation and acceptance
 
+### Latest cabin recording sequence review — 27 October
+
+In `20261027T172437888879Z`, the 61 missing encoded slots occur in 30 accepted-sample gaps. Thirty-six of those missing slots are in gaps whose endpoint source and image sequence numbers do not advance. The largest gap, 0.215 seconds, begins at 62.327 seconds; the next largest begins at 62.541 seconds. Several long gaps cluster around 60–63 seconds, after the left-camera print; two composited-eye capture requests run at 60.382–60.739 and 60.935–61.259 seconds. Endpoint observations do not show intermediate transactions, prove a stall, establish causation, or show that capturing the final eyes explains later gaps. Separate per-frame scheduling/copy timing from source production before changing behavior. No new game run or headset acceptance is claimed.
+
+
 ### Latest cabin recording drop breakdown — 27 October
 
 Retained `20261027T172437888879Z` reports 61 missed samples: 48 missed cadence slots, three encoder-queue drops and ten staging-busy samples, with no staging discards. Cadence is evaluated on recorder frame calls after ready GPU frames are copied; these counters do not distinguish delayed render calls from time spent within the recorder, nor prove a root cause. Enlarging the encoder queue alone cannot address the 48 unscheduled cadence slots in this take. Investigate the frame-call/copy timeline before changing scheduling; retain the earlier acceptance limits and do not infer a gameplay or headset pass.

@@ -3311,6 +3311,7 @@
       "staging_busy": 10,
       "staging_discards": 0,
       "interpretation": "Cadence is evaluated after ready GPU copies on frame calls; this does not distinguish delayed caller scheduling from recorder work. A larger encoder queue alone cannot address the 48 unscheduled slots."
-    }
+    },
+    "sequence_gap_review": "Thirty-six of 61 missing slots fall in gaps with unchanged source and image sequence endpoints; largest 0.215s begins at 62.327s. Long gaps cluster 60–63s after left-camera print; two final-eye requests overlap 60.382–60.739s and 60.935–61.259s. Endpoints and overlap do not prove intermediate state, a stall, or causation."
   }
 }
