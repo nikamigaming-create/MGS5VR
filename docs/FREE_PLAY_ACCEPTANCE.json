@@ -3108,5 +3108,14 @@
     "change": "Workbench chooses a clear board position or stops; recorded-state replay found six candidates. Not run in-game.",
     "cleanup": "Owned session closed, Steam retained; game-visible storage mapping uncertain and test-created items may remain.",
     "limits": "No physical headset acceptance; no finished movie."
+  },
+  "cabin_take_cleanup_2026_10_27": {
+    "candidate": "a1174b19694f7df8004b27db8a2759ecc3631f3531063746d3f45cfb29e628b6",
+    "run": "artifacts/bot/runs/20261027T150737725386Z",
+    "status": "failed_compositor_timeout",
+    "cleanup": "Exact pinned test note ID 5, text TAPE, removed through the game confirmation path before recording. Game and simulator closed; Steam retained. Game-visible storage mapping remains unverified.",
+    "observed": "Tape and camera states reached; photo placement not reached.",
+    "recording": "Source-eye/process-audio segment captured; 19 dropped and 18 repeated frames. Compositor chapter timed out.",
+    "review": "Sampled source-eye frames are steep with obscured contact; rejected as a finished showcase. Physical headset not tested."
   }
 }

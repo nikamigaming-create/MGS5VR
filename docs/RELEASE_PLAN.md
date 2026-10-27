@@ -1,5 +1,10 @@
 # Release execution plan — 26 October 2026
 
+### Cabin take and test-note cleanup - 27 October
+
+Retained run `artifacts/bot/runs/20261027T150737725386Z` removed the exact pinned test note ID 5 with text TAPE through its in-game confirmation before recording. It observed tape pickup, seating, ejection and recovery and camera photos from both hands, but failed before photo placement when the compositor capture timed out. The source-eye/audio segment completed with 19 dropped samples and 18 repeats. Sampled frames remain steep and obscure the hand/object contact; the take is rejected as the finished movie. The experimental view and one-time cleanup code were removed after the run; no gameplay source changed. The game and owned simulator were closed, Steam retained, and game-visible studio storage mapping remains unverified. Physical headset and the requested movie remain open.
+
+
 ### Cabin showcase recording and photo overlap - 27 October
 
 Retained run `artifacts/bot/runs/20261027T145943690455Z` completed scripted tape, camera and new-photo placement states on development DLL `a1174b19694f`. Its source-eye recording has non-silent AAC audio, 18 dropped samples and 18 repeated frames; audio content was not auditioned. Separate compositor chapters measured only 3.28-3.99 captures per second. Source-eye visual review found steep framing, obscured grips and a previous test note visible, so this is rejected as the requested movie. The newly placed photo and an older pinned photo occupied nearly the same board pose, making the gray board result ambiguous. The workbench now selects an unoccupied board position or stops; replay of recorded state finds clear candidates, but the change has not been run. The owned session closed and Steam remained. Game studio storage mapping remains uncertain; test-created photos and note may remain in the game-visible store. No physical-headset acceptance.
