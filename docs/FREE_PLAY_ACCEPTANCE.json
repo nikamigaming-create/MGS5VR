@@ -3041,5 +3041,11 @@
     "startup": "Initial attempt stalled at server maintenance notice. Same live session continued after a guarded confirmation keyed to witnessed native popup numeric 3 and StringId 0xd7658701ee40; it reached title and completed the workbench. See artifacts/opening-maintenance-startup-failure-20261027.",
     "cleanup": "Inputs released; owned simulator closed; Steam retained. Personal INIs restored. Studio tree restored byte-identically; a late shutdown write was preserved separately under private/opening-face-late-output.",
     "limits": "Not continuous final-eye acceptance or physical Quest; newly requested broader cabin interactions not yet audited."
+  },
+  "expanded_cabin_interaction_request_2026_10_27": {
+    "user_request": "Make the cabin deeply interactive, including grabbing and returning wall-mounted weapons.",
+    "existing": "Native owned cabin gear assemblies follow either hand and restore their parked transform on release; historical scoped rifle evidence exists on a prior candidate.",
+    "limitations": "Automatic return is not validated physical placement. Every prop, loadout, current candidate and physical headset remain unverified. Static interior geometry needs source ownership mapping before moving it.",
+    "next": "Map visible props and their native ownership; preserve native firing and loadout restrictions while developing and validating physical interactions."
   }
 }

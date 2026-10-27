@@ -1,5 +1,25 @@
 # Field fixes — implementation and acceptance
 
+### Expanded cabin interaction request — 27 October
+
+The user wants a deeply interactive first-person cabin, including removing
+wall-mounted guns and putting them back. Existing native cabin gear code
+admits up to six verified owned equipment assemblies, acquires one at its
+native root with either tracked hand, follows the solved palm, and restores
+the parked native transform on grip release or interruption. Earlier build
+`aaffbee70236` has both-eye, bounded carry/return evidence for a second rifle
+(`artifacts/bot/runs/20261023T100324956937Z` and 062844); close views crop
+the grip. This is automatic return, not a validated physical placement or
+coverage of every wall object or loadout. Current candidate and physical Quest
+remain unverified for this loop. Cassettes, the reconstructed player lid,
+the camera, photos, paper and marker have separate existing interaction paths;
+see earlier scoped reports. Fixed native cabin interior geometry is not proven
+independently movable. Next map visible objects to native ownership and test
+their existing interactions before changing working flows; design physical
+return with safe interruption and loadout identity. Preserve native cabin
+firing restrictions and the unfinished movie requirement.
+
+
 ### Cabin take and maintenance notice — 27 October
 
 Candidate `789a8e11c795` completed cassette pickup, insertion and ejection,
