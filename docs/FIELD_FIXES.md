@@ -1,5 +1,10 @@
 # Field fixes — implementation and acceptance
 
+### Test-image cleanup — 27 October
+
+Retained same-session retry `artifacts/bot/runs/20261027T163331720348Z` removed the exact backed-up digital test image 13437591790496 through the camera confirmation flow. The observed library retains the two previous image IDs, and the observed paper IDs 12 and 13 remain; loose print 12 remains at its previously documented displaced position. The earlier retry `20261027T163143242615Z` stopped before touching the gallery because the title native menu was still open; the corrected route opened prop mode in the same session. The prior cleanup's camera moved during pickup easing after the aim was sampled, a plausible reason its button hover missed but not proof of the consumed ray. Waiting for the camera to settle let this cleanup reach and confirm the exact control. Temporary cleanup code was removed, inputs released, game and simulator closed, and Steam retained. No gameplay fix, movie acceptance or physical Quest pass is claimed.
+
+
 ### Oriented cabin take and partial cleanup — 27 October
 
 On development DLL `aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f`, retained run `artifacts/bot/runs/20261027T162149228010Z` observed cassette pickup, insertion and ejection plus one right-hand camera photo. Two temporary observer corrections aligned the open carrier to a measured face-normal dot of 0.796 at 0.321 m; both final-eye ejection stills show its face more clearly. Sampled source-eye motion still obscures hand contact. The take failed when the scripted left hand acquired existing loose photo 12 instead of the camera; its last observed room-local position changed from [0.473453, -2.2112, -1.08705] to [0.513061, -2.2112, -1.23604]. This is a route collision, not a proven camera pickup defect. The pre-compositor recording has audio, 119 dropped/repeated samples and a 0.590-second largest source gap; audio was not auditioned. The take is rejected as the requested movie and does not verify physical Quest or continuous final-eye motion.

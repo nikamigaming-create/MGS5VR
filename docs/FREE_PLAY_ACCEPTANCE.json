@@ -3211,6 +3211,14 @@
     "limitations": [
       "Not a complete showcase or continuous final-eye motion proof.",
       "Physical Quest acceptance pending."
-    ]
+    ],
+    "followup_cleanup": {
+      "run": "artifacts/bot/runs/20261027T163331720348Z",
+      "result": "Exact test image removed after in-game confirmation; prior two library images and print IDs remain; print 12 remains displaced.",
+      "earlier_failed_attempt": "artifacts/bot/runs/20261027T163143242615Z",
+      "limitations": [
+        "No gameplay repair or headset acceptance inferred."
+      ]
+    }
   }
 }
