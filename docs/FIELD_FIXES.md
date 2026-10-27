@@ -1,5 +1,10 @@
 # Field fixes — implementation and acceptance
 
+### Test-note cleanup ray review - 27 October
+
+In retained run `20261027T151753032724Z`, the right-hand aim command at 99.563 seconds geometrically intersects the front of the test note at the nearby 99.750-second observation, about 10 mm from its center. Camera and marker were not held and no camera control was hovered at that observation. These are time-neighbor samples, not an atomic input/pose join: the consumed aim, trigger edge and moving note pose are not established. The failed cleanup remains unresolved and its test note may remain. No gameplay change is justified by this calculation alone.
+
+
 ### Cabin integrated check and cleanup failure - 27 October
 
 Retained run `artifacts/bot/runs/20261027T151753032724Z` on development DLL `a1174b19694f` observed tape pickup, seating and ejection, camera photos with both hands, note typing, marker strokes with both hands, and new-photo board placement. Both-eye board stills show the new print's image in a clear position; an older gray print remains, and the marker grip is obscured. The run failed afterward: the test-created note was acquired for disposal, but its editor did not open, so the note may remain. The experimental cleanup was removed after the run. The workbench now refuses to rewrite pre-existing notes and checks that a newly created note is reacquired before typing; that guard was exercised on the run, but its refusal case was not exercised in-game. A source-eye/audio segment was captured with 19 dropped and 19 repeated samples; this is diagnostic footage, includes note work, and is not the requested showcase. The game and simulator were closed and Steam retained; game storage mapping, existing gray print, final movie and physical Quest remain open.

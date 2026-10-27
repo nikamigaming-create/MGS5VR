@@ -3128,5 +3128,10 @@
     "recording": "Source-eye/audio diagnostic, 19 dropped and 19 repeated samples; includes note work and is not the finished showcase.",
     "guard": "Workbench will not rewrite pre-existing notes and verifies its own new note before typing; refusal path not exercised in-game.",
     "limits": "Old gray print, actual storage mapping, continuous final-eye motion, showcase and physical headset remain open."
+  },
+  "cabin_test_note_cleanup_ray_2026_10_27": {
+    "run": "artifacts/bot/runs/20261027T151753032724Z",
+    "finding": "A commanded right aim ray geometrically intersects the front of the nearby sampled test note; camera and marker were unheld, with no camera control hovered at that observation.",
+    "limits": "Command and note observation differ by about 187 ms; actual consumed aim, trigger edge and note pose are not atomically joined. Cleanup failure cause remains unresolved."
   }
 }
