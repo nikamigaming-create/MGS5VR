@@ -2641,6 +2641,32 @@ int main(){
             "AvatarEdit hands its retained hospital view to the next authored cutscene camera");
     }
     {
+        CabinProps props;std::array<CabinHand,2> hands{};
+        hands[1].tracked=true;
+        auto tick=[&](uint64_t t){return props.update(hands,t);};
+        tick(100);hands[1].pose=cabinTapeHomes()[1];hands[1].grip=1;auto frame=tick(150);
+        expect(frame.tapes[1].hand==1,"Cassette diagnostic acquires the intended tape");
+        const auto slot=cabinSlotPose();
+        const Quat sideways{0,0,.70710678f,.70710678f};
+        hands[1].pose=compose(slot,Pose{sideways,{.024f,0,.05f}});frame=tick(200);
+        auto relative=compose(inverse(slot),frame.tapes[1].pose);
+        expect(frame.tapes[1].state!=CabinTapeState::guiding
+            &&std::abs(rotate(relative.orientation,{1,0,0}).y)>.99f,
+            "Sideways cassette stays hand-oriented instead of snapping ninety degrees at the guide");
+        hands[1].pose=compose(slot,Pose{{},{.025f,0,.05f}});frame=tick(250);
+        relative=compose(inverse(slot),frame.tapes[1].pose);
+        expect(frame.tapes[1].state==CabinTapeState::guiding&&relative.position.x>.023f,
+            "Cassette guidance starts continuously at the mouth rather than jumping to the centre");
+        const Quat reversed{0,0,1,0};
+        hands[1].pose=compose(slot,Pose{reversed,{0,0,.01f}});frame=tick(300);
+        expect(frame.tapes[1].state==CabinTapeState::guiding,"A properly aligned reversed cassette can enter the carrier");
+        hands[1].grip=0;frame=tick(350);
+        expect(frame.inserted==1,"Reversed cassette seats on release");
+        for(uint64_t t=400;t<=700;t+=50)frame=tick(t);
+        relative=compose(inverse(cabinCarrierPose(frame.player,frame.lidOpen)),frame.tapes[1].pose);
+        expect(rotate(relative.orientation,{1,0,0}).x<-.99f,"Carrier closing preserves the inserted cassette direction");
+    }
+    {
         OpeningSelector opening;const Pose titleHead{};std::array<TrackedHand,2> hands{};
         for(auto& hand:hands)hand.gripTracked=true;
         const OpeningNativeFocus focus{{2,3,5,4,7,8,0},6,0,true};

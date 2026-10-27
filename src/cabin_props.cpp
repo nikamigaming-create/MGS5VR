@@ -37,6 +37,13 @@ Quat turn(Quat q,Vec3 angular,float dt){
     const float angle=speed*dt*.5f,s=std::sin(angle)/speed;
     return compose(Pose{{angular.x*s,angular.y*s,angular.z*s,std::cos(angle)},{}},Pose{q,{}}).orientation;
 }
+Quat blendRotation(Quat a,Quat b,float t){
+    const float dotq=a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w;
+    if(dotq<0)b={-b.x,-b.y,-b.z,-b.w};
+    Quat q{a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t,a.w+(b.w-a.w)*t};
+    const float n=std::sqrt(q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w);
+    return n>.0001f?Quat{q.x/n,q.y/n,q.z/n,q.w/n}:b;
+}
 // Separating-axis contact for real tape OBBs. Keep the minimum-penetration
 // normal, including edge/edge axes, so tilted or stacked tapes cannot overlap.
 bool contact(const CabinTape& a,const CabinTape& b,Vec3& normal,float& penetration,Vec3 bHalf=cabinTapeHalf){
@@ -220,12 +227,20 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
                 if(frame_.inserted<0&&!carrierOccupied&&frame_.lidOpen>.8f){
                     const auto relative=compose(inverse(slot),tape.pose);
                     const auto normal=rotate(relative.orientation,{0,0,1});
+                    const auto longAxis=rotate(relative.orientation,{1,0,0});
                     const bool aligned=std::abs(relative.position.x)<.026f&&std::abs(relative.position.y)<.035f
-                        &&relative.position.z>=-.016f&&relative.position.z<.085f&&normal.z>.85f;
+                        &&relative.position.z>=-.016f&&relative.position.z<.085f&&normal.z>.85f
+                        &&std::abs(longAxis.x)>.85f;
                     if(aligned){if(tape.state!=CabinTapeState::guiding)frame_.hapticMask|=uint8_t(1u<<side);
                         tape.state=CabinTapeState::guiding;frame_.hovered=held;
-                        // Gentle slot guidance retains the player's insertion axis.
-                        tape.pose=compose(slot,Pose{{},{relative.position.x*.25f,relative.position.y*.25f,std::max(0.f,relative.position.z)}});
+                        // Start guidance continuously at the edge of the mouth.
+                        // Do not turn a held tape away from the user's hand.
+                        const float depth=std::clamp(1.f-relative.position.z/.085f,0.f,1.f);
+                        const float xWeight=std::clamp((.026f-std::abs(relative.position.x))/.012f,0.f,1.f);
+                        const float yWeight=std::clamp((.035f-std::abs(relative.position.y))/.015f,0.f,1.f);
+                        tape.pose=compose(slot,Pose{relative.orientation,
+                            {relative.position.x*(1-.75f*depth*xWeight),
+                             relative.position.y*(1-.75f*depth*yWeight),relative.position.z}});
                     }else tape.state=CabinTapeState::held;
                 }else tape.state=CabinTapeState::held;
                 if(tape.state!=CabinTapeState::guiding){
@@ -240,7 +255,10 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
                 tape.hand=-1;
                 const auto relative=compose(inverse(slot),tape.pose);
                 if(tracked&&tape.state==CabinTapeState::guiding&&relative.position.z<.025f&&frame_.inserted<0){
-                    frame_.inserted=held;tape.state=CabinTapeState::seated;tape.pose=slot;tape.velocity={};
+                    frame_.inserted=held;tape.state=CabinTapeState::seated;insertionOffset_=relative;
+                    const auto axis=rotate(relative.orientation,{1,0,0});
+                    seatedOrientation_[static_cast<size_t>(held)]=axis.x<0?Quat{0,0,1,0}:Quat{};
+                    tape.velocity={};
                     tape.angularVelocity={};
                     insertionTime_=0;activationSent_=false;frame_.lidOpen=1;
                     frame_.hapticMask|=uint8_t(1u<<side);
@@ -268,16 +286,19 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
     }
     if(frame_.inserted>=0){
         insertionTime_+=dt;frame_.lidOpen=std::max(0.f,1-insertionTime_/.25f);
-        frame_.tapes[static_cast<size_t>(frame_.inserted)].pose=cabinCarrierPose(frame_.player,frame_.lidOpen);
+        const auto index=static_cast<size_t>(frame_.inserted);
+        const float t=std::clamp(insertionTime_/.25f,0.f,1.f);
+        frame_.tapes[index].pose=compose(cabinCarrierPose(frame_.player,frame_.lidOpen),
+            Pose{blendRotation(insertionOffset_.orientation,seatedOrientation_[index],t),insertionOffset_.position*(1.f-t)});
         if(insertionTime_>=.28f&&!activationSent_){frame_.activated=frame_.inserted;activationSent_=true;}
     }
-    for(auto& tape:frame_.tapes)if(tape.state==CabinTapeState::ejecting){
+    for(size_t i=0;i<frame_.tapes.size();++i){auto& tape=frame_.tapes[i];if(tape.state==CabinTapeState::ejecting){
         ejectionTime_+=dt;const float t=std::min(1.f,ejectionTime_/.25f);
-        frame_.lidOpen=t;tape.pose=cabinCarrierPose(frame_.player,t);
+        frame_.lidOpen=t;tape.pose=compose(cabinCarrierPose(frame_.player,t),Pose{seatedOrientation_[i],{}});
         // Eject presents the cassette in the carrier until it is taken by hand.
         // It is not a spring-launched loose prop.
         if(t>=1){tape.state=CabinTapeState::presented;tape.velocity={};tape.angularVelocity={};}
-    }
+    }}
     frame_.layout.slot=cabinCarrierPose(frame_.player,frame_.lidOpen);
     // Fixed small steps keep release throws from tunnelling through the support.
     for(float remaining=dt;remaining>0;){const float h=std::min(remaining,1.f/120.f);step(h);remaining-=h;}

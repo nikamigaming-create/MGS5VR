@@ -75,13 +75,20 @@ void observeCabinCoverBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,
         if(!streams[0].original||!streams[1].original)return;
         struct CoverVertex{size_t position,attributes;};
         std::vector<CoverVertex> vertices;
-        for(size_t i=0;i<478;++i)if(position(streams[0].bytes,297712+i*12).y> -2.188f
-            &&normal(streams[1].bytes,496176+i*20).y>.6f)vertices.push_back({297712+i*12,496176+i*20});
+        // Connected lid triangles in the exact hashed native mesh. Selecting
+        // only upward-facing vertices left ten triangles partly stationary,
+        // visibly stretching the lid as it opened. These 68 indices include
+        // the side and edge vertices in the same topologically isolated lid.
+        constexpr std::array<size_t,68> lid{
+            0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,
+            149,150,151,152,153,154,155,156,190,191,192,193,194,195,196,197,
+            304,305,306,307,308,309,310,311,354,355,356,357,358,359,360,361};
+        for(const auto i:lid)vertices.push_back({297712+i*12,496176+i*20});
         // The window is a separate material mesh; its four front vertices
         // belong to the cover, while its other four belong to the side control.
         for(size_t i=0;i<8;++i)if(position(streams[0].bytes,303456+i*12).y> -2.188f
             &&normal(streams[1].bytes,505744+i*20).y>.6f)vertices.push_back({303456+i*12,505744+i*20});
-        if(vertices.size()!=46){log("Native cabin cover rejected: owned cover topology differs");return;}
+        if(vertices.size()!=72){log("Native cabin cover rejected: owned cover topology differs");return;}
         // Exact owned interior streams and measured rigid placement of pcp0.
         // Only the existing cover and window move; all other bytes stay native.
         constexpr Vec3 hinge{.61138933f,-2.18173569f,-1.12080353f};
@@ -98,7 +105,7 @@ void observeCabinCoverBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,
             for(size_t i=0;i<2;++i){D3D11_SUBRESOURCE_DATA initial{};initial.pSysMem=i?attributes.data():positions.data();
                 if(FAILED(device->CreateBuffer(&streams[i].description,&initial,&streams[i].variants[step]))){log("Native cabin cover GPU allocation failed");return;}}
         }
-        ready.store(true,std::memory_order_release);log("Native cabin cover hinge ready: exact owned geometry, 46 vertices, 33 poses");
+        ready.store(true,std::memory_order_release);log("Native cabin cover hinge ready: exact owned geometry, 72 vertices, 33 poses");
     }catch(...){log("Native cabin cover unavailable; original geometry retained");}
 }
 }
