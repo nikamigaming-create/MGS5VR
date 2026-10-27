@@ -1,0 +1,42 @@
+{
+  "source": "artifacts\\bot\\runs\\20261027T133035987440Z\\workbench-progress.json",
+  "description": "Compare the carrier local +Z normal to head position in the retained observations. Opening anchor rotation was identity to sample precision.",
+  "samples": [
+    {
+      "phase": "tape-seated-without-native-import",
+      "slot_normal_tracking": [
+        0.0,
+        0.9999993688640001,
+        6.311359999067179e-07
+      ],
+      "head_minus_slot_tracking": [
+        -5.840000000012502e-05,
+        0.6499079999999999,
+        -0.00015199999999992997
+      ],
+      "distance_m": 0.6499080203987022,
+      "face_angle_degrees": 0.06596089233547227
+    },
+    {
+      "phase": "ejected-tape-supported-in-carrier",
+      "slot_normal_tracking": [
+        0.8476631843584,
+        0.25881858854719997,
+        0.46311911387999993
+      ],
+      "head_minus_slot_tracking": [
+        -0.015788400000000147,
+        0.602273,
+        -0.008743999999999974
+      ],
+      "distance_m": 0.6025433574769204,
+      "face_angle_degrees": 76.71643946561773
+    }
+  ],
+  "finding": "The overhead view is nearly face-on when closed but nearly edge-on after opening; future staging should account for the open carrier normal.",
+  "limits": [
+    "Native and rendered pose publications are not proven atomic.",
+    "Angles are geometric estimates, not proof of visibility, collision-free reach or acceptable cinematography.",
+    "No candidate viewpoint has been tested."
+  ]
+}
