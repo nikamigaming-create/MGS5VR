@@ -1,5 +1,35 @@
 # Field fixes — implementation and acceptance
 
+### Cabin showcase attempts — 26 October
+
+Four actual-game takes were attempted after the user requested a clear, human
+showcase. The source-eye recorder captured 30 fps with game-process audio;
+this is pre-compositor footage, not final-headset video. The last complete
+workbench take `artifacts/opening-showcase-close-20261026` observed cassette
+seat/eject, camera printing with each hand, note editing and marker writing,
+and photo/note board placement. Review rejected it as a finished showcase:
+the player's insertion is obscured by hands/props and the motions do not read
+clearly. The earlier reframe attempt stopped when an approaching left hand
+grabbed a loose photo instead of the camera; it is a failed take, not proof of
+a universal camera defect.
+
+A separate native ACC take `artifacts/opening-showcase-body-20261026` recorded
+full-body requested off/on/off with both final eyes sampled at each state. The
+on state admitted the body; the off state showed arms. Both-eye review found
+prominent forearm cut ends and incomplete body framing, so this does not certify
+a polished headset presentation. The two recordings are separate takes and
+must not be represented as one continuous scene or as a completed showcase.
+The studio board and existing images matched their pre-test inventory exactly;
+temporary photos were archived privately. Both user INIs matched their original
+hashes after restoration, the owned simulator/game session closed and Steam was
+retained. The checked development DLL did not change.
+
+Next: improve the actual hand/prop view and visually demonstrate a clear
+cassette insertion and eject, camera/photo/note handling and body switch with
+sound; inspect the completed takes and both eyes before delivery. Physical Quest
+and original native lid motion remain open.
+
+
 ### Follow-up contact evidence
 
 Retained motion samples expose a contact regression in the scripted center-grip

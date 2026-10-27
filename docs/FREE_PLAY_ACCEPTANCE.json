@@ -848,6 +848,17 @@
           "artifacts/opening-camera-pickup-lead-20261026.json",
           "artifacts/opening-marker-pickup-leads-20261026.json"
         ]
+      },
+      "showcase_attempt_2026_10_26": {
+        "status": "rejected_as_polished_showcase",
+        "run": "artifacts/opening-showcase-close-20261026",
+        "body_toggle": "artifacts/opening-showcase-body-20261026",
+        "limitations": [
+          "pre-compositor source video",
+          "cassette insertion obscured",
+          "forearm cut ends and body framing visibly incomplete",
+          "physical headset not tested"
+        ]
       }
     },
     {
@@ -872,6 +883,17 @@
         "limitations": [
           "stills do not clearly show fingertip contact or moving lid",
           "physical Quest and original lid animation unverified"
+        ]
+      },
+      "showcase_attempt_2026_10_26": {
+        "status": "rejected_as_polished_showcase",
+        "run": "artifacts/opening-showcase-close-20261026",
+        "body_toggle": "artifacts/opening-showcase-body-20261026",
+        "limitations": [
+          "pre-compositor source video",
+          "cassette insertion obscured",
+          "forearm cut ends and body framing visibly incomplete",
+          "physical headset not tested"
         ]
       }
     },
