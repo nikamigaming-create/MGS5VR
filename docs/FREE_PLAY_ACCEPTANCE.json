@@ -3093,5 +3093,10 @@
     "run": "artifacts/bot/runs/20261027T144612968660Z",
     "finding": "Preserved source PNG shows a detailed cassette-player view, while both later board checkpoints show a gray rectangle at the selected photo.",
     "limitations": "Different times; game texture lookup, storage mapping and front-versus-back presentation are not observed. Owned image stays private."
+  },
+  "cabin_recording_route_2026_10_27": {
+    "change": "Workbench --record now starts the existing source-eye/process-audio recorder after cabin readiness, before interaction.",
+    "validation": "Python compilation and gameplay_bot_contracts passed.",
+    "limits": "Not run in title cabin; actual sound, cadence and framing unverified. Separate compositor clips remain silent. Not a gameplay fix or finished movie."
   }
 }

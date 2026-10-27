@@ -1,5 +1,10 @@
 # Current MGS5VR work — 26 October 2026
 
+### Cabin recording route correction - 27 October
+
+The existing workbench commands ignored `--record`. They now start the existing source-eye/process-audio recorder after native workbench readiness and before interactions, with the recorder's first-frame gate and normal cleanup. This is a capture-route correction, not a gameplay fix or completed movie. Python compilation and gameplay_bot_contracts passed; title-cabin recording, actual cadence, sound content, image framing and headset acceptance remain unverified. The separate compositor chapters remain silent.
+
+
 ### Cabin photo source check - 27 October
 
 The preserved PNG for the older photo placed in `20261027T144612968660Z` visibly contains the cassette player, rather than a uniform gray source image. Both board-eye checkpoints show a gray rectangle at the placed photo. The evidence narrows the question to loading or presentation but does not distinguish an unavailable file, stale material, back face or another cause; the game process texture lookup and true storage mapping remain unobserved. The owned photo and local hash evidence stay private.

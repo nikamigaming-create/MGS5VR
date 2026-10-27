@@ -264,7 +264,8 @@ def main():
                           "captures": capture_continue_rack(live), "visual_acceptance": "pending"}
             elif args.command in ("bench","bench-film"):
                 from gameplay_bot.cabin_workbench import workbench
-                result=workbench(live,timeout=args.seconds,film=args.command=='bench-film')
+                result=workbench(live,timeout=args.seconds,film=args.command=='bench-film',
+                                 on_ready=start_recording if args.record else None)
             elif args.command == "studio-board":
                 from gameplay_bot.cabin_workbench import inspect_persisted_board
                 result=inspect_persisted_board(live,timeout=args.seconds)

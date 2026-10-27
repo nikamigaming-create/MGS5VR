@@ -24,7 +24,7 @@ def inverse_pose(pose):
     return {'position':rotate(q,[-p for p in pose['position']]),'orientation':q}
 
 
-def workbench(live, timeout=90., film=False):
+def workbench(live, timeout=90., film=False, on_ready=None):
     state=wait_for_continue_rack(live,advance_startup(live,timeout=timeout))
     ready_until=time.monotonic()+30.
     while not (state.get('opening_focus',{}).get('ready')
@@ -40,6 +40,10 @@ def workbench(live, timeout=90., film=False):
         time.sleep(.05);state=live.observe()
     if state.get('scene')!='title' or 3 in state.get('opening_focus',{}).get('actions',[]):
         raise BotFault('Workbench uses an unavailable GZ import tape; this title does not admit that safe case')
+    # A requested source-eye/audio recording starts only after the native
+    # workbench is ready and before the first scripted interaction. The
+    # recorder independently verifies its first frame and fails closed.
+    if on_ready:on_ready()
     captures=[];outcomes=[];started=time.monotonic()
     movie=None
     if film:
