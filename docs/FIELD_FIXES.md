@@ -1,5 +1,10 @@
 # Field fixes — implementation and acceptance
 
+### Test-created note cleanup - 27 October
+
+The specific note created by retained run `20261027T151753032724Z` was removed through the in-game confirmation path in retained `artifacts/bot/runs/20261027T153047221916Z`. The note ID and text were checked before interaction; the observed other paper identities and digital library were unchanged across the cleanup. A first attempt `artifacts/bot/runs/20261027T152836609861Z` stopped before touching the note because title prop mode was not ready; the same live session was used for the successful attempt. One-time cleanup code was removed. The game and simulator were closed, Steam retained. This is cleanup evidence only, not photo, grip, movie or headset acceptance.
+
+
 ### Test-note cleanup ray review - 27 October
 
 In retained run `20261027T151753032724Z`, the right-hand aim command at 99.563 seconds geometrically intersects the front of the test note at the nearby 99.750-second observation, about 10 mm from its center. Camera and marker were not held and no camera control was hovered at that observation. These are time-neighbor samples, not an atomic input/pose join: the consumed aim, trigger edge and moving note pose are not established. The failed cleanup remains unresolved and its test note may remain. No gameplay change is justified by this calculation alone.

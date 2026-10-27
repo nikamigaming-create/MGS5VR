@@ -3133,5 +3133,11 @@
     "run": "artifacts/bot/runs/20261027T151753032724Z",
     "finding": "A commanded right aim ray geometrically intersects the front of the nearby sampled test note; camera and marker were unheld, with no camera control hovered at that observation.",
     "limits": "Command and note observation differ by about 187 ms; actual consumed aim, trigger edge and note pose are not atomically joined. Cleanup failure cause remains unresolved."
+  },
+  "cabin_test_note_cleanup_2026_10_27": {
+    "run": "artifacts/bot/runs/20261027T153047221916Z",
+    "prior_failed_attempt": "artifacts/bot/runs/20261027T152836609861Z",
+    "result": "Exact test-created note removed using in-game confirmation. Other observed paper identities and digital library unchanged across the cleanup.",
+    "limits": "Not verification of remaining photos, grip presentation, finished movie, or physical headset. One-time cleanup code removed; game and simulator closed and Steam retained."
   }
 }
