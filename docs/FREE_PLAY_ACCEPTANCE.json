@@ -3227,6 +3227,11 @@
       "limitations": [
         "Does not fix or verify gameplay, cinematic quality, audio, or physical Quest."
       ]
+    },
+    "capture_gap_review": {
+      "evidence": "artifacts/bot/runs/20261027T162149228010Z/capture-gap-analysis.json",
+      "finding": "Largest gap overlaps a capture event; another large gap spans 20 source/image sequence advances without such an event. Endpoints do not prove cause.",
+      "next": "Use controlled source/recording comparison before altering recorder."
     }
   }
 }

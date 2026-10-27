@@ -1,5 +1,10 @@
 # Release execution plan — 26 October 2026
 
+### Cabin capture-gap review — 27 October
+
+In the retained oriented take, the source-eye ledger has ten accepted-sample gaps over 120 ms. The largest (0.590 seconds) spans five source-sequence advances and overlaps one operator capture event; the next (0.433 seconds) spans 20 source and image advances with no overlapping capture event. Several shorter gaps have no endpoint sequence advance. These are endpoint observations, not proof of intermediate GPU execution or of capture causing the gap. The measurements in `artifacts/bot/runs/20261027T162149228010Z/capture-gap-analysis.json` show that moving all eye checkpoints alone cannot be assumed to solve cadence. A controlled source/recording comparison is needed before changing the recorder. No gameplay repair or new movie is claimed.
+
+
 ### Left-hand camera approach correction — 27 October
 
 The failed oriented take observed the scripted left hand acquiring loose photo 12 while grip was held during travel to the camera. The existing workbench route now releases input before that approach, moves the left hand to the camera with grip open, and grips at contact. It stops if a paper or marker is acquired there rather than moving it as though it were the camera. Python compilation and the existing gameplay bot contract suite passed; those checks do not exercise this route in the game. This is a demonstration-route correction, not a gameplay repair or a finished movie. The next integrated take must verify actual pickup, user-print preservation, clear contact, audio and cadence in the game; physical Quest remains unverified.
