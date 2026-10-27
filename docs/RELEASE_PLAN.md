@@ -1,5 +1,28 @@
 # Release execution plan — 26 October 2026
 
+### Follow-up contact evidence
+
+Retained motion samples expose a contact regression in the scripted center-grip
+poses: the previous authored attachment put the index tip within 3–6 mm but
+snapped the sheet 8–9 cm and about 106 degrees; the current attachment avoids
+that snap but leaves a measured 30–38 mm fingertip gap during the sampled holds
+(`artifacts/opening-paper-contact-comparison-20261026.json`). Those scripted
+poses are not naturally aligned pinch trials. A nominal finger-chain search
+suggests the existing curl axes alone cannot close that gap in those poses; it
+is not a full IK or visual acceptance result
+(`artifacts/opening-paper-curl-feasibility-20261026.json`).
+
+Additional leads, not diagnosed failures: camera handle alignment predicts a
+33 mm pickup shift for the sampled right grip, while the sampled room-relative
+camera shift was 32 mm; the trace lacks a tight stationary before/after bracket
+(`artifacts/opening-camera-pickup-lead-20261026.json`). The marker's large
+right-hand displacement coincided with a 58 cm input-to-rendered-palm separation;
+a left-hand sample had close palm alignment but was not tightly bracketed
+(`artifacts/opening-marker-pickup-leads-20261026.json`). Reproduce these in a
+future combined pass with reachable, deliberately aligned grasps, inspect both
+eyes and preserve typing, drawing, release and throw behavior. Do not infer
+physical Quest results or change the existing flow solely from these leads.
+
 ## Opening cabin follow-up — 26 October
 
 Checked/deployed development DLL `217df3f4b9be` includes a repair for a

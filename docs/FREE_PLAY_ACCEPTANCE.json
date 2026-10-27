@@ -836,6 +836,18 @@
           "stills do not clearly show fingertip contact or moving lid",
           "physical Quest and original lid animation unverified"
         ]
+      },
+      "opening_contact_followup": {
+        "status": "visual_contact_gap_in_scripted_center_grips",
+        "evidence": "artifacts/opening-paper-contact-comparison-20261026.json",
+        "limitations": [
+          "natural pinch and physical headset remain unverified",
+          "camera and marker pickup observations are leads, not isolated failures"
+        ],
+        "related_leads": [
+          "artifacts/opening-camera-pickup-lead-20261026.json",
+          "artifacts/opening-marker-pickup-leads-20261026.json"
+        ]
       }
     },
     {
