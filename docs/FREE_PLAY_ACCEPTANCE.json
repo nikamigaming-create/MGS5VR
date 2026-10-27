@@ -3242,5 +3242,24 @@
         "No gameplay or headset acceptance inferred."
       ]
     }
+  },
+  "cabin_combined_take_2026_10_27": {
+    "run": "artifacts/bot/runs/20261027T164745284337Z",
+    "candidate": "aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f",
+    "observed": [
+      "Cassette pickup, seating, ejection and recovery.",
+      "Both-hand camera shutters and new-photo placement.",
+      "Corrected open-hand left camera approach completed without moving the original print."
+    ],
+    "cleanup": [
+      "artifacts/bot/runs/20261027T165156081291Z",
+      "artifacts/bot/runs/20261027T165455483354Z",
+      "artifacts/bot/runs/20261027T165632449221Z"
+    ],
+    "limitations": [
+      "Source-eye recording dropped 23 samples, repeated 22 frames, and has a 0.523-second gap; audio signal present but not auditioned.",
+      "Contact obscured and camera subjects dark; no body/eyepatch toggle demo.",
+      "Not continuous final-eye motion or physical-headset acceptance."
+    ]
   }
 }
