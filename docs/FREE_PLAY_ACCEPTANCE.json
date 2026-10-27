@@ -3321,6 +3321,7 @@
     "failure": "Two diagonal viewpoints failed the slot face dot >0.5 guard: distances 0.509/0.454 m and dots -0.310/-0.256.",
     "recording": "Partial pre-compositor source eye: 557 accepted, 34 dropped/repeated; audio capture no reported gaps, not auditioned.",
     "scope": "Test staging failure, not gameplay diagnosis or completed movie.",
-    "cleanup": "Inputs released, owned game/simulator closed; Steam retained; temporary route removed."
+    "cleanup": "Inputs released, owned game/simulator closed; Steam retained; temporary route removed.",
+    "diagnosis": "The published carrier normal was approximately [0.848, 0.259, 0.463], mostly horizontal. The temporary staging selected the horizontal direction toward the prior head pose while adding vertical height, putting the observer behind that face; negative dot values are consistent with that choice. This is a geometry lead, not a verified viewpoint."
   }
 }
