@@ -1,5 +1,10 @@
 # Current MGS5VR work — 26 October 2026
 
+### Cabin integrated check and cleanup failure - 27 October
+
+Retained run `artifacts/bot/runs/20261027T151753032724Z` on development DLL `a1174b19694f` observed tape pickup, seating and ejection, camera photos with both hands, note typing, marker strokes with both hands, and new-photo board placement. Both-eye board stills show the new print's image in a clear position; an older gray print remains, and the marker grip is obscured. The run failed afterward: the test-created note was acquired for disposal, but its editor did not open, so the note may remain. The experimental cleanup was removed after the run. The workbench now refuses to rewrite pre-existing notes and checks that a newly created note is reacquired before typing; that guard was exercised on the run, but its refusal case was not exercised in-game. A source-eye/audio segment was captured with 19 dropped and 19 repeated samples; this is diagnostic footage, includes note work, and is not the requested showcase. The game and simulator were closed and Steam retained; game storage mapping, existing gray print, final movie and physical Quest remain open.
+
+
 ### Cabin take and test-note cleanup - 27 October
 
 Retained run `artifacts/bot/runs/20261027T150737725386Z` removed the exact pinned test note ID 5 with text TAPE through its in-game confirmation before recording. It observed tape pickup, seating, ejection and recovery and camera photos from both hands, but failed before photo placement when the compositor capture timed out. The source-eye/audio segment completed with 19 dropped samples and 18 repeats. Sampled frames remain steep and obscure the hand/object contact; the take is rejected as the finished movie. The experimental view and one-time cleanup code were removed after the run; no gameplay source changed. The game and owned simulator were closed, Steam retained, and game-visible studio storage mapping remains unverified. Physical headset and the requested movie remain open.

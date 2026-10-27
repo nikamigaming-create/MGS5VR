@@ -263,23 +263,15 @@ def workbench(live, timeout=90., film=False, on_ready=None):
             live.release();time.sleep(.30);rest('left')
             if not movie:
                 current=studio()
-                reusable=min((p for p in current['papers'] if not p['photo'] and not p['pinned']),
-                    key=lambda p:math.dist(p['pose']['position'],current['notes_home']['position']),default=None)
-                if reusable and reusable['pose']['position'][1]<current['notes_home']['position'][1]-.15:
-                    reusable=next((p for p in current['papers'] if not p['photo'] and p['pinned'] and p['text']=='TAPE'),reusable)
-                note_home=compose(room,reusable['pose'] if reusable else current['notes_home'])
-                note_offset=(0.,.65,.32)
-                if reusable and reusable['pinned']:
-                    normal=rotate(note_home['orientation'],[0.,0.,1.])
-                    note_offset=[n*.55+(.10 if i==1 else 0.) for i,n in enumerate(normal)]
-                head=approach(note_home,note_offset)
+                existing_note_ids={p['id'] for p in current['papers'] if not p['photo']}
+                if any(not p['photo'] and not p['pinned'] for p in current['papers']):
+                    raise BotFault('Workbench note test would rewrite an existing note; collection preserved')
+                note_home=compose(room,current['notes_home'])
+                head=approach(note_home)
                 # Moving the observer can republish the cabin in a new pose.
-                # Rejoin the same sheet or notepad to the fresh room.
+                # Rejoin the notepad to the fresh room.
                 current=studio();room=current['room']
-                if reusable:
-                    reusable=next((p for p in current['papers'] if p['id']==reusable['id']),None)
-                    if reusable is None:raise BotFault('Reusable note disappeared during observer movement')
-                note_home=compose(room,reusable['pose'] if reusable else current['notes_home'])
+                note_home=compose(room,current['notes_home'])
                 hold(('right','Grip'))
                 move('right',note_home)
                 # Persistent loose prints can cover the notepad after earlier
@@ -293,12 +285,13 @@ def workbench(live, timeout=90., film=False, on_ready=None):
                     move('right',compose(studio()['room'],{'position':[.20,-2.0,-1.10],'orientation':[0.,0.,0.,1.]}))
                     live.release();time.sleep(.25)
                     current=studio()
-                    remaining=next((p for p in current['papers'] if reusable and p['id']==reusable['id']),None)
-                    move('right',compose(current['room'],remaining['pose'] if remaining else current['notes_home']))
+                    move('right',compose(current['room'],current['notes_home']))
                     hold(('right','Grip'))
                 right_note=wait(lambda s:any(p['hand']==1 and not p['photo'] for p in s['rendered']['studio']['papers']),
                                 'right-sticky-note-grip-before-contact')
                 right_note_id=next(p['id'] for p in right_note['rendered']['studio']['papers'] if p['hand']==1 and not p['photo'])
+                if right_note_id in existing_note_ids:
+                    raise BotFault('Workbench acquired an existing note; refusing to rewrite it')
                 move('right',paper_grip('right',shifted(head,[.12,-.18,-.45])))
                 checkpoint('right-hand-sticky-note')
                 move('right',paper_grip('right',note_home))
@@ -313,6 +306,8 @@ def workbench(live, timeout=90., film=False, on_ready=None):
                 picked=wait(lambda s:any(p['hand']==0 and not p['photo'] for p in s['rendered']['studio']['papers']),'sticky-note-peeled')
                 note=next(p for p in picked['rendered']['studio']['papers'] if p['hand']==0 and not p['photo'])
                 note_id=note['id']
+                if note_id!=right_note_id or note_id in existing_note_ids:
+                    raise BotFault('Workbench did not reacquire its own new note; refusing to rewrite it')
                 note_pose=shifted(head,[-.10,-.18,-.45])
                 move('left',paper_grip('left',note_pose));hold(('left','Grip'))
                 aim_at('right',shifted(note_pose,[0.,0.,.25]));hold(('left','Grip'),('right','Trigger'))

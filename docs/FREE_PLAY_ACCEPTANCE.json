@@ -3117,5 +3117,16 @@
     "observed": "Tape and camera states reached; photo placement not reached.",
     "recording": "Source-eye/process-audio segment captured; 19 dropped and 18 repeated frames. Compositor chapter timed out.",
     "review": "Sampled source-eye frames are steep with obscured contact; rejected as a finished showcase. Physical headset not tested."
+  },
+  "cabin_integrated_check_2026_10_27": {
+    "candidate": "a1174b19694f7df8004b27db8a2759ecc3631f3531063746d3f45cfb29e628b6",
+    "run": "artifacts/bot/runs/20261027T151753032724Z",
+    "status": "failed_test_note_cleanup",
+    "observed": "Tape, camera, note, marker both hands, and new-photo board placement states reached.",
+    "visual": "Both eyes show the new photo image at a clear position; older gray print remains. Marker grip obscured.",
+    "cleanup": "Test-created note acquired but editor did not open; it may remain. Experimental cleanup removed. Game and simulator closed, Steam retained.",
+    "recording": "Source-eye/audio diagnostic, 19 dropped and 19 repeated samples; includes note work and is not the finished showcase.",
+    "guard": "Workbench will not rewrite pre-existing notes and verifies its own new note before typing; refusal path not exercised in-game.",
+    "limits": "Old gray print, actual storage mapping, continuous final-eye motion, showcase and physical headset remain open."
   }
 }
