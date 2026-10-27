@@ -3313,5 +3313,14 @@
       "interpretation": "Cadence is evaluated after ready GPU copies on frame calls; this does not distinguish delayed caller scheduling from recorder work. A larger encoder queue alone cannot address the 48 unscheduled slots."
     },
     "sequence_gap_review": "Thirty-six of 61 missing slots fall in gaps with unchanged source and image sequence endpoints; largest 0.215s begins at 62.327s. Long gaps cluster 60–63s after left-camera print; two final-eye requests overlap 60.382–60.739s and 60.935–61.259s. Endpoints and overlap do not prove intermediate state, a stall, or causation."
+  },
+  "cabin_diagonal_guard_failure_2026_10_27": {
+    "run": "20261027T174300006026Z",
+    "candidate": "9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a",
+    "observed": "Tape pickup, release and recovery; no insertion or camera action.",
+    "failure": "Two diagonal viewpoints failed the slot face dot >0.5 guard: distances 0.509/0.454 m and dots -0.310/-0.256.",
+    "recording": "Partial pre-compositor source eye: 557 accepted, 34 dropped/repeated; audio capture no reported gaps, not auditioned.",
+    "scope": "Test staging failure, not gameplay diagnosis or completed movie.",
+    "cleanup": "Inputs released, owned game/simulator closed; Steam retained; temporary route removed."
   }
 }
