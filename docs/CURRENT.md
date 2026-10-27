@@ -1,5 +1,10 @@
 # Current MGS5VR work — 26 October 2026
 
+### Cabin photo source check - 27 October
+
+The preserved PNG for the older photo placed in `20261027T144612968660Z` visibly contains the cassette player, rather than a uniform gray source image. Both board-eye checkpoints show a gray rectangle at the placed photo. The evidence narrows the question to loading or presentation but does not distinguish an unavailable file, stale material, back face or another cause; the game process texture lookup and true storage mapping remain unobserved. The owned photo and local hash evidence stay private.
+
+
 ### Photo selection follow-up - 27 October
 
 Retained retry `20261027T144612968660Z` printed photo `13437586037990` but placed older photo `13437585700621`. The older ID originated in the preceding run and its PNG was absent from the restoring process's view. The workbench route now selects the photo it just printed and fails explicitly if it is absent. Offline review of the retained state confirms that the new ID was present; the corrected route has not been run and the gray rectangle's cause is not proven. The first run began with no paper photos even though the restoring process saw a board referencing two other IDs; the second began with the first run's IDs. Actual game storage and cleanup therefore remain unresolved.

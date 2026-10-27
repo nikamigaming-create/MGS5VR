@@ -3088,5 +3088,10 @@
     "finding": "The route placed an earlier run photo while a newly printed photo was present. Offline review confirms differing IDs.",
     "change": "Workbench route selects the photo just printed and explicitly fails if it is missing.",
     "limits": "Not yet rerun. Gray rectangle cause and game storage mapping remain unverified; no physical headset or film acceptance."
+  },
+  "cabin_photo_source_check_2026_10_27": {
+    "run": "artifacts/bot/runs/20261027T144612968660Z",
+    "finding": "Preserved source PNG shows a detailed cassette-player view, while both later board checkpoints show a gray rectangle at the selected photo.",
+    "limitations": "Different times; game texture lookup, storage mapping and front-versus-back presentation are not observed. Owned image stays private."
   }
 }
