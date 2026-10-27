@@ -170,6 +170,10 @@ def workbench(live, timeout=90., film=False, on_ready=None):
         if movie:
             movie.mark(label);time.sleep(1.25)
         else:captures.extend(live.capture(label,static_grips=True))
+    anchor_until=time.monotonic()+5.
+    while 'opening_position' not in state or 'opening_orientation' not in state:
+        if time.monotonic()>anchor_until:raise BotFault('Native cabin anchor did not publish')
+        time.sleep(.05);state=observe()
     anchor={'position':state['opening_position'],'orientation':state['opening_orientation']}
     layout=state.get('opening_bench',{}).get('layout',{})
     if not layout.get('verified'):raise BotFault('The actual native seat anchor is unavailable')

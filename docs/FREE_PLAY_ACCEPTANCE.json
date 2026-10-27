@@ -2,7 +2,7 @@
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
   "candidate": "9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a",
-  "candidate_status": "Checked recorder buffer-reuse development candidate installed; in-game capture, cabin interactions on this candidate and physical Quest remain unverified.",
+  "candidate_status": "Checked recorder buffer-reuse development candidate installed; scoped title-cabin interactions observed in simulator; recording and physical Quest acceptance remain open.",
   "checklist": "docs/FIELD_FIXES.md",
   "scope_limits": [
     "Simulator passes do not establish physical-headset acceptance",
@@ -3285,6 +3285,24 @@
       "Standalone benchmark is not a GPU or in-game measurement.",
       "No live capture cadence, cabin interaction, audio quality or headset acceptance on this candidate.",
       "Prior video and interaction evidence retains its original build scope."
+    ]
+  },
+  "cabin_buffer_candidate_take_2026_10_27": {
+    "candidate": "9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a",
+    "run": "20261027T172437888879Z",
+    "startup_failure": "20261027T172304096887Z",
+    "observed": "Tape pickup, seating, ejection and recovery; both-hand camera photos and board placement.",
+    "visual_review": "Both final-eye board stills and sampled source-eye contact sheet; cassette and hand motion remain insufficiently clear.",
+    "recording": "76.07 s pre-compositor source-eye, AAC nonzero audio not auditioned; 61 drops, 61 repeats, max accepted-sample gap 0.215 s; reject as completed movie.",
+    "cleanup": [
+      "20261027T172848508279Z",
+      "20261027T172926154386Z"
+    ],
+    "limitations": [
+      "No continuous final-eye acceptance",
+      "No body or eyepatch toggle demonstration",
+      "No physical Quest acceptance",
+      "No causal recorder performance conclusion"
     ]
   }
 }
