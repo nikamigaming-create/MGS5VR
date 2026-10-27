@@ -1,20 +1,35 @@
 # Current MGS5VR work — 26 October 2026
 
-### Nightly distribution setup - 27 October
+### First public nightly verified - 27 October
 
-The user authorized isolated release-automation work and public nightlies from
-committed main, leaving concurrent uncommitted gameplay/tooling work untouched.
-The daily/manual GitHub workflow reuses the Windows build and installer checks,
-verifies the asset-free package and uploaded hashes, and publishes a technical
-nightly prerelease without promoting the local Play pin. The exact existing
-blocker snapshots are disclosed under `config/nightly-policy.json`; new or changed
-blockers stop publication. Hardware-only tests and physical/full-game acceptance
-remain outside hosted CI. See [Nightly builds](NIGHTLIES.md).
+Nightly `nightly-2026-10-27-53f6bf541ef3` is public from committed source
+`53f6bf541ef37b3e862d470a5bec0318eddcd343`:
+[nightly-2026-10-27-53f6bf541ef3](https://github.com/nikamigaming-create/MGS5VR/releases/tag/nightly-2026-10-27-53f6bf541ef3).
+The Windows build, 56 hardware-independent CTest groups, nightly contracts and
+packaged installer checks passed in [the publication run](https://github.com/nikamigaming-create/MGS5VR/actions/runs/40564021306).
+All six public assets were downloaded without authentication and hash-verified;
+the installation archive's 231 manifest files verified. Archive SHA-256:
+`1c3fa35d600047db970dd9a253b14a5d7c07e18e0a7e81cfa76ca1a4cf762251`.
+Hosted DLL SHA-256: `61a323d8b1b527e5087b51a4d5d198fef58b98a03071ff32b0adebd1de6ef913`.
 
-This entry records setup, not a completed publication or a new gameplay pass.
-Next release action: pass the PR checks, enable the workflow on remote main,
-publish the first nightly and verify its public downloads. Development gameplay
-and the existing acceptance evidence retain their original candidate scope.
+The first attempt stopped before publication because CTest wrote its XML relative
+to the build directory. The workflow now supplies an absolute report path and
+requires the report to exist. The corrected complete publication passed. A plan
+check on the published commit returned `publish=false`; the repeat dispatch is
+[recorded here](https://github.com/nikamigaming-create/MGS5VR/actions/runs/40565064013).
+
+Daily publication is active at 10:37 UTC, with manual dispatch available. New or
+changed blocker snapshots stop the channel; the accepted existing limitations
+are disclosed, not resolved. The reviewed October 19.1 release and its asset
+identities are unchanged. This task used an isolated release-automation branch
+and did not alter the primary checkout, installed development or local Play pin.
+The two GPU-only tests, simulator, physical headset and full-game acceptance
+remain outside this CI result. Existing gameplay evidence keeps its original
+candidate scope; see [Nightly builds](NIGHTLIES.md).
+
+Next release action: commit and push reviewed development batches normally;
+the daily job considers new main commits. Keep new failures in the catalog and
+hold publication when needed. Reviewed-release promotion remains separate.
 
 ### Diagonal cabin take failed at framing guard — 27 October
 
