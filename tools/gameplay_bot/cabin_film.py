@@ -28,7 +28,7 @@ class CabinFilm:
         ready=self.output/f'{number+1:02d}.ready.json';stop=self.output/f'{number+1:02d}.stop'
         log=(self.output/f'{number+1:02d}.log').open('wb')
         process=subprocess.Popen([sys.executable,str(ROOT/'tools/record-simulator.py'),
-            '--proxy',self.proxy,'--mp4','--seconds','45','--eye','right','--max-fps','15',
+            '--proxy',self.proxy,'--mp4','--seconds','45','--eye','right','--max-fps','30',
             '--output',str(path),'--ready-file',str(ready),'--stop-file',str(stop)],
             stdout=log,stderr=log,creationflags=subprocess.CREATE_NO_WINDOW)
         self.active={'name':name,'path':str(path),'ready':ready,'stop':stop,'process':process,'log':log,'markers':[]}
