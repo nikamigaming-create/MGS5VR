@@ -3197,5 +3197,20 @@
       "staging_discard": 1
     },
     "limits": "The underlying stutter cause and indirect effects are unproven; take remains rejected."
+  },
+  "cabin_oriented_take_2026_10_27": {
+    "run": "artifacts/bot/runs/20261027T162149228010Z",
+    "cleanup": "artifacts/bot/runs/20261027T162624724008Z",
+    "status": "failed_incomplete",
+    "findings": [
+      "Two-eye ejection checkpoints show the cassette face more clearly; sampled motion still obscures contact.",
+      "Left scripted grip acquired existing loose photo 12; camera pickup was not observed and that print was displaced.",
+      "Test print 14 removed; its backed-up digital image remains after camera delete hover failed.",
+      "Source-eye recording: 119 dropped and repeated samples; 0.590 second maximum gap; audio not auditioned."
+    ],
+    "limitations": [
+      "Not a complete showcase or continuous final-eye motion proof.",
+      "Physical Quest acceptance pending."
+    ]
   }
 }
