@@ -366,7 +366,20 @@ def workbench(live, timeout=90., film=False, on_ready=None):
             if movie:movie.mark('polaroid-in-hand')
             head=approach(board_world,[n*.55+( .10 if i==1 else 0.) for i,n in enumerate(normal)])
             room=studio()['room'];board_world=compose(room,board)
-            hold(('left','Grip'));move('left',paper_grip('left',compose(room,shifted(board,[.09,0.,.006])),True))
+            # Avoid silently placing a new print on top of an existing paper.
+            # Board and paper poses are both room-local here.
+            occupied=[]
+            for paper in studio()['papers']:
+                if paper['pinned']:
+                    local=compose(inverse_pose(board),paper['pose'])['position']
+                    half=(.044,.0535) if paper['photo'] else (.038,.038)
+                    occupied.append((local,half))
+            locations=((.09,0.),(0.,.14),(0.,-.14),(-.13,.14),(.13,.14),(-.13,-.14),(.13,-.14),(-.09,0.))
+            placement=next(((x,y) for x,y in locations if all(
+                abs(x-p[0])>=.044+h[0]+.005 or abs(y-p[1])>=.0535+h[1]+.005
+                for p,h in occupied)),None)
+            if placement is None:raise BotFault('No clear board space for the printed photo')
+            hold(('left','Grip'));move('left',paper_grip('left',compose(room,shifted(board,[*placement,.006])),True))
             live.release();time.sleep(.12)
             wait(lambda s:any(p['id']==photo['id'] and p['pinned'] for p in s['rendered']['studio']['papers']),'polaroid-attached-to-native-board')
             board_world=compose(room,board)

@@ -3098,5 +3098,15 @@
     "change": "Workbench --record now starts the existing source-eye/process-audio recorder after cabin readiness, before interaction.",
     "validation": "Python compilation and gameplay_bot_contracts passed.",
     "limits": "Not run in title cabin; actual sound, cadence and framing unverified. Separate compositor clips remain silent. Not a gameplay fix or finished movie."
+  },
+  "cabin_recorded_showcase_2026_10_27": {
+    "candidate": "a1174b19694f7df8004b27db8a2759ecc3631f3531063746d3f45cfb29e628b6",
+    "run": "artifacts/bot/runs/20261027T145943690455Z",
+    "observed": "Tape, camera and newly printed photo placement states completed.",
+    "recording": "Source-eye 30 fps with non-silent AAC, 18 dropped samples and 18 repeats; audio content not auditioned. Compositor chapters measured 3.28-3.99 captures/s.",
+    "review": "Rejected showcase: steep framing, obscured grip, previous test note visible. Newly pinned photo overlapped old pinned photo.",
+    "change": "Workbench chooses a clear board position or stops; recorded-state replay found six candidates. Not run in-game.",
+    "cleanup": "Owned session closed, Steam retained; game-visible storage mapping uncertain and test-created items may remain.",
+    "limits": "No physical headset acceptance; no finished movie."
   }
 }

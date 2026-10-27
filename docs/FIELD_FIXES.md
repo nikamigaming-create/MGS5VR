@@ -1,5 +1,10 @@
 # Field fixes — implementation and acceptance
 
+### Cabin showcase recording and photo overlap - 27 October
+
+Retained run `artifacts/bot/runs/20261027T145943690455Z` completed scripted tape, camera and new-photo placement states on development DLL `a1174b19694f`. Its source-eye recording has non-silent AAC audio, 18 dropped samples and 18 repeated frames; audio content was not auditioned. Separate compositor chapters measured only 3.28-3.99 captures per second. Source-eye visual review found steep framing, obscured grips and a previous test note visible, so this is rejected as the requested movie. The newly placed photo and an older pinned photo occupied nearly the same board pose, making the gray board result ambiguous. The workbench now selects an unoccupied board position or stops; replay of recorded state finds clear candidates, but the change has not been run. The owned session closed and Steam remained. Game studio storage mapping remains uncertain; test-created photos and note may remain in the game-visible store. No physical-headset acceptance.
+
+
 ### Cabin recording route correction - 27 October
 
 The existing workbench commands ignored `--record`. They now start the existing source-eye/process-audio recorder after native workbench readiness and before interactions, with the recorder's first-frame gate and normal cleanup. This is a capture-route correction, not a gameplay fix or completed movie. Python compilation and gameplay_bot_contracts passed; title-cabin recording, actual cadence, sound content, image framing and headset acceptance remain unverified. The separate compositor chapters remain silent.
