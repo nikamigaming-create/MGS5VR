@@ -251,7 +251,8 @@ def workbench(live, timeout=90., film=False):
             previous_photo=studio()['photo']
             move('left',shifted(head,[-.16,-.10,-.42]))
             hold(('left','Grip'),('left','Trigger'))
-            wait(lambda s:s['rendered']['studio']['photo']>previous_photo,'left-camera-native-scene-printed',seconds=8.)
+            printed=wait(lambda s:s['rendered']['studio']['photo']>previous_photo,'left-camera-native-scene-printed',seconds=8.)
+            printed_photo=printed['rendered']['studio']['photo']
             live.release(keep=(('left','Grip',None),))
             checkpoint('left-camera-live-view-and-print')
             room=studio()['room'];move('left',compose(room,studio()['camera_home']))
@@ -351,7 +352,8 @@ def workbench(live, timeout=90., film=False):
                 current=studio();room=current['room'];board=current['board']
                 board_world=compose(room,board)
                 normal=rotate(board_world['orientation'],[0.,0.,1.])
-            photo=next(p for p in studio()['papers'] if p['photo'])
+            photo=next((p for p in studio()['papers'] if p['photo']==printed_photo),None)
+            if photo is None:raise BotFault('The photo just printed is no longer available for placement')
             head=approach(compose(room,photo['pose']))
             room=studio()['room']
             photo=next(p for p in studio()['papers'] if p['id']==photo['id'])

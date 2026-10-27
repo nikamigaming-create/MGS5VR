@@ -3082,5 +3082,11 @@
     "observed": "Scripted tape, camera, note, typing, marker both hands and photo placement states completed.",
     "visual": "Both-eye board snapshots show gray rectangle at attached photo; marker grip obscured. Selected photo ID came from previous run and differs from restored filenames; storage mapping and selection require investigation.",
     "limitations": "No moving-eye video or physical Quest acceptance. Restoring process reported matching files; game-loaded IDs do not match that view, so actual game storage mapping is unverified."
+  },
+  "cabin_photo_selection_followup_2026_10_27": {
+    "evidence": "artifacts/bot/runs/20261027T144612968660Z/workbench-progress.json",
+    "finding": "The route placed an earlier run photo while a newly printed photo was present. Offline review confirms differing IDs.",
+    "change": "Workbench route selects the photo just printed and explicitly fails if it is missing.",
+    "limits": "Not yet rerun. Gray rectangle cause and game storage mapping remain unverified; no physical headset or film acceptance."
   }
 }

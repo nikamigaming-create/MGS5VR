@@ -1,5 +1,10 @@
 # Field fixes — implementation and acceptance
 
+### Photo selection follow-up - 27 October
+
+Retained retry `20261027T144612968660Z` printed photo `13437586037990` but placed older photo `13437585700621`. The older ID originated in the preceding run and its PNG was absent from the restoring process's view. The workbench route now selects the photo it just printed and fails explicitly if it is absent. Offline review of the retained state confirms that the new ID was present; the corrected route has not been run and the gray rectangle's cause is not proven. The first run began with no paper photos even though the restoring process saw a board referencing two other IDs; the second began with the first run's IDs. Actual game storage and cleanup therefore remain unresolved.
+
+
 ### Title-cabin interaction retry - 27 October
 
 The retained run `artifacts/bot/runs/20261027T144612968660Z` on development DLL `a1174b19694f` completed the scripted cassette, camera, note, typing, marker and photo-placement state checks. The first failed run targeted the note using the room pose from before moving the observer: its last commanded hand was approximately 275 mm from the later published notepad position. Refreshing the room and note pose let the retry acquire the note. This repairs the test route, not a demonstrated gameplay defect. Paired eye snapshots show a gray rectangle where the photo was placed; the marker grip is obscured. The selected photo ID was from the earlier run and does not match the restored studio filenames, so storage visibility and photo selection require investigation before assigning cause. No motion video was recorded and physical Quest remains unverified. Steam was retained and the owned simulator closed. The restoring process reported matching studio files, but the game-loaded photo IDs disagree with that view, so actual game storage mapping is not yet verified.
