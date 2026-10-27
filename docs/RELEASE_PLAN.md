@@ -1,5 +1,10 @@
 # Release execution plan — 26 October 2026
 
+### Displaced loose print restored — 27 October
+
+Retained `artifacts/bot/runs/20261027T164143753479Z` returned the specific loose print 12 / photo 13437590506521, moved by the oriented take, through tracked pickup and release. The observed final room-local position differs from the prior position by about 0.29 mm and the normalized orientation matches to displayed precision. Both existing paper IDs and both gallery IDs remain. Both final-eye stills were reviewed but the print is obscured by the forearm, so the position result is telemetry, not visual contact proof. The first attempt `20261027T164004914011Z` stopped before touching the collection while the title native menu was open; the same-session retry entered prop mode. Temporary restoration code was removed; inputs released, game and simulator closed, Steam retained. This is cleanup, not a gameplay or physical-headset acceptance pass.
+
+
 ### Cabin capture-gap review — 27 October
 
 In the retained oriented take, the source-eye ledger has ten accepted-sample gaps over 120 ms. The largest (0.590 seconds) spans five source-sequence advances and overlaps one operator capture event; the next (0.433 seconds) spans 20 source and image advances with no overlapping capture event. Several shorter gaps have no endpoint sequence advance. These are endpoint observations, not proof of intermediate GPU execution or of capture causing the gap. The measurements in `artifacts/bot/runs/20261027T162149228010Z/capture-gap-analysis.json` show that moving all eye checkpoints alone cannot be assumed to solve cadence. A controlled source/recording comparison is needed before changing the recorder. No gameplay repair or new movie is claimed.

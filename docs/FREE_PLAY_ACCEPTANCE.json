@@ -3232,6 +3232,15 @@
       "evidence": "artifacts/bot/runs/20261027T162149228010Z/capture-gap-analysis.json",
       "finding": "Largest gap overlaps a capture event; another large gap spans 20 source/image sequence advances without such an event. Endpoints do not prove cause.",
       "next": "Use controlled source/recording comparison before altering recorder."
+    },
+    "print_restore": {
+      "run": "artifacts/bot/runs/20261027T164143753479Z",
+      "result": "Exact loose print restored within 0.29 mm of earlier room-local pose; other paper and library IDs unchanged.",
+      "earlier_failed_attempt": "artifacts/bot/runs/20261027T164004914011Z",
+      "limitations": [
+        "Both eye stills obscure the print; position is telemetry rather than visual contact proof.",
+        "No gameplay or headset acceptance inferred."
+      ]
     }
   }
 }
