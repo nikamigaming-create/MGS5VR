@@ -2,8 +2,10 @@
 
 ### Cabin showcase attempts — 26 October
 
-Four actual-game takes were attempted after the user requested a clear, human
-showcase. The source-eye recorder captured 30 fps with game-process audio;
+Multiple actual-game takes were attempted after the user requested a clear, human
+showcase. A later side-angle take (`artifacts/opening-showcase-side-retry-20261026`)
+completed at 30 fps with game audio but still obscured insertion behind the arm;
+it was rejected as a finished demonstration. The source-eye recorder captured 30 fps with game-process audio;
 this is pre-compositor footage, not final-headset video. The last complete
 workbench take `artifacts/opening-showcase-close-20261026` observed cassette
 seat/eject, camera printing with each hand, note editing and marker writing,

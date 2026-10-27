@@ -858,7 +858,9 @@
           "cassette insertion obscured",
           "forearm cut ends and body framing visibly incomplete",
           "physical headset not tested"
-        ]
+        ],
+        "side_retry": "artifacts/opening-showcase-side-retry-20261026",
+        "side_retry_result": "rejected: insertion remains obscured by the arm"
       }
     },
     {
@@ -894,7 +896,9 @@
           "cassette insertion obscured",
           "forearm cut ends and body framing visibly incomplete",
           "physical headset not tested"
-        ]
+        ],
+        "side_retry": "artifacts/opening-showcase-side-retry-20261026",
+        "side_retry_result": "rejected: insertion remains obscured by the arm"
       }
     },
     {
