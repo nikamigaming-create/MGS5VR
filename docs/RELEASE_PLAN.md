@@ -4,7 +4,9 @@
 
 The user requested the current nightly with Ground Zeroes and the accumulated VR work. The batch includes GZ first-person stereo, tracked hands/aim, left-hand iDroid, forearm HUD, physical recon and production owned-asset setup, alongside the TPP/cabin and contact repairs. The existing GitHub nightly workflow builds and verifies committed main. Three hardware-only tests remain local; the complete local 59-group run passed before publication work.
 
-Next: publish and verify this exact experimental nightly through Actions. Keep the recommended release and local Play pin unchanged. Remaining gameplay and showcase work is retained below.
+Published and anonymously download-verified: [nightly-2026-10-28-55b20f1ccc97](https://github.com/nikamigaming-create/MGS5VR/releases/tag/nightly-2026-10-28-55b20f1ccc97) from `55b20f1ccc979a19c741f479c191a6bf63b6e9e2`. All 56 hosted CPU-compatible CTest groups, Python checks and packaged installer checks passed. All 6 public assets and 231 manifest files verified; installer ZIP SHA-256 `3e3a9a75ca858ec8aec7d62793067307c2fa9123db8ee70c3a7f809ed776f462`. [Successful workflow](https://github.com/nikamigaming-create/MGS5VR/actions/runs/40631300775). The three GPU tests and native/simulator/headset sessions were not run by CI. Recommended release and local Play pin remain unchanged.
+
+Next: finish successful physical pet filming, remaining applicable gameplay/settings work and the complete combined Field Kit showcase. Nightly publication does not close those existing acceptance gaps.
 
 
 ### Checked contact repairs and 4:23 combined working cut — 27 October

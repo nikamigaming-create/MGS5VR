@@ -3789,5 +3789,45 @@
     },
     "cleanup": "All owned games/simulator and bounded readers/runners closed; inputs/poses released/restored; every temporary eyepatch transaction restored exactly. Steam 21472 retained. Published play pin unchanged.",
     "remaining": "Successful physical pet filming, remaining GZ native material/settings/vehicle adapters and full applicable gameplay feature coverage; complete final film remains unfinished."
+  },
+  "ground_zeroes_nightly_publication_2026_10_28": {
+    "schema": 1,
+    "channel": "nightly",
+    "tag": "nightly-2026-10-28-55b20f1ccc97",
+    "source_commit": "55b20f1ccc979a19c741f479c191a6bf63b6e9e2",
+    "created_utc": "2026-10-28T04:21:44.171245+00:00",
+    "validation": {
+      "hosted_windows_automated": "passed",
+      "ctest_groups_passed": 56,
+      "excluded_gpu_tests": [
+        "d3d11_mailbox",
+        "ground_zeroes_render_window",
+        "independent_render_window"
+      ],
+      "installer": "passed",
+      "simulator": "not_run",
+      "physical_headset": "unverified",
+      "full_game": "unverified",
+      "workflow_run": "https://github.com/nikamigaming-create/MGS5VR/actions/runs/40631300775"
+    },
+    "dll_sha256": "9a9a6c400dad56195e38f9f6dc139407fcf703fdc2769a2305a1a194e3364b9a",
+    "accepted_known_blockers": [
+      "hand-arm-rig",
+      "idroid-mount",
+      "idroid-lifecycle",
+      "idroid-native-guides",
+      "performance-pacing"
+    ],
+    "previous": "53f6bf541ef37b3e862d470a5bec0318eddcd343",
+    "archive": "MGS5VR-nightly-2026-10-28-55b20f1ccc97.zip",
+    "archive_sha256": "3e3a9a75ca858ec8aec7d62793067307c2fa9123db8ee70c3a7f809ed776f462",
+    "status": "published_and_anonymous_download_verified",
+    "release_url": "https://github.com/nikamigaming-create/MGS5VR/releases/tag/nightly-2026-10-28-55b20f1ccc97",
+    "verified_public_assets": 6,
+    "verified_manifest_files": 231,
+    "local_play_pin": "unchanged",
+    "acceptance_effect": "none; hosted CI and public distribution do not establish physical-headset or full-game acceptance",
+    "scope": "Current TPP/cabin and GZ first-person VR source included. Existing gameplay and physical-headset acceptance gaps remain; prior nightly record retained.",
+    "cancelled_attempt": "40630991896 cancelled before publication to restore Unicode in merged documentation."
   }
 }
