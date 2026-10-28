@@ -9,6 +9,7 @@ namespace mgs5vr {
 void resetForearmBindings(ID3D11DeviceContext*) noexcept;
 void requestEyepatchVisibility(bool visible) noexcept;
 void setForearmPlayer(uintptr_t owner,uintptr_t model) noexcept;
+void setForearmPlayer(uintptr_t owner,uintptr_t model,bool groundZeroes) noexcept;
 void bindForearmIndex(ID3D11DeviceContext*,ID3D11Buffer*,DXGI_FORMAT,UINT) noexcept;
 void bindForearmVertices(ID3D11DeviceContext*,UINT,UINT,ID3D11Buffer* const*,const UINT*,const UINT*) noexcept;
 void bindForearmConstants(ID3D11DeviceContext*,UINT,UINT,ID3D11Buffer* const*) noexcept;

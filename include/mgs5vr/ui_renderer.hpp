@@ -10,6 +10,7 @@
 
 namespace mgs5vr {
 void installUiRenderer(uintptr_t moduleBase);
+void installGzUiRenderer(uintptr_t moduleBase);
 // Exact native IsMbDvcTerminalOpened reader; no UI state is written.
 std::optional<bool> nativeMenuOpen() noexcept;
 // The terminal bit is kept separate from the actual native pause menu. This

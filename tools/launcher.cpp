@@ -132,14 +132,14 @@ void refresh(){
     for(auto& b:buttons){
         bool enabled=!busy;
         if(b.id==launch)enabled&=chosen&&installed();
-        if(b.id==install)enabled&=chosen&&selected==0&&hasPackage();
+        if(b.id==install)enabled&=chosen&&hasPackage();
         if(b.id==controls)enabled&=chosen&&file(games[selected].parent_path()/L"mgs5vr-controls.ini")&&file(package/L"tools/edit-settings.ps1");
         if(b.id==folder)enabled&=chosen;
-        if(b.id==remove)enabled&=chosen&&selected==0&&installed()&&hasPackage();
+        if(b.id==remove)enabled&=chosen&&installed()&&hasPackage();
         if(b.id==applyDisplay)enabled&=chosen&&selected==0&&file(package/L"tools/launcher-display.ps1");
         if(b.id==detect)enabled&=file(package/L"tools/launcher-display.ps1");
         if(b.id==accountConfig)enabled&=selected==0;
-        if(b.id==install)b.label=selected?L"FIRST-PERSON IN DEVELOPMENT":installed()?L"UPDATE / KEEP MY SETTINGS":L"INSTALL VR";
+        if(b.id==install)b.label=installed()?L"UPDATE / KEEP MY SETTINGS":L"INSTALL VR";
         if(b.window){EnableWindow(b.window,enabled);SetWindowTextW(b.window,b.label.c_str());InvalidateRect(b.window,nullptr,FALSE);}
     }
     displayEnabled();
@@ -177,7 +177,7 @@ void render(Graphics& g,bool includeControls){
     fill(g,{0,220,1080,29},ink);fill(g,{0,220,12,29},red);
     text(g,31,225,750,23,L"MGS5VR   //   EXPERIMENTAL PC VR MOD",15,paper,FontStyleBold);
     text(g,863,225,193,23,L"NIKAMI / FIELD DIVISION",12,paper);
-    text(g,37,327,670,26,selected?L"GROUND ZEROES  /  EXPERIMENTAL STEREO ONLY":L"THE PHANTOM PAIN  /  TRACKED VR",19,ink,FontStyleBold);
+    text(g,37,327,670,26,selected?L"GROUND ZEROES  /  TRACKED VR":L"THE PHANTOM PAIN  /  TRACKED VR",19,ink,FontStyleBold);
     fill(g,{36,415,672,35},Color(255,229,226,215));fill(g,{36,415,4,35},failed?red:muted);
     text(g,49,423,647,24,busy?L"WORKING — keep this window open until maintenance finishes.":status,14,failed?red:ink);
     fill(g,{735,266,309,385},ink);fill(g,{735,266,6,385},red);
@@ -185,7 +185,7 @@ void render(Graphics& g,bool includeControls){
     text(g,762,324,256,22,L"PER EYE / NOT DESKTOP OR SBS",12,paper);
     text(g,762,390,256,21,L"HEADSET SCALE (WIDTH + HEIGHT)",12,paper);
     text(g,762,452,256,21,L"CUSTOM WIDTH  x  HEIGHT",12,paper);
-    text(g,762,563,260,41,selected?L"GZ: existing graphics settings.\nFirst-person rig still in development.":actual,14,paper);
+    text(g,762,563,260,41,selected?L"GZ: existing graphics settings.\nNative first-person stereo.":actual,14,paper);
     text(g,37,673,683,25,L"TRANSMISSION LOG  /  OUTPUT & RECOVERY DETAILS",14,muted,FontStyleBold);
     fill(g,{36,704,1008,76},Color(255,230,227,216));
     text(g,37,792,1000,20,L"NO TELEMETRY  /  NO ACCOUNTS  /  ORIGINAL ARTWORK PRESERVED  /  NOT AFFILIATED WITH KONAMI",11,muted);
@@ -287,7 +287,7 @@ void poll(){
 }
 void action(Id id){
     if(busy)return;
-    if(id==tpp||id==gz){selected=id==gz?1u:0u;failed=false;status=selected?L"GZ first-person adapters are not ready. Existing installs only.":installed()?L"Installation record found. Ready to launch or update.":L"Select your game executable to get started.";refresh();}
+    if(id==tpp||id==gz){selected=id==gz?1u:0u;failed=false;status=installed()?L"Installation record found. Ready to launch or update.":L"Select your game executable to get started.";refresh();}
     else if(id==browse){if(smoke)smokeOpened.push_back(L"choose-game");else choose();}
     else if(id==launch||id==applyDisplay||id==detect){
         if(id!=detect&&(!file(games[selected])||(id==launch&&!installed())))return;
@@ -308,7 +308,7 @@ void action(Id id){
         if(GetOpenFileNameW(&dialog)){graphicsConfigs[selected]=path.data();append(L"Graphics account: "+graphicsConfigs[selected].wstring()+L"\r\n");}
     }else if(id==whatsNew){
         if(smoke){smokeOpened.push_back(L"changes");return;}
-        MessageBoxW(window,L"NEW IN THIS LAUNCHER\n\nOpenXR per-eye recommendation, 50-150% scale, custom native width/height, pre-launch Apply, live actual render size and recoverable graphics backups. Windows resolution and DSR are untouched.\n\nCURRENT TPP CHANGES\n\nBinocular side-cup grip, pistol support acquisition, lens-only recon visibility with a glow switch, dwell acquisition, and native title/menu presentation.\n\nSTILL OPEN\n\nTrue mirrored left-handed rig; remaining HUD/cinematic/effect cases; complete weapons, gadgets and buddy interactions; Ground Zeroes first-person rig and wrist HUD. Physical headset coverage and the full showcase are not complete.",L"MGS5VR / Changes and remaining work",MB_OK|MB_ICONINFORMATION);
+        MessageBoxW(window,L"CURRENT CHANGES\n\nGround Zeroes native first-person stereo, tracked arms and weapon aim, left-hand iDroid, forearm ammo HUD, physical binoculars and native recon marking/intel. Normal setup imports its owned binocular assets.\n\nTPP binocular side-cup grip, pistol support acquisition, lens-only recon visibility, dwell acquisition, and native title/menu presentation.\n\nSTILL OPEN\n\nTrue mirrored left-handed rig; remaining HUD/cinematic/effect cases; complete weapons, gadgets, buddy and vehicle interactions. Physical headset coverage and the full showcase are not complete.",L"MGS5VR / Changes and remaining work",MB_OK|MB_ICONINFORMATION);
     }else if(id==controls){
         startPowerShell(package/L"tools/edit-settings.ps1",{L"-Path",(games[selected].parent_path()/L"mgs5vr-controls.ini").wstring()},false);
     }else if(id==guide){
@@ -316,7 +316,7 @@ void action(Id id){
         open(file(local)?local.wstring():L"https://github.com/nikamigaming-create/MGS5VR/blob/main/docs/CONTROLS.md");
     }else if(id==folder){if(file(games[selected]))open(games[selected].parent_path().wstring(),L"explore");}
     else if(id==install||id==remove){
-        if(selected||!file(games[selected]))return;
+        if(!file(games[selected]))return;
         const std::wstring mode=id==remove?L"Remove":installed()?L"Update":L"Install";
         if(mode==L"Remove"&&!smoke&&MessageBoxW(window,L"Remove MGS5VR from game startup?\n\nMod files and settings are moved to a recoverable backup. Game archives and saves stay untouched.",L"Remove MGS5VR",MB_YESNO|MB_ICONQUESTION)!=IDYES)return;
         startPowerShell(package/L"tools/launcher-maintenance.ps1",{L"-Mode",mode,L"-GameExe",games[selected].wstring()},true);
@@ -460,6 +460,13 @@ int WINAPI wWinMain(HINSTANCE current,HINSTANCE,PWSTR,int show){
                     &&smokeInvocations[3].script.filename()==L"edit-settings.ps1"&&!smokeInvocations[3].monitor
                     &&argument(smokeInvocations[4],L"-Mode")==L"Update"&&argument(smokeInvocations[5],L"-Mode")==L"Remove";
                 busy=true;action(launch);busy=false;actions=actions&&smokeInvocations.size()==6;
+                games[1]=fixture/L"MgsGroundZeroes.exe";std::ofstream(games[1])<<"fixture";
+                action(gz);action(install);action(Id::remove);
+                actions=actions&&smokeInvocations.size()==8
+                    &&argument(smokeInvocations[6],L"-Mode")==L"Update"
+                    &&argument(smokeInvocations[6],L"-GameExe")==games[1].wstring()
+                    &&argument(smokeInvocations[7],L"-Mode")==L"Remove";
+                fs::remove(games[1]);
                 // Delete only the four files this self-test created.
                 for(const auto name:{L"mgsvtpp.exe",L"dinput8.dll",L"mgs5vr-install.json",L"mgs5vr-controls.ini"})fs::remove(fixture/name);
                 fs::remove(fixture);

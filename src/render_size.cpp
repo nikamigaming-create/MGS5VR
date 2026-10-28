@@ -28,12 +28,14 @@ CreateSwap originalCreate{};
 using ClientRect=BOOL(WINAPI*)(HWND,LPRECT);
 ClientRect originalClientRect{};
 uintptr_t nativeBegin{},nativeEnd{};
+bool fixedNativeCanvas{};
 void attachWindow(HWND window);
 bool gameWindow(HWND w){DWORD owner{};GetWindowThreadProcessId(w,&owner);return w&&owner==GetCurrentProcessId();}
 bool mainWindow(HWND w){
     if(!gameWindow(w))return false;
     std::array<wchar_t,128> title{};GetWindowTextW(w,title.data(),static_cast<int>(title.size()));
-    return !wcscmp(title.data(),L"METAL GEAR SOLID V: THE PHANTOM PAIN");
+    return !wcscmp(title.data(),L"METAL GEAR SOLID V: THE PHANTOM PAIN")
+        ||!wcscmp(title.data(),L"METAL GEAR SOLID V: GROUND ZEROES");
 }
 BOOL WINAPI clientRect(HWND window,LPRECT rect){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
@@ -154,7 +156,10 @@ void installRenderSizeHooks(IDXGISwapChain* probe,const std::filesystem::path& c
     if(FAILED(adapter->GetParent(IID_PPV_ARGS(&factory))))throw std::runtime_error("No DXGI factory for windowed render-size adapter");
     std::vector<void*> created;
     try{
-        if(!_wcsicmp(std::filesystem::path(exe.data()).filename().c_str(),L"mgsvtpp.exe")){
+        const auto executable=std::filesystem::path(exe.data()).filename();
+        fixedNativeCanvas=!_wcsicmp(executable.c_str(),L"MgsGroundZeroes.exe");
+        if(!_wcsicmp(executable.c_str(),L"mgsvtpp.exe")
+           ||!_wcsicmp(executable.c_str(),L"MgsGroundZeroes.exe")){
             nativeBegin=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
             const auto* dos=reinterpret_cast<const IMAGE_DOS_HEADER*>(nativeBegin);
             const auto* nt=reinterpret_cast<const IMAGE_NT_HEADERS*>(nativeBegin+dos->e_lfanew);
@@ -177,6 +182,16 @@ void observeRenderWindow(IDXGISwapChain* swap){
     // separating the desktop preview. Shrinking the 1024x576 boot window first
     // makes FlexibleWindowed treat that small preview as the requested canvas.
     if(!desc.Windowed){static bool reported{};if(!reported){reported=true;log("Small preview unavailable: game created an exclusive swapchain");}return;}
+    if(fixedNativeCanvas&&!canvasReady.load()){
+        // GZ's fixed native graphics mode does not resize its scene resources
+        // from WM_SIZE like TPP FlexibleWindowed. Preserve that complete native
+        // canvas while separating the preview; XR still uses its runtime eye
+        // dimensions. Never resize only the swapchain beneath native targets.
+        renderWidth=desc.BufferDesc.Width;renderHeight=desc.BufferDesc.Height;
+        canvasReady.store(true);
+        log("GZ native canvas retained: "+std::to_string(renderWidth)+"x"+std::to_string(renderHeight)
+            +"; desktop preview is independent");
+    }
     if(desc.BufferDesc.Width==renderWidth&&desc.BufferDesc.Height==renderHeight&&!canvasReady.exchange(true)){
         if(mirrorWindow.load())PostMessageW(desc.OutputWindow,smallMessage,0,0);
     }

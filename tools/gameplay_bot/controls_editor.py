@@ -10,6 +10,9 @@ from .cabin_workbench import compose,inverse_pose,shifted
 def inspect_controls_editor(live,policy,seconds=180.):
     deadline=time.monotonic()+min(seconds,180.)
     result={'status':'running','scope':policy,'phases':[],'headset_acceptance':'not_run'}
+    settings_path=live.game/'mgs5vr-controls.ini'
+    saved_settings=settings_path.read_bytes()
+    applied_settings=saved_settings
     pairs={h:compose(inverse_pose(_controller_pose(live,h,'grip','local')),_controller_pose(live,h,'aim','local')) for h in ('left','right')}
     def observe():
         if time.monotonic()>deadline:raise BotFault('Controls editor deadline')
@@ -38,6 +41,9 @@ def inspect_controls_editor(live,policy,seconds=180.):
             time.sleep(.025)
         time.sleep(.1)
     def click(control):
+        nonlocal applied_settings
+        if control==113 and settings_path.read_bytes()!=applied_settings:
+            raise BotFault('Personal controls changed outside this editor take')
         f=editor();hit=next(h for h in f['layout'] if h['id']==control)
         local=[(hit['x']+hit['width']/2-.5)*1.2,(.5-hit['y']-hit['height']/2)*.75,0.]
         target=shifted(f['panel'],local)['position']
@@ -46,6 +52,7 @@ def inspect_controls_editor(live,policy,seconds=180.):
         move_aim({'position':origin,'orientation':pointing([a-b for a,b in zip(target,origin)])})
         wait(lambda s:s['rendered']['controls_editor']['hover']==control,'hover-'+str(control),3.)
         live.input([channel('right_trigger')],.14);time.sleep(.12);live.release();time.sleep(.16)
+        if control==113:applied_settings=settings_path.read_bytes()
     def select(action):
         f=editor();index=next(n for n,r in enumerate(f['rows']) if r['action']==action)
         while editor()['page']<index//11:click(105)
@@ -111,14 +118,37 @@ def inspect_controls_editor(live,policy,seconds=180.):
                 wait(lambda s:s['rendered']['controls_editor'].get('settings'),'live-settings-tab')
                 configured=live.bindings.get('settings',[])
                 if len(editor()['rows'])!=len(configured)+1:raise BotFault('The headset omitted a supported gameplay setting')
-                for name,control in (('settings.binocular_auto_mark',120),('settings.player_height_offset_cm',119),('settings.turn_mode',118)):
+                selected=(('settings.binocular_auto_mark',120),('settings.player_height_offset_cm',119),('settings.turn_mode',118))
+                if policy.get('body_switches'):
+                    selected=(('settings.full_body',120),('settings.eyepatch',120))
+                def show_effect(name,label):
+                    if not policy.get('body_switches'):return
+                    click(100)
+                    wait(lambda s:not s['rendered']['controls_editor']['visible'],'effect-panel-closed')
+                    current_head=live.text_result(live.call('get_head_pose',{'base_space':'local'}))['pose']
+                    try:
+                        if name=='settings.full_body':
+                            target=compose(current_head,{'position':[0.,0.,0.],'orientation':pointing([0.,-1.,-.45])})
+                            live.call('set_head_pose',{'base_space':'local',**target,'duration_seconds':.7})
+                        time.sleep(2.);capture(label,static_grips=True)
+                    finally:
+                        live.call('set_head_pose',{'base_space':'local',**current_head,'duration_seconds':.7})
+                    open_panel('ON FOOT' if policy['scene']=='gameplay' else 'ACC')
+                    if not editor().get('settings'):click(117)
+                    select(name)
+                for name,control in selected:
                     select(name);original=editor()['binding'];click(control);capture('setting-proposed-'+name)
                     click(112);wait(lambda s:s['rendered']['controls_editor']['binding']==original and not s['rendered']['controls_editor']['proposed'],'setting-cancel-'+name)
                     click(control);proposed=editor()['proposed'];click(113)
                     wait(lambda s:s['rendered']['controls_editor']['phase']==0 and s['rendered']['controls_editor']['binding']==proposed,'setting-applied-'+name,8.)
                     capture('setting-live-'+name)
+                    show_effect(name,'effect-live-'+name)
                     click(control if control==120 else 118 if control==119 else 119);click(113)
                     wait(lambda s:s['rendered']['controls_editor']['phase']==0 and s['rendered']['controls_editor']['binding']==original,'setting-restored-'+name,8.)
+                    show_effect(name,'effect-restored-'+name)
+                if policy.get('body_switches'):
+                    click(100);wait(lambda s:not s['rendered']['controls_editor']['visible'],'body-switch-editor-closed')
+                    result['status']='observed_body_switches';return result
                 select('system.toggle_vr');click(120);click(113)
                 wait(lambda s:s['rendered']['controls_editor']['visible'] and s['rendered']['controls_editor']['binding']=='0' and not s.get('camera_active'),'vr-off-panel-stays-available',8.)
                 capture('live-vr-off-spatial-screen-and-settings')
@@ -157,9 +187,20 @@ def inspect_controls_editor(live,policy,seconds=180.):
             result['status']='observed_controls_editor'
             return result
         finally:
-            live.release()
-            current=live.observe()
-            if (current.get('rendered') or {}).get('controls_editor',{}).get('visible'):
-                if current.get('scene')==policy['scene'] or (policy['scene']=='cabin' and current.get('cabin')):click(100)
-                else:result['cleanup']='Scene changed; runtime closes editor on scene loss.'
-            live.release();atomic_json(live.events.output/'controls-editor-progress.json',result)
+            try:
+                live.release()
+                current=live.observe()
+                if (current.get('rendered') or {}).get('controls_editor',{}).get('visible'):
+                    if current.get('scene')==policy['scene'] or (policy['scene']=='cabin' and current.get('cabin')):click(100)
+                    else:result['cleanup']='Scene changed; runtime closes editor on scene loss.'
+                live.release()
+            finally:
+                if not policy.get('restore_vr_only'):
+                    if settings_path.read_bytes()==applied_settings:
+                        settings_path.write_bytes(saved_settings)
+                        result['personal_controls_restored']=True
+                    else:
+                        result['personal_controls_restored']=False
+                        result['controls_restore_error']='External edit preserved; original controls retained in run output.'
+                        (live.events.output/'original-controls.ini').write_bytes(saved_settings)
+                atomic_json(live.events.output/'controls-editor-progress.json',result)

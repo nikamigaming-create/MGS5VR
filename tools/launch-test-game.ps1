@@ -20,14 +20,22 @@ $mgsRoot=Split-Path -Parent $PSScriptRoot
 Import-Module (Join-Path $PSScriptRoot 'simulator-session-ownership.psm1') -Force
 $mgsSteam=Get-Process steam -ErrorAction Stop
 if(@($mgsSteam).Count -ne 1){throw 'One signed-in Steam client must already be running.'}
-if(Get-Process mgsvtpp -ErrorAction SilentlyContinue | Where-Object { !$_.HasExited }){throw 'MGSV already runs; reuse its session.'}
+if(Get-Process mgsvtpp,MgsGroundZeroes -ErrorAction SilentlyContinue | Where-Object { !$_.HasExited }){throw 'MGSV already runs; reuse its session.'}
 $mgsTarget=(Resolve-Path -LiteralPath $GameDir).Path
 $mgsExe=Join-Path $mgsTarget 'mgsvtpp.exe'
+$mgsAppId='287700'
+$mgsExpectedHash='085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45'
+if(!(Test-Path -LiteralPath $mgsExe -PathType Leaf)){
+    $mgsExe=Join-Path $mgsTarget 'MgsGroundZeroes.exe'
+    $mgsAppId='311340'
+    $mgsExpectedHash='7460d9dba9b6fe34893b5d330aca201983bb1734844f3688acffcc0ab22a1815'
+}
+$mgsProcessName=[IO.Path]::GetFileName($mgsExe)
 $mgsSha=[Security.Cryptography.SHA256]::Create()
 $mgsStream=[IO.File]::OpenRead($mgsExe)
 try{$mgsExeHash=[BitConverter]::ToString($mgsSha.ComputeHash($mgsStream)).Replace('-','').ToLowerInvariant()}
 finally{$mgsStream.Dispose();$mgsSha.Dispose()}
-if($mgsExeHash -ne '085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45'){throw 'Unsupported game executable.'}
+if($mgsExeHash -ne $mgsExpectedHash){throw 'Unsupported game executable.'}
 $mgsManifest=(Resolve-Path -LiteralPath $RuntimeManifest).Path
 $mgsLayer=(Resolve-Path -LiteralPath $OperatorDir).Path
 if(!(Test-Path -LiteralPath (Join-Path $mgsLayer 'XrApiLayer_METAX_operator.json'))){throw 'Operator manifest missing.'}
@@ -61,15 +69,18 @@ catch {
     throw
 }
 $mgsLaunchUtc=[DateTime]::UtcNow
-Start-Process -FilePath $mgsSteam.Path -ArgumentList '-applaunch','287700' -WindowStyle Hidden
+Start-Process -FilePath $mgsSteam.Path -ArgumentList '-applaunch',$mgsAppId -WindowStyle Hidden
 $mgsDeadline=[DateTime]::UtcNow.AddSeconds(40)
 do{
     if(!$mgsRecord.game){
-        $mgsRows=@(Get-CimInstance Win32_Process -Filter "Name='mgsvtpp.exe'" | Where-Object {
+        $mgsRows=@(Get-CimInstance Win32_Process -Filter "Name='$mgsProcessName'" | Where-Object {
             $_.ExecutablePath -eq $mgsExe -and $_.CreationDate -and $_.CreationDate.ToUniversalTime() -ge $mgsLaunchUtc -and (Test-MgsLiveProcess $_)
         })
-        if($mgsRows.Count -gt 1){throw 'Multiple new MGSV owners appeared; refusing ambiguous session ownership.'}
-        if($mgsRows.Count -eq 1){$mgsRecord.game=ConvertTo-MgsProcessIdentity $mgsRows[0];Write-MgsTestRecord}
+        # GZ starts its retail child under the original executable. Retain
+        # that root identity; runtime ownership follows its descendant tree.
+        $mgsRoots=@($mgsRows | Where-Object { $_.ParentProcessId -notin @($mgsRows.ProcessId) })
+        if($mgsRoots.Count -gt 1){throw 'Multiple new MGSV owners appeared; refusing ambiguous session ownership.'}
+        if($mgsRoots.Count -eq 1){$mgsRecord.game=ConvertTo-MgsProcessIdentity $mgsRoots[0];Write-MgsTestRecord}
     }
     if(!$mgsRecord.game){Start-Sleep -Milliseconds 250;continue}
     $mgsGame=Get-Process -Id $mgsRecord.game.pid -ErrorAction SilentlyContinue

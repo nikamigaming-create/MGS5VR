@@ -15,6 +15,7 @@ namespace mgs5vr {
 namespace {
 using Microsoft::WRL::ComPtr;
 std::atomic_uintptr_t playerOwner{},playerModel{};
+std::atomic_bool groundZeroesPlayer{};
 std::atomic_bool eyepatchVisible{true};
 #include "eyepatch_profiles.inc"
 constexpr GUID eyepatchKey{0xd09211ad,0x93a2,0x4bd7,{0xb8,0x16,0x74,0xc8,0x19,0x43,0x0b,0x72}};
@@ -98,8 +99,12 @@ void resetForearmBindings(ID3D11DeviceContext* c) noexcept {
     for(auto& state:drawStates)if(state.context==c){state={};break;}
 }
 void requestEyepatchVisibility(bool visible) noexcept {eyepatchVisible.store(visible);}
-void setForearmPlayer(uintptr_t owner,uintptr_t model) noexcept {
+void setForearmPlayer(uintptr_t owner,uintptr_t model,bool groundZeroes) noexcept {
+    groundZeroesPlayer.store(groundZeroes);
     playerOwner.store(owner);playerModel.store(model);
+}
+void setForearmPlayer(uintptr_t owner,uintptr_t model) noexcept {
+    setForearmPlayer(owner,model,false);
 }
 void bindForearmIndex(ID3D11DeviceContext* c,ID3D11Buffer* buffer,DXGI_FORMAT format,UINT offset) noexcept {
     if(auto* state=drawState(c)){state->indices=buffer;state->format=format;state->offset=offset;}
@@ -284,10 +289,18 @@ ForearmDraw::ForearmDraw(ID3D11DeviceContext* c) noexcept {
         if(deferred){if(!state->color)return;}
         else {ComPtr<ID3D11RenderTargetView> color;c->OMGetRenderTargets(1,&color,nullptr);if(!color)return;}
         const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+        if(groundZeroesPlayer.load()){
+            const auto entity=get<uintptr_t>(owner+0x38),table=get<uintptr_t>(entity+0x68);
+            const auto bodyInterface=table?get<uintptr_t>(table):0;
+            if(bodyInterface<0x28||get<uintptr_t>(bodyInterface-0x28)!=base+0x15f7460
+                ||get<uintptr_t>(get<uintptr_t>(bodyInterface-0x28+0x238))!=model
+                ||get<uintptr_t>(model)!=base+0x18437c0)return;
+        }else{
         const auto character=get<uintptr_t>(owner+0x370);
         if(get<uintptr_t>(owner)!=base+0x23b8218||get<uintptr_t>(character)!=base+0x2295210
             ||get<uintptr_t>(get<uintptr_t>(get<uintptr_t>(character+0x10)+0x10)+0x68)!=model
             ||get<uintptr_t>(model)!=base+0x20f4d90)return;
+        }
         std::array<float,16> playerWorld{};if(!read(model+0x40,playerWorld)||!nativeAffinePose(playerWorld))return;
         ComPtr<ID3D11Buffer> object;UINT first=0,count=0;
         ComPtr<ID3D11DeviceContext1> context1;

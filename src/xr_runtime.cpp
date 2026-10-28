@@ -14,6 +14,7 @@
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/tracking_fault.hpp"
 #include "mgs5vr/controller_rig.hpp"
+#include "mgs5vr/gz_rig.hpp"
 #include "mgs5vr/player_visibility.hpp"
 #include "mgs5vr/forearm_visibility.hpp"
 #include "mgs5vr/ui_renderer.hpp"
@@ -603,8 +604,20 @@ struct Session {
             hand.thumbTouched=boolean(thumbTouch,hands[n]);
         }
         auto nativeStatus=headCamera().status();
+        const auto gzInput=gzInputState();
+        // GZ has independent native menu owners. Route input from those live
+        // owners while its native UI remains on the existing render path.
+        // Do not activate TPP hooks or claim its physical iDroid adapter here.
+        if(gzInput.enabled){
+            nativeStatus.nativeMenuOpen=!gzInput.menu||gzInput.menu->pause||gzInput.menu->idroid;
+            nativeStatus.nativeIdroidOpen=gzInput.menu&&gzInput.menu->idroid;
+        }
         const bool liveIdroid=nativeStatus.nativeMenuOpen&&nativeStatus.nativeIdroidOpen;
-        const auto detectedMode=controllerRigEnabled()?nativeTravelMode():TravelMode::unknown;
+        const bool trackedControls=controllerRigEnabled()||(gzInput.player&&gzInput.menu.has_value());
+        // GZ's own basic-action query admits ordinary foot controls. Mounted,
+        // scripted and unrecognized actions keep their native camera axes.
+        const auto detectedMode=controllerRigEnabled()?nativeTravelMode():
+            gzInput.player?(gzInput.basicAction.value_or(false)?TravelMode::onFoot:TravelMode::nativeAction):TravelMode::unknown;
         const bool title=controllerRigEnabled()&&nativeTitleModeActive();
         const bool spatialTitle=title&&nativeTitleCabinMode()&&!manualScreenSelected&&!nativeGamepadActive();
         const bool loading=controllerRigEnabled()&&nativeLoadingTipsOpen();
@@ -651,7 +664,9 @@ struct Session {
         controllerFrame.frontEnd=title||loading;
         controllerFrame.loading=loading;
         controllerFrame.avatarEditor=avatarEditor;
-        controllerFrame.nativeSceneCanvas=nativeSceneCanvasActive();
+        controllerFrame.nativeSceneCanvas=nativeSceneCanvasActive()
+            ||(gzInput.enabled&&gzInput.menu&&(gzInput.menu->pause
+                ||(gzInput.menu->idroid&&!handheldMenusSelected())));
         controllerFrame.scriptedDemo=scriptedDemo;
         controllerFrame.scriptedLook=interactiveLook;
         controllerFrame.authoredCamera=(title&&!spatialTitle)||avatarEditor||scriptedDemo;
@@ -899,6 +914,8 @@ struct Session {
             controls.setting("settings.idroid_grip_y_cm")*.01f,controls.setting("settings.idroid_grip_z_cm")*.01f};
         controllerFrame.idroidGripRotation=binocularGripRotation(controls.setting("settings.idroid_grip_pitch_degrees"),
             controls.setting("settings.idroid_grip_yaw_degrees"),controls.setting("settings.idroid_grip_roll_degrees"));
+        // Both exact-build adapters publish the device through their own
+        // native attachment path and share the saved presentation preference.
         controllerFrame.handheldMenus=handheldMenusSelected();
         controllerFrame.menuQuadWidth=controls.setting("settings.menu_quad_width_cm")*.01f;
         controllerFrame.menuQuadDistance=controls.setting("settings.menu_quad_distance_cm")*.01f;
@@ -1021,7 +1038,7 @@ struct Session {
         publishHandheldMenuControl(idroidFree?HandheldMenuControl::locomotion:
             idroidFocus?HandheldMenuControl::menu:
             idroidRouting?HandheldMenuControl::blocked:HandheldMenuControl::native,now);
-        const bool gameplayContext=controllerRigEnabled()&&(cabinControlsReady||detectedMode!=TravelMode::unknown)&&!title&&!loading&&!avatarEditor&&!scriptedDemo
+        const bool gameplayContext=trackedControls&&(cabinControlsReady||detectedMode!=TravelMode::unknown)&&!title&&!loading&&!avatarEditor&&!scriptedDemo
             &&(nativeStatus.active||nativeStatus.pending)&&(!nativeStatus.nativeMenuOpen||idroidFree);
         // Scripted prologue/cinematic gameplay may have no tracked player rig.
         // Preserve native holds and BOTH sticks instead of routing movement
@@ -1154,7 +1171,7 @@ struct Session {
             automaticEntryDone=true;headCamera().toggle();nativeStatus=headCamera().status();
             log(title?"Tracked VR entered for the native Title menu":"Tracked VR entered automatically on the first playable character");
         }
-        const bool rigInput=controllerRigEnabled()&&(cabinControlsReady||detectedMode!=TravelMode::unknown)&&!title&&!loading&&!avatarEditor&&!scriptedDemo
+        const bool rigInput=trackedControls&&(cabinControlsReady||detectedMode!=TravelMode::unknown)&&!title&&!loading&&!avatarEditor&&!scriptedDemo
             &&(nativeStatus.active||nativeStatus.pending)&&(!nativeStatus.nativeMenuOpen||idroidFree);
         const bool menuPressed=activeControl("system.idroid")||activeControl("system.pause");
         const bool equipmentHeld=!liveIdroid&&mode!=TravelMode::vehicle&&controls.value("equipment.open")
@@ -1270,7 +1287,7 @@ struct Session {
         GamepadSample pad{};
         const auto terms=nativeTermsMenu();
         const auto fallbackMode=nativeSceneInputMode(nativeStatus.nativeMenuOpen||terms.ready(now),scriptedDemo,interactiveLook,
-            sceneFallback,liveIdroid&&controllerFrame.handheldMenus);
+            sceneFallback,liveIdroid&&controllerFrame.handheldMenus&&!gzInput.enabled);
         const bool cinematicPauseNavigation=!nativeInput.exclusive&&!rigInput
             &&fallbackMode==NativeMenuInput::menu&&nativePauseMenuOpen()&&scriptedDemo&&!interactiveLook
             &&controllerFrame.presentationFocused&&!editorInputOwned&&!nativeGamepadActive()
@@ -1572,7 +1589,9 @@ struct Session {
             controllerFrame.equipmentOpen=controllerFrame.commandControls=false;
             controllerFrame.allowMotionMelee=controllerFrame.allowAnimalTouch=false;
         }
-        if(liveIdroid&&controllerFrame.handheldMenus&&!handheldMenuInputReady())
+        // GZ's native terminal owns navigation and close. TPP's UI-only
+        // routing acknowledgment cannot authorize this different native UI.
+        if(!gzInput.enabled&&liveIdroid&&controllerFrame.handheldMenus&&!handheldMenuInputReady())
             pad={};
         const bool vehiclePedalInput=rigInput&&mode==TravelMode::vehicle&&!nativeInput.exclusive
             &&!liveIdroid&&!cabinTransit&&!stickNavigation&&!center&&!headToggle&&!utilityCenter;

@@ -18,6 +18,10 @@
 #include "mgs5vr/idroid_attachment.hpp"
 #include "mgs5vr/rocket_arm.hpp"
 #include "mgs5vr/control_prompts.hpp"
+#include "mgs5vr/gz_player.hpp"
+#include "mgs5vr/gz_rig.hpp"
+#include "mgs5vr/gz_recon.hpp"
+#include "mgs5vr/forearm_visibility.hpp"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -49,7 +53,185 @@ ListenerFn originalListener{},originalVirtualListener{};
 using PublisherFn=uintptr_t(*)(void*);
 PublisherFn originalPublisher{};
 thread_local uintptr_t publicationOwner{};
+using GzGroupFn=void(*)(void*,const uint64_t*);
+using GzVisibilityFn=uintptr_t(*)(void*);
+GzGroupFn gzHideGroup{},gzShowGroup{};
+GzVisibilityFn originalGzVisibility{};
+std::mutex gzVisibilityMutex;
+mgs5vr::GzPlayerHead gzHiddenHead;
+struct GzHiddenGroup {uint64_t name{};uint16_t index{};uint8_t flags{},native{};};
+std::array<GzHiddenGroup,128> gzHiddenBodyGroups{};
+size_t gzHiddenBodyCount{};
+bool gzBodyOff{};
+struct GzHiddenWeapon {
+    uintptr_t component{},weapon{},character{},model{};
+    uint8_t flags{},native{};
+} gzHiddenWeapon;
+bool gzWeaponReady{};
+constexpr uint64_t gzHeadGroup=0x619a9e88501ull;
+constexpr uint64_t gzRootGroup=0x5874f948d635ull;
+template<class T> T gzRead(uintptr_t address){
+    T value{};SIZE_T copied{};
+    if(!address||!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<const void*>(address),
+        &value,sizeof(value),&copied)||copied!=sizeof(value))return {};
+    return value;
+}
+bool ownsGzHead(const mgs5vr::GzPlayerHead& p){
+    const auto image=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+    if(!p.model||!p.character||!p.player||gzRead<uintptr_t>(p.model)!=image+0x18437c0
+       ||gzRead<uintptr_t>(p.character)!=image+0x15f7460
+       ||gzRead<uintptr_t>(p.player+0x38)!=p.entity)return false;
+    const auto models=gzRead<uintptr_t>(p.character+0x238);
+    if(!models||gzRead<uintptr_t>(models)!=p.model)return false;
+    const auto count=gzRead<uint16_t>(p.model+0x1e8);
+    const auto names=gzRead<uintptr_t>(p.model+0x188);
+    if(!names||!count||count>128)return false;
+    for(uint16_t i=0;i<count;++i)if((gzRead<uint64_t>(names+i*8)&0xffffffffffffull)==gzHeadGroup)return true;
+    return false;
+}
+bool ownsGzWeapon(){
+    const auto image=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+    const auto& w=gzHiddenWeapon;
+    const auto table=gzRead<uintptr_t>(gzHiddenHead.entity+0x68);
+    const auto entity=gzRead<uintptr_t>(w.weapon+0x38);
+    return w.model&&ownsGzHead(gzHiddenHead)&&table&&entity
+        &&gzRead<uintptr_t>(table+28*8)==w.component+0x28
+        &&gzRead<uintptr_t>(w.component)==image+0x1749470
+        &&gzRead<uintptr_t>(w.component+0x178)==w.weapon
+        &&gzRead<uintptr_t>(w.weapon)==image+0x16c30d0
+        &&gzRead<uintptr_t>(gzRead<uintptr_t>(entity+0x68))==w.character+0x28
+        &&gzRead<uintptr_t>(w.character)==image+0x15f7460
+        &&gzRead<uintptr_t>(gzRead<uintptr_t>(w.character+0x238))==w.model
+        &&gzRead<uintptr_t>(w.model)==image+0x18437c0
+        &&(gzRead<uint64_t>(gzRead<uintptr_t>(w.model+0x188))&0xffffffffffffull)==gzRootGroup;
+}
+void restoreGzWeaponLocked(){
+    if(gzShowGroup&&ownsGzWeapon()){
+        const auto& w=gzHiddenWeapon;
+        if((gzRead<uint8_t>(gzRead<uintptr_t>(w.model+0x180))&15)==((w.flags|1)&15)
+            &&gzRead<uint8_t>(gzRead<uintptr_t>(w.model+0x178))==static_cast<uint8_t>(w.native&~4u))
+            gzShowGroup(reinterpret_cast<void*>(w.model),&gzRootGroup);
+    }
+    gzHiddenWeapon={};
+}
+void hideGzStowedWeaponLocked(){
+    restoreGzWeaponLocked();
+    if(gzWeaponReady||!gzHideGroup||!ownsGzHead(gzHiddenHead))return;
+    const auto table=gzRead<uintptr_t>(gzHiddenHead.entity+0x68);
+    const auto weaponInterface=table?gzRead<uintptr_t>(table+28*8):0;
+    if(weaponInterface<0x28)return;
+    const auto component=weaponInterface-0x28,weapon=gzRead<uintptr_t>(component+0x178);
+    const auto entity=gzRead<uintptr_t>(weapon+0x38),weaponTable=gzRead<uintptr_t>(entity+0x68);
+    const auto bodyInterface=gzRead<uintptr_t>(weaponTable);
+    if(bodyInterface<0x28)return;
+    const auto character=bodyInterface-0x28,model=gzRead<uintptr_t>(gzRead<uintptr_t>(character+0x238));
+    gzHiddenWeapon={component,weapon,character,model};
+    if(!ownsGzWeapon()){gzHiddenWeapon={};return;}
+    auto& w=gzHiddenWeapon;
+    w.flags=gzRead<uint8_t>(gzRead<uintptr_t>(model+0x180));
+    w.native=gzRead<uint8_t>(gzRead<uintptr_t>(model+0x178));
+    if((w.flags&1)||!(w.native&4)){gzHiddenWeapon={};return;}
+    // Only the primary weapon's normal draw is concealed while lowered.
+    // Native attachment animation, inventory and shadow passes remain live.
+    gzHideGroup(reinterpret_cast<void*>(model),&gzRootGroup);
+}
+void restoreGzBodyLocked(){
+    if(gzShowGroup&&ownsGzHead(gzHiddenHead)){
+        const auto flags=gzRead<uintptr_t>(gzHiddenHead.model+0x180);
+        const auto native=gzRead<uintptr_t>(gzHiddenHead.model+0x178);
+        const auto names=gzRead<uintptr_t>(gzHiddenHead.model+0x188);
+        for(size_t i=0;i<gzHiddenBodyCount;++i){const auto& g=gzHiddenBodyGroups[i];
+            // GZ hide sets explicit bit 0 and clears native draw bit 2.
+            // Inherited high bits are recalculated by its group publisher.
+            if((gzRead<uint64_t>(names+g.index*8)&0xffffffffffffull)==g.name
+                &&(gzRead<uint8_t>(flags+g.index)&15)==((g.flags|1)&15)
+                &&gzRead<uint8_t>(native+g.index)==static_cast<uint8_t>(g.native&~4u))
+                gzShowGroup(reinterpret_cast<void*>(gzHiddenHead.model),&g.name);
+        }
+    }
+    gzHiddenBodyCount=0;
+}
+void hideGzBodyLocked(){
+    if(!gzBodyOff||!gzHideGroup||!ownsGzHead(gzHiddenHead))return;
+    const auto model=gzHiddenHead.model;
+    const auto count=gzRead<uint16_t>(model+0x1e8);
+    const auto names=gzRead<uintptr_t>(model+0x188);
+    const auto flags=gzRead<uintptr_t>(model+0x180),native=gzRead<uintptr_t>(model+0x178);
+    const auto asset=gzRead<uintptr_t>(model+0x190),records=gzRead<uintptr_t>(asset+8);
+    if(!count||count>128||!names||!flags||!native||!records)return;
+    std::array<int16_t,128> parents{};std::array<uint64_t,128> groups{};
+    std::array<bool,128> keep{};int arm=-1;
+    for(uint16_t i=0;i<count;++i){
+        parents[i]=gzRead<int16_t>(records+i*8+4);
+        groups[i]=gzRead<uint64_t>(names+i*8)&0xffffffffffffull;
+        if(parents[i]<-1||parents[i]>=i)return;
+        if(groups[i]==0x92574e74fd8cull){if(arm>=0)return;arm=i;}
+    }
+    if(arm<0||parents[arm]<0)return;
+    for(int i=arm;i>=0;i=parents[i]){if(groups[i]==0xff131a166b34ull)return;keep[i]=true;}
+    for(uint16_t i=0;i<count;++i){
+        auto ancestor=parents[i];
+        while(ancestor>=0&&ancestor!=arm)ancestor=parents[ancestor];
+        if(ancestor==arm)keep[i]=true;
+    }
+    for(uint16_t i=0;i<count;++i){
+        if(keep[i]||(parents[i]>=0&&!keep[parents[i]])||groups[i]==gzHeadGroup)continue;
+        const auto previous=gzRead<uint8_t>(flags+i),draw=gzRead<uint8_t>(native+i);
+        if((previous&1)||!(draw&4))continue;
+        if(gzHiddenBodyCount==gzHiddenBodyGroups.size())return;
+        gzHiddenBodyGroups[gzHiddenBodyCount++]={groups[i],i,previous,draw};
+        gzHideGroup(reinterpret_cast<void*>(model),&groups[i]);
+    }
+    mgs5vr::setForearmPlayer(gzHiddenHead.player,model,true);
+}
+void restoreGzHeadLocked(){
+    restoreGzWeaponLocked();gzWeaponReady=false;
+    restoreGzBodyLocked();gzBodyOff=false;mgs5vr::setForearmPlayer(0,0,true);
+    if(gzShowGroup&&gzHideGroup&&ownsGzHead(gzHiddenHead)){
+        // The native player visibility publisher owns this bit. A scope or
+        // authored action can still require the head hidden after VR exits.
+        const auto fn=(gzRead<uint32_t>(gzHiddenHead.player+0x480)&8)?gzHideGroup:gzShowGroup;
+        fn(reinterpret_cast<void*>(gzHiddenHead.model),&gzHeadGroup);
+    }
+    gzHiddenHead={};
+}
+void updateGzHeadVisibility(const std::optional<mgs5vr::GzPlayerHead>& player,const mgs5vr::HeadCameraSample& frame){
+    std::lock_guard lock(gzVisibilityMutex);
+    if(!gzHideGroup||!player||!frame.applied||frame.playerOwner!=player->entity){restoreGzHeadLocked();return;}
+    if(gzHiddenHead.model&&gzHiddenHead.model!=player->model)restoreGzHeadLocked();
+    if(!ownsGzHead(*player))return;
+    gzHiddenHead=*player;gzHideGroup(reinterpret_cast<void*>(player->model),&gzHeadGroup);
+    const bool bodyOff=!frame.controllers.fullBody;
+    if(bodyOff!=gzBodyOff){restoreGzBodyLocked();gzBodyOff=bodyOff;}
+    if(gzBodyOff)hideGzBodyLocked();else mgs5vr::setForearmPlayer(0,0,true);
+    gzWeaponReady=frame.controllers.weaponReady;
+    hideGzStowedWeaponLocked();
+}
+uintptr_t updateGzNativeVisibility(void* player){
+    {
+        std::lock_guard lock(gzVisibilityMutex);
+        if(reinterpret_cast<uintptr_t>(player)==gzHiddenHead.player){restoreGzBodyLocked();restoreGzWeaponLocked();}
+    }
+    const auto result=originalGzVisibility(player);
+    std::lock_guard lock(gzVisibilityMutex);
+    if(reinterpret_cast<uintptr_t>(player)==gzHiddenHead.player&&gzHideGroup&&ownsGzHead(gzHiddenHead)){
+        gzHideGroup(reinterpret_cast<void*>(gzHiddenHead.model),&gzHeadGroup);
+        hideGzBodyLocked();
+        hideGzStowedWeaponLocked();
+    }
+    return result;
+}
 uintptr_t base{};
+unsigned char* gzBackgroundBranch{};
+void setGzBackgroundBranch(unsigned char value){
+    if(!gzBackgroundBranch)return;
+    DWORD protection{};
+    if(!VirtualProtect(gzBackgroundBranch,1,PAGE_EXECUTE_READWRITE,&protection))
+        throw std::runtime_error("Cannot update GZ presentation policy");
+    *gzBackgroundBranch=value;
+    FlushInstructionCache(GetCurrentProcess(),gzBackgroundBranch,1);
+    DWORD ignored{};VirtualProtect(gzBackgroundBranch,1,protection,&ignored);
+}
 mgs5vr::RenderBuild renderBuild=mgs5vr::RenderBuild::phantomPain_1_0_15_4;
 mgs5vr::RenderLayout layout=mgs5vr::phantomPainRender;
 struct Pair {
@@ -254,7 +436,7 @@ __declspec(noinline) uintptr_t viewport(void* input,uint8_t history){
 struct NativeRestore {
     uintptr_t camera{},viewport{};
     std::array<float,2> cameraPlanes{};
-    float cameraFocal{},viewportAspect{};
+    float cameraFocal{},viewportAspect{},gzDepthOfField{};
     std::array<unsigned char,0xc0> cameraMatrices{};
     std::array<unsigned char,0x240> viewportMatrices{};
     NativeRestore(uintptr_t c,uintptr_t v):camera(c),viewport(v){
@@ -262,6 +444,8 @@ struct NativeRestore {
         std::memcpy(viewportMatrices.data(),reinterpret_cast<void*>(v+layout.viewportMatrices),viewportMatrices.size());
         if(layout.cameraNearPlane)std::memcpy(cameraPlanes.data(),reinterpret_cast<void*>(c+layout.cameraNearPlane),sizeof(cameraPlanes));
         if(layout.cameraFocalScale)std::memcpy(&cameraFocal,reinterpret_cast<void*>(c+layout.cameraFocalScale),sizeof(cameraFocal));
+        if(renderBuild==mgs5vr::RenderBuild::groundZeroes_1_0_0_5)
+            std::memcpy(&gzDepthOfField,reinterpret_cast<void*>(c+0x110),sizeof(float));
         std::memcpy(&viewportAspect,reinterpret_cast<void*>(v+layout.viewportScale),sizeof(viewportAspect));
     }
     void restore() const{
@@ -269,6 +453,8 @@ struct NativeRestore {
         std::memcpy(reinterpret_cast<void*>(viewport+layout.viewportMatrices),viewportMatrices.data(),viewportMatrices.size());
         if(layout.cameraNearPlane)std::memcpy(reinterpret_cast<void*>(camera+layout.cameraNearPlane),cameraPlanes.data(),sizeof(float));
         if(layout.cameraFocalScale)std::memcpy(reinterpret_cast<void*>(camera+layout.cameraFocalScale),&cameraFocal,sizeof(cameraFocal));
+        if(renderBuild==mgs5vr::RenderBuild::groundZeroes_1_0_0_5)
+            std::memcpy(reinterpret_cast<void*>(camera+0x110),&gzDepthOfField,sizeof(float));
         std::memcpy(reinterpret_cast<void*>(viewport+layout.viewportScale),&viewportAspect,sizeof(viewportAspect));
     }
     void applyNativeProjectionScales(mgs5vr::EyeFov fov) const{
@@ -296,6 +482,16 @@ struct NativeRestore {
         // reconstruction and both clip/GPU matrices then consume one plane.
         std::memcpy(reinterpret_cast<void*>(camera+layout.cameraNearPlane),&nearClip,sizeof(nearClip));
         if(!trackedNearReported.exchange(true))mgs5vr::log("TPP tracked scene uses a 2 cm native near plane; native camera restored between passes");
+    }
+    void applyGzTrackedFocus() const{
+        if(renderBuild!=mgs5vr::RenderBuild::groundZeroes_1_0_0_5)return;
+        // GZ's own DisableDepthOfField writes this native value to source
+        // camera +0x3c. Its publisher copies it to GrCamera +0x110. Apply
+        // that policy only to the tracked eye replay; restore authored focus
+        // for the desktop/theatre and scripted cameras.
+        const float disabled=gzRead<float>(base+0x1e01fc4);
+        if(std::isfinite(disabled)&&disabled==100.f)
+            std::memcpy(reinterpret_cast<void*>(camera+0x110),&disabled,sizeof(disabled));
     }
     void preserveOpticVisibility() const{
         if(renderBuild!=mgs5vr::RenderBuild::phantomPain_1_0_15_4)return;
@@ -736,6 +932,7 @@ __declspec(noinline) uintptr_t scene(void* render,void* graphics,void* task,uint
         // camera history. This avoids introducing the opposite eye's history.
         std::memcpy(reinterpret_cast<void*>(source.grCamera+0xb0),eyeView.data(),sizeof(eyeView));
         if(!titleSurface)saved.applyTrackedNearPlane();
+        if(!titleSurface&&!source.pair.sample.controllers.authoredCamera)saved.applyGzTrackedFocus();
         // The viewport builder can consume adaptation data too. Own the lens
         // state before any native viewport work, and restore it on early exits.
         std::optional<LensExposureGuard> exposure;
@@ -977,6 +1174,10 @@ __declspec(noinline) float* world(void* input,float* output){
     if(!enabled.load())return originalWorld(input,output);
     const auto source=reinterpret_cast<uintptr_t>(input);
     if(caller==base+layout.worldReturn){
+        if(renderBuild==mgs5vr::RenderBuild::groundZeroes_1_0_0_5){
+            const auto menu=mgs5vr::gzInputState().menu;
+            if(menu)mgs5vr::headCamera().setNativeMenuOpen(menu->pause||menu->idroid,menu->idroid,menu->pause);
+        }
         if(const auto menu=mgs5vr::nativeMenuOpen()){
             mgs5vr::headCamera().setNativeMenuOpen(*menu,mgs5vr::nativeIdroidOpen(),mgs5vr::nativePauseMenuOpen(),
                 mgs5vr::nativeIdroidTutorialPaused());
@@ -987,13 +1188,30 @@ __declspec(noinline) float* world(void* input,float* output){
         std::array<float,8> native{};std::memcpy(native.data(),input,sizeof(native));
         current.nativeInput=native;
         current.sample={pose(native.data()),{},0,0,false};
+        std::optional<mgs5vr::GzPlayerHead> gzPlayer;
         if(nativePairVerified.load()&&current.identity){
+            if(renderBuild==mgs5vr::RenderBuild::groundZeroes_1_0_0_5){
+                const auto read=[](uintptr_t address,void* output,size_t size){
+                    SIZE_T copied{};return address&&ReadProcessMemory(GetCurrentProcess(),
+                        reinterpret_cast<const void*>(address),output,size,&copied)&&copied==size;
+                };
+                gzPlayer=mgs5vr::readGzPlayerHead(base,current.sample.nativePose,read);
+                mgs5vr::observeGzRigCamera(current.identity,gzPlayer);
+                if(const auto& player=gzPlayer){
+                    if(mgs5vr::headCamera().publishPlayerHead(current.identity,player->entity,current.sample.nativePose,
+                        player->root,player->head,mgs5vr::steadyMilliseconds())){
+                        static bool reported{};
+                        if(!reported){reported=true;mgs5vr::log("GZ native player head joined to scene camera");}
+                    }
+                }
+            }
             // Pause/Help can stop native skin jobs while camera/UI jobs keep
             // running. Publish tracked skin before selecting this camera's rig
             // sample so both eye replays and wrist UI use the same generation.
             mgs5vr::refreshPausedControllerRig(current.identity,current.sample.nativePose);
             current.sample=mgs5vr::headCamera().resolveCurrent(current.identity,current.sample.nativePose);
         }
+        if(renderBuild==mgs5vr::RenderBuild::groundZeroes_1_0_0_5)updateGzHeadVisibility(gzPlayer,current.sample);
         alignas(16) auto adjusted=values(current.sample.nativePose);
         // Title's animated UI builds geometry from the native publication.
         // Keep that source intact, and move only the two render cameras into
@@ -1125,7 +1343,36 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
     constexpr std::array<unsigned char,8> gzFocalLoad{0xf3,0x0f,0x10,0x88,0xf8,0,0,0};
     if(!(gz?matches(moduleBase+0xf425a7,gzFocalLoad):matches(moduleBase+0x1b96ee,tppFocalLoad)))
         throw std::runtime_error("Native perspective focal-field signature mismatch");
+    // GZ's presentation manager requests a display suspension on desktop
+    // focus loss. XR owns its presentation independently. Bypass only that
+    // display request; preserve native focus state and input handling.
+    // The private 1.0.0.5 trace joins the focus flag writer, this consumer,
+    // and the stalled presentation queue. No TPP address is used here.
+    constexpr std::array<unsigned char,18> gzFocusBranch{
+        0x48,0x8b,0x05,0x06,0xf8,0xec,0x00,0x0f,0xb6,0x48,0x38,
+        0xf6,0xd1,0xf6,0xc1,0x01,0x75,0x0e};
+    if(gz&&!matches(moduleBase+0xfd33c3,gzFocusBranch))
+        throw std::runtime_error("GZ background presentation signature mismatch");
+    constexpr std::array<unsigned char,16> gzGroupSignature{
+        0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x0f,0xb7,0x89,0xe8,0x01,0,0};
+    constexpr std::array<unsigned char,16> gzVisibilitySignature{
+        0x40,0x53,0x56,0x57,0x41,0x54,0x41,0x57,0x48,0x83,0xec,0x30,0x48,0x8b,0x59,0x38};
+    if(gz){
+        constexpr std::array<unsigned char,14> disableDof{
+            0xf3,0x0f,0x10,0x05,0xdc,0x85,0xa5,0x01,0xf3,0x0f,0x11,0x41,0x14,0xc3};
+        constexpr std::array<unsigned char,13> copyDof{
+            0xf3,0x0f,0x10,0x4e,0x3c,0xf3,0x0f,0x11,0x8f,0x10,0x01,0,0};
+        if(!matches(moduleBase+0x3a99e0,disableDof)||!matches(moduleBase+0x39c6f0,copyDof))
+            throw std::runtime_error("GZ native focus policy signature mismatch");
+        if(!matches(moduleBase+0xf520a0,gzGroupSignature)||!matches(moduleBase+0xf540a0,gzGroupSignature)
+           ||!matches(moduleBase+0x6be910,gzVisibilitySignature)
+           ||!directCall(0x6bea79,0xf520a0)||!directCall(0x6bea80,0xf540a0))
+            throw std::runtime_error("GZ native head visibility signature mismatch");
+        gzHideGroup=reinterpret_cast<GzGroupFn>(moduleBase+0xf520a0);
+        gzShowGroup=reinterpret_cast<GzGroupFn>(moduleBase+0xf540a0);
+    }
     base=moduleBase;
+    if(gz){installGzRig(base);installGzRecon(base);}
     if(!directory.empty()){
         std::filesystem::create_directories(directory);
         evidence.open(directory/("matrices-"+std::to_string(GetCurrentProcessId())+".jsonl"));
@@ -1144,6 +1391,7 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
         {layout.listener,reinterpret_cast<void*>(&listener),reinterpret_cast<void**>(&originalListener)},
         {layout.virtualListener,reinterpret_cast<void*>(&virtualListener),reinterpret_cast<void**>(&originalVirtualListener)}};
     if(layout.publisher)hooks.push_back({layout.publisher,reinterpret_cast<void*>(&publishCamera),reinterpret_cast<void**>(&originalPublisher)});
+    if(gz)hooks.push_back({0x6be910,reinterpret_cast<void*>(&updateGzNativeVisibility),reinterpret_cast<void**>(&originalGzVisibility)});
     for(const auto& hook:hooks){const auto result=MH_CreateHook(reinterpret_cast<void*>(base+hook.rva),hook.wrapper,hook.original);
         if(result!=MH_OK)throw std::runtime_error(std::string("Native scene hook: ")+MH_StatusToString(result));
     }
@@ -1152,6 +1400,12 @@ void installRenderCamera(uintptr_t moduleBase,const std::filesystem::path& direc
         throw std::runtime_error("Cannot enable native scene/matrix hooks");
     }
     enabled.store(true);
+    if(gz){
+        gzBackgroundBranch=reinterpret_cast<unsigned char*>(moduleBase+0xfd33d3);
+        setGzBackgroundBranch(0xeb);
+        log("GZ presentation continues independently of desktop focus");
+        try{installGzUiRenderer(base);}catch(const std::exception& ex){log(std::string("GZ UI integration unavailable: ")+ex.what());}
+    }
     if(!gz){
         try{installUiRenderer(base);}catch(const std::exception& ex){log(std::string("Native UI integration unavailable: ")+ex.what());}
         try{installOpticMarkers(base);}catch(const std::exception& ex){log(std::string("Native optic markers unavailable: ")+ex.what());}
@@ -1238,5 +1492,7 @@ EyeFrame observeRenderPresent(void*) noexcept {
     }catch(...){}
     return {}; // Scene-capture command-list metadata owns the image/pose join.
 }
-void stopRenderCamera() noexcept {enabled.store(false);stopOpticMarkers();stopUiRenderer();headCamera().cancel();try{reportRenderCamera();evidence.close();}catch(...){}}
+void stopRenderCamera() noexcept {enabled.store(false);stopGzRig();stopGzRecon();stopOpticMarkers();stopUiRenderer();headCamera().cancel();try{
+    {std::lock_guard lock(gzVisibilityMutex);restoreGzHeadLocked();}
+    setGzBackgroundBranch(0x75);gzBackgroundBranch=nullptr;reportRenderCamera();evidence.close();}catch(...){}}
 }

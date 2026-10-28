@@ -71,8 +71,11 @@ function Get-MgsOwnedRuntimeProcesses {
                 if(!$seen.Add([int]$identity.pid)){continue}
                 $isRuntime=Test-MgsPathUnderRoot $identity.path $RuntimeRoot
                 $isMetaGui=[IO.Path]::GetFileName($identity.path) -ieq 'MetaXRSimulator.exe'
-                if($isRuntime){
-                    $identity.role=if($parent.depth -eq 0 -and $isMetaGui){'meta_gui'}else{'runtime_child'}
+                $isRetailChild=$parent.depth -eq 0 -and
+                    [IO.Path]::GetFileName([string]$Game.path) -ieq 'MgsGroundZeroes.exe' -and
+                    [string]::Equals($identity.path,[string]$Game.path,[StringComparison]::OrdinalIgnoreCase)
+                if($isRuntime -or $isRetailChild){
+                    $identity.role=if($isRetailChild){'game_child'}elseif($isMetaGui){'meta_gui'}else{'runtime_child'}
                     $identity.depth=[int]$parent.depth+1
                     $parentIdentity=if([int]$parent.pid -eq [int]$Game.pid){ConvertTo-MgsProcessIdentity $Game}else{ConvertTo-MgsProcessIdentity $byId[[int]$parent.pid]}
                     $identity.parentIdentity=[ordered]@{pid=[int]$parentIdentity.pid;parentPid=[int]$parentIdentity.parentPid;startedUtc=[string]$parentIdentity.startedUtc;path=[string]$parentIdentity.path}
@@ -136,12 +139,21 @@ function Get-MgsOpaqueVrEnvironmentPlan {
         if(!$current.Count){continue}
         if($current.Count -ne 1 -or !(Test-MgsExactProcessIdentity $identity $current[0])){throw 'Synthetic environment identity changed; refusing VR resource cleanup.'}
         $game=Get-MgsValue $Record 'game'
-        if(!$game -or [IO.Path]::GetFileName([string]$game.path) -ine 'mgsvtpp.exe'){throw 'Exact MGSV owner is not live; refusing VR resource cleanup.'}
+        if(!$game -or [IO.Path]::GetFileName([string]$game.path) -inotIn @('mgsvtpp.exe','MgsGroundZeroes.exe')){throw 'Exact MGSV owner is not live; refusing VR resource cleanup.'}
         $liveGame=@($Processes | Where-Object { [int]$_.ProcessId -eq [int]$game.pid })
         if($liveGame.Count -ne 1 -or !(Test-MgsExactProcessIdentity $game $liveGame[0])){throw 'Exact MGSV owner is not live; refusing VR resource cleanup.'}
         $parent=Get-MgsValue $identity 'parentIdentity'
         $gui=@($Processes | Where-Object { $parent -and [int]$_.ProcessId -eq [int]$parent.pid })
-        if(!$parent -or $gui.Count -ne 1 -or !(Test-MgsExactProcessIdentity $parent $gui[0]) -or [int]$parent.parentPid -ne [int]$game.pid -or [int]$identity.parentPid -ne [int]$parent.pid -or ![string]::Equals([string]$parent.path,(Join-Path $RuntimeRoot 'MetaXRSimulator.exe'),[StringComparison]::OrdinalIgnoreCase)){
+        $gameParentMatches=$parent -and [int]$parent.parentPid -eq [int]$game.pid
+        if($parent -and !$gameParentMatches -and [IO.Path]::GetFileName([string]$game.path) -ieq 'MgsGroundZeroes.exe'){
+            $retail=@($Record.ownedRuntimeProcesses | Where-Object { $_.role -eq 'game_child' -and [int]$_.pid -eq [int]$parent.parentPid })
+            $liveRetail=@($Processes | Where-Object { [int]$_.ProcessId -eq [int]$parent.parentPid })
+            $gameParentMatches=$retail.Count -eq 1 -and $liveRetail.Count -eq 1 -and
+                [int]$retail[0].parentPid -eq [int]$game.pid -and
+                [string]::Equals([string]$retail[0].path,[string]$game.path,[StringComparison]::OrdinalIgnoreCase) -and
+                (Test-MgsExactProcessIdentity $retail[0] $liveRetail[0])
+        }
+        if(!$parent -or $gui.Count -ne 1 -or !(Test-MgsExactProcessIdentity $parent $gui[0]) -or !$gameParentMatches -or [int]$identity.parentPid -ne [int]$parent.pid -or ![string]::Equals([string]$parent.path,(Join-Path $RuntimeRoot 'MetaXRSimulator.exe'),[StringComparison]::OrdinalIgnoreCase)){
             throw 'Synthetic environment has no exact MGSV simulator parent; refusing VR resource cleanup.'
         }
         if([string](Get-MgsValue $current[0] 'CommandLine') -notmatch '(?i)(?:^|\s)-batchmode(?:\s|$)'){throw 'Synthetic environment is not the recorded batch room; refusing VR resource cleanup.'}

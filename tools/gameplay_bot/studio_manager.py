@@ -90,6 +90,48 @@ def inspect_camera_manager(live, policy, seconds=120.):
         try:
             live.release();initial=live.observe(native=True)
             result['native_scene']=initial.get('native');mode=policy.get('mode','gallery')
+            if mode=='tidy-film-prints':
+                expected={int(x['paper']):int(x['photo']) for x in policy['remove']}
+                v=studio(); before_ids={p['id'] for p in v['papers']}; before_library=set(v['library'])
+                for pid,photo in expected.items():
+                    if photo not in before_library or not any(p['id']==pid and p['photo']==photo and p['hand']<0 for p in v['papers']):
+                        raise BotFault('Exact test print or image missing')
+                for item in policy['remove']:
+                    pid=int(item['paper']); v=studio(); paper=next(p for p in v['papers'] if p['id']==pid)
+                    approach(compose(v['room'],paper['pose']))
+                    v=studio(); paper=next(p for p in v['papers'] if p['id']==pid)
+                    move('left',compose(v['room'],shifted(paper['pose'],[0.,0.,.003]))); grip('left')
+                    got=wait(lambda s:any(p['hand']==0 for p in s['rendered']['studio']['papers']),'print-held')
+                    held_paper=next(p for p in got['rendered']['studio']['papers'] if p['hand']==0)
+                    if held_paper['id']!=pid or held_paper['photo']!=expected[pid]:raise BotFault('Unexpected print picked up')
+                    v=studio(); paper=next(p for p in v['papers'] if p['id']==pid)
+                    aim('right',shifted(compose(v['room'],paper['pose']),[0.,0.,.25])); trigger('right')
+                    wait(lambda s:s['rendered']['studio']['editor']==pid,'print-editor')
+                    key(43); wait(lambda s:s['rendered']['studio']['confirm_paper']==pid,'exact-print-confirmation')
+                    key(43); wait(lambda s:all(p['id']!=pid for p in s['rendered']['studio']['papers']),'exact-print-deleted')
+                    grip('left',False)
+                v=studio()
+                if {p['id'] for p in v['papers']}!=before_ids-set(expected) or set(v['library'])!=before_library:
+                    raise BotFault('Other collection identities changed')
+                result['status']='removed_exact_film_prints'; return result
+            if mode=='remove-exact-film-image':
+                photos=policy['photos'];v=studio()
+                before_papers={p['id'] for p in v['papers']};before_library=set(v['library'])
+                if not set(photos).issubset(before_library) or any(p['photo'] in photos for p in v['papers']):
+                    raise BotFault('Expected digital-only test photos are not present')
+                if v['selected_photo']!=photos[0]:raise BotFault('First exact test photo is not selected')
+                approach(v['camera']);v=studio();move('right',v['camera']);grip('right')
+                wait(lambda s:s['rendered']['studio']['camera_hand']==1,'camera-held-for-cleanup')
+                time.sleep(.8);renew()
+                for photo in photos:
+                    v=studio()
+                    if v['camera_hand']!=1 or v['selected_photo']!=photo:
+                        raise BotFault('Camera or selected photo changed before cleanup')
+                    button(3);wait(lambda s:s['rendered']['studio']['confirm_photo']==photo,'exact-photo-confirmation')
+                    button(3);v=wait(lambda s:photo not in s['rendered']['studio']['library'],'exact-photo-deleted')['rendered']['studio']
+                if {p['id'] for p in v['papers']}!=before_papers or set(v['library'])!=before_library-set(photos):
+                    raise BotFault('Other paper or library identities changed')
+                grip('right',False);result['status']='removed_exact_film_images';return result
             if mode=='held-hints':
                 if initial['scene']!='cabin':raise BotFault('Held-object review requires the ACC')
                 v=studio();approach(compose(v['room'],v['notes_home']))

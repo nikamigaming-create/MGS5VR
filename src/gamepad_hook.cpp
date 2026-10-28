@@ -7,7 +7,6 @@
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/mailbox.hpp"
 #include "mgs5vr/motion_melee.hpp"
-#include "mgs5vr/animal_interaction.hpp"
 #include <cstring>
 #include <stdexcept>
 #include <mutex>
@@ -74,7 +73,7 @@ DWORD WINAPI getState(DWORD index,XINPUT_STATE* state){
         setNativeGamepadActive(usePhysical);
         if(usePhysical){*state=physical;return delivered(ERROR_SUCCESS,NativeInputDeliverySource::nativeXInput,freshActive,connected,observedPhysicalSlot);}
         if(sample){
-            if(freshActive){consumeAnimalTouch();consumeMeleeSweep();}
+            if(freshActive)consumeMeleeSweep();
             // Give an attached physical pad back when XR is inactive. If none is
             // attached, synthesize neutral success to release the previous XR state.
             std::lock_guard guard(stateMutex);

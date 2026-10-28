@@ -19,8 +19,10 @@ checks conflicts while you type, refuses invalid saves, and backs up the previou
 file when saving. No game launch is needed to check a layout. The headset editor is also available with Menu + left-stick click held
 650 ms; its gear tab exposes gameplay tuning. These are default bindings.
 
-Gear starts with Immersive VR, Seated mode, Full body and Eyepatch, followed by
-the remaining on/off options before numeric fitting controls. Select an option,
+Gear starts with Immersive VR and common switches including God Mode, Full body,
+Eyepatch and Seated mode, followed by the remaining switches and numeric fitting
+controls. The checked October 27 build exposes 71 gameplay settings, including
+19 on/off settings, plus the Immersive VR presentation switch. Select an option,
 toggle it, select the check mark to save, then release the controls to apply it
 live. Eyepatch controls both the character's patch and the dark translucent
 first-person patch. Full body off retains hands and forearms on supported outfits.
@@ -507,6 +509,39 @@ do not move the hidden title-menu highlight. Movement checks native swept head
 and shoulder clearance and floor support; the initial six-ray actor envelope
 does not restrict walking to a small box. This is camera clearance, not a full
 native player capsule. The cabin keeps the game's original world scale.
+
+### Cabin props, camera and notes
+
+At the interactive title cabin, tap the effective **iDroid/Menu binding** to
+switch between the native title panel and physical prop interaction. The default
+is a short Menu tap. Close the panel before reaching for props. In the in-game
+ACC, that binding opens the left-hand iDroid instead.
+
+| Interaction | Control |
+| --- | --- |
+| Pick up a cassette | Reach either hand to it and squeeze that hand's grip; hold to carry. |
+| Insert a cassette | Align it with the open carrier, move it into the guide, then release grip to seat it. Sideways entry is rejected. At title, the tape selects its labeled native menu action when available. |
+| Eject and recover | With an empty open hand, touch the player's eject control with the index finger, then grip the presented tape. A nearby trigger press is the fallback when finger contact tracking is unavailable. |
+| Take a photo | Grip the camera with either hand, aim its lens, then press that hand's trigger in LIVE mode. A completed image produces a print at the front slot. |
+| Browse or reprint | While holding the camera, point the free hand at its BACK, NEXT or PRINT control and press the free-hand trigger. LIVE returns to shooting. |
+| Delete a digital photo | Select it in the camera, press DELETE, then press DELETE again to confirm. LIVE cancels. Printed copies are separate objects and remain. |
+| Take a note or carry a print | Squeeze grip at the notepad or an existing sheet with either hand. Keep grip held to carry. |
+| Type on a held sheet | Point the empty hand at the sheet and press its trigger. Point and trigger-select keyboard keys; DONE closes the editor. |
+| Draw or write | Grip the marker, hold that hand's trigger and touch its tip to a sheet. Release trigger to end the stroke. Either hand can hold the marker. |
+| Pin a note or photo | Hold it facing the board, place it close to the board surface, then release grip. Grab it again to remove it. |
+| Delete a paper object | Open its text editor, choose TRASH, then confirm with TRASH again. This removes that physical sheet. Release the holding grip before grabbing another object. |
+| Inspect a mounted rifle in the ACC | Grip its receiver with either hand; release to return the complete assembly to its saved mount. It retains native firing restrictions and loadout identity. |
+
+FREEZE on the camera is available only when the active gameplay scene supports
+the world-pause lease; it is unavailable in the title cabin. Releasing the camera
+ends its freeze request. The collection supports 32 physical sheets and 512
+digital photos; a full collection cannot create another item of that type.
+
+These controls are implemented. Current retained runs cover scoped cassette,
+camera, note, marker and board actions; clear moving hand contact, original
+cassette-lid motion, wider placements and physical-headset comfort remain open.
+The title tape **DOWNLOAD MGSV: GZ SAVE DATA** is the native save-import action;
+it does not launch Ground Zeroes or provide its missing VR adapters.
 
 Hands follow the controllers when reaching toward D-Dog. An open-hand stroke
 in contact with the native dog triggers his response. There is no dog-specific

@@ -18,5 +18,5 @@
     "all_equipment_sim_verified": false,
     "physical_headset_verified": false
   },
-  "notes": "Independent signature-qualified GZ camera/projection/viewport/scene/presentation layout. Native same-frame stereo exercised in the title cabin and Ground Zeroes mission using Meta XR Simulator. The camera remains at the native game viewpoint; player head anchoring, tracked arms, weapon aiming and wrist UI are not connected. Never use TPP native offsets for this executable. This is not a completed native VR port."
+  "notes": "Independent GZ native contracts provide first-person stereo, tracked arms, muzzle-based firing, spatial Pause, left-hand iDroid, body-off forearms, left forearm ammo HUD, native foot-state mapping, physical binocular carry/lens/zoom/support and native character acquisition/mark/clear. Current-player input ownership is independent of camera cadence. Broader capabilities remain incomplete: intel/radio, terrain waypoints, configurable native marker/glow policy, complete travel/equipment/body fitting and moving interaction coverage. GZ owned binocular import currently uses a private local helper; native material shader is not ported. Never use TPP native offsets for this executable. This is not a completed native VR port."
 }

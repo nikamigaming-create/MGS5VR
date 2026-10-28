@@ -98,6 +98,21 @@ inline size_t closeForearmCuffs(std::span<const Vec3> positions,
         }
         for(auto polygon:loops){
             if(!manifold||polygon.size()<3){manifold=false;break;}
+            // The native rim can step axially with identical Y/Z. Once
+            // flattened those adjacent vertices form a zero-length edge,
+            // which prevents ear clipping even though the ring is closed.
+            // Keep the full rim below for fitting, but triangulate its unique
+            // projected corners. Native skin/UV seams remain separate.
+            const auto coincident=[&](uint16_t a,uint16_t b){
+                const auto p=positions[a],q=positions[b];
+                return std::abs(p.y-q.y)<.000001f&&std::abs(p.z-q.z)<.000001f;
+            };
+            for(size_t i=0;polygon.size()>2&&i<polygon.size();){
+                const auto nextCorner=(i+1)%polygon.size();
+                if(coincident(polygon[i],polygon[nextCorner]))polygon.erase(polygon.begin()+nextCorner);
+                else ++i;
+            }
+            if(polygon.size()<3){manifold=false;break;}
             const auto area=[&](uint16_t a,uint16_t b,uint16_t c){
                 const auto p=positions[a],q=positions[b],r=positions[c];
                 return (q.y-p.y)*(r.z-p.z)-(q.z-p.z)*(r.y-p.y);
@@ -130,10 +145,12 @@ inline size_t closeForearmCuffs(std::span<const Vec3> positions,
             // only that rim to the authored elbow plane; hands and distal
             // forearms keep their native positions. All coincident seam
             // copies move together so UV/normal seams cannot open a crack.
-            for(auto& [vertex,duplicate]:duplicates){
-                duplicate=spare.back();spare.pop_back();
+            for(const auto& loop:loops)for(auto vertex:loop){
                 for(size_t i=0;i<canonical.size();++i)if(canonical[i]==vertex)
                     (*fitted)[i].x=right?-elbow:elbow;
+            }
+            for(auto& [vertex,duplicate]:duplicates){
+                duplicate=spare.back();spare.pop_back();
                 (*fitted)[duplicate]=(*fitted)[vertex];
                 copies->push_back({duplicate,vertex});
             }

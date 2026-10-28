@@ -1,4 +1,5 @@
 #include "mgs5vr/optic_markers.hpp"
+#include "mgs5vr/gz_recon.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/recon.hpp"
@@ -761,6 +762,7 @@ void installOpticMarkers(uintptr_t moduleBase){
     log("Physical optic hand ray connected to native intel selection and radio");
 }
 void publishOpticMarkerFrame(const HeadCameraSample& frame){
+    publishGzReconFrame(frame);
     std::lock_guard lock(mutex);
     if(frame.controllers.loading||frame.controllers.frontEnd)resetReconClears.store(true);
     if(!frame.applied||frame.menuOpen||!frame.controllers.optic.active||frame.activation!=latest.activation)queuedUse={};

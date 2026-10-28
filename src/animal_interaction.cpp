@@ -17,7 +17,7 @@ struct Hands {HeadCameraSample frame;std::array<Pose,2> palms;HandContacts conta
 std::mutex publicationMutex,interactionMutex;
 Hands latest;
 struct Stroke {
-    Vec3 relative{},local{};
+    Vec3 relative{},local{},tracked{};
     uint64_t sampledAt{},startedAt{},activation{};
     float travel{};
     bool latched{};
@@ -26,6 +26,13 @@ std::array<Stroke,2> strokes;
 uint64_t consumed{},lastReport{},nextResponseAt{},handActivation{};
 uint64_t lastRuntimeReport{};
 std::atomic_uint64_t physicalResponses{},physicalResponseAt{};
+struct ContactTrace {
+    uint64_t samples{},resets{},elapsed{},touchingFor{};
+    float distance{},speed{},travel{},curl{};
+    const char* state{"unobserved"};
+};
+std::array<ContactTrace,2> contactTrace;
+uint32_t eligibilityMask{};
 void resetContact(Stroke& stroke){
     stroke.sampledAt=stroke.startedAt=0;stroke.travel=0;
 }
@@ -83,14 +90,23 @@ void consumeAnimalTouch(){
     std::lock_guard lock(interactionMutex);
     const auto sample=hands();const auto& frame=sample.frame;
     const auto now=steadyMilliseconds();const auto status=headCamera().status();
-    if(!frame.controllers.allowAnimalTouch||!status.active||status.nativeMenuOpen||!frame.applied||frame.activation!=status.activation
-       ||now<frame.sampleTime||now-frame.sampleTime>100||frame.controllers.weaponReady
-       ||frame.controllers.vehicleControls||frame.controllers.optic.held||frame.controllers.commandControls
-       ||frame.controllers.equipmentOpen||frame.controllers.avatarEditor
-       ||(frame.controllers.frontEnd&&!frame.controllers.cabinPlay&&!frame.controllers.openingSelector)){
+    bool freshActive{};
+    gamepadMailbox().read(now,&freshActive);
+    eligibilityMask=(!frame.controllers.allowAnimalTouch?1u:0u)|(!status.active?2u:0u)
+        |(status.nativeMenuOpen?4u:0u)|(!frame.applied?8u:0u)|(frame.activation!=status.activation?16u:0u)
+        |(now<frame.sampleTime||now-frame.sampleTime>100?32u:0u)|(frame.controllers.weaponReady?64u:0u)
+        |(frame.controllers.vehicleControls?128u:0u)|(frame.controllers.optic.held?256u:0u)
+        |(frame.controllers.commandControls?512u:0u)|(frame.controllers.equipmentOpen?1024u:0u)
+        |(frame.controllers.avatarEditor?2048u:0u)
+        |(frame.controllers.frontEnd&&!frame.controllers.cabinPlay&&!frame.controllers.openingSelector?4096u:0u)
+        |(!freshActive||nativeGamepadActive()?8192u:0u);
+    const auto resetAll=[&](const char* reason){
+        for(size_t side=0;side<2;++side){resetContact(strokes[side]);contactTrace[side].state=reason;++contactTrace[side].resets;}
+    };
+    if(eligibilityMask){
         // A missed tracking frame may interrupt contact, but cannot re-arm
         // a hand that has already petted the buddy. It must withdraw first.
-        for(auto& stroke:strokes)resetContact(stroke);
+        resetAll("ineligible");
         return;
     }
     if(frame.sampleTime<=consumed)return;
@@ -103,12 +119,12 @@ void consumeAnimalTouch(){
             +" hand_touch_enabled="+std::to_string(frame.controllers.allowAnimalTouch));
     }
     if(handActivation!=frame.activation){strokes={};handActivation=frame.activation;}
-    if(!bones){for(auto& stroke:strokes)resetContact(stroke);return;}
+    if(!bones){resetAll("no_native_bones");return;}
     if(!cabinActor(frame,(*bones)[0])){
         // Gate the contact region, not the whole animal against six axial
         // samples. The authored dog's hindquarters can extend past a bench
         // ray while its head is visibly inside the reachable cabin.
-        for(auto& stroke:strokes)resetContact(stroke);return;
+        resetAll("outside_cabin");return;
     }
     const Vec3 skull=(*bones)[0],end=(*bones)[1];
     // Bone 5 is at the skull, behind the visible muzzle. Extend the contact
@@ -118,36 +134,43 @@ void consumeAnimalTouch(){
     const Vec3 start=skull+forward*(.20f/std::max(length(forward),.001f)),axis=end-start;
     for(size_t side=0;side<2;++side){
         auto& stroke=strokes[side];const auto& hand=frame.controllers.hands[side];
+        auto& trace=contactTrace[side];++trace.samples;trace.curl=frame.controllers.strikeCurl[side];
         const auto palm=(sample.contacts[side][2]+sample.contacts[side][3]+sample.contacts[side][4])*(1.f/3.f);
-        const auto local=compose(inverse(frame.nativePose),Pose{{},palm}).position;
+        const auto tracked=hand.grip.position;
+        const auto local=tracked-frame.headPose.position;
         float distance=100;
         for(const auto point:sample.contacts[side]){
             const float along=std::clamp(dot(point-start,axis)/std::max(dot(axis,axis),.0001f),0.f,1.f);
             distance=std::min(distance,length(point-(start+axis*along)));
         }
+        trace.distance=distance;trace.travel=stroke.travel;
         if(!hand.gripTracked||hand.squeeze>.4f||hand.trigger>.2f||frame.controllers.strikeCurl[side]>.25f||distance>.24f){
+            trace.state=!hand.gripTracked?"untracked":hand.squeeze>.4f?"grip":hand.trigger>.2f?"trigger":frame.controllers.strikeCurl[side]>.25f?"strike":"distant";
+            ++trace.resets;
             if(distance>.42f||!hand.gripTracked)stroke.latched=false;
             resetContact(stroke);continue;
         }
-        if(stroke.latched||now<nextResponseAt)continue;
+        if(stroke.latched||now<nextResponseAt){trace.state="latched_or_cooldown";continue;}
         const auto elapsed=stroke.sampledAt&&frame.sampleTime>stroke.sampledAt?frame.sampleTime-stroke.sampledAt:0;
+        trace.elapsed=elapsed;
         if(!elapsed||elapsed>100||stroke.activation!=frame.activation){
-            stroke.relative=palm-start;stroke.local=local;stroke.sampledAt=stroke.startedAt=frame.sampleTime;
+            trace.state=!elapsed?"begin":elapsed>100?"sample_gap":"activation";++trace.resets;
+            stroke.relative=palm-start;stroke.local=local;stroke.tracked=tracked;stroke.sampledAt=stroke.startedAt=frame.sampleTime;
             stroke.activation=frame.activation;stroke.travel=0;continue;
         }
         // Input can arrive between two native polls only a millisecond apart.
         // Measure the stroke across a short tracking interval; those polls
         // must not turn an ordinary wrist movement into a rejected fast hit.
-        if(elapsed<40)continue;
+        if(elapsed<40){trace.state="short_interval";continue;}
         const float dt=static_cast<float>(elapsed)*.001f;
-        const float relativeStep=length(palm-start-stroke.relative),localStep=length(local-stroke.local);
-        const float speed=std::max(relativeStep,localStep)/dt;
-        stroke.relative=palm-start;stroke.local=local;stroke.sampledAt=frame.sampleTime;
-        if(speed>.9f){stroke.startedAt=frame.sampleTime;stroke.travel=0;continue;}
-        // Walking past, a still palm, and the animal walking into the hand
-        // cannot contribute a stroke. Both reference frames must see movement.
-        if(speed>.025f)stroke.travel+=std::min(relativeStep,localStep);
+        const auto movement=animalStrokeDelta(palm-start-stroke.relative,tracked-stroke.tracked,local-stroke.local,dt);
+        const float speed=movement.speed;
+        trace.speed=speed;trace.state="contact";
+        stroke.relative=palm-start;stroke.local=local;stroke.tracked=tracked;stroke.sampledAt=frame.sampleTime;
+        if(speed>.9f){trace.state="too_fast";++trace.resets;stroke.startedAt=frame.sampleTime;stroke.travel=0;continue;}
+        stroke.travel+=movement.travel;
         const auto touchingFor=frame.sampleTime-stroke.startedAt;
+        trace.touchingFor=touchingFor;trace.travel=stroke.travel;
         if(touchingFor>=500&&stroke.travel>=.025f){
             if(respond()){
                 // Buddy responses are shared across the two hands. Preserve
@@ -164,6 +187,7 @@ void consumeAnimalTouch(){
     }
 }
 std::string inspectAnimalTouch(){
+    std::lock_guard lock(interactionMutex);
     const auto sample=hands();const auto bones=dogBones();
     std::ostringstream out;out<<"{\"dog\":"<<(bones?"true":"false");
     const auto vector=[&](const char* key,Vec3 v){out<<",\""<<key<<"\":["<<v.x<<','<<v.y<<','<<v.z<<']';};
@@ -186,7 +210,16 @@ std::string inspectAnimalTouch(){
        <<",\"optic\":"<<sample.frame.controllers.optic.held<<",\"frontEnd\":"<<sample.frame.controllers.frontEnd
        <<",\"squeeze\":"<<sample.frame.controllers.hands[1].squeeze
        <<",\"physicalPetResponses\":"<<physicalResponses.load()
-       <<",\"lastPhysicalPetAt\":"<<physicalResponseAt.load()<<'}';return out.str();
+       <<",\"lastPhysicalPetAt\":"<<physicalResponseAt.load()
+       <<",\"eligibilityMask\":"<<eligibilityMask<<",\"contact\":[";
+    for(size_t side=0;side<2;++side){
+        const auto& trace=contactTrace[side];if(side)out<<',';
+        out<<"{\"state\":\""<<trace.state<<"\",\"samples\":"<<trace.samples<<",\"resets\":"<<trace.resets
+           <<",\"elapsed\":"<<trace.elapsed<<",\"touchingFor\":"<<trace.touchingFor
+           <<",\"distance\":"<<trace.distance<<",\"speed\":"<<trace.speed<<",\"travel\":"<<trace.travel
+           <<",\"strikeCurl\":"<<trace.curl<<'}';
+    }
+    out<<"]}";return out.str();
 }
 std::string requestNativeDogResponse(){
     if(!dogBones())return "No active D-Dog";

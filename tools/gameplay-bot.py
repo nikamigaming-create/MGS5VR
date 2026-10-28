@@ -190,6 +190,10 @@ def main():
         identity["bindings_tool_sha256"] = digest(args.controls_tool)
         events = Events(args.output, identity)
         atomic_json(args.output / "bindings.json", bindings)
+        if identity['game'] == 'gz':
+            from gameplay_bot.ground_zeroes import run
+            run(args, identity, bindings, events)
+            return
         live = recording = pose_cleanup = None
         result = {"status": "failed"}
         try:
@@ -264,8 +268,12 @@ def main():
                           "captures": capture_continue_rack(live), "visual_acceptance": "pending"}
             elif args.command in ("bench","bench-film"):
                 from gameplay_bot.cabin_workbench import workbench
+                film_policy=read_json(args.suite) if args.suite else {}
+                source_film=film_policy.get('source_eye_film') is True
+                if source_film and (args.command!='bench-film' or not args.record):
+                    raise BotFault('Source-eye cabin film requires bench-film and --record')
                 result=workbench(live,timeout=args.seconds,film=args.command=='bench-film',
-                                 on_ready=start_recording if args.record else None)
+                                 on_ready=start_recording if args.record else None,source_film=source_film)
             elif args.command == "studio-board":
                 from gameplay_bot.cabin_workbench import inspect_persisted_board
                 result=inspect_persisted_board(live,timeout=args.seconds)
@@ -286,7 +294,18 @@ def main():
                     arrival=({'status':'current_scene','state':current} if current['scene']==policy['scene']
                         or (policy.get('restore_vr_only') and policy['scene']=='cabin' and current.get('cabin'))
                         else advance_startup(live,timeout=args.seconds))
-                result=inspect_controls_editor(live,policy,args.seconds);result['arrival']=arrival
+                start_recording()
+                film=None
+                if policy.get('compositor_film'):
+                    if not (policy.get('vr_only') or policy.get('inspect_only')):
+                        raise BotFault('Compositor controls chapter requires a bounded panel or VR toggle take')
+                    from gameplay_bot.cabin_film import CabinFilm
+                    film=CabinFilm(live);film.begin('live-controls')
+                try:
+                    result=inspect_controls_editor(live,policy,args.seconds);result['arrival']=arrival
+                finally:
+                    if film:film.end()
+                if film:result['film']=film.takes
             elif args.command == "studio-manager":
                 from gameplay_bot.studio_manager import inspect_camera_manager
                 policy=read_json(args.suite) if args.suite else {'scene':'title','mode':'gallery'}

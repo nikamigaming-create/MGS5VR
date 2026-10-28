@@ -9,7 +9,7 @@
 #include <stdexcept>
 using Microsoft::WRL::ComPtr;
 void require(bool ok,const char* why){if(!ok)throw std::runtime_error(why);}
-int main(){
+int main(int argc,char**){
     HWND probeWindow{},gameWindow{};std::filesystem::path path;int result=1;
     try {
         const auto suffix=std::to_wstring(GetCurrentProcessId())+L"-"+std::to_wstring(GetTickCount64());
@@ -18,7 +18,7 @@ int main(){
         {std::ofstream out(path);out<<"[display]\nenabled=1\nrender_width=4160\nrender_height=4160\nmirror_width=1280\nmirror_height=720\n";}
         // Both windows remain hidden. No game, headset, or monitor mode changes.
         probeWindow=CreateWindowExW(0,L"STATIC",L"MGS5VR display test probe",WS_OVERLAPPEDWINDOW,0,0,32,32,nullptr,nullptr,nullptr,nullptr);
-        gameWindow=CreateWindowExW(0,L"STATIC",L"METAL GEAR SOLID V: THE PHANTOM PAIN",WS_OVERLAPPEDWINDOW,0,0,100,100,nullptr,nullptr,nullptr,nullptr);
+        gameWindow=CreateWindowExW(0,L"STATIC",argc>1?L"METAL GEAR SOLID V: GROUND ZEROES":L"METAL GEAR SOLID V: THE PHANTOM PAIN",WS_OVERLAPPEDWINDOW,0,0,100,100,nullptr,nullptr,nullptr,nullptr);
         require(probeWindow&&gameWindow,"Create hidden test windows");
         ComPtr<ID3D11Device> device;ComPtr<ID3D11DeviceContext> context;ComPtr<IDXGISwapChain> probe;
         DXGI_SWAP_CHAIN_DESC desc{};desc.BufferDesc.Width=32;desc.BufferDesc.Height=32;desc.BufferDesc.Format=DXGI_FORMAT_R8G8B8A8_UNORM;

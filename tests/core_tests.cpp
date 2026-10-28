@@ -5,6 +5,7 @@
 #include "mgs5vr/forearm_crop.hpp"
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/motion_melee.hpp"
+#include "mgs5vr/animal_interaction.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/rocket_arm.hpp"
 #include "mgs5vr/eyepatch.hpp"
@@ -28,6 +29,8 @@
 #include "mgs5vr/native_text_input.hpp"
 #include "mgs5vr/vehicle_pedals.hpp"
 #include "mgs5vr/weapon_obstruction.hpp"
+#include "mgs5vr/gz_player.hpp"
+#include <unordered_map>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -40,6 +43,89 @@ static void expect(bool ok,const char* name){++checks;if(!ok){++failures;std::ce
 static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
+    {
+        constexpr uintptr_t base=0x100000000,system=0x1000,pause=0x2000,ui=0x3000,terminal=0x4000;
+        std::unordered_map<uintptr_t,unsigned char> memory;
+        const auto put=[&](uintptr_t address,const auto& value){
+            const auto* bytes=reinterpret_cast<const unsigned char*>(&value);
+            for(size_t i=0;i<sizeof(value);++i)memory[address+i]=bytes[i];
+        };
+        put(base+0x1e07a28,system);put(system,base+0x17674e0);put(system+0x3e8,pause);
+        put(pause,base+0x176c6c8);put(pause+0x30,uint32_t{0});
+        put(base+0x1e7e228,ui);put(ui,base+0x17c70e8);put(ui+0x7b0,terminal);
+        put(terminal,base+0x17c6698);put(terminal+0x28,uint8_t{0});
+        bool closing{};unsigned reads{};
+        const auto read=[&](uintptr_t address,void* output,size_t size){
+            if(closing&&address==terminal+0x28&&++reads==2)put(address,uint8_t{0});
+            auto* bytes=static_cast<unsigned char*>(output);
+            for(size_t i=0;i<size;++i){const auto it=memory.find(address+i);if(it==memory.end())return false;bytes[i]=it->second;}
+            return true;
+        };
+        auto state=readGzMenuState(base,read);
+        expect(state&&!state->idroid&&!state->pause,"GZ native menu owners permit gameplay only when both are closed");
+        put(terminal+0x28,uint8_t{1});put(pause+0x30,uint32_t{2});state=readGzMenuState(base,read);
+        expect(state&&state->idroid&&state->pause,"GZ Pause over iDroid retains both native owners");
+        closing=true;
+        expect(!readGzMenuState(base,read),"GZ menu transition cannot publish a mixed input context");
+        closing=false;put(terminal,base+0x22705a8);
+        expect(!readGzMenuState(base,read),"TPP terminal layout cannot be accepted as a GZ menu owner");
+        memory.erase(base+0x1e07a28);
+        expect(!readGzMenuState(base,read),"missing GZ menu manager cannot silently enable gameplay controls");
+        constexpr uintptr_t entity=0x5000,table=0x6000,basic=0x7000;
+        put(entity+0x60,uint32_t{139});put(entity+0x68,table);put(table+0x23*8,basic+0x28);
+        put(basic,base+0x16d0ef0);put(basic+0x30,entity);put(basic+0x50,uint8_t{0x24});
+        expect(readGzBasicAction(base,entity,read)==true,"GZ native basic action admits foot controls");
+        put(basic+0x50,uint8_t{0xe4});
+        expect(readGzBasicAction(base,entity,read)==false,"GZ suspended basic action retains native action controls");
+        put(basic+0x30,entity+8);
+        expect(!readGzBasicAction(base,entity,read),"GZ action from a different entity cannot admit foot controls");
+        put(basic+0x30,entity);put(basic,base+0x16d3050);
+        expect(!readGzBasicAction(base,entity,read),"GZ binocular component cannot masquerade as the basic action owner");
+    }
+    {
+        // A separate GZ entity and published body palette. The root is yawed
+        // 90 degrees, so a world-to-local error cannot pass at the origin.
+        constexpr uintptr_t base=0x100000000,registry=0x1000,entry=0x2000,player=0x3000,
+            entity=0x4000,table=0x5000,selector=0x6000,cameraOwner=0x7000,camera=0x8000,
+            character=0x9000,models=0xa000,model=0xb000,names=0xc000,parents=0xd000,palette=0xe000;
+        std::unordered_map<uintptr_t,unsigned char> memory;
+        const auto put=[&](uintptr_t a,const auto& value){
+            const auto* bytes=reinterpret_cast<const unsigned char*>(&value);
+            for(size_t i=0;i<sizeof(value);++i)memory[a+i]=bytes[i];
+        };
+        put(base+0x1e3b600,registry);put(registry+0x128,entry);put(entry+0x150,player);put(player+0x38,entity);
+        put(entity+0x60,int32_t{139});put(entity+0x68,table);put(table+0x43*8,selector+0x28);
+        put(selector,base+0x16b2088);put(selector+0x1fc,int32_t{0});put(table+0x45*8,cameraOwner+0x28);
+        put(cameraOwner+0x30,entity);put(cameraOwner+0xc0,camera);put(camera,base+0x16228e8);
+        const Pose source{{0,0,0,1},{11,3,20}};
+        put(camera+0xc0,std::array<float,8>{0,0,0,1,11,3,20,1});
+        put(table,character+0x28);put(character,base+0x15f7460);put(character+0x230,int32_t{1});
+        put(character+0x238,models);put(models,model);put(model,base+0x18437c0);put(model+0xf8,int32_t{138});
+        put(model+0xe8,names);put(model+0xf0,parents);put(model+0xe0,palette);put(names+16,uint32_t{0xc3a88a1b});
+        for(int32_t i=0;i<5;++i)put(parents+i*32,i-1);
+        put(model+0xa0,std::array<float,16>{0,0,-1,0,0,1,0,0,1,0,0,0,10,2,20,1});
+        put(palette+256,std::array<float,16>{0,0,-1,0,0,1,0,0,1,0,0,0,10.2f,3.5f,19.9f,1});
+        bool changePalette{};unsigned paletteReads{};
+        const auto read=[&](uintptr_t a,void* out,size_t size){
+            if(a==palette+256&&changePalette&&++paletteReads==2)return false;
+            auto* bytes=static_cast<unsigned char*>(out);
+            for(size_t i=0;i<size;++i){const auto it=memory.find(a+i);if(it==memory.end())return false;bytes[i]=it->second;}
+            return true;
+        };
+        auto head=readGzPlayerHead(base,source,read);
+        expect(head&&same({head->head[12],head->head[13],head->head[14]},{.1f,1.5f,.2f}),
+            "GZ published world head becomes local to its actual rotated body root");
+        expect(head&&playerHeadPosition(head->root,head->head)&&same(*playerHeadPosition(head->root,head->head),{10.2f,3.5f,19.9f}),
+            "GZ head reproduces native world position through the shared camera contract");
+        auto unrelated=source;unrelated.position.x+=1;
+        expect(!readGzPlayerHead(base,unrelated,read),"GZ rejects a scene camera not owned by the selected player camera");
+        put(selector+0x1fc,int32_t{-1});
+        expect(!readGzPlayerHead(base,source,read),"GZ title/loading camera cannot borrow the retired player head");
+        put(selector+0x1fc,int32_t{0});put(names+16,uint32_t{0});
+        expect(!readGzPlayerHead(base,source,read),"GZ rejects an unnamed or different head bone");
+        put(names+16,uint32_t{0xc3a88a1b});changePalette=true;
+        expect(!readGzPlayerHead(base,source,read),"GZ rejects a body palette that changes during observation");
+    }
     {
         const Pose head{},right{{},{.032f,0,0}},left{{},{-.032f,0,0}};
         const EyeFov fov{-.785398163f,.785398163f,.785398163f,-.785398163f};
@@ -699,6 +785,15 @@ int main(){
             expect(!suppressFlatFirearmReticle(order,100,true),"reticle suppression preserves prompts, equipment and text");
         expect(nativeReconLayer(23,false,true)&&!nativeReconLayer(23,true,false),"person cue needs its native layout-camera identity");
         expect(nativeReconLayer(2,true,false)&&nativeReconLayer(3,true,false),"native world silhouettes are recon layers");
+        for(const auto order:{23u,24u,25u,26u}){
+            expect(!gzWorldMarkerVisible(order,HudMode::off,HudView::binoculars,true),"GZ HUD off removes native lens markers too");
+            expect(gzWorldMarkerVisible(order,HudMode::binocularsOnly,HudView::binoculars,false),"GZ recon lens retains acquired cues when world enemies are disabled");
+            expect(!gzWorldMarkerVisible(order,HudMode::full,HudView::otherOptic,true),"GZ firearm scopes cannot inherit recon cues");
+        }
+        expect(gzWorldMarkerVisible(23,HudMode::binocularsOnly,HudView::world,true)
+            &&!gzWorldMarkerVisible(25,HudMode::binocularsOnly,HudView::world,true),"GZ enemy preference does not enable terrain labels");
+        for(const auto order:{49u,50u,70u,132u,133u,151u,173u})
+            expect(gzWorldMarkerVisible(order,HudMode::off,HudView::world,false),"GZ recon policy preserves prompts, map, status and menus");
         for(const auto order:{49u,51u,52u,133u,137u,147u,151u,171u})
             expect(!nativeReconLayer(order,false,true),"recon policy cannot hide caption, interaction, picker or status layers");
         expect(hudLayer(133,100,false,false)==HudLayer::general,"ordinary layer 133 is not an equipment card");
@@ -877,7 +972,8 @@ int main(){
             expect(l.presentCapacity==l.presentCount+4&&l.presentData==l.presentCount+8,
                 "duplicate scene replay removes only its own native present-vector append");
         }
-        expect(gz.uiProjectionReturn==0&&tpp.uiProjectionReturn!=0,"unmapped GZ UI cannot call the TPP adapter");
+        expect(gz.uiProjectionReturn==0x106e900&&tpp.uiProjectionReturn==0x2e68a0,
+            "UI workers join through each game's own perspective-builder return");
         HeadCameraStatus transition;transition.awaitingPlayer=true;transition.reason=HeadCameraStop::playerHeadUnavailable;
         expect(mayRetainStereoSurround(transition),"planned native loading retains its explicitly frozen surroundings");
         for(const auto reason:{HeadCameraStop::cameraChanged,HeadCameraStop::matrixMismatch,
@@ -1393,6 +1489,22 @@ int main(){
             "fresh aim and attack on the menu-opening frame do not acquire combat ownership");
     }
     {
+        // A stationary physical controller can still have animated skin
+        // motion and a dog moving against it. Neither is a deliberate stroke.
+        float idle{},walking{},headOnly{},stroking{};
+        for(unsigned n=0;n<200;++n){
+            const Vec3 animated{.003f,.001f,0};
+            idle+=animalStrokeDelta(animated,{},animated,.05f).travel;
+            walking+=animalStrokeDelta(animated,{.003f,0,0},{},.05f).travel;
+            headOnly+=animalStrokeDelta(animated,{},Vec3{0,.003f,0},.05f).travel;
+            if(n<20)stroking+=animalStrokeDelta({.003f,0,0},{.003f,0,0},{.003f,0,0},.05f).travel;
+        }
+        expect(idle==0&&walking==0&&headOnly==0,"native skin/animal motion, walking and head-only motion never accumulate a physical pet");
+        expect(stroking>.055f&&stroking<.065f,"a slow six-centimeter tracked stroke contributes real contact travel");
+        expect(animalStrokeDelta({.001f,0,0},{.001f,0,0},{.001f,0,0},.05f).travel==0,
+            "sub-threshold physical jitter cannot accumulate while the dog moves");
+        expect(animalStrokeDelta({.08f,0,0},{.08f,0,0},{.08f,0,0},.05f).speed>.9f,
+            "a rapid physical hit retains the existing pet speed rejection");
         MotionMelee melee;const Pose head{{},{0,1.6f,0}};
         const uint64_t actorTag=(uint64_t{1}<<63)|(uint64_t{1}<<59);
         for(uint64_t index=0;index<512;++index){
@@ -4322,6 +4434,29 @@ int main(){
             for(const auto copy:copies)intact&=near(fitted[copy[0]].x,-.432f);
         }
         expect(intact,"bilateral partition preserves both distal arms and independently caps the native female elbow planes");
+    }
+    {
+        // Owned Snake cuffs contain an axial step whose two corners become
+        // coincident only after projection onto the elbow plane.
+        std::vector<Vec3> points;
+        const std::array<Vec3,5> ring{{{0,-.04f,-.04f},{0,.04f,-.04f},
+            {0,.04f,-.03f},{0,.04f,.04f},{0,-.04f,.04f}}};
+        for(float x:{.35f,.48f,.60f})for(auto p:ring){p.x=x;points.push_back(p);}
+        points[7]={.51f,.04f,-.04f};
+        std::vector<uint16_t> original;
+        for(uint16_t ringIndex=0;ringIndex<2;++ringIndex)for(uint16_t i=0;i<5;++i){
+            const uint16_t a=ringIndex*5+i,b=ringIndex*5+(i+1)%5,c=a+5,d=b+5;
+            original.insert(original.end(),{a,b,c,b,d,c});
+        }
+        auto cropped=original;
+        for(size_t at=0;at<30;at+=3)cropped[at+1]=cropped[at+2]=cropped[at];
+        const std::array<ForearmIndexRange,1> lod{{{0,original.size()}}};
+        std::vector<Vec3> fitted;std::vector<std::array<uint16_t,2>> copies;
+        const auto caps=closeForearmCuffs(points,original,cropped,lod,false,.452f,&fitted,&copies);
+        expect(caps==2&&copies.size()==4&&fitted.size()==points.size()
+            &&near(fitted[6].x,.472f)&&near(fitted[7].x,.472f)
+            &&std::equal(cropped.begin()+30,cropped.end(),original.begin()+30),
+            "axially stepped cuff closes after projected corner collapse and fits both seam vertices");
     }
     // Captured ACC cross-body reach: its fully extended elbow circle lies
     // inside the head, so changing bend alone cannot produce a fresh rig.

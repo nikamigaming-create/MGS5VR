@@ -41,6 +41,13 @@ constexpr bool worldMarkerVisible(HudMode mode,bool enemyMarkers,uint8_t letter)
 constexpr bool nativeReconLayer(uint32_t order,bool sceneCamera,bool layoutCamera) noexcept {
     return (sceneCamera&&(order==2||order==3))||(layoutCamera&&order==23);
 }
+// GZ's owned priority table separates character cues (23/24) from terrain
+// markers (25/26). Apply only to joined gameplay cameras, never iDroid maps.
+constexpr bool gzWorldMarkerVisible(uint32_t order,HudMode mode,HudView view,bool enemies) noexcept {
+    if(order<23||order>26)return true;
+    if(view!=HudView::world)return worldHudVisible(mode,view);
+    return order<25?worldMarkerVisible(mode,enemies,0):worldHudVisible(mode,view);
+}
 // Retail status/ammo uses the Z=135 layout. iDroid's own animated map cameras
 // reuse priorities, so only this observed layout stays on the personal HUD.
 constexpr bool idroidPersonalStatus(uint32_t order,float cameraDepth,bool idroid) noexcept {

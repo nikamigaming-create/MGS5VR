@@ -34,6 +34,9 @@ def digest(path):
 
 def game_identity(game):
     game = pathlib.Path(game).resolve()
+    if (game / 'MgsGroundZeroes.exe').is_file():
+        from .ground_zeroes import game_identity as gz_identity
+        return gz_identity(game)
     # Exact executable path and process creation time prevent PID reuse. This
     # is read-only process inventory, never Windows keyboard/focus automation.
     script = ("Get-CimInstance Win32_Process -Filter \"Name='mgsvtpp.exe'\" | "

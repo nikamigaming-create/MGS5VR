@@ -1,4 +1,5 @@
 #include "mgs5vr/ui_renderer.hpp"
+#include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/opening_selector.hpp"
 #include "mgs5vr/head_camera.hpp"
 #include "mgs5vr/idroid_rig.hpp"
@@ -36,6 +37,7 @@ using QueueFn=uintptr_t(*)(void*,void*);
 using ExecuteFn=uintptr_t(*)(void*,void*,void*,uint32_t);
 using NodeFn=uintptr_t(*)(void*,void*);
 QueueFn originalQueue{};ExecuteFn originalExecute{};NodeFn originalNode{};
+std::atomic_bool gzUiEnabled{};
 using ParseTextFn=int(*)(const char*,void*,void*,uint32_t,uint32_t,float,void*,uint32_t);
 ParseTextFn originalParseText{};
 using PlainTextFn=bool(*)(void*,void*,const char*,bool,bool);
@@ -141,6 +143,7 @@ struct Source {
     float weaponHudSetback{.06f};
     bool firearmReticle{};
     float wristTextScale{1.5f};
+    bool enemyWorldMarkers{};
     UiBoundarySource boundaryTrace{};
     IdroidUiSource idroidSource{};
     Pose idroidDisplay{};
@@ -411,17 +414,19 @@ void equipmentUpdate(void* object){
     }
 }
 bool reconColor(uintptr_t model,uint32_t parameter,std::array<float,4>& color){
+    // GZ inserts one additional pointer before both native material arrays.
+    const uintptr_t shift=gzUiEnabled.load()?8:0;
     uint32_t count{};uintptr_t materials{};
-    if(!read(model+0x130,&count,sizeof(count))||count>64
-        ||!read(model+0x138,&materials,sizeof(materials))||!materials)return false;
+    if(!read(model+0x130+shift,&count,sizeof(count))||count>64
+        ||!read(model+0x138+shift,&materials,sizeof(materials))||!materials)return false;
     for(uint32_t i=0;i<count;++i){
         uintptr_t material{},records{},values{};uint32_t name{},recordCount{},valueCount{};
         if(!read(materials+i*8,&material,sizeof(material))||!material
             ||!read(material+0x10,&name,sizeof(name))||name!=0xd501d11c
-            ||!read(material+0x20,&recordCount,sizeof(recordCount))||recordCount>256
-            ||!read(material+0x28,&records,sizeof(records))||!records
-            ||!read(material+0x30,&valueCount,sizeof(valueCount))||valueCount>256
-            ||!read(material+0x38,&values,sizeof(values))||!values)continue;
+            ||!read(material+0x20+shift,&recordCount,sizeof(recordCount))||recordCount>256
+            ||!read(material+0x28+shift,&records,sizeof(records))||!records
+            ||!read(material+0x30+shift,&valueCount,sizeof(valueCount))||valueCount>256
+            ||!read(material+0x38+shift,&values,sizeof(values))||!values)continue;
         for(uint32_t p=0;p<recordCount;++p){
             std::array<uint32_t,2> record{};
             if(!read(records+p*8,record.data(),sizeof(record))||record[0]!=parameter)continue;
@@ -958,7 +963,8 @@ int parseText(const char* content,void* primary,void* secondary,uint32_t font,ui
 }
 __declspec(noinline) uintptr_t queue(void* job,void* state){
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress());
-    if(!enabled.load()||caller!=base+0x2e7d98)return originalQueue(job,state);
+    const bool gz=gzUiEnabled.load();
+    if((!enabled.load()&&!gz)||caller!=base+(gz?0x106fcf2:0x2e7d98))return originalQueue(job,state);
     try{
         std::lock_guard lock(mutex);const auto key=reinterpret_cast<uintptr_t>(state)+0x120;
         // Publish before native dispatch: a worker may start inside the queue
@@ -976,7 +982,7 @@ struct ExecutionScope {
     ~ExecutionScope(){executing=saved;}
 };
 __declspec(noinline) uintptr_t execute(void* renderer,void* info,void* task,uint32_t worker){
-    if(!enabled.load())return originalExecute(renderer,info,task,worker);
+    if(!enabled.load()&&!gzUiEnabled.load())return originalExecute(renderer,info,task,worker);
     ++executions;ExecutionScope scope;executing={};
     try{
         std::lock_guard lock(mutex);const auto found=pending.find(reinterpret_cast<uintptr_t>(info));
@@ -984,7 +990,97 @@ __declspec(noinline) uintptr_t execute(void* renderer,void* info,void* task,uint
     }catch(...){}
     return originalExecute(renderer,info,task,worker);
 }
+uintptr_t gzNode(void* state,void* item){
+    if(!executing.eye.sourceSequence||!executing.eye.projected
+       ||executing.frontEnd||executing.loading)return originalNode(state,item);
+    const auto camera=field<uintptr_t>(state,0x308);
+    const auto order=field<uint32_t>(item,0x20);
+    if(camera==executing.camera){
+        if(!executing.menuOpen){
+            std::lock_guard lock(mutex);
+            auto found=std::find_if(nodes.begin(),nodes.end(),[&](const auto& n){return n.sceneCamera&&n.order==order;});
+            if(found==nodes.end()&&nodes.size()<96){
+                nodes.push_back({reinterpret_cast<uintptr_t>(item),camera,0,0,1,executing.eye.sourceSequence,0,executing.eye.eye,order,{}});
+                nodes.back().sceneCamera=true;
+                log("GZ scene UI priority="+std::to_string(order));
+            }
+            if(!gzWorldMarkerVisible(order,executing.hudMode,executing.hudView,executing.enemyWorldMarkers)){
+                ++suppressedDraws;return 0;
+            }
+        }
+        return originalNode(state,item);
+    }
+    uintptr_t type{};std::array<float,16> world{};
+    if(!read(camera,&type,sizeof(type))||type!=base+0x1841378
+       ||!read(camera+0x30,world.data(),sizeof(world))||!nativeAffinePose(world))return originalNode(state,item);
+    if(executing.menuOpen){
+        const auto status=headCamera().status();const auto now=steadyMilliseconds();
+        if(!status.active||status.activation!=executing.eye.activation||now<executing.eye.sampleTime
+           ||now-executing.eye.sampleTime>150||!executing.menuPanelTracked){++suppressedDraws;return 0;}
+        const auto saved=field<std::array<float,16>>(state,0x1c0);
+        const auto canvas=nativeUiCanvasProjection(saved,executing.projection);
+        const auto width=executing.idroidScreenWidth;
+        const auto mapped=uiPanelProjection(canvas,executing.view,executing.eye.view.fov,
+            executing.menuPanel,width,width*9.f/16.f);
+        if(!mapped){++suppressedDraws;return 0;}
+        auto* output=static_cast<unsigned char*>(state)+0x1c0;
+        std::memcpy(output,mapped->data(),sizeof(*mapped));
+        const auto result=originalNode(state,item);
+        std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
+        if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
+        return result;
+    }
+    // Only native layout space belongs to personal HUD. Scene cameras retain
+    // their own world markers; title/loading/menus retain the native canvas.
+    const bool layout=world[0]==-1&&world[5]==1&&world[10]==-1&&world[15]==1
+        &&world[1]==0&&world[2]==0&&world[3]==0&&world[4]==0&&world[6]==0&&world[7]==0
+        &&world[8]==0&&world[9]==0&&world[11]==0&&world[12]==0&&world[13]==0
+        &&(world[14]==100||world[14]==135||world[14]==150);
+    if(!layout)return originalNode(state,item);
+    if(!gzWorldMarkerVisible(order,executing.hudMode,executing.hudView,executing.enemyWorldMarkers)){
+        ++suppressedDraws;return 0;
+    }
+    // GZ's packet priority is at +20 (TPP uses +28). Its owned priority
+    // table reserves 53..57 for the flat reticle; the raised rifle uses 56.
+    // Native scope layers start at 130 and retain their own sight content.
+    if(executing.firearmReticle&&world[14]==100&&order>=53&&order<=57){++suppressedDraws;return 0;}
+    {
+        std::lock_guard lock(mutex);
+        const auto address=reinterpret_cast<uintptr_t>(item);
+        if(nodes.size()<96&&std::none_of(nodes.begin(),nodes.end(),[&](const auto& n){return n.node==address&&n.camera==camera;})){
+            nodes.push_back({address,camera,0,0,1,executing.eye.sourceSequence,field<uint32_t>(item,0x48),executing.eye.eye,field<uint32_t>(item,0x20),{}});
+            std::ostringstream message;message<<"GZ layout packet node="<<address<<" depth="<<world[14]
+                <<" fields20_24_28="<<field<uint32_t>(item,0x20)<<','<<field<uint32_t>(item,0x24)<<','<<field<uint32_t>(item,0x28);
+            log(message.str());
+        }
+    }
+    const auto status=headCamera().status();const auto now=steadyMilliseconds();
+    if(!status.active||status.activation!=executing.eye.activation||now<executing.eye.sampleTime
+       ||now-executing.eye.sampleTime>150||!executing.panelTracked){++suppressedDraws;return 0;}
+    const auto saved=field<std::array<float,16>>(state,0x1c0);
+    const auto canvas=nativeUiCanvasProjection(saved,executing.projection);
+    // The native GZ weapon/ammo cards are priorities 132/133 at Z=135.
+    // Recenter their authored bottom-right canvas onto the forearm instead
+    // of shrinking the complete desktop canvas around the wrist origin.
+    const bool statusLayer=world[14]==135&&(order==132||order==133);
+    if(statusLayer&&!executing.panelVisible){++suppressedDraws;return 0;}
+    // GZ's dedicated Z=135 ammo layout fills much more of its canvas than
+    // TPP's common HUD. Give its authored card roughly a forearm's width;
+    // the previous .24 canvas made the ammunition digits too small to read.
+    const auto width=statusLayer?.42f*executing.wristTextScale:executing.pickerWidth*executing.wristTextScale;
+    const auto panel=statusLayer?executing.panel:executing.picker;
+    const auto mapped=uiPanelProjection(canvas,executing.view,executing.eye.view.fov,panel,width,width*9.f/16.f,
+        statusLayer?.72f+executing.weaponHudSetback/(width*.5f):0.f,statusLayer?-.70f:0.f);
+    if(!mapped){++suppressedDraws;return 0;}
+    auto* output=static_cast<unsigned char*>(state)+0x1c0;
+    std::memcpy(output,mapped->data(),sizeof(*mapped));
+    const auto result=originalNode(state,item);
+    std::memcpy(output,saved.data(),sizeof(saved));++spatialDraws;
+    if(executing.eye.eye<2)++spatialByEye[executing.eye.eye];
+    return result;
+}
 __declspec(noinline) uintptr_t node(void* state,void* item){
+    if(gzUiEnabled.load())return gzNode(state,item);
     // Hide native title rows only when the physical cassette selector belongs
     // to a verified helicopter title cabin. A fresh-start hospital backdrop
     // can remain in TitleMode without that replacement surface; keep the
@@ -1279,6 +1375,37 @@ __declspec(noinline) uintptr_t node(void* state,void* item){
     traceUiBoundary(state,item,UiObservedRoute::native);
     return originalNode(state,item);
 }
+}
+void installGzUiRenderer(uintptr_t moduleBase){
+    // Independently mapped GZ BuildDraw2D job, worker and packet interpreter.
+    // Keep TPP menu readers and its other hooks disabled for this executable.
+    struct Hook {uintptr_t rva;void* wrapper;void** original;std::array<unsigned char,10> bytes;size_t count;};
+    const std::array<Hook,3> hooks{{
+        {0x105bd10,reinterpret_cast<void*>(&queue),reinterpret_cast<void**>(&originalQueue),{0x40,0x57,0x48,0x83,0xec,0x30},6},
+        {0x106f670,reinterpret_cast<void*>(&execute),reinterpret_cast<void**>(&originalExecute),{0x4c,0x8b,0xdc,0x57,0x48,0x81,0xec,0x80,0x06,0},10},
+        {0x106e980,reinterpret_cast<void*>(&node),reinterpret_cast<void**>(&originalNode),{0x48,0x89,0x5c,0x24,0x10,0x57,0x48,0x83,0xec,0x20},10}}};
+    for(const auto& h:hooks){std::array<unsigned char,10> actual{};
+        if(!read(moduleBase+h.rva,actual.data(),h.count)||std::memcmp(actual.data(),h.bytes.data(),h.count))
+            throw std::runtime_error("GZ UI renderer signature mismatch");
+    }
+    base=moduleBase;
+    std::array<wchar_t,32768> executable{};
+    if(GetModuleFileNameW(nullptr,executable.data(),static_cast<DWORD>(executable.size())))
+        settings=std::filesystem::path(executable.data()).parent_path()/L"mgs5vr.ini";
+    wristHudEnabled=GetPrivateProfileIntW(L"diagnostics",L"wrist_hud_experiment",0,settings.c_str())==1;
+    for(const auto& h:hooks){
+        const auto target=reinterpret_cast<void*>(base+h.rva);
+        if(MH_CreateHook(target,h.wrapper,h.original)!=MH_OK||MH_EnableHook(target)!=MH_OK){
+            for(const auto& rollback:hooks)MH_DisableHook(reinterpret_cast<void*>(base+rollback.rva));
+            throw std::runtime_error("Cannot install GZ UI worker adapter");
+        }
+    }
+    constexpr unsigned char parameterEntry[]{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x83,0xec,0x20};
+    std::array<unsigned char,sizeof(parameterEntry)> parameterActual{};
+    if(read(base+0xf535c0,parameterActual.data(),parameterActual.size())
+        &&!std::memcmp(parameterActual.data(),parameterEntry,sizeof(parameterEntry)))
+        setReconParameter=reinterpret_cast<ModelParameterFn>(base+0xf535c0);
+    gzUiEnabled.store(true);log("GZ native UI worker adapter installed; retained wrist HUD preference="+std::to_string(wristHudEnabled));
 }
 void installUiRenderer(uintptr_t moduleBase){
     struct Hook {uintptr_t rva;void* wrapper;void** original;const unsigned char* signature;size_t size;};
@@ -1752,6 +1879,7 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
     producing.openingNativeMenu=rig.controllers.openingNativeMenu;
     producing.hudMode=rig.controllers.hudMode;
     producing.hudView=hudView;
+    producing.enemyWorldMarkers=rig.controllers.enemyWorldMarkers;
     producing.projection=projection;
     producing.equipmentOpen=rig.controllers.equipmentOpen;
     producing.weaponHudSetback=rig.controllers.weaponHudSetback;
@@ -1788,10 +1916,28 @@ void setUiRenderSource(const EyeFrame& eye,uintptr_t camera,const std::array<flo
 }
 void clearUiRenderSource() noexcept {producing={};}
 ReconModelVisibilityScope::ReconModelVisibilityScope(HudMode mode,HudView view,bool glow) noexcept {
-    if(!enabled.load()||!headCamera().active()||!setReconParameter
+    const bool gz=gzUiEnabled.load();
+    if((!enabled.load()&&!gz)||!headCamera().active()||!setReconParameter
         ||reconModelVisible(mode,view,glow))return;
     uintptr_t manager{},collection{},type{},data{};uint32_t count{};
-    if(!read(base+0x2be4c60,&manager,sizeof(manager))||!manager
+    if(gz){
+        uintptr_t entries{};uint32_t groups{};
+        if(!read(base+0x1e79d20,&manager,sizeof(manager))||!manager
+            ||!read(manager+0x80,&collection,sizeof(collection))||!collection
+            ||!read(collection,&type,sizeof(type))||type!=base+0x17bfbf8
+            ||!read(collection+0xa8,&groups,sizeof(groups))||groups>128
+            ||!read(collection+0xb0,&entries,sizeof(entries))||!entries)return;
+        // This collector groups objects by their native type key. Pending
+        // additions at +88/+98 are not the collection used by the renderer.
+        for(uint32_t i=0;i<groups;++i){
+            const auto entry=entries+i*24;uint64_t key{};
+            if(!read(entry,&key,sizeof(key))||(key&0xffffffffffffull)!=0xc6bbf233e078ull)continue;
+            if(!read(entry+8,&count,sizeof(count))||count>128
+                ||!read(entry+16,&data,sizeof(data)))return;
+            break;
+        }
+        if(!data||!count)return;
+    }else if(!read(base+0x2be4c60,&manager,sizeof(manager))||!manager
         ||!read(manager+0x58,&collection,sizeof(collection))||!collection
         ||!read(collection,&type,sizeof(type))||type!=base+0x21f7f48
         ||!read(collection+0x98,&data,sizeof(data))||!data
@@ -1800,11 +1946,11 @@ ReconModelVisibilityScope::ReconModelVisibilityScope(HudMode mode,HudView view,b
     if(!read(data,objects.data(),count*sizeof(uintptr_t)))return;
     for(uint32_t i=0;i<count&&count_<changes_.size();++i){
         const auto owner=objects[i];uintptr_t model{};uint16_t bones{};
-        // Never hide the source actor (+0x28), the whole mixed collector, or
-        // the occlusion-query proxy (+0x40). Only the verified recon clone.
-        if(!owner||!read(owner,&type,sizeof(type))||type!=base+0x21e0540
-            ||!read(owner+0x38,&model,sizeof(model))||!model
-            ||!read(model,&type,sizeof(type))||type!=base+0x20f4d90
+        // Only the recon clone: GZ source/clone/proxy are +38/+40/+48;
+        // TPP source/clone/proxy are +28/+38/+40. Never hide the source actor.
+        if(!owner||!read(owner,&type,sizeof(type))||type!=base+(gz?0x179bc28:0x21e0540)
+            ||!read(owner+(gz?0x40:0x38),&model,sizeof(model))||!model
+            ||!read(model,&type,sizeof(type))||type!=base+(gz?0x18437c0:0x20f4d90)
             ||!read(model+0xf8,&bones,sizeof(bones))||bones<2||bones>128)continue;
         // Both native tint vectors carry their opacity in W. Do not change
         // the source actor, native marking state, fade timer or RGB values.
@@ -1818,11 +1964,12 @@ ReconModelVisibilityScope::ReconModelVisibilityScope(HudMode mode,HudView view,b
     }
 }
 ReconModelVisibilityScope::~ReconModelVisibilityScope(){
+    const bool gz=gzUiEnabled.load();
     for(size_t i=0;i<count_;++i){
         const auto& c=changes_[i];uintptr_t type{},model{};
-        if(!read(c.owner,&type,sizeof(type))||type!=base+0x21e0540
-            ||!read(c.owner+0x38,&model,sizeof(model))||model!=c.model
-            ||!read(model,&type,sizeof(type))||type!=base+0x20f4d90)continue;
+        if(!read(c.owner,&type,sizeof(type))||type!=base+(gz?0x179bc28:0x21e0540)
+            ||!read(c.owner+(gz?0x40:0x38),&model,sizeof(model))||model!=c.model
+            ||!read(model,&type,sizeof(type))||type!=base+(gz?0x18437c0:0x20f4d90))continue;
         std::array<float,4> current{},hidden=c.color;hidden[3]=0;
         if(!reconColor(model,c.parameter,current)||current!=hidden)continue;
         alignas(16) const auto restored=c.color;
@@ -1830,7 +1977,7 @@ ReconModelVisibilityScope::~ReconModelVisibilityScope(){
     }
 }
 bool applyUiEyeProjection(float* output) noexcept {
-    if(!enabled.load()||!executing.eye.sourceSequence||!executing.eye.projected)return false;
+    if((!enabled.load()&&!gzUiEnabled.load())||!executing.eye.sourceSequence||!executing.eye.projected)return false;
     const auto status=headCamera().status();const auto now=steadyMilliseconds();
     if(!status.active||status.activation!=executing.eye.activation||now<executing.eye.sampleTime||now-executing.eye.sampleTime>150){++expired;return false;}
     // Native UI context stores this output at +0x1c0, with its selected
@@ -1974,6 +2121,7 @@ void reportUiRenderer(std::ostream& out){
     out<<"]}\n";
 }
 void stopUiRenderer() noexcept {
+    gzUiEnabled.store(false);
     enabled.store(false);uiBoundaryLayoutWindow.store(false);{std::lock_guard lock(popupChoiceMutex);popupChoiceLeases={};}
     clearUiRenderSource();
 }

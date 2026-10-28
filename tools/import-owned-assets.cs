@@ -1,5 +1,5 @@
-// Local, read-only import from the player's own supported TPP archives.
-// QAR/FPK layout and XOR decoding adapted from GzsTool (MIT, Atvaark 2015).
+// Local, read-only import from the player's own supported TPP/GZ archives.
+// QAR/GZS/FPK layout and XOR decoding adapted from GzsTool (MIT, Atvaark 2015).
 // FTEX layout adapted from FtexTool (MIT). See licenses/GzsTool.txt and FtexTool.txt.
 // No game content is embedded; exact hashes identify the supported owned assets.
 using System;
@@ -65,6 +65,19 @@ internal static class OwnedAssets
             0x15686aa73786877cUL, 0xb2c06aa73786877cUL, 0xb5706aa73786877cUL, 0x57186aa73786877cUL)
     };
     static readonly uint[] Xor = { 0x41441043, 0x11c22050, 0xd05608c3, 0x532c7319 };
+    static readonly ModelSpec GzBinocular = new ModelSpec("Assets/tpp/item/bin/Scenes/bin0_main0_def.fmdl",
+        "d559b632cf3255fc45d62289d712eed6e02ba8cb6db0a8fc8e0c96fb526c5f19");
+    static readonly TextureSpec[] GzTextures =
+    {
+        new TextureSpec("Assets/tpp/item/bin/Pictures/bin0_main0_def_c00_bsm.dds", "7cb40d536f37faa66d8153ef04afe6a23331d5bce45908dc7aa3f63558f566b3",
+            0x03409488e592869eUL, 0x06009488e592869eUL, 0x06109488e592869eUL, 0x06209488e592869eUL, 0x06309488e592869eUL),
+        new TextureSpec("Assets/tpp/item/bin/Pictures/bin0_main0_def_nrm.dds", "285c9a61b02b5798e79a5013b49ce3344b1f196ae2a56814ab7db6bfb9028eb4",
+            0x03402f8025d210e8UL, 0x06002f8025d210e8UL, 0x06102f8025d210e8UL, 0x06202f8025d210e8UL, 0x06302f8025d210e8UL),
+        new TextureSpec("Assets/tpp/item/bin/Pictures/bin0_main0_def_srm.dds", "20f1d6b3c6e13c149a79fc3526a524f442fc3457bceaa5ce775579bd0d43b61d",
+            0x0340071e626396f7UL, 0x0600071e626396f7UL, 0x0610071e626396f7UL, 0x0620071e626396f7UL, 0x0630071e626396f7UL),
+        new TextureSpec("Assets/tpp/item/bin/Pictures/bin0_main0_def_mtm.dds", "88c9679a783ece860f6182d4444b0ad07b59771be2d1b0eedab166e4f18b3e13",
+            0x0340fb8b6dcff051UL, 0x0600fb8b6dcff051UL, 0x0610fb8b6dcff051UL, 0x0620fb8b6dcff051UL, 0x0630fb8b6dcff051UL)
+    };
     static readonly uint[] Decode = { 0xbb8adedb, 0x65229958, 0x08453206, 0x88121302, 0x4c344955, 0x2c02f10c, 0x4887f823, 0xf3818583 };
 
     static void Require(bool ok, string reason) { if (!ok) throw new InvalidDataException(reason); }
@@ -169,6 +182,53 @@ internal static class OwnedAssets
     }
     static Dictionary<ulong, byte[]> ReadArchive(string path, params ulong[] wanted)
     { using (var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) return ReadArchive(input, new HashSet<ulong>(wanted)); }
+    static byte[] DecodeGzEntry(byte[] data, uint offset)
+    {
+        // GZS offsets are 16-byte blocks; arithmetic wraps at 32 bits.
+        uint mask = unchecked(101436752u * offset);
+        for (int at = 0; at < data.Length; at++)
+        { data[at] ^= (byte)(mask >> 16); mask = unchecked(mask + 6339797u); }
+        if (U32(data, 0) == 0xa0f8efe6)
+        {
+            uint key = U32(data, 4); data = Slice(data, 8, data.Length - 8);
+            mask = key | ((key ^ 0xffffcdec) << 16);
+            uint seed = unchecked(69069u * key);
+            for (int at = 0; at + 4 <= data.Length; at += 4)
+            {
+                Put32(data, at, U32(data, at) ^ mask);
+                mask = unchecked(3u * (seed + 23023u * mask));
+            }
+        }
+        return data;
+    }
+    static Dictionary<ulong, byte[]> ReadGzArchive(Stream input, HashSet<ulong> wanted)
+    {
+        var footer = Read(input, input.Length - 20, 20);
+        Require(U32(footer, 4) == 0x71610000 && U32(footer, 12) == 0 && U32(footer, 16) == 20,
+            "Unsupported GZS footer");
+        uint count = U32(footer, 0); Require(count <= 1000000, "GZS entry count is excessive");
+        long tableAt = (long)U32(footer, 8) * 16;
+        Require(tableAt <= input.Length - 20 && (long)count * 16 <= input.Length - 20 - tableAt,
+            "GZS table overlaps footer");
+        var table = Read(input, tableAt, checked((int)count * 16));
+        var result = new Dictionary<ulong, byte[]>();
+        for (int i = 0; i < count; i++)
+        {
+            int at = i * 16;
+            ulong hash = (ulong)U32(table, at + 4) << 32 | U32(table, at);
+            if (!wanted.Contains(hash)) continue;
+            Require(!result.ContainsKey(hash), "Duplicate requested GZS entry");
+            uint offset = U32(table, at + 8), size = U32(table, at + 12);
+            long position = (long)offset * 16;
+            Require(size >= 4 && size <= Limit && position <= tableAt && size <= tableAt - position,
+                "Invalid requested GZS asset extent");
+            result.Add(hash, DecodeGzEntry(Read(input, position, (int)size), offset));
+        }
+        Require(result.Count == wanted.Count, "Required owned assets are missing from the GZS archive");
+        return result;
+    }
+    static Dictionary<ulong, byte[]> ReadGzArchive(string path, params ulong[] wanted)
+    { using (var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) return ReadGzArchive(input, new HashSet<ulong>(wanted)); }
     static byte[] ReadModel(byte[] package, ModelSpec model)
     {
         Require(package.Length >= 48 && Encoding.ASCII.GetString(package, 0, 6) == "foxfpk", "Invalid collectible FPK");
@@ -186,7 +246,7 @@ internal static class OwnedAssets
     }
     static byte[] DecodeTexture(Dictionary<ulong, byte[]> archive, TextureSpec texture)
     {
-        byte[] info = archive[texture.Base]; Require(info.Length >= 64 && U32(info, 0) == 0x58455446 && U32(info, 4) == 0x4001eb85, "Expected FTEX 2.04");
+        byte[] info = archive[texture.Base]; Require(info.Length >= 64 && U32(info, 0) == 0x58455446 && U32(info, 4) == 0x4001eb85, "Expected FTEX 2.03");
         uint format = U16(info, 8), width = U16(info, 10), height = U16(info, 12), depth = U16(info, 14), mips = info[16];
         Require((format == 2 || format == 4) && width > 0 && width <= 4096 && height > 0 && height <= 4096 && depth <= 1 && mips > 0 && mips <= 13, "Unsupported collectible texture layout");
         Range(info, 64, mips * 16);
@@ -372,17 +432,35 @@ internal static class OwnedAssets
     static void Import(string game, string destination)
     {
         game = Path.GetFullPath(game); destination = Path.GetFullPath(destination);
-        // Import only the minimum validated local files; the game archives are never changed.
+        // Match the installer's game selection, then import only that game's assets.
+        bool gz = !File.Exists(Path.Combine(game, "mgsvtpp.exe"));
+        string executable = Path.Combine(game, gz ? "MgsGroundZeroes.exe" : "mgsvtpp.exe");
+        using (var input = File.OpenRead(executable)) using (var sha = SHA256.Create())
+            Require(BitConverter.ToString(sha.ComputeHash(input)).Replace("-", "").ToLowerInvariant() ==
+                (gz ? "7460d9dba9b6fe34893b5d330aca201983bb1734844f3688acffcc0ab22a1815" :
+                "085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45"), "Unsupported owned game executable");
+        var outputs = new Dictionary<string, byte[]>();
+        if (gz)
+        {
+            const ulong gzPackage = 0x005094749b602c88UL;
+            var package = ReadGzArchive(Path.Combine(game, "data_02.g0s"), gzPackage)[gzPackage];
+            outputs.Add(SafeTarget(destination, GzBinocular.Path), ReadModel(package, GzBinocular));
+            var wanted = GzTextures.SelectMany(texture => texture.Streams.Concat(new[] { texture.Base })).Distinct().ToArray();
+            var archive = ReadGzArchive(Path.Combine(game, "data_01.g0s"), wanted);
+            foreach (var texture in GzTextures) outputs.Add(SafeTarget(destination, texture.Path), DecodeTexture(archive, texture));
+        }
+        else
+        {
         var package = ReadArchive(Path.Combine(game, "master", "chunk0.dat"), Package)[Package];
         var wanted = new HashSet<ulong>(Textures.SelectMany(texture => texture.Streams.Concat(new[] { texture.Base })));
         var textureArchive = ReadArchive(Path.Combine(game, "master", "texture0.dat"), wanted.ToArray());
-        var outputs = new Dictionary<string, byte[]>();
         foreach (var model in Models) outputs.Add(SafeTarget(destination, model.Path), ReadModel(package, model));
         const ulong facePackageId = 0x52282a5f83a94178UL;
         var facePackage = ReadArchive(Path.Combine(game, "master", "chunk0.dat"), facePackageId)[facePackageId];
         outputs.Add(SafeTarget(destination, EyepatchModel.Path), ReadModel(facePackage, EyepatchModel));
         foreach (var texture in Textures) outputs.Add(SafeTarget(destination, texture.Path), DecodeTexture(textureArchive, texture));
         outputs.Add(SafeTarget(destination, MaterialShaderPath), ReadMaterialShader(game));
+        }
         foreach (var file in outputs) if (File.Exists(file.Key))
         {
             Require(new FileInfo(file.Key).Length == file.Value.Length, "Existing modified asset was preserved: " + file.Key);
@@ -400,7 +478,8 @@ internal static class OwnedAssets
             }
         }
         catch { foreach (string path in created) File.Delete(path); throw; }
-        Console.WriteLine("Imported owned binocular, cassette, radio, iDroid materials and native material shader locally. No archive or save was modified.");
+        Console.WriteLine(gz ? "Imported owned Ground Zeroes binocular model and materials locally. No archive or save was modified."
+            : "Imported owned binocular, cassette, radio, iDroid materials and native material shader locally. No archive or save was modified.");
     }
     // These fixtures are independently authored metadata, not game bytecode.
     // The synthetic token stream cannot pass the production identity gate.
@@ -527,6 +606,25 @@ internal static class OwnedAssets
     }
     static void SelfTest()
     {
+        // Authored text encrypted by the independent GzsTool v0.2 reference.
+        const string plain = "Authored GZS fixture.";
+        Require(Encoding.ASCII.GetString(DecodeGzEntry(Convert.FromBase64String("O69P9JIv23ugpxvxIgWtXfGTNc0m"), 1234567)) == plain,
+            "GZS outer cipher wrap and trailing bytes");
+        Require(Encoding.ASCII.GetString(DecodeGzEntry(Convert.FromBase64String("7YM1jva5ZKIoURPAm9+mNB+YRyHqeFvMMbi+Wo4="), 1)) == plain,
+            "GZS nested payload cipher and trailing byte");
+        byte[] gz = new byte[100];
+        Buffer.BlockCopy(Convert.FromBase64String("Shm5RuGdNdQxNYlgtJM/zmMNq1y0"), 0, gz, 16, 21);
+        Put32(gz, 48, 7); Put32(gz, 56, 1); Put32(gz, 60, 21);
+        Put32(gz, 80, 1); Put32(gz, 84, 0x71610000); Put32(gz, 88, 3); Put32(gz, 96, 20);
+        using (var stream = new MemoryStream(gz))
+            Require(Encoding.ASCII.GetString(ReadGzArchive(stream, new HashSet<ulong> { 7 })[7]) == plain, "Selective GZS fixture");
+        RejectFixture(() => { using (var stream = new MemoryStream(gz)) ReadGzArchive(stream, new HashSet<ulong> { 8 }); }, "Missing GZS entry");
+        byte[] duplicate = (byte[])gz.Clone(); Buffer.BlockCopy(duplicate, 48, duplicate, 64, 16); Put32(duplicate, 80, 2);
+        RejectFixture(() => { using (var stream = new MemoryStream(duplicate)) ReadGzArchive(stream, new HashSet<ulong> { 7 }); }, "Duplicate GZS entry");
+        Put32(gz, 60, 33);
+        RejectFixture(() => { using (var stream = new MemoryStream(gz)) ReadGzArchive(stream, new HashSet<ulong> { 7 }); }, "GZS payload overlaps table");
+        Put32(gz, 80, 3);
+        RejectFixture(() => { using (var stream = new MemoryStream(gz)) ReadGzArchive(stream, new HashSet<ulong> { 7 }); }, "GZS table overlaps footer");
         bool rejected = false; try { using (var s = new MemoryStream(new byte[32])) ReadArchive(s, new HashSet<ulong>()); } catch (InvalidDataException) { rejected = true; }
         Require(rejected, "QAR magic test");
         rejected = false; try { Slice(new byte[8], 4, 8); } catch (InvalidDataException) { rejected = true; }
@@ -548,7 +646,7 @@ internal static class OwnedAssets
         try
         {
             if (args.Length == 1 && args[0] == "--self-test") { SelfTest(); return 0; }
-            if (args.Length != 2) { Console.Error.WriteLine("Usage: mgs5vr_import <owned TPP directory> <mod-local output directory>"); return 2; }
+            if (args.Length != 2) { Console.Error.WriteLine("Usage: mgs5vr_import <owned TPP or GZ directory> <mod-local output directory>"); return 2; }
             Import(args[0], args[1]); return 0;
         }
         catch (Exception e) { Console.Error.WriteLine("Owned asset import failed: " + e.Message); return 1; }

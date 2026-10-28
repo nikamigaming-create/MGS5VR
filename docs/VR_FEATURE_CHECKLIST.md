@@ -1,6 +1,6 @@
 # VR feature checklist
 
-Updated 24 October 2026. [FIELD_FIXES.md](FIELD_FIXES.md) maps actual repairs to remaining work. Built does not mean every issue is fixed. Source paths, bounded simulator runs, and headset acceptance are different evidence; most interaction families remain partial.
+Controls inventory checked 27 October 2026; historical gameplay coverage below retains its original scope. [FIELD_FIXES.md](FIELD_FIXES.md) maps actual repairs to remaining work. Built does not mean every issue is fixed. Source paths, bounded simulator runs, and headset acceptance are different evidence; most interaction families remain partial.
 
 1. **Tracked stereo and head movement (TPP):** implemented; broad transitions and headset motion remain open.
 2. **Tracked hands, forearms and body rig:** implemented; physical fit and extremes remain open.
@@ -27,12 +27,12 @@ Updated 24 October 2026. [FIELD_FIXES.md](FIELD_FIXES.md) maps actual repairs to
 23. **HUD and world cues:** wrist status and selected cues exist; captions, notifications and marker issues remain.
 24. **Controls editor:** external and in-headset remapping exist. The spatial editor has contextual 3D controller feedback and confirmed live remapping; ACC, conflict rejection and automatic binocular mode passed a bounded simulator run. Physical-headset fit and broader mode coverage remain open.
 25. **Native gamepad:** XInput/native-button mode and VR handoff exist; full context matrix not accepted.
-26. **Ground Zeroes:** third-person stereo preview and selected actions exist; first-person rig and HUD are absent.
+26. **Ground Zeroes:** first-person stereo, tracked arms/aim, left-hand iDroid, forearm ammo HUD, physical binoculars and native acquisition/mark/clear now run in the simulator. Intel, terrain waypoints, remaining settings and full gameplay coverage are incomplete.
 27. **Pause:** spatial stereo panel over paused gameplay is implemented, retaining live head/hand tracking. Wider context and physical acceptance remain. Prior wrist-panel reports describe the earlier design.
 28. **Presentation toggle:** immersive VR and large-screen modes have a held-button switch.
 29. **Settings:** launcher tuning/validation/backups and the headset editor exist. The headset gear panel exposes the registered gameplay settings alongside action/button/chord/axis binding edits; broader physical usability remains unaccepted.
 30. **Training lessons:** ten recorded lessons sit beside interactive 3D controllers; cues use current bindings.
-31. **Control coverage:** eight decoder contexts and 97 semantic actions are exported from native config; the headset editor distinguishes ACC, launch cabin and iDroid presentation modes. Not every action is gameplay-tested.
+31. **Control coverage:** the checked October 27 development exports 105 semantic actions, ten axes and 71 gameplay settings across eight decoder contexts; the headset editor distinguishes ACC, launch cabin and iDroid presentation modes. Not every action is gameplay-tested, and an exported setting does not implement Ground Zeroes' missing native adapters.
 32. **Field terminal:** 3D lesson playback, controller inspection and settings UI are implemented; product flow still receives QA.
 33. **Install/update tools:** launcher install, update, backup and recovery paths exist; full user-environment matrix remains open.
 34. **Runtime diagnostics:** native snapshots, captures, bounded cases and evidence sidecars exist; they do not replace visual review.

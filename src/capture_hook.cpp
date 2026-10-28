@@ -30,6 +30,7 @@ IDXGISwapChain* selected{}; // Identity only. Never hold a backbuffer or swapcha
 HWND selectedWindow{};
 bool failed{};
 uint64_t presented{},copied{};
+std::atomic_uint64_t presentCalls{},testPresents{},unselectedPresents{};
 void reportRenderSize(UINT width,UINT height,HWND window,bool windowed){
     static uint64_t last{};static UINT previousWidth{},previousHeight{};
     const auto tick=GetTickCount64();
@@ -43,6 +44,11 @@ void reportRenderSize(UINT width,UINT height,HWND window,bool windowed){
 }
 HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
     using Clock=std::chrono::steady_clock;const auto entered=Clock::now();
+    const auto call=++presentCalls;
+    if(flags&DXGI_PRESENT_TEST){
+        const auto count=++testPresents;
+        if(count==1||count%600==0)log("Game Present test-only calls="+std::to_string(count));
+    }
     bool pace=false;
     if(!(flags&DXGI_PRESENT_TEST)) {
         std::lock_guard lock(captureMutex);
@@ -75,12 +81,19 @@ HRESULT WINAPI present(IDXGISwapChain* swap,UINT interval,UINT flags){
                 if(published)++copied;
                 if(++presented%600==1)log("Game Present="+std::to_string(presented)+" published="+std::to_string(copied)
                     +" size="+std::to_string(desc.BufferDesc.Width)+"x"+std::to_string(desc.BufferDesc.Height)+" interval="+std::to_string(interval));
+            }else{
+                const auto count=++unselectedPresents;
+                if(count==1||count%600==0)log("Game Present ignored="+std::to_string(count)
+                    +" owner="+std::to_string(owner)+" size="+std::to_string(desc.BufferDesc.Width)+"x"+std::to_string(desc.BufferDesc.Height)
+                    +" window="+std::to_string(reinterpret_cast<uintptr_t>(desc.OutputWindow))
+                    +" selected_window="+std::to_string(reinterpret_cast<uintptr_t>(selectedWindow)));
             }
         }catch(const std::exception& e){failed=true;log(std::string("Capture suspended: ")+e.what());}
         catch(...){failed=true;log("Capture suspended: unexpected exception");}
     }
     const auto captured=Clock::now();if(pace)paceNativePresent();const auto paced=Clock::now();
     const auto result=originalPresent(swap,pace?0:interval,flags);
+    if(call<=3)log("Game Present returned: call="+std::to_string(call)+" flags="+std::to_string(flags)+" result="+std::to_string(static_cast<uint32_t>(result)));
     if(pace){const auto elapsed=[](auto begin,auto end){return std::chrono::duration<double,std::milli>(end-begin).count();};
         recordNativePresent(elapsed(entered,captured),elapsed(captured,paced),elapsed(paced,Clock::now()));}
     if(result==DXGI_ERROR_DEVICE_REMOVED||result==DXGI_ERROR_DEVICE_RESET){

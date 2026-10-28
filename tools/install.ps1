@@ -35,8 +35,11 @@ $mgsHash = (Get-FileHash -LiteralPath $mgsExe -Algorithm SHA256).Hash.ToLowerInv
 if ($mgsHash -ne $mgsExpectedHash) {
     throw 'This development preview has only been baselined against executable version TPP 1.0.15.4 or GZ 1.0.0.5 with the exact supported SHA256.'
 }
-if (-not $mgsNativeAdapter -and ($EnableControllerRigExperiment -or $EnableWristHudExperiment)) {
-    throw 'Ground Zeroes player/weapon/wrist adapters are not connected. Only explicit theatre or scene-camera experiments are available; no TPP hooks will be installed.'
+if (-not $mgsNativeAdapter -and $EnableControllerRigExperiment) {
+    if (-not $EnableHeadCameraExperiment) { throw 'The Ground Zeroes rig requires -EnableHeadCameraExperiment.' }
+    # GZ installs its own player/weapon/handset adapter with its scene camera.
+    # The separate controller_rig_experiment switch selects the TPP adapter.
+    $EnableControllerRigExperiment = $false
 }
 $mgsDll = Join-Path $mgsRoot 'build\Release\dinput8.dll'
 if (-not (Test-Path -LiteralPath $mgsDll -PathType Leaf)) { $mgsDll = Join-Path $mgsRoot 'dinput8.dll' }
@@ -88,8 +91,15 @@ if ($EnableControllerRigExperiment) {
     $mgsConfig = $mgsConfig.Replace('controller_rig_experiment=0','controller_rig_experiment=1')
 }
 if ($EnableWristHudExperiment) {
-    if (-not $EnableControllerRigExperiment) { throw 'The left-arm HUD requires -EnableControllerRigExperiment.' }
+    if (($mgsNativeAdapter -and -not $EnableControllerRigExperiment) -or (-not $mgsNativeAdapter -and -not $EnableHeadCameraExperiment)) {
+        throw 'The left-arm HUD requires the game native tracked rig.'
+    }
     $mgsConfig = $mgsConfig.Replace('wrist_hud_experiment=0','wrist_hud_experiment=1')
+}
+if (-not $mgsNativeAdapter) {
+    $mgsConfig = $mgsConfig.Replace('retail-assets\Assets\tpp\item\tel\Scenes\tel0_main0_def.fmdl','retail-assets\Assets\tpp\item\bin\Scenes\bin0_main0_def.fmdl')
+    $mgsConfig = $mgsConfig.Replace('retail-assets\Assets\tpp\item\tel\Pictures\tel0_main0_def_c00_bsm.dds','retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_c00_bsm.dds')
+    $mgsConfig = $mgsConfig.Replace('[optics]',"[optics]`r`nbinocular_normal_dds=retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_nrm.dds`r`nbinocular_specular_dds=retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_srm.dds`r`nbinocular_material_dds=retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_mtm.dds")
 }
 if ($CameraEvidenceDir) {
     if (-not $EnableCameraObserver) { throw '-CameraEvidenceDir requires -EnableCameraObserver.' }
@@ -115,12 +125,21 @@ if ($mgsNativeAdapter -and $EnableControllerRigExperiment) {
         'retail-assets\Assets\tpp\item\idr\Pictures\idr0_main0_def_c00_bsm.dds' = '6129BF4BF7AB5A43F0180465356BE4735B5591C0FA77A96172377662A45E18E7'
         'retail-assets\shaders\dx11\fox3ddf_blin_4mt-ps.dxbc' = 'CABC964687CD259E0189B33968B090980AAB7E12A9C603E8560536AE2A9E64FE'
     }
-    foreach ($mgsName in $mgsAssetHashes.Keys) {
+}
+if (-not $mgsNativeAdapter -and $EnableHeadCameraExperiment) {
+    $mgsAssetHashes = @{
+        'retail-assets\Assets\tpp\item\bin\Scenes\bin0_main0_def.fmdl' = 'D559B632CF3255FC45D62289D712EED6E02BA8CB6DB0A8FC8E0C96FB526C5F19'
+        'retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_c00_bsm.dds' = '7CB40D536F37FAA66D8153EF04AFE6A23331D5BCE45908DC7AA3F63558F566B3'
+        'retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_nrm.dds' = '285C9A61B02B5798E79A5013B49CE3344B1F196AE2A56814AB7DB6BFB9028EB4'
+        'retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_srm.dds' = '20F1D6B3C6E13C149A79FC3526A524F442FC3457BCEAA5CE775579BD0D43B61D'
+        'retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_mtm.dds' = '88C9679A783ECE860F6182D4444B0AD07B59771BE2D1B0EEDAB166E4F18B3E13'
+    }
+}
+foreach ($mgsName in $mgsAssetHashes.Keys) {
         $mgsAsset = Join-Path $mgsTarget $mgsName
         if ((Test-Path -LiteralPath $mgsAsset) -and (Get-FileHash -LiteralPath $mgsAsset -Algorithm SHA256).Hash -ne $mgsAssetHashes[$mgsName]) {
             throw "Existing modified owned asset was preserved: $mgsName"
         }
-    }
 }
 try {
     [IO.Directory]::CreateDirectory((Join-Path $mgsTarget 'assets\controls')) | Out-Null
@@ -159,13 +178,9 @@ try {
     }
     throw
 }
-$mgsMode = if ($EnableHeadCameraExperiment -and -not $mgsNativeAdapter) { 'GZ native scene-camera experiment' } elseif ($EnableHeadCameraExperiment) { 'tracked VR' } elseif ($EnableTheatrePreview) { 'large-screen preview' } else { 'disabled preview' }
+$mgsMode = if ($EnableHeadCameraExperiment) { 'tracked VR' } elseif ($EnableTheatrePreview) { 'large-screen preview' } else { 'disabled preview' }
 Write-Output "Installed MGS5VR ($mgsMode) into $mgsTarget. Game executable, archives and saves were not modified."
-if (-not $mgsNativeAdapter) {
-    Write-Output 'Ground Zeroes: independent native scene stereo is experimental; tracked player arms, weapon aiming and wrist UI are not connected.'
-    if ($EnableHeadCameraExperiment) { Write-Output 'Bind [system].toggle_vr in mgs5vr-controls.ini to enter the GZ scene-camera experiment. It is not automatic tracked first-person VR.' }
-}
-if ($EnableHeadCameraExperiment -and $mgsNativeAdapter) {
+if ($EnableHeadCameraExperiment) {
     Write-Output 'Launch the game and load Continue/Resume Game. Tracked VR enters automatically.'
 }
 Write-Output "Edit controls in $mgsTarget\mgs5vr-controls.ini; save, release all controls and center both sticks for two seconds to apply live."

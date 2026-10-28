@@ -24,7 +24,7 @@ def inverse_pose(pose):
     return {'position':rotate(q,[-p for p in pose['position']]),'orientation':q}
 
 
-def workbench(live, timeout=90., film=False, on_ready=None):
+def workbench(live, timeout=90., film=False, on_ready=None, source_film=False):
     state=wait_for_continue_rack(live,advance_startup(live,timeout=timeout))
     ready_until=time.monotonic()+30.
     while not (state.get('opening_focus',{}).get('ready')
@@ -47,8 +47,22 @@ def workbench(live, timeout=90., film=False, on_ready=None):
     captures=[];outcomes=[];started=time.monotonic()
     movie=None
     if film:
-        from .cabin_film import CabinFilm
-        movie=CabinFilm(live)
+        if source_film:
+            class SourceFilm:
+                def __init__(self):self.takes=[];self.active=None
+                def begin(self,name):
+                    self.end();self.active={'name':name,'source':'native source eye before compositor','markers':[]}
+                    self.mark('chapter-start')
+                def mark(self,label):
+                    if self.active is None:raise BotFault('Source film marker has no active chapter')
+                    event=live.events.emit('source_film_marker',chapter=self.active['name'],label=label)
+                    self.active['markers'].append({'label':label,'qpc_100ns':event.get('qpc_100ns')})
+                def end(self):
+                    if self.active is not None:self.takes.append(self.active);self.active=None
+            movie=SourceFilm()
+        else:
+            from .cabin_film import CabinFilm
+            movie=CabinFilm(live)
     aim_from_grip={}
     for hand in ('left','right'):
         grip=_controller_pose(live,hand,'grip','local')
@@ -83,29 +97,37 @@ def workbench(live, timeout=90., film=False, on_ready=None):
         raise BotFault('Workbench did not observe '+label)
     def move(hand, target, seconds=.40):
         if movie:seconds=max(seconds,.70)
+        if source_film:seconds=max(seconds,1.0)
         before=_controller_pose(live,hand,'grip','local');began=time.monotonic()
-        for n in range(1,7):
-            pose=_blend(before,target,n/6)
+        steps=12 if source_film else 6
+        for n in range(1,steps+1):
+            fraction=n/steps
+            if source_film:fraction=fraction*fraction*(3-2*fraction)
+            pose=_blend(before,target,fraction)
             for kind,value in (('grip',pose),('aim',compose(pose,aim_from_grip[hand]))):
                 live.call('set_controller_pose',{'hand':hand,'pose_type':kind,'base_space':'local',**value})
-            time.sleep(max(0.,began+seconds*n/6-time.monotonic()))
+            time.sleep(max(0.,began+seconds*n/steps-time.monotonic()))
     def aim_at(hand,target,seconds=.40):
         move(hand,compose(target,inverse_pose(aim_from_grip[hand])),seconds)
     def approach(target,offset=(0.,.65,.32)):
         # Move the observer into ordinary arm reach before touching native
         # furniture. This is tracked room motion, never a two-meter arm.
+        if source_film and offset==(0.,.65,.32):offset=(0.,.27,.42)
         before=live.text_result(live.call('get_head_pose',{'base_space':'local'}))['pose']
         position=[a+b for a,b in zip(target['position'],offset)]
         end={'position':position,'orientation':pointing([a-b for a,b in zip(target['position'],position)])}
         delta=[a-b for a,b in zip(position,before['position'])]
         hands={hand:_controller_pose(live,hand,'grip','local') for hand in ('left','right')}
-        for n in range(1,9):
-            live.call('set_head_pose',{'base_space':'local',**_blend(before,end,n/8)})
+        steps=20 if source_film else 8
+        for n in range(1,steps+1):
+            fraction=n/steps
+            if source_film:fraction=fraction*fraction*(3-2*fraction)
+            live.call('set_head_pose',{'base_space':'local',**_blend(before,end,fraction)})
             for hand,original in hands.items():
-                pose={**original,'position':[a+b*n/8 for a,b in zip(original['position'],delta)]}
+                pose={**original,'position':[a+b*fraction for a,b in zip(original['position'],delta)]}
                 for kind,value in (('grip',pose),('aim',compose(pose,aim_from_grip[hand]))):
                     live.call('set_controller_pose',{'hand':hand,'pose_type':kind,'base_space':'local',**value})
-            time.sleep(.04)
+            time.sleep(.06 if source_film else .04)
         time.sleep(.20)
         return end
     def rest(hand):
@@ -169,10 +191,11 @@ def workbench(live, timeout=90., film=False, on_ready=None):
         else:raise BotFault('The submitted head pose did not settle before '+label)
         if movie:
             movie.mark(label);time.sleep(1.25)
+            if source_film:captures.extend(live.capture(label,static_grips=True))
         else:captures.extend(live.capture(label,static_grips=True))
-    anchor_until=time.monotonic()+5.
+    anchor_deadline=time.monotonic()+5.
     while 'opening_position' not in state or 'opening_orientation' not in state:
-        if time.monotonic()>anchor_until:raise BotFault('Native cabin anchor did not publish')
+        if time.monotonic()>anchor_deadline:raise BotFault('Opening anchor did not publish before take')
         time.sleep(.05);state=observe()
     anchor={'position':state['opening_position'],'orientation':state['opening_orientation']}
     layout=state.get('opening_bench',{}).get('layout',{})
@@ -203,9 +226,25 @@ def workbench(live, timeout=90., film=False, on_ready=None):
             move('right',compose(anchor,{'position':t['position'],'orientation':t['orientation']}));hold(('right','Grip'))
             wait(lambda s:s['opening_bench']['tapes'][1]['hand']==1,'dropped-tape-recovered')
             slot=compose(anchor,layout['slot'])
-            head=approach(slot)
-            s=observe();anchor={'position':s['opening_position'],'orientation':s['opening_orientation']}
-            layout=s['opening_bench']['layout'];slot=compose(anchor,layout['slot'])
+            if source_film:
+                for attempt in range(2):
+                    normal=rotate(slot['orientation'],[0.,0.,1.])
+                    hold(('right','Grip'))
+                    head=approach(slot,[normal[0]*.38,normal[1]*.38+.08,normal[2]*.38])
+                    s=observe()
+                    if s['opening_bench']['tapes'][1]['hand']!=1:raise BotFault('Cassette grip lost during framing')
+                    anchor={'position':s['opening_position'],'orientation':s['opening_orientation']}
+                    layout=s['opening_bench']['layout'];slot=compose(anchor,layout['slot'])
+                    d=[a-b for a,b in zip(s['rendered']['head_pose']['position'],slot['position'])]
+                    distance=math.sqrt(sum(x*x for x in d));normal=rotate(slot['orientation'],[0.,0.,1.])
+                    facing=sum(a*b for a,b in zip(d,normal))/distance if distance else -1.
+                    live.events.emit('cassette_framing',attempt=attempt+1,distance=distance,facing=facing)
+                    if .30<distance<.75 and facing>.5:break
+                else:raise BotFault('Cassette face could not be framed at a reachable distance')
+            else:
+                head=approach(slot)
+                s=observe();anchor={'position':s['opening_position'],'orientation':s['opening_orientation']}
+                layout=s['opening_bench']['layout'];slot=compose(anchor,layout['slot'])
             for height in (.12,.05,0.):move('right',shifted(slot,[0.,0.,height]));hold(('right','Grip'))
             live.release();time.sleep(.45)
             wait(lambda s:s['opening_bench']['inserted']==1,'tape-seated-without-native-import')

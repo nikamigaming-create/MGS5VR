@@ -1,5 +1,150 @@
 # Release execution plan — 26 October 2026
 
+### Checked contact repairs and 4:23 combined working cut — 27 October
+
+Development `6ef5532fb054d2ca0855c2d34264507e7495c1768d585e3790f85230ddf89011` is installed in both games. Physical animal interaction now runs in the native Lua transaction rather than XInput polling; the earlier simultaneous diagnostic had bones in 691/691 native queries but 56 missing-bone observations in the old consumer. The intermediate repair exposed an idle false pet from native skin/animal movement. The final repair requires raw controller movement and movement relative to head translation as well as rendered contact. Regression coverage preserves slow real strokes while rejecting animation-only contact, walking, head-only motion, jitter and rapid hits. All 59 CTest groups and installer checks passed.
+
+Fresh TPP reached the ACC and Afghanistan field. A 702-sample idle observation remained at zero responses while outside contact. The attempted approach did not reach its predicted position predicate and D-Dog remained out of reach; a successful physical pet is still unfilmed. The first startup exited during initialization; a clean retry worked, with the original failure retained. These results do not certify the pet interaction or whole-game readiness.
+
+The [combined private Field Kit working cut](../private/showcase/current-field-kit/MGS5VR-Field-Kit-working-cut.mp4) is now **4:23**, eleven chapters. It includes cabin interactions, clear field controls, paired iDroid/wipes, GZ recon/intel, live settings, and retained 26 October Rocket Arm steering/Blast Arm watchtower collapse. Original build scopes and audio are preserved. Full decode and representative layout review passed. It remains an incomplete all-feature showcase.
+
+All temporary personal settings and tracking poses are restored, menus/inputs released and owned simulator/game/readers closed. Steam is retained; published play pin unchanged. Next: finish physical pet filming and remaining shared/game-specific gameplay/settings work, then complete the final feature video. GZ already has independent first-person VR; TPP-native powered arms/buddies are not claimed as GZ content.
+
+
+### Clear field actions added; physical buddy stroke unresolved — 27 October
+
+Retained `20261028T024923719888Z` on checked `19e51307a1a3` records equipment/commands open and release, equipped secondary ready/fire/reload, prone/crouch/stand and left-hand iDroid open/stow. Both ready, fire, reload and iDroid final eyes were reviewed. Ammunition changes 42→39→43 are observed; target hits/damage are not claimed. The combined private Field Kit working cut is now **3:28**, nine chapters, with a continuous 38.6-second field chapter, animated official controller lessons and original game audio. Full decode and representative layout review passed; the all-feature movie remains unfinished.
+
+Physical D-Dog stroking failed in retained `025523260491Z`, `025844651644Z` and `031126539491Z` (28 October UTC): tracked hand contact/motion did not increment the native physical-response counter. The last take also records the dog walking out of reach. Generic motion-case pass is not pet success. Checked diagnostic development `41db3ae40e593fa2d023b6dabc93edd0850564e4be61c5391498918ad7b0e7cc` adds per-hand contact/reset state without changing thresholds; it is installed in TPP only. GZ retains checked `19e51307a1a3`. All 59 CTest groups and installer checks completed.
+
+Next: use the ongoing TPP session to isolate and repair the physical-stroke interruption, then remaining shared settings/adapters and final feature filming/edit. Exact earlier field settings were restored; the active diagnostic eyepatch transaction is `private/showcase/clear-view-buddy-setting.json` and must be restored before session closure. Steam and published play pin remain unchanged.
+
+
+### Ground Zeroes normal setup and animated controller lessons — 27 October
+
+Checked development `19e51307a1a3af763b8b0b870421dda729069874ff1d5b190253175f795bc455` is installed in both games. Normal setup and Field Terminal now enable GZ's connected first-person rig and forearm HUD, with independent native adapters and correct GZ optic paths. The production importer selectively reads the player's GZS archives and imports the exact binocular model and four material maps. GZ updates preserve personal settings. Stale installer and launcher refusals have been removed.
+
+All 59 CTest groups and installer checks passed. Actual owned GZ outputs match the assets used in prior simulator footage; TPP import still matches its model/material/shader identities. Both owned sessions remain closed, Steam and published pin unchanged. The 2:49 Field Kit working cut now contains animated official Quest Touch Plus instructions in the cabin, recon and intel chapters. Full video/audio decode and representative layout review passed; it is still the unfinished combined film.
+
+Next: clear TPP field actions from the observed iDroid page, remaining shared gameplay adapters/settings and the complete feature showcase. Native GZ optic shader, visible glow-on and broad weapon/equipment/vehicle coverage remain incomplete. Installer checks do not extend gameplay or physical-headset acceptance.
+
+
+### Ground Zeroes live recon visibility — 27 October
+
+Checked development `50fca91f11de43814a3ef9a1839394b92ca57d25962227a73489bda79c1744ff` is installed in both games. GZ HUD Off previously left its native 79M marker visible (`20261028T020601947606Z`). The repaired native marker routing hides it in retained `021711220890Z` and restores it with Full in `021834570739Z`; both final eyes were reviewed. The separate GZ native glow material scope is connected, but visible glow-on is still unverified. Source actors, native fade state and personal controls are preserved.
+
+All 59 CTest groups and installer checks passed. Exact original GZ controls bytes are restored, optic stowed, inputs/poses cleaned up and the owned game/simulator closed. Steam and the published play pin are unchanged. The single private Field Kit working cut now runs **2:49**, with eight chapters including a 12-second real HUD Off/Full comparison. It remains an incomplete film with source/build scopes retained in its edit indices.
+
+Next: production GZ owned-asset import and remaining gameplay/control differences, clear TPP field footage, animated controller lessons and the complete combined showcase. Terrain marker interactions, independent world-enemy preference and visible glow-on remain unresolved coverage rather than claimed completion.
+
+
+### Paired Field Kit working cut — 27 October
+
+A single private [2:37 working cut](../private/showcase/current-field-kit/MGS5VR-Field-Kit-working-cut.mp4) now combines the cabin, a real TPP/GZ left-hand iDroid comparison with wipes, GZ recon/intel, live VR switching and body/eyepatch effects. Its [chapter index](../private/showcase/current-field-kit/index.html) identifies seven chapters. All 4,723 encoded frames and stereo audio decode; sampled motion/layout review is retained. This is explicitly not the finished all-feature film. Native source-eye footage and the 4.039-fps final-compositor VR switch remain separately identified. The recon chapter retains its preceding `fd053e` build scope; the new paired footage uses checked `050ae82a4832`.
+
+Fresh GZ runs `20261028T012220370500Z` and `012347615433Z` show the left-hand handset/map and held rifle in both eyes. Clear-view TPP ACC iDroid `013412671686Z` shows open/hold/stow in both eyes. Personal eyepatch was temporarily off for that take and exact original controls bytes were restored. The later deployment sequence encountered a different remembered iDroid page and stopped at a mission acceptance dialog; cleanup cancelled/closed it. No mission was accepted. Both owned simulator sessions are closed and Steam retained.
+
+Next: finish missing GZ native settings/adapters and remaining gameplay families, capture unobscured paired field actions, animate controller instruction insets and complete the final full-feature edit. Reopen TPP deployment from its observed current page rather than assuming MISSIONS root. Published build pin is unchanged.
+
+
+### TPP cabin and shared-feature filming — 27 October
+
+The same checked `050ae82a4832` development candidate is installed in TPP and GZ. Retained TPP `20261028T003108427231Z` records a continuous 77.33-second cabin sequence: cassette pickup/insertion/touch eject, either-hand camera prints and board attachment. Both final eyes were reviewed for cassette, camera print and board states. The private 75.7-second `tpp-cabin.mp4` chapter uses Field Kit graphics, official controller plates and original audio. It is not the finished combined film.
+
+Field footage now includes equipped secondary fire (42 to 39), reload (39 to 43), prone/crouch/stand, left-hand iDroid open/stow, full-body on/off and eyepatch off/on. Both iDroid and body/eyepatch effect eyes were reviewed. The ordinary source-eye recorder excludes the controls panel; a separate 45-frame compositor take records VR off/on at measured 4.039 capture fps. Original personal values and the 300 ms binocular chord are restored. The editor recorder now supports the short compositor chapter and restores owned temporary file changes.
+
+TPP recon remains incomplete: no target acquisition before an operator pose request timed out. The game kept rendering, a new connection recovered, and exact saved head/grip/aim poses were restored and read back. Retained failures distinguish script assumptions (wrong ammo slot/count and an early iDroid interval) from game behavior. Next: fresh matched GZ capture, paired side-by-side/wipe editing, then remaining feature adapters. Published pin and Steam remain unchanged.
+
+
+### Ground Zeroes native binocular intel — 27 October
+
+Checked development `050ae82a4832018d2832ce01c73a3697405addfcc622ae2eb1435488a75352a4` connects physical binocular X to the native mission event pump. Retained `20261028T002337220348Z` records the tower guard candidate and native request with matching identity. Both action eyes were reviewed. Local transcription of the captured process audio identifies the guard warning and instruction to avoid combat. This audio result is machine transcription, not direct listening. The earlier radio-UI hooks did not run outside authored binocular mode; their failed scope is retained.
+
+All 59 CTest groups and installer checks passed. Inputs and temporary poses were restored, optic stowed, menus closed and owned GZ session closed with Steam retained. Published play pin is unchanged. A 16.6-second Field Kit recon chapter now exists privately with official controller plates, aspect-correct gameplay and original audio; the combined film remains unfinished. Next: deploy this checked candidate to TPP, capture the cabin and matching shared features, then assemble the paired Field Kit edit. Remaining GZ adapters and unreviewed gameplay contexts stay explicit in the ledger.
+
+
+### Ground Zeroes native binocular acquisition, mark and clear — 27 October
+
+Checked development `fd053ed8167ca89a9e3f2ec01b85b8035084024670de9ad7b781927f367064ca` is installed in GZ. The physical optic now drives the native character visibility job and native player marking. Retained `20261027T234007158128Z` shows the real tower guard at 79 m: 4× acquisition, A clear and right-trigger explicit re-mark. Both final eyes were reviewed at each state; the recorded source-eye take includes process audio. The earlier `5940c447d193` takes `232907` and `233026` failed to acquire because the adapter omitted the native optical range multiplier. Both failures are retained. The corrected adapter uses the same multiplier field as GZ's own binocular zoom setters, native collision results and native marking/clearing functions.
+
+The current-player input ownership repair is deployed; these takes show no unsolicited optic stow. Both candidates passed all 59 CTest groups and installer checks. Inputs, head/controller poses and menus are restored, binoculars stowed and recorders/readers closed. Steam, TPP installation and published play pin are retained. The 18.77-second source video has a 0.80-second startup gap before the optical actions; its cadence ledger is retained. No complete movie, mission or physical-headset claim is made.
+
+Next: GZ intel/radio and remaining shared controls/settings, then TPP/cabin review and the combined Field Kit film. Terrain waypoints, configurable native marker/glow behavior, production GZ owned-asset import and native optic materials remain unfinished.
+
+### Ground Zeroes physical optic and native foot controls — 27 October
+
+Checked development `274a81f4013bece41c10ae82329abad72be85df73e629d6b37328e219b7b27c6` is installed in GZ. Its native basic-action query enables shared foot controls and the physical binocular. The owned GZ model and decoded textures use the existing configurable optic paths. Both final eyes show right-hand equip (`225433`), the real ocular and lens (`225455`), 2×/4× zoom (`225818`), supporting-hand grip (`230129`) and the enlarged left-forearm ammo card (`225851`); full retained IDs are in the ledger. These runs also contain native source-eye recordings with process audio, distinct from final compositor stills. The complete Field Kit edit is unfinished.
+
+The optic spontaneously stowed during a slow rendered frame before take `225557`, which is retained as a failed zoom attempt. The adapter's 150 ms player freshness threshold was tied to camera publication. A source-only follow-up now resolves input ownership from the current native player registry; pose freshness remains separate. That follow-up is not built/deployed yet. All 59 CTest groups and installer checks passed for the installed candidate.
+
+Inputs and temporary poses are restored, menus closed and binoculars stowed; recording requests/readers are closed. Personal full-body setting remains 1. Steam, TPP installation and published play pin are retained. Next: deploy the ownership repair and finish remaining shared control behavior, GZ native enemy acquisition/marking/intel, then TPP/cabin review and the paired Field Kit video. GZ owned asset import currently uses a private local helper, and the native optic material shader is not yet ported. Whole-game and physical-headset completion remain unclaimed.
+
+### Shared forearm cuff repair deployed in Ground Zeroes — 27 October
+
+Checked development `a3c9a9eed06e0408da8fcd6a6a7c8579066595eae7ab7e87db8a4726357acc04` is installed in GZ. Native axial rim steps were collapsing to duplicate projected corners, preventing the closest Snake2 LOD from closing. The shared cap triangulator now collapses those corners while fitting the complete native rim and preserving native skin data. Both final eyes in retained `20261027T222812915905Z` show closed body-off sleeve ends without the previous jagged flaps.
+
+Both posed eyes in `20261027T222919313085Z` retain the left-hand native handset/map. After native B closure, both held eyes in `20261027T223039155404Z` show the rifle without a floating reticle. This is a staged pose/draw check, not a new shot or continuous-motion claim. All 59 CTest groups and installer checks passed. Full-body controls were restored byte-for-byte, poses restored, inputs released and menus closed. TPP installation and the published pin remain unchanged.
+
+Next: GZ native action/travel and physical binocular integration, small forearm ammo-card readability and remaining shared controls, followed by TPP/cabin review and the combined Field Kit movie. The shared cuff repair still needs fresh TPP visual review; whole-game and physical-headset completion remain unclaimed.
+
+### Ground Zeroes body and handset fit — 27 October
+
+Checked development `6b1a1a9405aabb2407a619e0b27548c3f9098d668830501f7ca6a44d524c6e8e` is installed in GZ. The native anatomical eye join, fixed-length torso fit when reachable, body-off shoulder placement and clavicle reach improve the left-hand iDroid fit. Native legs remain untouched. Both final eyes in retained `20261027T220710049689Z` show the main map at readable scale; outer labels are still clipped at the staged left-FOV edge. Native B closure was also observed.
+
+Retained `20261027T221020345667Z` shows the rifle in both held eyes with no flat reticle. The preceding shorter hold `20261027T220854419847Z` showed no rifle; cause remains unconfirmed, and this batch does not establish a confirmed shot. Body-off wrist pose `20261027T221121566780Z` exposes jagged sleeve cut ends in both eyes. The native mesh reproduces a shared triangulation failure at its closest LOD: separate axial vertices coincide when flattened. That cuff repair is source-only and building.
+
+All 59 CTest groups and installer checks passed for the installed candidate. Full-body controls were restored byte-for-byte, temporary poses restored, inputs released and iDroid closed. TPP installation and published pin remain unchanged. Next: finish cuff geometry, remaining common GZ controls and physical binoculars, then the combined Field Kit movie. Whole-game and physical-headset completion remain unclaimed.
+
+### Ground Zeroes native left-hand iDroid connected — 27 October
+
+Checked development `a1228d1f3e8b7655aece116ab2ae4741a1b49b5b316539214bf58d7b5dcb014c` is installed in GZ. The exact native variant-3 attachment now publishes from the left wrist during the player's skin call. The existing measured left-hand cup uses GZ's matching original finger lengths; handset and native map share that solved placement. GZ menu navigation keeps its own native controls. The preceding `4fc749434228` candidate exposed a TPP-only input acknowledgment blocking B; this is repaired.
+
+Both final eyes in retained `20261027T215120784175Z` show handset/map in the staged straight-on pose, but much of the map is clipped. The native shoulder reach clamps the device close to the eyes; final fit remains unresolved. Both final eyes in `20261027T215140842885Z` and `20261027T215728452935Z` show clean native closure, including after reopening. Inputs and temporary poses are restored, and iDroid is closed. Both candidates passed 59 CTest groups and installer checks. TPP installation and published play pin remain unchanged.
+
+Next: the source-only anatomical eye join, fixed-length spine/shoulder fit and clavicle reach batch is building. Finish the display fit and remaining shared gameplay controls/physical binoculars, then the combined Field Kit film. No complete iDroid usability, whole-game, movie or physical-headset completion is claimed.
+
+### Ground Zeroes body-off, forearm HUD and stowed rifle — 27 October
+
+Checked development `d127d2129ea4787f3eef2eef81a3b450bf18f80778c39cb89a823503cbe7c3b2` is installed in GZ. Its native body visibility preserves the arm groups and uses verified Snake2/Snake6 forearm buffers when full body is off. Native ammo/status now uses the left forearm; flat firearm reticles are suppressed while actual optics remain. Stowed primary rifle geometry is concealed through its native named group and restored when raised.
+
+Both final eyes in retained `20261027T213048323509Z` show the body-off forearms, compact left ammo card and absence of the intrusive rifle stock. Both held eyes in `20261027T213236942029Z` show the rifle restored without a floating crosshair. Forearm cut ends remain angular and moving HUD readability is unreviewed. Earlier `5674b2f7b476` wrist-up footage exposed an oversized card; the earlier initial ready run lacked a rifle, with cause undiagnosed. These earlier observations remain in the ledger.
+
+Both candidates passed 59 CTest groups and installer checks. Temporary full-body setting and controller poses were restored, inputs released, and menus closed. TPP installation and published pin are unchanged. Next: complete the left-hand iDroid handset/display and remaining shared controls/body fitting, then the requested combined Field Kit movie. Full-game, continuous-motion and physical-headset completion are not claimed.
+
+### Ground Zeroes menus and native firing connected — 27 October
+
+Checked development `8c4f2eb06c1e639a395b83b73f7d58df0de4fa201166bc09ddd239bb021638ea` is installed in GZ. Its native aim job uses a private camera basis from the last successfully published weapon muzzle, preserving native collision and recoil. Retained `20261027T203054611119Z` used saved grip/trigger controls: both held final eyes show the rifle and ammunition decreased from 30/210 to 28/210. The runtime observed the aim adapter. Impact alignment and moving firing remain unreviewed. The batch also implements proximity-based support contact and a joined left forearm panel pose; these are not yet visually exercised or connected to native HUD routing.
+
+The preceding checked `55dbb4ccf1beaad972ab93104d7c1299695bf669761fd506adaf4b073ab0d9ef` repairs invisible Pause through the native spatial canvas. Retained `20261027T202211258666Z` (Pause) and `20261027T202256786902Z` (iDroid) show their native menus in both eyes. B returns to gameplay; both eyes after iDroid closure were reviewed in `20261027T202331784896Z`. Retained `20261027T202134636398Z` shows native muzzle-based wrist alignment and sharp arms/rifle. iDroid is an interim spatial canvas with its native right-hand handset, not the required physical left-hand implementation. Free fingers now use controller curl, with native firearm contact retained; continuous articulation remains unreviewed.
+
+Both batches passed 59 CTest groups and installer checks. Inputs were released and test menus closed. TPP installation and published play pin remain unchanged. Next: native HUD/reticle routing, support and moving shot alignment, left-hand handset/projection, body-off/full-body fit and physical binoculars, then the complete combined Field Kit film. No whole-game, finished-movie or physical-headset completion is claimed.
+
+### Ground Zeroes tracked arms, weapon-ready control and focus — 27 October
+
+Checked development `e30550f3367f1b43fcde05deea201beec23cc118f6e817527537723f9ff1128e` is installed in GZ. Native arms/attachments now use the independently mapped skin publisher and shared fixed-length IK. GZ's verified Pause/iDroid owners route saved controls without enabling TPP hooks. Retained `20261027T200728345658Z` shows the saved right grip raising the rifle; both held final eyes were reviewed and the former close-up DOF blur is absent. No shot was fired. Native camera axes remain available pending GZ travel-action mapping.
+
+Retained `20261027T200801636407Z` exposed invisible Pause: its native kind became 1 but the reviewed left final eye kept the world without the menu. B closed it and the native kind returned to 0. The next source batch routes GZ native menus onto the existing spatial canvas, preserves native menu navigation, aligns the tracked wrist through GZ's own muzzle socket and adds shared free-finger articulation. That batch is not yet deployed or visually checked.
+
+All 59 CTest groups and installer checks passed for the installed candidate. TPP installation and the published play pin are unchanged. Next: finish the menu/weapon batch, then connect actual firing/support contact, left-hand iDroid and wrist UI. Full-body/body-off behavior, physical binoculars, remaining common interactions and the combined Field Kit movie remain unfinished. These simulator endpoints do not establish full-game or physical-headset completion.
+
+### Ground Zeroes first-person head obstruction repaired — 27 October
+
+Checked development `8b563b1358d5c6783acd89c3ccc248e7d064282a20272b43ac8d09f2a597cd5c` is deployed to GZ. Its native named head group is hidden only for the matching VR player; the native visibility publisher remains authoritative on VR exit. Retained on/off runs `20261027T193530760583Z` and `20261027T193559967649Z` were reviewed in both final eyes: the prior hair obstruction is absent in first person, and Snake's head returns in the native third-person view. These endpoints do not establish continuous motion or physical headset behavior. All 59 CTest groups and installer checks passed.
+
+Next: connect the independently mapped GZ skin publisher and named arm/finger hierarchy to tracked hands, retaining native skeleton lengths and attachments. The arm adapter is being implemented; tracked weapons, spatial UI, shared interactions and the combined Field Kit movie remain unfinished. TPP installation and published play pin are unchanged.
+
+### Ground Zeroes now reaches native first person — 27 October
+
+Checked development `8a3b9a58ea984fece51ebd1e366a062157b2aeb517045b975c7f3542b168b3df` is deployed to GZ. Its adapter resolves the selected player camera and the body's named HEAD matrix, converts that published world transform through the actual body root, and supplies the shared head camera. Retained `20261027T192058758856Z` was reviewed in both final compositor eyes: the viewpoint is at Snake's head, with no player ahead of the camera. Hair still intersects the upper edge. Native flat HUD, spotlight bloom, tracked arms/weapon and complete interactions remain open. This stationary simulator observation does not establish motion, transitions or headset completion.
+
+The same checked batch passed 59 CTest groups and installer checks. Runtime confirms the independent desktop preview is 1280 x 720 while GZ retains its complete native 3840 x 2160 canvas. TPP's installed build and the published pin are unchanged. Next: the reproduced head/hair intrusion is being repaired through GZ's own named head visibility group and native publisher, preserving ordinary visibility on VR exit. That repair is source-only. GZ's animation driver, 138-bone pose and native skin publication have also been identified for the shared rig connection. The requested combined Field Kit movie remains unfinished.
+
+### Ground Zeroes live display repaired — 27 October
+
+GZ's native focus-loss branch was suspending scene presentation when the simulator opened. The exact-build adapter now preserves native focus/input state while suppressing that display-suspension request. Checked development DLL `ffc7bbf0696f313e1b95ef0a0d013cb8acb8ab308ca8b93be33318c69b23725d` passed 59 CTest groups and installer checks and is deployed to GZ. Saved Continue and Start Mission reached live night gameplay. Retained `20261027T185839163442Z` shows the personal VR toggle switching to native stereo; both final compositor eyes were reviewed. This is still a third-person camera with heavy spotlight bloom and native flat HUD. First-person head, tracked rig and shared interactions remain unfinished.
+
+The GZ launcher now owns its exact launcher/game child pair and restores the per-game simulator lease during cleanup. Bounded GZ controls use saved bindings without TPP memory addresses. The 1280 x 720 preview correction is source-only and awaits the next meaningful build batch. TPP remains installed at `9d646890a2b4`; the published `play/` pin remains `b627c7cacc9a`. Current work is the GZ native head/skin connection, followed by shared rig/UI and the requested combined Field Kit video. No movie, whole-game or physical-headset completion is claimed.
+
 ### Diagonal cabin take failed at framing guard — 27 October
 
 Retained `20261027T174300006026Z` on installed development DLL `9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a` observed cassette pickup, release and recovery, then stopped before insertion: the temporary diagonal viewpoint reached distances of 0.509 and 0.454 m but the measured slot-face dot products were -0.310 and -0.256, below the 0.5 guard. This is a staging failure, not a diagnosed cassette gameplay defect. The observed carrier normal was approximately [0.848, 0.259, 0.463], mostly horizontal; the temporary offset followed the prior head direction instead of the carrier normal, putting the observer behind its face. A normal-relative offset is an unverified staging lead. Camera and photo actions were not reached. The partial source-eye take recorded 557 accepted frames, 34 dropped/repeated samples (10 missed cadence, 24 queue drops); the audio capture reports no gaps, but sound was not auditioned. It is not the requested movie. Temporary staging was saved privately and removed; inputs were released and owned simulator/game closed with Steam retained. No build, pin, or physical-headset acceptance changed. Do not rerun this unchanged viewpoint.
@@ -623,6 +768,24 @@ resolve camera and hand staging and verify a continuous, readable final-eye take
 do not present this take as finished or treat the scripted loop as headset proof.
 
 ### Cabin showcase attempts — 26 October
+
+### Current next action after cabin/settings review - 27 October
+
+The requested simulator completeness review used the existing checked candidate
+`9d646890a2b4`: title workbench and ACC settings/remapping completed in one session.
+Reviewed runs `20261027T180104125768Z` and `20261027T180305839994Z` are retained;
+CURRENT records the scoped results, visual obstructions and exact restoration.
+No new runtime build, publication or published-pin promotion occurred.
+
+Next, diagnose the initial ACC foreground obstruction and cabin hand-contact
+presentation from these retained views before changing the rig. Do not repeat
+unchanged narrow passes or treat every missing acceptance case as a defect.
+Ground Zeroes is a separate implementation task: establish its player/camera and
+skin ownership, then head anchoring, tracked hands/aim and wrist UI using its own
+verified layout. Preserve applicable personal settings and migrate the old GZ
+bindings with the new parser; copying TPP-specific hooks cannot provide parity.
+Full-game and physical-headset acceptance remain open. Batch justified runtime
+repairs into one checked development candidate when there are diagnosed repairs.
 
 Multiple actual-game takes were attempted after the user requested a clear, human
 showcase. A later side-angle take (`artifacts/opening-showcase-side-retry-20261026`)

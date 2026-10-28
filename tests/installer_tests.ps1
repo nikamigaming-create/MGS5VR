@@ -130,8 +130,35 @@ try {
     $mgsGzExe = Join-Path $mgsGzDir 'MgsGroundZeroes.exe'
     [IO.File]::WriteAllText($mgsGzExe,'Ground Zeroes fixture only; not executable.')
     $mgsAllowedExes += $mgsGzExe
-    Assert-Refused { & $mgsSetup -Mode Install -GameExe $mgsGzExe } 'Ground Zeroes player/weapon/wrist adapters are not connected.*'
-    Assert-Installer (-not (Test-Path -LiteralPath (Join-Path $mgsGzDir 'dinput8.dll'))) 'GZ native request silently installed theatre.'
+    $mgsGzAssets = @{
+        'retail-assets\Assets\tpp\item\bin\Scenes\bin0_main0_def.fmdl'='D559B632CF3255FC45D62289D712EED6E02BA8CB6DB0A8FC8E0C96FB526C5F19'
+        'retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_c00_bsm.dds'='7CB40D536F37FAA66D8153EF04AFE6A23331D5BCE45908DC7AA3F63558F566B3'
+        'retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_nrm.dds'='285C9A61B02B5798E79A5013B49CE3344B1F196AE2A56814AB7DB6BFB9028EB4'
+        'retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_srm.dds'='20F1D6B3C6E13C149A79FC3526A524F442FC3457BCEAA5CE775579BD0D43B61D'
+        'retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_mtm.dds'='88C9679A783ECE860F6182D4444B0AD07B59771BE2D1B0EEDAB166E4F18B3E13'
+    }
+    foreach ($mgsAsset in $mgsGzAssets.Keys) {
+        $mgsAssetPath=Join-Path $mgsGzDir $mgsAsset
+        [IO.Directory]::CreateDirectory((Split-Path -Parent $mgsAssetPath)) | Out-Null
+        [IO.File]::WriteAllText($mgsAssetPath,'Authored installer fixture; not game content.')
+        $mgsFixtureAssetHashes[$mgsAssetPath]=$mgsGzAssets[$mgsAsset]
+    }
+    $mgsGzModel=Join-Path $mgsGzDir 'retail-assets\Assets\tpp\item\bin\Scenes\bin0_main0_def.fmdl'
+    $mgsGzModelHash=$mgsFixtureAssetHashes[$mgsGzModel]
+    $mgsFixtureAssetHashes.Remove($mgsGzModel)
+    Assert-Refused { & $mgsSetup -Mode Install -GameExe $mgsGzExe } 'Existing modified owned asset was preserved:*bin0_main0_def.fmdl'
+    Assert-Installer (-not (Test-Path -LiteralPath (Join-Path $mgsGzDir 'dinput8.dll'))) 'Modified GZ owned asset allowed a partial installation.'
+    $mgsFixtureAssetHashes[$mgsGzModel]=$mgsGzModelHash
+    & $mgsSetup -Mode Install -GameExe $mgsGzExe
+    $mgsGzVrConfig=[IO.File]::ReadAllText((Join-Path $mgsGzDir 'mgs5vr.ini'))
+    foreach ($mgsKey in @('enabled','camera_observer','head_camera_experiment','wrist_hud_experiment')) {
+        Assert-Installer ($mgsGzVrConfig -match "(?m)^$mgsKey=1\r?$") "GZ setup failed to enable $mgsKey"
+    }
+    Assert-Installer ($mgsGzVrConfig -match '(?m)^controller_rig_experiment=0\r?$') 'GZ setup selected TPP rig hooks.'
+    Assert-Installer ($mgsGzVrConfig.Contains('binocular_fmdl=retail-assets\Assets\tpp\item\bin\Scenes\bin0_main0_def.fmdl')) 'GZ model path missing.'
+    Assert-Installer ($mgsGzVrConfig.Contains('binocular_normal_dds=retail-assets\Assets\tpp\item\bin\Pictures\bin0_main0_def_nrm.dds')) 'GZ material path missing.'
+    & $mgsSetup -Mode Uninstall -GameExe $mgsGzExe
+    Assert-Installer (Test-Path -LiteralPath $mgsGzModel) 'Existing GZ import was claimed by uninstall.'
     & $mgsSetup -Mode Install -GameExe $mgsGzExe -TheatrePreview
     $mgsGzConfig = [IO.File]::ReadAllText((Join-Path $mgsGzDir 'mgs5vr.ini'))
     Assert-Installer ($mgsGzConfig -match '(?m)^enabled=1\r?$') 'GZ explicit preview not enabled.'
@@ -149,7 +176,9 @@ try {
     Assert-Installer ($mgsSceneConfig -match '(?m)^controller_rig_experiment=0\r?$') 'GZ scene experiment enabled the TPP rig.'
     Assert-Installer ($mgsSceneConfig -match '(?m)^wrist_hud_experiment=0\r?$') 'GZ scene experiment enabled the TPP wrist.'
     & $mgsSetup -Mode Uninstall -GameExe $mgsGzExe
-    Assert-Refused { & $mgsInstall -GameDir $mgsGzDir -EnableVR } 'Ground Zeroes player/weapon/wrist adapters are not connected.*'
+    & $mgsInstall -GameDir $mgsGzDir -EnableVR
+    Assert-Installer ($mgsGzVrConfig -ceq [IO.File]::ReadAllText((Join-Path $mgsGzDir 'mgs5vr.ini'))) 'GZ setup and direct VR installation differ.'
+    & $mgsSetup -Mode Uninstall -GameExe $mgsGzExe
     Assert-Refused { & $mgsSetup -Mode Install -GameExe (Join-Path $mgsUnsupported 'mgsvtpp.exe') } '*baselined against executable version*'
     Assert-Installer (-not (Test-Path -LiteralPath (Join-Path $mgsUnsupported 'dinput8.dll'))) 'Unsupported game was modified.'
     $mgsWrong = Join-Path $mgsUnsupported 'another.exe'
@@ -178,7 +207,22 @@ try {
     $mgsRunning=$true
     Assert-Refused { & $mgsMaintenance -Mode Update -GameExe $mgsPlayerExe } 'Close The Phantom Pain*'
     $mgsRunning=$false
-    Assert-Refused { & $mgsMaintenance -Mode Install -GameExe $mgsGzExe } 'The launcher installs tracked VR for The Phantom Pain only.*'
+    & $mgsMaintenance -Mode Install -GameExe $mgsGzExe
+    $mgsGzControlsPath=Join-Path $mgsGzDir 'mgs5vr-controls.ini'
+    $mgsGzRuntimePath=Join-Path $mgsGzDir 'mgs5vr.ini'
+    $mgsGzPersonalControls=[IO.File]::ReadAllText($mgsGzControlsPath)+"`n; GZ personal bindings"
+    $mgsGzPersonalRuntime=[IO.File]::ReadAllText($mgsGzRuntimePath)+"`n; GZ personal runtime"
+    [IO.File]::WriteAllText($mgsGzControlsPath,$mgsGzPersonalControls,[Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($mgsGzRuntimePath,$mgsGzPersonalRuntime,[Text.UTF8Encoding]::new($false))
+    & $mgsMaintenance -Mode Update -GameExe $mgsGzExe
+    Assert-Installer ([IO.File]::ReadAllText($mgsGzControlsPath) -ceq $mgsGzPersonalControls) 'GZ update changed personal bindings.'
+    Assert-Installer ([IO.File]::ReadAllText($mgsGzRuntimePath) -ceq $mgsGzPersonalRuntime) 'GZ update changed personal runtime.'
+    $mgsRunning=$true
+    Assert-Refused { & $mgsMaintenance -Mode Update -GameExe $mgsGzExe } 'Close Ground Zeroes*'
+    $mgsRunning=$false
+    & $mgsMaintenance -Mode Remove -GameExe $mgsGzExe
+    Assert-Installer (-not (Test-Path -LiteralPath (Join-Path $mgsGzDir 'dinput8.dll'))) 'GZ launcher removal left the mod active.'
+    Assert-Installer (Test-Path -LiteralPath $mgsGzModel) 'GZ launcher removal changed owned data.'
 
     # An installer failure after the old mod is moved must restore every file.
     $mgsBrokenPackage=Join-Path $mgsFixtureRoot 'broken package'

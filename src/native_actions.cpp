@@ -1278,6 +1278,11 @@ void drainFastActions(void* state){
 void pump(void* state){
     pumpNativeTextInput();
     drainFastActions(state);
+    // Buddy command queries are stable in the native Lua transaction. XInput
+    // polling can occur while the buddy's bone response is unavailable and
+    // repeatedly interrupt an otherwise continuous physical hand stroke.
+    // This is ordinary gameplay work, independent of external diagnostics.
+    if(nativeLuaReady.load())consumeAnimalTouch();
     std::unique_lock lock(requestMutex,std::try_to_lock);
     const auto now=GetTickCount64();
     if(!lock.owns_lock()||now-checkedAt<100)return;

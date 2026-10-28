@@ -1,4 +1,143 @@
 {
+  "gz_menu_aim_2026_10_27": {
+    "candidate": "8c4f2eb06c1e639a395b83b73f7d58df0de4fa201166bc09ddd239bb021638ea",
+    "retained_runs": [
+      "20261027T203054611119Z"
+    ],
+    "result": "Saved right grip readies and the saved right trigger fires the native rifle; reviewed held final eyes show ammunition 28/210 after 30/210. Runtime reports native aim collision query using the published tracked weapon muzzle. This is not an impact/alignment or moving-fire review.",
+    "previous_candidate": "55dbb4ccf1beaad972ab93104d7c1299695bf669761fd506adaf4b073ab0d9ef",
+    "previous_runs": [
+      "20261027T202134636398Z",
+      "20261027T202211258666Z",
+      "20261027T202256786902Z",
+      "20261027T202331784896Z"
+    ],
+    "previous_result": "Both held eyes show rifle aligned through its native muzzle socket. Pause and iDroid native canvases are visible in both eyes. B returns to first-person gameplay; both final eyes reviewed after iDroid closure. Free-finger rest pose is visible. No continuous articulation review.",
+    "checks": "59 CTest groups and installer checks passed for both candidates",
+    "implemented_unreviewed": [
+      "Authored support-palm proximity attachment using shared hysteresis",
+      "Source-joined left forearm panel pose (native HUD routing not connected)"
+    ],
+    "open": [
+      "Moving weapon/shot/impact alignment and support contact",
+      "Full-body/body-off fit",
+      "Physical left iDroid and forearm HUD routing",
+      "Physical binoculars and other shared interactions",
+      "Combined Field Kit movie"
+    ],
+    "scope": "Bounded simulator actions only; no full-game or physical headset completion claim",
+    "cleanup": "Inputs released, test menus closed. TPP installation and published pin unchanged."
+  },
+  "gz_controls_focus_2026_10_27": {
+    "candidate": "e30550f3367f1b43fcde05deea201beec23cc118f6e817527537723f9ff1128e",
+    "retained_runs": [
+      "20261027T200728345658Z",
+      "20261027T200801636407Z"
+    ],
+    "result": "Saved right-grip weapon-ready control raises the native rifle. Close-up arms and weapon are sharp in both reviewed final eyes after applying the native DOF-disable value only to tracked eye replays.",
+    "earlier_arm_candidate": "648ae6f03f9a3560b9a0f6f61287983738646ce2c10007d44406e502c3532d83",
+    "earlier_arm_runs": [
+      "20261027T194303937111Z",
+      "20261027T194334825361Z",
+      "20261027T194829681620Z"
+    ],
+    "failure": "Pause opens natively (kind 1), but its reviewed left final eye has no menu. B closes it (kind 0). Spatial native-canvas routing and GZ menu navigation correction are source-only in the following batch.",
+    "checks": "59 CTest groups and installer checks passed",
+    "open": [
+      "Barrel/shot alignment and support-hand contact",
+      "Finger articulation and body-off presentation",
+      "Left iDroid, wrist HUD, physical binoculars and shared native interactions",
+      "Native Pause presentation",
+      "Full combined Field Kit video"
+    ],
+    "scope": "Stationary simulator endpoints, no firing, full-game or physical-headset completion claim"
+  },
+  "gz_head_visibility_2026_10_27": {
+    "candidate": "8b563b1358d5c6783acd89c3ccc248e7d064282a20272b43ac8d09f2a597cd5c",
+    "retained_runs": [
+      "20261027T193530760583Z",
+      "20261027T193559967649Z"
+    ],
+    "review": "Both final eyes reviewed. VR on: native first-person view is clear of the prior hair obstruction. VR off: Snake and his head are visible in native third-person theatre view.",
+    "checks": "59 CTest groups and installer checks passed",
+    "open": [
+      "Tracked hands and weapon",
+      "Spatial HUD and shared interactions",
+      "Motion/posture and transition review",
+      "Combined Field Kit movie"
+    ],
+    "scope": "On/off endpoints in simulator; no continuous or physical-headset completion claim"
+  },
+  "gz_first_person_2026_10_27": {
+    "candidate": "8a3b9a58ea984fece51ebd1e366a062157b2aeb517045b975c7f3542b168b3df",
+    "retained_run": "20261027T192058758856Z",
+    "result": "GZ native head-driven first-person stereo observed in both final compositor eyes",
+    "implementation": "GZ component 0 named HEAD palette and selected player-camera ownership; shared head-camera transform; no guessed height or forced ADS",
+    "review": "Snake no longer appears ahead of the viewer. Hair intersects the upper edge in both eyes; native HUD and bright spotlight bloom remain. Hands and weapon are not yet tracked.",
+    "desktop": "Runtime logs confirm independent 1280x720 preview, with the complete 3840x2160 native canvas retained.",
+    "checks": "59 CTest groups and installer checks passed",
+    "open": [
+      "Head/hair concealment implemented after this run, not yet built",
+      "Tracked rig and weapon",
+      "Spatial HUD and shared interactions",
+      "Motion/posture and transition review",
+      "Combined Field Kit video"
+    ],
+    "scope": "Stationary first-person simulator observation, not physical-headset or full-game acceptance"
+  },
+  "gz_live_display_repair_2026_10_27": {
+    "candidate": "ffc7bbf0696f313e1b95ef0a0d013cb8acb8ab308ca8b93be33318c69b23725d",
+    "game": "Ground Zeroes 1.0.0.5",
+    "retained_run": "20261027T185839163442Z",
+    "result": "Live native mission stereo after correcting background presentation suspension",
+    "review": "Both final compositor eyes reviewed before and after the saved Y+Menu hold; Snake remains ahead of the camera; heavy spotlight bloom and native flat HUD remain.",
+    "open": [
+      "Native player-head camera binding",
+      "Tracked native hands, arms and weapon",
+      "Shared VR interactions and spatial UI",
+      "1280x720 desktop preview candidate not yet built",
+      "Combined Field Kit video"
+    ],
+    "scope": "Simulator only; no universal gameplay or physical-headset acceptance"
+  },
+  "cabin_controls_gz_audit_2026_10_27": {
+    "candidate": "9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a",
+    "status": "scoped_interactions_and_controls_observed_visual_and_headset_acceptance_open",
+    "runs": [
+      "20261027T180104125768Z",
+      "20261027T180305839994Z"
+    ],
+    "controls_inventory": {
+      "actions": 105,
+      "axes": 10,
+      "settings": 71,
+      "boolean_settings": 19
+    },
+    "automated": "Eight selected existing controls/editor/launcher/core CTest groups passed; no rebuild",
+    "simulator": [
+      "24 workbench state checks completed",
+      "All settings listed; auto-mark, height offset and turn mode edited, cancelled, applied and reverted",
+      "VR off/on, confirmed remap, conflict rejection, binocular equip/context/stow and panel close completed"
+    ],
+    "review": [
+      "16 workbench pairs and 17 panel pairs reviewed",
+      "Exposed forearm ends obscure several contacts",
+      "Initial ACC foreground geometry obstructs the view; later VR-on view clear with changed source camera, cause undiagnosed",
+      "No continuous stereo or physical-headset acceptance"
+    ],
+    "ground_zeroes": {
+      "status": "first_person_arms_aim_wrist_adapters_missing",
+      "runtime_tested_this_batch": false,
+      "installed_controls": "Valid with installed checker; latest checker reports equip_binoculars/horse.reload conflict"
+    },
+    "cleanup": "Original controls and seven pre-test studio files restored byte-for-byte; exact two created photos archived privately then removed; owned game/simulator closed, Steam retained, per-game Meta 64-bit restored",
+    "receipts": [
+      "artifacts/bot/runs/20261027T180104125768Z/controls-audit-review.json",
+      "artifacts/bot/runs/20261027T180305839994Z/controls-audit-review.json",
+      "artifacts/bot/runs/20261027T180305839994Z/controls-audit-restoration.json"
+    ],
+    "release_pin_changed": false
+  },
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
   "candidate": "9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a",
@@ -1783,7 +1922,7 @@
         "both_hand_stick_release": "native axes neutral"
       },
       "failures": [
-        "Right-hand acquisition chased native pitch, oscillating about 15â€“18 degrees during a pure yaw movement.",
+        "Right-hand acquisition chased native pitch, oscillating about 15\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c18 degrees during a pure yaw movement.",
         "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
       ],
       "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
@@ -1838,7 +1977,7 @@
       "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
       "baseline_run": "20261022T044008503318Z",
       "retained_run": "20261022T045333990203Z",
-      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20â€“90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
       "remaining": [
         "Wider marker grip orientations",
         "Broader FP09/FP10",
@@ -1861,7 +2000,7 @@
         {
           "sha256_prefix": "1bbaac705854",
           "run": "20261022T051925150310Z",
-          "failure": "Native eye identity joined, but fitted eye remained26â€“31cm below cached passenger anchor; body rejected."
+          "failure": "Native eye identity joined, but fitted eye remained26\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c31cm below cached passenger anchor; body rejected."
         },
         {
           "sha256_prefix": "a563468ce054",
@@ -2298,9 +2437,9 @@
     "physical_headset_acceptance": false,
     "extreme_reach_followup": {
       "candidate_changed": false,
-      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44–59cm",
+      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015359cm",
       "captured_solver_fixture": "native upper/lower28.4/25.5cm; requested shoulder-to-wrist106cm; reach-only unavoidable clamp52.1cm",
-      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9–1.2mm over production fallback with/without stereo padding",
+      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u01531.2mm over production fallback with/without stereo padding",
       "conclusion": "No additional IK rewrite justified by unreachable-pose clamp. Current mesh eye penetration unproven without joined palette; physical comfort/reachable reproduction still required."
     }
   },
@@ -3312,7 +3451,7 @@
       "staging_discards": 0,
       "interpretation": "Cadence is evaluated after ready GPU copies on frame calls; this does not distinguish delayed caller scheduling from recorder work. A larger encoder queue alone cannot address the 48 unscheduled slots."
     },
-    "sequence_gap_review": "Thirty-six of 61 missing slots fall in gaps with unchanged source and image sequence endpoints; largest 0.215s begins at 62.327s. Long gaps cluster 60–63s after left-camera print; two final-eye requests overlap 60.382–60.739s and 60.935–61.259s. Endpoints and overlap do not prove intermediate state, a stall, or causation."
+    "sequence_gap_review": "Thirty-six of 61 missing slots fall in gaps with unchanged source and image sequence endpoints; largest 0.215s begins at 62.327s. Long gaps cluster 60\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015363s after left-camera print; two final-eye requests overlap 60.382\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015360.739s and 60.935\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015361.259s. Endpoints and overlap do not prove intermediate state, a stall, or causation."
   },
   "cabin_diagonal_guard_failure_2026_10_27": {
     "run": "20261027T174300006026Z",
@@ -3323,5 +3462,331 @@
     "scope": "Test staging failure, not gameplay diagnosis or completed movie.",
     "cleanup": "Inputs released, owned game/simulator closed; Steam retained; temporary route removed.",
     "diagnosis": "The published carrier normal was approximately [0.848, 0.259, 0.463], mostly horizontal. The temporary staging selected the horizontal direction toward the prior head pose while adding vertical height, putting the observer behind that face; negative dot values are consistent with that choice. This is a geometry lead, not a verified viewpoint."
+  },
+  "gz_body_hud_2026_10_27": {
+    "candidate": "d127d2129ea4787f3eef2eef81a3b450bf18f80778c39cb89a823503cbe7c3b2",
+    "retained_runs": [
+      "20261027T213048323509Z",
+      "20261027T213236942029Z"
+    ],
+    "result": "Both posed final eyes show body-off hands/forearms, the native ammo card on the left forearm, and no intruding stowed rifle stock. Both held final eyes in the subsequent ready run show the rifle restored and no floating crosshair.",
+    "limitations": [
+      "Forearm cut ends remain angular; natural cuffs are not established",
+      "Ammo card is compact; moving readability remains unreviewed",
+      "No continuous motion, complete equipment, or physical headset acceptance"
+    ],
+    "previous_candidate": "5674b2f7b47611e8c4d1d8d490c6d4ac756922db11937964669905f650446eb8",
+    "previous_results": {
+      "20261027T211326960210Z": "Both held eyes lacked rifle; cause undiagnosed",
+      "20261027T211408034387Z": "Both body-off posed eyes reviewed: cropped forearms but stowed stock intruded",
+      "20261027T211510595270Z": "Left held eye showed rifle after full body restored; right not reviewed",
+      "20261027T211644355084Z": "Left wrist-up eye exposed oversized ammo card; right not reviewed"
+    },
+    "checks": "59 CTest groups and installer checks passed for both candidates",
+    "cleanup": "Inputs and temporary poses released; full_body restored byte-for-byte. Wrist HUD enabled per existing left-forearm preference. TPP installation and published play pin unchanged.",
+    "next": "Left-hand native iDroid and display, shared gameplay controls and body fitting, followed by the combined Field Kit video; no finished movie."
+  },
+  "gz_left_idroid_2026_10_27": {
+    "candidate": "a1228d1f3e8b7655aece116ab2ae4741a1b49b5b316539214bf58d7b5dcb014c",
+    "retained_runs": [
+      "20261027T215120784175Z",
+      "20261027T215140842885Z",
+      "20261027T215728452935Z"
+    ],
+    "result": "Native handset is retargeted through GZ variant-3 CNP to the left wrist, with the shared measured native left-hand cup and GZ original finger translations. Native map is mapped to the same solved handset. Both posed final eyes reviewed. B closes handset and map and returns to first-person world in both eyes, including after reopening.",
+    "failure": "Straight-on posed view clips a large portion of the map. Native shoulder reach clamps the handset close to the eyes; final map fit is unresolved. Do not present this as finished iDroid usability.",
+    "previous_candidate": "4fc74943422875a65227ee397f7b7e773390b30b055f0af3c630216c1cb31884",
+    "previous_runs": [
+      "20261027T214423689567Z",
+      "20261027T214447291272Z",
+      "20261027T214526697606Z"
+    ],
+    "previous_result": "Left handset and map appear in both eyes and follow staged rotation. B did not close: the TPP-only input acknowledgment cleared GZ menu input. Corrected in current candidate by retaining native GZ navigation and excluding the TPP acknowledgment.",
+    "checks": "Both candidates passed 59 CTest groups and installer checks.",
+    "cleanup": "Inputs and temporary controller poses restored; native iDroid closed. Steam retained. TPP installation and published pin unchanged.",
+    "next": "Source-only native eye join, fixed-length spine/shoulder fit and clavicle reach are building to address close handset placement. Remaining common controls, physical binoculars, integrated motion and the combined Field Kit film remain unfinished."
+  },
+  "gz_body_fit_2026_10_27": {
+    "candidate": "6b1a1a9405aabb2407a619e0b27548c3f9098d668830501f7ca6a44d524c6e8e",
+    "retained_runs": [
+      "20261027T220710049689Z",
+      "20261027T220854419847Z",
+      "20261027T221020345667Z",
+      "20261027T221121566780Z"
+    ],
+    "result": "Native anatomical eye join, fixed-length torso fit when reachable, shared body-off shoulder placement and clavicle reach are deployed. Both final eyes show the left-hand native iDroid map at usable main-map scale; outer labels remain clipped at the staged left-FOV edge. Native legs are untouched. Both held eyes in 221020 show the rifle without a flat reticle.",
+    "failures": "Both held eyes in 220854 show no rifle after the shorter draw hold; cause unconfirmed. The longer hold shows the rifle but does not establish a confirmed shot. Both posed eyes in 221121 show jagged open body-off sleeve ends and a small forearm ammo card. Shared cuff algorithm fails the nearest Snake2 LOD because distinct axial rim vertices project to the same Y/Z corner. Cap repair is source-only and building.",
+    "checks": "59 CTest groups and installer checks passed for this deployed candidate.",
+    "cleanup": "Full-body personal controls restored byte-for-byte, temporary poses restored, inputs released, iDroid closed. Steam retained. TPP installation and published play pin unchanged.",
+    "next": "Finish the shared cuff repair, remaining GZ gameplay controls and physical binoculars; produce the combined Field Kit movie. Full-game, continuous-motion and physical-headset completion are not claimed."
+  },
+  "gz_shared_cuff_repair_2026_10_27": {
+    "candidate": "a3c9a9eed06e0408da8fcd6a6a7c8579066595eae7ab7e87db8a4726357acc04",
+    "retained_runs": [
+      "20261027T222812915905Z",
+      "20261027T222919313085Z",
+      "20261027T223039155404Z"
+    ],
+    "result": "Shared forearm triangulation now handles axial rim steps that collapse to coincident projected corners. Owned GZ Snake2 nearest LOD now closes both cuffs, and both final eyes in wrist-up body-off run 222812 show closed ends without the prior jagged flaps. Both posed eyes in 222919 show the left-hand native handset/map, and both held eyes in 223039 show the rifle without a flat reticle. B closure occurred between those runs.",
+    "scope": "GZ stationary/staged wrist and handset poses plus weapon draw. Native mesh and synthetic corner-collapse case exercised; same shared fix applies to TPP code but fresh TPP visual review is pending. No new shot or continuous-motion claim.",
+    "remaining": "Forearm ammo card is small. GZ action/travel mapping, physical binoculars and remaining shared features, TPP/cabin integrated review and the complete Field Kit movie remain unfinished.",
+    "checks": "59 CTest groups and installer checks passed.",
+    "cleanup": "Full-body controls restored byte-for-byte, poses restored, inputs released and iDroid closed. No active harness or reader. Steam retained. TPP installation and published play pin unchanged."
+  },
+  "gz_physical_optic_2026_10_27": {
+    "candidate": "274a81f4013bece41c10ae82329abad72be85df73e629d6b37328e219b7b27c6",
+    "retained_runs": [
+      "20261027T225433689268Z",
+      "20261027T225455471843Z",
+      "20261027T225557898392Z",
+      "20261027T225818219147Z",
+      "20261027T225851570979Z",
+      "20261027T230129391803Z"
+    ],
+    "result": "GZ native basic-action state now enables shared foot controls and physical binoculars. Owned GZ bin0 model and its decoded textures are installed through the configurable optic paths. Both final eyes show right-hand equip, the actual ocular with a magnified scene, 2x/4x change, supporting-hand curl and larger left-forearm ammunition card. Native source-eye video and process audio were recorded for these actions; final-eye stills were reviewed separately.",
+    "scope": "Native source-eye recordings are before runtime crop/composition, with cadence, repeated frames and exact source lineage retained. Final compositor endpoints were reviewed for equip, raised lens, zoom, support grip and wrist HUD. The 225818 native video middle frame was also reviewed. Complete continuous-motion/video editorial review remains pending; this is not the finished showcase.",
+    "failure": "At 1793141744217 the optic spontaneously stowed between takes when player freshness expired during a slow native frame. The 225557 zoom attempt therefore has no optic and is retained as a failure. 225818 after re-equip shows actual 2x/4x change and configured stow. Source now resolves input ownership from the native current-player registry instead of the 150ms render freshness threshold; that follow-up is not built/deployed yet.",
+    "remaining": "Build/deploy the ownership repair; verify movement and adjacent shared controls. Native GZ enemy acquisition/marking/intel and native optic material shader are not connected. Production GZ asset import is not yet generalized beyond the private owned local import. Remaining game interactions, TPP/cabin review and finished combined Field Kit movie remain open.",
+    "checks": "59 CTest groups and installer checks passed for 274a81. GZ recording wrapper Python compilation passed.",
+    "cleanup": "All run inputs released and temporary controller poses restored. Binoculars stowed; menus closed; recording requests cleared and owned recorders/readers closed. Full-body setting unchanged at 1. Steam retained. TPP installation and published play pin unchanged."
+  },
+  "gz_native_recon_2026_10_27": {
+    "candidate": "fd053ed8167ca89a9e3f2ec01b85b8035084024670de9ad7b781927f367064ca",
+    "retained_runs": [
+      "20261027T232907200846Z",
+      "20261027T233026715668Z",
+      "20261027T234007158128Z"
+    ],
+    "result": "Ground Zeroes physical binoculars now drive native collision visibility and character marking. At 4x the real tower guard at 79 m acquires, A clears the marker, and right trigger explicitly marks it again. Both final eyes were reviewed for all three states. The current-player ownership repair also removes render-cadence expiry from equip ownership; no involuntary stow was observed in these runs.",
+    "previous_failure": "5940c447d193edab73d9aabb0b4102ad152e0ef99e8f322af8539c3953a1ec52 queried only the 30 m native base range. Its two retained attempts show no acquired mark. The range repair uses the physical lens power in the same native multiplier field as the retail binocular zoom setters.",
+    "native_events": {
+      "automatic_mark_ms": 1793144420678,
+      "clear_ms": 1793144421781,
+      "explicit_mark_ms": 1793144423642,
+      "record_index": 30
+    },
+    "video": "Continuous native source-eye take with process audio; 18.7666 s, 538 accepted samples, 563 encoded frames, 25 repeats, 26 dropped samples. The largest 0.801 s source gap is at 0.110 s, before the optical actions. Both final compositor eye stills are separate from this source video. Full editorial review and the combined showcase remain unfinished.",
+    "checks": "59 CTest groups and installer checks passed for both candidates. GZ bot Python compilation passed.",
+    "cleanup": "Inputs released, head/controller poses restored, binoculars stowed, menus closed, recorder request cleared and owned readers closed. Full-body setting remains 1. Steam and published play pin retained; TPP installation unchanged.",
+    "remaining": "GZ native intel/radio, terrain waypoint control, shared marker visibility/glow settings, remaining gameplay combinations, TPP/cabin review and the complete combined Field Kit film."
+  },
+  "gz_native_intel_2026_10_27": {
+    "candidate": "050ae82a4832018d2832ce01c73a3697405addfcc622ae2eb1435488a75352a4",
+    "retained_runs": [
+      "20261028T002337220348Z",
+      "20261028T000135298023Z"
+    ],
+    "result": "GZ physical binocular X requests the tower guard through native mission event pump 14fbd0. Both action final eyes reviewed. Native candidate and PlayButton request agree on guard hash 0x4d68e67b84b5. Local faster-whisper tiny.en transcription of original process audio: It is a guard; do not let him see you; avoid combat whenever possible. Audio was machine-transcribed, not directly auditioned.",
+    "previous_failure": "Radio UI child c5cf30 and parent c5f750 did not tick outside authored binocular UI. Failed child take retained; neither was accepted as a working request.",
+    "video": "23.0333 s native right source-eye before compositor, 650 accepted, 691 encoded, 41 repeated, 42 dropped; largest source gap 1.22423 s. Separate final compositor stills. Process audio 48 kHz stereo, no reported gaps.",
+    "checks": "59 CTest groups and installer checks passed.",
+    "cleanup": "Inputs and poses restored; optic stowed, menus closed, recording/readers closed. Owned GZ session then closed with Steam retained.",
+    "remaining": "Terrain waypoints, marker/glow settings, remaining gameplay contexts, TPP/cabin review and combined film.",
+    "transcript": [
+      {
+        "start": 0.0,
+        "end": 3.0,
+        "text": " It's a guard."
+      },
+      {
+        "start": 3.0,
+        "end": 4.0,
+        "text": " Don't let him see you."
+      },
+      {
+        "start": 4.0,
+        "end": 6.0,
+        "text": " Avoid combat whenever possible."
+      }
+    ]
+  },
+  "tpp_cabin_film_2026_10_27": {
+    "candidate": "050ae82a4832018d2832ce01c73a3697405addfcc622ae2eb1435488a75352a4",
+    "retained_runs": [
+      "20261028T003108427231Z"
+    ],
+    "result": "One continuous native source-eye cabin take records physical cassette pickup/drop/recovery/insertion, index-tip eject and supported cassette recovery; camera shooting and printing in either hand; photo pickup and board placement. Both final eyes reviewed for seated/ejected cassette, right camera print and attached board print. Closed sleeve ends visible; moving contacts require editorial review.",
+    "video": "77.3333 seconds; 2306 accepted samples, 2304 unique image transactions, 2320 encoded frames, 14 repeats, 15 dropped samples; largest gap 0.4596 seconds. Original process audio has no reported gaps.",
+    "cleanup": "Workbench inputs and tracking poses restored; test-created board placement restored by the bounded workflow. Steam and published pin retained. TPP now runs the same checked development DLL as GZ.",
+    "chapter": "private/showcase/current-field-kit/tpp-cabin.mp4, 75.7 seconds aspect-correct native footage with Field Kit captions and official Quest Touch Plus controller plates. Eject and board editorial stills reviewed. This is a chapter, not the finished combined movie."
+  },
+  "tpp_shared_feature_film_2026_10_27": {
+    "candidate": "050ae82a4832018d2832ce01c73a3697405addfcc622ae2eb1435488a75352a4",
+    "retained_runs": [
+      "20261028T003525517793Z",
+      "20261028T005355660555Z",
+      "20261028T005603735945Z",
+      "20261028T005736391190Z",
+      "20261028T005920097640Z",
+      "20261028T010025889663Z",
+      "20261028T010128332547Z",
+      "20261028T010435032673Z"
+    ],
+    "result": "TPP recorded native equipment/commands contexts, equipped secondary fire (42 to 39 rounds), reload (39 to 43), prone/crouch/stand transitions, field left-hand iDroid open/stow, VR off/on, full-body on/off and eyepatch off/on. Both field iDroid eyes and both eyes of all four body/eyepatch effect states reviewed. Whole-arsenal, mission and headset behavior are not certified.",
+    "script_failures": "First reload case mistakenly watched primary ammo. Follow-up expected 42 but native reload produced 43; reload itself worked. First iDroid interval began before opening completed; subsequent ordinary open/stow succeeded. Retained deployment route needed longer native transition waits.",
+    "unresolved_take": "TPP recon acquired no native targets before operator set_head_pose request timed out. No explicit marks or zoom were completed. Game continued rendering. A fresh observation recovered the operator; exact pre-take head and all four local grip/aim poses were restored and verified in 20261028T010128332547Z/pose-recovery/result.json. No successful TPP recon claim.",
+    "capture": "Native source-eye recording omits the host controls panel. A separate final-compositor VR toggle take, 20261028T010025889663Z, contains 45 real frames at measured 4.039 capture fps. Native gameplay recordings and separate final-eye stills remain identified.",
+    "settings": "Original full_body=0 and eyepatch=1 restored. Editor demonstration temporarily changed binocular hold 300 to 400 ms; restored to original 300 ms. Editor workflow now restores exact starting controls bytes on owned cleanup, preserving external edits. Current body-switch take confirms byte restoration.",
+    "remaining": "GZ matched fresh footage; paired Field Kit edit; remaining shared adapters and per-feature behavior. Current private chapter files are not a completed combined showcase."
+  },
+  "paired_field_kit_working_cut_2026_10_27": {
+    "candidate": "050ae82a4832018d2832ce01c73a3697405addfcc622ae2eb1435488a75352a4",
+    "new_runs": [
+      "20261028T012152224791Z",
+      "20261028T012220370500Z",
+      "20261028T012315142189Z",
+      "20261028T012347615433Z",
+      "20261028T013233870341Z",
+      "20261028T013412671686Z"
+    ],
+    "observed": "GZ native first-person mission entry, left-hand iDroid open/view/stow and held rifle. Both final eyes reviewed for GZ posed handset and held rifle. TPP clear-view ACC iDroid open/hold/stow; both final eyes reviewed.",
+    "stereo_note": "Distant-feature comparison of GZ held-eye images: 116/123 feature matches fit a horizontal displacement of -203.69 px with median vertical displacement 0.013 px. This matches the approximately 204 px offset from asymmetric -54/+40 and -40/+54 degree eye crops at width 840; no camera defect established from differing screenshot framing.",
+    "settings": "TPP eyepatch temporarily changed 1 to 0 for clear-view footage, then the exact original controls bytes restored; private/showcase/clear-view-setting.json records ownership and restoration. No published pin change.",
+    "failed_scope": "First TPP hold-only case was rejected because its before/after predicate was identical. The observation was moved into the existing stow case. Subsequent map open/hold/stow passed. The later deployment route started on the remembered MAP page instead of the previously observed MISSIONS root, and stopped at a mission acceptance dialog; no mission was accepted. Owned cleanup closed the menu and restored camera. Future deployment must inspect the current page before navigation.",
+    "movie": "private\\showcase\\current-field-kit\\MGS5VR-Field-Kit-working-cut.mp4",
+    "movie_sha256": "6806e47339f70c756cadf74ce332db5a9ae1ddf00f7e8db3bdfb330339cdcb79",
+    "movie_seconds": 157.516667,
+    "movie_status": "Working cut, not final all-feature delivery. Seven indexed chapters; a 19.5-second paired iDroid chapter now contains real moving TPP/GZ footage and directional wipes. Both sources are native eye 1 before runtime composition. VR switch uses 45 actual final-compositor frames at measured 4.039 capture fps.",
+    "review": "All 4723 encoded video frames and both audio channels decode. AAC 48 kHz stereo; mean -24.5 dB, peak -6.5 dB. Assembled contact sheet and paired one-second motion samples reviewed; full-resolution paired layout and solo map frames reviewed. Audio metrics are not direct listening.",
+    "cleanup": "Both owned game/simulator sessions closed through workspace.py; Steam retained. No background recording/harness. TPP controls restored. GZ poses restored, optic/menu stowed/closed.",
+    "remaining": "Remaining native GZ adapters/settings, full weapons/reload/equipment/travel/actor coverage, unobscured TPP field weapon footage, animated controller lessons, final portrait/design and complete final feature film. GZ recon chapter uses preceding checked fd053e capture and needs final-build refresh."
+  },
+  "gz_recon_visibility_2026_10_27": {
+    "status": "repaired_native_marker_visibility_partial_glow_adapter",
+    "build_sha256": "50fca91f11de43814a3ef9a1839394b92ca57d25962227a73489bda79c1744ff",
+    "result": "Ground Zeroes native character marker obeys live HUD Off/Full. Before 050ae82a, Off left the native 79M marker visible. After 50fca91f, Off hides it and Full restores it in the physical binocular lens. Both final eyes reviewed; source-eye videos retained.",
+    "failure_run": "20261028T020601947606Z",
+    "off_run": "20261028T021711220890Z",
+    "on_run": "20261028T021834570739Z",
+    "implementation": "GZ scene and layout marker layers 23..26 use shared HUD/marker preferences. Recon opacity scope now resolves GZ collection, clone and material layouts independently. Source actor and native fade values are preserved.",
+    "scope_limits": "Visible native glow-on remains unverified; post-stow clone opacity was zero. Terrain marker interactions and independent enemy-world switch still require coverage. Native radio request was observed in the on take, but its spoken content was not reviewed. No physical-headset or whole-game claim.",
+    "checks": "59/59 CTest and installer checks passed. Both installations use this development DLL. Published play pin unchanged.",
+    "cleanup": "Exact original GZ controls bytes restored; inputs/poses released/restored by bounded cases; binocular stowed; owned game/simulator closed; Steam 21472 retained.",
+    "movie": {
+      "path": "D:\\code\\MGS5VR\\private\\showcase\\current-field-kit\\MGS5VR-Field-Kit-working-cut.mp4",
+      "sha256": "a4e4d0a392f16c4e28da92188dd0f6ce66618029f5c548efb6b459d750eebf11",
+      "duration": 169.516667,
+      "status": "working_cut_not_final",
+      "chapters": 8,
+      "added": "12-second real GZ HUD Off/Full effect chapter"
+    },
+    "next": "Production GZ owned-asset import and remaining actual gameplay/control differences; unobscured TPP field capture; complete feature chapters, animated controller lessons and final combined film."
+  },
+  "gz_normal_setup_2026_10_27": {
+    "status": "implemented_checked_deployed",
+    "build_sha256": "19e51307a1a3af763b8b0b870421dda729069874ff1d5b190253175f795bc455",
+    "repair": "Ground Zeroes normal setup and Field Terminal now install tracked first-person VR using the independent GZ adapter, forearm HUD and correct owned binocular paths. Selective GZS import decodes only the exact owned model and four material maps. Launcher update retains personal runtime/settings bytes.",
+    "validation": "59/59 CTest plus installer checks. Authored GZS cipher fixtures use independent GzsTool v0.2 ciphertext; malformed/duplicate/missing extents rejected. Actual owned GZ model and four maps match their prior simulator asset hashes. Existing TPP model/material/native-shader import still matches. Both development installations match checked DLL.",
+    "importer_sha256": "e6706c10044cd18c1f21c79282e9e141f85c33c71b0fbac81f2ab081c0d2bde9",
+    "movie": {
+      "path": "D:\\code\\MGS5VR\\private\\showcase\\current-field-kit\\MGS5VR-Field-Kit-working-cut.mp4",
+      "sha256": "76899b7a1eef1f2724a0979c98045ebf8c69d4d5813f5b30fc63cb710312043c",
+      "duration": 169.516666,
+      "status": "working_cut_not_final",
+      "animated_chapters": [
+        "cabin",
+        "GZ recon",
+        "GZ intel"
+      ],
+      "animation": "Official Quest Touch Plus meshes with authored press endpoints; illustrative orientation/timing, distinct from game footage.",
+      "review": "Full movie/audio decode passed; representative cabin/recon and controller button frames reviewed."
+    },
+    "limits": "No new gameplay or headset acceptance from installer checks. Remaining gameplay contexts, native GZ material shader and visible glow-on, missing full feature footage and final film remain open.",
+    "cleanup": "Both games and owned simulator sessions closed, personal settings retained, Steam and published play pin unchanged. Clean-builds audit found zero recognized obsolete build targets."
+  },
+  "clear_field_chapter_2026_10_27": {
+    "status": "field_actions_filmed_buddy_failure_under_investigation",
+    "source_build_sha256": "19e51307a1a3af763b8b0b870421dda729069874ff1d5b190253175f795bc455",
+    "field_run": "20261028T024923719888Z",
+    "departure_run": "20261028T024621209690Z",
+    "field_actions": [
+      "equipment picker open/release",
+      "commands open/release",
+      "equipped secondary ready",
+      "secondary fire 42->39",
+      "secondary reload 39->43",
+      "prone/crouch/stand",
+      "left-hand iDroid open/stow"
+    ],
+    "review": "Both ready, fire, reload and field iDroid final eyes reviewed. Full movie video/audio decode passed; fire/controller layout reviewed. No target-hit or damage claim.",
+    "field_source": {
+      "eye": 1,
+      "accepted_samples": 1156,
+      "encoded_frames": 1160,
+      "dropped_samples": 5,
+      "max_accepted_gap_seconds": 0.1598727
+    },
+    "buddy_failure": {
+      "runs": [
+        "20261028T025523260491Z",
+        "20261028T025844651644Z",
+        "20261028T031126539491Z"
+      ],
+      "physical_responses": 0,
+      "detail": "Slow tracked hand reaches natural D-Dog but response does not fire. Latest read-only trace also records the dog walking out of reach. Generic motion-case observed_pass does not represent successful petting.",
+      "samples": "private/showcase/buddy-contact-samples.json",
+      "diagnostic_build_sha256": "41db3ae40e593fa2d023b6dabc93edd0850564e4be61c5391498918ad7b0e7cc",
+      "diagnostic_change": "Read-only inspect-animal-touch now exposes eligibility mask, contact state, distance, elapsed, curl, travel, speed and reset count per hand. No interaction thresholds changed.",
+      "diagnostic_validation": "59 CTest groups and installer checks completed; TPP installed; GZ retains previous 19e51307 build pending the actual repair."
+    },
+    "movie": {
+      "path": "D:\\code\\MGS5VR\\private\\showcase\\current-field-kit\\MGS5VR-Field-Kit-working-cut.mp4",
+      "sha256": "dcf93a8a334f61e64280c831a1c3a601c859f79d63e73fa5e4404dd8a496e94e",
+      "duration": 208.116666,
+      "chapters": 9,
+      "status": "working_cut_not_final",
+      "new_chapter": "38.6-second continuous clear-view field actions with official animated controller lessons and original process audio"
+    },
+    "settings": "Original clear-view-field-setting.json transaction restored exactly. New clear-view-buddy-setting.json temporary eyepatch=0 is active for the ongoing diagnostic session; restore it before closing.",
+    "next": "Identify physical pet reset reason, repair reproduced interaction and finish remaining shared settings/adapters and all-feature movie."
+  },
+  "physical_pet_native_transaction_2026_10_27": {
+    "build_sha256": "283ff99bb873fe8df0ddb96a0113e9167e8f2c491620d012d4f959ec130bb91b",
+    "repair": "Physical D-Dog contact consumption moved from XInput polling to the native Lua transaction; fresh XR ownership and all contact thresholds preserved.",
+    "cause": "691/691 read-only native queries had bones; XInput path reported no_native_bones in 56 of the simultaneous observations. Those missing queries reset the contact stroke.",
+    "validation": "59 CTest groups plus installer checks passed; both game installations match checked development. Fresh physical response and visible animation remain to be tested.",
+    "before_trace": "private/showcase/buddy-contact-transaction-before.json",
+    "published_pin_unchanged": true
+  },
+  "field_kit_latest_delivery_2026_10_27": {
+    "status": "checked_deployed_showcase_incomplete",
+    "build_sha256": "6ef5532fb054d2ca0855c2d34264507e7495c1768d585e3790f85230ddf89011",
+    "fixes": [
+      "Physical D-Dog bone query and response now run from the native Lua transaction, removing the reproduced intermittent query loss in XInput polling.",
+      "Stroke travel additionally requires actual raw controller motion and motion relative to head translation. Rendered skin animation or a moving animal cannot accumulate a pet stroke."
+    ],
+    "tests": {
+      "ctest_groups": 59,
+      "failures": 0,
+      "installer_checks": "passed",
+      "regressions": "Stationary tracking with native skin/animal motion, walking, head-only movement, sub-threshold jitter, slow real stroke and rapid strike rejection."
+    },
+    "live": {
+      "latest_departure_run": "20261028T035119248170Z",
+      "commands_run": "20261028T035657712458Z",
+      "repaired_physical_responses": 0,
+      "idle_samples": 702,
+      "idle_scope": "No response while outside contact; not a successful pet or near-contact idle claim.",
+      "failed_approach_run": "20261028T035457540851Z",
+      "approach_scope": "The bounded walking executor moved farther than the predicted final x predicate. Dog remained out of reach; this does not diagnose a new gameplay defect.",
+      "startup": "First launch exited during initialization without an Application Error event; clean retry reached ACC and field. Startup failure retained in buddy-final-launch.log; cause unresolved."
+    },
+    "prior_false_response": {
+      "build": "283ff99bb873fe8df0ddb96a0113e9167e8f2c491620d012d4f959ec130bb91b",
+      "native_pet_count": 1,
+      "scope": "Response occurred with controllers idle while dog/native skin moved; it is not successful physical petting.",
+      "receipt": "private/showcase/buddy-idle-false-response.json"
+    },
+    "movie": {
+      "path": "D:\\code\\MGS5VR\\private\\showcase\\current-field-kit\\MGS5VR-Field-Kit-working-cut.mp4",
+      "sha256": "2ca59f1f9401d43e18eef9c673bffca02a9617711049e53722516c153d77a137",
+      "seconds": 263.416666,
+      "chapters": 11,
+      "status": "working_cut_not_final",
+      "added": "Retained 26 October Rocket Arm steering and Blast Arm watchtower collapse, rebuilt into the current Field Kit layout. Their 9d5e15c0 build and native footage/audio scope remain in chapter edit indices; they are TPP-specific, not claimed in GZ.",
+      "validation": "Full video/audio decode passed. Field-fire and Blast Arm impact layouts reviewed; original paired aftermath review retained with the source."
+    },
+    "cleanup": "All owned games/simulator and bounded readers/runners closed; inputs/poses released/restored; every temporary eyepatch transaction restored exactly. Steam 21472 retained. Published play pin unchanged.",
+    "remaining": "Successful physical pet filming, remaining GZ native material/settings/vehicle adapters and full applicable gameplay feature coverage; complete final film remains unfinished."
   }
 }

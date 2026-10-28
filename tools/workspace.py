@@ -539,6 +539,8 @@ def bot(args):
             raise ValueError('emplacement requires an existing reviewed --policy file')
     value = settings()
     game, proxy = Path(value["game_dir"]), Path(value["operator_proxy"])
+    if getattr(args, 'game_dir', None):
+        game = args.game_dir.resolve()
     selected_build = PLAY if getattr(args, 'slot', 'dev') == 'play' else DEV
     manifest = checked_build(selected_build)
     if digest(game / "dinput8.dll") != manifest["files"]["dinput8.dll"]:
@@ -616,7 +618,7 @@ def bot(args):
         print(f"Running {args.operation}; evidence: {output}", flush=True)
         with (output / "runner.log").open("w", encoding="utf-8") as log:
             environment = dict(os.environ)
-            environment["MGS5VR_OPERATOR_URL"] = f"http://127.0.0.1:{value.get('operator_port', 8720)}"
+            environment["MGS5VR_OPERATOR_URL"] = f"http://127.0.0.1:{getattr(args, 'operator_port', None) or value.get('operator_port', 8720)}"
             code = subprocess.run([str(a) for a in command], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
                                   env=environment).returncode
     finally:
@@ -791,6 +793,8 @@ def main():
         clean(sys.modules[__name__], args)
     cleanup.set_defaults(handler=clean_builds)
     observe = commands.add_parser("bot")
+    observe.add_argument('--game-dir', type=Path, help='Use this installed game for this run only')
+    observe.add_argument('--operator-port', type=int, help='Use this simulator session for this run only')
     observe.add_argument('--slot', choices=('dev','play'), default='dev', help='Verify the selected retained build before testing')
     observe.add_argument("--command", choices=("observe", "showcase", "showcase-setup", "title", "cold-start", "cinematic", "profile", "bench", "bench-film", "studio-manager", "controls-editor", "body", "studio-field", "studio-board", "studio-hands", "continue", "run", "session", "move", "idroid", "optics", "supervise", "state", "mortar", "cqc", "recon"), default="observe")
     observe.add_argument('--policy', type=Path, help='mortar: reviewed authored fixture and operator position')

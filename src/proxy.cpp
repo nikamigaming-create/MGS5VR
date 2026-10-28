@@ -264,8 +264,8 @@ DWORD WINAPI initialize(void*){
                 const auto evidencePath=cameraEvidenceDirectory(ini);
                 if(GetPrivateProfileIntW(L"diagnostics",L"head_camera_experiment",0,ini.c_str())==1){
                     installRenderCamera(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),evidencePath,RenderBuild::groundZeroes_1_0_0_5);
-                    headCamera().configure(true,1,false);
-                    log("GZ scene-camera experiment: native stereo at the game camera, not yet a tracked first-person player rig");
+                    headCamera().configure(true,1,true);
+                    log("GZ native player camera, tracked rig and weapon adapter connected");
                 }
                 if(GetPrivateProfileIntW(L"diagnostics",L"camera_observer",0,ini.c_str())==1)
                     installCameraObserver(evidencePath,RenderBuild::groundZeroes_1_0_0_5);

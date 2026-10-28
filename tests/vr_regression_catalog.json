@@ -61,6 +61,7 @@
     "launcher_display_settings",
     "headset_launcher",
     "independent_render_window",
+    "ground_zeroes_render_window",
     "installer_safety",
     "owned_asset_importer",
     "controls_config",
@@ -134,8 +135,8 @@
     "gameplay": 37,
     "runtime": 6,
     "tooling": 5,
-    "baseline_ctest_groups": 41,
-    "current_ctest_groups": 58,
+    "baseline_ctest_groups": 42,
+    "current_ctest_groups": 59,
     "public_native_fixture_files": 20,
     "features_with_registered_automated_tests": 45,
     "features_with_auxiliary_tests_only": 1,
@@ -316,6 +317,7 @@
       ],
       "automated_tests": [
         "independent_render_window",
+        "ground_zeroes_render_window",
         "launcher_display_settings"
       ],
       "test_sources": [
@@ -3957,7 +3959,7 @@
     },
     {
       "id": "ground-zeroes",
-      "title": "Separate Ground Zeroes native stereo experiment",
+      "title": "Ground Zeroes native stereo and first-person adapter",
       "kind": "gameplay",
       "source_paths": [
         "src/render_camera.cpp",
@@ -3965,7 +3967,12 @@
         "profiles/gz-1.0.0.5.json",
         "include/mgs5vr/game_target.hpp",
         "include/mgs5vr/render_camera.hpp",
-        "include/mgs5vr/render_layout.hpp"
+        "include/mgs5vr/render_layout.hpp",
+        "include/mgs5vr/gz_player.hpp",
+        "src/gz_rig.cpp",
+        "include/mgs5vr/gz_rig.hpp",
+        "src/gz_recon.cpp",
+        "include/mgs5vr/gz_recon.hpp"
       ],
       "automated_tests": [
         "contracts",
@@ -4007,7 +4014,7 @@
       },
       "release_gate": {
         "status": "experimental",
-        "reason": "Only the explicitly scoped third-person stereo experiment is implemented; no complete GZ first-person claim."
+        "reason": "First-person head and visibility work in scoped simulator observations; tracked rig, native aim, wrist UI and full gameplay remain incomplete."
       },
       "missing_checks": [
         "Game-specific first-person, tracked rig/aim and wrist UI adapters remain incomplete.",
@@ -4929,6 +4936,7 @@
     "launcher_display_settings",
     "headset_launcher",
     "independent_render_window",
+    "ground_zeroes_render_window",
     "installer_safety",
     "owned_asset_importer",
     "controls_config",

@@ -188,6 +188,23 @@ $roomRecord=@{game=$game;ownedRuntimeProcesses=@($roomOwned)} | ConvertTo-Json -
 $otherGameProc=Proc 999 1 'D:\Other\other-game.exe' '2026-09-27T19:00:00Z' 'other-game.exe'
 $roomPlan=@(Get-MgsOpaqueVrEnvironmentPlan -Record $roomRecord -Processes @($gameProc,$guiProc,$roomProc,$otherGameProc) -RuntimeRoot $root -TcpConnections @() -TcpSnapshotComplete $true)
 Assert ($roomPlan.Count -eq 1 -and [int]$roomPlan[0].pid -eq 202) 'opaque VR resource cleanup selects only its recorded batch room, retaining the game, GUI and unrelated game'
+$gzRoot=Proc 300 10 'D:\Games\GZ\MgsGroundZeroes.exe' '2026-09-27T19:00:00Z' 'MgsGroundZeroes.exe'
+$gzChild=Proc 301 300 $gzRoot.ExecutablePath '2026-09-27T19:00:01Z' 'MgsGroundZeroes.exe'
+$gzGui=Proc 302 301 "$root\MetaXRSimulator.exe" '2026-09-27T19:00:02Z' 'MetaXRSimulator.exe'
+$gzRoom=Proc 303 302 "$root\synthetic_env_server\synth_env_server.exe" '2026-09-27T19:00:03Z' 'synth_env_server.exe'
+$gzRoom | Add-Member -NotePropertyName CommandLine -NotePropertyValue ('"'+$gzRoom.ExecutablePath+'" Bedroom -batchmode')
+$gzIdentity=ConvertTo-MgsProcessIdentity $gzRoot
+$gzOwned=@(Get-MgsOwnedRuntimeProcesses -Processes @($gzRoot,$gzChild,$gzGui,$gzRoom) -Game $gzIdentity -RuntimeRoot $root)
+Assert ($gzOwned.Count -eq 3 -and @($gzOwned|Where-Object role -eq 'game_child').Count -eq 1 -and @($gzOwned|Where-Object role -eq 'meta_gui').Count -eq 1) 'GZ retail child and simulator are retained under the exact original launcher'
+$gzRecord=@{game=$gzIdentity;ownedRuntimeProcesses=$gzOwned}|ConvertTo-Json -Depth 8|ConvertFrom-Json
+$gzPlan=@(Get-MgsOpaqueVrEnvironmentPlan -Record $gzRecord -Processes @($gzRoot,$gzChild,$gzGui,$gzRoom) -RuntimeRoot $root -TcpSnapshotComplete $true)
+Assert ($gzPlan.Count -eq 1 -and $gzPlan[0].pid -eq 303) 'GZ room cleanup follows the recorded retail child and retains both game processes'
+$gzReused=Proc 301 300 $gzRoot.ExecutablePath '2026-09-27T20:00:00Z' 'MgsGroundZeroes.exe'
+$gzRejected=$false
+try{Get-MgsOpaqueVrEnvironmentPlan -Record $gzRecord -Processes @($gzRoot,$gzReused,$gzGui,$gzRoom) -RuntimeRoot $root -TcpSnapshotComplete $true|Out-Null}catch{$gzRejected=$true}
+Assert $gzRejected 'GZ reused retail-child PID cannot authorize runtime cleanup'
+$gzForeign=Proc 301 300 'D:\Other\MgsGroundZeroes.exe' '2026-09-27T19:00:01Z' 'MgsGroundZeroes.exe'
+Assert (@(Get-MgsOwnedRuntimeProcesses -Processes @($gzRoot,$gzForeign,$gzGui,$gzRoom) -Game $gzIdentity -RuntimeRoot $root).Count -eq 0) 'same-named GZ child at another path never grants ownership'
 $goneRoom=@(Get-MgsOpaqueVrEnvironmentPlan -Record $roomRecord -Processes @($gameProc,$guiProc) -RuntimeRoot $root)
 Assert ($goneRoom.Count -eq 0) 'an already released room is a no-op without requiring network inspection'
 $unrecordedRoom=@(Get-MgsOpaqueVrEnvironmentPlan -Record $record -Processes @($gameProc,$guiProc,$roomProc) -RuntimeRoot $root)

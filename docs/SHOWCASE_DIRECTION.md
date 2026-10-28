@@ -1,3 +1,7 @@
+### Current delivery direction — 27 October 2026
+
+Both TPP and Ground Zeroes need first-person VR and their shared features working before the finished showcase. Build one Field Kit video from actual simulator footage with runtime on/off demonstrations, paired actions, side-by-side views and wipes. Preserve original game audio and readable control instructions. Earlier GZ-last staging directions below are historical. Resolve observed defects rather than repeating unchanged recording attempts.
+
 # Final combined showcase
 
 September 26 continuation: the requested deliverable now includes a sustained,

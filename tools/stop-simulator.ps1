@@ -10,7 +10,7 @@ if(!(Test-Path -LiteralPath $mgsRecordPath)){throw 'No simulator session owned b
 $mgsRecord=Get-Content -Raw -LiteralPath $mgsRecordPath | ConvertFrom-Json
 if(!$mgsRecord.game){
     if($mgsRecord.PSObject.Properties['runtimeConfigLease']){
-        if(Get-Process mgsvtpp -ErrorAction SilentlyContinue | Where-Object { !$_.HasExited }){
+        if(Get-Process mgsvtpp,MgsGroundZeroes -ErrorAction SilentlyContinue | Where-Object { !$_.HasExited }){
             throw 'A game is running without an exact recorded owner; preserve its runtime lease for inspection.'
         }
         Restore-MgsRuntimeConfigLease -Lease $mgsRecord.runtimeConfigLease -GameExe $mgsRecord.gameExe
@@ -51,6 +51,12 @@ if($mgsGameRow -and (Test-MgsExactProcessIdentity $mgsRecord.game $mgsGameRow)){
     $mgsRecord.ownedRuntimeProcesses=@($mgsKnown.Values)
     [IO.File]::WriteAllText($mgsRecordPath,($mgsRecord|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false))
 }
+foreach($mgsIdentity in @($mgsRecord.ownedRuntimeProcesses | Where-Object role -eq 'game_child')){
+    $mgsChild=Find-MgsOwnedIdentity $mgsIdentity
+    if($mgsChild){$mgsChild.Kill();[void]$mgsChild.WaitForExit(8000)}
+}
+# The retail launcher may exit when its GZ child exits. Resolve it again
+# afterward rather than terminating a handle obtained before that transition.
 $mgsGame=Find-MgsOwnedIdentity $mgsRecord.game
 if($mgsGame){
     # Backend process cleanup only: no desktop/window/input automation.

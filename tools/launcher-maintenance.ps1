@@ -5,14 +5,16 @@ param(
 $ErrorActionPreference='Stop'
 $mgsTargetExe=(Resolve-Path -LiteralPath $GameExe).Path
 $mgsTarget=Split-Path -Parent $mgsTargetExe
-if ([IO.Path]::GetFileName($mgsTargetExe) -ine 'mgsvtpp.exe') {
-    throw 'The launcher installs tracked VR for The Phantom Pain only. Ground Zeroes first-person adapters are still in development.'
+$mgsTpp=[IO.Path]::GetFileName($mgsTargetExe) -ieq 'mgsvtpp.exe'
+if (-not $mgsTpp -and [IO.Path]::GetFileName($mgsTargetExe) -ine 'MgsGroundZeroes.exe') { throw 'Choose mgsvtpp.exe or MgsGroundZeroes.exe.' }
+$mgsExpected=if ($mgsTpp) {'085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45'} else {'7460d9dba9b6fe34893b5d330aca201983bb1734844f3688acffcc0ab22a1815'}
+if ((Get-FileHash -LiteralPath $mgsTargetExe -Algorithm SHA256).Hash -ine $mgsExpected) {
+    throw 'Unsupported game executable. This package requires TPP 1.0.15.4 or GZ 1.0.0.5.'
 }
-if ((Get-FileHash -LiteralPath $mgsTargetExe -Algorithm SHA256).Hash -ine '085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45') {
-    throw 'Unsupported game executable. This package requires TPP 1.0.15.4.'
-}
-if (Get-Process -Name mgsvtpp -ErrorAction SilentlyContinue | Where-Object { -not $_.WaitForExit(0) }) {
-    throw 'Close The Phantom Pain before changing its mod files.'
+$mgsProcessName=if ($mgsTpp) {'mgsvtpp'} else {'MgsGroundZeroes'}
+$mgsGameName=if ($mgsTpp) {'The Phantom Pain'} else {'Ground Zeroes'}
+if (Get-Process -Name $mgsProcessName -ErrorAction SilentlyContinue | Where-Object { -not $_.WaitForExit(0) }) {
+    throw "Close $mgsGameName before changing its mod files."
 }
 $mgsRecordPath=Join-Path $mgsTarget 'mgs5vr-install.json'
 if ($Mode -eq 'Install') {
