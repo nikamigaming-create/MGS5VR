@@ -128,10 +128,13 @@ from published releases. Historical HUD/rendering reports retain their tested-bu
 · [Current status](docs/STATUS.md) · [Historical rendering notes](docs/RENDER_FIX_NOTES.md)
 · [Community report history](docs/COMMUNITY_RECOVERY_PLAN.md)
 
-**Ground Zeroes 1.0.0.5 is not a finished first-person VR port.** Its independent
-native stereo experiment runs in SIM; tracked player anchoring, arms, wrist HUD,
-and weapon aiming are not connected. The launcher can open an existing GZ
-installation, but does not pretend to install a complete GZ first-person adapter.
+**Ground Zeroes 1.0.0.5 now includes experimental first-person VR.** The current
+nightly source connects independent native stereo, tracked hands and weapon aim,
+left-hand iDroid, forearm HUD, and physical binocular acquisition, marking and
+intel. Normal setup imports the required binocular assets from your own GZ
+installation. These features have scoped simulator observations; complete
+mission, equipment, vehicle, material-effect and physical-headset coverage remain
+unfinished. TPP-only buddies and powered arms are not added to GZ.
 [Both-game coverage](docs/DUAL_GAME_SIM_COVERAGE.md)
 
 ---

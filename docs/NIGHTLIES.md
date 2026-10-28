@@ -29,7 +29,7 @@ push local work automatically. Commit and push complete development batches to
 `main` to make them eligible. A failed check leaves the previous download intact.
 
 The build runs the Windows CTest suite except `d3d11_mailbox` and
-`independent_render_window`, which require real GPU hardware. Python, inventory,
+`independent_render_window` and `ground_zeroes_render_window`, which require real GPU hardware. Python, inventory,
 nightly failure-path and packaged-installer checks also run. Packaging checks the
 clean source identity, complete install inventory, public defaults, licenses,
 source archive and every payload hash. These hosted checks do not run MGSV,

@@ -1,5 +1,12 @@
 # Release execution plan â€” 26 October 2026
 
+### Ground Zeroes nightly publication - 27 October
+
+The user requested the current nightly with Ground Zeroes and the accumulated VR work. The batch includes GZ first-person stereo, tracked hands/aim, left-hand iDroid, forearm HUD, physical recon and production owned-asset setup, alongside the TPP/cabin and contact repairs. The existing GitHub nightly workflow builds and verifies committed main. Three hardware-only tests remain local; the complete local 59-group run passed before publication work.
+
+Next: publish and verify this exact experimental nightly through Actions. Keep the recommended release and local Play pin unchanged. Remaining gameplay and showcase work is retained below.
+
+
 ### Checked contact repairs and 4:23 combined working cut â€” 27 October
 
 Development `6ef5532fb054d2ca0855c2d34264507e7495c1768d585e3790f85230ddf89011` is installed in both games. Physical animal interaction now runs in the native Lua transaction rather than XInput polling; the earlier simultaneous diagnostic had bones in 691/691 native queries but 56 missing-bone observations in the old consumer. The intermediate repair exposed an idle false pet from native skin/animal movement. The final repair requires raw controller movement and movement relative to head translation as well as rendered contact. Regression coverage preserves slow real strokes while rejecting animation-only contact, walking, head-only motion, jitter and rapid hits. All 59 CTest groups and installer checks passed.

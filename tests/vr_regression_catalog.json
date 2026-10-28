@@ -4001,7 +4001,7 @@
         },
         "native": {
           "status": "retained_scoped",
-          "scope": "Historical third-person native stereo and selected weapon/item actions exist; TPP first-person rig/HUD success does not apply."
+          "scope": "Historical third-person evidence retains its original build scope. New GZ-specific retained observations cover first-person stereo, tracked hands/weapon aim, left-hand iDroid, forearm HUD, physical binoculars and native acquisition/mark/clear/intel; see FREE_PLAY_ACCEPTANCE. Whole-game and physical acceptance remain open."
         },
         "continuous": {
           "status": "unverified",
@@ -4014,10 +4014,10 @@
       },
       "release_gate": {
         "status": "experimental",
-        "reason": "First-person head and visibility work in scoped simulator observations; tracked rig, native aim, wrist UI and full gameplay remain incomplete."
+        "reason": "Independent first-person rig, native aim, left-hand iDroid, forearm HUD, physical recon and owned-asset setup are connected with scoped simulator observations. Remaining native material/settings effects, wider gameplay and physical acceptance are incomplete."
       },
       "missing_checks": [
-        "Game-specific first-person, tracked rig/aim and wrist UI adapters remain incomplete.",
+        "Broader moving-shot/contact, material effects, vehicle/equipment and physical-headset coverage for the connected GZ adapters.",
         "GZ guard/rescue/mission and native menu regression on its own profile."
       ],
       "sustained_regression": {

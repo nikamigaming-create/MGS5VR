@@ -51,11 +51,11 @@ jobs:
       - name: Build all targets
         run: cmake --build --preset release --parallel
       - name: Run tests that do not require a GPU or headset
-        # The native window/canvas test, like the mailbox test, needs a real
-        # DXGI hardware device. Both are exercised locally on the SIM machine.
+        # Both games' native window/canvas tests and the mailbox test need a
+        # real DXGI hardware device. They run locally on the SIM machine.
         run: |
           $mgsTestReport = Join-Path $env:GITHUB_WORKSPACE 'build/ci-tests.xml'
-          ctest --preset release --exclude-regex "d3d11_mailbox|independent_render_window" --output-junit $mgsTestReport
+          ctest --preset release --exclude-regex "d3d11_mailbox|independent_render_window|ground_zeroes_render_window" --output-junit $mgsTestReport
           if ($LASTEXITCODE -ne 0) { throw 'Windows tests failed.' }
           if (-not (Test-Path -LiteralPath $mgsTestReport)) { throw 'CTest did not write its required report.' }
       - name: Check Python tooling

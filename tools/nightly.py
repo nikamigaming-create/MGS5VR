@@ -19,7 +19,7 @@ from regression_catalog import current_ctests, validate_catalog
 ROOT = Path(__file__).resolve().parents[1]
 REPO = "nikamigaming-create/MGS5VR"
 OUTPUT = ROOT / "build/nightly-release"
-SKIPPED = {"d3d11_mailbox", "independent_render_window"}
+SKIPPED = {"d3d11_mailbox", "independent_render_window", "ground_zeroes_render_window"}
 TAG = re.compile(r"nightly-\d{4}-\d{2}-\d{2}-[0-9a-f]{12}")
 _spec = importlib.util.spec_from_file_location("release_package", ROOT / "tools/package-release.py")
 _package = importlib.util.module_from_spec(_spec)
@@ -191,7 +191,11 @@ def package(tag, previous):
              "Your game files are imported locally from your own installation. No retail assets or personal settings are included.", "",
              f"Source: `{commit}` · [Build and checks]({run_url})", "",
              f"Windows build, {count} CPU-compatible CTest groups, Python checks and packaged installer checks passed.",
-             "The two GPU-dependent tests, native gameplay, simulator and physical headset were not exercised by this CI run.", "",
+             f"The {len(SKIPPED)} GPU-dependent tests, native gameplay, simulator and physical headset were not exercised by this CI run.", "",
+             "## Included game support", "",
+             "- **The Phantom Pain 1.0.15.4:** the current VR rig, cabin interactions, controls and settings.",
+             "- **Ground Zeroes 1.0.0.5:** independent first-person stereo, tracked hands and weapon aim, left-hand iDroid, forearm HUD, physical binocular acquisition/marking/intel, and normal setup with local owned-asset import.",
+             "Ground Zeroes has scoped simulator observations; remaining native effects, vehicle/equipment/mission coverage and physical-headset acceptance are unfinished. TPP-only buddies and powered arms are not added to GZ.", "",
              "## Known issues and acceptance limits", "",
              "These catalog entries retain their original evidence/build scope; a historical block is not a new reproduction:", ""]
     notes += [f"- **{f['title']}**: {f['release_gate']['reason']}" for f in blocked]
