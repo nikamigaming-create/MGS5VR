@@ -108,3 +108,18 @@ Batch remaining justified gameplay fixes on main, then build/check/deploy one
 candidate for the user. Do not end after one small source edit. Do not restart
 per-case simulator or soak loops; the user will test the deployed candidate.
 Keep unresolved or undiagnosed reports explicit rather than inventing repairs.
+
+## Nightly publication direction — 27 October 2026
+
+The user authorized an opt-in automated nightly channel and publication of the
+current committed code, with release-automation work isolated on its own branch
+and worktree while another task continues in the primary checkout. This is an
+exception to the earlier main-only rule for this release-automation task.
+
+GitHub Actions builds committed main daily or on manual dispatch. The exact
+accepted blocker snapshots are in `config/nightly-policy.json`; new or changed
+blockers stop publication. Hosted checks exclude the two hardware-only tests and
+must never be described as physical or full-game acceptance. Follow
+`docs/NIGHTLIES.md` for the workflow and stop switch. Nightlies use technical tags
+and GitHub prereleases, never formal versions or the Latest designation. They do
+not promote the local play pin, deploy to the game, or add retained local builds.

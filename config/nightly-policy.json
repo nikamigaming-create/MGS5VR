@@ -1,0 +1,317 @@
+{
+  "schema": 1,
+  "enabled": true,
+  "authorized_on": "2026-10-27",
+  "scope": "User authorized an opt-in nightly channel and the current committed code; these exact existing blockers are disclosed, not resolved. New or changed blocker snapshots require review. Set enabled=false to stop publication.",
+  "accepted_blockers": {
+    "hand-arm-rig": {
+      "title": "Tracked hands, arm IK, fingers and native animation preservation",
+      "release_gate": {
+        "status": "blocked",
+        "reason": "Conservative block retained for extreme full-body cross-head cloth crowding, other outfit admission and physical acceptance. Fixed-length legs/pelvis, garment drivers, reach and wrist isolation exist; flat cuff caps and repeated native attribute-slot selection now have scoped both-eye review on351d84672f0e."
+      },
+      "coverage": {
+        "automated": {
+          "status": "partial",
+          "scope": "IK, contact transforms, finger curl and paused-parts rules are isolated; no test host plays native action animations."
+        },
+        "native": {
+          "status": "blocked",
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Fixed-length legs/shared pelvis, clavicle reach/wrist isolation, garment drivers and native hand publication exist. Rough cuff, cross-head sleeve crowding and outfit admission remain real limits."
+        },
+        "continuous": {
+          "status": "blocked",
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Fixed-length legs/shared pelvis, clavicle reach/wrist isolation, garment drivers and native hand publication exist. Rough cuff, cross-head sleeve crowding and outfit admission remain real limits."
+        },
+        "headset": {
+          "status": "historical_feedback",
+          "scope": "Earlier headset feedback exists; it is not a passing regression on the current candidate."
+        }
+      },
+      "missing_checks": [
+        "Review the implemented hand/stow repairs and later retained evidence, then continuously replay; repair only any remaining reproduced failure.",
+        "Native equip/stow, reload, action animation and transition coverage.",
+        "Tracking occlusion and physical reach extremes for each supported outfit/profile."
+      ],
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "IK, contact transforms, finger curl and paused-parts rules are isolated; no test host plays native action animations."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "Native hands and selected grips are visible in retained runs. Newer current-candidate continuous iDroid evidence reveals a hand/stow defect and supersedes older still-only passes. The public six-cycle, 180-second motion fixture exists; it has not passed native iDroid acceptance."
+          },
+          "continuous": {
+            "status": "blocked",
+            "scope": "Current-candidate dense source-eye and continuous capture review reproduced missing rig frames during opening, three to four missing/translucent stow frames, and device persistence for about 0.3 seconds. Older successful endpoint captures do not clear these transitions."
+          },
+          "headset": {
+            "status": "historical_feedback",
+            "scope": "Earlier headset feedback exists; it is not a passing regression on the current candidate."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Confirmed current-candidate hand/stow regression; a release claiming this repair must remain blocked."
+        },
+        "missing_checks": [
+          "Repair and continuously replay the iDroid hand/stow regression before promotion.",
+          "Native equip/stow, reload, action animation and transition coverage.",
+          "Tracking occlusion and physical reach extremes for each supported outfit/profile."
+        ]
+      }
+    },
+    "idroid-mount": {
+      "title": "Left-hand iDroid default, native device mount and live screen",
+      "release_gate": {
+        "status": "blocked",
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Left cinematic contact, native connector/projector frame and effect-cone retargeting exist. Continuous stereo motion/readability and physical fit remain unaccepted. Candidate a6dc5fb91151 fixes the sustained handheld stale-skin failure; retained 27-case ACC/menu/reopen group passes. Broader/physical acceptance remains required."
+      },
+      "coverage": {
+        "automated": {
+          "status": "partial",
+          "scope": "Default-on and explicit opt-out, socket projection, menu posture, UI readiness and stationary navigation contracts. Native display publication checks require exact body/device owner, generation, activation/focus epochs, palette and post-A8 temporal ordering, including the native local/world palette branch. They do not substitute native transforms or accept attachment visuals. Outgoing device-layout policy excludes the shared Mission Orders resource and does not suppress unknown layouts."
+        },
+        "native": {
+          "status": "blocked",
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Left cinematic contact, native connector/projector frame and effect-cone retargeting exist. Continuous stereo motion/readability and physical fit remain unaccepted."
+        },
+        "continuous": {
+          "status": "blocked",
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Left cinematic contact, native connector/projector frame and effect-cone retargeting exist. Continuous stereo motion/readability and physical fit remain unaccepted."
+        },
+        "headset": {
+          "status": "unverified",
+          "scope": "No current-candidate physical-headset acceptance is established."
+        }
+      },
+      "missing_checks": [
+        "Continuous native device/hand animation and screen publication during opening, movement and stow.",
+        "Projection matches the native emitter at default and explicit fit settings.",
+        "Ordinary HUD stays on the left forearm; physical ergonomics remain open."
+      ],
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "Default-on and explicit opt-out, socket projection, menu posture, UI readiness and stationary navigation contracts. Native display publication checks require exact body/device owner, generation, activation/focus epochs, palette and post-A8 temporal ordering, including the native local/world palette branch. They do not substitute native transforms or accept attachment visuals. Outgoing device-layout policy excludes the shared Mission Orders resource and does not suppress unknown layouts."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "Older bounded both-eye open/fit checks are retained. The current candidate's hand/stow regression prevents complete native animation acceptance. The public six-cycle, 180-second motion fixture exists; it has not passed native iDroid acceptance."
+          },
+          "continuous": {
+            "status": "blocked",
+            "scope": "Current-candidate dense source-eye and continuous capture review reproduced missing rig frames during opening, three to four missing/translucent stow frames, and device persistence for about 0.3 seconds. Older successful endpoint captures do not clear these transitions."
+          },
+          "headset": {
+            "status": "unverified",
+            "scope": "No current-candidate physical-headset acceptance is established."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Shares the confirmed current-candidate native hand/stow defect; do not promote the default/animation repair yet."
+        },
+        "missing_checks": [
+          "Continuous native device/hand animation and screen publication during opening, movement and stow.",
+          "Projection matches the native emitter at default and explicit fit settings.",
+          "Ordinary HUD stays on the left forearm; physical ergonomics remain open."
+        ]
+      }
+    },
+    "idroid-lifecycle": {
+      "title": "Ordinary iDroid stow and immediate reopening",
+      "release_gate": {
+        "status": "blocked",
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Native stow ordering, close-input ownership, terminal scene handoff and retired-player/exit-notice repairs exist; later scoped ordinary reopen evidence is retained in FREE_PLAY_ACCEPTANCE. Continuous/full lifecycle acceptance remains. Candidate a6dc5fb91151 fixes the sustained handheld stale-skin failure; retained 27-case ACC/menu/reopen group passes. Broader/physical acceptance remains required."
+      },
+      "coverage": {
+        "automated": {
+          "status": "partial",
+          "scope": "State/runner outcome and cleanup contracts; native animation playback is not simulated. Exact native device-layout ownership, prior-open lineage, close-boundary epochs and missing-pose routing are isolated policy checks, not a native close-animation pass. The mod-owned world-pause policy retains spatial field pausing, excludes verified cabin play and handheld presentation, and releases before native closing; ACC child-page exit still needs native replay."
+        },
+        "native": {
+          "status": "blocked",
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Native stow ordering, close-input ownership, terminal scene handoff and retired-player/exit-notice repairs exist; later scoped ordinary reopen evidence is retained in FREE_PLAY_ACCEPTANCE. Continuous/full lifecycle acceptance remains."
+        },
+        "continuous": {
+          "status": "blocked",
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Native stow ordering, close-input ownership, terminal scene handoff and retired-player/exit-notice repairs exist; later scoped ordinary reopen evidence is retained in FREE_PLAY_ACCEPTANCE. Continuous/full lifecycle acceptance remains."
+        },
+        "headset": {
+          "status": "unverified",
+          "scope": "No current-candidate physical-headset acceptance is established."
+        }
+      },
+      "missing_checks": [
+        "Reconcile historical failure with existing repairs and inspect the whole open/stow/reopen sequence; repair only a remaining reproduced failure.",
+        "Final cleanup must release inputs and leave no test-opened iDroid or Pause.",
+        "Repeat with native animation, tracking changes and personal opt-out."
+      ],
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "State/runner outcome and cleanup contracts; native animation playback is not simulated. Exact native device-layout ownership, prior-open lineage, close-boundary epochs and missing-pose routing are isolated policy checks, not a native close-animation pass. The mod-owned world-pause policy retains spatial field pausing, excludes verified cabin play and handheld presentation, and releases before native closing; ACC child-page exit still needs native replay."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "Released-build and older candidate after-state stow/reopen passes exist. Current source plus continuous capture shows a hand/stow failure. The public six-cycle, 180-second motion fixture exists; it has not passed native iDroid acceptance."
+          },
+          "continuous": {
+            "status": "blocked",
+            "scope": "Current-candidate dense source-eye and continuous capture review reproduced missing rig frames during opening, three to four missing/translucent stow frames, and device persistence for about 0.3 seconds. Older successful endpoint captures do not clear these transitions."
+          },
+          "headset": {
+            "status": "unverified",
+            "scope": "No current-candidate physical-headset acceptance is established."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Confirmed native hand/stow regression on the current candidate."
+        },
+        "missing_checks": [
+          "Fix the reproduced current defect and inspect the whole open/stow/reopen sequence, not just endpoints.",
+          "Final cleanup must release inputs and leave no test-opened iDroid or Pause.",
+          "Repeat with native animation, tracking changes and personal opt-out."
+        ]
+      }
+    },
+    "idroid-native-guides": {
+      "title": "iDroid native restrictions, completed guide recovery and tutorial escape",
+      "release_gate": {
+        "status": "blocked",
+        "reason": "Conservative block retained pending evidence reconciliation and required acceptance. Completed-guide cleanup and exit-notice repairs exist; free-roam route has scoped resolution. Forced unfinished lessons, earlier accounts and wider transactions remain unaccepted."
+      },
+      "coverage": {
+        "automated": {
+          "status": "partial",
+          "scope": "Exact owner/status restoration, preservation of independent disabled entries, stationary navigation and guarded escape. Pure contracts distinguish unknown, inactive and active tutorial modes; unknown rejects forced terminal recovery and remains JSON null. Mocked short ACC Confirm tests require current two-eye supervisor review, one effective face-button edge, a sampled mapped A packet and subsequent neutral release; they reject unreviewed/chained actions, late or missing input proof, remapped holds/chords and changed native owners. This input-only result explicitly does not prove page navigation. Menu variant contracts preserve existing MENU IDs and independent first/unfinished/completed guidance, normal/confirmation/help and Development-state obligations. Unknown applicability remains unproven; parent-row evidence cannot promote variants or imply every legal native menu combination."
+        },
+        "native": {
+          "status": "blocked",
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Completed-guide cleanup and exit-notice repairs exist; free-roam route has scoped resolution. Forced unfinished lessons, earlier accounts and wider transactions remain unaccepted."
+        },
+        "continuous": {
+          "status": "unverified",
+          "scope": "No current-candidate continuous acceptance of this complete behavior is claimed."
+        },
+        "headset": {
+          "status": "unverified",
+          "scope": "No current-candidate physical-headset acceptance is established."
+        }
+      },
+      "missing_checks": [
+        "Forced unfinished tutorial stow and immediate reopening with native progression preserved.",
+        "Development/support/deployment and nested dialog coverage.",
+        "Native failed-read coverage while holding Back; pure unknown-state contracts do not constitute native tutorial acceptance.",
+        "Do not widen completed-guide recovery to unknown or unfinished tutorials.",
+        "Current ACC Development report: review all four windows, visible selection/navigation, Back and immediate re-entry without purchases; record actual native eligibility and popup/tutorial state."
+      ],
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "Exact owner/status restoration, preservation of independent disabled entries, stationary navigation and guarded escape. Pure contracts distinguish unknown, inactive and active tutorial modes; unknown rejects forced terminal recovery and remains JSON null. Mocked short ACC Confirm tests require current two-eye supervisor review, one effective face-button edge, a sampled mapped A packet and subsequent neutral release; they reject unreviewed/chained actions, late or missing input proof, remapped holds/chords and changed native owners. This input-only result explicitly does not prove page navigation. Menu variant contracts preserve existing MENU IDs and independent first/unfinished/completed guidance, normal/confirmation/help and Development-state obligations. Unknown applicability remains unproven; parent-row evidence cannot promote variants or imply every legal native menu combination."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "A/B in actual Mother Base Helicopter Development proved the mod-owned tutorial pause stopped the child exit; removing it recovered Back and restoring it reproduced the failure. Candidate 278 checked spatial ACC/Mother Base Weapons/Items, Buddy and Helicopter scroll/Back plus weapon dialogs, ACC suit/gear interaction and native stow/first-tap reopen. These are late-game scoped observations, not early-account, every transaction or full guide acceptance. See docs/ACC_MENU_REGRESSION.md."
+          },
+          "continuous": {
+            "status": "unverified",
+            "scope": "No current-candidate continuous acceptance of this complete behavior is claimed."
+          },
+          "headset": {
+            "status": "unverified",
+            "scope": "No current-candidate physical-headset acceptance is established."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Spatial Development freeze fixed and scoped late-game ACC/Mother Base exit/reopen paths checked. Earlier-account lessons, all four upgrade transactions and complete guide lifecycle acceptance remain open."
+        },
+        "missing_checks": [
+          "Forced unfinished tutorial stow and immediate reopening with native progression preserved.",
+          "Development/support/deployment and nested dialog coverage.",
+          "Native failed-read coverage while holding Back; pure unknown-state contracts do not constitute native tutorial acceptance.",
+          "Do not widen completed-guide recovery to unknown or unfinished tutorials.",
+          "Current ACC Development report: review all four windows, visible selection/navigation, Back and immediate re-entry without purchases; record actual native eligibility and popup/tutorial state."
+        ]
+      }
+    },
+    "performance-pacing": {
+      "title": "Native frame pacing, GPU timing and fresh XR submission",
+      "release_gate": {
+        "status": "blocked",
+        "reason": "Current a6dc5fb91151 sustained ACC measurements are retained: settled window median fresh pairs75.83 front,76.12 turned,62.42 stowed against about90 runtime submissions/sec. Frame repeats persist. No full-field or physical no-drops acceptance."
+      },
+      "coverage": {
+        "automated": {
+          "status": "partial",
+          "scope": "Native adapter and GPU timing fixtures; no test establishes a zero-drop gameplay guarantee. A bounded process-only display-period pacing diagnostic has interval/lease validation and exact-expiry contracts; it has not passed a native A/B performance trial. Exact submission-stage diagnostics separately count layer preparation and xrEndFrame, histogram boundaries/overflow, display-budget excess and actual submitted-layer categories; these are instrumentation contracts, not a performance pass."
+        },
+        "native": {
+          "status": "blocked",
+          "scope": "Historical observation retained in historical_failure_record; not a new reproduction on audited development. Adaptive native pacing and timing instrumentation exist. The retained 4df measurements describe their own workload, not a measurement of current development. No sustained no-drops or physical acceptance."
+        },
+        "continuous": {
+          "status": "unverified",
+          "scope": "No current-candidate continuous acceptance of this complete behavior is claimed."
+        },
+        "headset": {
+          "status": "unverified",
+          "scope": "No current-candidate physical-headset acceptance is established."
+        }
+      },
+      "missing_checks": [
+        "Matched closed/open/stowed windows with owned process identity and actual display period.",
+        "Per-stage p50/p95/max, fresh/repeat counters, GPU/CPU and submit over-budget counts.",
+        "No-drops claim requires sustained native/headset evidence at unchanged eye size/FOV; do not use recording FPS."
+      ],
+      "historical_failure_record": {
+        "baseline_id": "october-2-unreleased-handheld-investigation",
+        "note": "Original recorded language, including current-candidate references, retained verbatim; later notes may reference their own newer runs.",
+        "coverage": {
+          "automated": {
+            "status": "partial",
+            "scope": "Native adapter and GPU timing fixtures; no test establishes a zero-drop gameplay guarantee. A bounded process-only display-period pacing diagnostic has interval/lease validation and exact-expiry contracts; it has not passed a native A/B performance trial. Exact submission-stage diagnostics separately count layer preparation and xrEndFrame, histogram boundaries/overflow, display-budget excess and actual submitted-layer categories; these are instrumentation contracts, not a performance pass."
+          },
+          "native": {
+            "status": "blocked",
+            "scope": "Candidate 4df capture-off closed ACC has 130.092 seconds of complete timing bins: 88.24 XR submissions/s but 40.14 fresh pairs/s, native GPU mean 14.85 ms and submit-stage max 653.33 ms with 33 over-budget cycles. Consumer mean 0.092 ms/max 5.955 ms has no over-budget cycle in this scope, but a separate recorded open interval reaches 121.168 ms consumption with 120.955 ms keyed-mutex Acquire. These are distinct workloads; no no-drops claim is supported."
+          },
+          "continuous": {
+            "status": "unverified",
+            "scope": "No current-candidate continuous acceptance of this complete behavior is claimed."
+          },
+          "headset": {
+            "status": "unverified",
+            "scope": "No current-candidate physical-headset acceptance is established."
+          }
+        },
+        "release_gate": {
+          "status": "blocked",
+          "reason": "Current native repeats and long submission/transfer stalls fail the requested sustained no-drops objective; capture cadence is not runtime performance."
+        },
+        "missing_checks": [
+          "Matched closed/open/stowed windows with owned process identity and actual display period.",
+          "Per-stage p50/p95/max, fresh/repeat counters, GPU/CPU and submit over-budget counts.",
+          "No-drops claim requires sustained native/headset evidence at unchanged eye size/FOV; do not use recording FPS."
+        ]
+      }
+    }
+  }
+}

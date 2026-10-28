@@ -5,6 +5,17 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      nightly:
+        type: boolean
+        default: false
+      nightly_tag:
+        type: string
+        default: ''
+      previous_commit:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -25,6 +36,12 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Check nightly publication contracts
+        run: python tests/nightly_tests.py
       - name: Fetch pinned open-source dependencies
         run: ./tools/bootstrap.ps1
       - name: Configure Windows x64
@@ -36,7 +53,11 @@ jobs:
       - name: Run tests that do not require a GPU or headset
         # The native window/canvas test, like the mailbox test, needs a real
         # DXGI hardware device. Both are exercised locally on the SIM machine.
-        run: ctest --preset release --exclude-regex "d3d11_mailbox|independent_render_window" --output-junit build/ci-tests.xml
+        run: |
+          $mgsTestReport = Join-Path $env:GITHUB_WORKSPACE 'build/ci-tests.xml'
+          ctest --preset release --exclude-regex "d3d11_mailbox|independent_render_window" --output-junit $mgsTestReport
+          if ($LASTEXITCODE -ne 0) { throw 'Windows tests failed.' }
+          if (-not (Test-Path -LiteralPath $mgsTestReport)) { throw 'CTest did not write its required report.' }
       - name: Check Python tooling
         run: python -m compileall -q tools
       - name: Check asset-free equipment inventory fixtures
@@ -45,6 +66,19 @@ jobs:
         run: cmake --install build --config Release --component MGS5VR --prefix dist/MGS5VR-development
       - name: Verify packaged setup on Windows PowerShell
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/installer_tests.ps1 -PackageRoot dist/MGS5VR-development
+      - name: Package checked nightly
+        if: inputs.nightly == true
+        env:
+          NIGHTLY_TAG: ${{ inputs.nightly_tag }}
+          PREVIOUS_COMMIT: ${{ inputs.previous_commit }}
+        run: python tools/nightly.py package --tag $env:NIGHTLY_TAG --previous $env:PREVIOUS_COMMIT
+      - name: Upload verified nightly payload
+        if: inputs.nightly == true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nightly-release-payload
+          path: build/nightly-release/
+          if-no-files-found: error
       - name: Preserve build and test evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -1,6 +1,6 @@
-# Release execution plan — 26 October 2026
+# Release execution plan â€” 26 October 2026
 
-### Checked contact repairs and 4:23 combined working cut — 27 October
+### Checked contact repairs and 4:23 combined working cut â€” 27 October
 
 Development `6ef5532fb054d2ca0855c2d34264507e7495c1768d585e3790f85230ddf89011` is installed in both games. Physical animal interaction now runs in the native Lua transaction rather than XInput polling; the earlier simultaneous diagnostic had bones in 691/691 native queries but 56 missing-bone observations in the old consumer. The intermediate repair exposed an idle false pet from native skin/animal movement. The final repair requires raw controller movement and movement relative to head translation as well as rendered contact. Regression coverage preserves slow real strokes while rejecting animation-only contact, walking, head-only motion, jitter and rapid hits. All 59 CTest groups and installer checks passed.
 
@@ -11,16 +11,16 @@ The [combined private Field Kit working cut](../private/showcase/current-field-k
 All temporary personal settings and tracking poses are restored, menus/inputs released and owned simulator/game/readers closed. Steam is retained; published play pin unchanged. Next: finish physical pet filming and remaining shared/game-specific gameplay/settings work, then complete the final feature video. GZ already has independent first-person VR; TPP-native powered arms/buddies are not claimed as GZ content.
 
 
-### Clear field actions added; physical buddy stroke unresolved — 27 October
+### Clear field actions added; physical buddy stroke unresolved â€” 27 October
 
-Retained `20261028T024923719888Z` on checked `19e51307a1a3` records equipment/commands open and release, equipped secondary ready/fire/reload, prone/crouch/stand and left-hand iDroid open/stow. Both ready, fire, reload and iDroid final eyes were reviewed. Ammunition changes 42→39→43 are observed; target hits/damage are not claimed. The combined private Field Kit working cut is now **3:28**, nine chapters, with a continuous 38.6-second field chapter, animated official controller lessons and original game audio. Full decode and representative layout review passed; the all-feature movie remains unfinished.
+Retained `20261028T024923719888Z` on checked `19e51307a1a3` records equipment/commands open and release, equipped secondary ready/fire/reload, prone/crouch/stand and left-hand iDroid open/stow. Both ready, fire, reload and iDroid final eyes were reviewed. Ammunition changes 42â†’39â†’43 are observed; target hits/damage are not claimed. The combined private Field Kit working cut is now **3:28**, nine chapters, with a continuous 38.6-second field chapter, animated official controller lessons and original game audio. Full decode and representative layout review passed; the all-feature movie remains unfinished.
 
 Physical D-Dog stroking failed in retained `025523260491Z`, `025844651644Z` and `031126539491Z` (28 October UTC): tracked hand contact/motion did not increment the native physical-response counter. The last take also records the dog walking out of reach. Generic motion-case pass is not pet success. Checked diagnostic development `41db3ae40e593fa2d023b6dabc93edd0850564e4be61c5391498918ad7b0e7cc` adds per-hand contact/reset state without changing thresholds; it is installed in TPP only. GZ retains checked `19e51307a1a3`. All 59 CTest groups and installer checks completed.
 
 Next: use the ongoing TPP session to isolate and repair the physical-stroke interruption, then remaining shared settings/adapters and final feature filming/edit. Exact earlier field settings were restored; the active diagnostic eyepatch transaction is `private/showcase/clear-view-buddy-setting.json` and must be restored before session closure. Steam and published play pin remain unchanged.
 
 
-### Ground Zeroes normal setup and animated controller lessons — 27 October
+### Ground Zeroes normal setup and animated controller lessons â€” 27 October
 
 Checked development `19e51307a1a3af763b8b0b870421dda729069874ff1d5b190253175f795bc455` is installed in both games. Normal setup and Field Terminal now enable GZ's connected first-person rig and forearm HUD, with independent native adapters and correct GZ optic paths. The production importer selectively reads the player's GZS archives and imports the exact binocular model and four material maps. GZ updates preserve personal settings. Stale installer and launcher refusals have been removed.
 
@@ -29,7 +29,7 @@ All 59 CTest groups and installer checks passed. Actual owned GZ outputs match t
 Next: clear TPP field actions from the observed iDroid page, remaining shared gameplay adapters/settings and the complete feature showcase. Native GZ optic shader, visible glow-on and broad weapon/equipment/vehicle coverage remain incomplete. Installer checks do not extend gameplay or physical-headset acceptance.
 
 
-### Ground Zeroes live recon visibility — 27 October
+### Ground Zeroes live recon visibility â€” 27 October
 
 Checked development `50fca91f11de43814a3ef9a1839394b92ca57d25962227a73489bda79c1744ff` is installed in both games. GZ HUD Off previously left its native 79M marker visible (`20261028T020601947606Z`). The repaired native marker routing hides it in retained `021711220890Z` and restores it with Full in `021834570739Z`; both final eyes were reviewed. The separate GZ native glow material scope is connected, but visible glow-on is still unverified. Source actors, native fade state and personal controls are preserved.
 
@@ -38,7 +38,7 @@ All 59 CTest groups and installer checks passed. Exact original GZ controls byte
 Next: production GZ owned-asset import and remaining gameplay/control differences, clear TPP field footage, animated controller lessons and the complete combined showcase. Terrain marker interactions, independent world-enemy preference and visible glow-on remain unresolved coverage rather than claimed completion.
 
 
-### Paired Field Kit working cut — 27 October
+### Paired Field Kit working cut â€” 27 October
 
 A single private [2:37 working cut](../private/showcase/current-field-kit/MGS5VR-Field-Kit-working-cut.mp4) now combines the cabin, a real TPP/GZ left-hand iDroid comparison with wipes, GZ recon/intel, live VR switching and body/eyepatch effects. Its [chapter index](../private/showcase/current-field-kit/index.html) identifies seven chapters. All 4,723 encoded frames and stereo audio decode; sampled motion/layout review is retained. This is explicitly not the finished all-feature film. Native source-eye footage and the 4.039-fps final-compositor VR switch remain separately identified. The recon chapter retains its preceding `fd053e` build scope; the new paired footage uses checked `050ae82a4832`.
 
@@ -47,7 +47,7 @@ Fresh GZ runs `20261028T012220370500Z` and `012347615433Z` show the left-hand ha
 Next: finish missing GZ native settings/adapters and remaining gameplay families, capture unobscured paired field actions, animate controller instruction insets and complete the final full-feature edit. Reopen TPP deployment from its observed current page rather than assuming MISSIONS root. Published build pin is unchanged.
 
 
-### TPP cabin and shared-feature filming — 27 October
+### TPP cabin and shared-feature filming â€” 27 October
 
 The same checked `050ae82a4832` development candidate is installed in TPP and GZ. Retained TPP `20261028T003108427231Z` records a continuous 77.33-second cabin sequence: cassette pickup/insertion/touch eject, either-hand camera prints and board attachment. Both final eyes were reviewed for cassette, camera print and board states. The private 75.7-second `tpp-cabin.mp4` chapter uses Field Kit graphics, official controller plates and original audio. It is not the finished combined film.
 
@@ -56,30 +56,30 @@ Field footage now includes equipped secondary fire (42 to 39), reload (39 to 43)
 TPP recon remains incomplete: no target acquisition before an operator pose request timed out. The game kept rendering, a new connection recovered, and exact saved head/grip/aim poses were restored and read back. Retained failures distinguish script assumptions (wrong ammo slot/count and an early iDroid interval) from game behavior. Next: fresh matched GZ capture, paired side-by-side/wipe editing, then remaining feature adapters. Published pin and Steam remain unchanged.
 
 
-### Ground Zeroes native binocular intel — 27 October
+### Ground Zeroes native binocular intel â€” 27 October
 
 Checked development `050ae82a4832018d2832ce01c73a3697405addfcc622ae2eb1435488a75352a4` connects physical binocular X to the native mission event pump. Retained `20261028T002337220348Z` records the tower guard candidate and native request with matching identity. Both action eyes were reviewed. Local transcription of the captured process audio identifies the guard warning and instruction to avoid combat. This audio result is machine transcription, not direct listening. The earlier radio-UI hooks did not run outside authored binocular mode; their failed scope is retained.
 
 All 59 CTest groups and installer checks passed. Inputs and temporary poses were restored, optic stowed, menus closed and owned GZ session closed with Steam retained. Published play pin is unchanged. A 16.6-second Field Kit recon chapter now exists privately with official controller plates, aspect-correct gameplay and original audio; the combined film remains unfinished. Next: deploy this checked candidate to TPP, capture the cabin and matching shared features, then assemble the paired Field Kit edit. Remaining GZ adapters and unreviewed gameplay contexts stay explicit in the ledger.
 
 
-### Ground Zeroes native binocular acquisition, mark and clear — 27 October
+### Ground Zeroes native binocular acquisition, mark and clear â€” 27 October
 
-Checked development `fd053ed8167ca89a9e3f2ec01b85b8035084024670de9ad7b781927f367064ca` is installed in GZ. The physical optic now drives the native character visibility job and native player marking. Retained `20261027T234007158128Z` shows the real tower guard at 79 m: 4× acquisition, A clear and right-trigger explicit re-mark. Both final eyes were reviewed at each state; the recorded source-eye take includes process audio. The earlier `5940c447d193` takes `232907` and `233026` failed to acquire because the adapter omitted the native optical range multiplier. Both failures are retained. The corrected adapter uses the same multiplier field as GZ's own binocular zoom setters, native collision results and native marking/clearing functions.
+Checked development `fd053ed8167ca89a9e3f2ec01b85b8035084024670de9ad7b781927f367064ca` is installed in GZ. The physical optic now drives the native character visibility job and native player marking. Retained `20261027T234007158128Z` shows the real tower guard at 79 m: 4Ã— acquisition, A clear and right-trigger explicit re-mark. Both final eyes were reviewed at each state; the recorded source-eye take includes process audio. The earlier `5940c447d193` takes `232907` and `233026` failed to acquire because the adapter omitted the native optical range multiplier. Both failures are retained. The corrected adapter uses the same multiplier field as GZ's own binocular zoom setters, native collision results and native marking/clearing functions.
 
 The current-player input ownership repair is deployed; these takes show no unsolicited optic stow. Both candidates passed all 59 CTest groups and installer checks. Inputs, head/controller poses and menus are restored, binoculars stowed and recorders/readers closed. Steam, TPP installation and published play pin are retained. The 18.77-second source video has a 0.80-second startup gap before the optical actions; its cadence ledger is retained. No complete movie, mission or physical-headset claim is made.
 
 Next: GZ intel/radio and remaining shared controls/settings, then TPP/cabin review and the combined Field Kit film. Terrain waypoints, configurable native marker/glow behavior, production GZ owned-asset import and native optic materials remain unfinished.
 
-### Ground Zeroes physical optic and native foot controls — 27 October
+### Ground Zeroes physical optic and native foot controls â€” 27 October
 
-Checked development `274a81f4013bece41c10ae82329abad72be85df73e629d6b37328e219b7b27c6` is installed in GZ. Its native basic-action query enables shared foot controls and the physical binocular. The owned GZ model and decoded textures use the existing configurable optic paths. Both final eyes show right-hand equip (`225433`), the real ocular and lens (`225455`), 2×/4× zoom (`225818`), supporting-hand grip (`230129`) and the enlarged left-forearm ammo card (`225851`); full retained IDs are in the ledger. These runs also contain native source-eye recordings with process audio, distinct from final compositor stills. The complete Field Kit edit is unfinished.
+Checked development `274a81f4013bece41c10ae82329abad72be85df73e629d6b37328e219b7b27c6` is installed in GZ. Its native basic-action query enables shared foot controls and the physical binocular. The owned GZ model and decoded textures use the existing configurable optic paths. Both final eyes show right-hand equip (`225433`), the real ocular and lens (`225455`), 2Ã—/4Ã— zoom (`225818`), supporting-hand grip (`230129`) and the enlarged left-forearm ammo card (`225851`); full retained IDs are in the ledger. These runs also contain native source-eye recordings with process audio, distinct from final compositor stills. The complete Field Kit edit is unfinished.
 
 The optic spontaneously stowed during a slow rendered frame before take `225557`, which is retained as a failed zoom attempt. The adapter's 150 ms player freshness threshold was tied to camera publication. A source-only follow-up now resolves input ownership from the current native player registry; pose freshness remains separate. That follow-up is not built/deployed yet. All 59 CTest groups and installer checks passed for the installed candidate.
 
 Inputs and temporary poses are restored, menus closed and binoculars stowed; recording requests/readers are closed. Personal full-body setting remains 1. Steam, TPP installation and published play pin are retained. Next: deploy the ownership repair and finish remaining shared control behavior, GZ native enemy acquisition/marking/intel, then TPP/cabin review and the paired Field Kit video. GZ owned asset import currently uses a private local helper, and the native optic material shader is not yet ported. Whole-game and physical-headset completion remain unclaimed.
 
-### Shared forearm cuff repair deployed in Ground Zeroes — 27 October
+### Shared forearm cuff repair deployed in Ground Zeroes â€” 27 October
 
 Checked development `a3c9a9eed06e0408da8fcd6a6a7c8579066595eae7ab7e87db8a4726357acc04` is installed in GZ. Native axial rim steps were collapsing to duplicate projected corners, preventing the closest Snake2 LOD from closing. The shared cap triangulator now collapses those corners while fitting the complete native rim and preserving native skin data. Both final eyes in retained `20261027T222812915905Z` show closed body-off sleeve ends without the previous jagged flaps.
 
@@ -87,7 +87,7 @@ Both posed eyes in `20261027T222919313085Z` retain the left-hand native handset/
 
 Next: GZ native action/travel and physical binocular integration, small forearm ammo-card readability and remaining shared controls, followed by TPP/cabin review and the combined Field Kit movie. The shared cuff repair still needs fresh TPP visual review; whole-game and physical-headset completion remain unclaimed.
 
-### Ground Zeroes body and handset fit — 27 October
+### Ground Zeroes body and handset fit â€” 27 October
 
 Checked development `6b1a1a9405aabb2407a619e0b27548c3f9098d668830501f7ca6a44d524c6e8e` is installed in GZ. The native anatomical eye join, fixed-length torso fit when reachable, body-off shoulder placement and clavicle reach improve the left-hand iDroid fit. Native legs remain untouched. Both final eyes in retained `20261027T220710049689Z` show the main map at readable scale; outer labels are still clipped at the staged left-FOV edge. Native B closure was also observed.
 
@@ -95,7 +95,7 @@ Retained `20261027T221020345667Z` shows the rifle in both held eyes with no flat
 
 All 59 CTest groups and installer checks passed for the installed candidate. Full-body controls were restored byte-for-byte, temporary poses restored, inputs released and iDroid closed. TPP installation and published pin remain unchanged. Next: finish cuff geometry, remaining common GZ controls and physical binoculars, then the combined Field Kit movie. Whole-game and physical-headset completion remain unclaimed.
 
-### Ground Zeroes native left-hand iDroid connected — 27 October
+### Ground Zeroes native left-hand iDroid connected â€” 27 October
 
 Checked development `a1228d1f3e8b7655aece116ab2ae4741a1b49b5b316539214bf58d7b5dcb014c` is installed in GZ. The exact native variant-3 attachment now publishes from the left wrist during the player's skin call. The existing measured left-hand cup uses GZ's matching original finger lengths; handset and native map share that solved placement. GZ menu navigation keeps its own native controls. The preceding `4fc749434228` candidate exposed a TPP-only input acknowledgment blocking B; this is repaired.
 
@@ -103,7 +103,7 @@ Both final eyes in retained `20261027T215120784175Z` show handset/map in the sta
 
 Next: the source-only anatomical eye join, fixed-length spine/shoulder fit and clavicle reach batch is building. Finish the display fit and remaining shared gameplay controls/physical binoculars, then the combined Field Kit film. No complete iDroid usability, whole-game, movie or physical-headset completion is claimed.
 
-### Ground Zeroes body-off, forearm HUD and stowed rifle — 27 October
+### Ground Zeroes body-off, forearm HUD and stowed rifle â€” 27 October
 
 Checked development `d127d2129ea4787f3eef2eef81a3b450bf18f80778c39cb89a823503cbe7c3b2` is installed in GZ. Its native body visibility preserves the arm groups and uses verified Snake2/Snake6 forearm buffers when full body is off. Native ammo/status now uses the left forearm; flat firearm reticles are suppressed while actual optics remain. Stowed primary rifle geometry is concealed through its native named group and restored when raised.
 
@@ -111,7 +111,7 @@ Both final eyes in retained `20261027T213048323509Z` show the body-off forearms,
 
 Both candidates passed 59 CTest groups and installer checks. Temporary full-body setting and controller poses were restored, inputs released, and menus closed. TPP installation and published pin are unchanged. Next: complete the left-hand iDroid handset/display and remaining shared controls/body fitting, then the requested combined Field Kit movie. Full-game, continuous-motion and physical-headset completion are not claimed.
 
-### Ground Zeroes menus and native firing connected — 27 October
+### Ground Zeroes menus and native firing connected â€” 27 October
 
 Checked development `8c4f2eb06c1e639a395b83b73f7d58df0de4fa201166bc09ddd239bb021638ea` is installed in GZ. Its native aim job uses a private camera basis from the last successfully published weapon muzzle, preserving native collision and recoil. Retained `20261027T203054611119Z` used saved grip/trigger controls: both held final eyes show the rifle and ammunition decreased from 30/210 to 28/210. The runtime observed the aim adapter. Impact alignment and moving firing remain unreviewed. The batch also implements proximity-based support contact and a joined left forearm panel pose; these are not yet visually exercised or connected to native HUD routing.
 
@@ -119,7 +119,7 @@ The preceding checked `55dbb4ccf1beaad972ab93104d7c1299695bf669761fd506adaf4b073
 
 Both batches passed 59 CTest groups and installer checks. Inputs were released and test menus closed. TPP installation and published play pin remain unchanged. Next: native HUD/reticle routing, support and moving shot alignment, left-hand handset/projection, body-off/full-body fit and physical binoculars, then the complete combined Field Kit film. No whole-game, finished-movie or physical-headset completion is claimed.
 
-### Ground Zeroes tracked arms, weapon-ready control and focus — 27 October
+### Ground Zeroes tracked arms, weapon-ready control and focus â€” 27 October
 
 Checked development `e30550f3367f1b43fcde05deea201beec23cc118f6e817527537723f9ff1128e` is installed in GZ. Native arms/attachments now use the independently mapped skin publisher and shared fixed-length IK. GZ's verified Pause/iDroid owners route saved controls without enabling TPP hooks. Retained `20261027T200728345658Z` shows the saved right grip raising the rifle; both held final eyes were reviewed and the former close-up DOF blur is absent. No shot was fired. Native camera axes remain available pending GZ travel-action mapping.
 
@@ -127,98 +127,128 @@ Retained `20261027T200801636407Z` exposed invisible Pause: its native kind becam
 
 All 59 CTest groups and installer checks passed for the installed candidate. TPP installation and the published play pin are unchanged. Next: finish the menu/weapon batch, then connect actual firing/support contact, left-hand iDroid and wrist UI. Full-body/body-off behavior, physical binoculars, remaining common interactions and the combined Field Kit movie remain unfinished. These simulator endpoints do not establish full-game or physical-headset completion.
 
-### Ground Zeroes first-person head obstruction repaired — 27 October
+### Ground Zeroes first-person head obstruction repaired â€” 27 October
 
 Checked development `8b563b1358d5c6783acd89c3ccc248e7d064282a20272b43ac8d09f2a597cd5c` is deployed to GZ. Its native named head group is hidden only for the matching VR player; the native visibility publisher remains authoritative on VR exit. Retained on/off runs `20261027T193530760583Z` and `20261027T193559967649Z` were reviewed in both final eyes: the prior hair obstruction is absent in first person, and Snake's head returns in the native third-person view. These endpoints do not establish continuous motion or physical headset behavior. All 59 CTest groups and installer checks passed.
 
 Next: connect the independently mapped GZ skin publisher and named arm/finger hierarchy to tracked hands, retaining native skeleton lengths and attachments. The arm adapter is being implemented; tracked weapons, spatial UI, shared interactions and the combined Field Kit movie remain unfinished. TPP installation and published play pin are unchanged.
 
-### Ground Zeroes now reaches native first person — 27 October
+### Ground Zeroes now reaches native first person â€” 27 October
 
 Checked development `8a3b9a58ea984fece51ebd1e366a062157b2aeb517045b975c7f3542b168b3df` is deployed to GZ. Its adapter resolves the selected player camera and the body's named HEAD matrix, converts that published world transform through the actual body root, and supplies the shared head camera. Retained `20261027T192058758856Z` was reviewed in both final compositor eyes: the viewpoint is at Snake's head, with no player ahead of the camera. Hair still intersects the upper edge. Native flat HUD, spotlight bloom, tracked arms/weapon and complete interactions remain open. This stationary simulator observation does not establish motion, transitions or headset completion.
 
 The same checked batch passed 59 CTest groups and installer checks. Runtime confirms the independent desktop preview is 1280 x 720 while GZ retains its complete native 3840 x 2160 canvas. TPP's installed build and the published pin are unchanged. Next: the reproduced head/hair intrusion is being repaired through GZ's own named head visibility group and native publisher, preserving ordinary visibility on VR exit. That repair is source-only. GZ's animation driver, 138-bone pose and native skin publication have also been identified for the shared rig connection. The requested combined Field Kit movie remains unfinished.
 
-### Ground Zeroes live display repaired — 27 October
+### Ground Zeroes live display repaired â€” 27 October
 
 GZ's native focus-loss branch was suspending scene presentation when the simulator opened. The exact-build adapter now preserves native focus/input state while suppressing that display-suspension request. Checked development DLL `ffc7bbf0696f313e1b95ef0a0d013cb8acb8ab308ca8b93be33318c69b23725d` passed 59 CTest groups and installer checks and is deployed to GZ. Saved Continue and Start Mission reached live night gameplay. Retained `20261027T185839163442Z` shows the personal VR toggle switching to native stereo; both final compositor eyes were reviewed. This is still a third-person camera with heavy spotlight bloom and native flat HUD. First-person head, tracked rig and shared interactions remain unfinished.
 
 The GZ launcher now owns its exact launcher/game child pair and restores the per-game simulator lease during cleanup. Bounded GZ controls use saved bindings without TPP memory addresses. The 1280 x 720 preview correction is source-only and awaits the next meaningful build batch. TPP remains installed at `9d646890a2b4`; the published `play/` pin remains `b627c7cacc9a`. Current work is the GZ native head/skin connection, followed by shared rig/UI and the requested combined Field Kit video. No movie, whole-game or physical-headset completion is claimed.
+### First public nightly verified - 27 October
 
-### Diagonal cabin take failed at framing guard — 27 October
+Nightly `nightly-2026-10-27-53f6bf541ef3` is public from committed source
+`53f6bf541ef37b3e862d470a5bec0318eddcd343`:
+[nightly-2026-10-27-53f6bf541ef3](https://github.com/nikamigaming-create/MGS5VR/releases/tag/nightly-2026-10-27-53f6bf541ef3).
+The Windows build, 56 hardware-independent CTest groups, nightly contracts and
+packaged installer checks passed in [the publication run](https://github.com/nikamigaming-create/MGS5VR/actions/runs/40564021306).
+All six public assets were downloaded without authentication and hash-verified;
+the installation archive's 231 manifest files verified. Archive SHA-256:
+`1c3fa35d600047db970dd9a253b14a5d7c07e18e0a7e81cfa76ca1a4cf762251`.
+Hosted DLL SHA-256: `61a323d8b1b527e5087b51a4d5d198fef58b98a03071ff32b0adebd1de6ef913`.
+
+The first attempt stopped before publication because CTest wrote its XML relative
+to the build directory. The workflow now supplies an absolute report path and
+requires the report to exist. The corrected complete publication passed. A plan
+check on the published commit returned `publish=false`; the repeat dispatch is
+[recorded here](https://github.com/nikamigaming-create/MGS5VR/actions/runs/40565064013).
+
+Daily publication is active at 10:37 UTC, with manual dispatch available. New or
+changed blocker snapshots stop the channel; the accepted existing limitations
+are disclosed, not resolved. The reviewed October 19.1 release and its asset
+identities are unchanged. This task used an isolated release-automation branch
+and did not alter the primary checkout, installed development or local Play pin.
+The two GPU-only tests, simulator, physical headset and full-game acceptance
+remain outside this CI result. Existing gameplay evidence keeps its original
+candidate scope; see [Nightly builds](NIGHTLIES.md).
+
+Next release action: commit and push reviewed development batches normally;
+the daily job considers new main commits. Keep new failures in the catalog and
+hold publication when needed. Reviewed-release promotion remains separate.
+
+### Diagonal cabin take failed at framing guard â€” 27 October
 
 Retained `20261027T174300006026Z` on installed development DLL `9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a` observed cassette pickup, release and recovery, then stopped before insertion: the temporary diagonal viewpoint reached distances of 0.509 and 0.454 m but the measured slot-face dot products were -0.310 and -0.256, below the 0.5 guard. This is a staging failure, not a diagnosed cassette gameplay defect. The observed carrier normal was approximately [0.848, 0.259, 0.463], mostly horizontal; the temporary offset followed the prior head direction instead of the carrier normal, putting the observer behind its face. A normal-relative offset is an unverified staging lead. Camera and photo actions were not reached. The partial source-eye take recorded 557 accepted frames, 34 dropped/repeated samples (10 missed cadence, 24 queue drops); the audio capture reports no gaps, but sound was not auditioned. It is not the requested movie. Temporary staging was saved privately and removed; inputs were released and owned simulator/game closed with Steam retained. No build, pin, or physical-headset acceptance changed. Do not rerun this unchanged viewpoint.
 
 
-### Latest cabin recording sequence review — 27 October
+### Latest cabin recording sequence review â€” 27 October
 
-In `20261027T172437888879Z`, the 61 missing encoded slots occur in 30 accepted-sample gaps. Thirty-six of those missing slots are in gaps whose endpoint source and image sequence numbers do not advance. The largest gap, 0.215 seconds, begins at 62.327 seconds; the next largest begins at 62.541 seconds. Several long gaps cluster around 60–63 seconds, after the left-camera print; two composited-eye capture requests run at 60.382–60.739 and 60.935–61.259 seconds. Endpoint observations do not show intermediate transactions, prove a stall, establish causation, or show that capturing the final eyes explains later gaps. Separate per-frame scheduling/copy timing from source production before changing behavior. No new game run or headset acceptance is claimed.
+In `20261027T172437888879Z`, the 61 missing encoded slots occur in 30 accepted-sample gaps. Thirty-six of those missing slots are in gaps whose endpoint source and image sequence numbers do not advance. The largest gap, 0.215 seconds, begins at 62.327 seconds; the next largest begins at 62.541 seconds. Several long gaps cluster around 60â€“63 seconds, after the left-camera print; two composited-eye capture requests run at 60.382â€“60.739 and 60.935â€“61.259 seconds. Endpoint observations do not show intermediate transactions, prove a stall, establish causation, or show that capturing the final eyes explains later gaps. Separate per-frame scheduling/copy timing from source production before changing behavior. No new game run or headset acceptance is claimed.
 
 
-### Latest cabin recording drop breakdown — 27 October
+### Latest cabin recording drop breakdown â€” 27 October
 
 Retained `20261027T172437888879Z` reports 61 missed samples: 48 missed cadence slots, three encoder-queue drops and ten staging-busy samples, with no staging discards. Cadence is evaluated on recorder frame calls after ready GPU frames are copied; these counters do not distinguish delayed render calls from time spent within the recorder, nor prove a root cause. Enlarging the encoder queue alone cannot address the 48 unscheduled cadence slots in this take. Investigate the frame-call/copy timeline before changing scheduling; retain the earlier acceptance limits and do not infer a gameplay or headset pass.
 
 
-### Integrated cabin recording on checked candidate — 27 October
+### Integrated cabin recording on checked candidate â€” 27 October
 
 Retained run `artifacts/bot/runs/20261027T172437888879Z` on installed development DLL `9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a` observed cassette pickup, seating, ejection and recovery, right- and left-hand camera shutter actions, and photo placement. Both final-eye board stills show the new cabin-wall photo. Both final-eye cassette-ejection stills were subsequently reviewed: the player and tape are visible, but a large dark forearm end obscures the hand. This does not establish the crop cause, natural grip or clear insertion. Sampled source-eye frames leave hand contact and cassette action poorly framed; this is not continuous stereo acceptance. The 76-second source-eye recording has an AAC game-audio track with nonzero signal (mean -23.1 dB, peak -11.5 dB), not auditioned; it has 61 dropped and 61 repeated frames, with a 0.215-second maximum accepted-sample gap. Body and eyepatch toggles are absent. Reject this take as the requested finished movie. The change in gap and drops versus prior takes does not establish recorder performance because conditions were not controlled.
 
 The first run `20261027T172304096887Z` stopped before interaction when the native anchor was absent. A bounded wait for anchor publication was exercised in the successful temporary route and is retained in the workbench; the existing bot suite passes. Test photos were backed up with matching hashes, and retained same-session cleanup runs `20261027T172848508279Z` and `20261027T172926154386Z` removed exactly their prints and library entries, preserving the two original identities. Temporary film and cleanup edits were removed, inputs released, and the owned game and simulator closed; Steam remains running. The release pin is unchanged. No physical Quest pass, authentic lid-motion verification, clear moving contact, complete toggle showcase, or universal interaction acceptance is claimed. Next: address the identified framing and cadence problems, audition sound, and verify remaining interactions without replacing the established controls; user headset testing remains separate.
 
 
-### Recorder buffer reuse candidate — 27 October
+### Recorder buffer reuse candidate â€” 27 October
 
 The latest cabin take had 15 encoder-queue drops and copied 2368 x 2576 RGBA frames. A standalone same-size UCRT/RAM microbenchmark found median allocation-plus-copy 4.024 ms versus 0.821 ms with a reused buffer; it does not measure GPU readback, encoder contention or in-game performance. The native recorder now retains at most four idle CPU frame buffers, reusing only a matching size after the encoder has copied the pixels into its own Media Foundation buffer. Dropped CPU copies return to the pool, and an allocation failure unmaps and accounts for the staging sample. Eye dimensions, source ordering, timestamps and encoded repeat accounting are unchanged. New tests check buffer size, exclusive ownership and concurrent reuse.
 
 The first build failed on a test argument conversion warning; after correcting it, a full check found the new header absent from the source catalog, which was then mapped. The final development build passed all 58 test groups and installer checks. Development DLL `9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a` is installed; published play remains pinned to `b627c7cacc9a`. No simulator or physical-headset run has exercised this candidate, so no improvement in actual cadence or video quality is claimed. The earlier cabin interaction evidence applies only to its recorded candidate. Clear hand contact, true lid motion, full showcase and headset acceptance remain open.
 
 
-### Latest take gap timing — 27 October
+### Latest take gap timing â€” 27 October
 
 In the retained combined take, the 0.523-second accepted-sample gap occurred before the first filmed chapter; a separate 0.274-second gap occurred between the tape-on-seat and tape-seated markers. Trimming the startup alone therefore would not remove all visible cadence problems. `artifacts/bot/runs/20261027T164745284337Z/capture-gap-phase-analysis.json` records the timing; markers do not establish exact hand-motion boundaries or the cause. No final-eye cadence, gameplay repair or finished movie is inferred.
 
 
-### Showcase camera framing correction — 27 October
+### Showcase camera framing correction â€” 27 October
 
 The completed combined take captured dark cabin-seat subjects because its scripted camera target used the controller/head orientation rather than the actual held-camera lens orientation. For film runs, the workbench now waits through the existing pickup easing, derives the current camera-to-controller attachment and aims the camera at the native cabin board for both hands. A previous retained staged take using the same attachment/lens-aware approach produced cabin-wall images, but this integration has not been rerun. Python compilation and the existing bot contract suite passed; these do not prove camera pixels, natural grasp, continuous stereo, audio, cadence or physical Quest behavior. This is showcase staging, not a gameplay repair or completed movie.
 
 
-### Combined cabin take and test cleanup — 27 October
+### Combined cabin take and test cleanup â€” 27 October
 
 On development DLL `aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f`, retained run `artifacts/bot/runs/20261027T164745284337Z` observed cassette pickup, insertion, eject and recovery, both-hand camera shutters and newly printed photo placement. The corrected open-hand left-camera approach succeeded; the two existing print IDs and room-local positions were unchanged in the observed start and end states. The open player and placed photo were reviewed in both final-eye snapshots. The sample contact-sheet review still shows obstructed hand contact and dark, poorly composed camera subjects; these results are not continuous two-eye contact proof. The pre-compositor recording carries AAC audio with mean -23.1 dB, but it was not auditioned. It reports 23 dropped source samples, 22 encoded repeats and a 0.523-second maximum accepted-sample gap. Body/eyepatch toggles are not demonstrated, and this is rejected as the finished movie.
 
 Both test PNGs were privately backed up with matching hashes. In `artifacts/bot/runs/20261027T165156081291Z`, exact test prints 14 and 15 were removed but digital cleanup stopped at the camera delete hover. After the owned session restarted, `20261027T165455483354Z` stopped before modifying the collection because title prop mode was not ready; same-session `20261027T165632449221Z` confirmed and removed exactly the two test gallery IDs. The last observed collection contains the two original gallery IDs and prints at their observed prior positions. Temporary filming and cleanup changes were removed, test inputs released, game and simulator closed, Steam retained. No physical Quest, new gameplay repair or completed showcase is claimed.
 
 
-### Displaced loose print restored — 27 October
+### Displaced loose print restored â€” 27 October
 
 Retained `artifacts/bot/runs/20261027T164143753479Z` returned the specific loose print 12 / photo 13437590506521, moved by the oriented take, through tracked pickup and release. The observed final room-local position differs from the prior position by about 0.29 mm and the normalized orientation matches to displayed precision. Both existing paper IDs and both gallery IDs remain. Both final-eye stills were reviewed but the print is obscured by the forearm, so the position result is telemetry, not visual contact proof. The first attempt `20261027T164004914011Z` stopped before touching the collection while the title native menu was open; the same-session retry entered prop mode. Temporary restoration code was removed; inputs released, game and simulator closed, Steam retained. This is cleanup, not a gameplay or physical-headset acceptance pass.
 
 
-### Cabin capture-gap review — 27 October
+### Cabin capture-gap review â€” 27 October
 
 In the retained oriented take, the source-eye ledger has ten accepted-sample gaps over 120 ms. The largest (0.590 seconds) spans five source-sequence advances and overlaps one operator capture event; the next (0.433 seconds) spans 20 source and image advances with no overlapping capture event. Several shorter gaps have no endpoint sequence advance. These are endpoint observations, not proof of intermediate GPU execution or of capture causing the gap. The measurements in `artifacts/bot/runs/20261027T162149228010Z/capture-gap-analysis.json` show that moving all eye checkpoints alone cannot be assumed to solve cadence. A controlled source/recording comparison is needed before changing the recorder. No gameplay repair or new movie is claimed.
 
 
-### Left-hand camera approach correction — 27 October
+### Left-hand camera approach correction â€” 27 October
 
 The failed oriented take observed the scripted left hand acquiring loose photo 12 while grip was held during travel to the camera. The existing workbench route now releases input before that approach, moves the left hand to the camera with grip open, and grips at contact. It stops if a paper or marker is acquired there rather than moving it as though it were the camera. Python compilation and the existing gameplay bot contract suite passed; those checks do not exercise this route in the game. This is a demonstration-route correction, not a gameplay repair or a finished movie. The next integrated take must verify actual pickup, user-print preservation, clear contact, audio and cadence in the game; physical Quest remains unverified.
 
 
-### Test-image cleanup — 27 October
+### Test-image cleanup â€” 27 October
 
 Retained same-session retry `artifacts/bot/runs/20261027T163331720348Z` removed the exact backed-up digital test image 13437591790496 through the camera confirmation flow. The observed library retains the two previous image IDs, and the observed paper IDs 12 and 13 remain; loose print 12 remains at its previously documented displaced position. The earlier retry `20261027T163143242615Z` stopped before touching the gallery because the title native menu was still open; the corrected route opened prop mode in the same session. The prior cleanup's camera moved during pickup easing after the aim was sampled, a plausible reason its button hover missed but not proof of the consumed ray. Waiting for the camera to settle let this cleanup reach and confirm the exact control. Temporary cleanup code was removed, inputs released, game and simulator closed, and Steam retained. No gameplay fix, movie acceptance or physical Quest pass is claimed.
 
 
-### Oriented cabin take and partial cleanup — 27 October
+### Oriented cabin take and partial cleanup â€” 27 October
 
 On development DLL `aedd2a4c42ed322cfbf04690288c950b20e7572cd2369e53f487dbd3d470b78f`, retained run `artifacts/bot/runs/20261027T162149228010Z` observed cassette pickup, insertion and ejection plus one right-hand camera photo. Two temporary observer corrections aligned the open carrier to a measured face-normal dot of 0.796 at 0.321 m; both final-eye ejection stills show its face more clearly. Sampled source-eye motion still obscures hand contact. The take failed when the scripted left hand acquired existing loose photo 12 instead of the camera; its last observed room-local position changed from [0.473453, -2.2112, -1.08705] to [0.513061, -2.2112, -1.23604]. This is a route collision, not a proven camera pickup defect. The pre-compositor recording has audio, 119 dropped/repeated samples and a 0.590-second largest source gap; audio was not auditioned. The take is rejected as the requested movie and does not verify physical Quest or continuous final-eye motion.
 
 One newly created image was backed up with matching SHA-256. Retained cleanup `artifacts/bot/runs/20261027T162624724008Z` removed only test print 14; its digital photo 13437591790496 remains because the delete-control hover was not reached. The last observed library contains that test image and the two existing images; both existing print IDs remain, with photo 12 displaced as above. The separate `studio-board` inspection `20261027T162423799609Z` failed because its fixed expected note and Polaroid were absent; it is not a reload verdict. The temporary film and cleanup changes are saved privately and removed from source. Inputs released, game and simulator closed, Steam retained. Next preserve and tidy that exact test image via verified camera controls, avoid holding grip while approaching unrelated prints, and produce a readable complete take; no additional gameplay fix is inferred.
 
 
-### WM-R55 lid reference — 27 October
+### WM-R55 lid reference â€” 27 October
 
 A [photo of an open WM-R55](https://www.ebay.com/p/21011535430) shows the actual empty compartment and open door; a local reference copy is retained privately. It is one perspective and does not measure hinge travel or establish the loading path. A [WM-R55 video](https://www.youtube.com/watch?v=hh8WE7Wl9bM) was identified but could not be retrieved for review (HTTP 403), so it is not evidence of the motion. Compare a clear in-game insertion against an accessible moving reference before changing the existing guide or lid. The sleeve cap visible in the body-off cabin still also remains a visual issue; its cause has not been isolated.
 
@@ -303,7 +333,7 @@ The retained run `artifacts/bot/runs/20261027T144612968660Z` on development DLL 
 On development DLL `a1174b19694f`, retained run `artifacts/bot/runs/20261027T144043760382Z` observed tape pickup, release, recovery, seating, ejection and recovery, plus camera pickup and a photo from each hand. It stopped because the scripted hand did not acquire a notepad sheet; the marker and photo-placement portions were not reached. This is a reproduced route failure, not yet a diagnosed interaction defect: hand-to-notepad contact and ownership need investigation. Both eyes were reviewed at the seated-tape and camera checkpoints; the view is steep, grips are obscured, and forearm ends dominate the foreground. These stills do not verify contact during motion. No video was recorded in this run. Test outputs were preserved and the restoring process reported matching files; later game-loaded photo IDs do not match that view, so the actual storage mapping remains under investigation. The owned simulator and game were closed and Steam retained. Physical Quest and the requested movie remain open.
 
 
-### Cassette compartment geometry lead — 27 October
+### Cassette compartment geometry lead â€” 27 October
 
 A static check clips the reconstructed cassette interaction box against the
 owned player mesh. At the default closed carrier pose, eight stationary
@@ -319,7 +349,7 @@ Review an actual close two-eye insertion and native material before changing
 the working guide. The original hinge motion and finished movie remain open.
 
 
-### Cassette-player model identification — 27 October
+### Cassette-player model identification â€” 27 October
 
 The owned `pcp0_main0_def_c00_bsm` cutscene-player texture bears the
 inscription `STEREO CASSETTE-CORDER WM-R55`. Its corresponding cutscene
@@ -333,7 +363,7 @@ confirms that model exists. Next inspect direct opening/loading footage and
 the native animation before changing lid behavior; the movie remains open.
 
 
-### Cabin weapon contact and rack cues — 27 October
+### Cabin weapon contact and rack cues â€” 27 October
 
 The native cabin weapon path now forwards a tactile cue when the hand reaches
 an eligible owned assembly. After moving that assembly away, returning it
@@ -350,7 +380,7 @@ the simulator or physical Quest. The broader cabin interactions and movie
 remain open; do not treat tactile design thresholds as headset acceptance.
 
 
-### Expanded cabin interaction request — 27 October
+### Expanded cabin interaction request â€” 27 October
 
 The user wants a deeply interactive first-person cabin, including removing
 wall-mounted guns and putting them back. Existing native cabin gear code
@@ -370,7 +400,7 @@ return with safe interruption and loadout identity. Preserve native cabin
 firing restrictions and the unfinished movie requirement.
 
 
-### Cabin take and maintenance notice — 27 October
+### Cabin take and maintenance notice â€” 27 October
 
 Candidate `789a8e11c795` completed cassette pickup, insertion and ejection,
 both camera shutters and photo placement in `artifacts/bot/runs/20261027T133035987440Z`.
@@ -386,7 +416,7 @@ See `visual-review.json` in the run; headset and continuous final-eye motion
 remain unverified. Next audit the user-requested broader cabin interactions.
 
 
-### Marker pickup continuity candidate — 27 October
+### Marker pickup continuity candidate â€” 27 October
 
 A retained earlier actual-game trace showed the marker stationary in 15 samples
 over 3.062 seconds; the last left controller pose coincided with its last
@@ -405,7 +435,7 @@ contact, release/throw and both-eye presentation need user validation. The
 showcase movie remains unfinished. Evidence: `artifacts/opening-marker-continuity-20261027.json`.
 
 
-### Diagonal cabin showcase attempt — 27 October
+### Diagonal cabin showcase attempt â€” 27 October
 
 The retained bounded bot run `artifacts/bot/runs/20261027T131055498302Z`
 observed tape pickup, insertion, eject/recovery, both camera shutters and photo
@@ -426,7 +456,7 @@ See `visual-review.json` in the run for scope and limits. The finished showcase,
 continuous final-eye motion and physical Quest remain open.
 
 
-### Cassette showcase viewpoint diagnosis — 27 October
+### Cassette showcase viewpoint diagnosis â€” 27 October
 
 The recorded source-eye cassette transfer was reviewed against simulator pose
 commands. The staged approach points nearly straight down at the player: the
@@ -440,7 +470,7 @@ The diagonal proposal was later exercised in the retained run described above;
 its framing still obscures actions. The movie and physical Quest remain open.
 
 
-### Final-eye camera framing review — 27 October
+### Final-eye camera framing review â€” 27 October
 
 A private diagnostic projects a time-neighbor candidate hand mesh over retained
 final-eye stills. The right-eye wireframe overlaps the hand and sleeve region;
@@ -453,7 +483,7 @@ continuous two-eye presentation, a finished movie and physical Quest acceptance
 remain open. Do not install a speculative grip based on this overlay.
 
 
-### Opposed-handle search and draw-identity check — 27 October
+### Opposed-handle search and draw-identity check â€” 27 October
 
 A multi-start opposed-side grip search using distal skin and full-finger
 penalties produced an extreme modeled wrist rotation and over 60 mm translation;
@@ -471,7 +501,7 @@ current gameplay draw ownership and derive a supported hand/handle relationship;
 review continuous eye motion and physical controller alignment. The movie and
 physical Quest remain open.
 
-### Camera grip visual geometry review — 27 October
+### Camera grip visual geometry review â€” 27 October
 
 A private static diagnostic rendered the candidate hand skin and the camera's
 beveled body, base and handle from multiple angles. It is synthetic geometry
@@ -487,7 +517,7 @@ and derive a supported pose that works for both hands, preserving controller
 alignment, camera shutter and print behavior; then review both final eyes
 through motion. The finished movie and physical Quest remain open.
 
-### Finger palette composition validation — 26 October, later
+### Finger palette composition validation â€” 26 October, later
 
 Retained actual-game right-hand samples validate the offline palette-composition
 convention for the thumb, middle, ring and little when grip changes from 0.08
@@ -505,7 +535,7 @@ physical wrist or motion validation. Next establish actual draw ownership and
 reasonable finger/handle contact targets rather than optimizing only distance.
 The grip, finished movie and physical Quest acceptance remain open.
 
-### Articulated camera-grip exploration — 26 October, later
+### Articulated camera-grip exploration â€” 26 October, later
 
 A private diagnostic reposed five weighted finger groups from the retained
 nearby native skin palette while exploring palm rotation and translation. The
@@ -526,7 +556,7 @@ validate the palette-delta convention in a bounded real pose and constrain
 the actual drawn hand, camera surfaces and controller motion together. Both-eye
 motion, physical Quest and the finished movie remain open.
 
-### Projected full-hand grip search — 26 October, later
+### Projected full-hand grip search â€” 26 October, later
 
 A static candidate-hand projection was grouped by thumb, four fingers and palm
 using the retained loaded `sna3_main1` asset and nearby non-atomic skin sample.
@@ -544,7 +574,7 @@ with finger articulation and a draw-matched skin join, then test both eyes and
 motion. Do not promote either pose from aggregate distance alone. The film and
 physical headset remain unaccepted.
 
-### Candidate current hand geometry — 26 October, later
+### Candidate current hand geometry â€” 26 October, later
 
 The game log for the palette session reports `sna3_main1_def` forearm resources
 loaded after the exact game process started. All three input-buffer hashes match
@@ -563,7 +593,7 @@ not exact surface distance. Identify the drawn mesh and evaluate the full skin
 and grasp through motion in both eyes before a repair or acceptance claim. The
 raw asset and palette remain private; physical Quest and the movie remain open.
 
-### Live camera-hand palette — 26 October, later
+### Live camera-hand palette â€” 26 October, later
 
 A combined actual-game take on `1ed68066ab7c` completed tape and camera/photo
 actions while a bounded read-only skin-palette reader sampled a stationary
@@ -581,7 +611,7 @@ retained. Next identify the exact current model/mesh and obtain a same-frame
 skin-to-camera join; then review contact through motion in both final eyes.
 The movie remains unfinished.
 
-### Owned hand-mesh inventory — 26 October, later
+### Owned hand-mesh inventory â€” 26 October, later
 
 A previously retained owned `sna5` mesh contains a right-hand mesh whose
 23 vertices have at least 50 percent weight on bone 42; 17 are fully weighted.
@@ -595,7 +625,7 @@ remains private. Next capture matched model identity, skin palette and camera
 pose from the same current render transaction and evaluate the deformed surface
 in both eyes. Physical headset and the finished movie remain open.
 
-### Correction: camera contact point — 26 October, later
+### Correction: camera contact point â€” 26 October, later
 
 The telemetry field `index_tip_local` is published from the position of the
 third articulated index bone (`controller_rig.cpp`), not from a measured
@@ -612,7 +642,7 @@ geometry to the camera surface through motion. The same naming limitation
 also applies to historical paper distance reports; their original results are
 retained with this qualification. Physical headset and finished movie remain open.
 
-### Full-hand camera contact model — 26 October, later
+### Full-hand camera contact model â€” 26 October, later
 
 The retained native-left 16-joint hand offsets, mirrored for the right, now
 include thumb, index, middle, ring and little chains and their shared parent.
@@ -631,7 +661,7 @@ Next: obtain full actual hand contacts and establish valid camera-side contact
 landmarks, then derive and test the hand/handle transform; verify motion and
 both eyes before changing acceptance. Physical headset and the movie remain open.
 
-### Camera grip geometry search — 26 October, later
+### Camera grip geometry search â€” 26 October, later
 
 An offline nominal-hand search compared index and thumb positions with boxes
 approximating the mod-authored camera body, base and side handle. The first
@@ -647,7 +677,7 @@ use exact camera-side surfaces and complete finger chains to derive a supported
 grasp, then verify actual hand/controller motion and both eyes. Physical
 headset comfort and the finished cabin movie remain open.
 
-### Camera hand contact investigation — 26 October, later
+### Camera hand contact investigation â€” 26 October, later
 
 The centered-camera run exposed a specific unresolved grip problem. Published
 rendered index fingertips in the shutter poses were 35.6 mm (right) and 23.5 mm
@@ -663,7 +693,7 @@ may bury the palm. Next derive and test compatible palm orientation, handle
 contact and articulation together, then inspect full hands through motion in
 both eyes. Other grip poses, thumb contact and physical Quest remain unverified.
 
-### Centered-camera take — 26 October, later
+### Centered-camera take â€” 26 October, later
 
 `artifacts/opening-centered-camera-20261026` exercised the current checked
 candidate with a centered camera position and a deliberate cassette-face reveal.
@@ -680,7 +710,7 @@ simulator closed. Continuous final-eye motion and physical headset remain open.
 Next: verify the camera-side grip geometry and a reachable viewpoint that exposes
 the hand, and validate the cassette interaction without the covering arm.
 
-### Camera pickup continuity repair — 26 October, later
+### Camera pickup continuity repair â€” 26 October, later
 
 A controlled stationary right-hand grip reproduced the camera moving 33.28 mm
 in 116 ms (`artifacts/opening-stationary-camera-20261026`). Camera pickup now
@@ -699,7 +729,7 @@ test photos were archived in `tenth-trial`, settings were restored, the owned
 simulator closed, and the published `play/` pin remains unchanged. Next: verify
 full-view hand contact during motion and produce a readable cassette sequence.
 
-### Camera displaced by interrupted test — 26 October, later
+### Camera displaced by interrupted test â€” 26 October, later
 
 `artifacts/opening-cinematic-offset-20261026/camera-fall-cause.json` narrows
 the camera-on-floor observation: after the simulated tape grip expired, the
@@ -713,7 +743,7 @@ verify the camera is at its native resting location before recording. The
 previously documented camera pickup movement remains a separate, unisolated
 lead. No gameplay change or headset acceptance is inferred.
 
-### Offset-view retry — 26 October, later
+### Offset-view retry â€” 26 October, later
 
 The first offset-view take (`artifacts/opening-cinematic-offset-20261026`)
 stopped when its five-second scripted grip lease expired during slow observer
@@ -731,7 +761,7 @@ and the owned simulator closed. The original lid motion, both-eye motion quality
 and physical Quest acceptance remain open. Do not repeat this route unchanged;
 frame the grip and carrier from a reach-valid pose and reset the prop before filming.
 
-### Revised cabin staging — 26 October, later
+### Revised cabin staging â€” 26 October, later
 
 `artifacts/opening-cinematic-staged-20261026` records an actual ACC take on
 the unchanged checked candidate. The test route now carries the cassette to
@@ -751,7 +781,7 @@ Personal INIs match their original hashes and the owned simulator is closed.
 Next: solve the framing and movement from actual playback, then capture and
 review both final eyes through motion; do not call this finished footage.
 
-### Clean-set cabin take — 26 October, later
+### Clean-set cabin take â€” 26 October, later
 
 At the user's request, the prior custom photo and note collection was cleared;
 its 47 PNGs and board were backed up under `private/user-cleared-cabin-studio-20261026`.
@@ -767,7 +797,7 @@ Quest acceptance. Settings were restored and the owned simulator closed. Next:
 resolve camera and hand staging and verify a continuous, readable final-eye take;
 do not present this take as finished or treat the scripted loop as headset proof.
 
-### Cabin showcase attempts — 26 October
+### Cabin showcase attempts â€” 26 October
 
 ### Current next action after cabin/settings review - 27 October
 
@@ -825,9 +855,9 @@ and original native lid motion remain open.
 ### Follow-up contact evidence
 
 Retained motion samples expose a contact regression in the scripted center-grip
-poses: the previous authored attachment put the index tip within 3–6 mm but
-snapped the sheet 8–9 cm and about 106 degrees; the current attachment avoids
-that snap but leaves a measured 30–38 mm fingertip gap during the sampled holds
+poses: the previous authored attachment put the index tip within 3â€“6 mm but
+snapped the sheet 8â€“9 cm and about 106 degrees; the current attachment avoids
+that snap but leaves a measured 30â€“38 mm fingertip gap during the sampled holds
 (`artifacts/opening-paper-contact-comparison-20261026.json`). Those scripted
 poses are not naturally aligned pinch trials. A nominal finger-chain search
 suggests the existing curl axes alone cannot close that gap in those poses; it
@@ -845,11 +875,11 @@ future combined pass with reachable, deliberately aligned grasps, inspect both
 eyes and preserve typing, drawing, release and throw behavior. Do not infer
 physical Quest results or change the existing flow solely from these leads.
 
-## Opening cabin follow-up — 26 October
+## Opening cabin follow-up â€” 26 October
 
 Checked/deployed development DLL `217df3f4b9be` includes a repair for a
 reproduced stationary pickup jump: the pinned note and Polaroid previously
-moved 8–9 cm and rotated about 106 degrees when gripped. Pickup now preserves
+moved 8â€“9 cm and rotated about 106 degrees when gripped. Pickup now preserves
 the selected hand-relative pose, with only a small aligned pinch adjustment;
 contact adjustment does not manufacture throw velocity. In the combined native
 run `artifacts/opening-paper-lid-validation-20261026`, stationary samples
@@ -870,7 +900,7 @@ wider grab orientations, physical Quest testing and whole-scene acceptance
 remain open. The test-owned session is closed and Steam retained.
 
 
-## Opening cabin cassette and lid — 26 October
+## Opening cabin cassette and lid â€” 26 October
 
 The user reports unnatural cassette insertion and questions the tape-player
 model and lid motion; Polaroid and Post-it handling are also in scope. The
@@ -909,9 +939,9 @@ whole-scene acceptance remain open. Steam retained; owned session closed;
 published play pin and personal control settings unchanged.
 
 
-## Gameplay toggle demonstrations — 26 October
+## Gameplay toggle demonstrations â€” 26 October
 
-Source `52585ca` adds a 25–150% marked-enemy size control (60% default),
+Source `52585ca` adds a 25â€“150% marked-enemy size control (60% default),
 front-loads God Mode and common switches, and groups related settings in the
 headset and launcher. A reproduced live-edit bug stowed binoculars when marker
 settings changed; display/recon-only changes now preserve the active optic
@@ -934,7 +964,7 @@ Next: finish effect-based demonstrations for the remaining switches and
 investigate the tracked-owner interruption; diagnose daytime shadow movement.
 
 
-## Mounted spatial aim and daytime shadow report — 26 October
+## Mounted spatial aim and daytime shadow report â€” 26 October
 
 The user clarified that the daytime report is **larger light/shadow patches
 shifting during head nods**. Trees never disappear. Do not diagnose this as
@@ -978,7 +1008,7 @@ closed, clock/poses restored, Steam retained and Meta 64-bit Link checked.
 Receipt: `artifacts/mounted-spatial-preservation.json`; final build log:
 `artifacts/mounted-spatial-final-build.log`. No whole-game/headset sign-off.
 
-## Blast Arm tower destruction with game audio � 26 October
+## Blast Arm tower destruction with game audio — 26 October
 
 The user rejected take6's 3.3 fps capture and missing game audio. Replacement
 `artifacts/rocket-proof-20261026/take7-native-av/field-kit-rocket-arm-game-audio.mp4`
@@ -1023,7 +1053,7 @@ personal settings match the earlier receipt. Published pin unchanged. Receipt:
 `artifacts/rocket-tower-20261026/preservation.json`.
 
 
-## Checked spatial controls and silent video — 26 October
+## Checked spatial controls and silent video â€” 26 October
 
 Candidate `9d5e15c0a101` / source `e162ef6` passed all 58 test groups and installer
 checks and is deployed to development. The new spatial socket channel, stronger
@@ -1059,7 +1089,7 @@ personal settings and published pin are unchanged. Receipt:
 retain tutorial persistence and tower-ascent input failure as unresolved. Older
 sections below retain the historical stage and build they originally describe.
 
-## Socket + gyro + joystick clarification — 26 October
+## Socket + gyro + joystick clarification â€” 26 October
 
 User explicitly requests three concurrent controls: spatial forearm/socket aim,
 stronger independent phantom-wrist gyro, and fine joystick correction. Prior
@@ -1197,7 +1227,7 @@ those decisions and attribution; see [fork review](FORK_REVIEW_2026-09-20.md).
 
 ## Execution order
 
-### 0. Documentation preparation — completed in this pass
+### 0. Documentation preparation â€” completed in this pass
 
 Consolidate current rules and entry points; preserve old evidence as history;
 record code state separately from acceptance; keep the release gate conservative.
@@ -1261,11 +1291,11 @@ an unimplemented fixture; select its actual guarded case before dispatch.
 
 | Combined review | Required behavior and adjacent transitions |
 | --- | --- |
-| Body and movement — FP04/05/06/17 | Standing/seated calibration and recenter; crouch/prone/walk; both-arm reach and wrist isolation; cross-head return; cover lean/peek/exit; full-body on/off and fallback; boarding/transit/disembark. Native thigh/shin lengths remain unchanged. |
-| Combat and recovery — FP01/02/08 | Moving supported rifle, fire/visible impact, reload, bolt cycle, release/reacquire and weapon swap; valid idle and invalid tracking with no held-trigger discharge on recovery; Rocket Arm flight/impact/return and eligible Blast Arm case. |
-| Mounted and contextual actions — FP03/11/15 | Each claimed mounted type: actual entry, either-hand yaw/pitch, limits, contact, operating-hand transfer, stick override, release, discharge/impact, exit. Vehicle entry/exit, deliberate driving turn, Fulton and table/sandbag climb at four starting headings; fixed HMD heading must not inherit forced actor alignment. |
-| iDroid/progression — FP07/12/13/14 | Left-hand contact/projector and readable both-eye motion; ordinary and forced stow/immediate reopen; authored-scene return and exit notice; Development and nested dialog navigation without unintended purchases; sortie preview and native free-roam route; physical binocular inspection/zoom/acquisition/explicit marking preserved. Complete a naturally available mission through its objective and return; do not call a lesson a mission pass. |
-| Cabin — FP09/10/11 | Both-hand paper/marker contact, write/type/pin, front-slot printing, stacking and cassette presentation; both native rifle assemblies carry/return and reject held-grip reacquisition across interruptions. Recheck already-passed cases only when the changed code affects them. |
+| Body and movement â€” FP04/05/06/17 | Standing/seated calibration and recenter; crouch/prone/walk; both-arm reach and wrist isolation; cross-head return; cover lean/peek/exit; full-body on/off and fallback; boarding/transit/disembark. Native thigh/shin lengths remain unchanged. |
+| Combat and recovery â€” FP01/02/08 | Moving supported rifle, fire/visible impact, reload, bolt cycle, release/reacquire and weapon swap; valid idle and invalid tracking with no held-trigger discharge on recovery; Rocket Arm flight/impact/return and eligible Blast Arm case. |
+| Mounted and contextual actions â€” FP03/11/15 | Each claimed mounted type: actual entry, either-hand yaw/pitch, limits, contact, operating-hand transfer, stick override, release, discharge/impact, exit. Vehicle entry/exit, deliberate driving turn, Fulton and table/sandbag climb at four starting headings; fixed HMD heading must not inherit forced actor alignment. |
+| iDroid/progression â€” FP07/12/13/14 | Left-hand contact/projector and readable both-eye motion; ordinary and forced stow/immediate reopen; authored-scene return and exit notice; Development and nested dialog navigation without unintended purchases; sortie preview and native free-roam route; physical binocular inspection/zoom/acquisition/explicit marking preserved. Complete a naturally available mission through its objective and return; do not call a lesson a mission pass. |
+| Cabin â€” FP09/10/11 | Both-hand paper/marker contact, write/type/pin, front-slot printing, stacking and cassette presentation; both native rifle assemblies carry/return and reject held-grip reacquisition across interruptions. Recheck already-passed cases only when the changed code affects them. |
 
 Review final composition in both eyes and through transitions, not only endpoint
 stills. Preserve exact candidate/run identity and failed cases. For sustained
@@ -1362,9 +1392,9 @@ both slots verify. Never remove settings, saves, source or retained evidence.
   is ready through Play-Dev. Next: physical Quest feedback and a newly
   reproducible field case; frame repeats remain measured and unresolved.
 
-## Current execution checkpoint — 25 October, completed batch
+## Current execution checkpoint â€” 25 October, completed batch
 
-Steps 1–3 below are complete: `d4b526e24cf5` is installed and ready through
+Steps 1â€“3 below are complete: `d4b526e24cf5` is installed and ready through
 `Play-Dev.cmd`. Continue with the user's play feedback; do not rerun this batch
 or resume historical simulator loops. Remaining limits are in FIELD_FIXES.
 
