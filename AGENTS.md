@@ -118,7 +118,7 @@ exception to the earlier main-only rule for this release-automation task.
 
 GitHub Actions builds committed main daily or on manual dispatch. The exact
 accepted blocker snapshots are in `config/nightly-policy.json`; new or changed
-blockers stop publication. Hosted checks exclude the two hardware-only tests and
+blockers stop publication. Hosted checks exclude the three hardware-only tests and
 must never be described as physical or full-game acceptance. Follow
 `docs/NIGHTLIES.md` for the workflow and stop switch. Nightlies use technical tags
 and GitHub prereleases, never formal versions or the Latest designation. They do
