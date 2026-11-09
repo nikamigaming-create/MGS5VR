@@ -36,15 +36,17 @@ public:
             &&acquireRadius>0&&releaseRadius>=acquireRadius;
         const bool discontinuity=sampled_&&(now<time_||now-time_>250||owner!=owner_);
         if(!available||!identity||!dimensions||!valid(hand)||!valid(contact)||!valid(aim)||discontinuity){
-            held_=false;pressed_=squeeze;armed_=!squeeze;
+            held_=false;armed_=!squeeze;
             owner_=owner;time_=now;sampled_=true;return {};
         }
         owner_=owner;time_=now;sampled_=true;
-        if(!squeeze){held_=pressed_=false;armed_=true;return {};}
-        const bool edge=armed_&&!pressed_;pressed_=true;
+        if(!squeeze){held_=false;armed_=true;return {};}
         const auto distance=hand.position-contact.position;
         bool acquired=false;
-        if(edge&&!held_&&dot(distance,distance)<=acquireRadius*acquireRadius){
+        // A fresh squeeze may start just before the hand reaches the handle.
+        // Keep that approach armed until contact; loss/forced release still
+        // disarms it and requires an actual release before reacquisition.
+        if(armed_&&!held_&&dot(distance,distance)<=acquireRadius*acquireRadius){
             held_=acquired=true;armed_=false;
             // Capture orientation at contact: acquisition itself cannot turn
             // the native gun, even if the physical controller is misaligned.
@@ -79,7 +81,7 @@ private:
     Vec3 startPosition_{};
     float lever_{};
     uint64_t time_{};
-    bool sampled_{},held_{},pressed_{},armed_{};
+    bool sampled_{},held_{},armed_{};
 };
 // Stick trim changes the requested bearing while either hand owns a native
 // handle. It never turns the VR reference space or recenters the physical hand.

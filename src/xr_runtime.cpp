@@ -941,7 +941,6 @@ struct Session {
         controllerFrame.enemyWorldMarkers=controls.setting("settings.enemy_world_markers")!=0;
         controllerFrame.enemyMarkerScale=controls.setting("settings.enemy_marker_scale_percent")*.01f;
         controllerFrame.scopeEyeRelief=controls.setting("settings.scope_eye_relief_cm")*.01f;
-        controllerFrame.scopePoseStabilization=controls.setting("settings.scope_pose_stabilization")!=0;
         controllerFrame.weaponAimPitch=controls.setting("settings.weapon_aim_pitch_degrees");
         controllerFrame.binocularAutoMark=controls.setting("settings.binocular_auto_mark")>=.5f;
         controllerFrame.binocularActorGlow=controls.setting("settings.binocular_actor_glow")>=.5f;
@@ -1723,7 +1722,8 @@ struct Session {
         }
         auto& weaponHand=controllerFrame.hands[1];
         const auto steadyGrip=weaponSmoothing.update(head,weaponHand.grip,
-            weaponHand.gripTracked&&controllerFrame.weaponReady&&!binocularSelected&&!nativeStatus.nativeMenuOpen,
+            weaponHand.gripTracked&&controllerFrame.weaponReady&&!binocularSelected&&!nativeStatus.nativeMenuOpen
+                &&!stationaryWeaponAction(controllerFrame.nativeActionId),
             controls.setting("settings.weapon_smoothing_ms"),now,referenceEpoch);
         if(weaponHand.aimTracked)weaponHand.aim=compose(compose(steadyGrip,inverse(weaponHand.grip)),weaponHand.aim);
         weaponHand.grip=steadyGrip;

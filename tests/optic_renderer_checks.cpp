@@ -47,6 +47,23 @@ int opticRendererChecks(){
         const bool reticle=sample(64,54)[1]<180;
         context->Unmap(readback.Get(),0);
         if(!image||!outside||!reticle)throw std::runtime_error("Weapon lens image, aperture or reticle pixels are incorrect");
+        // A reflex dot stays at the optic's bearing for either eye and while
+        // leaning. A dot painted at glass centre follows the shifted housing.
+        for(float eyeShift:{-.01f,0.f,.01f}){
+            context->ClearRenderTargetView(targetView.Get(),blue);
+            auto shifted=view;shifted[12]=eyeShift;
+            if(!drawPhysicalWeaponScope(context.Get(),world,shifted,projection,.02f,1,nullptr,true))
+                throw std::runtime_error("Collimator draw failed");
+            context->CopyResource(readback.Get(),target.Get());
+            checkHr(context->Map(readback.Get(),0,D3D11_MAP_READ,0,&mapped),"Read collimated dot pixels");
+            double weight=0,xSum=0;
+            for(UINT y=0;y<128;++y)for(UINT x=0;x<128;++x){
+                const auto pixel=sample(x,y);weight+=pixel[0];xSum+=(x+.5)*pixel[0];
+            }
+            context->Unmap(readback.Get(),0);
+            if(weight<1||std::abs(xSum/weight-64.)>.6)
+                throw std::runtime_error("Collimator dot follows the glass instead of the optical bearing");
+        }
         // Actual D3D pixels: a lens passing the near plane must not be depth
         // clamped across the user's normal eye image.
         for(float z:{.015f,-.02f}){

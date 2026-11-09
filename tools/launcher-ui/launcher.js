@@ -204,7 +204,7 @@ const settingCopy={
  menu_quad_distance_cm:['World menu distance','Distance to Pause, and to iDroid when handheld mode is off.'],
  menu_quad_tilt_degrees:['World menu tilt','Negative values tilt the menu panel upward.'],
  scope_eye_relief_cm:['Scope eye distance','Preferred distance from your eye to the scope glass.'],
- scope_pose_stabilization:['Steady scope glass','Remove small scope attachment shakes. The glass and its view move together; intentional hand movement follows immediately.'],
+ scope_pose_stabilization:['Legacy scope filter (inactive)','Retained for settings compatibility. Sights follow the weapon exactly; use weapon smoothing to steady the whole gun.'],
  block_firing_near_cover:['Block firing near cover','Off by default: nearby cover does not veto firing your tracked gun. Bullets still hit the world normally; ammunition and reload rules stay active.'],
  cover_assistance:['Cover assistance','On keeps native wall attachment with physical leaning and aiming. Off releases wall attachment. World collision, crouching and bullet obstruction still apply.'],
  enemy_world_markers:['Enemy markers in the world','Show enemies you have already marked at their world positions in both eyes. Binocular marking and the iDroid map keep working. HUD Off hides these labels.'],

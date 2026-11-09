@@ -150,7 +150,11 @@ Pose HeadCamera::followCinematicLocked(Pose nativePose,uint64_t time,bool advanc
         if(dot(jump,jump)>16.f||std::abs(wrap(rawYaw-s.rawYaw))>.9f){
             s.pose.position=nativePose.position;yaw=rawYaw;s.freeOffset={};
         }else{
-            s.pose.position=s.pose.position+(nativePose.position-s.pose.position)*smoothingAlpha(dt,.25f);
+            // A world-space position filter leaves a moving shot (including
+            // ACC departure) speed * tau metres behind its native subject.
+            // The cinematic owns translation exactly; only yaw is filtered.
+            // Cabin-play is already false once a deployment demo owns the view.
+            s.pose.position=nativePose.position;
             const float requested=wrap(rawYaw-yaw)*smoothingAlpha(dt,.45f);
             yaw=wrap(yaw+std::clamp(requested,-1.2f*dt,1.2f*dt));
         }
@@ -787,8 +791,8 @@ HeadCameraSample HeadCamera::resolveLocked(uintptr_t camera,Pose nativePose,uint
         ?compose(nativeTrackedPose(nativePose,head_,head_),Pose{{},{0,-.05f,-1.3f}}):frontEndPanel_;
     else if(controllers_.avatarEditor)
         result.menuPanel=compose(nativeTrackedPose(nativePose,head_,head_),Pose{{},{0,-.05f,-1.3f}});
-    // Coco's cinematic follow keeps current shot motion while filtering its
-    // shake and roll. Cuts snap to the new source; physical head motion is
+    // Cinematic follow keeps exact shot translation while filtering its
+    // yaw and removing roll. Cuts snap to the new source; physical head motion is
     // applied afterwards without filtering. Pause owns its separate anchor.
     if(!spatialMenu&&controllers_.scriptedDemo&&!controllers_.scriptedLook){
         nativePose=followCinematicLocked(nativePose,time,useRig);

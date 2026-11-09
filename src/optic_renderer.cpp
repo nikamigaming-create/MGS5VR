@@ -736,7 +736,7 @@ float4 main(PSIn input) : SV_TARGET {
         // A 1x collimator retains the native transparent glass and stereo
         // scene. Only its sight point emits light; no copied lens image.
         float edgeWidth=max(length(fwidth(input.aperture)),0.0001);
-        float dotMask=1.0-smoothstep(0.018-edgeWidth,0.018+edgeWidth,length(input.aperture));
+        float dotMask=1.0-smoothstep(0.018-edgeWidth,0.018+edgeWidth,length(input.aperture-viewport.zw));
         if(dotMask<=0.001) discard;
         return float4(1.0,0.035,0.015,dotMask);
     }
@@ -2075,6 +2075,15 @@ bool drawLensPortal(ID3D11DeviceContext* context,const std::array<float,16>& wor
     // Never show the portal through its back face or from inside the housing.
     if(facing<=.15f)return false;
     constants.viewport[0]=state.viewport.Width;constants.viewport[1]=state.viewport.Height;
+    if(reticle>2.5f){
+        // A collimated dot is viewed along the optic axis, not painted at
+        // the centre of the glass. Project this eye onto the aperture plane
+        // along that axis. worldView includes the aperture's uniform scale.
+        const float scaleSquared=worldView[0]*worldView[0]+worldView[1]*worldView[1]+worldView[2]*worldView[2];
+        if(!std::isfinite(scaleSquared)||scaleSquared<1e-8f)return false;
+        constants.viewport[2]=-(ocular.x*worldView[0]+ocular.y*worldView[1]+ocular.z*worldView[2])/(scaleSquared*ocularRadius);
+        constants.viewport[3]=-(ocular.x*worldView[4]+ocular.y*worldView[5]+ocular.z*worldView[6])/(scaleSquared*ocularRadius);
+    }
     context->UpdateSubresource(resources.lensConstants.Get(),0,nullptr,&constants,0,0);
     ID3D11RenderTargetView* renderTarget=state.renderTarget.Get();
     context->OMSetRenderTargets(1,&renderTarget,depthTarget);

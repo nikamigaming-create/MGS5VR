@@ -3829,5 +3829,33 @@
     "acceptance_effect": "none; hosted CI and public distribution do not establish physical-headset or full-game acceptance",
     "scope": "Current TPP/cabin and GZ first-person VR source included. Existing gameplay and physical-headset acceptance gaps remain; prior nightly record retained.",
     "cancelled_attempt": "40630991896 cancelled before publication to restore Unicode in merged documentation."
+  },
+  "sights_mounted_acc_2026_11_09": {
+    "status": "checked_development_installed_physical_review_pending",
+    "user_report": "Scope/dot disagreement with working laser across sights; reversed/stiff mounted hand steering; excessive ACC departure camera separation; verify cover.",
+    "changes": [
+      "Remove lens-only pose filter; retain whole-weapon smoothing and native laser",
+      "Per-eye 1x collimator dot projection",
+      "Fresh squeeze approach acquires mounted native handle; retain interruption rearm rules",
+      "Bypass right-hand whole-weapon smoothing on admitted stationary mounts",
+      "Exact native translation for scripted cameras including ACC departure (native demo state clears cabin-play)"
+    ],
+    "unresolved": [
+      "Mounted reversal not diagnosed; native yaw mapping unchanged",
+      "Physical final-eye sight/muzzle/impact alignment across weapons",
+      "ACC headset excursion not independently reproduced",
+      "Fresh cover, all mounted types and physical contact/response acceptance"
+    ],
+    "validation": "Final candidate: all 59 CTest groups and installer checks passed. D3D collimator pixels checked across eye translations; mounted grip approach/release and native scripted-camera motion regressions pass. No gameplay or physical-headset acceptance.",
+    "historical_evidence": [
+      "artifacts/bot/runs/20261022T231846971284Z/machinegun-yaw-summary.json",
+      "artifacts/bot/runs/20261022T233242186549Z/machinegun-pitch-stick-summary.json"
+    ],
+    "cleanup": "No game or simulator session launched; settings and published pin unchanged",
+    "candidate_dll_sha256": "8960a4e5375162e4061cff54c1b97402228f987c078794e0637128c54ccbdc5b",
+    "built_source_sha256": "ff78e2ab402da44e968d03e397086c8f76f79cff64a1b7939d524aaaa6783e12",
+    "build_log": "artifacts/sights-mounted-acc-final-build.log",
+    "superseded_attempt": "Initial 79f7aa72fa49 passed checks but had unreachable cabin-play cinematic condition; corrected before final delivery.",
+    "documentation_scope": "Outcome documentation newer than built snapshot; runtime source unchanged after build."
   }
 }

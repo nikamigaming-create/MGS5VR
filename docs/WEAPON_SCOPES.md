@@ -1,5 +1,11 @@
 # Physical weapon scopes (development)
 
+9 November correction: the independent scope-disc filter described in the historical
+October section below is retired. Current glass/objective use the exact solved weapon
+pose; use whole-weapon smoothing for steadiness. The compatibility setting is inactive.
+The 1x collimator dot is projected per eye along the optic axis, clipped by the native
+aperture. Magnified reticles and the native laser remain. Physical alignment is pending.
+
 ![Original Snake weapon and grenade artwork](images/field-gear.svg)
 
 TPP's round-scope implementation uses the equipped weapon resource, its native

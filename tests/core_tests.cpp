@@ -501,65 +501,6 @@ int main(){
     expect(!menuLease.ready(1,2),"partial or interleaved native begin cannot restore flags");
     menuLease.reset();expect(!menuLease.prior(2),"consumed lease cannot be reused for another lesson");
     {
-        ScopePoseStabilizer filter;
-        const WeaponScopeSample original{Pose{{},{0,0,-.1f}},Pose{{},{0,0,-.3f}},.018f,.1f,8.f,17,true};
-        auto makeScope=[&](Pose owner,Pose noise){
-            auto s=original;s.ocular=compose(owner,compose(noise,original.ocular));
-            s.objective=compose(owner,compose(noise,original.objective));return s;
-        };
-        filter.update({},original,true,1000,1,1);
-        auto tiny=makeScope({},Pose{{},{.0005f,0,0}});
-        auto stable=filter.update({},tiny,true,1010,1,1);
-        expect(same(stable.ocular.position,original.ocular.position),"scope attachment dead zone removes sub-millimetre skin jitter");
-        const Pose movement{{0,.38268343f,0,.92387953f},{.3f,.2f,-.4f}};
-        auto moved=makeScope(movement,Pose{{},{.0005f,0,0}});
-        stable=filter.update(movement,moved,true,1020,1,1);
-        expect(same(stable.ocular.position,compose(movement,original.ocular).position)
-            &&same(rotate(stable.ocular.orientation,{0,0,-1}),rotate(movement.orientation,{0,0,-1})),
-            "scope stabilization follows deliberate controller translation and rotation without lag");
-        expect(same(compose(inverse(stable.ocular),stable.objective).position,{0,0,-.2f}),
-            "stabilized scope glass and scene keep their exact native ocular/objective relationship");
-        float rawEnergy=0,filteredEnergy=0;filter.reset();
-        filter.update({},original,true,2000,1,1);
-        for(unsigned n=1;n<=400;++n){
-            const float wave=std::sin(static_cast<float>(n)*1.3f);
-            const auto noisy=makeScope({},Pose{{0,std::sin(.002618f*wave),0,std::cos(.002618f*wave)},{.002f*wave,0,0}});
-            stable=filter.update({},noisy,true,2000+n*10,1,1);
-            if(n>50){
-                const auto raw=noisy.ocular.position-original.ocular.position;
-                const auto corrected=stable.ocular.position-original.ocular.position;
-                rawEnergy+=dot(raw,raw);filteredEnergy+=dot(corrected,corrected);
-            }
-        }
-        expect(filteredEnergy<rawEnergy*.1f,"Coco scope filter removes at least 68 percent RMS attachment jitter at x8");
-        std::cout<<"Scope attachment jitter RMS ratio "<<std::sqrt(filteredEnergy/rawEnergy)<<'\n';
-        auto changed=makeScope({},Pose{{},{.005f,0,0}});changed.weaponIdentity=18;
-        stable=filter.update({},changed,true,6010,1,1);
-        expect(same(stable.ocular.position,changed.ocular.position),"scope swap starts from the actual new glass without stale history");
-        changed.ocular.position.x+=.005f;changed.objective.position.x+=.005f;
-        stable=filter.update({},changed,true,6020,2,1);
-        expect(same(stable.ocular.position,changed.ocular.position),"XR reference-space reset discards scope attachment history");
-        changed.ocular.position.x+=.005f;changed.objective.position.x+=.005f;
-        stable=filter.update({},changed,true,6030,2,2);
-        expect(same(stable.ocular.position,changed.ocular.position),"camera activation change cannot reuse an old scope attachment");
-        changed.ocular.position.x+=.005f;changed.objective.position.x+=.005f;
-        stable=filter.update({},changed,true,6230,2,2);
-        expect(same(stable.ocular.position,changed.ocular.position),"scope tracking gap does not interpolate from an old pose");
-        stable=filter.update({},tiny,false,6240,2,2);
-        expect(same(stable.ocular.position,tiny.ocular.position),"disabled stabilization or a changing contact keeps the completed skin authoritative");
-        stable=filter.update({},original,true,6250,2,2);
-        expect(same(stable.ocular.position,original.ocular.position),"scope reactivation after menus or tracking loss starts without a jump");
-        auto flipped=original;flipped.ocular.orientation.w=-1;flipped.objective.orientation.w=-1;
-        stable=filter.update({},flipped,true,6260,2,2);
-        expect(valid(stable.ocular)&&same(rotate(stable.ocular.orientation,{0,0,-1}),{0,0,-1}),
-            "equivalent quaternion signs do not create a scope rotation spike");
-        auto invalid=original;invalid.magnification=std::numeric_limits<float>::quiet_NaN();
-        stable=filter.update({},invalid,true,6270,2,2);
-        expect(!weaponScopeSceneView(stable),"invalid scope data cannot acquire a camera through stabilization");
-        stable=filter.update({},tiny,true,6260,2,2);
-        expect(same(stable.ocular.position,tiny.ocular.position),"scope filter clock regression starts with the current pose");
-    }
-    {
         OpticEventQueue events;
         events.push({OpticEventKind::raised,{},101,1});
         expect(!events.take(100,1),"an optic event newer than the consumer clock is not delivered early");
@@ -2680,8 +2621,8 @@ int main(){
         filtered.trackStereo({},rigEyes,true,100,input);filtered.toggle();filtered.resolve(9,{},100);
         const Pose moving{{0,.04997917f,0,.99875026f},{.2f,0,0}};
         filtered.trackStereo({},rigEyes,true,120,input);const auto smooth=filtered.resolve(9,moving,120);
-        expect(smooth.applied&&smooth.nativePose.position.x>0&&smooth.nativePose.position.x<.2f,
-            "Coco's cinematic follow filters shake while advancing toward the current shot");
+        expect(smooth.applied&&same(smooth.nativePose.position,moving.position),
+            "cinematic translation stays with its native shot while yaw uses comfort filtering");
         expect(std::abs(rotate(smooth.nativePose.orientation,{0,0,1}).x)<=.02401f,
             "cinematic camera heading obeys its turn-rate cap");
         filtered.trackStereo({},rigEyes,true,130,input);const auto cut=filtered.resolve(9,Pose{{},{8,0,0}},130);
@@ -2700,6 +2641,17 @@ int main(){
         input.cinematicFreeMove=false;input.cinematicMove={};
         filtered.trackStereo({},rigEyes,true,190,input);const auto returnedShot=filtered.resolve(9,stationaryShot,190);
         expect(returnedShot.applied&&same(returnedShot.nativePose.position,stationaryShot.position),"live cinematic movement toggle returns to the authored path");
+        // Native presentation reports scripted-demo instead of cabin here.
+        input.cabinPlay=false;
+        // A 30 m/s departure shot must not trail the helicopter by the
+        // translation filter's 250 ms time constant, even below the cut gate.
+        for(uint64_t t=200;t<=1200;t+=20){
+            const Pose departure{{},{8,0,float(t-190)*.03f}};
+            filtered.trackStereo({},rigEyes,true,t,input);
+            const auto cabinShot=filtered.resolve(9,departure,t);
+            expect(cabinShot.applied&&same(cabinShot.nativePose.position,departure.position),
+                "ACC departure retains exact moving shot translation without helicopter lag");
+        }
     }
     {
         HeadCamera title;title.configure(true);ControllerFrame input;input.frontEnd=true;input.referenceEpoch=1;
@@ -5790,6 +5742,11 @@ int main(){
         step(false,301);step(true,302);++owner.generation;
         expect(!step(true,303).held&&!step(true,304).held,
             "a new stationary action on the same player cannot inherit the previous emplacement grip");
+        step(false,305);hand.position={.2f,0,0};
+        expect(!step(true,306).held,"squeeze outside the mounted handle does not grab at a distance");
+        hand.position=contact.position;
+        expect(step(true,307).acquired,"fresh held squeeze acquires when approaching the native handle");
+        expect(!step(false,308).held,"releasing grip immediately frees the mounted hand");
         const auto yawAxes=mountedAimAxes({},Pose{{0,std::sin(.1f),0,std::cos(.1f)},{}});
         const auto pitchAxes=mountedAimAxes({},Pose{{-std::sin(.1f),0,0,std::cos(.1f)},{}});
         expect(yawAxes[0]<0&&near(yawAxes[1],0)&&pitchAxes[1]>0&&near(pitchAxes[0],0),

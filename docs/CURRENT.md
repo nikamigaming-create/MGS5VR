@@ -1,5 +1,51 @@
 # Current MGS5VR work — 26 October 2026
 
+### Sight alignment, mounted contact and ACC departure — 9 November 2026
+
+Incoming physical feedback: laser useful; scope/dot alignment difficult across sights;
+mounted hand steering reportedly reversed and stiff; ACC deployment view excessively
+far from the helicopter, beyond the expected exterior shot. Cover requested for review.
+
+This batch removes the independent scope-disc filter: glass, objective, housing and
+muzzle retain the completed weapon pose, with existing whole-weapon smoothing intact.
+The 1x collimator now projects its dot separately for each eye along the optic axis,
+instead of painting it at the glass centre. Native laser and magnified reticles remain.
+The old scope-filter setting is accepted for compatibility and labelled inactive.
+
+Mounted handles accept a fresh squeeze started just before contact; tracking loss,
+forced detachment and owner changes still require release. Mounted right hands bypass
+whole-weapon smoothing (the user's effective value was 100 ms), matching the unsmoothed
+left hand. Native yaw signs are unchanged: the full coordinate join and retained
+22 October native recordings do not establish an axis inversion. The reported reversal,
+all mounted types and physical grip/response remain unresolved acceptance items.
+
+Scripted cameras, including ACC departure, retain exact native translation rather
+than trailing through the 250 ms position filter; exterior shots and yaw comfort remain.
+Final review rejected an initial cabin-play condition: native demo ownership clears
+that flag. The corrected path and regression use the actual scripted-demo state.
+This repairs a source-demonstrable moving-shot lag, not a claim that the reported
+headset excursion has been reproduced or fully resolved. The new regression covers
+30 m/s motion below the camera-cut threshold.
+
+Cover audit: assistance defaults on; native wall attachment/exit and physical peek
+are implemented, with prior 26 October attachment/release evidence on its original
+build. Approach an eligible wall/sandbag with locomotion, lean physically to peek,
+and move away to leave; raising the weapon alone should not force the stock peek.
+No newly diagnosed cover defect or fresh cover acceptance is claimed.
+
+Checked development `8960a4e53751` is installed in Phantom Pain. All 59 CTest groups
+and installer checks passed, including actual D3D collimator pixels under eye motion,
+mounted approach/release and native scripted-shot translation. Build log:
+`artifacts/sights-mounted-acc-final-build.log`. The initial candidate passed tests but
+was superseded after the unreachable ACC flag condition was found in final review.
+
+No simulator loops or game sessions launched; no final-eye/headset acceptance added.
+Next: user's physical sight, turret, cover and ACC review; diagnose turret reversal
+on the actual affected emplacement before changing native yaw signs. Published play
+pin and personal settings remain unchanged. Outcome documentation is newer than the
+built source snapshot; no runtime source changed after the successful build.
+
+
 ### Ground Zeroes nightly publication - 27 October
 
 The user requested the current nightly with Ground Zeroes and the accumulated VR work. The batch includes GZ first-person stereo, tracked hands/aim, left-hand iDroid, forearm HUD, physical recon and production owned-asset setup, alongside the TPP/cabin and contact repairs. The existing GitHub nightly workflow builds and verifies committed main. Three hardware-only tests remain local; the complete local 59-group run passed before publication work.
