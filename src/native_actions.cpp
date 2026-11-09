@@ -1832,8 +1832,13 @@ void pump(void* state){
             &&std::memcmp(presentationValue,"sortie",6)==0);
         publishNativeProfileMenu(profileMenuActive&&!nativePopupActive);
         setTop(state,top);
-        const bool requested=openingCabinEnabled()&&nativeTitleMenuOpen()&&headCamera().status().active;
-        const std::string script=std::string("local requested=")+(requested?"true\n":"false\n")+std::string(nativeCabinScript);
+        // The widget can close while its native buddy block is still loading.
+        // Cabin scene ownership, not iDroid/title-widget visibility, drives the
+        // lifecycle. Lua retains an already accepted load through title exit.
+        const bool requested=openingCabinEnabled()&&(nativeTitleCabinMode()||nativeCabinPlay())
+            &&headCamera().status().active;
+        const std::string script=std::string("local requested=")+(requested?"true\n":"false\n")
+            +"local nativeDogPositioned="+(nativeCabinDogPositioned()?"true\n":"false\n")+std::string(nativeCabinScript);
         int status=load(state,script.data(),script.size(),"@mgs5vr-native-cabin");
         if(!status)status=original(state,0,1,0);
         size_t length{};const auto* value=getString(state,-1,&length);

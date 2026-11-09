@@ -171,6 +171,11 @@ try {
     foreach ($mgsName in $mgsCreated) { $mgsFiles[$mgsName] = (Get-FileHash -LiteralPath (Join-Path $mgsTarget $mgsName) -Algorithm SHA256).Hash }
     $mgsRecord = @{schema=1; product='MGS5VR theatre preview'; game_executable=[IO.Path]::GetFileName($mgsExe); game_sha256=$mgsHash; game_dir=$mgsTarget; installed_utc=[DateTime]::UtcNow.ToString('o'); files=$mgsFiles}
     [IO.File]::WriteAllText((Join-Path $mgsTarget 'mgs5vr-install.json'),($mgsRecord|ConvertTo-Json -Depth 5),[Text.UTF8Encoding]::new($false))
+    if ($mgsNativeAdapter) {
+        $mgsImporter = Join-Path $mgsRoot 'build\Release\mgs5vr_import.exe'
+        if (-not (Test-Path -LiteralPath $mgsImporter -PathType Leaf)) { $mgsImporter = Join-Path $mgsRoot 'mgs5vr_import.exe' }
+        & (Join-Path $PSScriptRoot 'install-cabin-actors.ps1') -GameDir $mgsTarget -Importer $mgsImporter
+    }
 } catch {
     foreach ($mgsName in $mgsCreated) {
         $mgsPath = Join-Path $mgsTarget $mgsName
@@ -179,7 +184,7 @@ try {
     throw
 }
 $mgsMode = if ($EnableHeadCameraExperiment) { 'tracked VR' } elseif ($EnableTheatrePreview) { 'large-screen preview' } else { 'disabled preview' }
-Write-Output "Installed MGS5VR ($mgsMode) into $mgsTarget. Game executable, archives and saves were not modified."
+Write-Output "Installed MGS5VR ($mgsMode) into $mgsTarget. Game executable and saves were not modified."
 if ($EnableHeadCameraExperiment) {
     Write-Output 'Launch the game and load Continue/Resume Game. Tracked VR enters automatically.'
 }

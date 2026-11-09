@@ -21,6 +21,8 @@ void publishAnimalHands(const HeadCameraSample& frame,const std::array<Pose,2>& 
 // Call only from the native Lua transaction, where buddy command responses
 // are available. Rechecks fresh XR ownership before consuming a hand frame.
 void consumeAnimalTouch();
+// Fresh native query, called only on the game's Lua transaction thread.
+bool nativeCabinDogPositioned();
 // Private native-action queue helpers; never synthesize player action buttons.
 std::string inspectAnimalTouch();
 std::string requestNativeDogResponse();

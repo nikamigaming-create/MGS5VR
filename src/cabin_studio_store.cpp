@@ -76,20 +76,25 @@ struct Store {
     std::mutex mutex;std::condition_variable wake;std::thread worker;bool stopping{};
     std::shared_ptr<const CabinStudioFrame> save;
     std::shared_ptr<StudioPhotoPixels> encode;
-    uint64_t encodeId{},savedRevision{};
+    uint64_t encodeId{},submittedRevision{},saveRetryAfter{};
     std::map<uint64_t,std::shared_ptr<const StudioPhotoPixels>> images;
+    std::map<uint64_t,uint64_t> imageRetryAfter;
     std::set<uint64_t> retainedImages;
     std::atomic_uint64_t completed{},accepted{};
     ComPtr<ID3D11Texture2D> pending;ComPtr<ID3D11Query> query;ComPtr<ID3D11Device> device;
     D3D11_TEXTURE2D_DESC desc{};uint64_t shutter{},queued{};bool armed{};
-    Store():worker([this]{
+    Store(){
+        // Construct every queue/cache/state member before the worker can
+        // evaluate its condition predicate or process a request.
+        worker=std::thread([this]{
         const auto com=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
         for(;;){
             std::shared_ptr<const CabinStudioFrame> state;std::shared_ptr<StudioPhotoPixels> photo;uint64_t id{};
             {std::unique_lock lock(mutex);wake.wait(lock,[&]{return stopping||save||encode;});
                 if(stopping&&!save&&!encode)break;state=std::move(save);photo=std::move(encode);id=encodeId;}
-            try{if(photo){encodePhoto(*photo,id);{std::lock_guard lock(mutex);images[id]=photo;retainedImages.insert(id);}completed.store(id);}
+            try{if(photo){encodePhoto(*photo,id);{std::lock_guard lock(mutex);images[id]=photo;imageRetryAfter.erase(id);retainedImages.insert(id);}completed.store(id);}
                 if(state){persist(*state);std::lock_guard lock(mutex);
+                    saveRetryAfter=0;
                     std::set<uint64_t> retained(state->photos.begin(),state->photos.end());
                     for(const auto& paper:state->papers)if(paper.photo)retained.insert(paper.photo);
                     uint64_t pendingPhoto{};std::ifstream receipt(directory/L"pending-photo.dat",std::ios::binary);
@@ -98,17 +103,27 @@ struct Store {
                     // collected. Printed copies keep their immutable pixels
                     // even after the digital library entry is deleted.
                     for(const auto old:retainedImages)if(!retained.contains(old)){
-                        std::filesystem::remove(photoPath(old));images.erase(old);
+                        std::filesystem::remove(photoPath(old));images.erase(old);imageRetryAfter.erase(old);
                     }
                     retainedImages=std::move(retained);
                     // A library can be much larger than the CPU image cache.
                     for(auto it=images.begin();it!=images.end();)if(images.size()>12&&it->first!=state->selectedPhoto
-                        &&it->first!=completed.load())it=images.erase(it);else ++it;
+                        &&it->first!=completed.load()){imageRetryAfter.erase(it->first);it=images.erase(it);}else ++it;
                 }
-            }catch(const std::exception& e){log(std::string("Cabin studio save failed: ")+e.what());}
+            }catch(const std::exception& e){
+                // Submission is not persistence. Permit the unchanged frame
+                // to retry after a transient write error, without dropping a
+                // newer frame queued while this one was being written.
+                if(state){std::lock_guard lock(mutex);
+                    if(submittedRevision==state->revision)submittedRevision=0;
+                    saveRetryAfter=GetTickCount64()+1000;
+                }
+                log(std::string("Cabin studio save failed: ")+e.what());
+            }
         }
         if(SUCCEEDED(com))CoUninitialize();
-    }){}
+        });
+    }
     ~Store(){stop();}
     void stop(){
         {std::lock_guard lock(mutex);stopping=true;}wake.notify_one();if(worker.joinable())worker.join();
@@ -170,8 +185,9 @@ StudioCollection loadCabinStudio(){
     return collection;
 }
 void saveCabinStudio(std::shared_ptr<const CabinStudioFrame> frame) noexcept{
-    try{auto& s=store();std::lock_guard lock(s.mutex);if(s.stopping||!frame||!frame->revision||frame->revision==s.savedRevision)return;
-        s.savedRevision=frame->revision;s.save=std::move(frame);s.wake.notify_one();}catch(...){}
+    try{auto& s=store();std::lock_guard lock(s.mutex);if(s.stopping||!frame||!frame->revision
+        ||frame->revision==s.submittedRevision||GetTickCount64()<s.saveRetryAfter)return;
+        s.submittedRevision=frame->revision;s.save=std::move(frame);s.wake.notify_one();}catch(...){}
 }
 uint64_t completedStudioPhoto() noexcept{return store().completed.load();}
 uint64_t acceptedStudioShutter() noexcept{return store().accepted.load();}
@@ -210,7 +226,12 @@ void pollStudioPhoto(ID3D11DeviceContext* context) noexcept{
     }catch(...){}
 }
 std::shared_ptr<const StudioPhotoPixels> studioPhotoPixels(uint64_t photo){
-    if(!photo||directory.empty())return {};auto& s=store();{std::lock_guard lock(s.mutex);if(const auto it=s.images.find(photo);it!=s.images.end())return it->second;}
+    if(!photo||directory.empty())return {};auto& s=store();{std::lock_guard lock(s.mutex);
+        if(const auto it=s.images.find(photo);it!=s.images.end()){
+            if(it->second||GetTickCount64()<s.imageRetryAfter[photo])return it->second;
+            s.images.erase(it);s.imageRetryAfter.erase(photo);
+        }
+    }
     const auto com=CoInitializeEx(nullptr,COINIT_MULTITHREADED);std::shared_ptr<StudioPhotoPixels> pixels;
     try{ComPtr<IWICImagingFactory> factory;checkHr(CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&factory)),"Studio photo load");
         ComPtr<IWICBitmapDecoder> decoder;checkHr(factory->CreateDecoderFromFilename(photoPath(photo).c_str(),nullptr,GENERIC_READ,WICDecodeMetadataCacheOnLoad,&decoder),"Studio PNG load");
@@ -221,7 +242,15 @@ std::shared_ptr<const StudioPhotoPixels> studioPhotoPixels(uint64_t photo){
         checkHr(converted->Initialize(frame.Get(),GUID_WICPixelFormat32bppBGRA,WICBitmapDitherTypeNone,nullptr,0,WICBitmapPaletteTypeCustom),"Studio PNG BGRA");
         checkHr(converted->CopyPixels(nullptr,pixels->width*4,static_cast<UINT>(pixels->bgra.size()*4),reinterpret_cast<BYTE*>(pixels->bgra.data())),"Studio PNG pixels");
     }catch(...){pixels.reset();}
-    if(SUCCEEDED(com))CoUninitialize();{std::lock_guard lock(s.mutex);s.images[photo]=pixels;}return pixels;
+    if(SUCCEEDED(com))CoUninitialize();{std::lock_guard lock(s.mutex);
+        // A missing/temporarily unreadable PNG must not remain gray for the
+        // rest of the session. Bound retries so an unavailable image does not
+        // open a decoder every rendered frame. Preserve a concurrently saved
+        // successful image instead of overwriting it with a failed read.
+        auto& cached=s.images[photo];if(pixels){cached=pixels;s.imageRetryAfter.erase(photo);}
+        else if(!cached)s.imageRetryAfter[photo]=GetTickCount64()+1000;
+        return cached;
+    }
 }
 void stopCabinStudioStore() noexcept{try{store().stop();}catch(...){}}
 }

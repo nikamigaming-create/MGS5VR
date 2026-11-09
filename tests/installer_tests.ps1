@@ -3,7 +3,8 @@ $ErrorActionPreference = 'Stop'
 Import-Module Microsoft.PowerShell.Utility
 Import-Module Microsoft.PowerShell.Management
 $mgsPackage = (Resolve-Path -LiteralPath $PackageRoot).Path
-$mgsFixtureRoot = Join-Path ([IO.Path]::GetTempPath()) ('mgs5vr-installer-test-' + [guid]::NewGuid().ToString('N'))
+$mgsFixtureParent = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\build'))
+$mgsFixtureRoot = Join-Path $mgsFixtureParent ('mgs5vr-installer-test-' + [guid]::NewGuid().ToString('N'))
 $mgsAllowedExes = @()
 $mgsRunning = $false
 $mgsFixtureAssetHashes = @{}
@@ -47,11 +48,51 @@ function Assert-Refused([scriptblock]$Action, [string]$Pattern) {
     Assert-Installer $mgsRejected "Expected refusal: $Pattern"
 }
 try {
+    # Exercise the real installer and archive transaction against authored
+    # fixture bytes. The native parser's exact executable/asset checks are
+    # tested separately; it must never accept these fake game files.
+    $mgsOriginalPackage=$mgsPackage
+    $mgsPackage=Join-Path $mgsFixtureRoot 'package'
+    [IO.Directory]::CreateDirectory((Join-Path $mgsPackage 'tools'))|Out-Null
+    foreach($mgsScript in @('setup.ps1','install.ps1','uninstall.ps1','install-cabin-actors.ps1','launcher-maintenance.ps1')) {
+        Copy-Item -LiteralPath (Join-Path $mgsOriginalPackage ('tools\'+$mgsScript)) -Destination (Join-Path $mgsPackage ('tools\'+$mgsScript))
+    }
+    foreach($mgsFile in @('dinput8.dll','mgs5vr_controls.exe')) {
+        $mgsSource=Join-Path $mgsOriginalPackage $mgsFile
+        if(-not (Test-Path -LiteralPath $mgsSource)){$mgsSource=Join-Path $mgsOriginalPackage ('build\Release\'+$mgsFile)}
+        Copy-Item -LiteralPath $mgsSource -Destination (Join-Path $mgsPackage $mgsFile)
+    }
+    foreach($mgsFile in @('mgs5vr.ini','mgs5vr-controls.ini')) {
+        $mgsSource=Join-Path $mgsOriginalPackage $mgsFile
+        if(-not (Test-Path -LiteralPath $mgsSource)){$mgsSource=Join-Path $mgsOriginalPackage ('config\'+$mgsFile)}
+        Copy-Item -LiteralPath $mgsSource -Destination (Join-Path $mgsPackage $mgsFile)
+    }
+    [IO.Directory]::CreateDirectory((Join-Path $mgsPackage 'assets'))|Out-Null
+    Copy-Item -LiteralPath (Join-Path $mgsOriginalPackage 'assets\controls') -Destination (Join-Path $mgsPackage 'assets') -Recurse
+    $mgsMockSource=Join-Path $mgsFixtureRoot 'fixture-importer.cs'
+    [IO.File]::WriteAllText($mgsMockSource,@'
+using System;
+using System.IO;
+class FixtureImporter {
+ static int Main(string[] args) {
+  if(args.Length!=3 || (args[0]!="--prepare-cabin" && args[0]!="--remove-cabin"))return 9;
+  string marker=Path.Combine(args[1],"mgsvtpp.exe");
+  if(File.ReadAllText(marker)!="Installer fixture only; not executable.")return 10;
+  File.WriteAllText(args[2],args[0]=="--prepare-cabin"?"augmented authored archive fixture":"original authored archive fixture");
+  return 0;
+ }
+}
+'@)
+    $mgsMockExe=Join-Path $mgsPackage 'mgs5vr_import.exe'
+    & (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe') /nologo /target:exe /platform:x64 ('/out:'+$mgsMockExe) $mgsMockSource
+    if($LASTEXITCODE -ne 0){throw 'Unable to compile authored installer dependency fixture.'}
     foreach ($mgsCase in @("Player's game [test]",'legacy','defaults','unsupported','running')) {
         $mgsCaseDir = Join-Path $mgsFixtureRoot $mgsCase
         New-Item -ItemType Directory -Path $mgsCaseDir | Out-Null
         $mgsCaseExe = Join-Path $mgsCaseDir 'mgsvtpp.exe'
         [IO.File]::WriteAllText($mgsCaseExe,'Installer fixture only; not executable.')
+        [IO.Directory]::CreateDirectory((Join-Path $mgsCaseDir 'master\0'))|Out-Null
+        [IO.File]::WriteAllText((Join-Path $mgsCaseDir 'master\0\00.dat'),'original authored archive fixture')
         if ($mgsCase -ne 'unsupported') { $mgsAllowedExes += $mgsCaseExe }
         if ($mgsCase -in @("Player's game [test]",'legacy')) {
             # Existing, unchanged local imports are reused, never claimed by
@@ -273,7 +314,7 @@ try {
     Write-Output "Installer checks passed on PowerShell $($PSVersionTable.PSVersion): setup, VR preset, unusual paths, modified-file protection, unsupported/running-game refusal, removal, launcher update/settings backup and failed-update rollback. File-picker UI was not automated."
 } finally {
     $mgsResolvedFixture = [IO.Path]::GetFullPath($mgsFixtureRoot)
-    $mgsTempParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
+    $mgsTempParent = $mgsFixtureParent.TrimEnd('\')
     if ((Split-Path -Parent $mgsResolvedFixture) -ne $mgsTempParent -or
         (Split-Path -Leaf $mgsResolvedFixture) -notmatch '^mgs5vr-installer-test-[a-f0-9]{32}$') {
         throw 'Refusing cleanup outside the unique installer fixture directory.'

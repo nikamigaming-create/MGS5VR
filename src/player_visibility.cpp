@@ -115,9 +115,13 @@ float actorCameraFade(void* owner,uint32_t index,void* character,const void* tra
     // Its camera-nearness query still receives the stock ACC camera even
     // though our cabin renderer uses the tracked VR view. iDroid temporarily
     // bypasses that query, which made the same dog appear only with it open.
-    // Join the existing native calculation to the view we actually render.
+    // The tracked-view correction alone still hides him at petting distance:
+    // this query fades within 1--1.5 m of three native dog bones. For the
+    // current interactive VR cabin owner, suppress ONLY that distance query.
+    // Native actor lifecycle, groups, publisher branches and smoothing remain
+    // authoritative; scripted/nonimmersive callers retain the original query.
     if(reinterpret_cast<uintptr_t>(_ReturnAddress())!=base+0xc5e99a||!camera
-        ||!mgs5vr::nativeCabinPlay())
+        ||(!mgs5vr::nativeCabinPlay()&&!mgs5vr::nativeTitleCabinMode()))
         return originalActorCameraFade(owner,index,character,transform,camera,inner,outer);
     const auto registry=get<uintptr_t>(base+0x2c389a0);
     const auto registration=get<uintptr_t>(registry+0x30+19*8);
@@ -139,24 +143,25 @@ float actorCameraFade(void* owner,uint32_t index,void* character,const void* tra
         ||get<uintptr_t>(pool+0xa0)!=reinterpret_cast<uintptr_t>(character))
         return originalActorCameraFade(owner,index,character,transform,camera,inner,outer);
     const auto frame=mgs5vr::headCamera().publishedRigFrame(mgs5vr::steadyMilliseconds());
-    if(frame&&frame->applied&&frame->controllers.cabinPlay){
+    if(frame&&frame->applied){
         const auto component=get<uintptr_t>(body+0x10);
         const auto model=get<uintptr_t>(get<uintptr_t>(component+0x10)+0x68);
         if(get<uintptr_t>(component)==base+0x22e6070&&get<uintptr_t>(model)==base+0x20f4d90
-            &&get<uint64_t>(model+0x120)==0x84a0e671b02ebb56ull){
-            const auto position=frame->nativePose.position;
-            const FadePoint tracked{position.x,position.y,position.z,camera->w};
-            const auto alpha=originalActorCameraFade(owner,index,character,transform,&tracked,inner,outer);
+            &&mgs5vr::suppressCabinDogCameraNearFade({get<uint64_t>(model+0x120),
+                frame->applied&&frame->controllers.presentationFocused,frame->controllers.cabinPlay,
+                frame->controllers.frontEnd,frame->controllers.authoredCamera,
+                frame->controllers.scriptedDemo||mgs5vr::nativeScriptedDemoActive(),
+                frame->controllers.nativeGamepad||mgs5vr::nativeGamepadActive(),
+                mgs5vr::nativeTitleCabinMode(),frame->controllers.openingBackend,
+                frame->controllers.openingSelector,frame->controllers.openingNativeMenu,
+                frame->controllers.loading,frame->controllers.avatarEditor})){
             static std::atomic_bool reported{};
             if(!reported.exchange(true)){
-                std::ostringstream out;out<<"Cabin D-Dog camera fade uses tracked view: native="
-                    <<camera->x<<','<<camera->y<<','<<camera->z<<" tracked="
-                    <<tracked.x<<','<<tracked.y<<','<<tracked.z<<" preceding_alpha="
-                    <<get<float>(model+0x1b8)
-                    <<" tracked_alpha="<<alpha;
+                std::ostringstream out;out<<"Interactive VR cabin D-Dog proximity fade suppressed: native_inner="
+                    <<inner<<" native_outer="<<outer<<" preceding_alpha="<<get<float>(model+0x1b8);
                 mgs5vr::log(out.str());
             }
-            return alpha;
+            return 1.f;
         }
     }
     return originalActorCameraFade(owner,index,character,transform,camera,inner,outer);

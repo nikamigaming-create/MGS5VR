@@ -82,7 +82,7 @@ def inspect_physical_grips(live, policy, anchor, output, result):
             if state['rendered'].get('mounted_weapon_hands')==mask:return state
             if time.monotonic()>=until:raise BotFault('Physical grip did not acquire the native handle')
             time.sleep(.025)
-    def place(side,contact,degrees=0.,axis='yaw'):
+    def place(side,contact,degrees=0.,axis='yaw',offset=None):
         grip=live.text_result(live.call('get_controller_pose',{'hand':side,'pose_type':'grip','base_space':'local'}))['pose']
         aim=live.text_result(live.call('get_controller_pose',{'hand':side,'pose_type':'aim','base_space':'local'}))['pose']
         pair=controller_pair(grip,aim);half=math.radians(degrees)/2
@@ -95,12 +95,65 @@ def inspect_physical_grips(live, policy, anchor, output, result):
         rotation=[v*math.sin(half) for v in direction]+[math.cos(half)]
         attitude=mul(rotation,contact['orientation'])
         aim_attitude=mul(attitude,inverse(pair['orientation']))
-        for kind,point,q in (('grip',contact['position'],attitude),
-                            ('aim',paired_aim_position(contact['position'],aim_attitude,pair),aim_attitude)):
+        position=[v+d for v,d in zip(contact['position'],offset or [0.,0.,0.])]
+        for kind,point,q in (('grip',position,attitude),
+                            ('aim',paired_aim_position(position,aim_attitude,pair),aim_attitude)):
             live.call('set_controller_pose',{'hand':side,'pose_type':kind,'base_space':'local',
                 'position':point,'orientation':q})
     def yaw(pose):
         f=rotate(pose['orientation'],[0.,0.,1.]);return math.degrees(math.atan2(f[0],f[2]))
+    # Diagnose the reported translation reversal separately from wrist turn.
+    # Every sign starts with a released hand at the fresh authored contact, so
+    # the opposite sign also proves ordinary station re-grab without exiting.
+    for side,mask in (('right',2),('left',1)):
+        for direction in (1.,-1.):
+            row={'hand':side,'axis':'spatial_right' if direction>0 else 'spatial_left',
+                 'translation_metres':.05,'samples':[]};checks.append(row)
+            atomic_json(output/'progress.json',result)
+            try:
+                live.release();released=wait_grip(0)
+                if released['controls']['native_axes'][2:]!=[0,0]:
+                    raise BotFault('Released spatial handle retained native aiming input')
+                contact=released['rendered']['mounted_'+side+'_grip']
+                place(side,contact);time.sleep(.12)
+                live.input([channel(side+'_grip')],5.,lease_seconds=5.)
+                before=wait_grip(mask);row['before']=before
+                time.sleep(.12);settled=sample(mask);row['regrab_settled']=settled
+                jump=(settled['native']['player_camera_yaw']-before['native']['player_camera_yaw']+180.)%360.-180.
+                if abs(jump)>1. or settled['rendered']['mounted_weapon_axes']!=[0,0]:
+                    raise BotFault('Re-grabbing the native handle turned the gun before hand movement')
+                frame=settled['rendered'];bearing=math.radians(settled['native']['player_camera_yaw'])
+                to_local=mul(frame['head_pose']['orientation'],mul([0.,1.,0.,0.],inverse(frame['native_pose']['orientation'])))
+                # Native +Z forward has screen-right -X; preserve that vector
+                # through the same native->XR join as the actual grip adapter.
+                right=rotate(to_local,[-math.cos(bearing),0.,math.sin(bearing)])
+                row['local_offset']=[direction*.05*v for v in right]
+                place(side,contact,offset=row['local_offset'])
+                until=time.monotonic()+2.2;neutral_samples=0
+                while time.monotonic()<until:
+                    state=sample(mask);row['samples'].append(state)
+                    change=(state['native']['player_camera_yaw']-settled['native']['player_camera_yaw']+180.)%360.-180.
+                    # Positive viewed-right displacement requests negative
+                    # native yaw. Assert the observed bearing, not dispatch.
+                    signed=-direction*change
+                    if signed < -1.:
+                        raise BotFault('Spatial handle movement turned the native gun in the opposite direction')
+                    neutral_samples=neutral_samples+1 if signed>2. and state['rendered']['mounted_weapon_axes']==[0,0] else 0
+                    if neutral_samples>=3:break
+                    time.sleep(.025)
+                viewer=(yaw(state['rendered']['native_pose'])-yaw(settled['rendered']['native_pose'])+180.)%360.-180.
+                row.update(after=state,native_yaw_delta=change,viewer_yaw_delta=viewer)
+                if not 2.<signed<20. or abs(viewer)>1. or neutral_samples<3:
+                    raise BotFault('Spatial handle did not reach and stop at the requested native bearing independently of the viewer')
+                row['eyes']=live.capture('mounted-'+side+'-'+row['axis'],static_grips=True)
+            except Exception as error:
+                row['error']=str(error);raise
+            finally:
+                live.release();atomic_json(output/'progress.json',result)
+            row['released']=wait_grip(0)
+            if row['released']['controls']['native_axes'][2:]!=[0,0]:
+                raise BotFault('Spatial handle release left native steering active')
+            atomic_json(output/'progress.json',result)
     for side,mask,axis in (('right',2,'yaw'),('left',1,'yaw'),('right',2,'pitch'),('left',1,'pitch')):
         live.release();state=sample();contact=state['rendered']['mounted_'+side+'_grip']
         place(side,contact);time.sleep(.12)

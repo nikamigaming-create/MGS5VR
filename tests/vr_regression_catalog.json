@@ -136,17 +136,17 @@
     "runtime": 6,
     "tooling": 5,
     "baseline_ctest_groups": 42,
-    "current_ctest_groups": 59,
+    "current_ctest_groups": 62,
     "public_native_fixture_files": 20,
-    "features_with_registered_automated_tests": 45,
+    "features_with_registered_automated_tests": 46,
     "features_with_auxiliary_tests_only": 1,
-    "features_without_automated_tests": 2,
+    "features_without_automated_tests": 1,
     "features_with_public_native_fixtures": 13,
     "current_candidate_continuous_passes": 0,
     "current_candidate_headset_passes": 0,
     "automated": {
-      "partial": 46,
-      "none": 2
+      "partial": 47,
+      "none": 1
     },
     "native": {
       "retained_scoped": 30,
@@ -788,13 +788,15 @@
       "automated_tests": [
         "contracts",
         "gameplay_bot_session_contracts",
-        "gameplay_bot_contracts"
+        "gameplay_bot_contracts",
+        "cabin_studio_storage_recovery"
       ],
       "test_sources": [
         "tests/core_tests.cpp",
         "tests/gameplay_bot_session_tests.py",
         "tests/gameplay_bot_tests.py",
-        "tests/native_cabin_tests.lua"
+        "tests/native_cabin_tests.lua",
+        "tests/cabin_studio_store_tests.cpp"
       ],
       "auxiliary_tests": [
         "tests/native_cabin_tests.lua"
@@ -3546,10 +3548,11 @@
       "source_paths": [
         "src/small_animal.cpp",
         "include/mgs5vr/small_animal.hpp",
+        "include/mgs5vr/cabin_rat_realization.hpp",
         "src/native_cabin.lua"
       ],
-      "automated_tests": [],
-      "test_sources": [],
+      "automated_tests": ["contracts"],
+      "test_sources": ["tests/core_tests.cpp"],
       "auxiliary_tests": [],
       "native_fixtures": [],
       "evidence_sources": [
@@ -3561,8 +3564,8 @@
       ],
       "coverage": {
         "automated": {
-          "status": "none",
-          "scope": "No dedicated automated pickup/release regression was identified in the 41 registered groups."
+          "status": "partial",
+          "scope": "Contracts cover bounded cabin selector ownership, native restrictions and candidate ranking. Native realization, visible pickup and release are not exercised by these isolated checks."
         },
         "native": {
           "status": "unverified",
@@ -4325,13 +4328,17 @@
       "kind": "tooling",
       "source_paths": [
         "tools/import-owned-assets.cs",
-        "tools/setup.ps1"
+        "tools/setup.ps1",
+        "tools/import-cabin-actors.cs",
+        "tools/cabin-actor-data.cs"
       ],
       "automated_tests": [
-        "owned_asset_importer"
+        "owned_asset_importer",
+        "native_cabin_importer"
       ],
       "test_sources": [
-        "tools/import-owned-assets.cs"
+        "tools/import-owned-assets.cs",
+        "tools/import-cabin-actors.cs"
       ],
       "auxiliary_tests": [],
       "native_fixtures": [],
@@ -4394,17 +4401,20 @@
         "tools/install.ps1",
         "tools/uninstall.ps1",
         "tools/workspace.py",
-        "tools/package-release.py"
+        "tools/package-release.py",
+        "tools/install-cabin-actors.ps1"
       ],
       "automated_tests": [
         "installer_safety",
         "workspace_transactions",
-        "vr_regression_catalog"
+        "vr_regression_catalog",
+        "native_cabin_installer"
       ],
       "test_sources": [
         "tests/installer_tests.ps1",
         "tests/workspace_tests.py",
-        "tests/regression_catalog_tests.py"
+        "tests/regression_catalog_tests.py",
+        "tests/cabin_installer_tests.ps1"
       ],
       "auxiliary_tests": [],
       "native_fixtures": [],
@@ -4989,7 +4999,10 @@
     "gameplay_menu_variant_contracts",
     "headset_controls_editor",
     "gameplay_bot_showcase_contracts",
-    "body_gear_contact"
+    "body_gear_contact",
+    "cabin_studio_storage_recovery",
+    "native_cabin_importer",
+    "native_cabin_installer"
   ],
   "source_inventory_rule": "Every current file under src/ and include/ must have at least one feature source_paths reference. Public source additions/deletions require explicit catalog review.",
   "current_user_reports": [

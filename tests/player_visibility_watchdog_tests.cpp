@@ -2,6 +2,72 @@
 #include "mgs5vr/paused_rig.hpp"
 #include <stdexcept>
 
+// The owned adult D-Dog body variants use distinct resource identities.
+// main3 was observed at native alpha .01 despite a valid live dog owner;
+// main4 was the sole previously admitted outfit. Puppies/other actors remain
+// outside this verified adult-buddy publisher path.
+static_assert(mgs5vr::cabinDogCameraResource(0x84a2627e55f4658dull)); // main3, reproduced failure
+static_assert(mgs5vr::cabinDogCameraResource(0x84a0e671b02ebb56ull)); // main4, prior accepted resource
+static_assert(mgs5vr::cabinDogCameraResource(0x84a0d026d7938ff5ull)); // main0
+static_assert(mgs5vr::cabinDogCameraResource(0x84a1d561958eb109ull)); // main1
+static_assert(mgs5vr::cabinDogCameraResource(0x84a03f16dbbc41b6ull)); // main2
+static_assert(!mgs5vr::cabinDogCameraResource(0x84a23d954f15159eull)); // puppy
+static_assert(!mgs5vr::cabinDogCameraResource(0x84a3894e7b2bce61ull)); // puppy low-detail
+static_assert(!mgs5vr::cabinDogCameraResource(0x84a1add434a40c96ull)); // unrelated dog
+static_assert(!mgs5vr::cabinDogCameraResource(0));
+static_assert(!mgs5vr::cabinDogCameraResource(0x84a2627e55f4658cull));
+
+constexpr bool dogProximityPolicyIsCabinInteractionOnly(){
+    const mgs5vr::CabinDogCameraContext active{0x84a2627e55f4658dull,true,true,false,false,false,false};
+    if(!mgs5vr::suppressCabinDogCameraNearFade(active))return false;
+    // Every exclusion independently restores native distance policy. A
+    // current frame is supplied only by the existing fresh owner/epoch join.
+    auto excluded=active;excluded.currentImmersiveFrame=false;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=active;excluded.cabinPlay=false;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=active;excluded.frontEnd=true;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=active;excluded.authoredCamera=true;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=active;excluded.scriptedDemo=true;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=active;excluded.nativeGamepad=true;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    for(const auto resource:{0ull,0x84a23d954f15159eull,0x84a1add434a40c96ull,0x84a2627e55f4658cull}){
+        excluded=active;excluded.resource=resource;
+        if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    }
+    return true;
+}
+static_assert(dogProximityPolicyIsCabinInteractionOnly());
+constexpr bool dogProximityPolicyAdmitsOnlyInteractiveTitle(){
+    mgs5vr::CabinDogCameraContext title{0x84a2627e55f4658dull,true,false,true,false,false,false};
+    title.nativeTitleCabin=title.openingBackend=title.openingSelector=true;
+    if(!mgs5vr::suppressCabinDogCameraNearFade(title))return false;
+    auto excluded=title;excluded.nativeTitleCabin=false;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=title;excluded.openingBackend=false;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=title;excluded.openingSelector=false;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=title;excluded.openingNativeMenu=true;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=title;excluded.loading=true;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=title;excluded.avatarEditor=true;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=title;excluded.currentImmersiveFrame=false;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=title;excluded.authoredCamera=true;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=title;excluded.scriptedDemo=true;
+    if(mgs5vr::suppressCabinDogCameraNearFade(excluded))return false;
+    excluded=title;excluded.nativeGamepad=true;
+    return !mgs5vr::suppressCabinDogCameraNearFade(excluded);
+}
+static_assert(dogProximityPolicyAdmitsOnlyInteractiveTitle());
+
 static_assert(!mgs5vr::shouldRestoreStalePlayerVisibility(249, false, false, false));
 static_assert(mgs5vr::shouldRestoreStalePlayerVisibility(250, false, false, false));
 static_assert(mgs5vr::shouldRestoreStalePlayerVisibility(500, false, false, true));

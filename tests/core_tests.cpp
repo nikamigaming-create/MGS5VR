@@ -1,6 +1,7 @@
 #include "mgs5vr/core.hpp"
 #include "mgs5vr/mounted_grip.hpp"
 #include "mgs5vr/cabin_walk.hpp"
+#include "mgs5vr/cabin_rat_realization.hpp"
 #include "mgs5vr/arm_ik.hpp"
 #include "mgs5vr/forearm_crop.hpp"
 #include "mgs5vr/input_bridge.hpp"
@@ -43,6 +44,84 @@ static void expect(bool ok,const char* name){++checks;if(!ok){++failures;std::ce
 static bool near(float a,float b){return std::abs(a-b)<0.0001f;}
 static bool same(Vec3 a,Vec3 b){return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z);}
 int main(){
+    {
+        CabinRatSelectionContext c;
+        c.freshFrame=c.ownedSelector=c.nativeCabin=c.cabinPlay=true;
+        c.logicalCount=c.capacity=2;c.bounds={true,{}, {-2,-1,-2},{2,2,2},1};c.head={0,1,0};
+        expect(cabinRatContactContains(c.bounds,{0,-1,0}),"Native rat feet may contact the sampled cabin floor");
+        expect(cabinRatContactContains(c.bounds,{0,-1.004f,0}),"Native rat floor solve tolerates observed four millimetre ray difference");
+        expect(!cabinRatContactContains(c.bounds,{0,-1.011f,0}),"Rat contact cannot pass below the bounded floor tolerance");
+        expect(cabinRatContactContains(c.bounds,{2.003f,-1,0}),"Native rat may walk beyond a single side-ray sample");
+        expect(cabinRatContactContains(c.bounds,{0,-1,2.003f}),"Native rat may walk beyond a single end-ray sample");
+        expect(!cabinRatContactContains(c.bounds,{0,1.98f,0}),"Floor admission retains native ceiling clearance");
+        const Vec3 nativeFoot{-.2460686f,1197.3001709f,-.7135813f};
+        const Vec3 nativeCenter{-.2460686f,1197.5001221f,-.7135813f};
+        const Vec3 liftedFoot{.10f,1197.7f,-.30f};
+        const auto liftedCenter=translatedRatLogicalPosition(nativeCenter,nativeFoot,liftedFoot);
+        expect(near(liftedCenter.y-liftedFoot.y,nativeCenter.y-nativeFoot.y),
+            "Carrying native rat preserves measured simulation-center to foot offset");
+        expect(same(translatedRatLogicalPosition(liftedCenter,liftedFoot,nativeFoot),nativeCenter),
+            "Native rat lowering restores center above floor rather than burying it at the feet");
+        const Vec3 animatedFoot=nativeFoot+Vec3{0,.03f,0};
+        const auto afterAnimation=translatedRatLogicalPosition(nativeCenter,animatedFoot,liftedFoot);
+        expect(near(afterAnimation.y-liftedFoot.y,nativeCenter.y-animatedFoot.y),
+            "Rat carry uses fresh native root animation instead of a fixed guessed center offset");
+        const std::array<CabinRatCandidate,2> rats{{
+            {0x4917765c,0xfb33a487,{-.35f,0,-.5f},2,true,true,true},
+            {0xcef22f3b,0x86358b80,{.35f,0,-.45f},1,true,true,true}}};
+        const auto selected=cabinRatSelection(c,rats);
+        expect(selected&&selected->count==2&&selected->indices==std::array<uint16_t,2>{1,0},"Cabin rats retain native nearest-first selection");
+        auto measured=c;measured.bounds={true,{{0,.371772f,0,.928324f},{.213f,1198.17f,.106f}},
+            {-1.42253f,-.865845f,-1.61693f},{.952127f,.505249f,.915993f},1};
+        measured.head=measured.bounds.origin.position;
+        auto walking=rats;walking[0].position={-.3909983f,1197.500122f,-.82595f};
+        walking[1].position={.757900536f,1197.500122f,-.70585686f};
+        expect(!nativeRoomContains(measured.bounds,nativeRoomLocal(measured.bounds,walking[1].position)),
+            "Retained native rat position reproduces rejection at sampled cabin corner");
+        const auto atCorner=cabinRatSelection(measured,walking);
+        expect(atCorner&&atCorner->count==2&&cabinRatContactContains(measured.bounds,{.757900536f,1197.300171f,-.70585686f}),
+            "Both native rats remain available at the measured rotated cabin corner");
+        auto title=c;title.nativeCabin=title.cabinPlay=false;title.nativeTitle=title.frontEnd=title.openingBackend=title.openingSelector=true;
+        expect(cabinRatSelection(title,rats).has_value(),"Physical title cabin admits genuine rats without cabinPlay");
+        for(auto flag:{&CabinRatSelectionContext::freshFrame,&CabinRatSelectionContext::ownedSelector}){
+            auto bad=c;bad.*flag=false;expect(!cabinRatSelection(bad,rats),"Missing current frame or native ownership preserves selector result");
+        }
+        for(auto flag:{&CabinRatSelectionContext::loading,&CabinRatSelectionContext::avatarEditor,
+            &CabinRatSelectionContext::authoredCamera,&CabinRatSelectionContext::scriptedDemo,
+            &CabinRatSelectionContext::nativeGamepad,&CabinRatSelectionContext::nativeStopped}){
+            auto bad=c;bad.*flag=true;expect(!cabinRatSelection(bad,rats),"Native presentation or stop restriction is preserved");
+        }
+        for(auto flag:{&CabinRatSelectionContext::nativeTitle,&CabinRatSelectionContext::openingBackend,&CabinRatSelectionContext::openingSelector}){
+            auto bad=title;bad.*flag=false;expect(!cabinRatSelection(bad,rats),"Title fallback requires complete physical opening ownership");
+        }
+        title.openingNativeMenu=true;expect(!cabinRatSelection(title,rats),"Native title menu leaves selector unchanged");
+        auto bad=c;bad.nativeCabin=false;expect(!cabinRatSelection(bad,rats),"Field scene never receives cabin fallback");
+        bad=c;bad.nativeCount=1;expect(!cabinRatSelection(bad,rats),"Existing native selection is never displaced or duplicated");
+        bad=c;bad.capacity=1;expect(!cabinRatSelection(bad,rats),"Insufficient native output capacity is preserved");
+        bad=c;bad.logicalCount=3;expect(!cabinRatSelection(bad,rats),"A different native locator count is not owned");
+        bad=c;bad.bounds.sceneGeneration=0;expect(!cabinRatSelection(bad,rats),"Missing collision generation fails closed");
+        bad=c;bad.head={0,7,0};expect(!cabinRatSelection(bad,rats),"Cabin fallback is bounded to six metres from current head");
+        for(size_t i=0;i<2;++i){
+            for(auto flag:{&CabinRatCandidate::enabled,&CabinRatCandidate::nativeEligible,&CabinRatCandidate::outsideNativeGrid}){
+                auto rejected=rats;rejected[i].*flag=false;const auto survivor=cabinRatSelection(c,rejected);
+                expect(survivor&&survivor->count==1&&survivor->indices[0]==1-i,"A restricted rat does not suppress its eligible native sibling");
+            }
+            auto rejected=rats;rejected[i].locator^=1;expect(!cabinRatSelection(c,rejected),"Wrong locator cannot inherit cabin ownership");
+            rejected=rats;rejected[i].route^=1;expect(!cabinRatSelection(c,rejected),"Wrong route cannot inherit cabin ownership");
+            rejected=rats;rejected[i].position.x=2.003f;const auto corner=cabinRatSelection(c,rejected);
+            expect(corner&&corner->count==2,"Native walking rat is not stranded at a sampled horizontal edge");
+            rejected=rats;rejected[i].position.y=-1.1f;const auto below=cabinRatSelection(c,rejected);
+            expect(below&&below->count==1&&below->indices[0]==1-i,"Rat below sampled floor context is rejected independently");
+            rejected=rats;rejected[i].position.y=2.1f;const auto above=cabinRatSelection(c,rejected);
+            expect(above&&above->count==1&&above->indices[0]==1-i,"Rat above sampled ceiling context is rejected independently");
+            rejected=rats;rejected[i].position.x=6.1f;const auto distant=cabinRatSelection(c,rejected);
+            expect(distant&&distant->count==1&&distant->indices[0]==1-i,"Rat beyond local six-metre ownership range is rejected independently");
+            rejected=rats;rejected[i].nativeDistanceSquared=std::numeric_limits<float>::quiet_NaN();
+            const auto finite=cabinRatSelection(c,rejected);
+            expect(finite&&finite->count==1&&finite->indices[0]==1-i,"Nonfinite native ranking fails closed for that rat");
+        }
+        auto duplicate=rats;duplicate[1]=duplicate[0];expect(!cabinRatSelection(c,duplicate),"Duplicate locator is not two owned rats");
+    }
     {
         constexpr uintptr_t base=0x100000000,system=0x1000,pause=0x2000,ui=0x3000,terminal=0x4000;
         std::unordered_map<uintptr_t,unsigned char> memory;
@@ -2705,6 +2784,83 @@ int main(){
             "AvatarEdit hands its retained hospital view to the next authored cutscene camera");
     }
     {
+        // A constrained tape must not turn collision/slot correction into a
+        // throw. Use raw hand displacement, with a new baseline after gaps.
+        for(size_t side=0;side<2;++side){
+            CabinProps props;std::array<CabinHand,2> hands{};
+            hands[side].tracked=true;
+            auto frame=props.update(hands,100);
+            hands[side].pose=frame.tapes[0].pose;hands[side].grip=1;
+            frame=props.update(hands,110);
+            expect(frame.tapes[0].hand==int(side),"Either hand picks up the cassette before constrained-motion review");
+            hands[side].pose.position.y-=.05f;
+            props.update(hands,120);frame=props.update(hands,130);
+            expect(same(frame.tapes[0].velocity,{})&&same(frame.tapes[0].angularVelocity,{}),
+                "Stationary constrained cassette cannot acquire collision-generated throwing velocity");
+            hands[side].pose.position.y+=.3f;
+            frame=props.update(hands,400);
+            expect(same(frame.tapes[0].velocity,{})&&same(frame.tapes[0].angularVelocity,{}),
+                "A cassette pose after a publication gap starts without a stale throw");
+            hands[side].tracked=false;frame=props.update(hands,410);
+            expect(frame.tapes[0].hand<0,"Lost tracking releases the cassette");
+            hands[side].tracked=true;hands[side].pose=frame.tapes[0].pose;
+            frame=props.update(hands,420);
+            expect(frame.tapes[0].hand<0,"Held grip after tracking recovery cannot snatch the cassette again");
+            hands[side].grip=0;props.update(hands,430);
+            hands[side].grip=1;frame=props.update(hands,440);
+            expect(frame.tapes[0].hand==int(side),"Tracked release rearms cassette pickup after recovery");
+        }
+    }
+    for(float quaternionScale:{1.f,1.0004f,.9996f}){
+        CabinProps props;std::array<CabinHand,2> idle{};CabinBenchFrame frame;
+        auto layout=cabinDefaultLayout();
+        layout.room.orientation.y*=quaternionScale;layout.room.orientation.w*=quaternionScale;
+        expect(valid(layout.room),"Idle cassette regression uses a tolerance-valid native room rotation");
+        for(uint64_t t=100;t<=2100;t+=10)frame=props.update(idle,t,layout);
+        const auto settled=frame.tapes;
+        for(uint64_t t=2110;t<=12100;t+=10)frame=props.update(idle,t,layout);
+        for(size_t i=0;i<frame.tapes.size();++i){
+            expect(valid(frame.tapes[i].pose)&&same(frame.tapes[i].pose.position,settled[i].pose.position)
+                &&same(frame.tapes[i].velocity,{})&&same(frame.tapes[i].angularVelocity,{}),
+                "All six untouched cassettes remain rigid and settled without accumulating contact energy");
+        }
+    }
+    {
+        CabinProps props;std::array<CabinHand,2> hands{};
+        for(auto& hand:hands)hand.tracked=true;
+        auto frame=props.update(hands,100);
+        hands[0].pose=frame.tapes[0].pose;hands[0].grip=1;
+        hands[1].pose=frame.tapes[1].pose;hands[1].grip=1;
+        props.update(hands,110);
+        // Press the held cassette into the native cushion, then place a
+        // second cassette directly above it. The stationary lower hand
+        // supplies contact support, never an artificial prop-launch impulse.
+        hands[0].pose.position.y-=.05f;frame=props.update(hands,120);
+        hands[1].pose=frame.tapes[0].pose;hands[1].pose.position.y+=2*cabinTapeHalf.z+.001f;
+        props.update(hands,130);props.update(hands,140);
+        hands[1].grip=0;frame=props.update(hands,150);
+        const auto start=frame.tapes[1].pose.position;
+        float highest=start.y,fastest=0;
+        for(uint64_t t=160;t<=1150;t+=10){
+            frame=props.update(hands,t);highest=std::max(highest,frame.tapes[1].pose.position.y);
+            fastest=std::max(fastest,std::sqrt(dot(frame.tapes[1].velocity,frame.tapes[1].velocity)));
+        }
+        expect(highest-start.y<.015f&&fastest<.3f,
+            "Stationary constrained cassette cannot launch its supported neighbour through restitution");
+    }
+    {
+        CabinProps props;std::array<CabinHand,2> hands{};hands[1].tracked=true;
+        auto frame=props.update(hands,100);hands[1].pose=frame.tapes[0].pose;hands[1].grip=1;
+        props.update(hands,110);hands[1].pose.position.y+=.2f;props.update(hands,120);
+        props.update(hands,130);
+        hands[1].pose.position.x+=.08f;frame=props.update(hands,230);
+        expect(near(frame.tapes[0].velocity.x,.8f),
+            "Cassette hand velocity uses the real 100 ms sample interval instead of bounded physics dt");
+        hands[1].pose.position.x+=.008f;hands[1].grip=0;frame=props.update(hands,240);
+        expect(frame.tapes[0].hand<0&&frame.tapes[0].velocity.x>.7f,
+            "A deliberate tracked cassette throw keeps its real hand momentum");
+    }
+    {
         CabinProps props;std::array<CabinHand,2> hands{};
         hands[1].tracked=true;
         auto tick=[&](uint64_t t){return props.update(hands,t);};
@@ -2778,6 +2934,22 @@ int main(){
         bool blocked=false;
         for(uint64_t time=300;time<=700;time+=50){frame=unknown.update(true,true,false,titleHead,hands,time);blocked|=frame.blocked;expect(frame.pulse==OpeningPulse::none,"Unknown native focus never receives confirmation");}
         expect(blocked,"Insertion reports unavailable native focus instead of guessing its action");
+    }
+    for(size_t side=0;side<2;++side)for(bool trackedRelease:{false,true}){
+        CabinStudio studio;StudioPaper paper{};paper.id=701;
+        paper.pose=compose(cabinNativeBoard,Pose{{},{0,0,.003f}});
+        paper.pinned=true;paper.ink=std::make_shared<const StudioInk>();
+        studio.restore(std::vector<StudioPaper>{paper});
+        std::array<StudioHand,2> hands{};hands[side].tracked=true;
+        studio.update(true,true,Pose{},Pose{},hands,100);
+        hands[side].grip=paper.pose;hands[side].squeeze=1;
+        auto frame=studio.update(true,true,Pose{},Pose{},hands,110);
+        expect(frame->papers[0].hand==int(side)&&!frame->papers[0].pinned,
+            "Either hand lifts a pinned note before board-release review");
+        hands[side].tracked=trackedRelease;hands[side].squeeze=trackedRelease?0.f:1.f;
+        frame=studio.update(true,true,Pose{},Pose{},hands,120);
+        expect(frame->papers[0].hand<0&&frame->papers[0].pinned==trackedRelease,
+            "Only a deliberate tracked release pins paper; lost tracking at the board does not");
     }
     {
         const Pose pelvis{{0,.38268343f,0,.92387953f},{.5f,.9f,-.5f}};
@@ -2855,6 +3027,44 @@ int main(){
             const auto floor=cabinNativeSupportHeight(dropped->marker.position);
             expect(dropped->markerHand<0&&std::min(tip.y,tail.y)>=floor-.0001f,
                 "a vertically released marker rests on its endpoint instead of penetrating the cabin support");
+        }
+        // Moving studio props must not inherit stale hand velocity on an
+        // occlusion, nor inflate a real throw when the physics step is capped.
+        for(int kind=0;kind<3;++kind)for(size_t side=0;side<2;++side){
+            for(bool loseTracking:{false,true}){
+                CabinStudio props;std::array<StudioHand,2> input{};
+                const Vec3 home=kind==0?studioCameraHome:kind==1?studioMarkerHome:Vec3{.1f,-1.6f,-.8f};
+                if(kind==2){StudioPaper paper{};paper.id=71;paper.pose={{},home};
+                    paper.ink=std::make_shared<const StudioInk>();props.restore({paper});}
+                const auto pose=[&](const CabinStudioFrame& f){return kind==0?f.camera:kind==1?f.marker:f.papers[0].pose;};
+                const auto held=[&](const CabinStudioFrame& f){return kind==0?f.cameraHand:kind==1?f.markerHand:f.papers[0].hand;};
+                input[side].tracked=true;input[side].grip.position=home;
+                auto f=props.update(true,true,{}, {},input,100);
+                if(kind==2)input[side].grip.position=f->papers[0].pose.position;
+                input[side].squeeze=1;f=props.update(true,true,{}, {},input,120);
+                expect(held(*f)==static_cast<int>(side),"studio throw fixture acquires actual prop for either hand");
+                input[side].grip.position.y+=.5f;f=props.update(true,true,{}, {},input,420);
+                if(loseTracking){
+                    input[side].grip.position.x+=.02f;f=props.update(true,true,{}, {},input,440);
+                    const auto before=pose(*f).position;
+                    input[side].tracked=false;f=props.update(true,true,{}, {},input,460);
+                    expect(held(*f)<0&&near(pose(*f).position.x,before.x),
+                        "lost studio hand drops camera, marker or paper without stale horizontal throw");
+                    input[side].tracked=true;input[side].grip.position=pose(*f).position;
+                    f=props.update(true,true,{}, {},input,480);
+                    expect(held(*f)<0,"studio tracking recovery with held grip cannot reacquire a prop");
+                    input[side].squeeze=0;f=props.update(true,true,{}, {},input,500);
+                    input[side].grip.position=pose(*f).position;input[side].squeeze=1;
+                    f=props.update(true,true,{}, {},input,520);
+                    expect(held(*f)==static_cast<int>(side),"studio tracked release rearms intentional pickup after occlusion");
+                }else{
+                    const auto before=pose(*f).position;
+                    input[side].grip.position.x-=.05f;input[side].squeeze=0;
+                    f=props.update(true,true,{}, {},input,520);
+                    expect(held(*f)<0&&near(pose(*f).position.x,before.x-.075f),
+                        "100 ms studio hand sample yields real throw speed with a 50 ms physics step");
+                }
+            }
         }
         CabinStudio studio;std::array<StudioHand,2> hands{};
         auto frame=studio.update(true,false,Pose{{},{2,1.7f,3}},Pose{},hands,100,0,false,
@@ -4409,6 +4619,57 @@ int main(){
             &&near(fitted[6].x,.472f)&&near(fitted[7].x,.472f)
             &&std::equal(cropped.begin()+30,cropped.end(),original.begin()+30),
             "axially stepped cuff closes after projected corner collapse and fits both seam vertices");
+    }
+    {
+        // Closed sleeve fixture with spare native slots. The cap is a lining
+        // inside the existing volume; it cannot move the visible outer sleeve.
+        std::vector<Vec3> points;
+        for(float x:{.3f,.5f,.8f})for(const auto yz:std::array<Vec3,4>{{{0,-.05f,-.05f},{0,.05f,-.05f},{0,.05f,.05f},{0,-.05f,.05f}}})
+            points.push_back({x,yz.y,yz.z});
+        for(unsigned i=0;i<8;++i)points.push_back({.1f,.001f*static_cast<float>(i),0});
+        std::vector<uint16_t> original;
+        for(uint16_t ring=0;ring<2;++ring)for(uint16_t i=0;i<4;++i){
+            const uint16_t a=ring*4+i,b=ring*4+(i+1)%4,c=a+4,d=b+4;
+            original.insert(original.end(),{a,b,c,b,d,c});
+        }
+        original.insert(original.end(),{0,0,0,0,0,0});
+        const std::array<ForearmIndexRange,1> lod{{{0,original.size()}}};
+        auto cut=original;for(size_t at=0;at<24;at+=3)cut[at+1]=cut[at+2]=cut[at];
+        for(bool right:{false,true}){
+            auto native=points;if(right)for(auto& p:native)p.x=-p.x;
+            auto cropped=cut,flat=cut;
+            std::vector<Vec3> fitted,flatFitted;std::vector<std::array<uint16_t,2>> copies,flatCopies;
+            closeForearmCuffs(native,original,flat,lod,right,.452f,&flatFitted,&flatCopies);
+            ForearmCuffShading shading;
+            const auto faces=closeForearmCuffs(native,original,cropped,lod,right,.452f,&fitted,&copies,.472f,&shading);
+            bool intact=faces==10&&shading.recessedLoops==1&&copies.size()==12;
+            for(size_t i=4;i<12;++i)intact&=same(fitted[i],flatFitted[i]);
+            intact&=std::equal(cropped.begin()+24,cropped.begin()+48,original.begin()+24);
+            for(const auto copy:copies){
+                const auto p=fitted[copy[0]],n=shading.normals[copy[0]];
+                intact&=copy[1]>=4&&copy[1]<8&&std::isfinite(dot(n,n))&&near(dot(n,n),1.f)
+                    &&std::abs(p.y)<=.05001f&&std::abs(p.z)<=.05001f
+                    &&std::abs(p.x)>=.47199f&&std::abs(p.x)<=.48401f;
+            }
+            expect(intact,"recessed cuff preserves exact native outer rim, distal triangles and skin sources on both arms");
+            auto accumulated=native;for(size_t i=0;i<4;++i)accumulated[i].x=right?4.f:-4.f;
+            auto accumulatedCut=cut;
+            const auto immutableFaces=closeForearmCuffs(accumulated,original,accumulatedCut,lod,right,.452f,
+                &fitted,&copies,.472f,&shading,native);
+            expect(immutableFaces==10&&shading.recessedLoops==1,
+                "previous-arm reuse of removed native vertices cannot alter immutable cuff topology or volume admission");
+            // Removing spare triangle capacity must retain the old closed cap.
+            const std::array<ForearmIndexRange,1> limited{{{0,48}}};auto limitedCut=cut;
+            const auto limitedFaces=closeForearmCuffs(native,original,limitedCut,limited,right,.452f,&fitted,&copies,.472f,&shading);
+            expect(limitedFaces==2&&shading.recessedLoops==0,
+                "insufficient exclusive LOD capacity falls back to the existing flat closed cuff");
+            // A fold/hole through the proposed inset is not permission to
+            // manufacture a generic sleeve volume beyond the owned geometry.
+            auto openNative=original;for(size_t at=0;at<24;at+=3)openNative[at+1]=openNative[at+2]=openNative[at];
+            auto openCut=cut;
+            closeForearmCuffs(native,openNative,openCut,lod,right,.452f,&fitted,&copies,.472f,&shading);
+            expect(shading.recessedLoops==0,"missing native cross-section cannot admit recessed cuff geometry");
+        }
     }
     // Captured ACC cross-body reach: its fully extended elbow circle lies
     // inside the head, so changing bend alone cannot produce a fresh rig.

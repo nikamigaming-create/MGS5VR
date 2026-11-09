@@ -77,14 +77,18 @@ add_test(NAME installer_safety COMMAND powershell.exe -NoLogo -NoProfile -NonInt
 find_program(MGS5VR_CSC csc.exe PATHS "$ENV{WINDIR}/Microsoft.NET/Framework64/v4.0.30319" REQUIRED NO_DEFAULT_PATH)
 set(MGS5VR_IMPORT_EXE "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/mgs5vr_import.exe")
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/tools/import-owned-assets.cs" MGS5VR_IMPORT_SOURCE)
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/tools/import-cabin-actors.cs" MGS5VR_CABIN_IMPORT_SOURCE)
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/tools/cabin-actor-data.cs" MGS5VR_CABIN_DATA_SOURCE)
 string(REPLACE "/" "\\" MGS5VR_IMPORT_OUTPUT "${MGS5VR_IMPORT_EXE}")
 add_custom_command(OUTPUT "${MGS5VR_IMPORT_EXE}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>"
   COMMAND "${CMAKE_COMMAND}" -E env --unset=LIB "${MGS5VR_CSC}" /nologo /target:exe /platform:x64 /optimize+ /warnaserror+
-    "/out:${MGS5VR_IMPORT_OUTPUT}" "${MGS5VR_IMPORT_SOURCE}"
-  DEPENDS tools/import-owned-assets.cs VERBATIM)
+    "/out:${MGS5VR_IMPORT_OUTPUT}" "${MGS5VR_IMPORT_SOURCE}" "${MGS5VR_CABIN_IMPORT_SOURCE}" "${MGS5VR_CABIN_DATA_SOURCE}"
+  DEPENDS tools/import-owned-assets.cs tools/import-cabin-actors.cs tools/cabin-actor-data.cs VERBATIM)
 add_custom_target(mgs5vr_import ALL DEPENDS "${MGS5VR_IMPORT_EXE}")
 add_test(NAME owned_asset_importer COMMAND "${MGS5VR_IMPORT_EXE}" --self-test)
+add_test(NAME native_cabin_importer COMMAND "${MGS5VR_IMPORT_EXE}" --cabin-self-test)
+add_test(NAME native_cabin_installer COMMAND powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/tests/cabin_installer_tests.ps1")
 add_executable(mgs5vr_controls tools/controls-check.cpp)
 target_link_libraries(mgs5vr_controls PRIVATE mgs5vr_core)
 add_test(NAME controls_config COMMAND mgs5vr_controls --check "${CMAKE_CURRENT_SOURCE_DIR}/config/mgs5vr-controls.ini")
@@ -166,6 +170,11 @@ if(MSVC)
     target_link_options(mgs5vr_tests PRIVATE /STACK:4194304)
 endif()
 add_test(NAME contracts COMMAND mgs5vr_tests)
+add_executable(mgs5vr_studio_store_tests tests/cabin_studio_store_tests.cpp src/cabin_studio_store.cpp)
+target_link_libraries(mgs5vr_studio_store_tests PRIVATE mgs5vr_core ole32 windowscodecs)
+target_compile_options(mgs5vr_studio_store_tests PRIVATE /W4 /WX /permissive- /EHsc)
+add_test(NAME cabin_studio_storage_recovery COMMAND "${CMAKE_COMMAND}" -E env
+  "LOCALAPPDATA=${CMAKE_CURRENT_BINARY_DIR}/studio-store-test-data" "$<TARGET_FILE:mgs5vr_studio_store_tests>")
 add_executable(mgs5vr_optic_lighting_probe_tests tests/optic_native_lighting_probe_tests.cpp)
 target_link_libraries(mgs5vr_optic_lighting_probe_tests PRIVATE mgs5vr_core)
 target_compile_options(mgs5vr_optic_lighting_probe_tests PRIVATE /W4 /WX /permissive- /EHsc)
@@ -221,6 +230,7 @@ install(DIRECTORY assets/fonts/permanent-marker DESTINATION assets/fonts COMPONE
 install(DIRECTORY assets/controls DESTINATION assets COMPONENT MGS5VR)
 install(DIRECTORY docs/ DESTINATION docs COMPONENT MGS5VR FILES_MATCHING PATTERN "*.md" PATTERN "*.png" PATTERN "*.svg" PATTERN "*.json")
 install(FILES tools/install.ps1 tools/uninstall.ps1 tools/setup.ps1 tools/launch-simulator.ps1 tools/launch-steam-simulator.ps1 tools/simulator-session-ownership.psm1 tools/launch-headset.ps1 tools/edit-controls.ps1 tools/launcher-maintenance.ps1 tools/launcher-display.ps1 tools/native-actions.py DESTINATION tools COMPONENT MGS5VR)
+install(FILES tools/install-cabin-actors.ps1 DESTINATION tools COMPONENT MGS5VR)
 install(FILES tools/edit-settings.ps1 tools/settings-store.psm1 tools/launcher-cli.ps1 DESTINATION tools COMPONENT MGS5VR)
 install(FILES tools/launcher-bridge.ps1 DESTINATION tools COMPONENT MGS5VR)
 install(FILES profiles/tpp-1.0.15.4.json profiles/gz-1.0.0.5.json DESTINATION profiles COMPONENT MGS5VR)

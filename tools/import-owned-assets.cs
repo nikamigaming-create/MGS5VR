@@ -10,7 +10,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-internal static class OwnedAssets
+internal static partial class OwnedAssets
 {
     const int Limit = 16 * 1024 * 1024;
     const ulong Package = 0x522a4f25e0ac957bUL;
@@ -645,6 +645,9 @@ internal static class OwnedAssets
     {
         try
         {
+            if (args.Length == 1 && args[0] == "--cabin-self-test") { CabinSelfTest(); return 0; }
+            if (args.Length == 3 && args[0] == "--prepare-cabin") { PrepareCabin(args[1], args[2]); return 0; }
+            if (args.Length == 3 && args[0] == "--remove-cabin") { PrepareCabin(args[1], args[2], true); return 0; }
             if (args.Length == 1 && args[0] == "--self-test") { SelfTest(); return 0; }
             if (args.Length != 2) { Console.Error.WriteLine("Usage: mgs5vr_import <owned TPP or GZ directory> <mod-local output directory>"); return 2; }
             Import(args[0], args[1]); return 0;

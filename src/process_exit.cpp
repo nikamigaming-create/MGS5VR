@@ -21,10 +21,28 @@ LONG CALLBACK observeLoadFault(EXCEPTION_POINTERS* e){
         ||reports.fetch_add(1)>=8)return EXCEPTION_CONTINUE_SEARCH;
     const auto& c=*e->ContextRecord;
     std::ostringstream s;s<<"Native load AV rip="<<std::hex<<c.Rip<<" rcx="<<c.Rcx
-        <<" rdx="<<c.Rdx<<" r8="<<c.R8<<" r9="<<c.R9<<" rax="<<c.Rax<<" stack=";
+        <<" rdx="<<c.Rdx<<" r8="<<c.R8<<" r9="<<c.R9<<" rax="<<c.Rax
+        <<" rbx="<<c.Rbx<<" rsi="<<c.Rsi<<" rdi="<<c.Rdi
+        <<" r12="<<c.R12<<" r13="<<c.R13<<" r14="<<c.R14<<" r15="<<c.R15
+        <<" stack=";
     std::array<uintptr_t,48> stack{};SIZE_T read{};
     if(ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(c.Rsp),stack.data(),sizeof(stack),&read))
         for(auto address:stack)s<<address<<',';
+    // The supported retail rat initializer dereferences a native resource
+    // returned from this handle. Keep the opt-in probe read-only and bounded;
+    // a missing resource must still fail normally, never be fabricated.
+    const auto image=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+    if(c.Rip==image+0xa777e8&&c.Rcx>=0x38){
+        std::array<uintptr_t,24> parameter{};
+        if(ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(c.Rcx-0x38),parameter.data(),sizeof(parameter),&read)){
+            s<<" rat_parameter=";for(auto word:parameter)s<<word<<',';
+            const auto vtable=parameter[7];
+            std::array<uintptr_t,12> methods{};
+            if(ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(vtable),methods.data(),sizeof(methods),&read)){
+                s<<" rat_resource_vtable=";for(auto address:methods)s<<address<<',';
+            }
+        }
+    }
     log(s.str());
     return EXCEPTION_CONTINUE_SEARCH; // Evidence only: never swallow/recover a game fault.
 }

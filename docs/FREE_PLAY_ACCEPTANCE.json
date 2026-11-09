@@ -1,4 +1,378 @@
 {
+  "cockpit_adversarial_2026_11_09": {
+  "status": "checked_deployed_scoped_rat_contact_observed_fullgame_gaps_open",
+  "baseline_candidate": "8960a4e5375162e4061cff54c1b97402228f987c078794e0637128c54ccbdc5b",
+  "retained_baseline_runs": [
+    "20261109T144055925833Z",
+    "20261109T144520674811Z",
+    "20261109T144620796441Z",
+    "20261109T144802521797Z",
+    "20261109T144956106357Z"
+  ],
+  "reproduced": [
+    "Untouched cassette quaternion roundtrip creates spontaneous angular and bounce energy",
+    "Collision-corrected tape position creates false hand velocity",
+    "Sparse hand samples and tracking loss create stale or exaggerated prop throws",
+    "Tracking loss near board pins held paper",
+    "Failed board persistence does not retry unchanged revision",
+    "Failed photo decode permanently caches unavailable pixels",
+    "Live native D-Dog main3 resource falls outside existing camera fade admission; model alpha0.01",
+    "Afghanistan40010 lacks named native rat objects while custom dataset exists only in40050",
+    "New native rat dataset causes cold-load crash; same DLL boots after dataset/routes removed",
+    "D-Dog native physical-response counter increments but native camera-nearness query hides model at close petting distance"
+  ],
+  "review": "artifacts/cockpit-audit-20261109/adversarial-audit.md",
+  "iterations": "artifacts/cockpit-audit-20261109/review-iterations.json",
+  "scope": "Four reviewers,15 distinct review criteria/iterations; finalACC native rat1 pickup/lift/lower and cleanup observed. Exact earlier-candidate outcomes retained. No15successfulplaythrough/fullgame/headset claim.",
+  "open": [
+    "Ordinary field rats at a known naturally enabled habitat; user globalabsence report unresolved",
+    "Physicalheadset and all-hands/scenes/outfits animal coverage",
+    "Actual optic/laser/muzzle/hit alignment across applicable weapon families",
+    "Eligible cover contact",
+    "Visually framed mounted grip/attachment and physicalfeel across stations",
+    "Left-marker intendedboardstroke procedure, oldgrayboarditems, remainingstudio/gallery/persistence",
+    "Conspicuous sleeve caps and remaining rig visual acceptance",
+    "Complete shared TPP/GZ/fullcapability showcase"
+  ],
+  "cleanup": "Exactoriginal settings/9studio hashes and all HMD/controller poses reverified; buttonsaxes0; final nativeheld0selected0 bothratsmoving. Ownedgame/operator stopped; Steam/unrelatedsessions retained. Completed studio backup transaction removed per studio-transaction-cleanup.json. Bothbuildslotsverified,zeroobsoletebuilds. Final contact recordingfailure remains explicit.",
+  "candidate": "d4a9fbaeb657fd61f76c591959ef831d54485cae1a87722bf9983e5e6e649a15",
+  "checks": {
+    "ctest_groups": 62,
+    "ctest": "passed",
+    "packaged_installer": "passed",
+    "build_log": "artifacts/cockpit-audit-native-boundary-build.log",
+    "scope": "Finald4a9 checked/deployed; simulator cases do not certify physicalheadset/fullgame"
+  },
+  "candidate_outcomes": {
+    "rat_cold_load": {
+      "status": "failed",
+      "run": "20261109T151003949222Z",
+      "evidence": "artifacts/cockpit-audit-20261109/candidate-cold-load-crash.log",
+      "same_dll_without_dataset": "20261109T151430691090Z",
+      "isolation": "Title boot succeeds after removing only recognized dataset/routes; not rat acceptance",
+      "next": "Correct native metadata/importer and cold-test next combined candidate",
+      "candidate_sha256": "fbf75f8463553c5dab20dc05b8af9e1dcdf89e11095840afc0ee77a8a2c743fc"
+    },
+    "tape_idle": {
+      "status": "scoped_observed_pass",
+      "run": "20261109T151720323386Z",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-idle-review.json",
+      "scope": "Six untouched tapes unchanged at published precision over 50 observations/18.172s; both final eyes reviewed",
+      "candidate_sha256": "fbf75f8463553c5dab20dc05b8af9e1dcdf89e11095840afc0ee77a8a2c743fc"
+    },
+    "workbench": {
+      "status": "scoped_observed_pass_with_visual_limits",
+      "run": "20261109T151923022778Z",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-workbench-review.json",
+      "scope": "Cassette pickup/drop/recover/seat/eject; each-hand camera shutter/print; new photo board attachment",
+      "limits": [
+        "Large sleeve caps",
+        "Older gray board items",
+        "No note/drawing/gallery-navigation/persistence or all-interruption acceptance"
+      ],
+      "final_png_provenance": "artifacts/cockpit-audit-20261109/workbench-png-provenance.json",
+      "candidate_sha256": "fbf75f8463553c5dab20dc05b8af9e1dcdf89e11095840afc0ee77a8a2c743fc"
+    },
+    "dog_before_idroid": {
+      "status": "scoped_observed_pass",
+      "run": "20261109T152349065702Z",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-dog-presence-review.json",
+      "scope": "Adult main3 outfit visible in both final eyes before iDroid; native alpha1 versus baseline.01",
+      "candidate_sha256": "fbf75f8463553c5dab20dc05b8af9e1dcdf89e11095840afc0ee77a8a2c743fc"
+    },
+    "dog_close_pet": {
+      "status": "failed_visual_acceptance",
+      "run": "20261109T153000462393Z",
+      "native_response_counter": [
+        0,
+        1
+      ],
+      "scope": "Actual native physical response occurs but model disappears in both final eyes at close approach",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-pet-failure-review.json",
+      "diagnosis": "Native third-person near-camera query inner1m/outer1.5m; alpha.01 at contact",
+      "diagnostic_evidence": "artifacts/cockpit-audit-20261109/dog-near-fade-findings.json",
+      "next": "Gated near-camera-query suppression including interactive title pending next combined candidate",
+      "candidate_sha256": "fbf75f8463553c5dab20dc05b8af9e1dcdf89e11095840afc0ee77a8a2c743fc"
+    },
+    "dog_close_visibility_3efd": {
+      "candidate_sha256": "3efd92235ed304a613d55395769241b32cf8b06e34ae80d52b571fae091e2799",
+      "run": "20261109T155256009317Z",
+      "status": "scoped_close_visibility_pass_pet_response_unproved",
+      "native_response_counter": [
+        0,
+        0
+      ],
+      "evidence": "artifacts/cockpit-audit-20261109/independent-closefix-pet-review.json"
+    },
+    "dog_reachable_pet_e994": {
+      "candidate_sha256": "e9940f282a27e2c40fff9deae53f311e4647e9f128a79b57579fccff17b908de",
+      "run": "20261109T160112581139Z",
+      "status": "scoped_visible_native_physical_response_observed",
+      "native_response_counter": [
+        0,
+        1
+      ],
+      "native_response_during_hand_only_stroke": true,
+      "both_final_eyes_reviewed": true,
+      "scope": "One right-hand ACC adult-main3 interaction after staged25cm/33cm approach; no limb-length route mutation, no physical-headset/all-outfit acceptance",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-reachable-pet-review.json"
+    },
+    "rat_corrected_metadata_crash": {
+      "candidate_sha256": "3efd92235ed304a613d55395769241b32cf8b06e34ae80d52b571fae091e2799",
+      "run": "20261109T154440704636Z",
+      "status": "failed_cold_load",
+      "scope": "Metadata correction alone did not resolve native resource initialization failure"
+    },
+    "rat_order_only_boot": {
+      "candidate_sha256": "e9940f282a27e2c40fff9deae53f311e4647e9f128a79b57579fccff17b908de",
+      "status": "title_and_acc_boot_pass_native_realization_missing",
+      "runs": [
+        "20261109T160538671488Z",
+        "20261109T161019250477Z"
+      ],
+      "archive_verification": "artifacts/cockpit-audit-20261109/rat-order-only-independent-verification.json",
+      "scope": "Order-only changes preserve payloads/references and unrelated records; native models load but active logical mapping remains511 and visible rats absent",
+      "next": "Production ordering plus reviewed selector fallback pending combined build/deploy/live checks"
+    },
+    "departure_passenger_view": {
+      "candidate_sha256": "e9940f282a27e2c40fff9deae53f311e4647e9f128a79b57579fccff17b908de",
+      "run": "20261109T163421149224Z",
+      "status": "passenger_view_concern_orientation_vs_rendering_unresolved",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-deployment-compositor-review.json",
+      "scope": "Actual right-eye compositor terrain view while direct native ridden helicopter persists beforeY; native camera remains near native anatomical eye. Large excursion not established. HMD turn and vehicle-model join required.",
+      "arrival_both_eyes_reviewed": true,
+      "capture_limit": "4.07/2.56fps, about50s gap, no continuous stereo/headset acceptance"
+    },
+    "mg_operator_approach": {
+      "candidate_sha256": "e9940f282a27e2c40fff9deae53f311e4647e9f128a79b57579fccff17b908de",
+      "run": "20261109T163811774084Z",
+      "status": "failed_operator_approach_before_mount",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-mg-approach-review.json",
+      "distance_m": 0.23762389447138227,
+      "required_distance_below_m": 0.2,
+      "scope": "No mounted steering/fire or reversal diagnosis; seven approach pulses, life unchanged, input/menu cleanup verified"
+    },
+    "cover_contact_gap": {
+      "candidate_sha256": "e9940f282a27e2c40fff9deae53f311e4647e9f128a79b57579fccff17b908de",
+      "run": "20261109T164632272313Z",
+      "prerequisite_route": "20261109T164525146609Z",
+      "status": "cover_contact_not_established_no_pass_or_defect",
+      "native_behind": [
+        false,
+        false
+      ],
+      "evidence": "artifacts/cockpit-audit-20261109/independent-cover-gap-review.json",
+      "scope": "Both eyes reviewed, native eligible contact unproved; no cover pass/defect. Earlier sandboxCIM refusals are not game failures."
+    },
+    "rat_ACC_appearance_55c4": {
+      "candidate_sha256": "55c4f227ed36423023fbd5a4700d5ed522fe9ade910666970c26d2e47381948c",
+      "run": "20261109T165700989113Z",
+      "status": "scoped_native_rats_visible_no_interaction_pass",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-ACC-rat-appearance-review.json",
+      "limits": "Floor contact admission blocked; title and global-field absence unresolved"
+    },
+    "continue_55c4": {
+      "candidate_sha256": "55c4f227ed36423023fbd5a4700d5ed522fe9ade910666970c26d2e47381948c",
+      "runs": [
+        "20261109T165342080447Z",
+        "20261109T165543072209Z"
+      ],
+      "status": "native_continue_ACC_arrival_observed",
+      "both_arrival_eyes_reviewed": true,
+      "controller_restoration_reported": true,
+      "limits": "Not continuous transition/headset acceptance"
+    },
+    "dog_adjacent_55c4": {
+      "candidate_sha256": "55c4f227ed36423023fbd5a4700d5ed522fe9ade910666970c26d2e47381948c",
+      "run": "20261109T165936797862Z",
+      "status": "close_visible_native_response_during_contact_dwell",
+      "counter_after": 1,
+      "counter_before": null,
+      "response_during_hand_only_stroke": false,
+      "both_final_eyes_reviewed": true,
+      "evidence": "artifacts/cockpit-audit-20261109/independent-rat-adjacent-pet-review.json"
+    },
+    "passenger_direction_55c4": {
+      "candidate_sha256": "55c4f227ed36423023fbd5a4700d5ed522fe9ade910666970c26d2e47381948c",
+      "run": "20261109T170123325433Z",
+      "status": "outward_door_view_explains_tested_route_no_excursion_reproduced",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-passenger-direction-review.json",
+      "scope": "Both final eyes directional cabin/door/Quiet and threshold; nativepassenger7168/type14; camera-head~0.137m",
+      "capture_limit": "ActualRIGHT compositor175frames/45.079s/3.882fps; not stereo/headset acceptance",
+      "broader_user_report": "open"
+    },
+    "rifle_fixed_1x_e994": {
+      "candidate_sha256": "e9940f282a27e2c40fff9deae53f311e4647e9f128a79b57579fccff17b908de",
+      "run": "20261109T164715773307Z",
+      "status": "native_fixed1x_and_two_round_discharge_observed",
+      "scope": "HIPammo40to38; no magnifiedzoom/globalrender-model identity/alignment/hit claim",
+      "evidence": "private/showcase/cockpit-audit-edition-20261109/takes.json"
+    },
+    "workbench_aa389": {
+      "candidate_sha256": "aa3891bbc8fac1b939eacfffa7de066a7f283ab2aa41eada42e4c69171285eb1",
+      "run": "20261109T171732023594Z",
+      "status": "failed_intended_left_marker_board_stroke",
+      "partial_observed": [
+        "tape pickup/drop/recover/seat/eject",
+        "bothcamera prints",
+        "typedTAPE note andrightstroke",
+        "newboard attachment",
+        "title rat appearance"
+      ],
+      "evidence": "artifacts/cockpit-audit-20261109/independent-final-workbench-review.json",
+      "geometry": "minimum170.793mm tip-plane gap; overlappingold16 stroke2to3,new23 stays1; no deadinput diagnosis"
+    },
+    "rat_boundary_aa389": {
+      "candidate_sha256": "aa3891bbc8fac1b939eacfffa7de066a7f283ab2aa41eada42e4c69171285eb1",
+      "status": "reproduced_native_rat_stranded_by_sampled_horizontal_edge",
+      "evidence": "artifacts/cockpit-audit-20261109/rat-boundary-reproduction.md",
+      "excess_m": 0.002531,
+      "native_center_root_offset_m": 0.199951,
+      "resolution_candidate": "d4a9fbaeb657fd61f76c591959ef831d54485cae1a87722bf9983e5e6e649a15"
+    },
+    "mounted_physical_55c4": {
+      "candidate_sha256": "55c4f227ed36423023fbd5a4700d5ed522fe9ade910666970c26d2e47381948c",
+      "run": "20261109T171219209609Z",
+      "status": "correct_hand_direction_and_release_telemetry_oneMG_visualfeel_open",
+      "evidence": "artifacts/cockpit-audit-20261109/mounted-current-independent-review.json",
+      "scope": "Both spatial signs correct,regrabdelta0,releaseaxes/mask0,viewindependent; immediateinput with90percent nativeyaw682to732ms afterfinalRPC",
+      "limits": "Gun/contact croppedoutsideheldmovie; no both-eye grip/feel/allmount/fire pass"
+    },
+    "continue_d4a9": {
+      "candidate_sha256": "d4a9fbaeb657fd61f76c591959ef831d54485cae1a87722bf9983e5e6e649a15",
+      "run": "20261109T173324638047Z",
+      "status": "ACC_arrival_observed_both_final_eyes",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-final-continue-review.json"
+    },
+    "rat_contact_procedure_failures_d4a9": {
+      "candidate_sha256": "d4a9fbaeb657fd61f76c591959ef831d54485cae1a87722bf9983e5e6e649a15",
+      "run": "20261109T173437019666Z",
+      "status": "failed_procedure_not_native_rat_defect",
+      "scope": "Already-satisfied crouch no dispatch; correctedcrouch pass;20cm packet missingrequiredorientation rejectedbeforedispatch; posesrestored",
+      "restoration_evidence": "artifacts/cockpit-audit-20261109/contact-restored-state.json"
+    },
+    "rat_contact_d4a9": {
+      "candidate_sha256": "d4a9fbaeb657fd61f76c591959ef831d54485cae1a87722bf9983e5e6e649a15",
+      "run": "20261109T174022319502Z",
+      "status": "scoped_native_right_ACC_rat1_pickup_lift_lower_and_withdrawal_observed",
+      "native_held_y": 1197.39,
+      "native_lifted_y": 1197.67,
+      "floor_y": 1197.3,
+      "held_after_withdrawal": 0,
+      "selected_after_withdrawal": 0,
+      "action_case_results": "all6observed_pass",
+      "aggregate_result": "FAILED_recording_segment0003",
+      "release_ready": false,
+      "recording_error": "recording/segment-0003.mp4 failed",
+      "evidence": "artifacts/cockpit-audit-20261109/independent-final-rat-contact-review.json",
+      "scope": "Wholeheldratbothfinaleyes;liftfeet/palmvisibleupperbodycropped;loweredemptyrightpalm/nativewalking;withdrawalpairpartlyoccluded",
+      "limits": "Finald4a9ACC only; titleappearanceaa389; no continuousvideo/fullgame/field/headset acceptance"
+    }
+  },
+  "fresh_showcase": {
+    "status": "partial_mixed_candidate_audit_edition",
+    "seconds": 115.1,
+    "path": "private/showcase/cockpit-audit-edition-20261109/MGS5VR-Cockpit-Field-Audit-Edition.mp4",
+    "sha256": "8faf52d55e25f55c79c92ef70214576e9cf2d85667abaf9da69a9624f701443d",
+    "provenance": "private/showcase/cockpit-audit-edition-20261109/edit-index.json",
+    "candidate_sha256s": [
+      "fbf75f8463553c5dab20dc05b8af9e1dcdf89e11095840afc0ee77a8a2c743fc",
+      "e9940f282a27e2c40fff9deae53f311e4647e9f128a79b57579fccff17b908de",
+      "55c4f227ed36423023fbd5a4700d5ed522fe9ade910666970c26d2e47381948c"
+    ],
+    "continuous_video_source": "nativeRIGHTsource_eye_before_runtime_composition",
+    "checkpoint_source": "separate sequential final-compositor PNGs",
+    "audio": "originalnative retained; technicaldecode passed; listeningpending",
+    "output_review": "Reviewed all 10 encoded chapter midpoint frames, full-size pet/rat chapters and source motion/contact sheets; labels, aspect, action visibility and known caps retained. Not an every-frame or headset acceptance review.",
+    "scope": "10 scoped chapters; rats appearance only, fixed1x rifle without alignmentclaim; not whole-game or continuous single-candidate playthrough",
+    "old_cut_unchanged": true
+  },
+  "user_report_rat_absence": {
+    "reported_utc_date": "2026-11-09",
+    "scope": "Rats not visible anywhere, including normal field gameplay",
+    "user_suspects": "Regression",
+    "status": "user_reported_not_yet_reproduced_in_fresh_field_session",
+    "diagnosis": "Not established",
+    "separate_reproduced_failure": "The new authored cabin dataset cold-load crash is a distinct observed failure; repairing it does not establish resolution of gameplay-wide rat absence.",
+    "investigation": "Actor and cassette reviewers audit shared native resources/visibility path; runtime coordinator to observe a known native rat location in a bounded field check.",
+    "field_observation": "Fresh mission30010 sample registered5 definitions but enable nil/active model list empty; inspected stock free-roam source enables birds only. Not reproduction at an enabled rat habitat or global resolution."
+  },
+  "prior_candidate_checks": {
+    "fbf75f8463553c5dab20dc05b8af9e1dcdf89e11095840afc0ee77a8a2c743fc": {
+      "ctest_groups": 62,
+      "ctest": "passed",
+      "packaged_installer": "passed",
+      "build_log": "artifacts/cockpit-audit-combined-checked-build.log",
+      "candidate_receipt": "artifacts/cockpit-audit-20261109/candidate.json"
+    },
+    "e9940f282a27e2c40fff9deae53f311e4647e9f128a79b57579fccff17b908de": {
+      "ctest_groups": 62,
+      "ctest": "passed",
+      "packaged_installer": "passed",
+      "build_log": "artifacts/cockpit-audit-resource-diagnostic-build.log",
+      "scope": "Checked diagnostic candidate e994; new rat realization selector is not yet built/deployed"
+    },
+    "55c4f227ed36423023fbd5a4700d5ed522fe9ade910666970c26d2e47381948c": {
+      "ctest_groups": 62,
+      "ctest": "passed",
+      "packaged_installer": "passed",
+      "build_log": "artifacts/cockpit-audit-native-realization-final-build.log",
+      "scope": "Installed55c4 contains rat ordering/selector; new floor,center,cuff source edits not in this DLL"
+    }
+  },
+  "next": "Observe naturally enabled field rat habitat; actual optics/laser/muzzle-hit alignment; eligiblecover; visuallyframed mounted grip/physicalfeel; remainingstudio/persistence andsharedTPP/GZcoverage. Rat1ACCappearance/pickup/lowering no longer the next missing feature.",
+  "selector_55c4": {
+    "status": "installed_ACC_appearance_observed_title_and_contact_open",
+    "evidence": "artifacts/cockpit-audit-20261109/rat-selector-independent-review.json",
+    "scope": "Original selector first; exact two owned locator/route identities; fresh native title/ACC; native stop/enable/NPC guards; independent eligible subset and native ranking; no fake models/transform writes",
+    "required_live": [
+      "Cold title/ACC realization",
+      "Visible rat pickup/release",
+      "Scene transition and ordinary field forwarding"
+    ],
+    "candidate_sha256": "55c4f227ed36423023fbd5a4700d5ed522fe9ade910666970c26d2e47381948c"
+  },
+  "prior_fresh_showcase": {
+    "status": "partial_working_cut",
+    "seconds": 82.3,
+    "path": "private/showcase/cockpit-20261109/MGS5VR-Fresh-Cockpit-Chapter.mp4",
+    "sha256": "df83ca7f6e965655a3d4f623ecdf1d524d4c22818fddf64fafee62e2b1bb5df7",
+    "provenance": "private/showcase/cockpit-20261109/edit-index.json",
+    "fresh_runs": [
+      "20261109T151720323386Z",
+      "20261109T151923022778Z",
+      "20261109T152349065702Z"
+    ],
+    "old_gameplay_reused": false,
+    "continuous_video_source": "native right-eye source before runtime composition, not final-compositor video",
+    "checkpoint_source": "separate paired final-compositor PNGs",
+    "audio": "original game track preserved; technical decode passed; auditory review pending",
+    "output_review": "full decode and representative layout frames reviewed",
+    "scope": "Seven scoped cockpit chapters, not complete cockpit/all-VR showcase; close-pet failure excluded from positive footage"
+  },
+  "source_batch_resolution": {
+    "status": "checked_deployed",
+    "candidate_sha256": "d4a9fbaeb657fd61f76c591959ef831d54485cae1a87722bf9983e5e6e649a15",
+    "changes": [
+      "Bounded10mm floor admission preserving35mm walls/ceiling and nativefloorAt",
+      "Translate native logical position by fresh root delta, preserving existing offset",
+      "Native-geometry-admitted recessed cuff lining with conservative flat fallback"
+    ],
+    "required_live": [
+      "Native root/model/logical representation observation",
+      "Visible rat pickup/lift/lowering",
+      "Both-eye cuff movement and adjacent dog/transition checks"
+    ],
+    "limits": "Selective cuff recess only; leftflat/conspicuous ends remain. No fullvolume/headset proof",
+    "additional_boundary_repair": "Remove sampledX/Z actor rejection after aa389 nativewalk2.531mmbeyondedge; retain verticalcontext/6m/nativeownership and floorAt contact"
+  },
+  "cleanup_evidence": [
+    "artifacts/cockpit-audit-20261109/final-restored-state.json",
+    "artifacts/cockpit-audit-20261109/final-restored-rats.json",
+    "artifacts/cockpit-audit-20261109/studio-restoration-final.json",
+    "artifacts/cockpit-audit-20261109/studio-transaction-cleanup.json"
+  ]
+},
   "gz_menu_aim_2026_10_27": {
     "candidate": "8c4f2eb06c1e639a395b83b73f7d58df0de4fa201166bc09ddd239bb021638ea",
     "retained_runs": [
@@ -138,7 +512,28 @@
     ],
     "release_pin_changed": false
   },
-  "nightly_distribution": {"authorized_on": "2026-10-27", "policy": "config/nightly-policy.json", "documentation": "docs/NIGHTLIES.md", "status": "published_and_anonymous_download_verified", "acceptance_effect": "none; hosted CI and public distribution do not establish physical headset or full-game acceptance", "local_play_pin": "unchanged", "tag": "nightly-2026-10-27-53f6bf541ef3", "source_commit": "53f6bf541ef37b3e862d470a5bec0318eddcd343", "release_url": "https://github.com/nikamigaming-create/MGS5VR/releases/tag/nightly-2026-10-27-53f6bf541ef3", "workflow_run": "https://github.com/nikamigaming-create/MGS5VR/actions/runs/40564021306", "archive_sha256": "1c3fa35d600047db970dd9a253b14a5d7c07e18e0a7e81cfa76ca1a4cf762251", "dll_sha256": "61a323d8b1b527e5087b51a4d5d198fef58b98a03071ff32b0adebd1de6ef913", "verified_public_assets": 6, "verified_manifest_files": 231, "hosted_ctest_groups_passed": 56, "excluded_gpu_tests": ["d3d11_mailbox", "independent_render_window"], "first_attempt": "report path missing; stopped before publication; fixed and complete rerun passed"},
+  "nightly_distribution": {
+    "authorized_on": "2026-10-27",
+    "policy": "config/nightly-policy.json",
+    "documentation": "docs/NIGHTLIES.md",
+    "status": "published_and_anonymous_download_verified",
+    "acceptance_effect": "none; hosted CI and public distribution do not establish physical headset or full-game acceptance",
+    "local_play_pin": "unchanged",
+    "tag": "nightly-2026-10-27-53f6bf541ef3",
+    "source_commit": "53f6bf541ef37b3e862d470a5bec0318eddcd343",
+    "release_url": "https://github.com/nikamigaming-create/MGS5VR/releases/tag/nightly-2026-10-27-53f6bf541ef3",
+    "workflow_run": "https://github.com/nikamigaming-create/MGS5VR/actions/runs/40564021306",
+    "archive_sha256": "1c3fa35d600047db970dd9a253b14a5d7c07e18e0a7e81cfa76ca1a4cf762251",
+    "dll_sha256": "61a323d8b1b527e5087b51a4d5d198fef58b98a03071ff32b0adebd1de6ef913",
+    "verified_public_assets": 6,
+    "verified_manifest_files": 231,
+    "hosted_ctest_groups_passed": 56,
+    "excluded_gpu_tests": [
+      "d3d11_mailbox",
+      "independent_render_window"
+    ],
+    "first_attempt": "report path missing; stopped before publication; fixed and complete rerun passed"
+  },
   "schema": 1,
   "goal": "Frictionless native VR free play with no known unresolved defects and evidence for claimed coverage",
   "candidate": "9d646890a2b40468a556054f3643da71b79c595650fa7ed35904c28a2a811e2a",
@@ -1923,7 +2318,7 @@
         "both_hand_stick_release": "native axes neutral"
       },
       "failures": [
-        "Right-hand acquisition chased native pitch, oscillating about 15\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c18 degrees during a pure yaw movement.",
+        "Right-hand acquisition chased native pitch, oscillating about 15ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“18 degrees during a pure yaw movement.",
         "Native mounted state ended after trigger; fixture subsequently reports broken. Cause and shot/impact remain unproven."
       ],
       "visual_limits": "Held views are native source-eye recording checkpoints, not compositor stereo captures. Hands/contact acceptance remains pending.",
@@ -1978,7 +2373,7 @@
       "candidate_sha256": "e64919c6caa505fd21743b51be6cebb7095ef5227089fca501a0ff2f9364c221",
       "baseline_run": "20261022T044008503318Z",
       "retained_run": "20261022T045333990203Z",
-      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
+      "result": "Cabin marker/contact and loose-sheet batch on e64919c6caa5: marker socket and finger articulation now meet at the thumb/index grip instead of burying the shaft in the palm. Both-hand writing and both final eyes reviewed. Previously edge-balanced sheets (20ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“90 degrees) now rest flat; ten unchanged loose sheets show at most 0.0001 degree tilt and no displacement throughout the combined run. Cassette handling, both-hand camera use, caption editing, freehand writing and board pinning complete. Wider grip orientations, physical Quest remain open. Owned session closed; published play unchanged.",
       "remaining": [
         "Wider marker grip orientations",
         "Broader FP09/FP10",
@@ -2001,7 +2396,7 @@
         {
           "sha256_prefix": "1bbaac705854",
           "run": "20261022T051925150310Z",
-          "failure": "Native eye identity joined, but fitted eye remained26\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c31cm below cached passenger anchor; body rejected."
+          "failure": "Native eye identity joined, but fitted eye remained26ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“31cm below cached passenger anchor; body rejected."
         },
         {
           "sha256_prefix": "a563468ce054",
@@ -2438,9 +2833,9 @@
     "physical_headset_acceptance": false,
     "extreme_reach_followup": {
       "candidate_changed": false,
-      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015359cm",
+      "retained_final_runs": "neutral return palm error below1mm; extreme target clamp44Ã¢â‚¬â€œ59cm",
       "captured_solver_fixture": "native upper/lower28.4/25.5cm; requested shoulder-to-wrist106cm; reach-only unavoidable clamp52.1cm",
-      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u01531.2mm over production fallback with/without stereo padding",
+      "independent_dense_comparison": "200000 elbow directions; sampled improvement0.9Ã¢â‚¬â€œ1.2mm over production fallback with/without stereo padding",
       "conclusion": "No additional IK rewrite justified by unreachable-pose clamp. Current mesh eye penetration unproven without joined palette; physical comfort/reachable reproduction still required."
     }
   },
@@ -3452,7 +3847,7 @@
       "staging_discards": 0,
       "interpretation": "Cadence is evaluated after ready GPU copies on frame calls; this does not distinguish delayed caller scheduling from recorder work. A larger encoder queue alone cannot address the 48 unscheduled slots."
     },
-    "sequence_gap_review": "Thirty-six of 61 missing slots fall in gaps with unchanged source and image sequence endpoints; largest 0.215s begins at 62.327s. Long gaps cluster 60\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015363s after left-camera print; two final-eye requests overlap 60.382\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015360.739s and 60.935\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015361.259s. Endpoints and overlap do not prove intermediate state, a stall, or causation."
+    "sequence_gap_review": "Thirty-six of 61 missing slots fall in gaps with unchanged source and image sequence endpoints; largest 0.215s begins at 62.327s. Long gaps cluster 60Ã¢â‚¬â€œ63s after left-camera print; two final-eye requests overlap 60.382Ã¢â‚¬â€œ60.739s and 60.935Ã¢â‚¬â€œ61.259s. Endpoints and overlap do not prove intermediate state, a stall, or causation."
   },
   "cabin_diagonal_guard_failure_2026_10_27": {
     "run": "20261027T174300006026Z",

@@ -6,6 +6,38 @@
 #include "core.hpp"
 
 namespace mgs5vr {
+// Resource admission is additional to the typed live TppBuddyDog2 owner,
+// publisher callsite and fresh cabin frame checks. It must never authorize
+// another character merely because a mesh happens to share a skeleton size.
+constexpr bool cabinDogCameraResource(uint64_t resource) noexcept {
+    // Owned /Assets/tpp/chara/ddg/Scenes/ddg0_main[0-4]_def.fmdl.
+    // The previous main4-only check made other native outfits use the stock
+    // helicopter camera and disappear until iDroid bypassed that fade query.
+    switch(resource){
+    case 0x84a0d026d7938ff5ull: // main0
+    case 0x84a1d561958eb109ull: // main1
+    case 0x84a03f16dbbc41b6ull: // main2
+    case 0x84a2627e55f4658dull: // main3
+    case 0x84a0e671b02ebb56ull: // main4
+        return true;
+    default:return false;
+    }
+}
+struct CabinDogCameraContext {
+    uint64_t resource{};
+    bool currentImmersiveFrame{},cabinPlay{},frontEnd{},authoredCamera{},scriptedDemo{},nativeGamepad{};
+    bool nativeTitleCabin{},openingBackend{},openingSelector{},openingNativeMenu{},loading{},avatarEditor{};
+};
+// Called only after the native buddy publisher's exact callsite and typed
+// current owner have been joined. This removes its third-person proximity
+// fade during physical cabin interaction, not other native visibility policy.
+constexpr bool suppressCabinDogCameraNearFade(const CabinDogCameraContext& context) noexcept {
+    const bool interactiveTitle=context.nativeTitleCabin&&context.frontEnd&&context.openingBackend
+        &&context.openingSelector&&!context.openingNativeMenu;
+    const bool interactiveCabin=(context.cabinPlay&&!context.frontEnd)||interactiveTitle;
+    return cabinDogCameraResource(context.resource)&&context.currentImmersiveFrame&&interactiveCabin
+        &&!context.loading&&!context.avatarEditor&&!context.authoredCamera&&!context.scriptedDemo&&!context.nativeGamepad;
+}
 // Render-only forearm policy shares the native player visibility owner.
 void setForearmPlayer(uintptr_t owner,uintptr_t model) noexcept;
 void requestFullBodyVisibility(bool enabled) noexcept;

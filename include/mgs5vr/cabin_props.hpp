@@ -62,8 +62,9 @@ private:
     void step(float dt);
     CabinBenchFrame frame_{};
     std::array<bool,2> grabbed_{},triggered_{};
+    std::array<bool,2> grabArmed_{};
     std::array<bool,2> buttonContact_{};
-    std::array<Pose,2> attachment_{};
+    std::array<Pose,2> attachment_{},rawHeldPose_{};
     std::array<Quat,6> seatedOrientation_{};
     Pose insertionOffset_{};
     uint64_t lastTime_{};

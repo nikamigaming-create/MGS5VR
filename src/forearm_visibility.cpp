@@ -3,6 +3,7 @@
 #include "mgs5vr/forearm_crop.hpp"
 #include "mgs5vr/log.hpp"
 #include <d3d11_1.h>
+#include <DirectXPackedVector.h>
 #include <bcrypt.h>
 #include <algorithm>
 #include <atomic>
@@ -203,27 +204,37 @@ void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,con
         std::vector<uint16_t> nativeIndices(g.indexBytes.size()/2),closedIndices(cropped.size()/2);
         std::memcpy(nativeIndices.data(),g.indexBytes.data(),g.indexBytes.size());
         std::memcpy(closedIndices.data(),cropped.data(),cropped.size());
-        size_t caps{};
+        size_t caps{},recessedCuffs{};
         for(const auto& mesh:meshes){
             std::vector<Vec3> points(mesh.count);
             static_assert(sizeof(Vec3)==12);
             std::memcpy(points.data(),g.positionBytes.data()+mesh.positions,mesh.count*12);
+            const auto nativePoints=points;
             for(bool right:{false,true}){
             std::vector<Vec3> fitted;std::vector<std::array<uint16_t,2>> copies;
-            caps+=closeForearmCuffs(points,nativeIndices,closedIndices,mesh.lods,right,cut,&fitted,&copies,profile.elbow);
+            ForearmCuffShading shading;
+            caps+=closeForearmCuffs(points,nativeIndices,closedIndices,mesh.lods,right,cut,&fitted,&copies,profile.elbow,&shading,nativePoints);
+            recessedCuffs+=shading.recessedLoops;
             if(fitted.size()!=points.size())return;
             std::memcpy(fittedPositions.data()+mesh.positions,fitted.data(),mesh.count*12);
             // Normal/tangent are native half4. Preserve each layout's skin
             // bytes and UV locations (attribute strides are 28, 32 or 36).
-            const std::array<uint16_t,8> frame{static_cast<uint16_t>(right?0x3c00:0xbc00),0,0,0x3c00,0,0x3c00,0,0x3c00};
             for(const auto copy:copies){
                 auto* destination=capAttributes.data()+mesh.attributes+copy[0]*mesh.stride;
                 std::memcpy(destination,g.attributeBytes.data()+mesh.attributes+copy[1]*mesh.stride,mesh.stride);
+                const auto n=shading.normals[copy[0]];
+                const auto axis=std::abs(n.y)<.9f?Vec3{0,1,0}:Vec3{0,0,1};
+                auto t=axis-n*dot(axis,n);t=t*(1.f/std::sqrt(dot(t,t)));
+                const auto half=DirectX::PackedVector::XMConvertFloatToHalf;
+                const std::array<uint16_t,8> frame{half(n.x),half(n.y),half(n.z),half(1.f),half(t.x),half(t.y),half(t.z),half(1.f)};
                 std::memcpy(destination,frame.data(),16);
                 // One native fabric sample across the cap avoids drawing a
                 // stretched strip of the shoulder atlas over the cut end.
                 // All native UV sets on a cap use a single authored sample.
-                std::memcpy(destination+mesh.uv,g.attributeBytes.data()+mesh.attributes+copies.front()[1]*mesh.stride+mesh.uv,mesh.stride-mesh.uv);
+                // The new lining preserves the rim's own native fabric UVs;
+                // only the closed inner surface uses the flat fabric sample.
+                if(std::abs(n.x)>.9999f)
+                    std::memcpy(destination+mesh.uv,g.attributeBytes.data()+mesh.attributes+copies.front()[1]*mesh.stride+mesh.uv,mesh.stride-mesh.uv);
             }
             points=std::move(fitted);
             }
@@ -244,7 +255,7 @@ void observeForearmBuffer(ID3D11Device* device,const D3D11_BUFFER_DESC* desc,con
             ||FAILED(g.indices->SetPrivateDataInterface(nativePositionKey,g.positions.Get()))
             ||FAILED(g.indices->SetPrivateDataInterface(nativeAttributeKey,g.attributes.Get())))return;
         g.indices->SetPrivateDataInterface(croppedKey,g.cropped.Get());
-        log("Native forearm-only indices ready outfit="+std::string(profile.name)+" shoulder triangles removed="+std::to_string(removed)+" cuff triangles="+std::to_string(caps));
+        log("Native forearm-only indices ready outfit="+std::string(profile.name)+" shoulder triangles removed="+std::to_string(removed)+" cuff triangles="+std::to_string(caps)+" recessed cuffs="+std::to_string(recessedCuffs));
         }
     }catch(...){}
 }

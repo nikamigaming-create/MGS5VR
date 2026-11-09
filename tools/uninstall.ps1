@@ -36,6 +36,11 @@ foreach ($mgsName in $mgsOwnedNames) {
         }
     }
 }
+if (Test-Path -LiteralPath (Join-Path $mgsTarget 'mgs5vr-cabin-assets.json')) {
+    $mgsCabinImporter=Join-Path (Split-Path -Parent $PSScriptRoot) 'mgs5vr_import.exe'
+    if (-not (Test-Path -LiteralPath $mgsCabinImporter)) { $mgsCabinImporter=Join-Path (Split-Path -Parent $PSScriptRoot) 'build\Release\mgs5vr_import.exe' }
+    & (Join-Path $PSScriptRoot 'install-cabin-actors.ps1') -GameDir $mgsTarget -Importer $mgsCabinImporter -Remove
+}
 foreach ($mgsName in $mgsOwnedNames) {
     $mgsPath = Join-Path $mgsTarget $mgsName
     if (Test-Path -LiteralPath $mgsPath) { Remove-Item -LiteralPath $mgsPath }

@@ -343,6 +343,15 @@ def deploy(value, known_old=None, build=None):
     controls_changed = controls != (game / "mgs5vr-controls.ini").read_bytes()
     if running and controls_changed:
         raise ValueError("Close MGSV before changing the build's control-settings compatibility")
+    # Native datasets are installed for the exact checked candidate as well as
+    # its DLL. The published slot predating this module remains unchanged.
+    if 'tools/install-cabin-actors.ps1' in manifest['files']:
+        cabin_command = ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+                         '-File', build / 'tools/install-cabin-actors.ps1', '-GameDir', game,
+                         '-Importer', build / 'mgs5vr_import.exe']
+        if running:
+            cabin_command.append('-CheckOnly')
+        run(cabin_command)
     personal = {name: digest(game / name) for name in ("mgs5vr.ini", "mgs5vr-controls.ini")}
     slot = "play" if build == PLAY else "dev"
     if (all(digest(game / name) == digest(build / name) for name in BINARIES)

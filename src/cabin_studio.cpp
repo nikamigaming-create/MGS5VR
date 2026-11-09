@@ -274,14 +274,20 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
     frame_.capacityReached=frame_.papers.size()>=studioPaperLimit;
     frame_.freezeSupported=freezeSupported;frame_.freezeState=freeze;
     if(!freezeSupported||frame_.cameraHand<0||freeze==StudioFreeze::unavailable)frame_.freezeRequested=false;
-    const float dt=last_&&now>=last_?std::min(.05f,static_cast<float>(now-last_)*.001f):0;last_=now;
+    // Physics may cap a step, but hand velocity must use the real sample
+    // interval. A stall is not a fast throw; a lost interval cannot supply one.
+    const float elapsed=last_&&now>last_?static_cast<float>(now-last_)*.001f:0;
+    const float motionDt=elapsed>0&&elapsed<=.15f?elapsed:0;
+    const float dt=std::min(.05f,elapsed);last_=now;
     if(!initialized_){initialized_=true;frame_.camera=compose(room,Pose{{},studioCameraHome});frame_.marker={{},studioMarkerHome};
         for(size_t i=0;i<2;++i){squeezed_[i]=hands[i].squeeze>.55f;triggered_[i]=hands[i].trigger>.65f;}}
     if(!allowed){frame_.editor=-1;frame_.cameraHand=frame_.markerHand=-1;frame_.outputPaper=0;
         cameraContact_={};
+        cameraVelocity_=markerVelocity_={};
         frame_.freezeRequested=false;frame_.confirmPhoto=0;frame_.confirmPaper=0;
-        for(auto& paper:frame_.papers){paper.hand=-1;paper.field=false;}
-        for(size_t i=0;i<2;++i){squeezed_[i]=hands[i].squeeze>.55f;triggered_[i]=hands[i].trigger>.65f;}
+        for(auto& paper:frame_.papers){paper.hand=-1;paper.field=false;paper.velocity={};}
+        for(size_t i=0;i<2;++i){squeezed_[i]=hands[i].squeeze>.55f;triggered_[i]=hands[i].trigger>.65f;
+            releaseAfterPaperDelete_[i]=true;triggerReleaseRequired_[i]=true;}
         return std::make_shared<const CabinStudioFrame>(frame_);}
     if(frame_.cameraHand<0){
         if(cabin){if(!cameraDropped_)frame_.camera=compose(room,Pose{{},studioCameraHome});}
@@ -302,7 +308,11 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
     for(size_t side=0;side<2;++side){
         const auto& hand=hands[side];const bool tracking=hand.tracked&&valid(hand.grip);
         const bool squeeze=tracking&&hand.squeeze>(squeezed_[side]?.25f:.55f);
-        const bool trigger=tracking&&hand.trigger>.65f,edge=trigger&&!triggered_[side];
+        if(!tracking&&(squeezed_[side]||triggered_[side])){
+            releaseAfterPaperDelete_[side]=true;triggerReleaseRequired_[side]=true;
+        }
+        if(tracking&&hand.trigger<=.65f)triggerReleaseRequired_[side]=false;
+        const bool trigger=tracking&&hand.trigger>.65f,edge=trigger&&!triggered_[side]&&!triggerReleaseRequired_[side];
         if(tracking&&!squeeze)releaseAfterPaperDelete_[side]=false;
         const auto local=compose(inverse(room),hand.grip);
         auto paperIt=std::find_if(frame_.papers.begin(),frame_.papers.end(),[&](const auto& p){return p.hand==static_cast<int>(side);});
@@ -336,8 +346,9 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 const auto next=compose(hand.grip,contact);
                 // Handle alignment is not a throw: measure hand movement at
                 // the same blend fraction, just as for picked-up paper.
-                if(dt>0)cameraVelocity_=(next.position-compose(cameraPreviousGrip_[side],contact).position)*(1/dt);
+                cameraVelocity_=motionDt>0?(next.position-compose(cameraPreviousGrip_[side],contact).position)*(1/motionDt):Vec3{};
                 cameraPreviousGrip_[side]=hand.grip;frame_.camera=next;frame_.cameraGripBlend=blend;}
+            else cameraVelocity_={};
             if(edge&&now-lastShot_>1000&&frame_.photos.size()<studioPhotoLimit&&!frame_.review&&!frame_.confirmPhoto){
                 lastShot_=now;frame_.shutter=now;frame_.shutterPose=compose(frame_.camera,studioCameraLens);
                 frame_.hapticMask|=uint8_t(1u<<side);}
@@ -352,8 +363,9 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 const auto contact=blendPaperPickup(markerPickupAttachment_[side],attachment_[side],blend);
                 const auto next=compose(local,contact);
                 // Contact correction is not a throw; measure only actual hand motion.
-                if(dt>0)markerVelocity_=(next.position-compose(markerPreviousGrip_[side],contact).position)*(1/dt);
+                markerVelocity_=motionDt>0?(next.position-compose(markerPreviousGrip_[side],contact).position)*(1/motionDt):Vec3{};
                 markerPreviousGrip_[side]=local;frame_.marker=next;}
+            else markerVelocity_={};
             if(trigger&&tracking){
                 const auto tip=compose(frame_.marker,Pose{{},{0,0,-.08f}}).position;
                 bool wrote=false;
@@ -387,13 +399,14 @@ std::shared_ptr<const CabinStudioFrame> CabinStudio::update(bool allowed,bool ca
                 const auto next=compose(grip,contact);
                 // The contact easing is not a physical throw. Measure only
                 // hand translation/rotation at the same contact fraction.
-                if(dt>0)paperIt->velocity=(next.position-compose(paperPreviousGrip_[side],contact).position)*(1/dt);
+                paperIt->velocity=motionDt>0?(next.position-compose(paperPreviousGrip_[side],contact).position)*(1/motionDt):Vec3{};
                 paperPreviousGrip_[side]=grip;paperPose=next;}
+            else paperIt->velocity={};
             if(!squeeze){
                 paperIt->hand=-1;const auto half=studioPaperHalf(paperIt->photo!=0);
                 const auto boardLocal=compose(inverse(cabinNativeBoard),paperIt->pose);
                 const auto p=boardLocal.position,normal=rotate(boardLocal.orientation,{0,0,1});
-                if(cabin&&std::abs(p.z)<.045f&&std::abs(p.x)<cabinBoardHalf.x-half.x&&std::abs(p.y)<cabinBoardHalf.y-half.y&&normal.z>.75f){
+                if(tracking&&cabin&&std::abs(p.z)<.045f&&std::abs(p.x)<cabinBoardHalf.x-half.x&&std::abs(p.y)<cabinBoardHalf.y-half.y&&normal.z>.75f){
                     // Preserve where the user placed the sheet, but put it
                     // in front of overlapping pinned sheets. Coplanar prints
                     // fight for the same pixels and can obscure one another.

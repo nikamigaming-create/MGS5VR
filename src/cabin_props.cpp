@@ -5,6 +5,12 @@
 namespace mgs5vr {
 namespace {
 constexpr Quat flat{-.70710678f,0,0,.70710678f};
+Pose rigid(Pose pose){
+    auto& q=pose.orientation;
+    const double n=std::sqrt(double(q.x)*q.x+double(q.y)*q.y+double(q.z)*q.z+double(q.w)*q.w);
+    if(std::isfinite(n)&&n>.5)q={float(q.x/n),float(q.y/n),float(q.z/n),float(q.w/n)};
+    return pose;
+}
 Vec3 extent(Pose pose){
     const auto x=rotate(pose.orientation,{1,0,0}),y=rotate(pose.orientation,{0,1,0}),z=rotate(pose.orientation,{0,0,1});
     return {std::abs(x.x)*cabinTapeHalf.x+std::abs(y.x)*cabinTapeHalf.y+std::abs(z.x)*cabinTapeHalf.z,
@@ -35,7 +41,7 @@ Vec3 inverseInertia(Pose pose,Vec3 impulse){
 Quat turn(Quat q,Vec3 angular,float dt){
     const float speed=length(angular);if(speed<.001f)return q;
     const float angle=speed*dt*.5f,s=std::sin(angle)/speed;
-    return compose(Pose{{angular.x*s,angular.y*s,angular.z*s,std::cos(angle)},{}},Pose{q,{}}).orientation;
+    return rigid(compose(Pose{{angular.x*s,angular.y*s,angular.z*s,std::cos(angle)},{}},Pose{q,{}})).orientation;
 }
 Quat blendRotation(Quat a,Quat b,float t){
     const float dotq=a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w;
@@ -83,6 +89,7 @@ void supportContacts(CabinTape& tape,const CabinLayout& layout){
 }
 CabinLayout nativeCabinLayout(Pose origin,uint64_t generation) noexcept{
     CabinLayout layout{};if(!valid(origin)||!generation)return layout;
+    origin=rigid(origin);
     const auto fromWorld=inverse(origin);
     const auto local=[&](Vec3 p,Quat q=Quat{}){return compose(fromWorld,Pose{q,p+Vec3{0,1200,0}});};
     layout.room=local({});
@@ -173,9 +180,14 @@ void CabinProps::step(float dt){
         supportContacts(tape,layout);
         // Cabin-contained props remain recoverable on the native floor.
         auto roomPose=compose(inverse(layout.room),tape.pose);const auto roomExtent=extent(roomPose);
+        const auto beforeClamp=roomPose.position;
         roomPose.position.x=std::clamp(roomPose.position.x,-.95f+roomExtent.x,.95f-roomExtent.x);
         roomPose.position.z=std::clamp(roomPose.position.z,-1.35f+roomExtent.z,2.40f-roomExtent.z);
-        tape.pose=compose(layout.room,roomPose);
+        // Bound only the translation that actually hit a wall. Repeatedly
+        // round-tripping a resting orientation through inverse(room) and room
+        // accumulates float quaternion error until a flat tape starts tipping.
+        if(roomPose.position.x!=beforeClamp.x||roomPose.position.z!=beforeClamp.z)
+            tape.pose.position=compose(layout.room,Pose{{},roomPose.position}).position;
     }
     for(unsigned iteration=0;iteration<3;++iteration)for(size_t i=0;i<6;++i)for(size_t j=i+1;j<6;++j){
         auto& a=frame_.tapes[i];auto& b=frame_.tapes[j];const bool da=dynamic(a),db=dynamic(b);
@@ -193,17 +205,28 @@ void CabinProps::step(float dt){
 CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t now,CabinLayout layout){
     if(initialized_&&layout.verified&&layout.generation!=frame_.layout.generation)reset();
     if(!initialized_){
+        layout.room=rigid(layout.room);layout.seat=rigid(layout.seat);layout.player=rigid(layout.player);
+        layout.slot=rigid(layout.slot);layout.board=rigid(layout.board);
         initialized_=true;frame_.layout=layout;frame_.player=layout.player;const auto homes=tapeHomes(layout);
-        for(size_t i=0;i<6;++i)frame_.tapes[i].pose=homes[i];
-        for(size_t side=0;side<2;++side){grabbed_[side]=hands[side].grip>.55f;triggered_[side]=hands[side].trigger>.68f;}
+        for(size_t i=0;i<6;++i)frame_.tapes[i].pose=rigid(homes[i]);
+        for(size_t side=0;side<2;++side){
+            grabbed_[side]=hands[side].grip>.55f;triggered_[side]=hands[side].trigger>.68f;
+            grabArmed_[side]=hands[side].tracked&&valid(hands[side].pose)&&hands[side].grip<=.25f;
+        }
     }
     const float dt=lastTime_&&now>=lastTime_?std::min(.05f,static_cast<float>(now-lastTime_)*.001f):0;
+    // Physics may use bounded substeps; throw velocity must use the actual
+    // sampling interval. A stale/duplicate/backwards sample is not a throw.
+    const float motionDt=lastTime_&&now>lastTime_&&now-lastTime_<=150
+        ?static_cast<float>(now-lastTime_)*.001f:0;
     lastTime_=now;frame_.hovered=frame_.activated=-1;frame_.ejectPressed=false;frame_.blocked=false;
     frame_.hapticMask=0;
     frame_.layout.slot=cabinCarrierPose(frame_.player,frame_.lidOpen);
     const auto slot=frame_.layout.slot;
     for(size_t side=0;side<2;++side){
         const auto& hand=hands[side];const bool tracked=hand.tracked&&valid(hand.pose);
+        if(!tracked)grabArmed_[side]=false;
+        else if(hand.grip<=.25f)grabArmed_[side]=true;
         const bool gripping=tracked&&(hand.grip>(grabbed_[side]?.25f:.55f));
         const bool trigger=tracked&&hand.trigger>.68f;
         const bool fingerTracked=tracked&&hand.indexTipTracked;
@@ -217,9 +240,14 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
         int held=-1;for(size_t i=0;i<6;++i)if(frame_.tapes[i].hand==static_cast<int>(side))held=static_cast<int>(i);
         if(held>=0){
             auto& tape=frame_.tapes[static_cast<size_t>(held)];
-            if(tracked){const auto next=compose(hand.pose,attachment_[side]);
-                if(dt>0){tape.velocity=limit((next.position-tape.pose.position)*(1/dt),3.f);
-                    tape.angularVelocity=limit(angularVelocity(tape.pose.orientation,next.orientation,dt),12.f);}
+            if(tracked){const auto next=rigid(compose(hand.pose,attachment_[side]));
+                if(motionDt>0){tape.velocity=limit((next.position-rawHeldPose_[side].position)*(1/motionDt),3.f);
+                    tape.angularVelocity=limit(angularVelocity(rawHeldPose_[side].orientation,next.orientation,motionDt),12.f);}
+                else {tape.velocity={};tape.angularVelocity={};}
+                // Slot guidance and collision resolution below may move the
+                // displayed tape. Never feed those corrections into the next
+                // hand velocity or impulse against neighbouring cassettes.
+                rawHeldPose_[side]=next;
                 tape.pose=next;
                 const bool carrierOccupied=std::any_of(frame_.tapes.begin(),frame_.tapes.end(),[](const auto& other){
                     return other.state==CabinTapeState::presented||other.state==CabinTapeState::ejecting;
@@ -264,12 +292,13 @@ CabinBenchFrame CabinProps::update(const std::array<CabinHand,2>& hands,uint64_t
                     frame_.hapticMask|=uint8_t(1u<<side);
                 }else {tape.state=CabinTapeState::falling;if(!tracked){tape.velocity={};tape.angularVelocity={};}}
             }
-        }else if(gripping){
+        }else if(gripping&&grabArmed_[side]){
             int nearest=-1;float distance=.04f*.04f;
             for(size_t i=0;i<6;++i){const auto& tape=frame_.tapes[i];if(tape.hand>=0||tape.state==CabinTapeState::seated||tape.state==CabinTapeState::ejecting)continue;
                 const float d=distanceBox(hand.pose.position,tape);if(d<distance){distance=d;nearest=static_cast<int>(i);}}
             if(nearest>=0){auto& tape=frame_.tapes[static_cast<size_t>(nearest)];tape.hand=static_cast<int>(side);
                 tape.state=CabinTapeState::held;attachment_[side]=compose(inverse(hand.pose),tape.pose);frame_.hovered=nearest;
+                rawHeldPose_[side]=tape.pose;grabArmed_[side]=false;tape.velocity={};tape.angularVelocity={};
                 frame_.hapticMask|=uint8_t(1u<<side);}
         }
         if(tracked&&held<0&&!gripping){

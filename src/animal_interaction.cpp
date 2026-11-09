@@ -2,6 +2,7 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/opening_selector.hpp"
+#include "mgs5vr/ui_renderer.hpp"
 #include <windows.h>
 #include <algorithm>
 #include <array>
@@ -85,6 +86,11 @@ Hands hands(){std::lock_guard lock(publicationMutex);return latest;}
 }
 void publishAnimalHands(const HeadCameraSample& frame,const std::array<Pose,2>& palms,const HandContacts& contacts){
     std::lock_guard lock(publicationMutex);latest={frame,palms,contacts};
+}
+bool nativeCabinDogPositioned(){
+    // dogBones sends a new native command every call; it is not the render
+    // publication cache and cannot retain the previous scene's bone sample.
+    return (nativeTitleCabinMode()||nativeCabinPlay())&&dogBones().has_value();
 }
 void consumeAnimalTouch(){
     std::lock_guard lock(interactionMutex);

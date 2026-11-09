@@ -1,5 +1,123 @@
 # Current MGS5VR work — 26 October 2026
 
+### Cockpit adversarial repair batch - 9 November 2026 (checked development)
+
+Latest checked development is installed in TPP:
+`d4a9fbaeb657fd61f76c591959ef831d54485cae1a87722bf9983e5e6e649a15`.
+All 62 CTest groups and packaged installer checks passed
+(`artifacts/cockpit-audit-native-boundary-build.log`). The batch repairs cassette
+idle/throw/tracking behavior, studio release/timing and storage recovery, narrowly
+owned adult D-Dog visibility, native rat package ordering/realization/contact, and
+supported recessed cuff geometry. Steam and the published play pin remain unchanged.
+This is scoped checked development, not whole-game or physical-headset acceptance.
+
+The user requested a complete cockpit audit and repeated adversarial review with
+three collaborating reviewers/coders. `artifacts/cockpit-audit-20261109/review-iterations.json`
+records actual challenges and revisions; `adversarial-audit.md` inventories fifteen
+separate gameplay criteria. These are not fifteen successful live playthroughs.
+
+Final native rat interaction is observed in retained `20261109T174022319502Z` on d4a9.
+After a bounded low approach and refined open-palm offer, native logical rat1 is held
+on the right palm at1197.39m, then lifted28cm to1197.67m with held/lifted true and
+continuing skin updates. Whole rat/palm contact is visible in both held final eyes;
+lifted images retain feet/palm contact but crop the upper body. Lowering returns rat1
+to native floor1197.3m and it walks away. Rat0 then enters contact proximity; deliberate
+withdrawal clears held and selected to0, with both native rats continuing to move.
+The final withdrawal pair is partly forearm-occluded, not proof of two simultaneously
+visible rats in both eyes. One HMD and four controller restoration events are retained.
+Exact review: `independent-final-rat-contact-review.json` and native contact-held,
+contact-lifted, contact-lowered and contact-withdrawn observations.
+
+All six contact action cases report observed_pass, but the aggregate run is FAILED
+because recording segment0003.mp4 failed; release_ready is false. This recording
+failure is preserved. Native observations and reviewed final-eye stills establish the
+scoped interaction, not a clean whole-run or continuous-video pass. Earlier retained
+`173437019666Z` includes an already-satisfied crouch proof precondition, a corrected
+crouch pass, and a20cm head packet rejected before input because required orientation
+was omitted. Those procedure failures are not rat/gameplay failures. Final Continue
+`173324638047Z` reaches ACC; both arrival eyes are independently reviewed. Final d4a9
+interaction scope is ACC/right hand/logical1. Title rat appearance was observed earlier
+on aa389 workbench; title pickup, other hands/scenes and physical Quest remain open.
+
+Rat investigation retains its actual failures: new dataset cold-load crash
+`151003949222Z`, metadata-only crash `154440704636Z`, e994 order-only title/ACC boots
+with unrealized models, then55c4 ACC appearance. aa389 introduced floor-contact and
+logical-center preservation but exposed native rat1 walking2.531mm beyond a single
+center-ray Xedge and being artificially unrealized. d4a9 removes that sampled X/Z
+actor rejection while preserving exact native ownership, stop/enable/NPC rules,
+original-first field forwarding, sampled vertical context and6m distance. Native AI
+owns horizontal movement; actual native floor queries remain for contact/lowering.
+Fresh root and model-foot agree; logical center is0.199951m above them. Carrying now
+translates logical metadata by the same fresh root delta, never a guessed offset.
+
+The user's ordinary-field rat absence/suspected regression remains separate and open.
+A fresh mission30010 sample had registered definitions but no enabled rats; owned
+free-roam source enables birds only. Cabin success does not resolve an enabled native
+field habitat. No global rat fix or every-scene acceptance is claimed.
+
+D-Dog e994 run `160112581139Z` has native response0-to-1 during the hand-only stroke
+and visible close hand/neck contact in both eyes. Adjacent55c4 `165936797862Z` retains
+close visibility and response1 after contact dwell, without a separately sampled
+pre-counter. Both cover one right-hand adult-main3 ACC interaction. Earlier fbf75
+invisible close-pet `153000462393Z` and3efd visible approach with counter0-to-0
+`155256009317Z` remain their original failures/gaps. Other hands/outfits/title and
+physical-headset acceptance are open.
+
+The apparent missing helicopter is explained for the tested departure route by
+retained55c4 `170123325433Z`: outward terrain becomes cabin/door/Quiet after right,
+behind and left HMD turns; downward views show the threshold. Both final eyes show
+vehicle geometry. Native passenger7168/type14 persists and camera/head separation
+stays about0.137m. The actual RIGHT compositor proof is175frames/45.079s/3.882fps.
+The earlier missing-vehicle/excessive-camera-excursion inference is retracted for this
+route; the broader physical user report remains open. Exact directional evidence is
+in `independent-passenger-direction-review.json`; no stereo-motion/headset pass.
+
+Mounted55c4 `171219209609Z` reaches one stationary MG and observes correct viewed
+right/left signs for both hands, zero re-grab bearing change and zero axes/hand mask
+after release, with independent view retained. The hand inputs are immediate pose
+steps: native yaw starts promptly but reaches90percent about682-732ms after final RPC,
+then settles. This is not proof the user's desired feel is satisfied. The gun/contact
+is cropped or outside held source-eye images, so convincing grip attachment and
+both-eye motion remain open. No reversal was reproduced on this MG; every mount and
+physical feel remain unaccepted. Earlier approach failure `163811774084Z` is retained.
+Cover `164632272313Z` never proves eligible wall contact. Rifle `164715773307Z` shows
+fixed native1x and HIPammo40-to-38 only, not magnified zoom or muzzle/sight/laser-hit
+alignment. See `mounted-current-independent-review.json` for exact timing/source limits.
+
+Full aa389 workbench `171732023594Z` remains FAILED at its intended left-marker board
+stroke. Partial tape drop/recover/seat/eject, both-hand camera prints, typed TAPE note,
+right-hand freehand stroke and new board attachment were observed in both final-eye
+checkpoints. The intended left marker tip stays at least170.793mm from the target
+plane; a transient stroke marks overlapping old note16 while target23 stays unchanged.
+This is a contact/procedure attribution failure, not established dead left-marker
+input. Old gray board items remain. Prior fbf75 idle/workbench observations remain
+scoped to their original builds. Exact failure: `independent-final-workbench-review.json`.
+Cuff repair admits native recessed lining selectively; the left closure remains flat
+and large sleeve ends remain conspicuous. Source/fixture passes do not close visual
+rig acceptance, persistence/gallery or remaining studio combinations.
+
+The [115.1-second partial audit edition](../private/showcase/cockpit-audit-edition-20261109/index.html)
+contains ten labeled chapters from six same-day fbf75/e994/55c4 takes. Exact candidate
+and native RIGHT source-eye labels remain visible. Its rat chapter is appearance only;
+the later d4a9 pickup evidence is separate. Original audio remains; full AV decode and
+sampled visual review passed, listening pending. SHA256
+`8faf52d55e25f55c79c92ef70214576e9cf2d85667abaf9da69a9624f701443d`.
+The old82.3s cut is unchanged. Neither is the complete TPP/GZ/full-capability showcase.
+
+Both protected studio test transactions restored the exact original nine files/hashes;
+latest receipt: `artifacts/cockpit-audit-20261109/studio-restoration-final.json`.
+Final original settings/studio hashes and HMD/controller poses were reverified; native
+buttons/axes and rat held/selected state are zero. The runtime owner closed only the
+owned game/operator; Steam and unrelated operator sessions remain. The completed
+studio backup transaction was removed (`studio-transaction-cleanup.json`); both build
+slots verify and cleanup found zero obsolete builds. No background harness remains.
+Next: an ordinary field habitat with native rats actually enabled; real optic/laser/
+muzzle-hit alignment across applicable weapons; eligible cover contact; visually
+framed mounted hand attachment and physical feel; remaining studio/persistence and
+shared TPP/GZ feature coverage. Preserve reviewed scoped passes, retained failures,
+personal settings/saves and the published pin. Do not rerun unchanged acceptance loops
+or call the game100percent complete.
+
 ### Sight alignment, mounted contact and ACC departure — 9 November 2026
 
 Incoming physical feedback: laser useful; scope/dot alignment difficult across sights;

@@ -3,6 +3,9 @@
 #include "mgs5vr/input_bridge.hpp"
 #include "mgs5vr/log.hpp"
 #include "mgs5vr/opening_selector.hpp"
+#include "mgs5vr/cabin_rat_realization.hpp"
+#include "mgs5vr/ui_renderer.hpp"
+#include <MinHook.h>
 #include <windows.h>
 #include <algorithm>
 #include <atomic>
@@ -16,6 +19,10 @@ namespace mgs5vr {
 namespace {
 uintptr_t base{};
 std::atomic_bool enabled{};
+struct NativeRatSelection {uint16_t* entries{};uint32_t count{};};
+using SelectRats=void(*)(void*,NativeRatSelection*,const NativeRatSelection*);
+SelectRats originalSelectRats{};
+std::atomic_uint64_t cabinSelections{};
 struct Hands {HeadCameraSample frame;std::array<Pose,2> palms;HandContacts contacts;};
 std::mutex handsMutex,animalsMutex;
 Hands hands;
@@ -71,7 +78,83 @@ bool eligible(const Hands& sample,uint64_t now){
 }
 bool cabinContains(const HeadCameraSample& frame,Vec3 world){
     const auto& bounds=frame.controllers.cabinBounds;
-    return nativeRoomContains(bounds,nativeRoomLocal(bounds,world),.035f);
+    const auto distance=world-frame.nativePose.position;
+    return cabinRatContactContains(bounds,world)&&dot(distance,distance)<=36.f;
+}
+void selectRats(void* nativeSelector,NativeRatSelection* output,const NativeRatSelection* previous){
+    originalSelectRats(nativeSelector,output,previous);
+    if(!enabled.load()||!output||output->count||!output->entries)return;
+    if(!nativeCabinPlay()&&!nativeTitleCabinMode())return;
+    const auto frame=headCamera().publishedRigFrame(steadyMilliseconds());
+    if(!frame||!frame->applied||!frame->controllers.presentationFocused)return;
+    const auto& controls=frame->controllers;
+    CabinRatSelectionContext context;
+    context.freshFrame=true;context.nativeCabin=nativeCabinPlay();context.nativeTitle=nativeTitleCabinMode();
+    context.frontEnd=controls.frontEnd;context.cabinPlay=controls.cabinPlay;
+    context.openingBackend=controls.openingBackend;context.openingSelector=controls.openingSelector;
+    context.openingNativeMenu=controls.openingNativeMenu;context.loading=controls.loading;
+    context.avatarEditor=controls.avatarEditor;context.authoredCamera=controls.authoredCamera;
+    context.scriptedDemo=controls.scriptedDemo||nativeScriptedDemoActive();
+    context.nativeGamepad=controls.nativeGamepad||nativeGamepadActive();
+    context.bounds=controls.cabinBounds;context.head=frame->nativePose.position;
+    // Reject every field selector before traversing native actor data.
+    if((!context.nativeCabin&&!context.nativeTitle)||context.loading||context.avatarEditor
+        ||context.authoredCamera||context.scriptedDemo||context.nativeGamepad)return;
+    const auto selector=reinterpret_cast<uintptr_t>(nativeSelector);
+    if(read<uintptr_t>(selector)!=base+0x230b618)return;
+    const auto registry=read<uintptr_t>(base+0x2c389a0);
+    const auto pool=read<uintptr_t>(read<uintptr_t>(read<uintptr_t>(registry+0x30+33*8)+8)+0x20);
+    const auto poolReference=read<uintptr_t>(pool+0x48);
+    const auto module=read<uintptr_t>(poolReference+0x10)+0x20;
+    if(read<uintptr_t>(module)!=base+0x23d9410||read<uintptr_t>(selector+8)!=poolReference
+        ||read<uintptr_t>(selector+0x10)!=module
+        ||read<uintptr_t>(read<uintptr_t>(module+0xc8)+0x10)+0x20!=selector
+        ||read<uint64_t>(module+0x38)!=0xe0abbca053cf1501ull)return;
+    const auto metadata=read<uintptr_t>(module+8),locators=read<uintptr_t>(module+0x108);
+    context.logicalCount=read<uint8_t>(selector+0x18);context.capacity=read<uint8_t>(selector+0x19);
+    if(!metadata||!locators||context.logicalCount!=2||context.capacity!=2
+        ||read<uint32_t>(metadata+0x40)!=2||read<uint32_t>(metadata+0x44)!=2
+        ||read<uint32_t>(read<uintptr_t>(module+0x10)+0x14)!=2)return;
+    // Reuse the selector's native global-stop and per-rat NPC/enable methods.
+    const auto manager=read<uintptr_t>(read<uintptr_t>(base+0x2c3a8a0)+8);
+    const auto services=read<uintptr_t>(manager+0x98),status=read<uintptr_t>(services+0xf8);
+    const auto statusMethod=read<uintptr_t>(read<uintptr_t>(status));
+    const auto eligibility=read<uintptr_t>(read<uintptr_t>(module)+0x18);
+    const auto provider=read<uintptr_t>(services+8),providerMethod=read<uintptr_t>(read<uintptr_t>(provider));
+    if(statusMethod!=base+0x53eb20||eligibility!=base+0xc3d800||providerMethod!=base+0xa1a6d0)return;
+    context.nativeStopped=reinterpret_cast<bool(*)(uintptr_t,uint8_t)>(statusMethod)(status,21);
+    if(context.nativeStopped)return;
+    const auto spatial=reinterpret_cast<uintptr_t(*)(uintptr_t)>(providerMethod)(provider);
+    if(read<uintptr_t>(spatial)!=base+0x20e2a10)return;
+    const auto spatialTable=read<uintptr_t>(spatial);
+    if(read<uintptr_t>(spatialTable+0x38)!=base+0x15f890
+        ||read<uintptr_t>(spatialTable+0x40)!=base+0x15f350)return;
+    std::array<int32_t,4> grid{};std::array<int32_t,3> focus{};
+    reinterpret_cast<void(*)(uintptr_t,int32_t*)>(base+0x15f890)(spatial,grid.data());
+    reinterpret_cast<void(*)(uintptr_t,int32_t*,int32_t*,int32_t*)>(base+0x15f350)
+        (spatial,&focus[0],&focus[2],&focus[1]);
+    const auto positions=read<uintptr_t>(metadata+0x20),enabledBits=read<uintptr_t>(metadata);
+    if(!positions||!enabledBits||grid[2]<=0||grid[3]<=0)return;
+    std::array<CabinRatCandidate,2> rats{};
+    for(size_t i=0;i<rats.size();++i){
+        auto& rat=rats[i];const auto locator=locators+i*40;
+        rat.locator=read<uint32_t>(read<uintptr_t>(locator)+0x10);rat.route=read<uint32_t>(locator+0x10);
+        rat.position=read<Vec3>(positions+i*16);rat.enabled=(read<uint8_t>(enabledBits)&(1u<<i))!=0;
+        rat.nativeEligible=reinterpret_cast<bool(*)(uintptr_t,uint32_t)>(eligibility)(module,static_cast<uint32_t>(i));
+        // Native new-candidate grid inclusion has a 32 m boundary margin.
+        rat.outsideNativeGrid=rat.position.x<float(grid[0])+32.f||rat.position.z<float(grid[1])+32.f
+            ||rat.position.x>float(grid[0])+float(grid[2])-32.f||rat.position.z>float(grid[1])+float(grid[3])-32.f;
+        const auto delta=rat.position-Vec3{float(focus[0]),float(focus[1]),float(focus[2])};
+        rat.nativeDistanceSquared=dot(delta,delta);
+    }
+    context.ownedSelector=true;context.nativeCount=output->count;
+    if(const auto selection=cabinRatSelection(context,rats)){
+        for(uint32_t i=0;i<selection->count;++i)output->entries[i]=selection->indices[i];
+        output->count=selection->count;
+        // Native realization consumes this list; no skin, position, enable,
+        // grid or eligibility metadata is written by the fallback.
+        if(cabinSelections.fetch_add(1)==0)log("Owned cabin rat locators admitted outside unavailable field grid");
+    }
 }
 Vec3 palmNormal(const Hands& h,unsigned side){return rotate(h.palms[side].orientation,{side?-1.f:1.f,0,0});}
 Pose perch(const Hands& h,unsigned side){
@@ -126,13 +209,16 @@ std::optional<Animal> identify(uintptr_t character,uint32_t index){
 void place(const Animal& a,Pose target){
     // This runs in this animal's skin transaction, after native movement.
     // Native queries and the skin share one root.
-    const auto delta=target.position-read<Vec3>(a.root+0x10);
+    const auto nativeRoot=read<Vec3>(a.root+0x10);
+    const auto logicalPosition=read<uintptr_t>(a.metadata+0x20)+a.logical*16;
+    const auto translatedLogical=translatedRatLogicalPosition(read<Vec3>(logicalPosition),nativeRoot,target.position);
+    const auto delta=target.position-nativeRoot;
     put(a.root+0x20,read<Vec3>(a.root+0x20)+delta);
     put(a.root+0x10,target.position);
     put(a.root+0x60,target.orientation);put(a.root+0x80,target.orientation);
     put(a.root+0xe0,matrix(target));
     put(a.model+0x60,target.position);put(a.model+0xa0,matrix(target));
-    put(read<uintptr_t>(a.metadata+0x20)+a.logical*16,target.position);
+    put(logicalPosition,translatedLogical);
 }
 bool owns(const Animal& a){return carry.model==a.model&&carry.module==a.module&&carry.logical==a.logical;}
 void release(const Animal& a,const char* reason,uint64_t now){
@@ -248,6 +334,11 @@ void installSmallAnimalInteraction(uintptr_t imageBase){
     base=imageBase;
     const std::array<unsigned char,7> signature{0x4c,0x8b,0xc1,0xb9,0xff,0xff,0x00};
     if(read<std::array<unsigned char,7>>(base+0x12e2fe0)!=signature)throw std::runtime_error("Small animal active-slot ABI differs");
+    const std::array<unsigned char,21> selectorSignature{0x48,0x8b,0xc4,0x55,0x56,0x57,0x41,0x54,0x41,0x55,0x41,0x56,0x41,0x57,0x48,0x81,0xec,0x20,0x01,0x00,0x00};
+    auto* selector=reinterpret_cast<void*>(base+0xc10d80);
+    if(read<std::array<unsigned char,21>>(base+0xc10d80)!=selectorSignature
+        ||MH_CreateHook(selector,reinterpret_cast<void*>(&selectRats),reinterpret_cast<void**>(&originalSelectRats))!=MH_OK
+        ||MH_EnableHook(selector)!=MH_OK)throw std::runtime_error("Cabin rat selector ABI/hook differs");
     enabled.store(true);log("Small animal palm interaction installed for every active native rat instance");
 }
 void stopSmallAnimalInteraction() noexcept{enabled.store(false);}
@@ -300,7 +391,8 @@ void applySmallAnimalSkin(uintptr_t binding){
 std::string inspectSmallAnimals(){
     const auto h=latestHands();std::lock_guard lock(animalsMutex);
     std::ostringstream o;o<<"{\"held\":"<<carry.held<<",\"selected\":"<<(carry.model!=0)
-        <<",\"logical\":"<<carry.logical<<",\"lifted\":"<<carry.lifted<<",\"skinUpdates\":"<<skinUpdates<<",\"palmUp\":["
+        <<",\"logical\":"<<carry.logical<<",\"lifted\":"<<carry.lifted<<",\"skinUpdates\":"<<skinUpdates
+        <<",\"cabinSelections\":"<<cabinSelections.load()<<",\"palmUp\":["
         <<palmNormal(h,0).y<<','<<palmNormal(h,1).y<<"],\"rats\":[";
     bool first=true;const auto now=steadyMilliseconds();
     for(const auto& a:animals)if(a.model&&now-a.seen<2000){
