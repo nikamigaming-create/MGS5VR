@@ -1,4 +1,88 @@
 {
+  "sight_alignment_2026_11_09": {
+    "status": "checked_deployed_duplicate_reticle_scoped_observed_pass_hit_and_other_families_open",
+    "source_commit": "ad4f1f49f21f18a5fb24debb3225647c87713787",
+    "candidate_sha256": "3f82200547cb4aa9668f15f2e1646eda5cc2756a2e3fadf858b9f97aa8e887e8",
+    "reproduced": "Current st02 fixed1x draws both a correct collimated point and a finite native point; fixed-weapon head shifts match both predicted projections within0.65px.",
+    "repair": "Exact current st02 native reticle group5136384d suppressed only during physical1x replacement; native Show/Hide desired state tracked for restoration. Housing, glass, laser and native shot solver preserved.",
+    "checks": {
+      "ctest_groups": 62,
+      "ctest": "passed",
+      "installer": "passed",
+      "source_reviewers": 3,
+      "build_log": "artifacts/sight-alignment-20261109/reticle-build.log"
+    },
+    "retained_runs": {
+      "reproduction": "20261110T025330205866Z",
+      "adjacent_saved_scope_2x": "20261110T030409761070Z",
+      "candidate_continue": "20261110T031420095648Z",
+      "candidate_sortie": "20261110T031607981274Z",
+      "candidate_final_eyes": "20261110T032300298199Z",
+      "candidate_discharge": "20261110T032741381764Z"
+    },
+    "final_eye_review": {
+      "status": "narrowly_observed_pass",
+      "cases": 6,
+      "evidence": "artifacts/sight-alignment-20261109/postrepair-independent-review.json",
+      "observed": [
+        "Former finite point absent across +/-10mm head shifts and restore in both final eyes",
+        "Correct right-eye collimated point stable within0.005px across reviewed endpoints",
+        "Glass/housing and native ground laser retained",
+        "Release/re-grip exercised"
+      ],
+      "limits": [
+        "Sequential final-eye screenshots, not continuous compositor video",
+        "Nearby telemetry joins, not exact compositor sourceframe",
+        "No physical Quest or all-family acceptance"
+      ]
+    },
+    "discharge": {
+      "cases": 4,
+      "status": "observed_pass_discharge_only",
+      "trigger_seconds": 0.12,
+      "ammo_before": 40,
+      "ammo_after": 38,
+      "controller_pose_fixed": true,
+      "grip_continuity": "Ready released between semantic actions; gun animation may move",
+      "impact_proven": false,
+      "movie_source": "Native RIGHT eye before runtime composition; excludes compositor-only reticles",
+      "continuous_source_seconds": 65.5,
+      "actual_capture_fps": 29.9035683,
+      "accepted_frames": 1959,
+      "encoded_frames": 1965,
+      "repeat_frames": 6,
+      "dropped_samples": 7
+    },
+    "mobile_video": {
+      "url": "https://drive.google.com/file/d/1C4dXKxfRgxNflwVO-Zixt4Diz22Bcwzm/view?usp=drivesdk",
+      "seconds": 24,
+      "scope": "Continuous source26-50s, four-case savedHIP discharge test; NOT all-sights accuracy showcase",
+      "path": "private/showcase/sight-repair-20261109/MGS5VR-Saved-HIP-1x-Demonstration.mp4",
+      "sha256": "6a50473ad27f188ef4a3424976ab13d8acf48cf9c2b1bb5dbb89a240b3940055",
+      "metadata_readback_verified": true
+    },
+    "open": [
+      "Independently visible target impact aligned with final-eye optic/laser references",
+      "Baked dot-sight receiver ownership and reproduction",
+      "Magnified scope reticle/laser attribution and every fitted power",
+      "Other weapon/optic families and GZ",
+      "Physical Quest Link acceptance",
+      "Earlier cockpit/cover/field-rat/fullgame gaps retain historical scope"
+    ],
+    "cleanup": {
+      "poses": "Head and all four controller grip/aim poses restored",
+      "inputs": "Release samples verified; owned game/simulator closed",
+      "steam_pid_retained": 34192,
+      "settings_sha256": "a2b836b8ebd5b3ec725f175f922796b3da87ac41d86d31fa531c9e1e05a56565",
+      "controls_sha256": "5709010f8fda8ae04954950e2811af5a042f09e3f792b2981c4467a48e508ecf",
+      "game_runtime_sha256": "daaf206f2736e417ddbeaecafff50d5d256e05e052a14c91385027acca02ca1c",
+      "game_runtime": "Restored exact Meta64 per-game manifest; Windows default unchanged",
+      "installed_matches_dev": true,
+      "published_play_pin_unchanged": true,
+      "log": "artifacts/sight-alignment-20261109/reticle-cleanup.log"
+    },
+    "release_ready": false
+  },
   "cockpit_adversarial_2026_11_09": {
   "status": "checked_deployed_scoped_rat_contact_observed_fullgame_gaps_open",
   "baseline_candidate": "8960a4e5375162e4061cff54c1b97402228f987c078794e0637128c54ccbdc5b",

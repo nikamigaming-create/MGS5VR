@@ -1,5 +1,28 @@
 # Field fixes — implementation and acceptance
 
+### Reproduced competing sight references — 9 November 2026
+
+Retained `20261110T025330205866Z` on d4a9 shows two red points in the current
+st02 1x optic during fixed-weapon +/-10mm head motion. Pixel/projection analysis
+matches one to the infinite collimator and one to the native finite reticle quad.
+Checked/deployed `3f82200547cb` (`ad4f1f4`) suppresses only native group5136384d
+on the exact current st02 model while the physical 1x replacement is active.
+Native Show/Hide intent is retained for stow and teardown; housing/glass/laser and
+ballistics are unchanged. Three source reviews, all62CTest and installer checks
+passed. Retained `20261110T032300298199Z` passes six scoped live cases: both eyes
+retain glass/housing and laser; fixed-weapon +/-10mm head shifts show one stable
+collimated point and no competing finite point. Release/re-grip was exercised.
+Retained `20261110T032741381764Z` adds a same-controller-pose trigger case with
+ammo40->38; this proves discharge, not an independently observed target hit.
+Its native RIGHT-eye movie excludes compositor-only reticles. No all-sights,
+impact or physical-headset acceptance is claimed.
+
+Baked models contain an equivalent isolated quad but their current receiver
+ownership is unproven, so this patch does not claim them. The separate saved
+[2,4,8,1] scope was inspected at2x in retained `20261110T030409761070Z`; scene and
+reticle attribution/hit agreement remain separate. The measured109mm mechanical
+offset alone is not a defect diagnosis. See `artifacts/sight-alignment-20261109/`.
+
 ### Cockpit adversarial repair batch - 9 November 2026 (checked development)
 
 Latest checked development is installed in TPP:

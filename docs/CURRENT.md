@@ -1,5 +1,41 @@
 # Current MGS5VR work — 26 October 2026
 
+### Sight alignment — 9 November 2026 (checked development)
+
+Development `3f82200547cb4aa9668f15f2e1646eda5cc2756a2e3fadf858b9f97aa8e887e8`
+is installed from `ad4f1f49f21f18a5fb24debb3225647c87713787`. All 62 CTest
+groups and installer checks passed (`artifacts/sight-alignment-20261109/reticle-build.log`).
+The published play pin and personal settings are unchanged. Retained live recheck
+`20261110T032300298199Z` passes the narrow duplicate-point repair: both final eyes
+retain glass/housing and the native laser, while the correct right-eye dot remains
+stable through +/-10mm head shifts and release/re-grip. Independent pixel review
+finds the former finite-depth point absent at all predicted positions.
+
+Retained pre-repair `20261110T025330205866Z` reproduces two red references in the
+current st02 1x sight: a correct collimated VR point and a native finite-depth point
+that shifts with the glass. Independent pixel/projection review identifies both
+within 0.65 pixels during fixed-weapon, +/-10mm head motion. The repair suppresses
+only that exact native reticle group for the current physical 1x replacement and
+tracks native Show/Hide requests to restore intended visibility on teardown.
+Housing, glass, laser and native ballistics are preserved. Three source reviewers
+challenged ownership, native visibility restoration and unrelated setter behavior.
+
+The approximately 109mm sight-over-bore offset is not itself a diagnosed error;
+no speculative zero or bullet-steering change was made. Baked dot-sight receiver
+ownership, other optic families, actual impact agreement and physical Quest remain
+open. Adjacent retained `20261110T030409761070Z` shows the saved [2,4,8,1] scope
+at 2x through head motion; it does not prove reticle/laser/impact agreement.
+Exact evidence and remaining family rows: `artifacts/sight-alignment-20261109/`.
+
+Retained firing run `20261110T032741381764Z` passes four select/level/alignment/
+discharge cases with the controller pose held fixed during the trigger case;
+ammo40->38 confirms two rounds, not target-hit accuracy. Its continuous native
+RIGHT-eye recording is before runtime composition and omits compositor-only
+reticle overlays; it cannot substitute for the paired final-eye sight evidence.
+Actual hit agreement remains unaccepted. Mobile discharge clip (native eye, not all-sights proof):
+[24-second recording](https://drive.google.com/file/d/1C4dXKxfRgxNflwVO-Zixt4Diz22Bcwzm/view?usp=drivesdk). Test inputs/poses were restored, the
+owned game/simulator closed, Steam retained, and personal settings hashes match.
+
 ### Cockpit adversarial repair batch - 9 November 2026 (checked development)
 
 Latest checked development is installed in TPP:

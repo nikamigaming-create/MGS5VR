@@ -1,5 +1,19 @@
 # Release execution plan — 26 October 2026
 
+### Sight alignment batch — 9 November 2026
+
+Checked development `3f82200547cb` from `ad4f1f4` is installed; all62CTest and
+installer checks passed. The reproduced st02 duplicate finite reticle has a narrow
+native-group repair preserving the laser, glass and native shot behavior.
+Matching live fixed-weapon/head-motion/re-grip recheck is retained and narrowly
+passes (`20261110T032300298199Z`). The four-case recorded firing demonstration
+(`20261110T032741381764Z`) proves discharge only; native-eye video excludes
+compositor-only reticles. Next gameplay acceptance needs independently visible
+target impacts with final-eye optic/laser references, then bounded reproduction
+of remaining baked and magnified families on the installed candidate. Keep
+physical Quest acceptance explicit. Do not change zeroing from mechanical offset
+alone, restart completed cockpit cases, or promote the published play pin.
+
 ### Cockpit adversarial repair batch - 9 November 2026 (checked development)
 
 Latest checked development is installed in TPP:
