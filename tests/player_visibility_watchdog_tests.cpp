@@ -2,6 +2,47 @@
 #include "mgs5vr/paused_rig.hpp"
 #include <stdexcept>
 
+constexpr bool st02ReplacementIsExact(){
+    using namespace mgs5vr;
+    constexpr uint32_t resource=27873;
+    constexpr uint64_t identity=uint64_t(resource)<<32|2;
+    if(!replaceNativeSt02Reticle(nativeSt02Model,identity,resource,true,true,true,false,1))return false;
+    for(const auto sight:{4u,5u})
+        if(!replaceNativeSt02Reticle(nativeSt02Model,uint64_t(resource)<<32|sight,resource,true,true,true,false,1))return false;
+    for(const auto model:{0ull,nativeSt02Model^1ull,0x84a1df03c6484ee1ull,0x84a2233aa7f98e18ull})
+        if(replaceNativeSt02Reticle(model,identity,resource,true,true,true,false,1))return false;
+    for(const float power:{0.f,2.f,4.f,8.f})
+        if(replaceNativeSt02Reticle(nativeSt02Model,identity,resource,true,true,true,false,power))return false;
+    if(replaceNativeSt02Reticle(nativeSt02Model,identity,resource,false,true,true,false,1)
+       ||replaceNativeSt02Reticle(nativeSt02Model,identity,resource,true,false,true,false,1)
+       ||replaceNativeSt02Reticle(nativeSt02Model,identity,resource,true,true,false,false,1)
+       ||replaceNativeSt02Reticle(nativeSt02Model,identity,resource,true,true,true,true,1)
+       ||replaceNativeSt02Reticle(nativeSt02Model,identity,resource+1,true,true,true,false,1)
+       ||replaceNativeSt02Reticle(nativeSt02Model,uint64_t(resource)<<32|25,resource,true,true,true,false,1))return false;
+    for(uint32_t equipment=871;equipment<=876;++equipment)
+        if(nativeCustomWeaponAssembly(equipment)!=std::array<uint32_t,6>{0,3,1,4,2,5}[equipment-871])return false;
+    return !nativeCustomWeaponAssembly(870)&&!nativeCustomWeaponAssembly(877);
+}
+static_assert(st02ReplacementIsExact());
+constexpr bool nativeReticleDesiredStateSurvivesSuppression(){
+    using namespace mgs5vr;
+    for(unsigned flags=0;flags<256;++flags){
+        NativeReticleVisibility visibility;visibility.observe(static_cast<uint8_t>(flags));
+        const auto hidden=static_cast<uint8_t>(flags&~4u);
+        if(visibility.restoreVisible(hidden)!=bool(flags&4u))return false;
+        // Native stow/zoom Hide must retire an earlier visible request.
+        visibility.observe(hidden);
+        if(visibility.restoreVisible(hidden))return false;
+        // A subsequent native Show is remembered while presentation hides it.
+        visibility.observe(static_cast<uint8_t>(flags|4u));
+        if(!visibility.restoreVisible(hidden))return false;
+        // Unrelated native flag changes invalidate our restoration snapshot.
+        if(visibility.restoreVisible(static_cast<uint8_t>(hidden^2u)))return false;
+    }
+    return true;
+}
+static_assert(nativeReticleDesiredStateSurvivesSuppression());
+
 // The owned adult D-Dog body variants use distinct resource identities.
 // main3 was observed at native alpha .01 despite a valid live dog owner;
 // main4 was the sole previously admitted outfit. Puppies/other actors remain

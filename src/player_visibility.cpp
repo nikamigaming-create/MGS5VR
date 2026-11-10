@@ -235,7 +235,7 @@ struct Binding {
     bool equipment{};
     uintptr_t service{},itemInterface{};
     uint32_t itemIndex{};
-    bool backWeapon{};
+    bool backWeapon{},opticReticle{};
     uintptr_t custom{};
     uint64_t resourceCode{};
     uint32_t assembly{},part{};
@@ -255,16 +255,17 @@ bool names(uintptr_t model,std::array<uint32_t,128>& result,uint16_t& count){
 bool owned(const Binding& b){
     if(get<uintptr_t>(b.owner)!=base+0x23b8218||get<uintptr_t>(b.owner+0x370)!=b.character
         ||get<uintptr_t>(b.character)!=base+0x2295210)return false;
-    if(b.equipment||b.backWeapon){
+    if(b.equipment||b.backWeapon||b.opticReticle){
         const auto component=get<uintptr_t>(b.character+0x80);
         if(get<uintptr_t>(component)!=base+0x23b3e80||get<uintptr_t>(component+8)!=b.character
             ||get<uintptr_t>(component+0x60)!=b.service||get<uintptr_t>(b.service)!=base+0x234b840
             ||get<uintptr_t>(b.itemInterface)!=base+0x22e2970)return false;
-        if(b.backWeapon){
+        if(b.backWeapon||b.opticReticle){
             if(!resolveWeaponPart||get<uintptr_t>(b.service+0xf0)!=b.custom
                 ||get<uintptr_t>(b.custom)!=base+0x233ad90
                 ||get<uintptr_t>(base+0x233ad90+0x10)!=base+0xd45930
-                ||(b.assembly!=1&&b.assembly!=4)||b.part>11)return false;
+                ||(b.opticReticle?(b.assembly>5||(b.part!=6&&b.part!=7)):
+                    ((b.assembly!=1&&b.assembly!=4)||b.part>11)))return false;
             uint32_t index{};
             if(resolveWeaponPart(reinterpret_cast<void*>(b.custom),b.assembly,b.part,&index)!=b.itemInterface
                 ||index!=b.itemIndex)return false;
@@ -275,6 +276,7 @@ bool owned(const Binding& b){
             ||get<uintptr_t>(models+static_cast<uintptr_t>(b.itemIndex)*8)!=b.model
             ||get<uintptr_t>(b.model)!=base+0x20f4d90)return false;
         const auto code=get<uint64_t>(b.model+0x120);
+        if(b.opticReticle)return code==mgs5vr::nativeSt02Model;
         if(b.backWeapon)return code==b.resourceCode;
         return std::find(nvgModels.begin(),nvgModels.end(),code)!=nvgModels.end();
     }
@@ -302,6 +304,99 @@ int groupIndex(const Binding& b,uint32_t name){
 uint8_t groupFlags(const Binding& b,uint32_t name){
     const auto index=groupIndex(b,name);const auto data=get<uintptr_t>(b.model+0x170);
     return index>=0&&data?get<uint8_t>(data+static_cast<uintptr_t>(index)):0;
+}
+std::mutex reticleMutex;
+Binding reticleBinding;
+mgs5vr::NativeReticleVisibility reticleNativeVisibility;
+uint64_t reticleSampleTime{};
+uint32_t reticleResource{};
+std::atomic_bool reticleHooksReady{};
+void concealReticleLocked(){
+    hideVisibleGroup(reinterpret_cast<void*>(reticleBinding.model),mgs5vr::nativeSt02ReticleGroup);
+    static unsigned reports{};static uint32_t reportedResource{};
+    if(reports<8&&reportedResource!=reticleResource){
+        ++reports;reportedResource=reticleResource;
+        std::ostringstream message;message<<"Native physical collimator reticle suppressed model="<<reticleBinding.model
+            <<" resource="<<reticleResource<<" group=0x5136384d desired_flags="<<unsigned(reticleNativeVisibility.desired)
+            <<" glass_housing_laser_preserved=1";mgs5vr::log(message.str());
+    }
+}
+void releaseReticleLocked(){
+    if(reticleBinding.model&&owned(reticleBinding)&&showVisibleGroup
+       &&reticleNativeVisibility.restoreVisible(groupFlags(reticleBinding,mgs5vr::nativeSt02ReticleGroup)))
+        showVisibleGroup(reinterpret_cast<void*>(reticleBinding.model),mgs5vr::nativeSt02ReticleGroup);
+    reticleBinding={};reticleNativeVisibility={};reticleSampleTime=0;reticleResource=0;
+}
+void restoreExpiredReticle(){
+    std::lock_guard lock(reticleMutex);
+    const auto now=mgs5vr::steadyMilliseconds();
+    if(reticleBinding.model&&(now<reticleSampleTime||now-reticleSampleTime>150))releaseReticleLocked();
+}
+void nativeReticleGroupWrite(void* model,uint32_t group,bool visible){
+    // Our own conceal/restore writes use these native trampolines directly.
+    // Never acquire hiddenMutex here: existing body visibility calls them
+    // while holding it. Native group writes retain their original behavior.
+    if(group!=mgs5vr::nativeSt02ReticleGroup){(visible?showVisibleGroup:hideVisibleGroup)(model,group);return;}
+    std::lock_guard lock(reticleMutex);
+    (visible?showVisibleGroup:hideVisibleGroup)(model,group);
+    if(!reticleHooksReady.load()||group!=mgs5vr::nativeSt02ReticleGroup
+       ||reinterpret_cast<uintptr_t>(model)!=reticleBinding.model||!owned(reticleBinding))return;
+    reticleNativeVisibility.observe(groupFlags(reticleBinding,group));
+    const auto now=mgs5vr::steadyMilliseconds();
+    if(now>=reticleSampleTime&&now-reticleSampleTime<=150&&(reticleNativeVisibility.desired&4u))
+        concealReticleLocked();
+}
+void nativeHideGroup(void* model,uint32_t group){nativeReticleGroupWrite(model,group,false);}
+void nativeShowGroup(void* model,uint32_t group){nativeReticleGroupWrite(model,group,true);}
+void updateScopeReticle(const std::optional<mgs5vr::HeadCameraSample>& frame,uintptr_t owner,bool physical){
+    std::lock_guard lock(reticleMutex);
+    const auto now=mgs5vr::steadyMilliseconds();
+    const bool active=reticleHooksReady.load()&&physical&&frame&&frame->applied&&frame->rigSequence
+        &&frame->playerOwner==owner&&now>=frame->sampleTime&&now-frame->sampleTime<=150
+        &&frame->nativeFirearmActive&&frame->controllers.weaponReady&&frame->controllers.presentationFocused
+        &&frame->controllers.hands[1].gripTracked&&frame->controllers.hands[1].aimTracked
+        &&!frame->menuOpen&&!frame->controllers.frontEnd&&!frame->controllers.loading
+        &&!frame->controllers.optic.held&&!frame->controllers.cabinPlay&&!frame->controllers.cabinTransit
+        &&!frame->controllers.authoredCamera&&!frame->controllers.scriptedDemo&&!frame->controllers.nativeGamepad
+        &&!mgs5vr::nativeScriptedDemoActive()&&!mgs5vr::nativeGamepadActive()
+        &&frame->weaponRig.componentAccepted&&frame->weaponRig.instanceIndexMatched&&frame->weaponRig.resourceAccepted;
+    Binding candidate{};
+    if(active&&resolveWeaponPart&&mgs5vr::replaceNativeSt02Reticle(mgs5vr::nativeSt02Model,
+        frame->weaponScope.weaponIdentity,frame->weaponRig.resourceHandle,true,frame->weaponScope.tracked,
+        frame->weaponScope.dotReticle,frame->weaponScope.opaqueAtOnePower,frame->weaponScope.magnification)){
+        const auto character=get<uintptr_t>(owner+0x370),component=get<uintptr_t>(character+0x80);
+        const auto service=get<uintptr_t>(component+0x60),custom=get<uintptr_t>(service+0xf0);
+        const auto assembly=*mgs5vr::nativeCustomWeaponAssembly((frame->weaponRig.resourceHandle>>5)&0x7ffu);
+        const auto playerIndex=get<uint32_t>(owner+0x3a0),first=get<uint32_t>(get<uintptr_t>(component+0x38)+0x24);
+        if(get<uintptr_t>(owner)==base+0x23b8218&&get<uintptr_t>(character)==base+0x2295210
+           &&get<uintptr_t>(component)==base+0x23b3e80&&get<uintptr_t>(component+8)==character
+           &&get<uintptr_t>(service)==base+0x234b840
+           &&playerIndex>=first&&playerIndex-first<=15
+           &&frame->weaponRig.state==get<uintptr_t>(component+0x58)+(playerIndex-first)*0x610ull
+           &&component==frame->weaponRig.component&&character==frame->weaponRig.character
+           &&get<uint32_t>(frame->weaponRig.state+0x240)==frame->weaponRig.resourceHandle
+           &&get<uintptr_t>(custom)==base+0x233ad90&&get<uintptr_t>(base+0x233ad90+0x10)==base+0xd45930){
+            for(uint32_t part:{6u,7u}){
+                uint32_t index{};const auto interface=resolveWeaponPart(reinterpret_cast<void*>(custom),assembly,part,&index);
+                if(get<uintptr_t>(interface)!=base+0x22e2970||index>=get<uint32_t>(interface+0x50)||index>=128)continue;
+                const auto model=get<uintptr_t>(get<uintptr_t>(interface+0x58)+static_cast<uintptr_t>(index)*8);
+                Binding value{owner,character,0,0,0,model};value.opticReticle=true;value.service=service;value.custom=custom;
+                value.itemInterface=interface;value.itemIndex=index;value.assembly=assembly;value.part=part;
+                std::array<uint32_t,128> groups{};uint16_t count{};
+                if(owned(value)&&names(model,groups,count)&&count==3
+                   &&groups[0]==0xf948d635u&&groups[1]==mgs5vr::nativeSt02ReticleGroup&&groups[2]==0xc5549e41u){candidate=value;break;}
+            }
+        }
+    }
+    if(reticleBinding.model&&(candidate.model!=reticleBinding.model||candidate.owner!=reticleBinding.owner
+       ||candidate.custom!=reticleBinding.custom||candidate.assembly!=reticleBinding.assembly||candidate.part!=reticleBinding.part
+       ||candidate.itemInterface!=reticleBinding.itemInterface||candidate.itemIndex!=reticleBinding.itemIndex||!owned(reticleBinding)))
+        releaseReticleLocked();
+    if(!candidate.model)return;
+    if(!reticleBinding.model){reticleBinding=candidate;reticleNativeVisibility.observe(groupFlags(candidate,mgs5vr::nativeSt02ReticleGroup));}
+    reticleSampleTime=frame->sampleTime;reticleResource=frame->weaponRig.resourceHandle;
+    if(groupFlags(candidate,mgs5vr::nativeSt02ReticleGroup)&4u)
+        concealReticleLocked();
 }
 bool bodyBranches(uintptr_t model,const std::array<uint32_t,128>& groups,uint16_t count,std::array<bool,128>& conceal){
     // The native group inheritance walk (1ce980) reads signed parents at +4
@@ -351,6 +446,7 @@ void restore(Binding& b){
     b={};
 }
 void restoreStaleVisibilityIfAllowed() noexcept {
+    restoreExpiredReticle();
     if(mgs5vr::nativeSortiePreviewActive()){
         std::unique_lock lock(hiddenMutex,std::try_to_lock);
         if(!lock.owns_lock())return;
@@ -581,6 +677,17 @@ void initializePlayerVisibility(uintptr_t moduleBase) noexcept {
     std::array<unsigned char,22> hideBytes{};std::array<unsigned char,23> showBytes{};
     if(read(base+0x1ccc30,hideBytes)&&hideBytes==hideSignature&&read(base+0x1cee30,showBytes)&&showBytes==showSignature){
         hideVisibleGroup=reinterpret_cast<GroupFn>(base+0x1ccc30);showVisibleGroup=reinterpret_cast<GroupFn>(base+0x1cee30);
+        auto* hideTarget=reinterpret_cast<void*>(hideVisibleGroup);auto* showTarget=reinterpret_cast<void*>(showVisibleGroup);
+        if(MH_CreateHook(hideTarget,reinterpret_cast<void*>(&nativeHideGroup),reinterpret_cast<void**>(&hideVisibleGroup))==MH_OK){
+            if(MH_CreateHook(showTarget,reinterpret_cast<void*>(&nativeShowGroup),reinterpret_cast<void**>(&showVisibleGroup))==MH_OK){
+                if(MH_EnableHook(hideTarget)==MH_OK&&MH_EnableHook(showTarget)==MH_OK){
+                    reticleHooksReady.store(true);log("Native st02 reticle visibility follows physical collimator with native Show/Hide ownership");
+                }else{MH_DisableHook(hideTarget);MH_DisableHook(showTarget);MH_RemoveHook(hideTarget);MH_RemoveHook(showTarget);}
+            }else MH_RemoveHook(hideTarget);
+            if(!reticleHooksReady.load()){
+                hideVisibleGroup=reinterpret_cast<GroupFn>(hideTarget);showVisibleGroup=reinterpret_cast<GroupFn>(showTarget);
+            }
+        }
     }
     constexpr std::array<unsigned char,20> visualSignature{0x89,0x54,0x24,0x10,0x55,0x53,0x56,0x57,
         0x48,0x8d,0x6c,0x24,0xa8,0x48,0x81,0xec,0x58,0x01,0,0};
@@ -645,6 +752,7 @@ void updatePlayerVisibility(uintptr_t owner,bool firstPerson,bool hideArms,bool 
         ?headCamera().publishedRigFrame(steadyMilliseconds()):std::nullopt;
     const auto cameraStatus=headCamera().status();
     const auto view=!frame?headCamera().publishedView():std::nullopt;
+    updateScopeReticle(frame,owner,firstPerson&&!hideArms&&!authoredBody);
     std::lock_guard lock(hiddenMutex);
     lastFirstPersonUpdateMs.store(firstPerson?GetTickCount64():0);
     const auto now=GetTickCount64();

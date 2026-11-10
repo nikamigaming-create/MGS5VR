@@ -6,6 +6,32 @@
 #include "core.hpp"
 
 namespace mgs5vr {
+inline constexpr uint64_t nativeSt02Model=0x84a35edc984905ceull;
+inline constexpr uint32_t nativeSt02ReticleGroup=0x5136384du;
+constexpr std::optional<uint32_t> nativeCustomWeaponAssembly(uint32_t equipment) noexcept {
+    if(equipment<871||equipment>876)return {};
+    return equipment<873?(equipment-871)*3:equipment<875?(equipment-873)*3+1:(equipment-875)*3+2;
+}
+// Only the reproduced transparent 1x replacement claims the native finite
+// reticle. Magnified/unknown optics retain native visibility pending review.
+constexpr bool replaceNativeSt02Reticle(uint64_t model,uint64_t scopeIdentity,
+        uint32_t resource,bool currentPhysicalFrame,bool tracked,bool dotReticle,
+        bool opaqueAtOnePower,float power) noexcept {
+    const auto sight=static_cast<uint32_t>(scopeIdentity);
+    return model==nativeSt02Model&&currentPhysicalFrame&&tracked&&dotReticle&&!opaqueAtOnePower
+        &&power==1.f&&resource&&scopeIdentity>>32==resource&&(sight==2||sight==4||sight==5)
+        &&nativeCustomWeaponAssembly((resource>>5)&0x7ffu).has_value();
+}
+// Observe native Show/Hide even while our replacement suppresses the group.
+// Restoring an old "visible" snapshot after native stow would revive a dot
+// the game deliberately hid. Preserve its latest desired bits instead.
+struct NativeReticleVisibility {
+    uint8_t desired{};
+    constexpr void observe(uint8_t flags) noexcept {desired=flags;}
+    constexpr bool restoreVisible(uint8_t current) const noexcept {
+        return (desired&4u)&&current==static_cast<uint8_t>(desired&~4u);
+    }
+};
 // Resource admission is additional to the typed live TppBuddyDog2 owner,
 // publisher callsite and fresh cabin frame checks. It must never authorize
 // another character merely because a mesh happens to share a skeleton size.
