@@ -1,5 +1,27 @@
 # Release execution plan — 26 October 2026
 
+### Persistent resume next action — 11 November 2026
+
+User requires resume after closing/restarting, plus quick return to a defect's
+test situation. Private native checkpoint-file proof restored one free-roam
+location after a real process restart (`20261111T184636809945Z`) and accepted
+ordinary VR movement afterward. Preserve this proof; do not repeat its unchanged
+field staging or describe it as an implemented general save system.
+
+Next implementation is a transactional named-bookmark save/load flow with native
+eligibility, account/build identity, durable backup, read/version validation,
+failure rollback and retained VR selection. Stock Continue routes free-roam to
+ACC; explicit mission restore is necessary. Prologue needs sequence-specific
+investigation: its early backup replayed the opening, and CanSaveAsCheckPoint was
+true inside a non-playable cinematic. Do not enable arbitrary hospital saves
+from that flag. Quest/enemy/task progress, ordinary long missions, physical Quest
+and PC reboot remain unproven. Original campaign/settings/runtime were restored.
+
+Prior sight/cockpit code is published in nightly `nightly-2026-11-11-c0c5b13c287a`
+(Actions43043903883; hosted tests/installer/package/upload hash checks passed).
+The resume prototype is private and absent from that nightly. Keep the published
+play pin unchanged and carry the sight/impact acceptance gaps below forward.
+
 ### Sight alignment batch — 9 November 2026
 
 Checked development `3f82200547cb` from `ad4f1f4` is installed; all62CTest and

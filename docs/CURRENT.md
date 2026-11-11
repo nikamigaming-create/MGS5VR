@@ -1,5 +1,43 @@
 # Current MGS5VR work — 26 October 2026
 
+### Persistent mission resume — 11 November 2026 (private feasibility proof)
+
+The requested feature must survive closing the game/restarting the PC. One
+isolated Afghanistan free-roam bookmark now has a real process-restart proof on
+unchanged checked development `3f82200547cb`. The native current-position
+checkpoint was written to a separate file, MGSV exited, and a new MGSV process
+read/version-checked that file and explicitly restored/reloaded its mission.
+Run `20261111T184636809945Z` returns to the same mission30010, sequence, XYZ,
+story, health and primary weapon; facing changes by1 degree. Both final eyes
+were reviewed. `20261111T184721543360Z` then moves0.626m through ordinary VR input.
+No fixture-position override exists in the restarted process. Stock Continue
+instead returns to ACC40010, so file backups alone do not solve direct resume.
+
+This is a private prototype, not a shipped save system, exact memory snapshot,
+PC-reboot test, completed mission, or full-game/prologue acceptance. The early
+hospital backup restarts the opening; bounded run `20261111T184951669656Z` fails
+its startup deadline in `Seq_Demo_StartHasTitleMission`. A fresh read reports
+`CanSaveAsCheckPoint=true` while mission-playable=false and non-playable-demo=true;
+that single eligibility flag is insufficient. No forced hospital checkpoint was
+created. Retain this limitation rather than treating the historical profile name
+as proof of its cold-start destination.
+
+All six original campaign/personal files were restored byte-for-byte from
+`before-save-resume-20261111`. Personal controls/config and Meta64 game runtime
+hashes match; owned game/simulator/readers closed, Steam retained. Only the two
+new probe-slot files were removed from the account after verified private copies.
+Evidence: `artifacts/save-resume-20261111/`, especially
+`field-cold-resume-comparison.json` and `cleanup.json`. Next: transaction-safe
+bookmark creation/restore with rollback and VR selection, then genuine mission
+progress/enemy/quest tests and specific hospital sequence adapters. Do not expose
+the exploratory pipe scripts as a finished general-purpose save feature.
+
+Nightly delivery was independently verified at committed main `c0c5b13c287a`:
+https://github.com/nikamigaming-create/MGS5VR/releases/tag/nightly-2026-11-11-c0c5b13c287a
+This contains the prior sight/cockpit repairs, not the private resume experiment.
+Daily/manual Actions publication requires pushed commits, passes59 hosted tests
+and packaging checks, and does not promote the local play pin or auto-update users.
+
 ### Sight alignment — 9 November 2026 (checked development)
 
 Development `3f82200547cb4aa9668f15f2e1646eda5cc2756a2e3fadf858b9f97aa8e887e8`

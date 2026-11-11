@@ -1,4 +1,70 @@
 {
+  "persistent_resume_2026_11_11": {
+    "status": "private_field_process_restart_proof_user_feature_and_prologue_open",
+    "requirement": "Resume after closing/restarting, with direct return to a gameplay test situation",
+    "candidate_sha256": "3f82200547cb4aa9668f15f2e1646eda5cc2756a2e3fadf858b9f97aa8e887e8",
+    "source_commit": "ad4f1f49f21f18a5fb24debb3225647c87713787",
+    "implementation": "Private source-grounded native Lua experiment; no new production save feature",
+    "proof": {
+      "saved_mission": 30010,
+      "saved_sequence": "Seq_Game_FreePlay",
+      "old_process": 22572,
+      "new_process": 46828,
+      "stock_continue_run": "20261111T184112967522Z",
+      "stock_continue_destination": 40010,
+      "native_slot_restore_run": "20261111T184636809945Z",
+      "matched": [
+        "mission",
+        "location",
+        "sequence",
+        "story",
+        "checkpoint",
+        "player_xyz",
+        "health",
+        "primary_hip_weapon"
+      ],
+      "yaw_degrees": {
+        "saved": -136,
+        "restored": -135
+      },
+      "movement_after_restore_run": "20261111T184721543360Z",
+      "movement_metres": 0.6261777896316648,
+      "both_final_eyes_reviewed": true,
+      "setup_position_override_active_on_restore": false,
+      "comparison": "artifacts/save-resume-20261111/field-cold-resume-comparison.json"
+    },
+    "prologue": {
+      "run": "20261111T184951669656Z",
+      "status": "bounded_startup_failed_no_new_checkpoint_written",
+      "sequence": "Seq_Demo_StartHasTitleMission",
+      "result": "Early hospital profile replays opening rather than its recorded lesson; startup deadline retained",
+      "can_save_as_checkpoint": true,
+      "mission_playable": false,
+      "demo_nonplayable": true,
+      "implication": "Native save-position eligibility alone cannot authorize a safe cinematic bookmark"
+    },
+    "cleanup": {
+      "receipt": "artifacts/save-resume-20261111/cleanup.json",
+      "original_profile": "before-save-resume-20261111",
+      "six_original_save_hashes_match": true,
+      "controls_config_runtime_hashes_match": true,
+      "probe_files_removed_after_private_verified_copy": true,
+      "owned_game_simulator_harness_closed": true,
+      "steam_retained": true
+    },
+    "remaining": [
+      "transactional named-bookmark feature and VR UI",
+      "backup rollback and account/build/version binding",
+      "ordinary long-mission objective/enemy/quest-state validation",
+      "prologue sequence-safe restoration",
+      "actual PC reboot/power-loss validation",
+      "physical Quest",
+      "full-game progression"
+    ],
+    "public_nightly_contains_feature": false,
+    "physical_headset_acceptance": false,
+    "full_game_acceptance": false
+  },
   "sight_alignment_2026_11_09": {
     "status": "checked_deployed_duplicate_reticle_scoped_observed_pass_hit_and_other_families_open",
     "source_commit": "ad4f1f49f21f18a5fb24debb3225647c87713787",

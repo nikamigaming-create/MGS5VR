@@ -1,5 +1,31 @@
 # Field fixes — implementation and acceptance
 
+### Save after closing / direct return to a test situation — 11 November 2026
+
+**Private scoped proof; user-facing feature and full-game acceptance open.**
+On unchanged development `3f82200547cb`, a separate native checkpoint file survives
+MGSV exit and restores mission30010/Seq_Game_FreePlay at the chosen XYZ through an
+explicit native mission reload. Story33, life7801 and HIP871 match; yaw rounds
+from-136 to-135 degrees. Both restored final eyes are reviewed in retained
+`20261111T184636809945Z`; subsequent ordinary VR movement advances0.626m in
+`20261111T184721543360Z`. Stock Continue returns to ACC instead. The setup-only
+field-position wrapper was removed before saving and cannot survive the restart.
+
+The retained early-hospital profile replays its opening on cold start rather than
+returning to its recorded look-lesson state. `20261111T184951669656Z` retains the
+bounded startup deadline failure; it is not a diagnosed save corruption or a
+complete prologue test. Native CanSaveAsCheckPoint=true coexists with a non-playable
+cinematic and mission-playable=false. Do not force save eligibility or promise
+arbitrary cinematic/time/AI restoration. No new hospital checkpoint was written.
+
+The public nightly has no new save feature. Required implementation remains a
+transactional, account-bound named-bookmark flow with backup/rollback, native
+version/mission/position validation and VR selection; broader mission progress,
+enemy/quest/animation state, power-loss/PC reboot and physical Quest remain open.
+Original six save files, controls/config and Meta64 runtime hashes were restored
+and verified; owned sessions closed and Steam retained. Exact comparison and
+cleanup receipts: `artifacts/save-resume-20261111/`.
+
 ### Reproduced competing sight references — 9 November 2026
 
 Retained `20261110T025330205866Z` on d4a9 shows two red points in the current
