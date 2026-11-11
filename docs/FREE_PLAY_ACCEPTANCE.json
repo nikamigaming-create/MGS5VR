@@ -1,6 +1,6 @@
 {
   "persistent_resume_2026_11_11": {
-    "status": "private_field_process_restart_proof_user_feature_and_prologue_open",
+    "status": "private_field_and_prologue_section_process_restart_proofs_user_feature_open",
     "requirement": "Resume after closing/restarting, with direct return to a gameplay test situation",
     "candidate_sha256": "3f82200547cb4aa9668f15f2e1646eda5cc2756a2e3fadf858b9f97aa8e887e8",
     "source_commit": "ad4f1f49f21f18a5fb24debb3225647c87713787",
@@ -34,14 +34,42 @@
       "comparison": "artifacts/save-resume-20261111/field-cold-resume-comparison.json"
     },
     "prologue": {
-      "run": "20261111T184951669656Z",
-      "status": "bounded_startup_failed_no_new_checkpoint_written",
-      "sequence": "Seq_Demo_StartHasTitleMission",
-      "result": "Early hospital profile replays opening rather than its recorded lesson; startup deadline retained",
-      "can_save_as_checkpoint": true,
-      "mission_playable": false,
-      "demo_nonplayable": true,
-      "implication": "Native save-position eligibility alone cannot authorize a safe cinematic bookmark"
+      "status": "native_section_bookmark_restart_and_progress_verified",
+      "historical_startup_attempt": {
+        "run": "20261111T184951669656Z",
+        "status": "bounded_startup_failed_no_new_checkpoint_written",
+        "sequence": "Seq_Demo_StartHasTitleMission",
+        "result": "Startup deadline at the special hospital title before native Continue; earlier inference of replaying the whole opening is superseded by later section restoration proof",
+        "can_save_as_checkpoint": true,
+        "mission_playable": false,
+        "demo_nonplayable": true,
+        "implication": "Native save-position eligibility alone cannot authorize a safe cinematic bookmark"
+      },
+      "bookmark": "prologue-escape-bookmark",
+      "old_process": 42892,
+      "new_process": 9856,
+      "run": "20261111T194752680054Z",
+      "saved_checkpoint_sequence": 41,
+      "restored_sequence": "Seq_Game_EscapeFromAwakeRoom",
+      "captured_live_sequence": "Seq_Game_AfterHeliDemo",
+      "exact_live_position_restored": false,
+      "ishmael_restored": true,
+      "rail_active": true,
+      "movement_unlocked": true,
+      "native_movement_metres": 4.051126803822749,
+      "native_next_sequence": "Seq_Demo_Heli",
+      "both_settled_final_eyes_reviewed": true,
+      "transition_blank_capture_retained": true,
+      "can_save_current_position_during_tested_rails": false,
+      "forced_manual_hospital_checkpoint_written": false,
+      "avatar_restore_run": "20261111T192745220779Z",
+      "proof": "artifacts/prologue-resume-20261111/proof.json",
+      "workflow": "docs/PROLOGUE_BOOKMARKS.md",
+      "cleanup": "artifacts/prologue-resume-20261111/cleanup.json",
+      "original_six_files_and_settings_restored": true,
+      "owned_sessions_closed": true,
+      "steam_retained": true,
+      "earlier_probe_mirror_cleanup": "The remaining311340 mirror of the prior field probe matched the retained private hash and was deleted through the native API. Both app directories now have no probe files."
     },
     "cleanup": {
       "receipt": "artifacts/save-resume-20261111/cleanup.json",
@@ -56,7 +84,7 @@
       "transactional named-bookmark feature and VR UI",
       "backup rollback and account/build/version binding",
       "ordinary long-mission objective/enemy/quest-state validation",
-      "prologue sequence-safe restoration",
+      "later prologue section bookmarks and exact scripted-action restoration; first playable escape section proved",
       "actual PC reboot/power-loss validation",
       "physical Quest",
       "full-game progression"

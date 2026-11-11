@@ -1,5 +1,37 @@
 # Current MGS5VR work — 26 October 2026
 
+### Prologue resume — 11 November 2026 (verified local section bookmark)
+
+`prologue-escape-bookmark` now returns to the first playable hospital escape
+after a real process restart, without replaying avatar creation or the opening
+scenes. On unchanged development `3f82200547cb`, process42892 was closed, the six
+hash-verified bookmark files activated, and process9856 selected native Continue
+and loading Resume. Retained `20261111T194752680054Z` restores mission10010,
+`Seq_Game_EscapeFromAwakeRoom`, story0, checkpoint1437554836 and the native rail.
+Ishmael is present and movement is unlocked. Ordinary VR movement advances4.051m
+in27.828s and triggers `Seq_Demo_Heli`; a later read reaches AfterHeliDemo. Both
+settled gameplay eyes and the following cinematic eyes were reviewed. Immediate
+transition captures include a blank fade; that case failure remains retained.
+
+This is a reusable **native section bookmark**, not an exact mid-rail save or a
+new shipped save system. The captured live position was later in AfterHeliDemo;
+the saved checkpoint sequence was41 (EscapeFromAwakeRoom). Native
+CanSaveAsCheckPoint is false during both tested crawl sections. Never label the
+archive with its live capture position as its resume destination. The earlier
+hospital startup timeout stopped at the special hospital title before Continue;
+it did not prove that the stored checkpoint was lost or that the whole opening
+had to replay. Avatar restoration was also verified in `20261111T192745220779Z`.
+
+Use [PROLOGUE_BOOKMARKS.md](PROLOGUE_BOOKMARKS.md) for the retained return workflow.
+Evidence and exact cleanup: `artifacts/prologue-resume-20261111/`. Original six
+campaign/personal files and personal controls/config/Meta64 runtime hashes match
+the pre-test backup. The previous field probe's remaining311340 mirror was
+hash-verified and deleted through the native file API; both app directories are
+clear. Owned game/simulator/input runners are closed; Steam and play pin retained.
+No production binary changed. Next: implement transaction-safe bookmarks and VR
+selection, with explicit section semantics for prologue rails; extend restore
+proof to later hospital sections and eligible manual save positions.
+
 ### Persistent mission resume — 11 November 2026 (private feasibility proof)
 
 The requested feature must survive closing the game/restarting the PC. One
@@ -14,9 +46,10 @@ No fixture-position override exists in the restarted process. Stock Continue
 instead returns to ACC40010, so file backups alone do not solve direct resume.
 
 This is a private prototype, not a shipped save system, exact memory snapshot,
-PC-reboot test, completed mission, or full-game/prologue acceptance. The early
-hospital backup restarts the opening; bounded run `20261111T184951669656Z` fails
-its startup deadline in `Seq_Demo_StartHasTitleMission`. A fresh read reports
+PC-reboot test, completed mission, or full-game/prologue acceptance. Bounded run
+`20261111T184951669656Z` fails its startup deadline at the hospital title in
+`Seq_Demo_StartHasTitleMission`, before Continue (see the later correction above).
+A fresh read reports
 `CanSaveAsCheckPoint=true` while mission-playable=false and non-playable-demo=true;
 that single eligibility flag is insufficient. No forced hospital checkpoint was
 created. Retain this limitation rather than treating the historical profile name

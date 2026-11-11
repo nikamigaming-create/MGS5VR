@@ -1,5 +1,25 @@
 # Field fixes — implementation and acceptance
 
+### Prologue return point — 11 November 2026
+
+**Verified local section bookmark; exact-position save system remains open.**
+`prologue-escape-bookmark` survives MGSV process42892 exiting and restores in
+process9856 through native Continue/Resume. Retained `20261111T194752680054Z`
+returns to the first playable hospital escape, with Ishmael and the native rail
+restored. VR movement advances4.051m and triggers the next helicopter scene.
+Both settled gameplay eyes and subsequent cinematic eyes are reviewed. The
+immediate transition capture hit a blank fade and remains a failed capture;
+the fresh pair and native transition support the narrower progression result.
+
+The archive captures the native checkpoint at section41, not the later live
+AfterHeliDemo position. Both tested crawl sections report CanSaveAsCheckPoint=false.
+Exact mid-rail restoration, later hospital bookmarks, VR bookmark selection,
+PC reboot and physical Quest remain open. No save-anywhere feature was shipped.
+The earlier title timeout did not diagnose lost hospital progress; native Continue
+was still pending. [PROLOGUE_BOOKMARKS.md](PROLOGUE_BOOKMARKS.md) records how to
+reuse this return point without replaying the opening. Original campaign and
+settings were restored byte-for-byte; owned sessions closed and Steam retained.
+
 ### Save after closing / direct return to a test situation — 11 November 2026
 
 **Private scoped proof; user-facing feature and full-game acceptance open.**
@@ -11,10 +31,11 @@ from-136 to-135 degrees. Both restored final eyes are reviewed in retained
 `20261111T184721543360Z`. Stock Continue returns to ACC instead. The setup-only
 field-position wrapper was removed before saving and cannot survive the restart.
 
-The retained early-hospital profile replays its opening on cold start rather than
-returning to its recorded look-lesson state. `20261111T184951669656Z` retains the
-bounded startup deadline failure; it is not a diagnosed save corruption or a
-complete prologue test. Native CanSaveAsCheckPoint=true coexists with a non-playable
+`20261111T184951669656Z` retains the bounded startup deadline failure at the
+hospital title before native Continue. The earlier inference that this meant the
+checkpoint replayed the whole opening is superseded by the later proof above.
+It is not a diagnosed save corruption or a complete prologue test. Native
+CanSaveAsCheckPoint=true coexists with a non-playable
 cinematic and mission-playable=false. Do not force save eligibility or promise
 arbitrary cinematic/time/AI restoration. No new hospital checkpoint was written.
 

@@ -2,6 +2,15 @@
 
 ### Persistent resume next action — 11 November 2026
 
+Prologue is a required part of this feature, including quick return for VR fixes.
+The local `prologue-escape-bookmark` is now verified after process restart:
+native Continue/Resume returns to EscapeFromAwakeRoom, and VR input advances into
+the next helicopter scene (`20261111T194752680054Z`). Reuse this retained bookmark
+via [PROLOGUE_BOOKMARKS.md](PROLOGUE_BOOKMARKS.md); do not replay avatar creation
+or the opening to re-establish the same test point. It restores a native section,
+not the live mid-rail capture position. Later hospital sections, exact-position
+support and a user-facing VR bookmark flow remain required.
+
 User requires resume after closing/restarting, plus quick return to a defect's
 test situation. Private native checkpoint-file proof restored one free-roam
 location after a real process restart (`20261111T184636809945Z`) and accepted
@@ -11,10 +20,11 @@ field staging or describe it as an implemented general save system.
 Next implementation is a transactional named-bookmark save/load flow with native
 eligibility, account/build identity, durable backup, read/version validation,
 failure rollback and retained VR selection. Stock Continue routes free-roam to
-ACC; explicit mission restore is necessary. Prologue needs sequence-specific
-investigation: its early backup replayed the opening, and CanSaveAsCheckPoint was
-true inside a non-playable cinematic. Do not enable arbitrary hospital saves
-from that flag. Quest/enemy/task progress, ordinary long missions, physical Quest
+ACC; explicit mission restore is necessary. The earlier hospital timeout stopped
+at its special title before Continue; it did not establish a lost checkpoint.
+CanSaveAsCheckPoint was true inside a non-playable cinematic, but false during
+the tested playable rails. Do not enable arbitrary hospital saves from that flag.
+Quest/enemy/task progress, ordinary long missions, physical Quest
 and PC reboot remain unproven. Original campaign/settings/runtime were restored.
 
 Prior sight/cockpit code is published in nightly `nightly-2026-11-11-c0c5b13c287a`
